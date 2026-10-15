@@ -51,34 +51,36 @@ function copyButton(text, label) {
   return button;
 }
 
-// `sendAgain()` sends the message once more and resolves once it is on its way; the button waits meanwhile.
-function sendAgainButton(sendAgain) {
+// `editFromHere()` asks whether to rewind the chat to before the message and does what the owner chose (item 282); it
+// resolves once that is done or dropped, and the button waits meanwhile.
+function editFromHereButton(editFromHere) {
   const button = el(
     "button",
     {
       class: "btn ghost sm icon-only",
       type: "button",
-      title: "Send again",
-      "aria-label": "Send again",
+      title: "Edit from here",
+      "aria-label": "Edit from here",
       onclick: () => {
         button.disabled = true;
-        sendAgain().finally(() => {
+        editFromHere().finally(() => {
           button.disabled = false;
         });
       },
     },
-    icon("refresh"),
+    icon("undo"),
   );
   return button;
 }
 
 /**
  * What the user wrote, as a bubble on the right, the files that came with it (`files`, as the timeline has them), and
- * under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `sendAgain` is null, a
- * button that sends it again. The foot shows once the turn has its answer: a run at work keeps it back (`.run-working`,
- * `.turn-working`). The text reads as markdown, as an answer does (item 206).
+ * under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `editFromHere` is null,
+ * Edit from here, which rewinds the chat to before it (item 282, after T3 Code). The foot shows once the turn has its
+ * answer: a run at work keeps it back (`.run-working`, `.turn-working`). The text reads as markdown, as an answer does
+ * (item 206).
  */
-export function userMessage({ text, sentAt, files, sendAgain }) {
+export function userMessage({ text, sentAt, files, editFromHere }) {
   return el(
     "div",
     { class: "user-message" },
@@ -89,7 +91,7 @@ export function userMessage({ text, sentAt, files, sendAgain }) {
       { class: "message-foot" },
       stamp(sentAt, dateTimeFull(sentAt)),
       copyButton(text, "Copy the message"),
-      sendAgain === null ? null : sendAgainButton(sendAgain),
+      editFromHere === null ? null : editFromHereButton(editFromHere),
     ),
   );
 }

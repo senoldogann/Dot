@@ -257,6 +257,16 @@ async def message_with_attachments(
     return user_message(f"{content}\n{described}", ())
 
 
+class AttachedFile(FrozenModel):
+    """An attachment of a message as ``attachment_summary`` tells it: what the timeline shows of it, and what a composer
+    takes back with the message (item 282)."""
+
+    id: str
+    name: str
+    kind: AttachmentKind
+    size: int
+
+
 def attachment_summary(files: Sequence[StoredAttachment]) -> list[JsonValue]:
     """What the timeline shows of the attachments of a message."""
     return [{"id": file.id, "name": file.name, "kind": file.kind, "size": file.size} for file in files]

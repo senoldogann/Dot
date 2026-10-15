@@ -62,6 +62,36 @@ export function confirmDialog({ title, message, confirmLabel, danger, focusCance
   });
 }
 
+// The look of a choice of `choiceDialog`, by its tone.
+const CHOICE_TONES = { plain: "btn", primary: "btn primary", danger: "btn danger" };
+
+/**
+ * A dialog that offers `choices` (`{ value, label, tone }`, `tone` one of "plain", "primary" and "danger") after Cancel,
+ * in their order; resolves with the value of the choice pressed, or null when it is cancelled, Escape too. Cancel takes
+ * the focus.
+ */
+export function choiceDialog({ title, message, choices }) {
+  return new Promise((resolve) => {
+    const dialog = el("dialog", { class: "modal" });
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("") }, "Cancel");
+    const buttons = choices.map((choice, index) =>
+      el("button", { class: CHOICE_TONES[choice.tone], type: "button", onclick: () => dialog.close(String(index)) }, choice.label),
+    );
+    dialog.append(
+      el("div", { class: "modal-body" }, el("h3", null, title), el("p", { class: "muted" }, message)),
+      el("div", { class: "modal-actions" }, cancel, ...buttons),
+    );
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      const chosen = dialog.returnValue === "" ? undefined : choices[Number(dialog.returnValue)];
+      resolve(chosen === undefined ? null : chosen.value);
+    });
+    document.body.append(dialog);
+    dialog.showModal();
+    cancel.focus();
+  });
+}
+
 /** Show a screenshot at full size until it is clicked or Escape is pressed. */
 export function showImage(url, description) {
   if (viewer === null) {

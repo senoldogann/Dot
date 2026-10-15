@@ -995,7 +995,10 @@ class RunManager:
         """Let a held queue go on: its next message starts now when no run works on the chat, else after that run."""
         await self._runtime.store.release_queue(thread_id)
         await self._queue_changed(thread_id, None, None, None)
-        await self._drain(thread_id, await self._newest_run_id(thread_id))
+        newest_run_id: str | None = await self._newest_run_id(thread_id)
+        # A chat that a rewind emptied holds no queue: a rewind waits for its queue to be sent or taken out.
+        if newest_run_id is not None:
+            await self._drain(thread_id, newest_run_id)
 
     async def decide(self, approval_id: str, approve: bool, source: str, note: str) -> ApprovalRecord:
         """Record the user's decision on an approval or a question (``ApprovalBroker.resolve``); ``source`` is where it
@@ -1042,7 +1045,7 @@ class RunManager:
         """Resume by hand a run that was cut off (:func:`dotagent.agent.resume.cut_off_by`): a new run on its thread goes
         on from where it stopped. Refused unless :meth:`resumable` allows it; any source may be resumed this way."""
         old: RunRecord = await self._runtime.store.get_run(run_id)
-        newest_run_id: str = await self._newest_run_id(old.thread_id)
+        newest_run_id: str | None = await self._newest_run_id(old.thread_id)
         if not can_resume(old, newest_run_id):
             raise RunConflict(
                 "only the newest run of a thread that was cut off, by the daemon or by the end of its dotx command, "
@@ -1242,12 +1245,13 @@ class RunManager:
             raise RunConflict("the run is not active", {"run_id": run_id})
         return handle
 
-    async def _newest_run_id(self, thread_id: str) -> str:
+    async def _newest_run_id(self, thread_id: str) -> str | None:
+        """The newest run still in the chat, ``None`` once a rewind took them all out (item 282)."""
         newest: list[RunRecord] = await self._runtime.store.list_runs(1, thread_id)
-        return newest[0].id
+        return newest[0].id if newest else None
 
     async def _require_newest(self, thread_id: str, run_id: str) -> None:
-        newest_run_id: str = await self._newest_run_id(thread_id)
+        newest_run_id: str | None = await self._newest_run_id(thread_id)
         if newest_run_id != run_id:
             raise RunConflict(
                 "the thread went on after the run to resume", {"run_id": run_id, "newest_run_id": newest_run_id}
@@ -1540,7 +1544,9 @@ class RunManager:
         if opening.resumed is not None:
             return await self._ended_tainted(opening.resumed.from_run_id)
         if source == BACKGROUND_SOURCE:
-            return await self._ended_tainted(await self._newest_run_id(thread_id))
+            # A chat that a rewind emptied cannot say how its last run ended: its notice starts tainted.
+            newest_run_id: str | None = await self._newest_run_id(thread_id)
+            return newest_run_id is None or await self._ended_tainted(newest_run_id)
         for run_id in opening.carried:
             if await self._ended_tainted(run_id):
                 return True
@@ -2005,26 +2011,36 @@ class RunManager:
         self, thread_id: str, started_run_id: str | None, after_run_id: str | None, error: str | None
     ) -> None:
         """Tell the pages that a chat's queue changed, as a live event of its newest run: the run its next message
-        started and the run that ended before it, or why that message could not start."""
+        started and the run that ended before it, or why that message could not start. A chat that a rewind emptied has
+        no page to tell."""
+        newest_run_id: str | None = await self._newest_run_id(thread_id)
+        if newest_run_id is None:
+            return
         await self._runtime.bus.emit(
-            await self._newest_run_id(thread_id),
+            newest_run_id,
             QUEUE_CHANGED_EVENT,
             {"thread_id": thread_id, "started_run_id": started_run_id, "after_run_id": after_run_id, "error": error},
             False,
         )
 
     async def sessions_changed(self, thread_id: str) -> None:
-        """Tell the pages that a chat's terminal sessions changed (item 229), as a live event of its newest run."""
-        await self._runtime.bus.emit(
-            await self._newest_run_id(thread_id), TERMINALS_CHANGED_EVENT, {"thread_id": thread_id}, False
-        )
+        """Tell the pages that a chat's terminal sessions changed (item 229), as a live event of its newest run; a chat
+        that a rewind emptied has no page to tell."""
+        newest_run_id: str | None = await self._newest_run_id(thread_id)
+        if newest_run_id is not None:
+            await self._runtime.bus.emit(newest_run_id, TERMINALS_CHANGED_EVENT, {"thread_id": thread_id}, False)
 
     async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
         """Tell a chat that its command in the background ended (item 229): a message at the end of its queue, with the
         chat's choices and agent, which starts its next run at once when no run works there and the queue is not held,
-        else waits its turn. The message says what Dot saw, and nothing the command printed (:func:`ended_notice`)."""
+        else waits its turn. The message says what Dot saw, and nothing the command printed (:func:`ended_notice`). A
+        chat that a rewind emptied (item 282) is not told: the turn that started the command is gone from it."""
         store: Store = self._runtime.store
-        newest: RunRecord = (await store.list_runs(1, thread_id))[0]
+        runs: list[RunRecord] = await store.list_runs(1, thread_id)
+        if not runs:
+            log.warning("background_command_ended_in_emptied_chat", thread_id=thread_id, session_id=session.id)
+            return
+        newest: RunRecord = runs[0]
         kept: ChatChoices | None = await store.chat_choices(thread_id)
         choices: ChatChoices = (
             kept

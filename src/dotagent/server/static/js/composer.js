@@ -16,6 +16,8 @@ import { clearPref, readPref, writePref } from "./prefs.js";
 import { filterGroups, paletteGroups, replaceSlashWord, slashWord } from "./slash.js";
 
 const DRAFT_PREFIX = "dot.draft.";
+// The draft key of a new chat's composer.
+export const NEW_CHAT_DRAFT = "home";
 
 /** The draft kept under `key` (`{ text, files }`), or null when there is none or it is not one. */
 function readDraft(key) {
@@ -33,6 +35,12 @@ function readDraft(key) {
   }
   clearPref(`${DRAFT_PREFIX}${key}`);
   return null;
+}
+
+/** Keep `draft` (`{ text, files }`) as the draft of the composer of `draftKey`, which takes it up when it is next made:
+ * a message a rewind gave back (item 282). */
+export function keepDraft(draftKey, draft) {
+  writePref(`${DRAFT_PREFIX}${draftKey}`, JSON.stringify(draft));
 }
 
 // The skills and the MCP tools, asked for once per page and kept; a failure is kept too, so the menu says so.

@@ -25,6 +25,7 @@ _RUN: RunRecord = RunRecord(
     goal_mode=True,
     campaign_id=None,
     agent_id=None,
+    rewindable=False,
 )
 
 

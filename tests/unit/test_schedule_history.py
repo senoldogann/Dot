@@ -47,6 +47,7 @@ def _run(run_id: str, status: RunStatus, finished_at: float | None, result: str)
         goal_mode=False,
         campaign_id=None,
         agent_id=None,
+        rewindable=False,
     )
 
 

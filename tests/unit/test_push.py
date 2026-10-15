@@ -45,6 +45,7 @@ def _run(parent: str | None) -> RunRecord:
         goal_mode=False,
         campaign_id=None,
         agent_id=None,
+        rewindable=False,
     )
 
 

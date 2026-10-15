@@ -4,7 +4,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
-from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
+from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile
 from dotagent.agent.lessons import RunLessons
 from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
 from dotagent.connections.catalogue import ConnectionKind
@@ -640,6 +640,26 @@ class RunActions(FrozenModel):
 
 class UndoRequest(FrozenModel):
     path: str = Field(min_length=1, max_length=_TEXT_CHARS)
+
+
+class RewindRequest(FrozenModel):
+    """The owner's answer to Edit from here (item 282): ``revert`` takes back the file changes of the runs taken out of
+    the chat too, ``keep`` leaves the files as they are."""
+
+    files: Literal["revert", "keep"]
+
+
+class RewindView(FrozenModel):
+    """A chat rewound to before one of the owner's messages (item 282): the run it ends with now (``None`` when none is
+    left, and a new chat's composer takes the message), the message's words and attachments for the composer, and the
+    files taken back (``reverted``) and those left as they are, with why (``left``)."""
+
+    thread_id: str
+    back_to: str | None
+    text: str
+    files: list[AttachedFile]
+    reverted: list[FileEdit]
+    left: list[FileEdit]
 
 
 class CampaignSummary(FrozenModel):

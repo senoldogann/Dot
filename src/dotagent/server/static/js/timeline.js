@@ -210,11 +210,10 @@ function buildFlock() {
  * a section missing or a name the conversation never had),
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
- * browser tool call (Dot's computer starts its view on it). `sendAgain(text, files)` sends a message written to the run
- * again with its files (item 205); null where the page sends nothing. `onGoalFiles(files)` takes the files that came
+ * browser tool call (Dot's computer starts its view on it). `onGoalFiles(files)` takes the files that came
  * with the run's goal, to show them under it; null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, sendAgain, onGoalFiles }) {
+export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -943,7 +942,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     steer(scope, record) {
       const files = record.data.files ?? [];
       const text = record.data.text;
-      place(scope, userMessage({ text, sentAt: record.ts, files, sendAgain: sendAgain === null ? null : () => sendAgain(text, files) }), record.ts);
+      place(scope, userMessage({ text, sentAt: record.ts, files, editFromHere: null }), record.ts);
     },
 
     // The files that came with the goal; they sit under the goal's bubble.

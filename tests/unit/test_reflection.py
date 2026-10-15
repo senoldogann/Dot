@@ -60,6 +60,7 @@ def _run(status: RunStatus, mode: str, parent: str | None, source: str) -> RunRe
         goal_mode=False,
         campaign_id=None,
         agent_id=None,
+        rewindable=False,
     )
 
 

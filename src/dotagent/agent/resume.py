@@ -109,9 +109,10 @@ def cut_off_by(run: RunRecord) -> CutOff | None:
             return None
 
 
-def can_resume(run: RunRecord, newest_run_id: str) -> bool:
+def can_resume(run: RunRecord, newest_run_id: str | None) -> bool:
     """Whether ``run`` may be resumed: it was cut off (:func:`cut_off_by`), no other run started it, and it is the
-    newest run of its thread (``newest_run_id``), so nothing went on after it there. A run the owner stopped is never
+    newest run still in its thread (``newest_run_id``, ``None`` once a rewind took them all out), so nothing went on
+    after it there. A run the owner stopped is never
     resumed, nor is a
     session of a campaign: the campaign goes on with its next session, whose brief says that this one was cut off."""
     return (
@@ -127,7 +128,7 @@ def repeatable(call: InterruptedCall) -> bool:
     return call.kind is not None and call.kind in REPEATABLE_KINDS
 
 
-def resumes_on_start(run: RunRecord, newest_run_id: str, calls: Sequence[InterruptedCall]) -> bool:
+def resumes_on_start(run: RunRecord, newest_run_id: str | None, calls: Sequence[InterruptedCall]) -> bool:
     """Whether the daemon resumes ``run`` on its own when it starts: a run of the web UI that may be resumed and whose
     calls that were cut off while they ran only read. A call that finished is reported with its result and one that had
     not started did nothing, so neither counts. A run that the command line, a schedule or an evaluation started waits

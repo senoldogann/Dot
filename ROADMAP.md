@@ -5217,19 +5217,19 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 276 | The view of Dot's computer comes back by itself                                       | done        | f7e09a6 |
 | 277 | Every chat wears a creature, its last message under its name                          | done        | d2476f5 |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | done        | 4f21322 |
-| 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | in progress |         |
+| 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | done        | 8aa45dd |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
-| 282 | A chat can be rewound to an earlier message, its files with it                        | planned     |         |
+| 282 | A chat can be rewound to an earlier message, its files with it                        | in progress |         |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
 | 284 | OpenCode's agent uses Dot's own tools over MCP                                        | planned     |         |
-| 285 | A helper that starts late joins its siblings, and stopped ones stand still            | in progress |         |
-| 286 | The phone comes back quietly, on the chat it was in                                   | in progress |         |
-| 287 | Connect apps' sections give their lines room                                          | in progress |         |
-| 288 | macOS asks for Dot, and a closed Mac app keeps its answer                             | in progress |         |
-| 289 | Connect apps sits under Campaigns; the sidebar has no stop button                     | in progress |         |
-| 290 | DeepSeek V4.1 Flash's reasoning levels are back                                       | in progress |         |
-| 291 | A schedule made in a chat runs as that chat does, and knows five runs                 | in progress |         |
+| 285 | A helper that starts late joins its siblings, and stopped ones stand still            | done        | 8aa45dd |
+| 286 | The phone comes back quietly, on the chat it was in                                   | done        | 8aa45dd |
+| 287 | Connect apps' sections give their lines room                                          | done        | 8aa45dd |
+| 288 | macOS asks for Dot, and a closed Mac app keeps its answer                             | done        | 8aa45dd |
+| 289 | Connect apps sits under Campaigns; the sidebar has no stop button                     | done        | 8aa45dd |
+| 290 | DeepSeek V4.1 Flash's reasoning levels are back                                       | done        | 8aa45dd |
+| 291 | A schedule made in a chat runs as that chat does, and knows five runs                 | done        | 8aa45dd |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12261,7 +12261,7 @@ refused with its guide, a web application signed in and one not.
 
 ### 279. Connect apps: the tools of other services, over MCP, signed in from Dot
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **What.** The same page lists the MCP servers Dot has, with their state and tools, and adds one from a short catalogue of
 services that offer one (Notion, Linear, GitHub, Atlassian, Asana, …) or by its address or command: Dot tries it, and a
@@ -12335,16 +12335,39 @@ and stops when its run says done; Stop ends it.
 
 ### 282. A chat can be rewound to an earlier message, its files with it
 
-**Status: planned.**
+**Status: in progress.** Built on `item-282-rewind`.
 
-**What.** On a message of the owner's, Rewind to here: the changes the later runs made with the file tools are taken
-back (a command's are not, and the step says so), the later turns leave what the model reads and stay greyed in the
-chat, and the message comes back into the box to be changed and sent again.
+**What.** On a message of the owner's that opened a turn, Edit from here, as T3 Code has it (the owner asked for its
+way): a dialog, "Edit from here? Rewind chat to before this message. Your prompt and attachments return to the
+composer.", with Cancel, Revert files too and Revert and keep changes. Either way the turn and the later ones leave the
+chat (their runs stay stored, marked, with what they cost, and the questions they left expire), the history the model
+reads ends where it ended before the message, and the message with its files comes back into the box of the turn
+before it, or of a new chat when none is left. Revert files too also takes back what those runs and their helpers
+changed with the file tools, each file that is as they left it; a file changed since is left and named, and a
+command's changes stay. The chat's OpenCode session is let go, so that its next run there reads the rewound history.
 
-**Why.** The third saying: open to being wrong, with a way back.
+- A run of a chat keeps, as it is made, where its first message goes in the chat's history: the history's version and
+  the place (`runs.history_version`, `runs.history_seq`). A compaction writes the history anew as the next version and
+  keeps aside what came before the latest run of the old one (`message_archive`), so that a rewind across a compaction
+  gives the history back as it was.
+- `POST /api/runs/{id}/rewind` with `files` `revert` or `keep`. The take-back is planned first, so that a journal that
+  cannot be read stops the rewind; a file that cannot be put back afterwards is named with why. Refused for a helper's
+  run, a run from before the places were kept, a run taken out already, a chat with a run at work or messages in its
+  queue, and a chat that changed since its runs were read for the plan. A live `chat_rewound` event has the pages read
+  their lists of chats again.
+- Send again (item 205) gives way to it: the box sends the message again, changed or not.
+- What it costs: the history is written anew whenever a run drops old screenshots or shortens old outputs, not only when
+  it compacts, and each run that does so keeps aside the history before it, with the screenshots that history names.
+  A long chat's share of the database grows with its turns (the owner's largest chat holds 3.4 MB of history over 11
+  turns, which comes to about 20 MB kept aside). Keeping each distinct message once would bring that down.
 
-**Tests.** Unit: what a rewind takes back. Smoke: a chat of three turns rewound to the second; the file of the third as
-before it, the model's next run without the third.
+**Why.** The third saying: open to being wrong, with a way back. The plan had the later turns stay greyed in the chat;
+in T3 Code they leave it, and so they do here.
+
+**Tests.** Smoke, `test_rewind.py`: a chat of three turns rewound from its page to its second message, the files as the
+first turn left them, the second message and its file in the box, the next run without the third; a rewind that keeps
+the changes; one across a compaction; the refusals; the dialog wide and light and on a phone in the dark.
+`test_message_feet.py` follows the new foot.
 
 ### How to start part 49 (the handoff prompt)
 
@@ -12494,7 +12517,7 @@ The batch is built on `item-279-mcp-sign-in` with item 279, and goes in one PR.
 
 ### 285. A helper that starts late joins its siblings, and stopped ones stand still
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The delegate tool's own limit (`_TIMEOUT_S`, an hour, `tools/delegate.py`) stopped helpers that
 worked longer: they ended cancelled, as the sidebar showed. `[agent] parallel_tools = 4` runs four calls of a step at a
@@ -12518,7 +12541,7 @@ of before it fails: the head says "4 helpers" for the 32 s the test waits.
 
 ### 286. The phone comes back quietly, on the chat it was in
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The manifest's `start_url` was `/#/activity` (item 52), so the home-screen app opened on Activity.
 A phone put away leaves the page's streams open and silent; back in view, the lifecycle stream was cut only after
@@ -12543,7 +12566,7 @@ Activity.
 
 ### 287. Connect apps' sections give their lines room
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `static/css/app.css`: a section's line under its head (On this Mac, Your files, On the web)
 had no room above it and sat on the head's line; it has a row's padding now, and a second line follows the first
@@ -12551,7 +12574,7 @@ closely. Screenshots of `tests/smoke/test_connect_apps.py`, wide and light and o
 
 ### 288. macOS asks for Dot, and a closed Mac app keeps its answer
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **What was found.** macOS holds the program launchd starts responsible for all it starts, and the job started the
 virtual environment's Python: `responsibility_get_pid_responsible_for_pid` of the owner's daemon was the daemon itself,
@@ -12584,7 +12607,7 @@ asks whether Dot may use the Desktop folder, where the owner's checkout is.
 
 ### 289. Connect apps sits under Campaigns; the sidebar has no stop button
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `static/js/sidebar.js`: Connect apps is a link of the sidebar's pages after Campaigns, like
 the others; the foot holds Settings alone, without the emergency stop button (a chat's composer has its stop, and
@@ -12595,7 +12618,7 @@ Settings › System and `POST /api/failsafe` the emergency stop). `failsafe.js` 
 
 ### 290. DeepSeek V4.1 Flash's reasoning levels are back
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **What was found.** Item 258 (`3118d17`) took the levels off OpenCode Go's DeepSeek models after measuring that the
 chat route did not honour them (the reasoning tokens of one prompt were the same at low, high, max and a made-up
@@ -12607,7 +12630,7 @@ OpenCode's own client sends them; the other DeepSeek models offer none. README: 
 
 ### 291. A schedule made in a chat runs as that chat does, and knows five runs
 
-**Status: in progress.** Built on `item-279-mcp-sign-in`.
+**Status: done.** Merged as `8aa45dd` (PR #322; no Linear issue, the Linear connector was signed out).
 
 **What was found.** `schedule_create` made a schedule with the defaults: a new chat each time, the default model, the
 approvals of the config and no goal mode, whatever the chat it was made in had chosen.
@@ -13339,3 +13362,11 @@ shows Fast. `defaults.toml`: `[scheduler] history_runs = 5`. README: Schedules. 
 - 2026-10-15 (Opus 5.5): item 277 merged as `d2476f5` (PR #319; no Linear issue, the connector was signed out): every chat in the sidebar wears a creature of the character engine (an agent's look, or a look its id picks for a chat with Dot, 64 looks), in the state of its latest run, with its name over its last line in plain words ("You:" before the owner's message while the run works) and its age over the unread dot at its right; creatures kept between paints (200 drawn in 82 ms); test_chat_creatures.py (new) in Chrome and WebKit; full offline smoke 572 passed, 1 timing failure under load that passes 3 of 3 alone
 - 2026-10-15 (Opus 5.5): item 278 merged as `4f21322` (PR #320; no Linear issue, the connector was signed out): the sidebar's Connect apps pill opens a page that shows where each application of the Mac and of the web stands, asks macOS for Automation, opens the right pane of System Settings under a line that says what to switch on there, finds OneDrive's synced folders and the web applications Dot's browser is signed in to, and says once how a browser without a window signs in
 - 2026-10-15 (Opus 5.5): item 283 merged as `aeee10b` (PR #321; no Linear issue, the connector was signed out): a run on one of zen's free models goes whole to opencode's own agent, in an opencode server dot starts in its own folders with none of the owner's setup and stops when idle; each action the agent takes is asked of dot's policy first, its steps, tool calls and tokens show in the run's timeline, a chat keeps its session, a message reaches the agent at work and stop stops it with its question decided; the picker marks the free models whose providers may learn from what they get
+- 2026-10-15 (Opus 5.5): item 279 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): Connect apps adds the tools of other services over MCP, from a catalogue or any URL or command line; a server that asks for OAuth signs in from Dot's page (dynamic client registration, no client secret, the tokens kept and renewed), and added servers connect without a restart.
+- 2026-10-15 (Opus 5.5): item 285 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): a helper that starts late (a fifth delegate waiting for one of four slots) joins its siblings' card, and the card settles from the run's children when helpers start or end and when the stream comes back, so stopped helpers stand still and the count is right.
+- 2026-10-15 (Opus 5.5): item 286 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): the home-screen app opens on the chat it was on, or New chat, instead of Activity; back in view, a stream silent for 20 s is followed again at once, breaks under 2 s are not shown, and for 10 s a read that cannot reach the daemon is tried again quietly.
+- 2026-10-15 (Opus 5.5): item 287 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): the line under each of Connect apps' section heads has a row's padding.
+- 2026-10-15 (Opus 5.5): item 288 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): dotx service install builds Dot.app, a small launcher compiled and signed ad hoc on the Mac and rebuilt only when its source or Info.plist change, so that macOS asks for Dot and keeps what it granted when Python changes; Connect apps keeps the last answer per program and application while the application is closed, and the permission lines name the program macOS holds responsible.
+- 2026-10-15 (Opus 5.5): item 289 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): Connect apps sits under Campaigns in the sidebar, and the sidebar has no emergency stop; it stays in Settings › System and POST /api/failsafe.
+- 2026-10-15 (Opus 5.5): item 290 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): DeepSeek V4.1 Flash offers low, high and max again on OpenCode Go, at the owner's choice.
+- 2026-10-15 (Opus 5.5): item 291 merged as `8aa45dd` (PR #322; no Linear issue, the connector was signed out): a schedule made in a chat keeps the chat's model, level, speed, approvals, goal mode, mode and chat, stores its speed, and reads five runs back by default.
