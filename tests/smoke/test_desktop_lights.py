@@ -139,12 +139,13 @@ async def test_in_the_desktop_shell_the_bars_stand_on_the_line_of_the_lights(
             await _on_line(page.locator(".stagebar-row"), LIGHTS_Y)
             await page.screenshot(path=str(tmp_path / "lights-1280-docked.png"), animations="disabled")
 
-            # Closed, the top bar's opener takes the button's place, and the emergency stop beside it the same line.
+            # Closed, the top bar's opener takes the button's place, alone: the emergency stop stays in the sidebar
+            # (item 273).
             await hide.click()
             show: Locator = page.get_by_role("button", name="Show sidebar")
             await _on_line(show, LIGHTS_Y)
             assert abs(await _left(show) - hide_left) <= _TOLERANCE_PX
-            await _on_line(page.locator(".stagebar-left").get_by_role("button", name="Emergency stop"), LIGHTS_Y)
+            await expect(page.locator(".stagebar").get_by_role("button", name="Emergency stop")).to_have_count(0)
             await page.screenshot(path=str(tmp_path / "lights-1280-closed.png"), animations="disabled")
             assert errors == []
 

@@ -23,8 +23,8 @@ export async function engageFailsafe() {
   await refresh();
 }
 
-/** The emergency stop's button, a red square whose words are in its tooltip: in the sidebar's foot beside Settings, and
- * beside the button that shows the sidebar while it is closed, so it is never out of reach (item 120). */
+/** The emergency stop's button, a red square whose words are in its tooltip, in the sidebar's foot beside Settings (item
+ * 120); while the sidebar is closed it is a tap away, behind the sidebar's opener (item 273). */
 export function failsafeButton() {
   return el(
     "button",

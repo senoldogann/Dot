@@ -5210,8 +5210,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
 | 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
-| 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | in progress |         |
-| 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | planned     |         |
+| 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
+| 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | in progress |         |
 | 274 | A streamed message is drawn as it will stay                                           | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11965,7 +11965,7 @@ of ten parts:
 
 ### 272. The Settings tabs are one row on a phone, and it stays under the bar
 
-**Status: in progress.** Built on `item-272-settings-tabs-phone`.
+**Status: done.** Merged as `2aa0600` (PR #314; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `settings.css`: where the tabs and the pane do not fit side by side, the strip is one row
 that scrolls sideways, without a scroll bar, and stays under the bar while the page scrolls, over the pane, its ground
@@ -11983,7 +11983,21 @@ pane; at 1680 px a column; once in WebKit). It fails on the code of before (four
 
 ### 273. On a phone the stop stays in the sidebar, the switches match, the level reads
 
-**Status: planned.**
+**Status: in progress.** Built on `item-273-phone-bar-composer`.
+
+**As built (2026-10-15).** `shell.js`: the bar beside a closed sidebar holds its opener alone; the emergency stop stays
+in the sidebar's foot (`failsafe.js`). `inspector.js`: the side panel's switch and the drawer's close are the sidebar's
+buttons (`icon-btn`, 36 px with a 19 px icon), on every width. `app.css`: the reasoning pill keeps its level's word at
+every width of the bar; on a phone, and on any touch screen, the box's text and its copy are at least `--touch-text`
+(16 px; `--composer-leading-ratio` keeps one leading for both) and the bar's buttons 36 px. README: the sidebar's foot,
+the emergency stop and the composer's bar. Tests: `tests/smoke/test_phone_pages.py` (at 390 px light and dark and at
+1280 px: no stop in the bar beside a closed sidebar and one in its foot; the opener, the sidebar's button, the panel's
+switch and, on a phone, the drawer's close all 36 px with a 19 px icon; the level's word in sight, Low and then High
+chosen from its menu; every button inside the bar; the box's text 16 px on a phone and 15 px wide; once in WebKit) and
+`tests/smoke/test_desktop_lights.py` (the closed sidebar's bar holds no stop). They fail on the code of before: the stop
+in the bar; with `app.css` alone as before, the level's word hidden; with `inspector.js` alone, a 32 px switch with a
+15 px icon. `test_composer.py` (the composer's bar 36 px high on a phone, 32 px wide) and `test_run_stop.py` (the stop
+in the sidebar's foot, never in the bar) follow the new sizes and place.
 
 **What.** The bar beside a closed sidebar holds its opener alone: the emergency stop is in the sidebar's foot, a tap
 away. The side panel's switch and its close are the sidebar's size (36 px, a 19 px icon). On a phone the box's text is
@@ -12724,3 +12738,4 @@ while the page follows.
 - 2026-10-15 (Opus 5.5): item 270 merged as `a27c018` (PR #311; no Linear issue, the connector was signed out): browser_eval settles the page after every script, as a step is settled, before the address rules are checked, so that a forbidden page answering after the value came back has the tab reset; after a script still running when its wait ended only a navigation under way is let commit, so a busy script no longer holds the call; full offline smoke on the stack top 565 passed.
 - 2026-10-15 (Opus 5.5): item 269 merged as `c4da0ed` (PR #312; no Linear issue, the connector was signed out): a text of 2,000 characters or 40 lines pasted into a message box goes as pasted-text-<time>.md when it reads as Markdown, else .txt, with a pencil that puts it back as text; a chip opens its file beside a conversation or in a dialog elsewhere, a Markdown file formatted with its source a click away; a send with only files asks for words, and a listed file keeps the send from turning into the Stop of a working run.
 - 2026-10-15 (Opus 5.5): item 267 merged as `a8c5cb0` (PR #313; no Linear issue, the connector was signed out): Settings › Phone gives a one-time pairing code (eight characters of Crockford's base32, ten minutes, five tries) that the sign-in screen of an app added to a phone's home screen trades for the token over the one public route besides the health check and the proof; only what can be a code is sent, so a token pasted into the code's field stays on the phone; neither the code nor the token is logged.
+- 2026-10-15 (Opus 5.5): item 272 merged as `2aa0600` (PR #314; no Linear issue, the connector was signed out): where the Settings tabs and the pane do not fit side by side, the tabs are one row that scrolls sideways with the open tab brought into sight and its edge fading while more lie beyond, and the row stays under the bar while the page scrolls; side by side they stay a column.

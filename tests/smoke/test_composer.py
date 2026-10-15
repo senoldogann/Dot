@@ -309,14 +309,18 @@ _BAR: str = """(() => {
     });
   return { top: bar.top, bottom: bar.bottom, right: bar.right, parts };
 })()"""
+# The bar is as tall as its pills; on a phone they are sized for a finger (item 273).
+_BAR_PX: int = 32
+_PHONE_BAR_PX: int = 36
+_PHONE_PX: int = 720
 
 
 async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
     runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
-    """Item 115: with every pill out (an agent, a model with reasoning levels, YOLO), the bar is one line 32 px high at
-    1280, 800, 560 and 390 px, nothing past its right edge; the mode's name folds to its icon on a short bar, and YOLO
-    wears no fill."""
+    """Item 115: with every pill out (an agent, a model with reasoning levels, YOLO), the bar is one line at 1280, 800,
+    560 and 390 px, as tall as its pills (32 px, and 36 px on a phone, item 273), nothing past its right edge; the mode's
+    name folds to its icon on a short bar, and YOLO wears no fill."""
     made: httpx.Response = await client.post(
         "/api/agents",
         json={
@@ -358,7 +362,7 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                     isinstance(top, float | int) and isinstance(bottom, float | int) and isinstance(right, float | int)
                 )
                 assert isinstance(parts, list) and len(parts) == 7, (width, bar)
-                assert round(bottom - top) == 32, (width, bar)
+                assert round(bottom - top) == (_PHONE_BAR_PX if width <= _PHONE_PX else _BAR_PX), (width, bar)
                 middles: list[float] = [float(part[1]) for part in parts]
                 assert max(middles) - min(middles) <= 1, (width, bar)
                 assert all(float(part[2]) <= right + 0.5 for part in parts), (width, bar)

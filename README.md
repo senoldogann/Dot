@@ -829,8 +829,8 @@ or your own words. The run reads which option you chose, and whether it was the 
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 
-- the **Emergency stop** button of the web UI (the red square in the sidebar's foot beside Settings, or beside the
-  button that shows the sidebar while it is closed; or `POST /api/failsafe`) creates the `STOP` file in the home
+- the **Emergency stop** button of the web UI (the red square in the sidebar's foot beside Settings, a tap away behind
+  the sidebar's opener while it is closed; or `POST /api/failsafe`) creates the `STOP` file in the home
   directory and ends every run as an emergency stop, a run that was starting at that moment too (a campaign whose
   session it ends stops too); the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
@@ -1212,8 +1212,9 @@ campaign (which works in a thread of its own). A chat whose run waits for you ke
 days, and what it asks stands under **Waiting for you**. Working counts what it lists, and Activity the runs that work,
 which it shows under the run too. Folded, Working keeps the open chat in sight, and the search finds the chats at work
 too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity**
-and **Campaigns**; in the foot, **Settings** and the red square of the **Emergency stop** (which comes along beside the
-button that shows the sidebar while the sidebar is closed). The top bar shows only what needs you: the approvals
+and **Campaigns**; in the foot, **Settings** and the red square of the **Emergency stop**, which stays there while the
+sidebar is closed (item 273): the top bar then holds the sidebar's opener alone, the size of the sidebar's own buttons
+and of the side panel's switch and close. The top bar shows only what needs you: the approvals
 waiting, and the connection to the daemon while it is being made or lost; what works stands under Working. The sections
 (Waiting for you, Working, Chats) fold on a click of their label, and the folds are kept between visits. The sidebar's
 head holds only the button that folds it away. **Select** turns the list into checkboxes: tick chats (or Select all) and
@@ -1282,9 +1283,10 @@ one picked), **Reasoning** (a brain and the level, only for a model that offers 
 and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill always
 shows, the Goal mode switch and Keep going, see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in
 the warn ink, on no fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no
-ground until the pointer is over it; as the frame narrows the names of the mode and of the reasoning fold to their
-icons, then the chevrons and the agent's name go and the model's name gives way with an ellipsis, so on a phone the bar
-is still one line. While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a
+ground until the pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the
+agent's name go and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273),
+so on a phone the bar is still one line. On a phone, and on any touch screen, the box's text is at least 16 px, as iOS
+zooms the page into a box whose text is smaller, and the bar's buttons are 36 px. While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a
 pick or Escape or a click outside closes it. The model's menu (item 208, after T3 Code's) has a rail on its left, a star
 for the favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the
 models of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model

@@ -55,7 +55,7 @@ export function createInspector({ layout, tabs, screensIn }) {
   }).element;
   const closeButton = el(
     "button",
-    { class: "btn ghost sm icon-only inspector-close", type: "button", title: "Close", "aria-label": "Close the details", onclick: () => setDrawer(false) },
+    { class: "icon-btn inspector-close", type: "button", title: "Close", "aria-label": "Close the details", onclick: () => setDrawer(false) },
     icon("x"),
   );
 
@@ -147,7 +147,7 @@ export function createInspector({ layout, tabs, screensIn }) {
   const scrim = el("div", { class: "inspector-scrim", hidden: true, onclick: () => setDrawer(false) });
   const toggle = el(
     "button",
-    { class: "btn ghost sm icon-only", type: "button", title: "Show the details", "aria-label": "Run details", "aria-pressed": "false" },
+    { class: "icon-btn", type: "button", title: "Show the details", "aria-label": "Run details", "aria-pressed": "false" },
     icon("panelRight"),
   );
 
