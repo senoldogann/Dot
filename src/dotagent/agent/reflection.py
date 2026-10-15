@@ -207,6 +207,7 @@ def stored_case(run: RunRecord, events: Sequence[EventRecord]) -> LessonCase:
     return LessonCase(
         run_id=run.id,
         thread_id=run.thread_id,
+        model=run.model,
         goal=run.goal,
         digest=digest_of(run.goal, results, run.status, run.result),
         failures=failures,
@@ -418,9 +419,11 @@ async def _describe_owner(runtime: Runtime, runs: Sequence[RunRecord], now: floa
     notes and the goals of ``runs``; the owner's lines are kept as they are. Returns whether the lines changed."""
     before: OwnerSection = await owner_section(runtime.store)
     notes: list[MemoryRecord] = await runtime.store.user_memories(_OWNER_NOTES)
+    latest: RunRecord = max(runs, key=lambda run: run.finished_at or 0.0)
     writer: OwnerWriter = owner_writer_for(
         runtime.router,
         runtime.roles.review(),
+        (latest.model,),
         runtime.config.agent.model_call_timeout_s,
         f"reflection:{int(now)}:owner",
     )

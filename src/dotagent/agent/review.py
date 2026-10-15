@@ -17,7 +17,7 @@ with a code that changes with every question, and the prompts say that it is dat
 import asyncio
 import secrets
 from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Annotated, Literal
 
 from pydantic import Field, StringConstraints, ValidationError
@@ -701,6 +701,36 @@ async def _decide[V: FrozenModel](question: _Question[V]) -> V:
     return await _decide_checked(question, _as_is)
 
 
+async def _decide_passing_on[V: FrozenModel](question: _Question[V], others: tuple[str, ...]) -> V:
+    """Ask as :func:`_decide` does; a question the review model declines (item 225) goes to each of ``others`` that is
+    another model, in turn, until one answers (item 249). Any other failure is raised as it comes; a question that
+    every model declines raises a refusal that names them all."""
+    try:
+        return await _decide(question)
+    except ProviderRefusedError as refused:
+        first: ProviderRefusedError = refused
+    declined: list[str] = [question.review_model]
+    for other in others:
+        if other in declined:
+            continue
+        log.warning(
+            "review_declined_passed_on",
+            purpose=question.origin.purpose,
+            run_id=question.origin.run_id,
+            declined=declined[-1],
+            to=other,
+        )
+        try:
+            return await _decide(replace(question, review_model=other))
+        except ProviderRefusedError:
+            declined.append(other)
+    if len(declined) == 1:
+        raise first
+    raise ProviderRefusedError(
+        f"{first.message}; {', '.join(declined[1:])} declined it too", {**first.context, "declined": list(declined)}
+    ) from first
+
+
 async def _decide_checked[V: FrozenModel, R](question: _Question[V], check: Callable[[V], R]) -> R:
     """Ask until a valid verdict comes back that ``check`` turns into the answer (it raises a
     :class:`ProviderProtocolError` for a verdict it cannot use, which is asked for again); the last attempt's error is
@@ -794,10 +824,16 @@ def progress_consultant_for(
 
 
 def lesson_writer_for(
-    router: ModelRouter, review_model: str, timeout_s: float, session_key: str, run_id: str | None
+    router: ModelRouter,
+    review_model: str,
+    others: tuple[str, ...],
+    timeout_s: float,
+    session_key: str,
+    run_id: str | None,
 ) -> LessonWriter:
     """A lesson writer for the run ``run_id`` (``None`` outside any run: its calls are only logged) that asks
-    ``review_model``; the model reference is read when the first question comes."""
+    ``review_model``, and ``others`` in turn when it declines (item 249); the model reference is read when the first
+    question comes."""
 
     async def write(request: LessonRequest) -> LessonProposal:
         nonce: str = secrets.token_hex(6)
@@ -812,7 +848,7 @@ def lesson_writer_for(
             tool=_LESSONS_SPEC,
             verdict_type=LessonProposal,
         )
-        return await _decide(question)
+        return await _decide_passing_on(question, others)
 
     return write
 
@@ -822,8 +858,11 @@ OwnerWriter = Callable[[OwnerRequest], Awaitable[OwnerDraft]]
 RuleDrafter = Callable[[RuleWordsRequest], Awaitable[DraftedRule]]
 
 
-def owner_writer_for(router: ModelRouter, review_model: str, timeout_s: float, session_key: str) -> OwnerWriter:
-    """The writer of the owner section, outside any run (its calls are only logged), asking ``review_model``."""
+def owner_writer_for(
+    router: ModelRouter, review_model: str, others: tuple[str, ...], timeout_s: float, session_key: str
+) -> OwnerWriter:
+    """The writer of the owner section, outside any run (its calls are only logged), asking ``review_model``, and
+    ``others`` in turn when it declines (item 249)."""
 
     async def write(request: OwnerRequest) -> OwnerDraft:
         nonce: str = secrets.token_hex(6)
@@ -838,7 +877,7 @@ def owner_writer_for(router: ModelRouter, review_model: str, timeout_s: float, s
             tool=_OWNER_SPEC,
             verdict_type=OwnerDraft,
         )
-        return await _decide(question)
+        return await _decide_passing_on(question, others)
 
     return write
 
@@ -884,10 +923,15 @@ def rule_drafter_for(router: ModelRouter, review_model: str, timeout_s: float, s
 
 
 def playbook_writer_for(
-    router: ModelRouter, review_model: str, timeout_s: float, session_key: str, run_id: str | None
+    router: ModelRouter,
+    review_model: str,
+    others: tuple[str, ...],
+    timeout_s: float,
+    session_key: str,
+    run_id: str | None,
 ) -> PlaybookWriter:
-    """A playbook writer for the run ``run_id`` that asks ``review_model``; the model reference is read when the
-    first question comes."""
+    """A playbook writer for the run ``run_id`` that asks ``review_model``, and ``others`` in turn when it declines
+    (item 249); the model reference is read when the first question comes."""
 
     async def write(request: PlaybookRequest) -> PlaybookDraft:
         nonce: str = secrets.token_hex(6)
@@ -902,7 +946,7 @@ def playbook_writer_for(
             tool=_PLAYBOOK_SPEC,
             verdict_type=PlaybookDraft,
         )
-        return await _decide(question)
+        return await _decide_passing_on(question, others)
 
     return write
 

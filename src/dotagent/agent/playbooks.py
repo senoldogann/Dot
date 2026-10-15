@@ -520,6 +520,7 @@ async def _write_from(
     writer: PlaybookWriter = playbook_writer_for(
         runtime.router,
         runtime.roles.review(),
+        (run.model,),
         runtime.config.agent.model_call_timeout_s,
         f"{run.thread_id}:playbook",
         run.id,

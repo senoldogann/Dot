@@ -49,6 +49,7 @@ def _case(failures: tuple[CallFact, ...], resolved: tuple[CallFact, ...]) -> Les
     return LessonCase(
         run_id="run-1",
         thread_id="thread-1",
+        model="ollama:scripted",
         goal=GOAL,
         digest="",
         failures=failures,

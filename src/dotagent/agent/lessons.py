@@ -79,6 +79,8 @@ class LessonCase(FrozenModel):
 
     run_id: str
     thread_id: str
+    # The model the run worked on last, which a question the review model declines goes to (item 249).
+    model: str
     goal: str
     digest: str
     failures: tuple[CallFact, ...]
@@ -269,6 +271,7 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     writer: LessonWriter = lesson_writer_for(
         runtime.router,
         runtime.roles.review(),
+        (case.model,),
         runtime.config.agent.model_call_timeout_s,
         f"{case.thread_id}:lessons",
         case.run_id,
