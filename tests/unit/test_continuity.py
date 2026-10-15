@@ -9,6 +9,7 @@ from dotagent.agent.continuity import (
     continuity_note,
     history_text,
     mechanical_summary,
+    missing_sections,
     new_ledger,
     reminder_note,
     render_pinned,
@@ -322,3 +323,21 @@ def test_the_plan_changes_of_one_reply_apply_one_after_another() -> None:
 def test_history_text_holds_tool_arguments() -> None:
     message: Message = user_message("hello", ())
     assert "hello" in history_text([message])
+
+
+@pytest.mark.parametrize(
+    ("summary", "missing"),
+    [
+        # The code review's O9: every section's name is a word of the text, and no line opens one.
+        (
+            "The user wants the state of the report. Next I will check it, which is done, but the goal changed. "
+            "No problems.",
+            ("GOAL", "DONE", "STATE", "PROBLEMS", "NEXT"),
+        ),
+        ("GOAL: x\nDONE: y\nSTATE: z\nDECISIONS: a\nPROBLEMS: none\nNEXT: b", ()),
+        ("## Goal\nx\n**DONE**: y\n- STATE (open): z\n1. PROBLEMS — none\n### NEXT\nb", ()),
+        ("Goal achieved.\nDone with it\nSTATE: z", ("GOAL", "DONE", "PROBLEMS", "NEXT")),
+    ],
+)
+def test_a_section_counts_only_where_a_line_opens_it(summary: str, missing: tuple[str, ...]) -> None:
+    assert missing_sections(summary) == missing

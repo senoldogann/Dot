@@ -166,10 +166,20 @@ def summary_part(text: str) -> str:
     return body.split("\n## Consistency check", 1)[0].strip()
 
 
+def _heading(section: str) -> re.Pattern[str]:
+    """Where ``section`` opens: its name at the start of a line, after marks of Markdown or a number, before a colon,
+    a dash, a bracket or the line's end (``GOAL:``, ``## Done``, ``**STATE** -``, ``1. NEXT``), or its name in capitals
+    and a colon anywhere (``GOAL: x. DONE: y``)."""
+    return re.compile(rf"^\W*(?:\d+[.)]\s*)?\W*(?i:{section})\W*?(?:[:\-–—(]|$)|\b{section}\s*:", re.MULTILINE)
+
+
+_HEADINGS: tuple[tuple[str, re.Pattern[str]], ...] = tuple((section, _heading(section)) for section in SUMMARY_SECTIONS)
+
+
 def missing_sections(summary: str) -> tuple[str, ...]:
-    """The required headings ``summary`` lacks."""
-    upper: str = summary.upper()
-    return tuple(section for section in SUMMARY_SECTIONS if section not in upper)
+    """The required headings ``summary`` lacks: a section counts only where a line opens it, not where its name is
+    a word of the text ("the state of the report")."""
+    return tuple(section for section, heading in _HEADINGS if heading.search(summary) is None)
 
 
 def spellings(name: str, home: str) -> tuple[str, ...]:
