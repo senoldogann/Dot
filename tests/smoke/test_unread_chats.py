@@ -152,7 +152,7 @@ async def test_a_chat_whose_run_ends_out_of_sight_is_unread_until_it_is_opened(
             # The run ended while no page showed its chat: the chat is unread, an accent dot that says so.
             photos: Locator = _row(page, PHOTOS)
             photos_link: Locator = photos.locator("a.side-run")
-            photos_dot: Locator = photos.locator(".status-dot.unread")
+            photos_dot: Locator = photos.locator(".side-unread")
             await expect(photos_dot).to_have_count(1)
             await expect(photos_dot).not_to_have_css("background-color", "rgba(0, 0, 0, 0)")
             await expect(photos_link).to_have_attribute("aria-label", f"{PHOTOS} (unread)")
@@ -173,7 +173,7 @@ async def test_a_chat_whose_run_ends_out_of_sight_is_unread_until_it_is_opened(
             # A run that ends in another chat while this one is open leaves that chat unread.
             folders_run: RunRecord = await _ended(manager, FOLDERS, None)
             folders: Locator = _row(page, FOLDERS)
-            folders_dot: Locator = folders.locator(".status-dot.unread")
+            folders_dot: Locator = folders.locator(".side-unread")
             await expect(folders_dot).to_have_count(1)
             await expect(photos_dot).to_have_count(0)
             await page.screenshot(path=str(tmp_path / "unread-1280-light.png"), animations="disabled")

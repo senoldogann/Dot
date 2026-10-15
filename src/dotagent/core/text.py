@@ -40,6 +40,16 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:password|passwd))(\"?\s*[:=]\s*\"?)[^\s\"',}]+"),
 )
 
+# The marks of Markdown a plain line leaves out (``plain_line``): a fence's line whole; a heading's, a quote's and a list
+# item's mark at the start of a line; bold, strike and code marks anywhere. A link or an image keeps its words.
+_FENCE_LINE: re.Pattern[str] = re.compile(r"^[ \t]*(?:```|~~~).*$", re.MULTILINE)
+_LINE_MARK: re.Pattern[str] = re.compile(
+    r"^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+(?:\[[ xX]\][ \t]+)?|\d{1,3}[.)][ \t]+)", re.MULTILINE
+)
+_INLINE_MARK: re.Pattern[str] = re.compile(r"\*\*|__|~~|`")
+_LINK: re.Pattern[str] = re.compile(r"!?\[([^\]]*)\]\([^)\s]*\)")
+_SPACES: re.Pattern[str] = re.compile(r"\s+")
+
 _BLOB_THRESHOLD: int = 400
 _WINDOW_SLACK: float = 0.8  # a window ends at a line or word break found in its last fifth
 # A cheap overestimate of how many characters one token holds, for budgets estimated before a provider counts.
@@ -88,6 +98,13 @@ def truncate_tail(text: str, max_chars: int) -> str:
     if len(text) <= max_chars:
         return text
     return f"{text[:max_chars]}\n...[{len(text) - max_chars} more chars]"
+
+
+def plain_line(text: str, max_chars: int) -> str:
+    """``text`` as one line of plain words for a list (item 277): the marks of Markdown left out, its lines and spaces
+    run together, at most ``max_chars`` characters."""
+    unmarked: str = _LINE_MARK.sub("", _LINK.sub(r"\1", _FENCE_LINE.sub("", text)))
+    return _SPACES.sub(" ", _INLINE_MARK.sub("", unmarked)).strip()[:max_chars]
 
 
 def redact_secrets(text: str) -> str:

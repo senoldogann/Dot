@@ -5215,7 +5215,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
 | 275 | On a phone the page fits the screen and holds still                                   | done        | d332e29 |
 | 276 | The view of Dot's computer comes back by itself                                       | in progress |         |
-| 277 | Every chat wears a creature, its last message under its name                          | planned     |         |
+| 277 | Every chat wears a creature, its last message under its name                          | in progress |         |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
@@ -12175,7 +12175,28 @@ stream the daemon refuses (the run is gone, the token is wrong) ends as today.
 
 ### 277. Every chat wears a creature, its last message under its name
 
-**Status: planned.**
+**Status: in progress.** Built on `item-277-chat-creatures`.
+
+**As built (2026-10-15).** `store/models.py`: `ThreadSummary` carries `actor_id` (the agent of the latest run, else the
+campaign it is a session of; `None` for Dot), `last_message` and `last_role`. `store/db.py`: the list reads the latest
+run's agent, campaign, message and answer (the first 1,000 characters of each, from the latest run alone) and the
+summary takes the answer, else the message, through `core/text.py`'s `plain_line` (the marks of Markdown left out, the
+lines run together, 160 characters). `hues.js`: `chatLook` picks a chat's shape and colour from its id's hash apart, so
+64 looks instead of the ring's 8. `sidebar.js`: every chat's row is its creature (`actorFace` in the state `faceState`
+gives its latest run), its name over its last line ("You:" before the owner's message), and at its right its age or its
+working time over the accent dot of an unread chat (`.side-unread`, in the status dot's place before); the rows of
+Select carry the same creature and lines, so the list keeps its place when the choosing ends. A chat's creature is kept
+from one painting of the list to the next while its look and state hold: drawing 200 creatures took 82 ms, and 181 ms
+with the processor slowed 4 times (`face_cost` probe), at every run that starts or ends. `shell.css`: the 32 px creature,
+the bold name, the muted last line; a resting creature does not breathe in the list. README: the sidebar, the unread
+dot, `GET /threads`. Tests: `tests/smoke/test_chat_creatures.py` (new): wide and light, on a phone and dark, and once in
+WebKit, five chats wear five creatures, the two with Dot the looks their ids give, the one with an agent the agent's;
+the one at work wears the working state and the failed one the failed state; the answer in plain words and "You:" with
+the message of the run at work under the names; the unread chat's dot at its right under its age, none on a chat seen.
+It fails on the code of before (no creature in a chat's row). `tests/unit/test_store_threads.py`: the last line and the
+face of a chat with Dot and of one with an agent; `tests/unit/test_actors.py`: `chatLook` against the Python mirror of
+the hash. `test_unread_chats.py`, `test_side_working.py` and `test_working_rows.py` look for the unread dot and the
+waiting creature where the status dot was.
 
 **What.** A chat in the sidebar shows a creature of the character engine: the agent's look for a chat with an agent, a
 look of its own for one with Dot (a shape and a colour from its id); its name; its last message in one grey line under

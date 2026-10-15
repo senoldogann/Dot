@@ -27,7 +27,7 @@ from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict, 
 from dotagent.core.ids import new_id
 from dotagent.core.jsonutil import dumps_compact, parse_json_object, parse_json_value
 from dotagent.core.logs import get_logger
-from dotagent.core.text import fold_search
+from dotagent.core.text import fold_search, plain_line
 from dotagent.core.types import JsonArray, JsonObject
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
@@ -184,6 +184,10 @@ _RECENT_IMAGE_S: float = 60.0
 # The random bytes of a shown page's id. The id is all that serves the page (``GET /pages/<id>``), so it is too
 # long to guess, as the API's token is.
 _PAGE_ID_BYTES: int = 18
+# A chat's last line in the sidebar (item 277): how many characters it keeps, and how many of the latest run's message
+# and answer are read for it (a fence or a heading at the start of an answer takes some of them).
+_LAST_MESSAGE_CHARS: int = 160
+_LAST_MESSAGE_READ_CHARS: int = 1000
 
 
 def _prepare_dirs(database: Path, image_dir: Path) -> None:
@@ -337,6 +341,7 @@ def _thread(row: aiosqlite.Row) -> ThreadRecord:
 
 
 def _summary(row: aiosqlite.Row) -> ThreadSummary:
+    answer: str = plain_line(row["latest_result"], _LAST_MESSAGE_CHARS)
     return ThreadSummary(
         id=row["id"],
         title=row["title"],
@@ -350,6 +355,9 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
         latest_mode=row["latest_mode"],
         latest_created_at=row["latest_created_at"],
         unread=bool(row["unread"]),
+        actor_id=row["actor_id"],
+        last_message=answer if answer != "" else plain_line(row["latest_goal"], _LAST_MESSAGE_CHARS),
+        last_role="assistant" if answer != "" else "user",
     )
 
 
@@ -917,10 +925,13 @@ class Store:
             " SELECT t.id, t.title, t.source, t.created_at, MAX(t.updated_at, r.created_at) AS updated_at,"
             "  t.pinned_at, r.run_count, r.id AS latest_run_id, r.status AS latest_status, r.mode AS latest_mode,"
             "  r.created_at AS latest_created_at,"
-            "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread"
+            "  r.finished_at IS NOT NULL AND (t.seen_at IS NULL OR r.finished_at > t.seen_at) AS unread,"
+            "  COALESCE(latest.agent_id, latest.campaign_id) AS actor_id,"
+            "  substr(latest.goal, 1, ?) AS latest_goal, substr(latest.result, 1, ?) AS latest_result"
             " FROM threads AS t JOIN ranked AS r ON r.thread_id = t.id AND r.place = 1"
+            " JOIN runs AS latest ON latest.id = r.id"
             " ORDER BY t.pinned_at IS NULL, t.pinned_at DESC, updated_at DESC LIMIT ?",
-            (limit,),
+            (_LAST_MESSAGE_READ_CHARS, _LAST_MESSAGE_READ_CHARS, limit),
         )
         return [_summary(row) for row in rows]
 

@@ -26,3 +26,10 @@ export function hueOf(id) {
 export function hueLook(hue) {
   return { shape: SHAPE_IDS[hue], expression: "neutral", colour: HUE_COLOURS[hue] };
 }
+
+/** The look of a chat with Dot (item 277): a shape and a colour of the ring, each picked from its id's hash on its own,
+ * so that the creatures of the chats differ more than the eight hues do. */
+export function chatLook(id) {
+  const hash = hashId(id);
+  return { shape: SHAPE_IDS[hash % HUES], expression: "neutral", colour: HUE_COLOURS[Math.floor(hash / HUES) % HUES] };
+}

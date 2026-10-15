@@ -185,12 +185,13 @@ async def test_a_working_chat_and_the_working_runs_say_working_and_how_long_wide
                 for slot in await section.locator(".side-working").all():
                     await expect(slot).to_have_text(_WORKING)
                     await expect(slot.locator("svg[data-icon='circleDashed']")).to_have_count(1)
-                # The chat at work says so in its age's place; the one that waits keeps its dot and age among the days.
+                # The chat at work says so in its age's place; the one that waits keeps its age among the days, its
+                # creature waiting.
                 busy: Locator = section.locator(f".side-chat a.side-run[href='#/runs/{working.id}']")
                 await expect(busy.locator(".side-working")).to_have_text(_WORKING)
                 await expect(busy.locator(".side-age")).to_have_count(0)
                 waiting: Locator = sidebar.locator(f".side-runs a.side-run[href='#/runs/{asking.id}']")
-                await expect(waiting.locator(".status-dot.s-blocked")).to_have_count(1)
+                await expect(waiting.locator(".avatar[data-state='waiting']")).to_have_count(1)
                 await expect(waiting.locator(".side-age")).to_have_count(1)
                 await expect(waiting.locator(".side-working")).to_have_count(0)
                 if index == 0:
