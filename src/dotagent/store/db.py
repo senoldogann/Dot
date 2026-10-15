@@ -1207,8 +1207,9 @@ class Store:
         runs holds them. The history the model reads ends where it ended before the run: cut back, or, when it was
         written anew since, made of what was kept aside of the version the run started on, as a new version. What a
         version kept aside after that place goes, and so do the versions after it; the screenshots only they named are
-        left to :meth:`orphan_images`. Refused for a delegated run, for a run from before the places of messages were
-        kept (``InvalidValueError``), for one a rewind took out already and while a run works on the chat
+        left to :meth:`orphan_images`. The questions those runs, or the runs they delegated to, left for the owner wait
+        no more: they expire. Refused for a delegated run, for a run from before the places of messages were kept
+        (``InvalidValueError``), for one a rewind took out already and while a run works on the chat
         (``RunConflict``)."""
 
         async def statements() -> RewindCut:
@@ -1235,9 +1236,15 @@ class Store:
             )
             rewound: tuple[RunRecord, ...] = tuple(_run(item) for item in later)
             now: float = time.time()
+            ids: tuple[str, ...] = tuple(item.id for item in rewound)
+            marks: str = ",".join("?" * len(ids))
+            await self._db.execute(f"UPDATE runs SET rewound_at = ? WHERE id IN ({marks})", (now, *ids))
             await self._db.execute(
-                f"UPDATE runs SET rewound_at = ? WHERE id IN ({','.join('?' * len(rewound))})",
-                (now, *(item.id for item in rewound)),
+                f"WITH RECURSIVE family(id) AS (SELECT id FROM runs WHERE id IN ({marks})"
+                " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
+                " UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
+                " WHERE status = 'left' AND run_id IN (SELECT id FROM family)",
+                (*ids, now, "the chat was rewound to before the run that asked"),
             )
             version: int = int(row["history_version"])
             place: int = int(row["history_seq"])

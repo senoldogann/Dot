@@ -1353,8 +1353,8 @@ turn has its answer, stand the time it was sent (the day too when it was not tod
 rests) and a copy of it as you wrote it (item 205, after T3 Code); the files a message came with stand between it and
 that line. Under a message that opened a turn stands **Edit from here** too (item 282, after T3 Code), which asks whether
 to "rewind chat to before this message". **Revert and keep changes** takes that turn and the ones after it out of the
-chat (they still count in what Dot spent) and ends the history the model reads where it ended before the message, a
-summary made since included; the message comes back into the box of the turn before it with its files, to be changed
+chat (they still count in what Dot spent, and a question they left for you waits no more) and ends the history the model
+reads where it ended before the message, a summary made since included; the message comes back into the box of the turn before it with its files, to be changed
 and sent again, or into a new chat's box when it was the first. **Revert files too** also takes back what those turns,
 and their helpers, changed with the file tools, each file that is as they left it; a file changed since is left and
 named, and what a command changed stays. A message sent before Dot kept the place of each message in its chat has no

@@ -3,8 +3,8 @@ scripted model, is rewound from its page to before its second message. The secon
 files are as the first turn left them (the file the third made is gone, with its folder), the chat's OpenCode session is
 let go, and the second message with its file is back in the composer of the first turn's page; sent from there, the next
 run's history holds no word of the turns taken out. A rewind that keeps the changes leaves the files, and one to a turn
-taken out already is refused. In the store, a rewind across a compaction reads the history kept aside, and a helper's
-run, a run from before the places were kept and a chat at work are refused. The dialog wide and light, and on a phone
+taken out already is refused. In the store, a rewind across a compaction reads the history kept aside, a question a run
+taken out left waits no more, and a helper's run, a run from before the places were kept and a chat at work are refused. The dialog wide and light, and on a phone
 in the dark. A real server and a real headless Chrome; no model service is called."""
 
 import asyncio
@@ -35,7 +35,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.db import Store
-from dotagent.store.models import RewindCut, RunRecord, ThreadRecord, ThreadSummary
+from dotagent.store.models import ApprovalRecord, RewindCut, RunRecord, ThreadRecord, ThreadSummary
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -328,11 +328,13 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
     one: RunRecord = await _store_turn(store, thread.id, ("one", "a1"))
     two: RunRecord = await _store_turn(store, thread.id, ("two", "a2"))
     three: RunRecord = await _store_turn(store, thread.id, ("three", "a3"))
+    left: ApprovalRecord = await store.create_left_approval(three.id, "ask_user", "Which bed first?", "low", {})
 
-    # Within one version of the history, a rewind cuts it back.
+    # Within one version of the history, a rewind cuts it back, and the question the third run left waits no more.
     cut: RewindCut = await store.rewind_chat(three.id)
     assert ([run.id for run in cut.rewound], cut.back_to) == ([three.id], two.id)
     assert await _history(store, thread.id) == ["one", "a1", "two", "a2"]
+    assert (await store.get_approval(left.id)).status == "expired"
 
     # A run compacts the history, and the next run works on the new version; rewound to before the second run, the
     # history is what was kept aside of the old version, up to the second run's message.

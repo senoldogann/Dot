@@ -12340,11 +12340,11 @@ and stops when its run says done; Stop ends it.
 **What.** On a message of the owner's that opened a turn, Edit from here, as T3 Code has it (the owner asked for its
 way): a dialog, "Edit from here? Rewind chat to before this message. Your prompt and attachments return to the
 composer.", with Cancel, Revert files too and Revert and keep changes. Either way the turn and the later ones leave the
-chat (their runs stay stored, marked, with what they cost), the history the model reads ends where it ended before the
-message, and the message with its files comes back into the box of the turn before it, or of a new chat when none is
-left. Revert files too also takes back what those runs and their helpers changed with the file tools, each file that is
-as they left it; a file changed since is left and named, and a command's changes stay. The chat's OpenCode session is
-let go, so that its next run there reads the rewound history.
+chat (their runs stay stored, marked, with what they cost, and the questions they left expire), the history the model
+reads ends where it ended before the message, and the message with its files comes back into the box of the turn
+before it, or of a new chat when none is left. Revert files too also takes back what those runs and their helpers
+changed with the file tools, each file that is as they left it; a file changed since is left and named, and a
+command's changes stay. The chat's OpenCode session is let go, so that its next run there reads the rewound history.
 
 - A run of a chat keeps, as it is made, where its first message goes in the chat's history: the history's version and
   the place (`runs.history_version`, `runs.history_seq`). A compaction writes the history anew as the next version and
