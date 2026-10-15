@@ -6,7 +6,7 @@ import { QUIET_BREAK_MS } from "./api.js";
 import { el, showAfter } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
 import { icon } from "./icons.js";
-import { holdBarInSight, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
+import { followSeen, PHONE, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
 import { installShortcuts, requestCompose } from "./shortcuts.js";
 import { buildSidebar } from "./sidebar.js";
 import { stageTitleSlot, stageToolsSlot } from "./stage.js";
@@ -78,22 +78,23 @@ export function buildShell({ homeRoute }) {
     onNavigate: closeAfterNavigation,
   });
   const indicators = buildIndicators();
-  const menu = el(
-    "button",
-    {
-      class: "icon-btn",
-      type: "button",
-      title: "Show sidebar",
-      "aria-label": "Show sidebar",
-      "aria-controls": "sidebar",
-      "aria-expanded": "false",
-      onclick: () => {
-        setOpen(true);
-        sidebar.focusClose();
-      },
+  const menu = el("button", {
+    class: "icon-btn",
+    type: "button",
+    title: "Show sidebar",
+    "aria-label": "Show sidebar",
+    "aria-controls": "sidebar",
+    "aria-expanded": "false",
+    onclick: () => {
+      setOpen(true);
+      sidebar.focusClose();
     },
-    icon("panelLeft"),
-  );
+  });
+  // On a phone the opener is the way back to the chats, a chevron as in T3 Code's phone app (item 295).
+  function paintOpener() {
+    menu.replaceChildren(icon(PHONE.matches ? "chevronLeft" : "panelLeft"));
+  }
+  paintOpener();
   // While the sidebar is closed the bar holds its opener alone (item 273).
   const opener = el("div", { class: "stagebar-left" }, menu);
   const main = el("main", { class: "page", tabindex: "-1" });
@@ -106,7 +107,7 @@ export function buildShell({ homeRoute }) {
   );
   const stage = el("div", { class: "stage" }, stagebar, main);
   trackStagebar(stagebar);
-  holdBarInSight(stagebar);
+  const stopFollowing = followSeen();
   const scrim = el("div", { class: "scrim", onclick: closeToOpener });
   const frame = el("div", { class: "shell" }, sidebar.element, scrim, stage);
 
@@ -185,6 +186,7 @@ export function buildShell({ homeRoute }) {
   }
 
   narrowQuery.addEventListener("change", onViewportChange);
+  PHONE.addEventListener("change", paintOpener);
   window.addEventListener("keydown", onEscape);
   const removeShortcuts = installShortcuts({ search: focusSearch, newRun, appearance: openAppearance, nextScheme: cycleScheme });
   apply();
@@ -202,8 +204,10 @@ export function buildShell({ homeRoute }) {
     paint: indicators.paint,
     dispose() {
       narrowQuery.removeEventListener("change", onViewportChange);
+      PHONE.removeEventListener("change", paintOpener);
       window.removeEventListener("keydown", onEscape);
       removeShortcuts();
+      stopFollowing();
       sidebar.dispose();
     },
   };

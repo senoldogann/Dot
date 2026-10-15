@@ -6,6 +6,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile
 from dotagent.agent.lessons import RunLessons
+from dotagent.agent.resume import CutOff
 from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
 from dotagent.connections.catalogue import ConnectionKind
 from dotagent.connections.states import ConnectionState, ConnectionStep
@@ -579,13 +580,17 @@ class RunDetail(FrozenModel):
     check is told (item 132). ``active`` is true while the daemon drives the run; ``elsewhere`` while another
     process that lives drives it at work (a ``dotx`` command): its page follows it and its Stop asks that process to
     stop it, but it is not steered or taken over from here. ``choices`` are what the next follow-up of the run's chat
-    starts with (item 199), ``None`` for a chat that has none of its own yet."""
+    starts with (item 199), ``None`` for a chat that has none of its own yet. ``title`` is the title of the run's chat,
+    which a phone's top bar shows (item 295). ``cut_off`` is how the run was cut off (``agent.resume.cut_off_by``),
+    which the line that offers to resume it names (item 299); ``None`` for a run that ended otherwise or works."""
 
     run: RunRecord
+    title: str
     children: list[RunRecord]
     active: bool
     elsewhere: bool
     resumable: bool
+    cut_off: CutOff | None
     lessons: RunLessons | None
     questions: list[ApprovalRecord]
     agent: AgentRecord | None

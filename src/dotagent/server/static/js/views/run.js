@@ -8,6 +8,7 @@ import { BUSY_SEND, valueOf } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
+import { createCapsule } from "../capsule.js";
 import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
@@ -44,6 +45,13 @@ const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
 const MAX_INPUT_PX = 160;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
+// What cut a run off (agent/resume.py `CutOff`), as the line that offers to resume it says it (item 299).
+const CUT_OFF_LINES = {
+  daemon_restarted: "Dot restarted while this run worked.",
+  daemon_shutdown: "Dot was shut down while this run worked.",
+  process_ended: "Its dotx command was told to end while this run worked.",
+  process_died: "Its dotx command died while this run worked.",
+};
 // Edit from here (item 282), worded as T3 Code words it: the dialog's line and the owner's two ways of rewinding.
 const REWIND_MESSAGE = "Rewind chat to before this message. Your prompt and attachments return to the composer.";
 const REWIND_CHOICES = [
@@ -180,8 +188,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const elsewhere = detail.elsewhere;
   let active = detail.active || elsewhere;
   // The run was cut off (by the daemon, or by the end of its dotx command) and a new run can go on from where it
-  // stopped.
+  // stopped; `cutOff` is how.
   let resumable = detail.resumable;
+  let cutOff = detail.cut_off;
   let finishedAt = run.finished_at;
   let following = active;
   let ticker = null;
@@ -221,15 +230,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     icon("arrowRight"),
     el("span", { class: "label" }, "Continue"),
   );
-  // Continue, for a run that was cut off, is a line above the composer (item 120); the run's answer says what cut
-  // it off.
-  const resumeLine = el(
-    "div",
-    { class: "note resume-line", hidden: true },
-    icon("alert"),
-    el("span", { class: "grow" }, "This run was cut off while it worked."),
-    resumeButton,
-  );
+  // Continue, for a run that was cut off, is a line above the composer (item 120) with the bolt of a restart and what
+  // cut the run off (item 299).
+  const resumeWords = el("span", { class: "grow" });
+  const resumeLine = el("div", { class: "note resume-line restart-note", hidden: true }, icon("bolt"), resumeWords, resumeButton);
   // A delegated run (item 82) names its parent in the bar as a breadcrumb, the parent's goal a link before its own, and
   // has a pill where the composer would be: the model, how long it took, whether its parent still works, the way back.
   // The pill is in the dock, so it stays at the window's foot as the conversation scrolls (item 244).
@@ -555,7 +559,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const stopStatus = onChange(choices.sync);
   // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
   const background = backgroundWork({ threadId: run.thread_id });
-  const dock = el("div", { class: "dock" }, resumeLine, queue.element, background.element, frame.element, foot);
+  // The line over a phone's composer (item 297): the run's time and its helpers, each the way to where it is told of.
+  // The queue's own banner, right under it, tells what waits.
+  const capsule = createCapsule({
+    onWork: () => inspector.openTab("run"),
+    onHelpers: () => inspector.openTab("agents"),
+  });
+  const dock = el("div", { class: "dock" }, capsule.element, resumeLine, queue.element, background.element, frame.element, foot);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -767,6 +777,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   function syncControls() {
     resumeLine.hidden = active || !resumable;
+    resumeWords.textContent = cutOff === null ? "" : CUT_OFF_LINES[cutOff];
     // A delegated run is not steered: its dock keeps the arrow down (item 96) and its pill, whose Stop stops it.
     const delegated = run.parent_run_id !== null;
     frame.element.hidden = delegated;
@@ -793,6 +804,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         paintStats();
         timeline.tick(Date.now() / 1000);
         agents.tick(Date.now() / 1000);
+        paintCapsule();
       }, 1000);
       costTicker = setInterval(paintCost, COST_REFRESH_MS);
     } else if (!active && ticker !== null) {
@@ -801,6 +813,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       ticker = null;
       costTicker = null;
     }
+    paintCapsule();
+  }
+
+  function paintCapsule() {
+    capsule.paint({ status: active ? status : null, since: run.created_at, now: Date.now() / 1000, helpers: timeline.helperStatuses() });
   }
 
   // ------------------------------------------------------------------------------------------------ scroll
@@ -899,6 +916,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       }
       run = fresh.run;
       resumable = fresh.resumable;
+      cutOff = fresh.cut_off;
+      // A chat renamed since the page opened shows its new title in a phone's bar (item 295).
+      if (parentId === null) {
+        headingTitle.textContent = clip(fresh.title, TITLE_CHARS);
+      }
       status = run.status;
       model = run.model;
       finishedAt = run.finished_at;
@@ -939,6 +961,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       loadActions();
     }
     paintStats();
+    paintHeading();
+    paintCapsule();
+  }
+
+  /** A phone's bar under the chat's title: the agent, or Helper on a helper's page, and the model the run uses now. */
+  function paintHeading() {
+    headingSub.textContent = `${parentId === null ? actorName : "Helper"} · ${modelName(model)}`;
   }
 
   // The feet of the run's own messages (their time, a copy, a send again) wait for its answer (item 205).
@@ -1113,7 +1142,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     sizes: stage.chooser,
   });
   // The agents of the chat: the runs its runs handed work to (item 227).
-  const agents = agentList({ threadId: run.thread_id });
+  const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
   // The side panel (item 84), in tabs after T3 Code's (item 203), each with its icon (item 227): the run (its details
   // and its cost, item 96), the plan, the actions (and the files of the conversation), the agents of the chat and the
   // screen (Dot's computer and the screenshots). The run's state is the top bar's face and the Details section's first
@@ -1130,12 +1159,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     screensIn: "screen",
   });
 
-  /** Read the chat's agents again; their tab counts them. */
+  /** Read the chat's agents again; their tab counts them, and so does a phone's bar. */
   async function paintAgents() {
     try {
       const count = await agents.refresh();
       if (!signal.aborted) {
         inspector.setCount("agents", count === 0 ? "" : String(count));
+        helpersButton.hidden = count === 0;
+        helpersCount.textContent = String(count);
       }
     } catch (error) {
       if (!signal.aborted) {
@@ -1182,7 +1213,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onImage: inspector.addImage,
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     onHeld: computer.setHeld,
-    onBrowserStep: (page) => computer.notePage(page),
+    onBrowserStep: (page) => {
+      computer.notePage(page);
+      screenButton.hidden = false;
+    },
     onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
   });
   const problem =
@@ -1192,8 +1226,29 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // Dot's face and name, or a delegated run's breadcrumb, name the page in the top bar (item 78), and the side panel's
   // switch is the bar's one tool (item 120): the run's state, start, agent, model, approvals and campaign are in the
   // Details of the panel's Run tab. The goal, the first message, is the page's heading for a reader of the structure.
-  setStageTitle(face, crumb, crumbSep, stageName);
-  setStageTools(inspector.toggle);
+  // On a phone the bar names the chat instead, its title over the agent and the model, after T3 Code's phone app (item
+  // 295); a helper's page names its goal and says it is a helper.
+  const headingTitle = el("span", { class: "stage-heading-title" }, clip(parentId === null ? detail.title : run.goal, TITLE_CHARS));
+  const headingSub = el("span", { class: "stage-heading-sub" });
+  const heading = el("span", { class: "stage-heading" }, headingTitle, headingSub);
+  paintHeading();
+  setStageTitle(face, crumb, crumbSep, stageName, heading);
+  // A phone's bar holds its tools in one pill (item 295): Dot's computer once the run has had a page, which then opens
+  // over the whole page (item 298), the chat's helpers once it has some, and the panel's switch; a wider bar shows the
+  // switch alone (app.css).
+  const screenButton = el(
+    "button",
+    { class: "icon-btn stage-quick", type: "button", title: "Dot's computer", "aria-label": "Show Dot's computer", hidden: !detail.held, onclick: () => computer.openFull() },
+    icon("monitor"),
+  );
+  const helpersCount = el("span", { class: "stage-quick-count" });
+  const helpersButton = el(
+    "button",
+    { class: "icon-btn stage-quick stage-helpers", type: "button", title: "Helpers", "aria-label": "Show the helpers", hidden: true, onclick: () => inspector.openTab("agents") },
+    icon("users"),
+    helpersCount,
+  );
+  setStageTools(el("div", { class: "stage-pill" }, screenButton, helpersButton, inspector.toggle));
 
   // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from the
   // first message (item 129).
@@ -1258,6 +1313,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       timeline.push(message.data);
       if (message.data.run_id !== runId && RUN_ENDS.has(message.data.kind)) {
         agentsChanged();
+        paintCapsule();
       }
       // A delegated run's row says how long it has worked as soon as its events are in, not at the next second.
       if (active) {

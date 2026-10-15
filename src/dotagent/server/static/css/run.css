@@ -490,8 +490,9 @@
   }
 }
 
-/* The agents of a chat (item 227), in the Agents tab: a row for each, the face with its state at the corner, the goal
-   over its state and model, how long it took at the right; the whole row is the way to its page. */
+/* The agents of a chat (item 227), in the Agents tab, after the rows of T3 Code's Agents sheet (item 296): a row for
+   each, the face with its state at the corner; the goal over the provider's mark, the model and the state in a word,
+   and what it does or did last; how long it took and a chevron at the right; the whole row is the way to its page. */
 .agent-list {
   display: flex;
   flex-direction: column;
@@ -533,12 +534,65 @@
   font-weight: var(--weight-label);
 }
 
+.agent-state {
+  flex: none;
+  color: var(--muted);
+  font-weight: var(--weight-label);
+}
+
+.agent-state::before {
+  content: "· ";
+  color: var(--faint);
+  font-weight: var(--weight-text);
+}
+
+.agent-state.s-running,
+.agent-state.s-queued {
+  color: var(--text);
+}
+
+.agent-state.s-blocked {
+  color: var(--warn);
+}
+
+.agent-state.s-failed {
+  color: var(--bad);
+}
+
 .agent-meta {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.agent-model,
+.agent-doing {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.agent-doing {
   color: var(--muted);
   font-size: var(--text-xs);
+}
+
+.agent-doing:empty {
+  display: none;
+}
+
+.agent-row > .chev {
+  display: inline-grid;
+  flex: none;
+  color: var(--faint);
+}
+
+.agent-row > .chev .icon {
+  width: 16px;
+  height: 16px;
 }
 
 .agent-time {
@@ -630,7 +684,7 @@
    areas (item 275). */
 .inspector[data-mode="drawer"] {
   position: fixed;
-  inset: 0 0 0 auto;
+  inset: var(--seen-top) 0 var(--seen-bottom) auto;
   z-index: 40;
   width: min(360px, 92vw);
   max-height: none;
@@ -975,7 +1029,7 @@
 
 .inspector-scrim {
   position: fixed;
-  inset: 0;
+  inset: var(--seen-top) 0 var(--seen-bottom);
   z-index: 39;
   background: var(--scrim);
 }
@@ -1180,4 +1234,145 @@
 .setting + .setting {
   padding-top: 12px;
   border-top: 1px solid var(--border);
+}
+
+/* ---------- a phone: the panel as a sheet, Dot's computer over the page (items 296 and 298) ---------- */
+
+/* The grabber is a sheet's (inspector.js). */
+.inspector-grabber {
+  display: none;
+}
+
+@media (max-width: 720px) {
+  /* The panel rises from the foot of what is seen as a sheet, after T3 Code's Agents sheet (item 296): nine tenths of
+     the seen height, round at the top, a grabber over the tabs; dragging the head down closes it. */
+  .inspector[data-mode="drawer"] {
+    inset: auto 0 var(--seen-bottom);
+    width: auto;
+    height: calc(0.9 * (100% - var(--seen-top) - var(--seen-bottom)));
+    padding: 0 var(--safe-right) var(--safe-bottom) var(--safe-left);
+    border-top: 1px solid var(--border);
+    border-left: 0;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    transform: translateY(100%);
+  }
+
+  .inspector[data-mode="drawer"][data-open="true"] {
+    transform: none;
+  }
+
+  .inspector[data-mode="drawer"] .inspector-head {
+    padding: 24px 8px 0 12px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    touch-action: pan-x;
+  }
+
+  .inspector[data-mode="drawer"] .inspector-grabber {
+    display: block;
+    position: absolute;
+    top: 8px;
+    left: 50%;
+    width: 40px;
+    height: 5px;
+    border-radius: var(--radius-pill);
+    background: var(--border-strong);
+    translate: -50% 0;
+  }
+
+  /* A file still takes all of what is seen. */
+  .inspector[data-mode="drawer"][data-file="on"] {
+    top: var(--seen-top);
+    height: auto;
+    border-radius: 0;
+  }
+}
+
+/* Dot's computer over a phone's page (item 298, computer.js), as T3 Code's phone app shows its browser: the close and
+   the title on top, the page's address in a pill, the view as wide as the screen, and the pill of who has control at
+   the foot. */
+dialog.computer-full {
+  position: fixed;
+  inset: var(--seen-top) 0 var(--seen-bottom);
+  width: auto;
+  height: auto;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: calc(8px + var(--safe-top)) calc(12px + var(--safe-right)) calc(12px + var(--safe-bottom)) calc(12px + var(--safe-left));
+  border: 0;
+  background: var(--bg);
+  color: var(--text);
+}
+
+dialog.computer-full[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+dialog.computer-full::backdrop {
+  inset: var(--seen-top) 0 var(--seen-bottom);
+  background: var(--bg);
+}
+
+.computer-full-close {
+  position: absolute;
+  top: calc(8px + var(--safe-top));
+  left: calc(8px + var(--safe-left));
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.computer-full > .computer {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.computer-full .panel-section-head {
+  min-height: 36px;
+  padding: 0 0 8px 48px;
+}
+
+.computer-full .panel-section-title {
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+}
+
+.computer-full .panel-section-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  padding: 0;
+}
+
+.computer-full .computer-body {
+  flex: 1;
+  min-height: 0;
+}
+
+.computer-full .computer-toolbar:has(> .computer-url:not(:empty)) {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+}
+
+.computer-full .computer-toolbar:has(> .computer-url:empty),
+.computer-full .stage-sizes {
+  display: none;
+}
+
+.computer-full .computer-screen {
+  flex: 1;
+  min-height: 0;
+  padding: 8px;
+  border-radius: var(--radius);
+}
+
+.computer-full .computer-pill {
+  margin-top: 4px;
 }

@@ -3,26 +3,31 @@ The server keeps the owner's own OpenCode setup out: a tool in the home's ``.ope
 A task run asks Dot for the command it runs, waits for the owner's answer and does what it was told, its steps, tool
 calls and tokens in the run's timeline and its words in the chat; the next run of the chat goes on in the same session
 and remembers; a command the owner refuses is not run, and the run still ends with an answer. A message the owner sends
-reaches the agent at work, and Stop stops it while it waits for the owner, its question decided with it.
+reaches the agent at work, and Stop stops it while it waits for the owner, its question decided with it. The free
+models listed are those of OpenCode's refreshed catalog (item 292).
 
 Needs the ``opencode`` program and the internet, and is skipped without the program.
 """
 
 import asyncio
+import json
 import os
 import secrets
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 import pytest_asyncio
+from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import OpenCodeConfig, load_config
+from dotagent.core.paths import opencode_dir
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.types import ChatProvider, Message, ModelInfo
 from dotagent.opencode.run import TOOL_PREFIX
-from dotagent.opencode.server import OpenCodeServer, find_program
+from dotagent.opencode.server import FreeModel, OpenCodeServer, find_program
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord
 
@@ -32,6 +37,8 @@ RUN_TIMEOUT_S: float = 300.0
 _POLL_S: float = 0.5
 # The free models the runs prefer, in order; the list changes, so any other free model does too.
 _PREFERRED: tuple[str, ...] = ("big-pickle", "nemotron-3.5-lightning-free", "step-5-preview-free")
+# A free model that only a stale catalog has.
+_PLANTED: str = "planted-free"
 
 requires_opencode = pytest.mark.skipif(
     find_program("opencode", os.environ.get("PATH", "")) is None, reason="needs the opencode program"
@@ -139,6 +146,47 @@ async def test_the_server_keeps_the_owners_own_opencode_setup_out(tmp_path: Path
         await server.aclose()
     assert "bash" in tools and "edit" in tools
     assert "planted" not in tools
+
+
+def _stale_catalog(catalog: Path, gone: str) -> None:
+    """Make OpenCode's catalog file stale: the free model ``gone`` deprecated, and a free model models.dev never had."""
+    data: dict[str, Any] = json.loads(catalog.read_text(encoding="utf-8"))
+    models: dict[str, Any] = data["opencode"]["models"]
+    models[_PLANTED] = {**models[gone], "id": _PLANTED, "name": "Planted"}
+    models[gone] = {**models[gone], "status": "deprecated"}
+    catalog.write_text(json.dumps(data), encoding="utf-8")
+
+
+@requires_opencode
+async def test_the_free_models_are_the_refreshed_catalogs_and_an_older_server_makes_way(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 292: the free models listed are those of OpenCode's catalog refreshed from models.dev, whatever catalog a
+    server read as it started; and a server started before the refresh, serving no run, is stopped when a run comes, so
+    that the run's server starts on the refreshed catalog and knows every model listed."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
+    workspace: Path = tmp_path / "workspace"
+    await asyncio.to_thread(workspace.mkdir)
+    server: OpenCodeServer = OpenCodeServer(
+        OpenCodeConfig(command="opencode", start_timeout_s=60.0, idle_stop_s=600.0, models_ttl_s=60.0),
+        {"PATH": os.environ.get("PATH", ""), "HOME": str(tmp_path)},
+    )
+    try:
+        first: tuple[FreeModel, ...] = await server.list_free_models()
+        assert first, "Zen lists no free model"
+        await asyncio.to_thread(_stale_catalog, opencode_dir() / "cache" / "opencode" / "models.json", first[0].id)
+        await server.tool_ids(workspace)
+        await asyncio.to_thread((opencode_dir() / "models.json").unlink)
+        listed: list[str] = [model.id for model in await server.list_free_models()]
+        assert first[0].id in listed and _PLANTED not in listed, listed
+        with capture_logs() as logs:
+            async with server.hold():
+                tools: tuple[str, ...] = await server.tool_ids(workspace)
+    finally:
+        await server.aclose()
+    assert "bash" in tools
+    events: list[object] = [entry["event"] for entry in logs]
+    assert events.index("opencode_server_stopped_for_catalog") < events.index("opencode_server_started"), events
 
 
 @requires_opencode

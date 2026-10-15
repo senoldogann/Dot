@@ -10,6 +10,7 @@ import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
 import { allModels, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
+import { touchFirst } from "../layout.js";
 import { lookPicker } from "../lookpicker.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
 import { APPROVAL_OPTIONS } from "../runmodes.js";
@@ -556,7 +557,10 @@ function mountPage(root, ctx, agentId) {
     if (detail !== null) {
       greet(detail.record);
       paintLists(detail);
-      composer.focus();
+      // On a touch screen the caret waits for a tap, as on the home (item 293).
+      if (!touchFirst()) {
+        composer.focus();
+      }
     }
   }
 

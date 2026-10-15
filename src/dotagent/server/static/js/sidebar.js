@@ -12,8 +12,9 @@ import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
 import { actorFace, lookOf } from "./actors.js";
-import { faceState } from "./face.js";
+import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
+import { PHONE } from "./layout.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
@@ -323,11 +324,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     autocomplete: "off",
     spellcheck: "false",
   });
-  const close = el(
-    "button",
-    { class: "icon-btn", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse },
-    icon("panelLeft"),
-  );
+  const close = el("button", { class: "icon-btn", type: "button", title: "Hide sidebar", "aria-label": "Hide sidebar", onclick: onCollapse });
   const selectButton = el("button", { class: "btn ghost sm", type: "button", hidden: true, onclick: () => enterSelectMode() }, "Select");
   let folds = readFolds(FOLDS_KEY);
   function toggleFold(key) {
@@ -1060,37 +1057,63 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   paintLists();
   load();
 
+  // On a phone the sidebar is the list of chats over the whole screen, after T3 Code's phone app (item 294): Dot's name
+  // at its head beside the close, and at its foot, under the thumb, Settings, the search and a new chat. The search
+  // moves between the head of the list and the foot as the width changes; there is one box.
+  const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));
+  const compose = el(
+    "a",
+    {
+      class: "side-compose",
+      href: homeHref,
+      title: "New chat",
+      "aria-label": "New chat",
+      onclick: () => {
+        requestCompose();
+        onNavigate();
+      },
+    },
+    icon("squarePen"),
+  );
+  const body = el(
+    "div",
+    { class: "side-body" },
+    searchBox,
+    el(
+      "a",
+      {
+        class: "side-btn",
+        href: homeHref,
+        onclick: () => {
+          requestCompose();
+          onNavigate();
+        },
+      },
+      icon("pencil"),
+      el("span", { class: "grow" }, "New chat"),
+      el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
+    ),
+    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink, connectLink),
+    activityNav,
+    el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
+  );
+  const foot = el("div", { class: "side-foot" }, settingsLink, compose);
+  function placeForWidth() {
+    close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
+    if (PHONE.matches) {
+      settingsLink.after(searchBox);
+    } else {
+      body.prepend(searchBox);
+    }
+  }
+  placeForWidth();
+  PHONE.addEventListener("change", placeForWidth);
   const element = el(
     "aside",
     { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
-    el(
-      "div",
-      { class: "side-head", "data-tauri-drag-region": "" },
-      close,
-    ),
-    el(
-      "div",
-      { class: "side-body" },
-      el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K")),
-      el(
-        "a",
-        {
-          class: "side-btn",
-          href: homeHref,
-          onclick: () => {
-            requestCompose();
-            onNavigate();
-          },
-        },
-        icon("pencil"),
-        el("span", { class: "grow" }, "New chat"),
-        el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
-      ),
-      el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink, connectLink),
-      activityNav,
-      el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
-    ),
-    el("div", { class: "side-foot" }, settingsLink),
+    el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName())),
+    body,
+    foot,
   );
   const workTicker = setInterval(() => {
     for (const node of element.querySelectorAll(".side-working-time")) {
@@ -1129,6 +1152,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       document.removeEventListener("visibilitychange", onBackInView);
       window.removeEventListener("focus", onBackInView);
       window.removeEventListener("keydown", onEscape);
+      PHONE.removeEventListener("change", placeForWidth);
     },
   };
 }

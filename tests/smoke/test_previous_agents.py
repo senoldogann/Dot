@@ -192,9 +192,10 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
                 await expect(rows.locator(".agent-title")).to_have_text(
                     [run.goal for run in newest_first[:_FIRST_ROWS]]
                 )
-                await expect(rows.locator(".agent-meta")).to_have_text(
-                    [f"{_STATE_WORDS[_ENDS[run.goal]]} · scripted" for run in newest_first[:_FIRST_ROWS]]
+                await expect(rows.locator(".agent-state")).to_have_text(
+                    [_STATE_WORDS[_ENDS[run.goal]] for run in newest_first[:_FIRST_ROWS]]
                 )
+                await expect(rows.locator(".agent-model")).to_have_text(["scripted"] * _FIRST_ROWS)
                 await expect(rows.first).to_have_attribute("href", f"#/runs/{newest_first[0].id}")
                 # The panel at its usual width has no room for every name: the tabs not chosen keep their icon.
                 hidden_label: Locator = panel.get_by_role("tab", name="Run").locator(".inspector-tab-label")

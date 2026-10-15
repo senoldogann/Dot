@@ -99,8 +99,8 @@ command = "opencode"
 start_timeout_s = 60.0
 # The server stops once it has served nothing this long, and starts again when needed (about 2 s, 340 MB while up).
 idle_stop_s = 600.0
-# How long the list of free models is kept without asking OpenCode again.
-models_ttl_s = 86400.0
+# How long the list of free models is kept without asking OpenCode again; OpenCode refreshes its own catalog hourly.
+models_ttl_s = 3600.0
 
 [providers.opencode_go]
 base_url = "https://opencode.ai/zen/go/v1"

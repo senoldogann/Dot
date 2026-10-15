@@ -1,7 +1,7 @@
 // Dot's computer: the page of the run's browser as Chrome paints it, and the handover of that browser to the reader.
 // Nothing is cast while the view is closed or the page is out of sight, and a view whose stream broke comes back by
 // itself (`watchInView`); the card is shown for a run that is going on and keeps its last frame once the run has ended,
-// when Watch goes too (there is no page left to watch).
+// when Watch goes too (there is no page left to watch). On a phone it also opens over the whole page (item 298).
 
 import { api, watchInView } from "./api.js";
 import { el } from "./dom.js";
@@ -27,7 +27,7 @@ const EMPTY_STATES = {
  * it is ("Dot has control"), `sizes` the size chooser of the panel (stagesize.js), above the view beside the page's
  * address.
  * Returns `element`, `setHeld(flag)` (the timeline calls it on the takeover and handback events), `setActive(flag)` (the
- * stream stops with the run) and `dispose()`.
+ * stream stops with the run), `openFull()` (show it over the whole page, the button of a phone's bar) and `dispose()`.
  */
 export function createComputer({ runId, active, elsewhere, held, name, sizes }) {
   let isActive = active;
@@ -150,9 +150,43 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     }
   }
 
+  // Over the whole page, as T3 Code's phone app shows its browser (item 298): the card moves into a dialog of its own,
+  // the page's address on top, the view as wide as the screen and the pill at the foot, and goes back to the panel when
+  // the dialog closes. The view starts as it opens, for a run that is going on.
+  let full = null;
+  function openFull() {
+    if (full !== null) {
+      return;
+    }
+    const closeButton = el(
+      "button",
+      { class: "icon-btn computer-full-close", type: "button", title: "Close", "aria-label": "Close Dot's computer", onclick: () => full?.dialog.close() },
+      icon("x"),
+    );
+    const dialog = el("dialog", { class: "computer-full", "aria-label": "Dot's computer" }, closeButton);
+    full = { dialog, home: element.parentNode, next: element.nextSibling };
+    dialog.append(element);
+    dialog.addEventListener("close", closeFull);
+    document.body.append(dialog);
+    dialog.showModal();
+    closeButton.focus();
+    start();
+  }
+
+  function closeFull() {
+    if (full === null) {
+      return;
+    }
+    const { dialog, home, next } = full;
+    full = null;
+    home.insertBefore(element, next);
+    dialog.remove();
+  }
+
   paint();
   return {
     element,
+    openFull,
     /** The run's browser has a page (its first browser step): the view starts by itself while the run works. */
     notePage() {
       hasPage = true;
@@ -171,6 +205,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
       paint();
     },
     dispose() {
+      full?.dialog.close();
       stop();
       if (objectUrl !== null) {
         URL.revokeObjectURL(objectUrl);

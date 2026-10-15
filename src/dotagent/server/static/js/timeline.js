@@ -67,8 +67,9 @@ function plainLine(text) {
     .trim();
 }
 
-/** How the helpers of a group stand, from their statuses: "2 working · 1 done". */
-function flockState(statuses) {
+/** How the helpers of a group stand, from their statuses: "2 working · 1 done". The line over a phone's composer says it
+ * of the run's helpers too (item 297). */
+export function flockState(statuses) {
   return FLOCK_WORDS.map(([word, kinds]) => ({ word, count: statuses.filter((status) => kinds.includes(status)).length }))
     .filter(({ count }) => count > 0)
     .map(({ word, count }) => `${count} ${word}`)
@@ -126,6 +127,14 @@ function drawLive(live) {
 
 // How a call of the step a resumed run was in ended (agent/resume.py).
 const CALL_ENDS = { succeeded: "finished", failed: "failed", cut_off: "cut off", not_started: "not started" };
+// What cut off the run that a resumed run goes on from (agent/resume.py `CutOff`): as the resumed run's line says it
+// after "Resumed this turn after", and in full.
+const CUT_OFFS = {
+  daemon_restarted: { after: "Dot restarted", how: "The daemon stopped while the run before this one worked: a crash, or a restart that did not wait for it." },
+  daemon_shutdown: { after: "Dot was shut down", how: "The daemon was shut down while the run before this one worked." },
+  process_ended: { after: "its dotx command was told to end", how: "The dotx command that drove the run before this one was told to end while it worked." },
+  process_died: { after: "its dotx command died", how: "The dotx command that drove the run before this one died while it worked." },
+};
 
 /** One call of the step a resumed run was in, as "tool how it ended". */
 function callEnd(call) {
@@ -200,7 +209,9 @@ function buildFlock() {
 
 /**
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
- * `settle(runs, now)` the records of its delegated runs, and `knows(runId)` says whether a run has its place in it; the
+ * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it and
+ * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row) and
+ * `helperStatuses()` the statuses of the delegated runs; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
@@ -996,30 +1007,32 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
     },
 
-    // The run goes on from where the run before it was cut off ([agent] resume, Continue or dotx resume): how that run
-    // was cut off, and how each call of the step it was in ended.
+    // The run goes on from where the run before it was cut off ([agent] resume, Continue or dotx resume), after T3
+    // Code's (item 299): a line with a bolt that says Dot restarted and resumed the turn; opened, how that run was cut
+    // off, how each call of the step it was in ended, and the way to that run.
     resumed(scope, record) {
       const data = record.data;
-      const who = data.automatic ? "Resumed on its own when the daemon started" : "Resumed by hand";
-      const hows = {
-        daemon_restarted: "the daemon stopped while the run before this one worked",
-        daemon_shutdown: "the daemon was shut down while the run before this one worked",
-        process_ended: "the dotx command that drove the run before this one was told to end while it worked",
-        process_died: "the dotx command that drove the run before this one died while it worked",
-      };
-      const how = hows[data.cut_off];
-      const calls = data.calls.length === 0 ? "" : `. Its last step: ${data.calls.map(callEnd).join(", ")}`;
-      place(
-        scope,
-        el(
-          "div",
-          { class: "note" },
-          icon("refresh"),
-          el("span", null, `${who}: ${how}${calls}`),
-          el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, "Open that run"),
-        ),
-        record.ts,
+      const cutOff = CUT_OFFS[data.cut_off];
+      const restarted = data.automatic && (data.cut_off === "daemon_restarted" || data.cut_off === "daemon_shutdown");
+      const head = el(
+        "summary",
+        { class: "tool-head" },
+        el("span", { class: "tool-kind restart-mark" }, icon("bolt")),
+        el("span", { class: "restart-label" }, restarted ? "Dot restarted and resumed this turn" : `Resumed this turn after ${cutOff.after}`),
+        el("span", { class: "chev" }, icon("chevron")),
       );
+      const calls =
+        data.calls.length === 0
+          ? null
+          : el("div", null, el("h4", null, "Its last step"), el("ul", { class: "restart-calls" }, ...data.calls.map((call) => el("li", null, callEnd(call)))));
+      const body = el(
+        "div",
+        { class: "tool-body restart-body" },
+        el("p", null, `${cutOff.how} ${data.automatic ? "Dot went on with it on its own when it started again." : "It was resumed by hand."}`),
+        calls,
+        el("a", { class: "small", href: `#/runs/${data.from_run_id}` }, "Open the run it resumes"),
+      );
+      place(scope, el("details", { class: "restart" }, head, body), record.ts);
     },
 
     // How much help the run's model gets. Shown only where it differs from the configuration: a context budget cut to
@@ -1237,5 +1250,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     onGrow();
   }
 
-  return { element, push, tick, settle, knows: (runId) => scopes.has(runId) };
+  // What the row of the delegated run `runId` keeps up to date for its card, null for a run without a row here.
+  const helper = (runId) => scopes.get(runId)?.panel?.helper ?? null;
+  // The statuses of the run's delegated runs, in the order they started.
+  const helperStatuses = () => [...scopes.values()].filter((scope) => scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
+  return { element, push, tick, settle, knows: (runId) => scopes.has(runId), helper, helperStatuses };
 }

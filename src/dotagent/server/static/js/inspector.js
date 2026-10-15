@@ -2,8 +2,8 @@
 // looked at, in tabs after T3 Code's side panel (item 203), each with its icon (item 227), one at a time, the one
 // chosen last kept per browser. On a wide page it sits beside the conversation when the reader wants it (see
 // layout.js), sliding in and out (item 220); on a narrow page it is a drawer that the button in the header slides in
-// over the conversation. A file the conversation carries or names takes the panel while it is open (item 195,
-// filepanel.js).
+// over the conversation, and on a phone a sheet that rises from the bottom, after T3 Code's (item 296). A file the
+// conversation carries or names takes the panel while it is open (item 195, filepanel.js).
 
 import { imageUrl } from "./api.js";
 import { el, motionMs } from "./dom.js";
@@ -11,7 +11,7 @@ import { fileView } from "./filepanel.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 import { readPref, writePref } from "./prefs.js";
-import { setShowInspector, showInspector } from "./layout.js";
+import { PHONE, setShowInspector, showInspector } from "./layout.js";
 import { onThemeChange } from "./theme.js";
 import { showImage } from "./ui.js";
 
@@ -23,6 +23,9 @@ const STRIP_LIMIT = 24;
 const TAB_KEY = "dot.panelTab";
 // The keys that move between the tabs, as a tab list's do.
 const TAB_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
+// A phone's sheet follows a drag of its head once it has gone this far down, and closes when let go past the second.
+const DRAG_SLOP_PX = 6;
+const DRAG_CLOSE_PX = 96;
 
 /**
  * The panel for a run page whose frame is `layout`, in `tabs` (`[{ id, label, icon, sections }]`, `icon` the name of
@@ -31,8 +34,8 @@ const TAB_KEYS = new Set(["ArrowLeft", "ArrowRight", "Home", "End"]);
  * a file takes it. Returns `element`
  * (the panel) and `scrim` (the veil behind the drawer), both to put inside the frame, `toggle` (the header button that
  * shows or hides the panel), `arrange()` (call it once the frame is on the page), `addImage(name)`, `setCount(tabId,
- * text)` (a short count beside a tab's name; "" for none), `showFile(source, opener)` (see `fileView`; `opener` gets
- * the focus back when the file closes) and `dispose()`.
+ * text)` (a short count beside a tab's name; "" for none), `openTab(id)` (show the tab `id`, the drawer opened for it),
+ * `showFile(source, opener)` (see `fileView`; `opener` gets the focus back when the file closes) and `dispose()`.
  */
 export function createInspector({ layout, tabs, screensIn }) {
   const names = [];
@@ -96,7 +99,9 @@ export function createInspector({ layout, tabs, screensIn }) {
     { class: "inspector-tabs", role: "tablist", "aria-label": "Run details", onkeydown: walkTabs },
     tabNodes.map((tab) => tab.button),
   );
-  const head = el("div", { class: "inspector-head" }, tabList, closeButton);
+  // A phone's sheet has a grabber over its tabs (run.css).
+  const grabber = el("div", { class: "inspector-grabber", "aria-hidden": "true" });
+  const head = el("div", { class: "inspector-head" }, grabber, tabList, closeButton);
   const element = el(
     "aside",
     { class: "inspector", "aria-label": "Run details", hidden: true },
@@ -383,6 +388,75 @@ export function createInspector({ layout, tabs, screensIn }) {
     (dropped.opener.isConnected ? dropped.opener : toggle).focus();
   }
 
+  /** Show the tab `id`: beside the conversation, or in the drawer opened for it (the buttons of a phone's bar and the
+   * line over its composer, items 295 and 297). */
+  function openTab(id) {
+    if (file !== null) {
+      closeFile();
+    }
+    choose(id, false);
+    if (measuredWidth >= MIN_WIDTH_PX) {
+      if (!showInspector()) {
+        setShowInspector(true);
+        arrange();
+      }
+    } else if (!drawerOpen) {
+      setDrawer(true);
+    }
+  }
+
+  // A phone's sheet goes down with a drag of its head, as T3 Code's sheets do: let go far enough down it closes, else
+  // it springs back. The tabs still scroll sideways (run.css lets the head pan only that way).
+  let drag = null;
+  function sheetShown() {
+    return element.dataset.mode === "drawer" && drawerOpen && PHONE.matches;
+  }
+  head.addEventListener("pointerdown", (event) => {
+    if (sheetShown() && event.isPrimary && event.button === 0 && !closeButton.contains(event.target)) {
+      drag = { id: event.pointerId, from: event.clientY, down: 0 };
+    }
+  });
+  head.addEventListener("pointermove", (event) => {
+    if (drag === null || event.pointerId !== drag.id) {
+      return;
+    }
+    // A mouse let go outside the head sends its head no let go: the next move, with no button down, ends the drag.
+    if ((event.buttons & 1) === 0) {
+      springBack();
+      return;
+    }
+    drag.down = Math.max(0, event.clientY - drag.from);
+    if (drag.down > DRAG_SLOP_PX) {
+      head.setPointerCapture(event.pointerId);
+      element.style.transition = "none";
+      element.style.transform = `translateY(${drag.down}px)`;
+    }
+  });
+  function springBack() {
+    drag = null;
+    element.style.transition = "";
+    element.style.transform = "";
+  }
+  function letGo(event) {
+    if (drag === null || event.pointerId !== drag.id) {
+      return;
+    }
+    const { down } = drag;
+    springBack();
+    if (down > DRAG_CLOSE_PX) {
+      setDrawer(false);
+    }
+  }
+  // A drag that the system takes away (a cancel, or the capture lost) springs back wherever it was.
+  function dropDrag(event) {
+    if (drag !== null && event.pointerId === drag.id) {
+      springBack();
+    }
+  }
+  head.addEventListener("pointerup", letGo);
+  head.addEventListener("pointercancel", dropDrag);
+  head.addEventListener("lostpointercapture", dropDrag);
+
   toggle.addEventListener("click", () => {
     if (file !== null) {
       closeFile();
@@ -427,6 +501,7 @@ export function createInspector({ layout, tabs, screensIn }) {
     arrange,
     addImage,
     setCount,
+    openTab,
     showFile,
     dispose: () => {
       stopLeaving();

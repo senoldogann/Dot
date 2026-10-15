@@ -6,6 +6,10 @@ the safe areas of an iPhone added to the home screen, the bar, the sidebar's hea
 panel keep out of them. While the keyboard pans the page, the bar stays at the top of what is seen. Before, Settings ›
 Models slid 51 px on an iPhone SE, the names, the selects, the searches and the sign-in's fields were 13 or 14 px, the
 sidebar's foot sat 8 px from the screen's bottom edge whatever the safe area, and the bar went out of sight with a pan.
+A page that iOS 26 leaves panned after the keyboard (item 293) keeps the dock, the sidebar and the side panel on what is
+seen too; before, they stood on the window, out of sight at the top by the pan and leaving a band of its height at the
+foot, as on the owner's iPhone. With the keyboard up, the dock and the sidebar stand on it, also where iOS shrinks
+`innerHeight` and not the box what is fixed stands in, which put them under the keyboard in the iOS 26.5 simulator.
 
 No network and no model service is used: the model is a scripted one.
 """
@@ -84,6 +88,14 @@ _SAFE: str = (
 )
 # How far the keyboard pans the page in the check of the bar.
 _PAN_PX: int = 300
+# How far iOS 26 left the owner's page panned once the keyboard had gone (their screenshots, item 293), and how much of
+# the screen a keyboard takes.
+_LEFT_PANNED_PX: int = 69
+_KEYBOARD_PX: int = 340
+# How much iOS 26.5 shrinks `innerHeight` while the keyboard is up, and not the box that what is fixed stands in (796 px
+# against 636 px in the simulator): a page that took `innerHeight` for that box put the composer and the sidebar's foot
+# under the keyboard.
+_INNER_SHRUNK_PX: int = 160
 _FIT: str = """() => {
   const root = document.scrollingElement;
   const before = window.scrollX;
@@ -98,14 +110,32 @@ _FIT: str = """() => {
       + getComputedStyle(node).fontSize);
   return { wider: root.scrollWidth - root.clientWidth, slid, small };
 }"""
-# A visual viewport that the test pans, as iOS's keyboard pans the page.
+# A visual viewport that the test pans and shortens, as iOS's keyboard does, and as iOS 26 leaves it panned once the
+# keyboard has gone (item 293); with the keyboard, `innerHeight` shrinks as iOS 26.5 shrinks it.
 _KEYBOARD: str = """(() => {
   const seen = new EventTarget();
+  const inner = Object.getOwnPropertyDescriptor(window, 'innerHeight') ?? Object.getOwnPropertyDescriptor(Window.prototype, 'innerHeight');
+  const full = () => inner.get.call(window);
   let top = 0;
+  let shorter = 0;
+  let narrower = 0;
   Object.defineProperty(seen, 'offsetTop', { get: () => top });
+  Object.defineProperty(seen, 'height', { get: () => full() - shorter });
+  Object.defineProperty(window, 'innerHeight', { configurable: true, get: () => full() - narrower });
   seen.panTo = (value) => { top = value; seen.dispatchEvent(new Event('scroll')); };
+  seen.keyboard = (value, pan, shrunk) => {
+    shorter = value;
+    top = pan;
+    narrower = shrunk;
+    seen.dispatchEvent(new Event('resize'));
+  };
   Object.defineProperty(window, 'visualViewport', { configurable: true, get: () => seen });
 })();"""
+
+
+def _edge(selector: str, side: str) -> str:
+    """A script that gives where the element `selector` is on the window, at its `side` (top or bottom), in whole pixels."""
+    return f"Math.round(document.querySelector({selector!r}).getBoundingClientRect().{side})"
 
 
 class Fit(TypedDict):
@@ -310,7 +340,7 @@ async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_sa
             await browser.close()
 
 
-async def test_the_bar_stays_at_the_top_of_what_is_seen_while_the_keyboard_pans_the_page(own_home: Path) -> None:
+async def test_the_bar_the_dock_and_the_drawers_stay_on_what_is_seen_while_the_page_is_panned(own_home: Path) -> None:
     async with _served(own_home) as (manager, address), async_playwright() as playwright:
         run: RunRecord = await manager.start(
             "Show me the long things",
@@ -341,6 +371,28 @@ async def test_the_bar_stays_at_the_top_of_what_is_seen_while_the_keyboard_pans_
             await page.wait_for_function(f"(want) => ({top})() === want", arg=_PAN_PX)
             await page.evaluate("window.visualViewport.panTo(0)")
             await page.wait_for_function(f"() => ({top})() === 0")
+            # iOS 26 can leave the page panned once the keyboard has gone (item 293): the bar, the composer's dock, the
+            # sidebar and the panel's sheet stand on what is seen, not on the window, so nothing goes out of sight at
+            # the top and no band is left at the foot.
+            height: int = await page.evaluate("window.innerHeight")
+            seen_top, seen_bottom = _LEFT_PANNED_PX, height + _LEFT_PANNED_PX
+            await page.evaluate(f"window.visualViewport.panTo({_LEFT_PANNED_PX})")
+            await page.wait_for_function(f"(want) => ({top})() === want", arg=seen_top)
+            await page.wait_for_function(f"(want) => {_edge('.dock', 'bottom')} === want", arg=seen_bottom)
+            await page.get_by_role("button", name="Show sidebar").click()
+            await page.wait_for_function(f"(want) => {_edge('.sidebar', 'top')} === want", arg=seen_top)
+            await page.wait_for_function(f"(want) => {_edge('.sidebar', 'bottom')} === want", arg=seen_bottom)
+            await page.get_by_role("button", name="Hide sidebar").click()
+            await page.get_by_role("button", name="Run details").click()
+            await page.wait_for_function(f"(want) => {_edge('.inspector', 'bottom')} === want", arg=seen_bottom)
+            await page.get_by_role("button", name="Close the details").click()
+            # With the keyboard up and the page panned short of it, the dock and the sidebar stand on the keyboard,
+            # though `innerHeight` shrinks as iOS 26.5 shrinks it.
+            on_keyboard: int = _PAN_PX + height - _KEYBOARD_PX
+            await page.evaluate(f"window.visualViewport.keyboard({_KEYBOARD_PX}, {_PAN_PX}, {_INNER_SHRUNK_PX})")
+            await page.wait_for_function(f"(want) => {_edge('.dock', 'bottom')} === want", arg=on_keyboard)
+            await page.get_by_role("button", name="Show sidebar").click()
+            await page.wait_for_function(f"(want) => {_edge('.sidebar', 'bottom')} === want", arg=on_keyboard)
             await context.close()
         finally:
             await browser.close()

@@ -196,27 +196,27 @@ answer keeps its words, Ollama's too.
 - **OpenCode** (Zen's free models, item 283): a free model of OpenCode Zen (Big Pickle, Nemotron, Step, Space Bunny and
   the others the day's list has) answers OpenCode's own agent only, so a run on one goes to that agent whole. It needs
   the `opencode` program (`brew install opencode`, or opencode.ai) and no key. Dot starts `opencode serve` on a free
-  loopback port behind a password of its own when a run or the model menu needs it (about 2 s) and stops it after
-  `[providers.opencode] idle_stop_s` (600 s) with nothing to do; it holds about 340 MB while up. The menu lists the free
-  models that call tools, from OpenCode's list kept for a day (`models_ttl_s`), with their reasoning levels. The server
-  keeps to its own folders in Dot's home (`opencode/`) and reads none of your own OpenCode setup: no key, plugin, skill,
-  command, tool or rule of yours, nor a project's `opencode.json` or `AGENTS.md`. Its agent works in Dot's workspace
-  with OpenCode's own tools (commands, reading and editing files, searching, fetching and searching the web, its to-do
-  list), and each of them asks Dot first: Dot weighs it as the same action of its own tools, by your rules, the preset
-  and the run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why,
-  and it goes on. A subagent it asks for is refused, as its session would not be the run's, and it has no question for
-  you. Its commands run outside Dot's sandbox (Settings › Sandbox), each after Dot's policy. The run's timeline shows
-  the agent's text and thinking as they come, each tool call (`opencode_bash`, `opencode_edit`, ...) with its result and
-  each step with its tokens; your messages reach the agent while it works, and Stop stops it. A chat keeps its OpenCode
-  session from run to run, so the agent remembers it, and a session that missed what the chat said on another model
-  hears it with the next message. What Dot's own runs have besides (Dot's tools, memory notes and skills, the checks of
-  a finish, lessons and playbooks) a run here does not have, and a free model cannot be the fast, review or vision
-  model, whose calls are Dot's own. Zen's terms of the free models apply: the providers of Big Pickle, Exo, MiMo and
-  Muse Spark may use what is sent to them to improve their models (opencode.ai/docs/zen, read 2026-10-15), so keep
-  private work on other models. The free tier is Zen's to give: it turned requests down for a few minutes after many in
-  a short time, OpenCode's own command line's too (measured 2026-10-15), and it is reported to refuse OpenCode with one
-  of its tools switched off, so Dot switches none off and has them ask instead; a run it turns down fails with words
-  that say so.
+  loopback port behind a password of its own when a run needs it (about 2 s) and stops it after `[providers.opencode]
+  idle_stop_s` (600 s) with nothing to do; it holds about 340 MB while up. The menu lists every free model that calls
+  tools, with its reasoning levels, from `opencode models opencode --refresh` (OpenCode's catalog refreshed from
+  models.dev first, so a model Zen has just added is there), kept for an hour (`models_ttl_s`). The server keeps to its
+  own folders in Dot's home (`opencode/`) and reads none of your own OpenCode setup: no key, plugin, skill, command,
+  tool or rule of yours, nor a project's `opencode.json` or `AGENTS.md`. Its agent works in Dot's workspace with
+  OpenCode's own tools (commands, reading and editing files, searching, fetching and searching the web, its to-do list),
+  and each of them asks Dot first: Dot weighs it as the same action of its own tools, by your rules, the preset and the
+  run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why, and it
+  goes on. A subagent it asks for is refused, as its session would not be the run's, and it has no question for you. Its
+  commands run outside Dot's sandbox (Settings › Sandbox), each after Dot's policy. The run's timeline shows the agent's
+  text and thinking as they come, each tool call (`opencode_bash`, `opencode_edit`, ...) with its result and each step
+  with its tokens; your messages reach the agent while it works, and Stop stops it. A chat keeps its OpenCode session
+  from run to run, so the agent remembers it, and a session that missed what the chat said on another model hears it
+  with the next message. What Dot's own runs have besides (Dot's tools, memory notes and skills, the checks of a finish,
+  lessons and playbooks) a run here does not have, and a free model cannot be the fast, review or vision model, whose
+  calls are Dot's own. Zen's terms of the free models apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may
+  use what is sent to them to improve their models (opencode.ai/docs/zen, read 2026-10-15), so keep private work on
+  other models. The free tier is Zen's to give: it turned requests down for a few minutes after many in a short time,
+  OpenCode's own command line's too (measured 2026-10-15), and it is reported to refuse OpenCode with one of its tools
+  switched off, so Dot switches none off and has them ask instead; a run it turns down fails with words that say so.
 
 `dotx models [ollama|openai|opencode_go|anthropic|opencode]` lists what a provider offers, including the reasoning
 levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server on this
@@ -1042,8 +1042,11 @@ question to you counts: it is asked again). A run of `dotx run`, of a schedule o
 another (so a run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have
 changed something (a command, a write, a click, or a delegation, whose run may have done anything) wait for you. `resume
 = "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Daemon writes the choice into
-the config file (item 231), and the daemon's next start reads it. The timeline of the new run shows how each call ended,
-with a link to the run it resumes.
+the config file (item 231), and the daemon's next start reads it. The new run's turn opens with a line with a bolt,
+after T3 Code's (item 299): "Dot restarted and resumed this turn" when the daemon went on with it by itself, else
+"Resumed this turn after" what cut it off; opened, it says how that run was cut off, how each call of the step it was in
+ended, and links to it. A run that waits for you wears the same bolt over its composer, with what cut it off ("Dot
+restarted while this run worked.") and Continue.
 
 **Lessons.** With `lessons = "propose"` or `"auto"` in `[agent]`, a task or research run of its own that reached its
 goal after something went wrong on the way (a call failed, whether the run found its way around it or not; the progress
@@ -1437,9 +1440,11 @@ and the goal check), the duration, the start and the run id; its other tabs hold
 the chat and the latest screenshots. Each tab wears its icon, and where the strip has no room for every name, the tabs
 not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs the chat's runs
 handed work to, after T3 Code's "Previous agents": five at first and the rest on **Show N more**, each with its face and
-goal, its state and model and how long it took, and a row opens its page. It stays closed until the panel button in the
-head of the run opens it (the choice is kept in the browser); open, it sits beside the conversation from 960 px and is a
-drawer below that. The run's head is the top bar itself: Dot's face and name on the left, the panel button on the right;
+goal, its provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how
+long it took, and a row opens its page (item 296). It stays closed until the panel button in the head of the run opens
+it (the choice is kept in the browser); open, it sits beside the conversation from 960 px, is a drawer below that, and
+on a phone a sheet that rises from the foot (item 296). The run's head is the top bar itself: Dot's face and name on
+the left, the panel button on the right;
 the bar is solid with a hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the
 box stays at the bottom. Every other page names itself in the same bar (Agents, Activity, Campaigns, Settings) and opens
 with one line of description.
@@ -1791,7 +1796,20 @@ On a phone the page holds still (item 275). Every page fits the screen's width: 
 code and tables scroll in their own frame. No text field is under 16 px, so iOS never zooms into one; a double tap does
 not zoom, and the page does not stretch past its ends. The app added to the home screen runs to the screen's edges, and
 the bar, the sidebar, the composer and the side panel keep out of the rounded corners, the notch and the home
-indicator. The bar stays at the top of what is seen, also while the keyboard is up.
+indicator. The bar stays at the top of what is seen, also while the keyboard is up, and the composer, the drawers and
+the dialogs stand on what is seen too: iOS 26 can leave the page panned once the keyboard has gone, which left a band
+under the composer and the tops of the drawers under the status bar (item 293). On a touch screen a page leaves the
+caret for a tap as it opens, so the keyboard comes only when you ask for it.
+
+At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
+list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
+the thumb. A chat's bar has a round way back to that list, the chat's title over the agent and the model, and its tools
+in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. A line over the
+composer says how long the run has worked (or that it waits for you) and how its helpers stand, and each part opens what
+it tells of; the queue's banner under it says what waits. The details rise from the foot as a sheet with a grabber, and
+a drag of its head down closes it; its Agents tab says of each helper its state, its model and what it does now (on a wide window
+too). Dot's computer opens over the whole screen, with the page's address and who has control (Take over), and goes back
+to the side panel when it closes.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
 that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›
