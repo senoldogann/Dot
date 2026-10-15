@@ -1,4 +1,5 @@
-"""Browser tools: open pages, read them as compact snapshots, act on them in batches, and move between tabs.
+"""Browser tools: open pages, read them as compact snapshots, act on them in batches, run scripts in them, and move between
+tabs.
 
 Every result carries page-derived text only inside a ``<web_content>`` fence with a fresh random nonce; the line above
 the fence is produced by Dot. Navigation is checked against the URL rules before anything is classified, and a batch of
@@ -19,6 +20,7 @@ from dotagent.browser.render import (
     render_find,
     render_links,
     render_page_view,
+    render_script_run,
     render_text_view,
     render_text_wait,
 )
@@ -38,6 +40,7 @@ from dotagent.browser.types import (
     FindResult,
     PageView,
     Screenshot,
+    ScriptRun,
     SecretField,
     SecretFieldCheck,
     Step,
@@ -85,6 +88,12 @@ _DEFAULT_WAIT_S: float = 10.0
 _VIEWPORT_SCROLL_RATIO: float = 0.8
 _QUICK_TIMEOUT_S: float = 45.0
 _SLOW_TIMEOUT_S: float = 120.0
+# browser_eval (item 263): the wait for a script's value, by default and at most, the longest script it takes, and how
+# much of the script the summary of the action shows.
+_DEFAULT_SCRIPT_S: float = 30.0
+_MAX_SCRIPT_S: float = 600.0
+_SCRIPT_CHARS: int = 100_000
+_SCRIPT_SUMMARY_CHARS: int = 160
 
 _REF_HELP: str = "Refs (e12, f2e7, …) come from the latest snapshot and stay valid until the page changes."
 
@@ -437,6 +446,50 @@ def _act_tool() -> RegisteredTool:
     )
 
 
+class EvalArgs(ToolArgs):
+    script: str = Field(
+        min_length=1,
+        max_length=_SCRIPT_CHARS,
+        description="An expression or a function; a promise is awaited. Return plain data, not DOM nodes.",
+    )
+    timeout_s: float | None = Field(
+        default=None,
+        ge=1,
+        le=_MAX_SCRIPT_S,
+        description="Seconds to wait for the value (default 30); the script runs on after it.",
+    )
+
+
+def _eval_tool() -> RegisteredTool:
+    def classify(args: EvalArgs, ctx: ToolContext) -> ActionInfo:
+        # A script may click, type and send whatever the page lets it, which no pattern can tell from its text: medium,
+        # as the shell guard rates the same script sent to Chrome through AppleScript.
+        target: str = ctx.browser.current_url(ctx.thread_id) or ""
+        summary: str = f"Run a script in the page: {_clip(args.script, _SCRIPT_SUMMARY_CHARS)}"
+        return _action("browser_eval", "browser_click", "medium", summary, target, ())
+
+    async def run(args: EvalArgs, ctx: ToolContext) -> ToolResult:
+        waited_s: float = args.timeout_s or _DEFAULT_SCRIPT_S
+        script_run: ScriptRun = await ctx.browser.run_script(ctx.thread_id, args.script, waited_s)
+        rendered: str = render_script_run(script_run, waited_s, _nonce(), _body_budget(ctx))
+        # The value is the page's: the run reads it as untrusted, whatever it says.
+        return mark_untrusted(fail(rendered) if script_run.end in ("error", "timeout") else ok(rendered))
+
+    return make_tool(
+        name="browser_eval",
+        description=(
+            "Run JavaScript in your tab's page, with its session, and get the value as JSON: read a whole list or the "
+            "data behind the page, or do many like actions in one call. A thrown error fails the call."
+        ),
+        args_model=EvalArgs,
+        modes=ACTING_MODES,
+        parallel_safe=False,
+        timeout_s=_MAX_SCRIPT_S + _SLOW_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
 class ScrollArgs(ToolArgs):
     direction: Literal["down", "up", "top", "bottom"] = Field(description="Where to scroll.")
     pixels: int | None = Field(
@@ -680,6 +733,7 @@ def build_browser_tools() -> tuple[RegisteredTool, ...]:
         _find_tool(),
         _links_tool(),
         _act_tool(),
+        _eval_tool(),
         _scroll_tool(),
         _read_text_tool(),
         _screenshot_tool(),

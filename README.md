@@ -446,7 +446,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 | Shell and files | `shell`, `read_file`, `write_file`, `edit_file`, `list_dir`, `find_files`, `search_files`, `write_notes`           |
 | Terminal        | `terminal_open`, `terminal_send`, `terminal_read`, `terminal_close`                                                |
 | Web             | `web_search`, `web_fetch`, `web_crawl`, `web_extract`, `judge_items`                                               |
-| Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
+| Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_eval`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
@@ -1814,6 +1814,17 @@ Both modes share what follows.
   fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its
   text, such as the text it held already, is done. A write that makes the page open another one, such as Enter in a
   search box, is done.
+- `browser_eval` runs JavaScript in the page of the run's own tab, in either mode, and gives back its value as JSON:
+  an expression (`document.title`), a function, or a promise it awaits (`timeout_s`, 30 seconds by default, at most
+  600). It reads what the snapshot shortens (a whole list, a table, the data behind a page) and does in one call what
+  would take many steps. A script that throws fails the call with its message; one still running when the wait ends
+  goes on in the page, and the call says so. A script that leads the tab elsewhere lets it land and says where, and
+  the URL rules hold after it as after a step: a forbidden address resets the tab and fails the call. The value is
+  fenced as the page's text and makes the run untrusted. As an action it is a click of medium risk on the tab's page:
+  the aggressive and balanced presets allow it, the cautious preset asks, a research run does not have it and a
+  `yolo` run does it without asking. What the script does inside the page is not checked or paced action by action,
+  as `browser_act`'s steps are. It takes the place of AppleScript's `execute javascript`, which lands in the front
+  window of whichever Chrome macOS picks when several run (item 263).
 - `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
   call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",

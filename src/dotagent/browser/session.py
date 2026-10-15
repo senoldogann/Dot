@@ -35,6 +35,7 @@ from dotagent.browser.driver import (
     measure_viewport,
     navigate,
     page_title,
+    run_script,
     run_step,
     screenshot_jpeg,
     scroll_page,
@@ -69,6 +70,7 @@ from dotagent.browser.types import (
     Frame,
     PageView,
     Screenshot,
+    ScriptRun,
     SecretFieldCheck,
     Step,
     StepReport,
@@ -1226,6 +1228,31 @@ class BrowserSession:
             view: PageView = await self._changes_view(thread, tab)
             await self._enforce_landing(tab)
             return TextWait(appeared=appeared, waited_s=waited_s, view=view)
+
+    async def run_script(self, thread_id: str, script: str, timeout_s: float) -> ScriptRun:
+        """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
+        263). What the script led to is waited for as after a step (a tab it opened, a dialog), a page it navigated to
+        is let load, and the address rules hold after it as after a step: a tab that ended on an address they forbid is
+        reset to a blank page and the call fails."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+            before: _Watch = self._watch(thread, tab)
+            started: float = time.monotonic()
+            end, text = await run_script(tab.page, script, timeout_s)
+            seconds: float = time.monotonic() - started
+            await self._let_events_land()
+            after: _Watch = self._watch(thread, tab)
+            current: Tab = await self._current_tab(thread)
+            if end == "navigated" or current is not tab or after.url != before.url:
+                await self._settle(current)
+            await self._enforce_landing(current)
+            return ScriptRun(
+                end=end,
+                text=text,
+                url=current.page.url,
+                surprise=describe_surprise(before, after),
+                seconds=seconds,
+            )
 
     async def back(self, thread_id: str) -> PageView:
         async with self._locked(thread_id) as thread:

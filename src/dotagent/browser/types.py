@@ -160,6 +160,23 @@ class ActOutcome(FrozenModel):
     view: PageView
 
 
+# How a script run in a page ended (item 263): with a value, with an error it threw, still running when the wait ended,
+# or cut off by a navigation of its page.
+ScriptEnd = Literal["value", "error", "timeout", "navigated"]
+
+
+class ScriptRun(FrozenModel):
+    """What a script run in the page of a tab did: how it ended, ``text`` (the JSON of its value, or the message of its
+    error; empty otherwise), the address of the thread's current tab after it, what else happened (a new tab, a dialog,
+    a navigation), and how long it ran."""
+
+    end: ScriptEnd
+    text: str
+    url: str
+    surprise: str | None
+    seconds: float
+
+
 class TextWait(FrozenModel):
     """What a wait for a text found: whether the text became visible in time, how long the wait took (the whole wait
     when it did not appear) and the page after it."""

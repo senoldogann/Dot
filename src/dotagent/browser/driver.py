@@ -1,6 +1,7 @@
 """Playwright calls that touch one page. Each function does one thing and turns driver errors into ``BrowserError``."""
 
 import asyncio
+import json
 import re
 from collections.abc import Awaitable, Callable
 from typing import Literal
@@ -19,7 +20,7 @@ from dotagent.browser.snapshot import (
     parse_snapshot,
     render_options,
 )
-from dotagent.browser.types import Dropdown, SecretField, SecretFieldCheck, SecretKind, Step, Viewport
+from dotagent.browser.types import Dropdown, ScriptEnd, SecretField, SecretFieldCheck, SecretKind, Step, Viewport
 from dotagent.core.errors import BrowserError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -615,6 +616,39 @@ async def visible_text(page: Page, ref: str | None, timeout_ms: int) -> str:
         return await locator.inner_text(timeout=timeout_ms)
     except PlaywrightError as error:
         raise _failure("reading the page text failed", page, {"ref": ref}, error) from error
+
+
+# How Playwright begins the error of a script, and the start of a line of its call stack.
+_EVALUATE_PREFIX: str = "Page.evaluate: "
+_STACK_LINE: str = "    at "
+# What Playwright says when the page navigated while a script ran (only this: a script's own error may say "navigator").
+_CONTEXT_DESTROYED: str = "Execution context was destroyed"
+
+
+def _script_error(raw: str) -> str:
+    """The message a script threw, without Playwright's prefix and the lines of the call stack (Playwright's own frames
+    and the anonymous ones of the script)."""
+    lines: list[str] = raw.removeprefix(_EVALUATE_PREFIX).splitlines()
+    return "\n".join(line for line in lines if not line.startswith(_STACK_LINE)).strip()
+
+
+async def run_script(page: Page, script: str, timeout_s: float) -> tuple[ScriptEnd, str]:
+    """Run ``script`` in the page's own JavaScript world (item 263) and wait at most ``timeout_s`` for its value:
+    Playwright calls a function and evaluates anything else, and waits for a promise either gives. Returns how it ended
+    and the JSON of its value (``null`` for ``undefined``; a value JSON cannot hold, a DOM node, comes as Playwright
+    writes it) or the message it threw. A script still running when the wait ends goes on in the page."""
+    try:
+        async with asyncio.timeout(timeout_s):
+            value: object = await page.evaluate(script)
+    except TimeoutError:
+        return "timeout", ""
+    except PlaywrightError as error:
+        if page.is_closed():
+            raise _failure("the tab closed while the script ran", page, {}, error) from error
+        if _CONTEXT_DESTROYED in str(error):
+            return "navigated", ""
+        return "error", _script_error(str(error))
+    return "value", json.dumps(value, ensure_ascii=False, default=str)
 
 
 async def measure_viewport(page: Page) -> Viewport:
