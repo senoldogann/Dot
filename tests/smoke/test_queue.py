@@ -28,7 +28,7 @@ import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent import manager as manager_module
-from dotagent.agent.attachments import StoredAttachment, load_attachments
+from dotagent.agent.attachments import StoredAttachment, UserInput, load_attachments
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, RunManager
 from dotagent.config import load_default_config
 from dotagent.core.errors import InvalidValueError, ProviderProtocolError, RunConflict, StoreError
@@ -310,6 +310,37 @@ async def test_a_failed_run_holds_its_chats_queue_too(login_env: dict[str, str])
         summary: QueuedMessage = await _queue(manager, first, SUMMARY, "yolo")
         await model.fail()
         assert (await _ended(manager, first.id)).status == "failed"
+        await _held(changes, runtime, first)
+        assert len(await runtime.store.list_runs(10, first.thread_id)) == 1
+        assert await _queued(runtime, first) == [(summary.id, SUMMARY)]
+
+
+async def test_a_stop_while_a_done_run_is_recorded_holds_its_chats_queue(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The code review's O5: a stop that came while the end of a run was being recorded ended the run's task there, so
+    its chat's queue was neither moved on nor held and its messages waited for nothing. The end is recorded as it was,
+    and the stop holds the queue, as any stop does."""
+    model: _GatedModel = _GatedModel()
+    async with _session(login_env, model) as (runtime, manager), _changes(runtime) as changes:
+        recording: asyncio.Event = asyncio.Event()
+        recorded: asyncio.Event = asyncio.Event()
+        keep_answers: Callable[[RunRecord, Sequence[UserInput]], Awaitable[None]] = manager._keep_answers
+
+        async def held_end(run: RunRecord, unread: Sequence[UserInput]) -> None:
+            recording.set()
+            await recorded.wait()
+            await keep_answers(run, unread)
+
+        monkeypatch.setattr(manager, "_keep_answers", held_end)
+        first: RunRecord = await _start(manager)
+        summary: QueuedMessage = await _queue(manager, first, SUMMARY, "yolo")
+        await model.release()
+        async with asyncio.timeout(WAIT_S):
+            await recording.wait()
+        manager.cancel(first.id)
+        recorded.set()
+        assert (await _ended(manager, first.id)).status == "done"
         await _held(changes, runtime, first)
         assert len(await runtime.store.list_runs(10, first.thread_id)) == 1
         assert await _queued(runtime, first) == [(summary.id, SUMMARY)]

@@ -462,6 +462,80 @@ class _Starts(RunManager):
         raise ConfigError("no run starts in this test", {"goal": goal})
 
 
+class _StartsAndEnds(RunManager):
+    """Starts every firing's run as a record of the store, which ends done once the test lets it (``ends``); no model
+    runs."""
+
+    def __init__(self, runtime: Runtime) -> None:
+        super().__init__(runtime)
+        self.goals: list[str] = []
+        self.ends: asyncio.Event = asyncio.Event()
+
+    async def start_firing(
+        self,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        carried: tuple[str, ...],
+    ) -> RunRecord:
+        self.goals.append(goal)
+        return await self._runtime.store.create_run(
+            thread_id,
+            goal,
+            mode,
+            f"ollama:{MODEL}",
+            None,
+            SCHEDULE_SOURCE,
+            "medium",
+            speed,
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+
+    async def wait(self, run_id: str) -> RunRecord:
+        await self.ends.wait()
+        await self._runtime.store.finish_run(run_id, "done", "pong")
+        return await self._runtime.store.get_run(run_id)
+
+
+async def test_a_schedule_whose_running_status_was_not_written_is_free_once_its_run_ends(
+    runtime: Runtime, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The code review's O3: the schedule was marked as running a run before its status was written, and freed only by
+    a watch started after that write; a write the store failed kept it running for good, so every later firing was
+    skipped as if its run were still going."""
+    write_status = runtime.store.set_schedule_status
+
+    async def fails_on_running(schedule_id: str, status: str) -> None:
+        if status == "running":
+            raise StoreError("the database is locked", {"schedule_id": schedule_id})
+        await write_status(schedule_id, status)
+
+    monkeypatch.setattr(runtime.store, "set_schedule_status", fails_on_running)
+    recurring: ScheduleRecord = await _schedule(runtime, _cron("Often", "*/5 * * * *"))
+    manager: _StartsAndEnds = _StartsAndEnds(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    try:
+        await scheduler.tick(_planned(recurring) + 5)
+        manager.ends.set()
+        fired: ScheduleRecord = await _until_over(runtime, recurring.id)
+        await scheduler.tick(_planned(fired) + 5)
+    finally:
+        await scheduler.drain()
+    assert manager.goals == [GOAL, GOAL]
+    assert (await runtime.store.get_schedule(recurring.id)).last_status != "skipped: the previous run was still going"
+
+
 async def test_a_one_time_schedule_overdue_fires_late_saying_when_it_was_due(runtime: Runtime) -> None:
     """Item 152: a one-time schedule whose moment passed while the daemon was off or the Mac slept has no next time to
     wait for: it fires late, and its run reads when it was due, where before it was switched off unseen; the run keeps

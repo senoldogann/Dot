@@ -385,3 +385,52 @@ async def test_the_half_minute_check_outlives_a_write_the_database_refuses(
         finally:
             await _stop(watcher)
             await manager.shutdown()
+
+
+async def test_the_half_minute_check_outlives_a_read_the_database_refuses(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The code review's O6: a read the database refuses raises sqlite3's own error, which the check did not catch; it
+    ended for the daemon's life, and the runs of dotx commands that died stayed at work, holding their chats."""
+    monkeypatch.setattr(manager_module, "COMMAND_CHECK_S", _CHECK_S)
+    async with _runtime(login_env) as runtime:
+        thread: ThreadRecord = await runtime.store.create_thread("left by a command", UI_SOURCE)
+        # A run whose command is gone: no lock of its owner is held.
+        left: RunRecord = await runtime.store.create_run(
+            thread.id,
+            GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            UI_SOURCE,
+            "medium",
+            "standard",
+            None,
+            "yolo",
+            False,
+            None,
+            None,
+            secrets.token_hex(16),
+        )
+        read_owners = runtime.store.active_run_owners
+        refused: list[str] = []
+
+        async def refused_once() -> list[str | None]:
+            if not refused:
+                refused.append("disk I/O error")
+                raise sqlite3.OperationalError("disk I/O error")
+            return await read_owners()
+
+        monkeypatch.setattr(runtime.store, "active_run_owners", refused_once)
+        manager: RunManager = RunManager(runtime)
+        watcher: asyncio.Task[None] = asyncio.create_task(manager.watch_commands())
+        try:
+            async with asyncio.timeout(_STORED_WITHIN_S):
+                closed: RunRecord = await runtime.store.get_run(left.id)
+                while closed.status == "queued":
+                    await asyncio.sleep(_CHECK_S)
+                    closed = await runtime.store.get_run(left.id)
+        finally:
+            await _stop(watcher)
+            await manager.shutdown()
+    assert refused == ["disk I/O error"]

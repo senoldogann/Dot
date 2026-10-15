@@ -991,3 +991,29 @@ async def test_a_campaign_whose_opening_session_could_not_start_in_any_way_is_no
             assert await asyncio.to_thread(_threads, db_path()) == threads
         finally:
             await manager.shutdown()
+
+
+async def test_a_session_that_could_not_start_in_any_way_is_tried_again_after_the_gap(
+    login_env: dict[str, str],
+) -> None:
+    """The code review's O4: a session clears the campaign's next one before it starts; only one of Dot's errors put it
+    back, so a start that failed otherwise left a campaign with no session planned until the daemon's next start, and
+    the thread made for it."""
+    model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, []))
+    async with _session(_config(60), login_env, model, Notices()) as (runtime, _):
+        store = runtime.store
+        thread: ThreadRecord = await store.create_thread("Leads", EVAL_SOURCE)
+        campaign: CampaignRecord = await store.create_campaign(
+            "Leads", GOAL, thread.id, SCRIPTED_MODEL, runtime.config.models.effort, "standard", None, "ask", (), "own"
+        )
+        manager: _LaunchFails = _LaunchFails(runtime)
+        try:
+            threads: int = await asyncio.to_thread(_threads, db_path())
+            before: float = time.time()
+            with pytest.raises(OSError, match="No space left on device"):
+                await manager.start_session(campaign.id)
+            planned: CampaignRecord = await store.get_campaign(campaign.id)
+            assert await asyncio.to_thread(_threads, db_path()) == threads
+        finally:
+            await manager.shutdown()
+    assert planned.next_session_at is not None and abs(planned.next_session_at - (before + 3600)) < 5

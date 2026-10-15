@@ -215,6 +215,19 @@ async def _uncancelled[T](work: Coroutine[object, object, T]) -> T:
     return task.result()
 
 
+async def _to_its_end[T](work: Coroutine[object, object, T]) -> T:
+    """Run ``work`` to its end even when the caller is cancelled meanwhile, and return what it returns or raise what it
+    raises: a cancellation that comes meanwhile is dropped, as what it came to stop is over once ``work`` is (a stop of
+    a run while its end is being recorded, the code review's O5)."""
+    task: asyncio.Task[T] = asyncio.ensure_future(work)
+    while True:
+        try:
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            if task.cancelled():
+                raise
+
+
 class RunManager:
     """Owns the live runs of one process. At most ``max_concurrent_runs`` execute at the same time.
 
@@ -391,13 +404,18 @@ class RunManager:
     async def watch_commands(self) -> None:
         """Every ``COMMAND_CHECK_S`` until cancelled, store the ends the store refused (:meth:`store_left_ends`) and
         close the runs of dead ``dotx`` commands (:meth:`close_runs_of_dead_commands`); a check that fails, on the store
-        or on the files of the owners, is logged and the next one goes on."""
+        or on the files of the owners (a read of the store fails with sqlite3's own error), is logged and the next one
+        goes on."""
         while True:
             await asyncio.sleep(COMMAND_CHECK_S)
             try:
                 stored: int = await self.store_left_ends()
             except DotError as exc:
                 log.warning("left_ends_not_stored", runs=len(self._left_ends), error=exc.message, context=exc.context)
+            except (sqlite3.Error, OSError) as exc:
+                log.warning(
+                    "left_ends_not_stored", runs=len(self._left_ends), error=str(exc), error_type=type(exc).__name__
+                )
             else:
                 if stored:
                     log.info("left_ends_stored", runs=stored)
@@ -406,7 +424,7 @@ class RunManager:
             except DotError as exc:
                 log.warning("dead_commands_not_checked", error=exc.message, context=exc.context)
                 continue
-            except OSError as exc:
+            except (sqlite3.Error, OSError) as exc:
                 log.warning("dead_commands_not_checked", error=str(exc), error_type=type(exc).__name__)
                 continue
             if closed:
@@ -755,10 +773,12 @@ class RunManager:
             None if campaign.cron is None else next_firing(campaign.cron, now, runtime.schedule_zone)
         )
         await runtime.store.set_next_session(campaign.id, following)
-        thread: ThreadRecord = await runtime.store.create_thread(
-            f"{campaign.title} · session {number}", SCHEDULE_SOURCE
-        )
+        made_thread_id: str | None = None
         try:
+            thread: ThreadRecord = await runtime.store.create_thread(
+                f"{campaign.title} · session {number}", SCHEDULE_SOURCE
+            )
+            made_thread_id = thread.id
             run, _ = await self._launch(
                 campaign.goal,
                 "task",
@@ -774,12 +794,13 @@ class RunManager:
                 campaign.id,
                 None,
             )
-        except DotError:
-            # The session is tried again; what cannot be undone is logged, not raised: the error of the start is the one
-            # to raise.
+        except Exception:
+            # Whatever failed, the session is tried again (its next one was cleared above); what cannot be undone is
+            # logged, not raised: the error of the start is the one to raise.
             try:
                 await runtime.store.set_next_session(campaign.id, now + runtime.config.agent.campaign_gap_minutes * 60)
-                await runtime.store.delete_threads([thread.id])
+                if made_thread_id is not None:
+                    await runtime.store.delete_threads([made_thread_id])
             except DotError as exc:
                 log.error("session_start_not_undone", campaign_id=campaign.id, error=exc.message, context=exc.context)
             raise
@@ -1796,7 +1817,8 @@ class RunManager:
         the lessons and playbooks of a run whose end was not recorded are not drawn. What follows a session of a
         campaign is planned once its end is recorded and before ``finished`` is set, so a waiter finds it planned. The
         lessons of a run that may hold some are drawn after that, in a task of its own, so that they hold up nothing.
-        Last, the run's chat moves its queue on (:meth:`_follow_queue`), once the run no longer holds the chat.
+        Last, the run's chat moves its queue on (:meth:`_follow_queue`), once the run no longer holds the chat; a stop
+        that came while the end was recorded holds the queue, as any stop does.
         """
         runtime: Runtime = self._runtime
         status: RunStatus = "failed"
@@ -1844,7 +1866,7 @@ class RunManager:
         if recorded and not self._stopping:
             # Nothing awaits a run's task: a queue that cannot be moved on is logged here and stays as it was.
             try:
-                await self._follow_queue(run, status)
+                await self._follow_queue(run, "cancelled" if cancel.is_set() else status)
             except Exception:
                 log.exception("queue_not_followed", run_id=run.id, thread_id=run.thread_id)
 
@@ -1870,11 +1892,12 @@ class RunManager:
         finished: asyncio.Event,
     ) -> bool:
         """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
-        happens; returns whether the end was recorded. Nothing awaits a run's task, so a failure to record it is
-        logged here with its traceback; an end the store refused is stored later (:meth:`store_left_ends`), and the
-        run stays as the store has it until then."""
+        happens; returns whether the end was recorded. A stop that comes meanwhile waits for the record and stops
+        nothing more, so what follows the end still happens (:func:`_to_its_end`). Nothing awaits a run's task, so a
+        failure to record it is logged here with its traceback; an end the store refused is stored later
+        (:meth:`store_left_ends`), and the run stays as the store has it until then."""
         try:
-            await _uncancelled(self._record_end(run, status, result, needs, error, inbox))
+            await _to_its_end(self._record_end(run, status, result, needs, error, inbox))
             return True
         except Exception:
             log.exception("run_end_not_recorded", run_id=run.id, status=status)

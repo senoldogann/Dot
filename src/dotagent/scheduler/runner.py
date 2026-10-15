@@ -305,7 +305,21 @@ class Scheduler:
             log.warning("schedule_run_stopped_emergency_stop", schedule_id=record.id, run_id=run.id)
             self._manager.end_by_emergency_stop(run.id)
         self._in_flight[record.id] = run.id
-        await store.set_schedule_status(record.id, "running")
+        # The watch starts first: it frees the schedule when the run ends, even when the store fails the write below.
+        watcher: asyncio.Task[None] = asyncio.create_task(self._watch(record.id, run.id), name=f"watch-{run.id}")
+        self._watchers.add(watcher)
+        watcher.add_done_callback(self._watcher_done)
+        try:
+            await store.set_schedule_status(record.id, "running")
+        except DotError as exc:
+            # The run started all the same; its watch writes how it ended.
+            log.error(
+                "schedule_status_not_written",
+                schedule_id=record.id,
+                run_id=run.id,
+                error=exc.message,
+                context=exc.context,
+            )
         log.info(
             "schedule_fired",
             schedule_id=record.id,
@@ -318,9 +332,6 @@ class Scheduler:
             approvals=run.approvals,
             goal_mode=run.goal_mode,
         )
-        watcher: asyncio.Task[None] = asyncio.create_task(self._watch(record.id, run.id), name=f"watch-{run.id}")
-        self._watchers.add(watcher)
-        watcher.add_done_callback(self._watcher_done)
 
     async def _firing_chat(
         self, record: ScheduleRecord, now: float, zone: ZoneInfo, same_chat: bool
