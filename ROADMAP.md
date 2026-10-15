@@ -5221,7 +5221,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | planned     |         |
-| 283 | Zen's free models work in Dot, as OpenCode's own agent                                | in progress |         |
+| 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
 | 284 | OpenCode's agent uses Dot's own tools over MCP                                        | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -12345,7 +12345,7 @@ owner judged the AgenticSideBar way allowed, and Dot drives OpenCode the same wa
 
 ### 283. Zen's free models work in Dot, as OpenCode's own agent
 
-**Status: in progress.** Built on `item-283-opencode-free-models`.
+**Status: done.** Merged as `aeee10b` (PR #321; no Linear issue, the Linear connector was signed out).
 
 **What.** With OpenCode installed, Dot starts it as a local server of its own when a run or the model list needs it (on
 a free loopback port, behind a password Dot makes, with a config and data folder in Dot's home, so that the owner's own
@@ -13144,3 +13144,4 @@ Zen's free tier must still answer with the MCP tools added (measured first).
 - 2026-10-15 (Opus 5.5): item 276 merged as `f7e09a6` (PR #318; no Linear issue, the connector was signed out): the view of Dot's computer comes back by itself: `watchInView` closes the screencast while the page is out of sight and makes it again once the page is back, and makes a stream that broke or went silent again after `follow`'s pause, so that only a refused stream ends the view with "The view of Dot's computer stopped"; test_takeover.py's new test in Chrome and in WebKit at a phone's width.
 - 2026-10-15 (Opus 5.5): item 277 merged as `d2476f5` (PR #319; no Linear issue, the connector was signed out): every chat in the sidebar wears a creature of the character engine (an agent's look, or a look its id picks for a chat with Dot, 64 looks), in the state of its latest run, with its name over its last line in plain words ("You:" before the owner's message while the run works) and its age over the unread dot at its right; creatures kept between paints (200 drawn in 82 ms); test_chat_creatures.py (new) in Chrome and WebKit; full offline smoke 572 passed, 1 timing failure under load that passes 3 of 3 alone
 - 2026-10-15 (Opus 5.5): item 278 merged as `4f21322` (PR #320; no Linear issue, the connector was signed out): the sidebar's Connect apps pill opens a page that shows where each application of the Mac and of the web stands, asks macOS for Automation, opens the right pane of System Settings under a line that says what to switch on there, finds OneDrive's synced folders and the web applications Dot's browser is signed in to, and says once how a browser without a window signs in
+- 2026-10-15 (Opus 5.5): item 283 merged as `aeee10b` (PR #321; no Linear issue, the connector was signed out): a run on one of zen's free models goes whole to opencode's own agent, in an opencode server dot starts in its own folders with none of the owner's setup and stops when idle; each action the agent takes is asked of dot's policy first, its steps, tool calls and tokens show in the run's timeline, a chat keeps its session, a message reaches the agent at work and stop stops it with its question decided; the picker marks the free models whose providers may learn from what they get
