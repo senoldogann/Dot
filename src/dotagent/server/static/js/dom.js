@@ -74,6 +74,24 @@ export function svg(tag, props, ...children) {
 }
 
 /** A function that runs `fn` once `ms` after the last call. */
+/** Show `node` once what it tells has held for `ms`, and hide it as soon as it no longer holds: returns `set(shown)`.
+ * A break of the connection that mends within `ms` (a phone back from the background) shows nothing (item 286). */
+export function showAfter(node, ms) {
+  let timer = null;
+  return (shown) => {
+    if (!shown) {
+      clearTimeout(timer);
+      timer = null;
+      node.hidden = true;
+    } else if (node.hidden && timer === null) {
+      timer = setTimeout(() => {
+        timer = null;
+        node.hidden = false;
+      }, ms);
+    }
+  };
+}
+
 export function debounce(fn, ms) {
   let timer = null;
   return (...args) => {

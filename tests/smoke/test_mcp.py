@@ -564,14 +564,14 @@ async def test_a_server_whose_tool_has_a_schema_dot_cannot_use_is_left_out_and_t
 async def test_mcp_list_reports_a_failure_that_is_not_one_of_dots_own_and_the_other_servers(
     login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    connect = mcp_hub._connect_server
+    connect = mcp_hub._connect_kept
 
     async def crashing(config: McpServerConfig, env: Mapping[str, str]) -> object:
         if config.name == "crashing":
             raise RuntimeError("a fault in the MCP library")
         return await connect(config, env)
 
-    monkeypatch.setattr(mcp_hub, "_connect_server", crashing)
+    monkeypatch.setattr(mcp_hub, "_connect_kept", crashing)
     reports: tuple[ServerReport, ...] = await inspect_servers(
         [_fixture_server("fine"), _fixture_server("crashing")], login_env
     )
@@ -586,7 +586,7 @@ async def test_a_missing_working_directory_is_named_rather_than_the_command(
 ) -> None:
     missing: Path = tmp_path / "gone"
     connection: McpConnection = McpConnection(
-        _fixture_server("homeless"), dict(login_env), {}, missing, tmp_path / "mcp-homeless.log"
+        _fixture_server("homeless"), dict(login_env), {}, None, missing, tmp_path / "mcp-homeless.log"
     )
     try:
         with pytest.raises(McpError) as raised:

@@ -26,6 +26,7 @@ from dotagent.launchd import (
 )
 
 PLUTIL: str = "/usr/bin/plutil"
+LAUNCHER: str = "/h/Dot/Dot.app/Contents/MacOS/Dot"
 
 # The layout of ``launchctl print gui/<uid>/<label>`` on macOS 26: the properties of the job stand one tab deep, those
 # of what it contains stand deeper (and may carry a ``state`` or a ``pid`` of their own).
@@ -69,10 +70,11 @@ def test_text_that_does_not_describe_a_job_is_an_error() -> None:
 
 
 def test_the_property_list_starts_the_daemon_at_login_and_after_a_crash_only() -> None:
-    agent: LaunchAgent = build_launch_agent("/opt/dot/bin/python", Path("/h/Dot"), Path("/h/Logs"), {})
+    agent: LaunchAgent = build_launch_agent(LAUNCHER, "/opt/dot/bin/python", Path("/h/Dot"), Path("/h/Logs"), {})
     parsed: dict[str, object] = plistlib.loads(render_launch_agent(agent))
     assert parsed["Label"] == LABEL
-    assert parsed["ProgramArguments"] == ["/opt/dot/bin/python", "-P", "-m", "dotagent", "daemon"]
+    # Dot.app's program starts the daemon's Python (item 288).
+    assert parsed["ProgramArguments"] == [LAUNCHER, "/opt/dot/bin/python", "-P", "-m", "dotagent", "daemon"]
     assert parsed["RunAtLoad"] is True
     assert parsed["KeepAlive"] == {"SuccessfulExit": False}
     assert parsed["LimitLoadToSessionType"] == "Aqua"
@@ -83,8 +85,10 @@ def test_the_property_list_starts_the_daemon_at_login_and_after_a_crash_only() -
 
 
 def test_the_home_and_the_log_directory_are_handed_on_only_when_the_environment_sets_them() -> None:
-    plain: LaunchAgent = build_launch_agent("/p", Path("/h"), Path("/l"), {"HOME": "/Users/someone"})
-    relocated: LaunchAgent = build_launch_agent("/p", Path("/h"), Path("/l"), {"DOT_HOME": "/x", "DOT_LOG_DIR": "/y"})
+    plain: LaunchAgent = build_launch_agent(LAUNCHER, "/p", Path("/h"), Path("/l"), {"HOME": "/Users/someone"})
+    relocated: LaunchAgent = build_launch_agent(
+        LAUNCHER, "/p", Path("/h"), Path("/l"), {"DOT_HOME": "/x", "DOT_LOG_DIR": "/y"}
+    )
     assert set(plain.environment) == {"PATH"}
     assert (relocated.environment["DOT_HOME"], relocated.environment["DOT_LOG_DIR"]) == ("/h", "/l")
 
@@ -101,12 +105,12 @@ def test_the_job_runs_the_dot_that_is_installed_not_a_package_left_in_its_workin
     planted.mkdir()
     (planted / "__init__.py").write_text("", encoding="utf-8")
     (planted / "__main__.py").write_text("print('planted')\n", encoding="utf-8")
-    words: list[str] = agent_plist(build_launch_agent(sys.executable, tmp_path, tmp_path / "logs", {}))[
+    words: list[str] = agent_plist(build_launch_agent(LAUNCHER, sys.executable, tmp_path, tmp_path / "logs", {}))[
         "ProgramArguments"
     ]
-    # The job's own words, with the help of the command line in place of the daemon.
+    # The words Dot.app's program starts the daemon with, with the help of the command line in place of the daemon.
     started: subprocess.CompletedProcess[str] = subprocess.run(
-        [*words[:-1], "--help"], cwd=tmp_path, capture_output=True, text=True, check=False
+        [*words[1:-1], "--help"], cwd=tmp_path, capture_output=True, text=True, check=False
     )
     assert started.returncode == 0, started.stderr
     assert "planted" not in started.stdout
@@ -115,7 +119,9 @@ def test_the_job_runs_the_dot_that_is_installed_not_a_package_left_in_its_workin
 
 def test_macos_accepts_the_property_list(tmp_path: Path) -> None:
     plist: Path = tmp_path / f"{LABEL}.plist"
-    plist.write_bytes(render_launch_agent(build_launch_agent(sys.executable, tmp_path, tmp_path / "logs", {})))
+    plist.write_bytes(
+        render_launch_agent(build_launch_agent(LAUNCHER, sys.executable, tmp_path, tmp_path / "logs", {}))
+    )
     linted: subprocess.CompletedProcess[str] = subprocess.run(
         [PLUTIL, "-lint", str(plist)], capture_output=True, text=True, check=False
     )

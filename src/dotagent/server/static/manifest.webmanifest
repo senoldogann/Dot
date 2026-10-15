@@ -2,7 +2,7 @@
   "name": "Dot",
   "short_name": "Dot",
   "description": "Dot, the agent on your Mac: what waits for you, what works now, and the chats.",
-  "start_url": "/#/activity",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",

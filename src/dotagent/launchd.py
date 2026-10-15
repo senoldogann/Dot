@@ -63,8 +63,10 @@ class AgentPlist(TypedDict):
 
 
 class LaunchAgent(FrozenModel):
-    """What the job runs and where it keeps its files; ``render_launch_agent`` turns it into the property list."""
+    """What the job runs and where it keeps its files; ``render_launch_agent`` turns it into the property list.
+    ``launcher`` is the program of Dot.app (``dot_app``), which starts ``python`` with the daemon."""
 
+    launcher: str
     python: str
     working_directory: str
     stdout_path: str
@@ -117,14 +119,16 @@ def service_target(uid: int) -> str:
     return f"{domain_target(uid)}/{LABEL}"
 
 
-def build_launch_agent(python: str, home: Path, logs: Path, environ: Mapping[str, str]) -> LaunchAgent:
-    """The job that runs the daemon with ``python``. ``DOT_HOME`` and ``DOT_LOG_DIR`` are handed on when set here."""
+def build_launch_agent(launcher: str, python: str, home: Path, logs: Path, environ: Mapping[str, str]) -> LaunchAgent:
+    """The job that runs the daemon with ``python`` through Dot.app's program ``launcher``. ``DOT_HOME`` and
+    ``DOT_LOG_DIR`` are handed on when set here."""
     environment: dict[str, str] = {"PATH": SERVICE_PATH}
     if environ.get("DOT_HOME", "") != "":
         environment["DOT_HOME"] = str(home)
     if environ.get("DOT_LOG_DIR", "") != "":
         environment["DOT_LOG_DIR"] = str(logs)
     return LaunchAgent(
+        launcher=launcher,
         python=python,
         working_directory=str(home),
         stdout_path=str(logs / "daemon.out.log"),
@@ -138,11 +142,12 @@ def agent_plist(agent: LaunchAgent) -> AgentPlist:
 
     ``Interactive`` keeps the browser and the desktop actions the daemon starts at full speed; ``Aqua`` keeps the job out
     of sessions that have no screen. ``-P`` keeps the working directory, Dot's home, where a run's commands may make
-    files, off the path Python imports from: the job runs the Dot that is installed.
+    files, off the path Python imports from: the job runs the Dot that is installed. launchd runs Dot.app's program,
+    which starts the daemon's Python and waits for it, so that macOS names Dot for the daemon (item 288).
     """
     return AgentPlist(
         Label=LABEL,
-        ProgramArguments=[agent.python, "-P", "-m", "dotagent", "daemon"],
+        ProgramArguments=[agent.launcher, agent.python, "-P", "-m", "dotagent", "daemon"],
         RunAtLoad=True,
         KeepAlive=KeepAlive(SuccessfulExit=False),
         ThrottleInterval=_THROTTLE_S,

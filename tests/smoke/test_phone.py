@@ -21,7 +21,7 @@ import pytest
 import pytest_asyncio
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -36,7 +36,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.db import Store
-from dotagent.store.models import ApprovalRecord, RunRecord
+from dotagent.store.models import ApprovalRecord, RunRecord, ThreadRecord
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -360,7 +360,7 @@ async def test_the_shell_of_the_web_app_is_served_and_the_service_worker_registe
 ) -> None:
     manifest: httpx.Response = await client.get("/manifest.webmanifest")
     assert manifest.status_code == 200 and manifest.headers["content-type"].startswith("application/manifest+json")
-    assert manifest.json()["start_url"] == "/#/activity" and manifest.json()["display"] == "standalone"
+    assert manifest.json()["start_url"] == "/" and manifest.json()["display"] == "standalone"
     assert (await client.get("/icons/icon-192.png")).status_code == 200
     assert (await client.get("/sw.js")).status_code == 200
     host: str = client.base_url.host
@@ -369,10 +369,39 @@ async def test_the_shell_of_the_web_app_is_served_and_the_service_worker_registe
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            page: Page = await browser.new_page(viewport={"width": 390, "height": 844})
+            # One browser's pages, which share what it stores: the token and the chat it was in last.
+            context: BrowserContext = await browser.new_context(viewport={"width": 390, "height": 844})
+            page: Page = await context.new_page()
             await page.goto(ui_url(host, port, TOKEN))
             scope: str = await page.evaluate("navigator.serviceWorker.ready.then((registration) => registration.scope)")
             assert scope == f"http://{host}:{port}/"
+            # The app opens on the chat it was in last (item 286): at the address without a route, and as a home-screen
+            # app added when it started on Activity; in a browser's tab, Activity stays a page of its own.
+            thread: ThreadRecord = await runtime.store.create_thread("Plan the garden", "test")
+            run: RunRecord = await runtime.store.create_run(
+                thread.id,
+                "Plan the garden",
+                "chat",
+                SCRIPTED_MODEL,
+                None,
+                "test",
+                None,
+                "standard",
+                None,
+                "ask",
+                False,
+                None,
+                None,
+                None,
+            )
+            await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
+            await page.wait_for_function(f"() => localStorage.getItem('dot.lastChat') === '/runs/{run.id}'")
+            await page.goto(f"http://{host}:{port}/")
+            await expect(page).to_have_url(f"http://{host}:{port}/#/runs/{run.id}")
+            app: Page = await context.new_page()
+            await app.add_init_script("Object.defineProperty(navigator, 'standalone', { get: () => true })")
+            await app.goto(f"http://{host}:{port}/#/activity")
+            await expect(app).to_have_url(f"http://{host}:{port}/#/runs/{run.id}")
             await page.goto(f"http://{host}:{port}/#/activity")
             await expect(page.locator(".activity-section")).to_have_count(3)
         finally:

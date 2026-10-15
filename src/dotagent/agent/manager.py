@@ -554,6 +554,7 @@ class RunManager:
         model: str | None,
         thread_id: str,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
@@ -563,8 +564,9 @@ class RunManager:
         ``opening`` is its first message to the model: the goal, after the note of a late start and the digest of the
         schedule's earlier runs (``scheduler/history.py``). ``carried`` are the earlier runs whose words the run reads,
         in the digest or in its chat: it starts tainted when one of them ended so. Goal mode is asked by the goal
-        alone. The rest is as for :meth:`start`."""
+        alone; fast mode only of a model that has it (item 291). The rest is as for :meth:`start`."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
+        _check_speed(ref, speed)
         if effort is not None:
             await self._check_effort(ref, effort)
         run, _ = await self._launch(
@@ -575,7 +577,7 @@ class RunManager:
             SCHEDULE_SOURCE,
             None,
             effort,
-            "standard",
+            speed,
             approvals,
             goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried),

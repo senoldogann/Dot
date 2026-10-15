@@ -132,6 +132,7 @@ def _options(same_chat: bool | None) -> ScheduleOptions:
     return ScheduleOptions(
         model=None,
         effort=None,
+        speed=None,
         approvals="yolo",
         goal_mode=False,
         timezone=None,
@@ -185,7 +186,7 @@ async def _two_firings(
             name=name, goal=GOAL, cron="0 9 * * *", at=None, mode="task", options=_options(same_chat)
         )
         created: ScheduleRecord = await create_schedule(
-            runtime.store, runtime.config.scheduler, runtime.schedule_zone, request, time.time()
+            runtime.store, runtime.config.scheduler, runtime.schedule_zone, request, time.time(), None
         )
         first: RunRecord = await _fired(runtime, scheduler, created.id)
         await between(runtime, first)
@@ -294,7 +295,7 @@ async def test_settings_show_the_two_choices_and_the_chat_shows_the_goal_alone(
                 form: Locator = page.locator("[data-schedule-form]").first
                 known: Locator = form.get_by_role("combobox", name="Earlier runs it knows")
                 await expect(known).to_have_value("")
-                await expect(known.locator("option").first).to_have_text("Default (The last 3 runs)")
+                await expect(known.locator("option").first).to_have_text("Default (The last 5 runs)")
                 chat: Locator = form.get_by_role("combobox", name="Chat")
                 await expect(chat.locator("option").first).to_have_text("Default (A new chat each time)")
                 await expect(page.get_by_text("The same chat", exact=True).first).to_be_attached()

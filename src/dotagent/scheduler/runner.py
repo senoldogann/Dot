@@ -273,6 +273,7 @@ class Scheduler:
                 record.options.model,
                 thread_id,
                 record.options.effort,
+                "standard" if record.options.speed is None else record.options.speed,
                 record.options.approvals,
                 record.options.goal_mode,
                 carried,

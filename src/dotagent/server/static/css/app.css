@@ -591,14 +591,6 @@ a.pill:hover {
   background: transparent;
 }
 
-.btn.failsafe .label {
-  display: none;
-}
-
-.btn.failsafe {
-  padding-inline: 8px;
-}
-
 .live-dot {
   width: 8px;
   height: 8px;
@@ -1370,10 +1362,16 @@ a.pill:hover {
 
 /* Connect apps (item 278): what to do or to know for an application, under what Dot does with it, and how to sign in to
    the applications of the web, once above them. A button too wide to sit beside the text of its application goes under
-   it instead of squeezing it. */
+   it instead of squeezing it. A section's lines stand clear of the line under its head and of its first row, as far
+   from them as a row's text is from its own lines (item 287); a second line follows the first closely. */
 .connect-hint {
   margin: 0;
-  padding: 0 16px 8px;
+  padding: var(--pad-row);
+}
+
+.connect-hint + .connect-hint {
+  margin-top: calc(-1 * var(--space-2));
+  padding-top: 0;
 }
 
 .connect-guide,
@@ -1388,6 +1386,41 @@ a.pill:hover {
 
 .connect-row > .row-main {
   flex: 1 1 220px;
+}
+
+/* An MCP server's address may be a long URL or command without a space: it breaks anywhere rather than widen the page
+   (item 279). The form that adds one by its address sits under the servers, its fields side by side when they fit. */
+.connect-address {
+  word-break: break-all;
+}
+
+.connect-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: var(--pad-row);
+  border-top: 1px solid var(--border);
+}
+
+.connect-add > .field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.connect-add > .field:nth-child(2) {
+  flex-grow: 3;
+}
+
+.connect-add-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .connect-add-actions {
+    flex-basis: 100%;
+  }
 }
 
 /* ---------- lists ---------- */

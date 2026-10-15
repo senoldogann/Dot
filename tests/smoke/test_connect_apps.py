@@ -1,9 +1,10 @@
-"""Connect apps (item 278) end to end: the sidebar's pill opens the page, wide and light and on a phone and dark. With
-macOS's answers given by the test (an application allowed, one not asked, one refused, one not installed), Allow asks
-macOS and its row says Allowed; Open System Settings shows the Automation pane, under a line that says what to switch
-on there, and goes under that line on a phone; OneDrive syncs a folder; a web application whose cookie the profile of
-Dot's browser holds is signed in, and another is not, with no Sign in in a browser without a window, which the web's
-section says once.
+"""Connect apps (item 278) end to end: the sidebar's link under Campaigns (item 289) opens the page, wide and light and
+on a phone and dark. With macOS's answers given by the test (an application allowed, one not asked, one refused, one
+not installed), Allow asks macOS and its row says Allowed, and still does once the application is closed and macOS
+tells nothing about it (item 288); Open System Settings shows the Automation pane, under a line that names Dot, the
+program to open there, and goes under that line on a phone; OneDrive syncs a folder; a web application whose cookie
+the profile of Dot's browser holds is signed in, and another is not, with no Sign in in a browser without a window,
+which the web's section says once.
 
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.
@@ -45,6 +46,8 @@ _OUTLOOK: str = "com.microsoft.Outlook"
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
 _PHONE_PX: int = 860
 _DAY_S: float = 86_400.0
+# The program macOS holds responsible for Dot here: the service's app.
+_DOT_APP: Path = Path("/Users/someone/Library/Application Support/Dot/Dot.app")
 
 
 class _Mac:
@@ -159,6 +162,7 @@ async def test_connect_apps_shows_where_each_application_stands_and_takes_its_st
     monkeypatch.setattr(mac, "start_hidden", macos.state)
     monkeypatch.setattr(mac, "installed_app", macos.installed)
     monkeypatch.setattr(perms, "open_settings", macos.show)
+    monkeypatch.setattr(perms, "responsible_program", lambda: _DOT_APP)
     cloud: Path = tmp_path / "CloudStorage"
     (cloud / "OneDrive-Personal").mkdir(parents=True)
     monkeypatch.setattr(routes_connections, "CLOUD_STORAGE", cloud)
@@ -175,11 +179,13 @@ async def test_connect_apps_shows_where_each_application_stands_and_takes_its_st
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 if width < _PHONE_PX:
                     await page.get_by_role("button", name="Show sidebar").first.click()
-                pill: Locator = page.locator("#sidebar a.side-connect")
-                await expect(pill).to_have_text("Connect apps")
-                pill_box: FloatRect = await _box(pill)
-                assert pill_box["y"] + pill_box["height"] <= 860, pill_box
-                await pill.click()
+                # A page among the others, under Campaigns (item 289).
+                pages: Locator = page.locator("#sidebar nav.side-links a.side-link")
+                await expect(pages).to_have_text(["Agents", "Activity", "Campaigns", "Connect apps"])
+                link: Locator = pages.nth(3)
+                link_box: FloatRect = await _box(link)
+                assert link_box["y"] + link_box["height"] <= 860, link_box
+                await link.click()
                 await expect(page).to_have_url(f"{address}/#/connect")
                 mail: Locator = _row(page, "mail")
                 await expect(mail.locator(".badge")).to_have_text("Allowed")
@@ -200,7 +206,7 @@ async def test_connect_apps_shows_where_each_application_stands_and_takes_its_st
                 notes: Locator = _row(page, "notes")
                 await expect(notes.locator(".badge")).to_have_text("Refused")
                 await expect(notes.locator(".connect-guide")).to_contain_text("Privacy & Security › Automation")
-                await expect(notes.locator(".connect-guide")).to_contain_text("switch on Notes")
+                await expect(notes.locator(".connect-guide")).to_contain_text("open Dot and switch on Notes")
                 # On a phone the wide button goes under the text instead of squeezing it; on a wide page it sits beside.
                 settings: Locator = notes.get_by_role("button", name="Open System Settings")
                 text_box: FloatRect = await _box(notes.locator(".row-main"))
@@ -228,5 +234,11 @@ async def test_connect_apps_shows_where_each_application_stands_and_takes_its_st
             # Allow asked macOS about Calendar alone, and showed no pane of System Settings.
             assert macos.asked == [_CALENDAR]
             assert macos.panes == ["automation"] * len(_SHOTS)
+            # Calendar closed, macOS tells nothing about it: its row keeps the answer macOS gave (item 288).
+            del macos.states[_CALENDAR]
+            await calendar_page.reload()
+            await expect(calendar.locator(".badge")).to_have_text("Allowed")
+            await expect(calendar.get_by_role("button")).to_have_count(0)
+            assert macos.asked == [_CALENDAR]
         finally:
             await browser.close()

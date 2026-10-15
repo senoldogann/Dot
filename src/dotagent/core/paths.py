@@ -141,6 +141,17 @@ def opencode_dir() -> Path:
     return dot_home() / "opencode"
 
 
+def connected_servers_path() -> Path:
+    """Dot's record of the MCP servers the owner added on Connect apps (item 279): each with its address or command."""
+    return dot_home() / "connected-servers.json"
+
+
+def mcp_sign_ins_dir() -> Path:
+    """Where Dot keeps what signing in to an MCP server gave it (item 279): one ``<server>.json`` per server, with its
+    tokens and the client the server's authorization server registered, readable by the owner alone."""
+    return dot_home() / "mcp-sign-ins"
+
+
 def plugins_data_dir() -> Path:
     """Where a plugin keeps its own files: ``<name>`` below here is its ``${CLAUDE_PLUGIN_DATA}``."""
     return dot_home() / "plugins-data"

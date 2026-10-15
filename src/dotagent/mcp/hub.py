@@ -1,4 +1,5 @@
-"""Every configured MCP server, connected: the tools they offer, the way to call them, and those that could not start."""
+"""Every configured MCP server, connected: the tools they offer, the way to call them, and those that could not start.
+A server added on Connect apps joins while Dot runs, and one removed there leaves (item 279)."""
 
 import asyncio
 from collections.abc import Mapping, Sequence
@@ -6,6 +7,7 @@ from contextlib import AsyncExitStack
 from dataclasses import dataclass
 from pathlib import Path
 
+import httpx2
 from mcp.types import CallToolResult
 from pydantic import JsonValue
 
@@ -17,6 +19,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.mcp.connection import McpConnection
 from dotagent.mcp.launch import resolve_server_secrets, server_environment, server_headers
 from dotagent.mcp.naming import require_distinct_names
+from dotagent.mcp.signin import kept_sign_in
 from dotagent.mcp.types import McpFailure, McpTool
 from dotagent.tools.schema import flatten_json_schema
 
@@ -28,6 +31,8 @@ _SHOWN_TOOL_NAMES: int = 60
 
 @dataclass(frozen=True)
 class _Connected:
+    """A server that answered with its tools: the connection, how many tools it listed, and those the model gets."""
+
     connection: McpConnection
     listed: int
     tools: tuple[McpTool, ...]
@@ -83,11 +88,15 @@ def tool_parameters(tool: McpTool) -> JsonObject:
         ) from exc
 
 
-async def _connect_server(config: McpServerConfig, login_env: Mapping[str, str]) -> _Connected:
+async def _connect_server(
+    config: McpServerConfig, login_env: Mapping[str, str], auth: httpx2.Auth | None
+) -> _Connected:
+    """Connect to ``config``, signing in with ``auth``, and take its tools; the connection is closed again when they
+    cannot be used."""
     secrets: dict[str, str] = await resolve_server_secrets(config)
     env: dict[str, str] = server_environment(config, login_env, secrets)
     headers: dict[str, str] = server_headers(config, secrets)
-    connection: McpConnection = McpConnection(config, env, headers, workspace_dir(), server_log_path(config))
+    connection: McpConnection = McpConnection(config, env, headers, auth, workspace_dir(), server_log_path(config))
     async with AsyncExitStack() as cleanup:
         cleanup.push_async_callback(connection.close)
         listed: tuple[McpTool, ...] = await connection.list_tools()
@@ -101,21 +110,79 @@ async def _connect_server(config: McpServerConfig, login_env: Mapping[str, str])
     return _Connected(connection=connection, listed=len(listed), tools=tools)
 
 
+async def _connect_kept(config: McpServerConfig, login_env: Mapping[str, str]) -> _Connected:
+    """Connect to ``config`` as runs do: one that signs in (``oauth``) with the sign-in kept for it, never a new one."""
+    auth: httpx2.Auth | None = await asyncio.to_thread(kept_sign_in, config) if config.oauth else None
+    return await _connect_server(config, login_env, auth)
+
+
 class McpHub:
-    """The connected servers and the tools they offer to the model, and the enabled servers left out at the start."""
+    """The connected servers and the tools they offer to the model, and the enabled servers left out at the start. A
+    server connected or removed while Dot runs (:meth:`connect`, :meth:`disconnect`) changes the tools of the runs
+    that start after; a run keeps those it started with."""
 
     def __init__(
         self,
         connections: Mapping[str, McpConnection],
         tools: tuple[McpTool, ...],
         failures: tuple[McpFailure, ...],
+        configs: Mapping[str, McpServerConfig],
+        login_env: Mapping[str, str],
     ) -> None:
         self._connections: dict[str, McpConnection] = dict(connections)
         self.tools: tuple[McpTool, ...] = tools
         self.failures: tuple[McpFailure, ...] = failures
+        self._configs: dict[str, McpServerConfig] = dict(configs)
+        self._login_env: dict[str, str] = dict(login_env)
+        self._changing: asyncio.Lock = asyncio.Lock()
+
+    def connected(self) -> tuple[str, ...]:
+        """The names of the servers connected now."""
+        return tuple(self._connections)
+
+    def configs(self) -> dict[str, McpServerConfig]:
+        """Every enabled server the hub has, connected or left out, by name."""
+        return dict(self._configs)
 
     async def call(self, tool: McpTool, arguments: JsonObject) -> CallToolResult:
-        return await self._connections[tool.server].call_tool(tool.remote_name, arguments)
+        connection: McpConnection | None = self._connections.get(tool.server)
+        if connection is None:
+            raise McpError(
+                "the MCP server was removed from Dot while the run worked",
+                {"server": tool.server, "tool": tool.remote_name},
+            )
+        return await connection.call_tool(tool.remote_name, arguments)
+
+    async def attempt(self, config: McpServerConfig, auth: httpx2.Auth | None) -> tuple[McpTool, ...]:
+        """Connect to ``config`` once, signing in with ``auth``, and close the connection again: the tools the model
+        would get from it. Raises when it cannot be used, as :func:`open_hub` would leave it out."""
+        done: _Connected = await _connect_server(config, self._login_env, auth)
+        await done.connection.close()
+        return done.tools
+
+    async def connect(self, config: McpServerConfig) -> tuple[McpTool, ...]:
+        """Connect ``config`` as runs connect to it, in the place of a server of the same name, and return the tools the
+        model gets from it. One that cannot be connected raises, and the hub stays as it was."""
+        async with self._changing:
+            done: _Connected = await _connect_kept(config, self._login_env)
+            previous: McpConnection | None = self._connections.pop(config.name, None)
+            self._connections[config.name] = done.connection
+            self._configs[config.name] = config
+            self.tools = (*(tool for tool in self.tools if tool.server != config.name), *done.tools)
+            self.failures = tuple(failure for failure in self.failures if failure.server != config.name)
+        if previous is not None:
+            await previous.close()
+        return done.tools
+
+    async def disconnect(self, server: str) -> None:
+        """Take the server ``server`` out, with its tools; nothing happens for one that is not here."""
+        async with self._changing:
+            connection: McpConnection | None = self._connections.pop(server, None)
+            self._configs.pop(server, None)
+            self.tools = tuple(tool for tool in self.tools if tool.server != server)
+            self.failures = tuple(failure for failure in self.failures if failure.server != server)
+        if connection is not None:
+            await connection.close()
 
     async def close(self) -> None:
         await asyncio.gather(*(connection.close() for connection in self._connections.values()))
@@ -137,7 +204,7 @@ async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, s
     their tools, so Dot starts without the tools of a broken server. A cancellation stops every server again."""
     enabled: list[McpServerConfig] = [config for config in configs if config.enabled]
     outcomes: list[_Connected | BaseException] = list(
-        await asyncio.gather(*(_connect_server(config, login_env) for config in enabled), return_exceptions=True)
+        await asyncio.gather(*(_connect_kept(config, login_env) for config in enabled), return_exceptions=True)
     )
     connected: dict[str, _Connected] = {
         config.name: outcome
@@ -156,7 +223,13 @@ async def open_hub(configs: Sequence[McpServerConfig], login_env: Mapping[str, s
         if isinstance(outcome, Exception)
     )
     tools: tuple[McpTool, ...] = tuple(tool for done in connected.values() for tool in done.tools)
-    return McpHub({name: done.connection for name, done in connected.items()}, tools, failures)
+    return McpHub(
+        {name: done.connection for name, done in connected.items()},
+        tools,
+        failures,
+        {config.name: config for config in enabled},
+        login_env,
+    )
 
 
 async def _inspect(config: McpServerConfig, login_env: Mapping[str, str]) -> ServerReport:
@@ -164,7 +237,7 @@ async def _inspect(config: McpServerConfig, login_env: Mapping[str, str]) -> Ser
     if not config.enabled:
         return ServerReport(server=config.name, enabled=False, listed=0, tools=(), error=None, detail={}, log=log_file)
     try:
-        connected: _Connected = await _connect_server(config, login_env)
+        connected: _Connected = await _connect_kept(config, login_env)
     except Exception as exc:
         # Any failure, as :func:`open_hub` leaves the server out with it.
         failure: McpFailure = _failure(config, exc)

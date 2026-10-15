@@ -38,6 +38,7 @@ from dotagent.server.routes_connections import connections_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_files import files_router
 from dotagent.server.routes_keys import keys_router
+from dotagent.server.routes_mcp import mcp_router
 from dotagent.server.routes_pages import pages_router
 from dotagent.server.routes_phone import phone_router
 from dotagent.server.routes_queue import queue_router
@@ -114,6 +115,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(agents_router(ctx))
     app.include_router(browser_router(ctx))
     app.include_router(connections_router(ctx))
+    app.include_router(mcp_router(ctx))
     app.include_router(keys_router(ctx))
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))

@@ -25,7 +25,7 @@ from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, To
 from dotagent.core.paths import failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
-from dotagent.llm.types import Effort
+from dotagent.llm.types import Effort, Speed
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
@@ -34,6 +34,7 @@ from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
 from dotagent.store.models import (
     CampaignRecord,
+    ChatChoices,
     EventRecord,
     RunMode,
     RunRecord,
@@ -121,7 +122,9 @@ async def scheduler(runtime: Runtime) -> AsyncIterator[Scheduler]:
 
 
 async def _schedule(runtime: Runtime, request: ScheduleRequest) -> ScheduleRecord:
-    return await create_schedule(runtime.store, runtime.config.scheduler, runtime.schedule_zone, request, time.time())
+    return await create_schedule(
+        runtime.store, runtime.config.scheduler, runtime.schedule_zone, request, time.time(), None
+    )
 
 
 def _cron(name: str, cron: str) -> ScheduleRequest:
@@ -158,15 +161,17 @@ async def _until_over(runtime: Runtime, schedule_id: str) -> ScheduleRecord:
 # ------------------------------------------------------------------------------------------ the tools
 
 
-async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[PreparedCall, ToolContext]:
+async def _prepare(
+    runtime: Runtime, run: RunRecord, name: str, arguments: JsonObject
+) -> tuple[PreparedCall, ToolContext]:
     ctx: ToolContext = ToolContext(
         runtime=runtime,
         browser=runtime.browser,
-        run_id="schedule-test",
+        run_id=run.id,
         agent_id=None,
-        thread_id="schedule-test",
-        mode="task",
-        approvals="ask",
+        thread_id=run.thread_id,
+        mode=run.mode,
+        approvals=run.approvals,
         questions="wait",
         workspace=workspace_dir(),
         gate=_Recorder(),
@@ -177,14 +182,44 @@ async def _prepare(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[
     return await runtime.registry.tools[name].prepare(arguments, ctx), ctx
 
 
-async def _call(runtime: Runtime, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
-    prepared, ctx = await _prepare(runtime, name, arguments)
+async def _call(runtime: Runtime, run: RunRecord, name: str, arguments: JsonObject) -> tuple[ToolResult, ActionInfo]:
+    prepared, ctx = await _prepare(runtime, run, name, arguments)
     return await prepared.run(ctx), prepared.action
 
 
+async def _chat_run(runtime: Runtime) -> RunRecord:
+    """The run of a chat the owner started with choices of their own: YOLO, goal mode, a chosen model and level, the
+    research mode; the chat keeps them as its composer shows them."""
+    store = runtime.store
+    thread: ThreadRecord = await store.create_thread("Plan the week", "ui")
+    run: RunRecord = await store.create_run(
+        thread.id,
+        "Plan the week",
+        "research",
+        CHOSEN_REF,
+        None,
+        "ui",
+        "high",
+        "standard",
+        None,
+        "yolo",
+        True,
+        None,
+        None,
+        None,
+    )
+    choices: ChatChoices = ChatChoices(
+        mode="research", model=CHOSEN_REF, effort="high", speed="standard", approvals="yolo", goal_mode=True
+    )
+    await store.set_chat_choices(thread.id, choices)
+    return run
+
+
 async def test_the_model_can_create_list_and_delete_schedules(runtime: Runtime) -> None:
+    run: RunRecord = await _chat_run(runtime)
     created, action = await _call(
         runtime,
+        run,
         "schedule_create",
         {"name": "Weekday digest", "goal": "Summarise today's Python news into digest.md", "cron": "0 9 * * 1-5"},
     )
@@ -199,8 +234,21 @@ async def test_the_model_can_create_list_and_delete_schedules(runtime: Runtime) 
     identified: re.Match[str] | None = re.match(r"Scheduled: (sch_\w+) ", created.text)
     assert identified is not None, created.text
     assert "dotx daemon" in created.text
+    # The schedule starts its runs as the chat it was made in does, in that chat (item 291).
+    kept: ScheduleRecord = await runtime.store.get_schedule(identified.group(1))
+    assert (kept.mode, kept.thread_id) == ("research", run.thread_id)
+    assert kept.options == ScheduleOptions(
+        model=CHOSEN_REF,
+        effort="high",
+        speed="standard",
+        approvals="yolo",
+        goal_mode=True,
+        timezone=None,
+        history_runs=None,
+        same_chat=True,
+    )
 
-    listed, action = await _call(runtime, "schedule_list", {})
+    listed, action = await _call(runtime, run, "schedule_list", {})
     assert (action.kind, action.risk) == ("meta", "safe")
     assert identified.group(1) in listed.text
     assert "Weekday digest" in listed.text
@@ -209,20 +257,24 @@ async def test_the_model_can_create_list_and_delete_schedules(runtime: Runtime) 
     with pytest.raises(ToolInputError, match="either cron or at"):
         await _prepare(
             runtime,
+            run,
             "schedule_create",
             {"name": "Both", "goal": "Do something at some point", "cron": "0 9 * * *", "at": "2099-01-01T09:00"},
         )
     with pytest.raises(ToolInputError, match="too often"):
         await _prepare(
-            runtime, "schedule_create", {"name": "Often", "goal": "Do something every minute", "cron": "* * * * *"}
+            runtime,
+            run,
+            "schedule_create",
+            {"name": "Often", "goal": "Do something every minute", "cron": "* * * * *"},
         )
 
-    deleted, action = await _call(runtime, "schedule_delete", {"schedule_id": identified.group(1)})
+    deleted, action = await _call(runtime, run, "schedule_delete", {"schedule_id": identified.group(1)})
     assert action.summary == f'Delete schedule "Weekday digest" ({identified.group(1)})'
     assert deleted.text.startswith("Deleted: ")
     with pytest.raises(StoreError, match="not found"):
-        await _prepare(runtime, "schedule_delete", {"schedule_id": identified.group(1)})
-    gone, _ = await _call(runtime, "schedule_list", {})
+        await _prepare(runtime, run, "schedule_delete", {"schedule_id": identified.group(1)})
+    gone, _ = await _call(runtime, run, "schedule_list", {})
     assert gone.text.startswith("No schedules.")
 
 
@@ -331,6 +383,7 @@ class _OwnerSwitchesTheOtherOff(RunManager):
         model: str | None,
         thread_id: str,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
@@ -399,6 +452,7 @@ class _Starts(RunManager):
         model: str | None,
         thread_id: str,
         effort: Effort | None,
+        speed: Speed,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         carried: tuple[str, ...],
@@ -501,6 +555,7 @@ async def test_a_schedule_is_edited_whole_and_keeps_its_history(runtime: Runtime
     options: ScheduleOptions = ScheduleOptions(
         model=CHOSEN_REF,
         effort="low",
+        speed=None,
         approvals="yolo",
         goal_mode=True,
         timezone=OTHER_ZONE,
@@ -599,6 +654,7 @@ async def test_a_schedule_starts_its_runs_with_the_mode_model_and_approvals_it_w
     options: ScheduleOptions = ScheduleOptions(
         model=CHOSEN_REF,
         effort=None,
+        speed=None,
         approvals="yolo",
         goal_mode=True,
         timezone=OTHER_ZONE,

@@ -82,6 +82,7 @@ def _model(
 
 _NO_EFFORT: tuple[str, ...] = ()
 _LMH: tuple[str, ...] = ("low", "medium", "high")
+_DEEPSEEK: tuple[str, ...] = ("low", "high", "max")
 _GPT_LUNA: tuple[str, ...] = ("none", "low", "medium", "high", "xhigh", "max")
 
 # The reasoning labels follow what OpenCode's own client sends per family (it sends none for GLM, Kimi, MiniMax
@@ -95,10 +96,11 @@ CATALOG: dict[str, GoModel] = {
     "kimi-k2.6": _model("chat", True, 262_144, 65_536, _NO_EFFORT, False, False),
     "longcat-2.0": _model("chat", False, 1_000_000, 131_072, _LMH, False, True),
     "longcat-2.5-preview-free": _model("chat", True, 1_000_000, 131_072, _LMH, False, True),
-    # DeepSeek's reasoning labels are not honoured on the chat route (measured 2026-10-15, item 258: the reasoning tokens of
-    # one prompt were the same at low, high, max and a made-up label; GLM 5.2 at max thought three times longer than at
-    # high), so no level is offered for it: a choice that changes nothing would be a lie in the menu.
-    "deepseek-v4.1-flash": _model("chat", True, 1_000_000, 384_000, _NO_EFFORT, False, True),
+    # DeepSeek's reasoning labels were not honoured on the chat route when measured (2026-10-15, item 258: the reasoning
+    # tokens of one prompt were the same at low, high, max and a made-up label; GLM 5.2 at max thought three times longer
+    # than at high), so its models offer no level, but for V4.1 Flash, the owner's main model, whose levels the owner
+    # asked to keep choosing (item 290): they are sent as OpenCode's own client sends them.
+    "deepseek-v4.1-flash": _model("chat", True, 1_000_000, 384_000, _DEEPSEEK, False, True),
     "deepseek-v4-flash": _model("chat", False, 1_000_000, 384_000, _NO_EFFORT, False, True),
     "deepseek-v4-pro": _model("chat", False, 1_000_000, 384_000, _NO_EFFORT, False, True),
     "deepseek-v4-flash-vision-exp": _model("chat", True, 1_000_000, 384_000, _NO_EFFORT, False, True),

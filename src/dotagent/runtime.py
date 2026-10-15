@@ -14,7 +14,7 @@ from dotagent.agent.sizes import ContextSizes
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AppConfig, McpServerConfig
-from dotagent.core.errors import ElsewhereError, StoreError
+from dotagent.core.errors import ElsewhereError, McpError, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.notify import Notifier, show_notification
 from dotagent.core.paths import (
@@ -22,6 +22,7 @@ from dotagent.core.paths import (
     browser_profile_dir,
     chrome_data_dir,
     config_path,
+    connected_servers_path,
     db_path,
     downloads_dir,
     ensure_layout,
@@ -45,6 +46,7 @@ from dotagent.launchd import launch_agent_path
 from dotagent.llm.calls import CALL_EVENT, CallRecorder, ModelCall, call_event_data, log_model_call
 from dotagent.llm.roles import ModelRoles
 from dotagent.llm.router import ModelRouter
+from dotagent.mcp.connected import ConnectedServers, read_connected
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
 from dotagent.notify.push import PushKeys, read_or_create_keys
@@ -283,6 +285,21 @@ def _added_servers(config: AppConfig, plugins: PluginCatalog) -> tuple[McpServer
     return configs
 
 
+def _connected_servers(taken: frozenset[str]) -> tuple[McpServerConfig, ...]:
+    """The MCP servers that the owner added on Connect apps (item 279). One whose name another server has (``taken``)
+    is logged and left out, and so are all of them when the record cannot be read."""
+    path: Path = connected_servers_path()
+    try:
+        record: ConnectedServers = read_connected(path)
+    except McpError as error:
+        log.warning("connected_servers_unreadable", path=str(path), reason=error.message)
+        return ()
+    for server in record.servers:
+        if server.name in taken:
+            log.warning("connected_server_left_out", server=server.name, reason="another MCP server has its name")
+    return tuple(server for server in record.servers if server.name not in taken)
+
+
 async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
     """Create the on-disk layout and open every service, with the environment of the login shell already read. Pair
     with :func:`close_runtime`.
@@ -305,7 +322,11 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
         store: Store = await Store.open(db_path(), screenshots_dir())
         cleanup.push_async_callback(store.close)
         added: tuple[McpServerConfig, ...] = await asyncio.to_thread(_added_servers, config, plugins)
-        mcp: McpHub = await open_hub([*config.mcp, *plugins.servers(), *added], login_env)
+        others: tuple[McpServerConfig, ...] = (*config.mcp, *plugins.servers(), *added)
+        connected: tuple[McpServerConfig, ...] = await asyncio.to_thread(
+            _connected_servers, frozenset(server.name for server in others)
+        )
+        mcp: McpHub = await open_hub([*others, *connected], login_env)
         cleanup.push_async_callback(mcp.close)
         memory: MemoryIndex = await open_memory_index(store, config)
         cleanup.push_async_callback(close_memory_index, memory)

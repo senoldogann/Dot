@@ -3,7 +3,7 @@
 
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { agentList } from "../agentlist.js";
-import { api, follow } from "../api.js";
+import { api, follow, QUIET_BREAK_MS } from "../api.js";
 import { BUSY_SEND, valueOf } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { askForWords, readyToSend } from "../attachments.js";
@@ -14,7 +14,7 @@ import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
-import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, requestFile } from "../dom.js";
+import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, requestFile, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -58,6 +58,10 @@ const FILES_SETTLE_MS = 250;
 const AGENTS_SETTLE_MS = 250;
 // The events of a run that start or end it.
 const RUN_ENDS = new Set(["run_queued", "run_finished"]);
+// The moments of a helper the lifecycle stream tells: the rows of the helpers are read from the store once a burst of
+// them has settled, whatever the run's own stream brought (item 285).
+const HELPER_MOMENTS = new Set(["run_queued", "run_started", "run_finished"]);
+const HELPERS_SETTLE_MS = 1500;
 // How often the cost card is read again while the run works (its numbers come from a query over the run's events).
 const COST_REFRESH_MS = 10_000;
 // What the Actions panel says of a file change, by the state of its undo (see undo.restore.UndoStep).
@@ -269,6 +273,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       .catch((error) => console.warn("the parent run could not be loaded", error));
   }
   const connectionNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Connection lost. Reconnecting…"));
+  // A break that mends at once, as when the page comes back into view, says nothing (item 286).
+  const showConnectionNote = showAfter(connectionNote, QUIET_BREAK_MS);
 
   // ------------------------------------------------------------------------------------ details and plan
   const details = createDetails(run, agent, detail.campaign, detail.keep_going);
@@ -901,10 +907,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       paintCost();
       paintLessons(fresh.lessons);
       paintQuestions(fresh.questions);
-      // Once the run is over, a row of a delegated run whose end its events did not bring shows how that run ended.
-      if (!active) {
-        timeline.settle(fresh.children);
-      }
+      // The rows of the delegated runs follow the store where the run's events did not bring them (item 285).
+      timeline.settle(fresh.children, Date.now() / 1000);
     } catch (error) {
       readFailed("The run", error);
     }
@@ -1226,10 +1230,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   loadActions();
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
-  // Lessons change after the run, and a question may be answered or skipped in another tab.
+  // Lessons change after the run, and a question may be answered or skipped in another tab. A helper that starts or
+  // ends is read from the store too.
+  const helpersChanged = debounce(() => reconcile(), HELPERS_SETTLE_MS);
   const stopLifecycle = onLifecycle((event) => {
     if ((LESSON_KINDS.has(event.kind) || event.kind === "approval_decided") && event.run_id === runId) {
       reconcile();
+    } else if (HELPER_MOMENTS.has(event.kind) && event.run_id !== runId && (event.data.parent_run_id === runId || timeline.knows(event.run_id))) {
+      helpersChanged();
     }
   });
   // The run as it stands, its lessons and its questions among it, once the lifecycle stream is back after a break.
@@ -1241,7 +1249,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     signal,
     isFinished: (message) => message.data.kind === "run_finished" && message.data.run_id === runId,
     onState: (state) => {
-      connectionNote.hidden = state !== "reconnecting";
+      showConnectionNote(state === "reconnecting");
     },
     onMessage: (message) => {
       if (message.data.kind === "steer" && message.data.run_id === runId) {

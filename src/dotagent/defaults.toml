@@ -17,7 +17,9 @@
 #   name = "docs"
 #   url = "https://mcp.example.com/mcp"             # a remote server; transport = "http" (default) or "sse"
 #   headers = { Authorization = "Bearer ${DOCS_TOKEN}" }   # ${NAME} as above; headers are never logged
-# Plugins add their own servers (see [plugins]); their names become <plugin>-<server>.
+#   oauth = false                       # true: sign in with your account (Connect apps › Sign in again)
+# Plugins add their own servers (see [plugins]); their names become <plugin>-<server>. Servers added on Connect apps
+# are kept in connected-servers.json in Dot's home, not here.
 mcp = []
 
 [server]
@@ -578,8 +580,8 @@ misfire_grace_s = 3600
 max_schedules = 50
 # A firing's run starts with the dated final answers of the schedule's last runs in front of its goal, so it builds
 # on what they found instead of doing the same work again (item 257): how many (0 = none; a schedule may choose its
-# own) and in how many characters at most.
-history_runs = 3
+# own; the last five, item 291) and in how many characters at most.
+history_runs = 5
 history_chars = 4000
 # Whether a firing goes on in the chat of the one before (its run reads their conversation, not the digest)
 # instead of a new chat; a schedule may choose its own.

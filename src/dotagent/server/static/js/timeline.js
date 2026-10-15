@@ -199,7 +199,8 @@ function buildFlock() {
 }
 
 /**
- * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order; the
+ * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
+ * `settle(runs, now)` the records of its delegated runs, and `knows(runId)` says whether a run has its place in it; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
@@ -237,6 +238,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       calls: new Map(),
       finishing: new Map(),
       group: null,
+      // The group that holds the calls of the model turn under way, open or ended by the rows of the helpers it started.
+      turnGroup: null,
       groups: [],
       live: null,
       // The block of the latest step's thinking (item 246; see startThought).
@@ -354,6 +357,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     if (scope.group === null) {
       const group = buildGroup(scope.boundary);
       scope.group = group;
+      scope.turnGroup = group;
       scope.groups.push(group);
       // The thinking of the step whose calls start the group, with nothing after it, is the group's first row (item 246);
       // a thought the reader opened stays in sight, the group opening with it.
@@ -365,6 +369,20 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       scope.container.append(group.node);
     }
     return scope.group;
+  }
+
+  /**
+   * The group a tool call of `scope` goes in, and the line of the decision on it: the open group, else the group of its
+   * model turn when the rows of the helpers that turn started stand last in the scope, else a new one. A turn's helpers
+   * run a few at a time (`[agent] parallel_tools`): the call of one that starts once another ended stays with the calls
+   * of its turn, so its row joins the group of its turn's helpers (item 285).
+   */
+  function callGroup(scope) {
+    const turn = scope.turnGroup;
+    if (scope.group === null && turn !== null && scope.flock !== null && scope.container.lastElementChild === scope.flock.anchor) {
+      return turn;
+    }
+    return groupFor(scope);
   }
 
   /** A delegated run asks the reader something (item 123): its row opens, and so do the rows it sits in and their
@@ -480,16 +498,31 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   }
 
   /**
-   * The rows of the delegated runs whose end the page did not read show how those runs ended, from `runs`, their
-   * records as the store has them (the `children` of the run's detail). Until item 197, the end of a stopped run was
-   * stored before the ends of the runs it delegated, and the page reads the events of a run up to its own end.
+   * The rows of the delegated runs as the store has them at `now` (seconds), from `runs`, their records (the `children`
+   * of the run's detail), for what the page did not read of their events: a run with no row gets one, the row of a
+   * run that ended shows how it ended, and the row of a run at work counts the steps the store counts, so the
+   * conversation says what the sidebar says (item 285). Until item 197, the end of a stopped run was stored before the
+   * ends of the runs it delegated, and the page reads the events of a run up to its own end.
    */
-  function settle(runs) {
+  function settle(runs, now) {
     for (const run of runs) {
-      const scope = scopes.get(run.id);
-      if (scope !== undefined && liveChildren.has(scope) && run.finished_at !== null) {
+      const known = scopes.get(run.id);
+      const scope =
+        known ??
+        childScope(
+          run.id,
+          { goal: run.goal, parent_run_id: run.parent_run_id, agent_id: run.agent_id, mode: run.mode, model: run.model, effort: run.effort, speed: run.speed },
+          run.created_at,
+        );
+      if (!liveChildren.has(scope)) {
+        continue;
+      }
+      if (run.finished_at !== null) {
         settleGroups(scope, run.finished_at);
         endChild(scope, run.status, run.steps, run.finished_at, run.result);
+      } else if (run.steps > scope.panel.steps) {
+        scope.panel.steps = run.steps;
+        paintChild(scope, now, [`step ${run.steps}`]);
       }
     }
   }
@@ -647,7 +680,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
 
   /** Add a tool call as a row to the group it belongs to; `call` is `{ id, tool, args }`. */
   function showCall(scope, call) {
-    const group = groupFor(scope);
+    const group = callGroup(scope);
     const row = toolRow({ tool: call.tool, args: call.args });
     group.body.append(row.node);
     group.calls += 1;
@@ -705,6 +738,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
 
     assistant(scope, record) {
       const data = record.data;
+      // A new turn: its calls go in the open group, or in the group its first call makes.
+      scope.turnGroup = scope.group;
       addModelTime(scope, data);
       settleThought(scope, data);
       if (scope.panel !== null) {
@@ -728,6 +763,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       }
       // A message ends the group of steps before it: the steps that follow it make a new one.
       endGroup(scope, record.ts);
+      scope.turnGroup = null;
       scope.boundary = record.ts;
       const target = bubble ?? newBubble(scope, data.step, false);
       target.node.className = "bubble";
@@ -883,7 +919,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const reason = said ? "" : ` — ${clip(data.note, 240)}`;
       const text = `${verdict}: ${clip(data.summary, 200)}${reason}`;
       const tone = denied ? "auto-decision denied" : yolo ? "auto-decision yolo" : "auto-decision";
-      groupFor(scope).body.append(el("div", { class: tone }, icon(yolo ? "bolt" : "shield"), el("span", null, text)));
+      callGroup(scope).body.append(el("div", { class: tone }, icon(yolo ? "bolt" : "shield"), el("span", null, text)));
     },
 
     // The checker of goal mode compared the answer with the goal: `final` says whether the run ends with this verdict,
@@ -1202,5 +1238,5 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     onGrow();
   }
 
-  return { element, push, tick, settle };
+  return { element, push, tick, settle, knows: (runId) => scopes.has(runId) };
 }

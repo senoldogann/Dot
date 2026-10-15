@@ -73,7 +73,7 @@ async def cmd_schedule_add(command: ScheduleAddCommand) -> int:
         options=UNSET_OPTIONS,
     )
     async with store_alone() as store:
-        record: ScheduleRecord = await create_schedule(store, config.scheduler, zone, request, time.time())
+        record: ScheduleRecord = await create_schedule(store, config.scheduler, zone, request, time.time(), None)
     sys.stdout.write(f"Scheduled: {render_schedule(record, await schedule_zone(record.options, zone))}\n")
     sys.stderr.write(f"{DAEMON_NOTE}\n")
     return 0

@@ -24,7 +24,8 @@ from dotagent.cli_commands import (
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import ConfigError, InvalidValueError, ServiceError
 from dotagent.core.paths import dot_home, log_dir, token_path
-from dotagent.desktop.perms import Pane, open_settings, program_of_this_process, settings_url
+from dotagent.desktop.perms import Pane, open_settings, settings_url
+from dotagent.dot_app import app_path, ensure_app
 from dotagent.launchd import (
     LABEL,
     JobState,
@@ -239,7 +240,8 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
             "a Dot daemon that is not the service already answers at the address",
             {"url": url, "fix": "stop it (Ctrl-C in its terminal), then install the service again"},
         )
-    agent: LaunchAgent = build_launch_agent(sys.executable, dot_home(), log_dir(), os.environ)
+    launcher: Path = await asyncio.to_thread(ensure_app, dot_home())
+    agent: LaunchAgent = build_launch_agent(str(launcher), sys.executable, dot_home(), log_dir(), os.environ)
     replaced: bool = await install_job(plist, render_launch_agent(agent), uid)
     sys.stdout.write(f"{'Replaced' if replaced else 'Installed'} the launchd job {LABEL}: {plist}\n")
     health: HealthView | None = await wait_for_daemon(url, _START_WAIT_S)
@@ -255,7 +257,7 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
                 "fix": (
                     "read daemon.err.log and dotx.log in the log directory; 'dotx service status' shows the job. "
                     "When Dot lives under Desktop, Documents or Downloads, the first start waits for the answer to "
-                    "the dialog in which macOS asks whether Python may use that folder"
+                    "the dialog in which macOS asks whether Dot may use that folder"
                 ),
             },
         )
@@ -263,8 +265,8 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
         f"The daemon answers at {base_url(config.server.host, config.server.port)} (version {health.version}). "
         "It starts at every login and again after a crash.\n"
         "Open the UI with 'dotx open'. Re-run 'dotx service install' after changing the configuration.\n"
-        f"macOS grants Accessibility and Screen Recording to the program that runs Dot, so allow this one in "
-        f"System Settings > Privacy & Security, or desktop actions fail:\n  {program_of_this_process()}\n"
+        f"macOS asks for Dot, the app {app_path(dot_home())} that runs the daemon, and grants Accessibility and "
+        "Screen Recording to it: allow Dot in System Settings > Privacy & Security, or desktop actions fail. "
         "'dotx service permissions' leads you through them.\n"
     )
     return 0
@@ -287,8 +289,8 @@ async def copy_to_clipboard(text: str) -> None:
 
 
 def _steps(pane: Pane) -> str:
-    """What the person does for one pane, as macOS behaves for a program that is not an app: it shows a dialog for
-    Accessibility but none for Screen Recording (its log says the service does not allow prompting)."""
+    """What the person does for one pane. macOS may show a dialog that names the program; when it shows none (it
+    showed none for Screen Recording to a program that is not an app), the program is added to the list by hand."""
     match pane:
         case "accessibility":
             return (
@@ -300,9 +302,9 @@ def _steps(pane: Pane) -> str:
             )
         case "screen_recording":
             return (
-                "macOS shows no dialog for Screen Recording, so add the program by hand in the pane that just opened: "
-                "press + (Touch ID or password), press Cmd+Shift+G, paste with Cmd+V (the path of the program is on "
-                "your clipboard), press Return, choose Open, and switch it on. It takes effect only for a program "
+                "Switch the program on in the pane that just opened (Touch ID or password). If it is not in the "
+                "list, press +, press Cmd+Shift+G, paste with Cmd+V (the path of the program is on your clipboard), "
+                "press Return, choose Open, and switch it on. It takes effect only for a program "
                 "that starts afterwards: run 'dotx service install' to restart the service, then "
                 "'dotx service permissions' to see all three granted."
             )

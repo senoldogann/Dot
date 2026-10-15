@@ -301,8 +301,8 @@ class MemoryRequest(FrozenModel):
 
 
 class ScheduleCreateRequest(FrozenModel):
-    """A new schedule. ``model``, ``effort``, ``approvals``, ``goal_mode`` and ``timezone`` left out take the configured
-    ones when the schedule fires."""
+    """A new schedule. ``model``, ``effort``, ``speed``, ``approvals``, ``goal_mode`` and ``timezone`` left out take the
+    configured ones when the schedule fires (the standard speed for ``speed``)."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -311,6 +311,7 @@ class ScheduleCreateRequest(FrozenModel):
     mode: Literal["task", "research"] = "task"
     model: str | None = None
     effort: Effort | None = None
+    speed: Speed | None = None
     approvals: ApprovalMode | None = None
     goal_mode: bool | None = None
     timezone: str | None = Field(default=None, max_length=64)
@@ -320,8 +321,9 @@ class ScheduleCreateRequest(FrozenModel):
 
 
 class ScheduleUpdateRequest(FrozenModel):
-    """The whole new state of a schedule: as for a new one, plus whether it is switched on. ``history_runs`` and
-    ``same_chat`` left out take the configured ones, as a client from before item 257 sends neither."""
+    """The whole new state of a schedule: as for a new one, plus whether it is switched on. ``history_runs``,
+    ``same_chat`` and ``speed`` left out take the configured ones, as a client from before item 257 sends none of them
+    (the standard speed for ``speed``, item 291)."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -335,6 +337,7 @@ class ScheduleUpdateRequest(FrozenModel):
     timezone: str | None = Field(max_length=64)
     history_runs: int | None = Field(default=None, ge=0, le=20)
     same_chat: bool | None = None
+    speed: Speed | None = None
     enabled: bool
 
 
@@ -784,7 +787,8 @@ class PaletteView(FrozenModel):
 
 
 class PermissionsView(FrozenModel):
-    """What macOS has granted to the program that runs the daemon, and the Settings panes that grant the rest."""
+    """What macOS has granted to ``program``, the program it holds responsible for the daemon (Dot.app for the
+    service), and the Settings panes that grant the rest."""
 
     program: str
     accessibility: bool
@@ -842,11 +846,71 @@ class ConnectionView(FrozenModel):
 class ConnectionsView(FrozenModel):
     """``GET /connections``: the applications of the Mac, then the folders, then the web's, in the catalogue's order.
     ``browser_mode`` and ``headless`` say why a web application offers no sign-in: in attach mode Dot uses the owner's
-    own Chrome as it is signed in, and a browser without a window has none to sign in in."""
+    own Chrome as it is signed in, and a browser without a window has none to sign in in. ``runner`` is the name of the
+    program macOS asks for Dot and lists in Privacy & Security (Dot for the service, item 288)."""
 
     apps: tuple[ConnectionView, ...]
     browser_mode: BrowserMode
     headless: bool
+    runner: str
+
+
+type McpOrigin = Literal["config", "plugin", "elsewhere", "connected"]
+type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signing_in"]
+
+
+class McpServerView(FrozenModel):
+    """One MCP server Dot has, as Connect apps shows it (item 279). ``origin`` is where it is set up: Dot's config, a
+    plugin, another agent of the Mac (Skills › Found elsewhere), or Connect apps itself, the only place that removes
+    one. ``address`` is its URL or its command. ``state``: its tools are offered to runs (``ready``, with ``tools``,
+    their names on the server), it was left out (``error`` says why), it is switched off in the config, or Dot tries it
+    now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the
+    owner's account, and Sign in again renews that."""
+
+    name: str
+    origin: McpOrigin
+    address: str
+    service: str | None
+    state: McpServerState
+    tools: tuple[str, ...]
+    error: str | None
+    link: str | None
+    signs_in: bool
+
+
+class McpServiceView(FrozenModel):
+    """A service of Connect apps' catalogue (``mcp/catalogue.py``), with whether Dot has its server already."""
+
+    id: str
+    name: str
+    does: str
+    url: str
+    signs_in: bool
+    added: bool
+
+
+class McpServersView(FrozenModel):
+    """``GET /mcp/servers``: every MCP server Dot has, those of its config first, and the catalogue's services."""
+
+    servers: tuple[McpServerView, ...]
+    services: tuple[McpServiceView, ...]
+
+
+class McpServerAdd(FrozenModel):
+    """``POST /mcp/servers``: a service of the catalogue (``service``), or a server by ``name`` and ``address``, a URL
+    (over SSE when its path ends in ``/sse``, else streamable HTTP) or a command line. ``origin`` is the page's own
+    origin, where the authorization server sends the browser back after a sign-in."""
+
+    service: str | None
+    name: str | None
+    address: str | None
+    origin: str
+
+
+class McpReconnect(FrozenModel):
+    """``POST /mcp/servers/{name}/connect``: the page's own origin, as in :class:`McpServerAdd`."""
+
+    origin: str
 
 
 class KeyView(FrozenModel):

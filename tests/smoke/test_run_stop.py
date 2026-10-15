@@ -129,11 +129,8 @@ async def test_the_send_is_the_runs_stop_while_the_box_is_empty_and_the_top_bar_
                 await expect(page.locator(".stage-tools button[aria-label='Run details']")).to_be_visible()
                 await expect(page.locator(".stagebar .chip")).to_have_count(0)
                 await expect(page.locator(".stagebar .pill.run")).to_have_count(0)
-                # The emergency stop stays in the sidebar's foot, also while the sidebar is closed (item 273).
-                await expect(page.locator(".side-foot .failsafe")).to_have_count(1)
-                if width >= 860:
-                    await expect(page.locator(".side-foot .failsafe")).to_be_visible()
-                await expect(page.locator(".stagebar .failsafe")).to_have_count(0)
+                # A run stops from its composer: the sidebar and the bar have no emergency stop (item 289).
+                await expect(page.locator(".failsafe")).to_have_count(0)
                 send: Locator = page.locator(".dock .btn.send")
                 box: Locator = page.locator(".dock textarea")
                 await expect(send).to_have_attribute("aria-label", "Stop")

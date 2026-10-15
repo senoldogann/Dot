@@ -24,7 +24,14 @@ from dotagent.store.models import ScheduleOptions, ScheduleRecord
 _GOAL_CHARS: int = 160
 # Options that leave every choice to the configuration at firing time.
 UNSET_OPTIONS: ScheduleOptions = ScheduleOptions(
-    model=None, effort=None, approvals=None, goal_mode=None, timezone=None, history_runs=None, same_chat=None
+    model=None,
+    effort=None,
+    speed=None,
+    approvals=None,
+    goal_mode=None,
+    timezone=None,
+    history_runs=None,
+    same_chat=None,
 )
 
 
@@ -79,14 +86,27 @@ def _upcoming(record: ScheduleRecord, zone: ZoneInfo, now: float) -> float | Non
 
 
 async def create_schedule(
-    store: Store, config: SchedulerConfig, fallback_zone: ZoneInfo, request: ScheduleRequest, now: float
+    store: Store,
+    config: SchedulerConfig,
+    fallback_zone: ZoneInfo,
+    request: ScheduleRequest,
+    now: float,
+    thread_id: str | None,
 ) -> ScheduleRecord:
+    """Save a new schedule; ``thread_id`` is the chat it goes on in, for a schedule made in a chat (item 291)."""
     _check_options(request.options)
     zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
     timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
     await _ensure_room(store, config)
     return await store.add_schedule(
-        request.name, timing.cron, timing.run_at, request.goal, request.mode, timing.first_run, request.options
+        request.name,
+        timing.cron,
+        timing.run_at,
+        request.goal,
+        request.mode,
+        timing.first_run,
+        request.options,
+        thread_id,
     )
 
 

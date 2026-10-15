@@ -179,9 +179,9 @@ answer keeps its words, Ollama's too.
   Settings › Models. The free models of OpenCode Zen do not answer Dot's own calls: Zen serves them only to OpenCode's
   programs and answers any other with a 403 (checked on 2026-10-12 and 2026-10-15, with and without a key), so they
   run as OpenCode's own agent (**OpenCode**, below). The reasoning levels offered are the
-  ones the gateway honours: DeepSeek's models offer none, since the chat route thinks the same at every label (measured
-  2026-10-15, item 258), so Ultrathink and Ultracode do not show for them; GLM 5.2, Grok, GPT Luna, Muse Spark,
-  Longcat, MiMo and Hy keep theirs.
+  ones the gateway honours: DeepSeek's models offer none, since the chat route thought the same at every label (measured
+  2026-10-15, item 258), so Ultrathink and Ultracode do not show for them, but for DeepSeek V4.1 Flash, which keeps Low,
+  High and Max at the owner's choice (item 290); GLM 5.2, Grok, GPT Luna, Muse Spark, Longcat, MiMo and Hy keep theirs.
 - **Anthropic**: what a model can do (pictures, its window and output limit, whether it thinks and at which levels) is
   read from the Models API, so a new Claude model needs no update of Dot. A model that thinks gets adaptive thinking at
   the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,
@@ -855,8 +855,8 @@ or your own words. The run reads which option you chose, and whether it was the 
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 
-- the **Emergency stop** button of the web UI (the red square in the sidebar's foot beside Settings, a tap away behind
-  the sidebar's opener while it is closed; or `POST /api/failsafe`) creates the `STOP` file in the home
+- the **Emergency stop** button of the web UI (Settings › System; or `POST /api/failsafe`; a chat's own run stops with
+  the stop button of its composer) creates the `STOP` file in the home
   directory and ends every run as an emergency stop, a run that was starting at that moment too (a campaign whose
   session it ends stops too); the page shows a banner with a button that releases it
 - `touch ~/Library/Application\ Support/Dot/STOP` blocks desktop control the same way, without ending a run; delete the
@@ -1626,23 +1626,27 @@ dotx service uninstall   # stop the daemon and remove the job
 - Run `service install` again to restart the daemon after you changed the configuration. It stops the running job before
   it writes the new job's file; when launchd does not load the new job, the file of before is put back and its job
   started again, and the install fails with launchd's words.
-- A launchd job has no terminal, so macOS attaches Accessibility (it covers posting input events) and Screen Recording
-  to the Python binary that runs the daemon, not to your terminal. Grant them to that binary; Settings › System in the
-  web UI reports what the daemon itself has, and `dotx desktop check` what your terminal has. This prints the binary:
-
-  ```bash
-  .venv/bin/python -c "import os, sys; print(os.path.realpath(sys.executable))"
-  ```
+- The job runs **Dot.app** (item 288), a small app in Dot's home (`~/Library/Application Support/Dot/Dot.app`) whose
+  program starts the daemon's Python and waits for it. macOS holds the program launchd starts responsible for all it
+  starts, so its questions and System Settings name **Dot**, and Accessibility (it covers posting input events),
+  Screen Recording, Automation and the folders you allow go to Dot. Before, the job ran Python itself: macOS named
+  `python3.13`, and a grant went to that Python binary alone, so the next one (a uv update, another version) had none.
+  `service install` builds the app with clang (Xcode's Command Line Tools; `xcode-select --install` when it says they
+  are missing) and signs it ad hoc. macOS knows such an app by the hash of its code, so the app is built again only when
+  its source or its Info.plist change; otherwise it stays as it is, with what you granted it. It is not the desktop
+  shell's window app (`desktop/`, `dev.dot.desktop`), which also bears the name. Moving from the Python job, grant the
+  permissions to Dot once; the `python3.13` rows in System Settings can go. Settings › System in the
+  web UI reports what the daemon itself has, and `dotx desktop check` what your terminal has.
 
   `dotx service permissions` leads you through it, one permission at a time. It asks the running daemon (so the dialog
-  names that Python binary and not your terminal), copies the binary's path to your clipboard, opens System Settings at
-  the first permission that is missing and says what to do there:
+  names Dot and not your terminal), copies Dot.app's path to your clipboard, opens System Settings at the first
+  permission that is missing and says what to do there:
 
   - **Accessibility** (the input events row follows this switch): macOS shows a dialog; choose **Open System Settings**
-    and switch the binary on (Touch ID or password).
-  - **Screen & System Audio Recording**: macOS shows no dialog for a program that is not an app, so add the binary by
-    hand in the pane that opened: press `+`, then Cmd+Shift+G, paste the path with Cmd+V, press Return, choose **Open**
-    and switch it on.
+    and switch Dot on (Touch ID or password).
+  - **Screen & System Audio Recording**: switch Dot on in the pane that opened. When it is not in the list (macOS showed
+    no dialog for this to a program that is not an app), press `+`, then Cmd+Shift+G, paste the path with Cmd+V, press
+    Return, choose **Open** and switch it on.
 
   A running process keeps what it had when it started, so after you switched a permission on run `dotx service install`
   (it restarts the daemon) and then `dotx service permissions` again for the next one. The command ends with
@@ -1651,8 +1655,9 @@ dotx service uninstall   # stop the daemon and remove the job
   name, pressed a button twice and ticked a checkbox in 4 steps and 13 seconds.
 - The job does not see the environment of your shell. Give it its API keys through `dotx auth set` or the Keychain.
 - When Dot's files are under Desktop, Documents or Downloads, the first start of the job waits for you: macOS asks once
-  whether the Python binary may use that folder, and `service install` waits up to 60 seconds for the answer. Measured
-  on an Apple-silicon Mac: 42 seconds with a person answering the dialog, then about 1.2 seconds for every later start.
+  whether Dot may use that folder, and `service install` waits up to 60 seconds for the answer. Measured on an
+  Apple-silicon Mac, with the Python job: 42 seconds with a person answering the dialog, then about 1.2 seconds for
+  every later start.
 
 The REST API (all under `/api`; bodies and replies are JSON, event streams are server-sent events):
 
@@ -1686,6 +1691,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
 | `GET /connections`, `POST /connections/{id}`                                    | the applications of Connect apps, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
+| `GET\|POST /mcp/servers`, `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`) and the services to add; add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one of Connect apps (409 for one set up elsewhere) |
+| `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state` (400 for none) |
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`); a new pairing code (item 267) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
@@ -1751,8 +1758,10 @@ three menu bar icons and the web app's icons, and `npm run icons` makes the bund
 
 ## Dot on the phone
 
-The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on Activity with
-the sidebar's sections, the chats and the run pages at a phone width. Its colours follow the light or dark appearance
+The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you
+were in last (New chat the first time; item 286), with the sidebar's sections, the chats and the run pages at a phone
+width. Back from the background, it follows the daemon again at once, and says it is reconnecting only when that takes
+more than two seconds. Its colours follow the light or dark appearance
 through CSS `light-dark()`, so it needs iOS 17.5 or later (Safari 17.5; Chrome 123 and Firefox 120 on a computer). It
 needs to reach the Mac, and a push needs a secure address, so the way there is your own network:
 
@@ -2074,7 +2083,7 @@ dotx schedule disable|enable|delete ID
 A schedule is a complete goal that Dot runs later, once (`--at`) or on a cron rhythm (`--cron`, five fields, read in
 `[scheduler] timezone`, which defaults to the zone `TZ` names when it is set, else the zone of this Mac). Each firing
 starts a run in a new chat, so the goal has to say everything; its first message carries, in front of the goal, the
-dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 3; 0 for none; at most
+dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 5; 0 for none; at most
 `history_chars` characters, each answer cut at 600), marked as what the schedule found before and not as instructions,
 so the run builds on them instead of doing the same work again (item 257). The chat shows the goal alone, and the run's
 reviewer takes only the goal as your words; a one-time schedule that fires late says when it was due in that first
@@ -2082,15 +2091,17 @@ message too. With `same_chat` a firing goes on in the chat of the one before (a 
 run reads their conversation instead of the digest. Either way it reads earlier runs' words without a message of
 yours, so it starts tainted (asking before outward-facing actions) when one of the runs it reads ended so. The digest
 counts the firings since item 257: a firing from before names no schedule. The agent can create schedules too
-(`schedule_create`). The scheduler also fires the nightly reflection at `[agent] reflection_time` (see Reflection
+(`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows
+them (the ones its first run started with until you picked others: its mode, model, reasoning level, speed, approval
+mode and goal mode; item 291). The scheduler also fires the nightly reflection at `[agent] reflection_time` (see Reflection
 above); it is not a schedule and does not count against `max_schedules`.
 
 On Settings › Schedules a schedule is created and edited whole: its name, goal, repetition (cron or one moment), time
 zone, kind of run (task, chat, research), model, reasoning level, approval mode, goal mode, the earlier runs it knows,
-whether it keeps its chat and whether it is on (`history_runs` and `same_chat` in `POST` and `PATCH /api/schedules`,
-left out for the configured ones). Options
-left on "default" take the configured value when the schedule fires. A schedule the agent creates always uses the
-defaults: a run cannot schedule itself into another approval mode.
+whether it keeps its chat and whether it is on (`history_runs`, `same_chat` and `speed` in `POST` and `PATCH
+/api/schedules`, left out for the configured ones and the standard speed). Options left on "default" take the
+configured value when the schedule fires. A schedule the agent creates takes its chat's choices, which are yours: the
+model of a run cannot pick another approval mode for it.
 
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
@@ -2234,17 +2245,19 @@ and your answers to their questions, are instructions of the sessions after it.
 
 ## Connect apps
 
-**Connect apps**, the pill in the sidebar's foot (item 278), lists the applications Dot works with, each with what Dot
+**Connect apps**, the sidebar's page under Campaigns (items 278 and 289), lists the applications Dot works with, each with what Dot
 does with it, where it stands and the one step that sets it up; **Check again** reads them all anew.
 
 - **On this Mac**: Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint and Outlook, which Dot
   drives with AppleScript. macOS lets an app send Apple events to another only once you have said yes to its question
-  (Privacy & Security › Automation), so a row says **Allowed**, **Not asked yet**, **Refused**, **Not checked** (macOS
-  tells about an application only while it runs) or **Not installed**. **Allow** asks macOS, which shows its question
-  on the Mac; an application that is not open is opened hidden first, without coming to the front. The page waits a
-  minute for your answer, then says that the question waits on the Mac. After a no macOS does not ask again: **Open
-  System Settings** opens the Automation pane, and the row says what to switch on there, under the app that runs Dot
-  (Terminal, iTerm, Claude, or the Dot service).
+  (Privacy & Security › Automation), so a row says **Allowed**, **Not asked yet**, **Refused**, **Not checked** or
+  **Not installed**. macOS tells about an application only while it runs: while one is closed, its row keeps the last
+  answer macOS gave about it (item 288), kept for the program macOS asks for Dot, and says **Not checked** only when
+  there is none. **Allow** asks macOS, which shows its question on the Mac; an application that is not open is opened
+  hidden first, without coming to the front. The page waits a minute for your answer, then says that the question waits
+  on the Mac. After a no macOS does not ask again: **Open System Settings** opens the Automation pane, and the row says
+  what to switch on there, under the program macOS asks for Dot: Dot for the service, else the app Dot was started
+  from (Terminal, iTerm, Claude).
 - **Your files**: OneDrive, whose folders (`~/Library/CloudStorage/OneDrive-*`) Dot's `onedrive` skill works in. It
   says **Syncing** once a folder of it is there; else **Open** opens OneDrive to sign in.
 - **On the web**: Google, Microsoft 365, GitHub, Slack, Notion, LinkedIn, X and Instagram, used in Dot's own browser.
@@ -2253,8 +2266,24 @@ does with it, where it stands and the one step that sets it up; **Check again** 
   opens the sign-in page in a tab of Dot's browser on the Mac. With My Chrome (Settings › Browser) Dot works in your own
   Chrome, where you are signed in as you always are; a browser without a window (`headless = true` under `[browser]`)
   has none to sign in in, which the section says once.
+- **Tools of other services** (item 279): every [MCP server](#mcp-servers) Dot has, from its config, a plugin, another
+  agent (Skills › Found elsewhere) or this page, with **Ready** and its tools, **Left out** and why, or **Off**. Below
+  it, **Services to add**: Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account, and
+  DeepWiki and Microsoft Learn, open to all; or any server by its name and address, a URL or the command that starts it
+  on this Mac. **Add** tries the server first and keeps it only once it answered with its tools, which go to the runs
+  that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using: the row
+  says **Waiting for your sign-in** with **Open the sign-in page**, the service's own page, which sends you back to
+  Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through `[server] reach`), and
+  the row turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself with the service as
+  a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before
+  they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words
+  that bring you back here (**Sign in again**). **Remove** takes a server of this page out, with its tools and its
+  sign-in; one set up elsewhere is removed there.
 
-A sign-in is told by its cookie alone: a session the site ended stays **Signed in** until its cookie expires.
+A sign-in is told by its cookie alone: a session the site ended stays **Signed in** until its cookie expires. Not in
+the services' list, as Dot cannot register with them by itself (checked 2026-10-15): GitHub, which takes a personal
+token (an `[[mcp]]` table with an `Authorization` header), Asana, Slack, Google and Box (clients registered by hand),
+and Vercel, Figma, Canva and Atlassian (approved clients only, or lists of allowed ones).
 
 ## MCP servers
 
@@ -2279,8 +2308,10 @@ headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; header
 ```
 
 `dotx mcp list` starts every configured server and shows its tools, or why it does not start. Only tools are used (no
-resources, prompts, sampling or OAuth). The tool list is read when Dot starts; a server that dies is started again by
-the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+resources, prompts or sampling). A server at a URL may sign in as MCP's authorization asks (OAuth): `oauth = true` has
+Dot send the token it keeps for it, which **Sign in again** on [Connect apps](#connect-apps) gets, and the servers added
+there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on Connect
+apps, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
 or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
 nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System names it
@@ -2464,6 +2495,8 @@ Anthropic one), a site under `[policy.spend]` that is not a bare host in lower c
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
 | `added-servers.json`                             | the MCP servers you added from other agents, by name and fingerprint |
+| `connected-servers.json`                         | the MCP servers you added on Connect apps, by address or command     |
+| `mcp-sign-ins/`                                  | what signing in to those servers gave: tokens and client (mode 0600) |
 | `opencode/`                                      | the OpenCode server Dot starts, the chats' sessions, the free models |
 | `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |
 | `browser-profile/`                               | the Chrome profile of the browser tools                              |

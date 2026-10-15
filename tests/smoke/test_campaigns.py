@@ -874,6 +874,7 @@ async def test_an_emergency_stop_engaged_while_a_schedule_starts_its_run_ends_th
             options: ScheduleOptions = ScheduleOptions(
                 model=SCRIPTED_MODEL,
                 effort=None,
+                speed=None,
                 approvals="yolo",
                 goal_mode=False,
                 timezone=None,
@@ -884,7 +885,7 @@ async def test_an_emergency_stop_engaged_while_a_schedule_starts_its_run_ends_th
                 name="Leads", goal=GOAL, cron="0 9 * * *", at=None, mode="task", options=options
             )
             record: ScheduleRecord = await create_schedule(
-                runtime.store, runtime.config.scheduler, runtime.schedule_zone, request, time.time()
+                runtime.store, runtime.config.scheduler, runtime.schedule_zone, request, time.time(), None
             )
             assert record.next_run_at is not None
             await scheduler.tick(record.next_run_at + 5)
