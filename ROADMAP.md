@@ -5215,8 +5215,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
 | 275 | On a phone the page fits the screen and holds still                                   | done        | d332e29 |
 | 276 | The view of Dot's computer comes back by itself                                       | done        | f7e09a6 |
-| 277 | Every chat wears a creature, its last message under its name                          | in progress |         |
-| 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
+| 277 | Every chat wears a creature, its last message under its name                          | done        | d2476f5 |
+| 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | in progress |         |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
@@ -12175,7 +12175,7 @@ stream the daemon refuses (the run is gone, the token is wrong) ends as today.
 
 ### 277. Every chat wears a creature, its last message under its name
 
-**Status: in progress.** Built on `item-277-chat-creatures`.
+**Status: done.** Merged as `d2476f5` (PR #319; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `store/models.py`: `ThreadSummary` carries `actor_id` (the agent of the latest run, else the
 campaign it is a session of; `None` for Dot), `last_message` and `last_role`. `store/db.py`: the list reads the latest
@@ -12209,7 +12209,34 @@ message under the name, the unread dot at the right; the creature at work while 
 
 ### 278. Connect apps: the Mac's applications and the web's, set up from the sidebar
 
-**Status: planned.**
+**Status: in progress.** Built on `item-278-connect-apps`.
+
+**As built (2026-10-15).** `connections/catalogue.py`: the applications, ten of the Mac by bundle id (Mail, Calendar,
+Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint, Outlook), OneDrive among the folders, and eight of the
+web (Google, Microsoft 365, GitHub, Slack, Notion, LinkedIn, X, Instagram) by their domains, the cookies only a
+signed-in visitor holds and their sign-in page; Google's one sign-in stands for Gmail, Calendar and Drive, and WhatsApp
+is not on the page, as its web app keeps its session in the page's storage rather than in a cookie.
+`connections/mac.py`: whether an application is installed (Launch Services) and what Automation lets
+(`AEDeterminePermissionToAutomateTarget` through ctypes, which pyobjc does not wrap: allowed, not asked, refused, or not
+open, as macOS tells only about an application that runs); the question is asked once the application runs, started
+hidden (`open -g -j`) when it did not. `connections/web.py`: the cookies of Dot's browser by host and name, never by
+value, from the browser while it runs (`BrowserSession.live_cookies`), else from a copy of its profile's cookie file,
+those expired left out. `connections/states.py`: the states of each kind and the step each offers.
+`server/routes_connections.py`: `GET /api/connections`; `POST /api/connections/{id}` takes the step: one question at a
+time for an application, waited for a minute and then said to wait on the Mac; the Automation pane after a no; OneDrive
+opened; the sign-in page in a tab of Dot's browser (409 in My Chrome and in a browser without a window).
+`views/connect.js`: the page in three cards (On this Mac, Your files, On the web), a badge for each state, a line where
+there is something to do (what to switch on after a no, what to install, OneDrive to sign in to), and how to sign in to
+the web once above its rows; a button too wide for its row goes under the text on a phone. `sidebar.js` and `shell.css`:
+the Connect apps pill above Settings in the foot. README: the sidebar's foot, Connect apps, the API. Tests:
+`tests/unit/test_connections.py` (the catalogue; macOS's answers and the step of each state; macOS asked for real but
+without a question, about Finder and an application that does not exist; the sign-ins read from a profile's cookie file
+by host and name, an expired cookie and a look-alike host left out); `tests/smoke/test_connect_apps.py` (new): wide and
+light, on a phone and dark, and once in WebKit, with macOS's answers given by the test, the pill opens the page; Mail is
+allowed, Outlook not installed, OneDrive syncing, GitHub signed in by a cookie file in the profile of Dot's browser and
+Slack not, with no Sign in in a browser without a window; Notes is refused, with what to switch on, and its Open System
+Settings shows the Automation pane; Allow asks macOS about Calendar and its row turns Allowed. It fails on the code of
+before (no Connect apps).
 
 **What.** A Connect apps pill in the sidebar's foot opens a page of applications, each with what Dot needs to use it and
 one step to give it: the Mac's applications Dot drives (Mail, Calendar, Notes, Reminders, Messages, Excel, Word,
@@ -12998,3 +13025,4 @@ before it, the model's next run without the third.
 - 2026-10-15 (Opus 5.5): item 274 merged as `428ad94` (PR #316; no Linear issue, the connector was signed out): a live message is drawn as the formatted prose it ends as, at most once a frame, the blocks already written left as they were drawn (2 ms a draw at 35,000 characters with the CPU four times slower, 31 ms drawn whole), its caret at the end of its text, its end moving nothing; the arrow down no longer flashes, nor does the follow stop, when the page's own scroll comes after the conversation grew.
 - 2026-10-15 (Opus 5.5): item 275 merged as `d332e29` (PR #317; no Linear issue, the connector was signed out): on a phone the page fits the screen and holds still: viewport-fit=cover and the --safe-* tokens keep the bar, the sidebar's head and foot, the composer, the side panel and the toasts out of the safe areas; touch-action manipulation and overscroll none; every field at least 16 px on touch; a select clips its label and a note breaks a long path; holdBarInSight keeps the bar at the top of what is seen while the keyboard pans the page. test_phone_fit.py (new) in WebKit as two iPhones and in Chrome as a Pixel 7; full offline smoke 570 passed, 1 timing failure under load that passes 3 of 3 alone.
 - 2026-10-15 (Opus 5.5): item 276 merged as `f7e09a6` (PR #318; no Linear issue, the connector was signed out): the view of Dot's computer comes back by itself: `watchInView` closes the screencast while the page is out of sight and makes it again once the page is back, and makes a stream that broke or went silent again after `follow`'s pause, so that only a refused stream ends the view with "The view of Dot's computer stopped"; test_takeover.py's new test in Chrome and in WebKit at a phone's width.
+- 2026-10-15 (Opus 5.5): item 277 merged as `d2476f5` (PR #319; no Linear issue, the connector was signed out): every chat in the sidebar wears a creature of the character engine (an agent's look, or a look its id picks for a chat with Dot, 64 looks), in the state of its latest run, with its name over its last line in plain words ("You:" before the owner's message while the run works) and its age over the unread dot at its right; creatures kept between paints (200 drawn in 82 ms); test_chat_creatures.py (new) in Chrome and WebKit; full offline smoke 572 passed, 1 timing failure under load that passes 3 of 3 alone

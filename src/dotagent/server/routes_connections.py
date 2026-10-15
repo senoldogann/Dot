@@ -1,0 +1,159 @@
+"""Routes of Connect apps (item 278): where each application stands, and the step that sets it up."""
+
+import asyncio
+import time
+
+from fastapi import APIRouter
+
+from dotagent.browser.session import BrowserSession
+from dotagent.connections import mac
+from dotagent.connections.catalogue import FOLDER_APPS, MAC_APPS, WEB_APPS, FolderApp, MacApp, WebApp
+from dotagent.connections.states import (
+    ConnectionState,
+    folder_state,
+    folder_step,
+    mac_step,
+    web_state,
+    web_step,
+)
+from dotagent.connections.web import CookieKey, profile_cookies, signed_in
+from dotagent.core.errors import NotFoundError, RunConflict
+from dotagent.core.logs import get_logger
+from dotagent.desktop import perms
+from dotagent.server.context import ServerContext
+from dotagent.server.views import ConnectionsView, ConnectionView
+from dotagent.skills.office import CLOUD_STORAGE, onedrive_folders
+
+log = get_logger(__name__)
+
+# The browser thread whose tab a sign-in opens in.
+_SIGN_IN_THREAD: str = "connect-apps"
+# How long a step waits for the owner's answer to macOS's question before it answers that the question waits; the
+# question stays on the Mac until it is answered.
+_ASK_WAIT_S: float = 60.0
+
+
+def _first_time(bundle_id: str) -> mac.AutomationState:
+    """macOS's question about the application ``bundle_id``, started hidden first when it does not run."""
+    state: mac.AutomationState = mac.automation_state(bundle_id)
+    if state == "not_open":
+        state = mac.start_hidden(bundle_id)
+    return mac.ask_automation(bundle_id) if state == "not_asked" else state
+
+
+def connections_router(ctx: ServerContext) -> APIRouter:
+    router: APIRouter = APIRouter(prefix="/api")
+    session: BrowserSession = ctx.runtime.browser
+    # The questions macOS asks the owner now, by application: each ends with the owner's answer.
+    asking: dict[str, asyncio.Future[mac.AutomationState]] = {}
+
+    def mac_view(app: MacApp) -> ConnectionView:
+        state: ConnectionState = (
+            "not_installed" if mac.installed_app(app.bundle_id) is None else mac.automation_state(app.bundle_id)
+        )
+        return ConnectionView(
+            id=app.id,
+            kind="mac",
+            name=app.name,
+            does=app.does,
+            state=state,
+            step=mac_step(state),
+            waiting=app.id in asking,
+        )
+
+    def folder_view(app: FolderApp) -> ConnectionView:
+        state: ConnectionState = folder_state(
+            mac.installed_app(app.bundle_id) is not None, len(onedrive_folders(CLOUD_STORAGE)) > 0
+        )
+        return ConnectionView(
+            id=app.id, kind="folder", name=app.name, does=app.does, state=state, step=folder_step(state), waiting=False
+        )
+
+    def web_view(app: WebApp, cookies: frozenset[CookieKey]) -> ConnectionView:
+        state: ConnectionState = web_state(session.mode, signed_in(app, cookies))
+        return ConnectionView(
+            id=app.id,
+            kind="web",
+            name=app.name,
+            does=app.does,
+            state=state,
+            step=web_step(state, session.config.headless),
+            waiting=False,
+        )
+
+    async def cookies() -> frozenset[CookieKey]:
+        """What Dot's browser holds: asked while it runs, else read from its profile; none in the owner's Chrome."""
+        if session.mode == "attach":
+            return frozenset()
+        live: frozenset[CookieKey] | None = await session.live_cookies()
+        if live is not None:
+            return live
+        return await asyncio.to_thread(profile_cookies, session.profile_dir, time.time())
+
+    def local_views() -> list[ConnectionView]:
+        return [*(mac_view(app) for app in MAC_APPS), *(folder_view(app) for app in FOLDER_APPS)]
+
+    @router.get("/connections")
+    async def list_connections() -> ConnectionsView:
+        local: list[ConnectionView] = await asyncio.to_thread(local_views)
+        held: frozenset[CookieKey] = await cookies()
+        return ConnectionsView(
+            apps=(*local, *(web_view(app, held) for app in WEB_APPS)),
+            browser_mode=session.mode,
+            headless=session.config.headless,
+        )
+
+    async def ask(app: MacApp) -> None:
+        """Ask macOS about ``app`` once at a time, and wait a while for the owner's answer."""
+        question: asyncio.Future[mac.AutomationState] | None = asking.get(app.id)
+        if question is None:
+            question = asyncio.ensure_future(asyncio.to_thread(_first_time, app.bundle_id))
+            asking[app.id] = question
+
+            def answered(done: asyncio.Future[mac.AutomationState]) -> None:
+                asking.pop(app.id, None)
+                if not done.cancelled() and done.exception() is not None:
+                    log.warning("automation_question_failed", app=app.id, error=str(done.exception()))
+
+            question.add_done_callback(answered)
+        try:
+            await asyncio.wait_for(asyncio.shield(question), _ASK_WAIT_S)
+        except TimeoutError:
+            log.info("automation_question_waits", app=app.id, waited_s=_ASK_WAIT_S)
+
+    @router.post("/connections/{app_id}")
+    async def take_step(app_id: str) -> ConnectionView:
+        """Take the step of the application ``app_id``: ask macOS about it, show the Automation pane after a no, open
+        its sign-in page in Dot's browser, or open the application to sign in there."""
+        found_mac: MacApp | None = next((app for app in MAC_APPS if app.id == app_id), None)
+        if found_mac is not None:
+            current: ConnectionView = await asyncio.to_thread(mac_view, found_mac)
+            if current.step == "settings":
+                await asyncio.to_thread(perms.open_settings, "automation")
+            elif current.step == "ask":
+                await ask(found_mac)
+            return await asyncio.to_thread(mac_view, found_mac)
+        found_folder: FolderApp | None = next((app for app in FOLDER_APPS if app.id == app_id), None)
+        if found_folder is not None:
+            current = await asyncio.to_thread(folder_view, found_folder)
+            if current.step == "open_app":
+                await asyncio.to_thread(mac.open_app, found_folder.bundle_id)
+            return current
+        found_web: WebApp | None = next((app for app in WEB_APPS if app.id == app_id), None)
+        if found_web is None:
+            raise NotFoundError("Connect apps has no such application", {"app_id": app_id})
+        if session.mode == "attach":
+            raise RunConflict(
+                "Dot works in your own Chrome (Settings › Browser › My Chrome), where you sign in as you always do",
+                {"app_id": app_id},
+            )
+        if session.config.headless:
+            raise RunConflict(
+                "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the config",
+                {"app_id": app_id},
+            )
+        await session.open_url(_SIGN_IN_THREAD, found_web.sign_in)
+        await session.focus(_SIGN_IN_THREAD)
+        return web_view(found_web, await cookies())
+
+    return router

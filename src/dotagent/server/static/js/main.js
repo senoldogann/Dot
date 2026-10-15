@@ -20,6 +20,7 @@ import * as activity from "./views/activity.js";
 import * as agents from "./views/agents.js";
 import * as team from "./views/team.js";
 import * as campaigns from "./views/campaigns.js";
+import * as connectApps from "./views/connect.js";
 import * as controls from "./views/controls.js";
 import * as run from "./views/run.js";
 import * as runs from "./views/runs.js";
@@ -41,6 +42,7 @@ const ROUTES = [
   { tab: "campaigns", layout: "page", title: "Campaigns", pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/, view: campaigns },
   { tab: "agents", layout: "page", title: "Agents", pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/, view: agents },
   { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, view: team },
+  { tab: "connect", layout: "page", title: "Connect apps", pattern: /^\/connect$/, view: connectApps },
   { tab: "settings", layout: "page", title: "Settings", pattern: /^\/settings(?:\/([a-z]+))?$/, view: settings },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
   { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls },

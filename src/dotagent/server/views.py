@@ -7,6 +7,8 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
 from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
+from dotagent.connections.catalogue import ConnectionKind
+from dotagent.connections.states import ConnectionState, ConnectionStep
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
@@ -817,6 +819,31 @@ class BrowserView(FrozenModel):
     raise_window: bool
     debug_port: int
     devtools_address: str | None
+
+
+class ConnectionView(FrozenModel):
+    """One application of Connect apps (item 278). ``kind`` says how Dot reaches it: ``mac``, it drives it with
+    AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it keeps in sync.
+    ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None`` when there is none
+    to take; ``waiting`` is true while macOS asks the owner about it on the Mac."""
+
+    id: str
+    kind: ConnectionKind
+    name: str
+    does: str
+    state: ConnectionState
+    step: ConnectionStep | None
+    waiting: bool
+
+
+class ConnectionsView(FrozenModel):
+    """``GET /connections``: the applications of the Mac, then the folders, then the web's, in the catalogue's order.
+    ``browser_mode`` and ``headless`` say why a web application offers no sign-in: in attach mode Dot uses the owner's
+    own Chrome as it is signed in, and a browser without a window has none to sign in in."""
+
+    apps: tuple[ConnectionView, ...]
+    browser_mode: BrowserMode
+    headless: bool
 
 
 class KeyView(FrozenModel):

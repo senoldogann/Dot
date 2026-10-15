@@ -1368,6 +1368,28 @@ a.pill:hover {
   white-space: nowrap;
 }
 
+/* Connect apps (item 278): what to do or to know for an application, under what Dot does with it, and how to sign in to
+   the applications of the web, once above them. A button too wide to sit beside the text of its application goes under
+   it instead of squeezing it. */
+.connect-hint {
+  margin: 0;
+  padding: 0 16px 8px;
+}
+
+.connect-guide,
+.connect-note {
+  color: var(--text-2);
+}
+
+.connect-row {
+  flex-wrap: wrap;
+  row-gap: 8px;
+}
+
+.connect-row > .row-main {
+  flex: 1 1 220px;
+}
+
 /* ---------- lists ---------- */
 
 .list-row {
