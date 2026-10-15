@@ -19,7 +19,18 @@ APPLE_SCRIPT_TOOL: str = "apple_script"
 _NONCE_BYTES: int = 8
 _PREVIEW_CHARS: int = 200
 _TIMEOUT_S: float = 120.0
-_TARGET_APP: re.Pattern[str] = re.compile(r"""(?:tell\s+application|\bapplication\s*\()\s*["']([^"']+)["']""", re.I)
+# Every string of a script, in the quotes of AppleScript or JavaScript: an application, a bundle id or a process of
+# System Events is named in one.
+_STRING: re.Pattern[str] = re.compile(r""""((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|`((?:[^`\\]|\\.)*)`""")
+# A target a script computes as it runs (a variable, the frontmost application), not named in quotes.
+_COMPUTED_TARGET: re.Pattern[str] = re.compile(
+    r"""\btell\s+(?:(?:application\s+)?process|application|app)\s+(?!id\b)(?!process\b)(?=[^"'\s])"""
+    r"""|\b(?:application|app|process)\s+id\s+(?=[^"'\s])|\btell\s+\("""
+    r"""|\bfrontmost\s+application\b|\bwhose\s+frontmost\b|\bfrontmost\s*:\s*true\b"""
+    r"""|\bApplication\s*\(\s*(?=[^"'`\s])|\bApplication\s*\(\s*`[^`]*\$\{"""
+    r"""|\bprocesses\s*(?:\.byName\s*\(|\[)\s*(?=[^"'`\s])""",
+    re.IGNORECASE,
+)
 
 
 class AppleScriptArgs(ToolArgs):
@@ -29,8 +40,19 @@ class AppleScriptArgs(ToolArgs):
     )
 
 
-def _targets_secrets(script: str) -> bool:
-    return any(is_secrets_app(name, None) for name in _TARGET_APP.findall(script))
+def secrets_reason(script: str) -> str | None:
+    """Why ``script`` may drive an application that holds passwords or keys, or None: one named in any of its strings
+    (as an application, a bundle id or a process of System Events, however the script spells its target), or a target
+    it computes, which could be one (the code review's Y10)."""
+    for match in _STRING.finditer(script):
+        text: str = next(group for group in match.groups() if group is not None)
+        if is_secrets_app(text, text):
+            return f"it names {truncate_middle(text, _PREVIEW_CHARS)!r}, which holds passwords or keys"
+    if _COMPUTED_TARGET.search(script) is not None:
+        return (
+            "it computes the application it drives, which could hold passwords or keys; name the application in quotes"
+        )
+    return None
 
 
 def _classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
@@ -39,16 +61,19 @@ def _classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
     )
     risk: Risk = assessment.risk
     flags: tuple[Flag, ...] = assessment.flags
-    if _targets_secrets(args.script):
+    reasons: tuple[str, ...] = assessment.reasons
+    secrets: str | None = secrets_reason(args.script)
+    if secrets is not None:
         risk = "high"
         flags = tuple(dict.fromkeys((*flags, "secret_access")))
+        reasons = (*reasons, secrets)
     kind: ActionKind = "shell" if script_reaches_shell(args.script) else "app_control"
     preview: str = truncate_middle(" ".join(args.script.split()), _PREVIEW_CHARS)
     return ActionInfo(
         tool=APPLE_SCRIPT_TOOL,
         kind=kind,
         risk=risk,
-        summary=f"Run {args.language}: {preview} ({'; '.join(assessment.reasons)})",
+        summary=f"Run {args.language}: {preview} ({'; '.join(reasons)})",
         target=args.script,
         flags=flags,
     )

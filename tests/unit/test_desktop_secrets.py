@@ -17,6 +17,7 @@ from dotagent.desktop.types import AppInfo, Step
 from dotagent.policy.elements import Element, StepAssessment
 from dotagent.policy.engine import auto_review
 from dotagent.policy.types import ActionInfo
+from dotagent.tools.apple import secrets_reason
 
 
 @pytest.mark.parametrize(
@@ -143,3 +144,30 @@ def test_keys_for_a_ref_go_only_to_its_application_when_it_holds_the_keyboard(
     assert sent == []
     actions._type(_notes_env(tmp_path, 101), step, inspection)
     assert sent == [text]
+
+
+@pytest.mark.parametrize(
+    ("script", "reaches"),
+    [
+        ('tell application "1Password" to activate', True),
+        ('tell app "1Password" to activate', True),
+        ('tell application id "com.1password.1password" to activate', True),
+        ("Application('com.1password.1password').activate()", True),
+        ('tell application "System Events" to tell process "Bitwarden" to keystroke "c" using command down', True),
+        ('activate application "Passwords"', True),
+        ("tell application appName to activate", True),
+        ('tell application "System Events" to tell (first process whose frontmost is true) to keystroke "c"', True),
+        ("set front to path to frontmost application as text", True),
+        ("Application(name).activate()", True),
+        ('Application("System Events").processes.byName(target).windows()', True),
+        ('tell application "Notes" to get name of every note', False),
+        ('tell application "System Events" to tell process "Safari" to set frontmost to true', False),
+        ('tell application "System Events" to get name of application process "Finder"', False),
+        ("var app = Application.currentApplication(); app.includeStandardAdditions = true", False),
+        ('display dialog "Change your passwords today"', False),
+    ],
+)
+def test_a_script_that_names_or_computes_a_password_manager_reaches_secrets(script: str, reaches: bool) -> None:
+    """The code review's Y10: only ``tell application "X"`` was read, so ``tell app``, a bundle id, a process of System
+    Events or a target the script computes drove a password manager with no question."""
+    assert (secrets_reason(script) is not None) is reaches, secrets_reason(script)
