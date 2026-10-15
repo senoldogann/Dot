@@ -14,6 +14,7 @@ from typing import TextIO
 
 import httpx2
 from mcp import Client, MCPError, StdioServerParameters, stdio_client
+from mcp.client.auth import OAuthFlowError
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import StreamableHTTPError, streamable_http_client
 from mcp.types import CONNECTION_CLOSED, REQUEST_TIMEOUT, CallToolResult, ListToolsResult, Tool, ToolAnnotations
@@ -120,6 +121,8 @@ def _startup_message(leaves: list[BaseException], cwd: Path) -> str:
 def _connect_message(leaves: list[BaseException]) -> str:
     """Why a server reached at a URL did not accept the connection. The client library turns an HTTP error status into
     a protocol error without the status, so a refused connection also means: check the url and the headers."""
+    if any(isinstance(leaf, OAuthFlowError) for leaf in leaves):
+        return "signing in to the MCP server failed"
     if any(isinstance(leaf, httpx2.TransportError) for leaf in leaves):
         return "the MCP server could not be reached"
     if any(isinstance(leaf, StreamableHTTPError) for leaf in leaves):
@@ -175,14 +178,22 @@ def _to_tool(config: McpServerConfig, tool: Tool) -> McpTool:
 
 
 class McpConnection:
-    """One configured MCP server. It connects on first use and connects again on the next call after it died."""
+    """One configured MCP server. It connects on first use and connects again on the next call after it died. A server
+    reached at a URL may sign in (``auth``, :mod:`dotagent.mcp.signin`), which adds its token to each request."""
 
     def __init__(
-        self, config: McpServerConfig, env: dict[str, str], headers: dict[str, str], cwd: Path, log_path: Path
+        self,
+        config: McpServerConfig,
+        env: dict[str, str],
+        headers: dict[str, str],
+        auth: httpx2.Auth | None,
+        cwd: Path,
+        log_path: Path,
     ) -> None:
         self._config: McpServerConfig = config
         self._env: dict[str, str] = env
         self._headers: dict[str, str] = headers
+        self._auth: httpx2.Auth | None = auth
         self._cwd: Path = cwd
         self._log_path: Path = log_path
         self._lock: asyncio.Lock = asyncio.Lock()
@@ -243,14 +254,18 @@ class McpConnection:
     async def _hold_http(self, slot: _Slot, url: str) -> None:
         timeout: httpx2.Timeout = httpx2.Timeout(_HTTP_TIMEOUT_S, read=self._read_timeout_s())
         async with (
-            httpx2.AsyncClient(headers=self._headers, timeout=timeout) as http,
+            httpx2.AsyncClient(headers=self._headers, timeout=timeout, auth=self._auth) as http,
             Client(streamable_http_client(url, http_client=http), mode="auto") as client,
         ):
             await _serve(slot, client)
 
     async def _hold_sse(self, slot: _Slot, url: str) -> None:
         transport = sse_client(
-            url, headers=self._headers, timeout=_HTTP_TIMEOUT_S, sse_read_timeout=self._read_timeout_s()
+            url,
+            headers=self._headers,
+            timeout=_HTTP_TIMEOUT_S,
+            sse_read_timeout=self._read_timeout_s(),
+            auth=self._auth,
         )
         async with Client(transport, mode="auto") as client:
             await _serve(slot, client)
@@ -278,12 +293,25 @@ class McpConnection:
             )
         try:
             owner.result()
-        except (OSError, ValueError, MCPError, StreamableHTTPError, httpx2.HTTPError, BaseExceptionGroup) as exc:
+        except (
+            OSError,
+            ValueError,
+            MCPError,
+            StreamableHTTPError,
+            httpx2.HTTPError,
+            OAuthFlowError,
+            McpError,
+            BaseExceptionGroup,
+        ) as exc:
             leaves: list[BaseException] = _leaf_errors(exc)
             causes: list[JsonValue] = [
                 truncate_middle(f"{type(leaf).__name__}: {leaf}", _SHOWN_CAUSE_CHARS) for leaf in leaves
             ]
             context: JsonObject = {**self._context(), "causes": causes, **await self._tail_since(offset)}
+            # Dot's own sign-in ended the connection (no sign-in kept, one the owner did not finish): its words say why.
+            own: McpError | None = next((leaf for leaf in leaves if isinstance(leaf, McpError)), None)
+            if own is not None:
+                raise McpError(own.message, {**context, **own.context}) from exc
             if _missing_directory(leaves, self._cwd):
                 context["cwd"] = str(self._cwd)
             elif any(isinstance(leaf, FileNotFoundError) for leaf in leaves):

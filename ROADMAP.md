@@ -5217,7 +5217,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 276 | The view of Dot's computer comes back by itself                                       | done        | f7e09a6 |
 | 277 | Every chat wears a creature, its last message under its name                          | done        | d2476f5 |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | done        | 4f21322 |
-| 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
+| 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | in progress |         |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | planned     |         |
@@ -12254,7 +12254,7 @@ refused with its guide, a web application signed in and one not.
 
 ### 279. Connect apps: the tools of other services, over MCP, signed in from Dot
 
-**Status: planned.**
+**Status: in progress.** Built on `item-279-mcp-sign-in`.
 
 **What.** The same page lists the MCP servers Dot has, with their state and tools, and adds one from a short catalogue of
 services that offer one (Notion, Linear, GitHub, Atlassian, Asana, …) or by its address or command: Dot tries it, and a
@@ -12265,6 +12265,39 @@ with Dot's keys and renewed; a server can be removed.
 
 **Tests.** Unit: the authorization's steps against a scripted server. Smoke: a server added, tried, listed with its
 tools, removed.
+
+**As built (2026-10-15).** `mcp/signin.py`: the MCP library's own flow (`OAuthClientProvider`: discovery, dynamic
+client registration as a client without a secret, PKCE, renewal), over a file per server in `mcp-sign-ins/` (mode
+0600: the tokens, the client, the redirect address it was registered with, when the token runs out, which the library
+is told again at a start so that it renews a token that ran out while Dot was stopped). `SignIns.flow` is the owner's
+sign-in from a page: the authorization server's page goes to the page, and the code comes back through
+`GET /oauth/callback`, outside `/api` so that it needs no token, matched by its `state`; `kept_sign_in` is the runs':
+the kept tokens and never a new sign-in, a server that asks for one being left out with `SIGN_IN_AGAIN`.
+`McpConnection` takes the sign-in (`auth`, on the streamable HTTP client and on SSE), and an error of Dot's own sign-in
+or of the library's flow is said as such instead of a refused connection. `McpHub` keeps its servers' configs and
+connects (`connect`) or removes (`disconnect`) one while Dot runs, `attempt` tries one once; `refresh_mcp_tools` makes
+the registry's MCP tools the hub's, for the runs that start after (a run's tools are its own copy). `McpServerConfig`
+has `oauth`. `mcp/connected.py`: `connected-servers.json`, the servers added on Connect apps, connected at the start
+after the config's, the plugins' and the other agents' (a name one of those has leaves one out, logged).
+`mcp/catalogue.py`: Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in, and DeepWiki and Microsoft
+Learn, open to all, each checked in its authorization server's own metadata on 2026-10-15 (dynamic registration and a
+client without a secret); GitHub (a personal token only), Asana, Slack, Google and Box (clients registered by hand),
+Vercel, Figma, Canva and Atlassian (approved clients or allow-lists) are not in it, and Supabase and Hugging Face
+register clients with a secret alone, not checked yet. `server/routes_mcp.py`: `GET /api/mcp/servers` (every server
+with where it is set up, its state, tools, error and sign-in page; the services), `POST /api/mcp/servers` (a service,
+or a name and a URL or command line; tried in a task of its own with a sign-in from the page's origin, which must be an
+address of this server, and answered once the sign-in page is known, the try ended or 20 s passed; kept and connected
+as runs connect once it answered with its tools), `POST /api/mcp/servers/{name}/connect` (again, signing in again) and
+`DELETE /api/mcp/servers/{name}` (Connect apps' own only: its tools, record and sign-in go). Connect apps: **Tools of
+other services**, every server with its tools and where it is set up, **Open the sign-in page** while one waits, the
+page asking every 2 s until the try ended, and a form for a name and an address; **Services to add**. Tests:
+`tests/smoke/test_mcp_sign_in.py`, against an MCP server that is its own authorization server (the library's, saying
+yes to every sign-in, its tokens running out after 3 s and checked against their resource), with Dot's own server: the
+sign-in followed as a browser would and the tool offered and called, the file's mode, the next start renewing the token
+without a new sign-in, a server whose sign-ins ended left out with `SIGN_IN_AGAIN`, Remove, a server open to all, a bad
+name, a page of another address and a stray callback refused; and Connect apps in a headless Chrome, wide and light
+and on a phone and dark (the config's server with its tools, one added by its address and signed in to on the page that
+opens, one removed, nothing wider than the phone).
 
 ### 280. Dot starts lean: the fewest words and tools, the rest found when needed
 

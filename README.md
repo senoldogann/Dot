@@ -1686,6 +1686,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
 | `GET /connections`, `POST /connections/{id}`                                    | the applications of Connect apps, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
+| `GET\|POST /mcp/servers`, `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`) and the services to add; add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one of Connect apps (409 for one set up elsewhere) |
+| `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state` (400 for none) |
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`); a new pairing code (item 267) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
@@ -2253,8 +2255,24 @@ does with it, where it stands and the one step that sets it up; **Check again** 
   opens the sign-in page in a tab of Dot's browser on the Mac. With My Chrome (Settings › Browser) Dot works in your own
   Chrome, where you are signed in as you always are; a browser without a window (`headless = true` under `[browser]`)
   has none to sign in in, which the section says once.
+- **Tools of other services** (item 279): every [MCP server](#mcp-servers) Dot has, from its config, a plugin, another
+  agent (Skills › Found elsewhere) or this page, with **Ready** and its tools, **Left out** and why, or **Off**. Below
+  it, **Services to add**: Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account, and
+  DeepWiki and Microsoft Learn, open to all; or any server by its name and address, a URL or the command that starts it
+  on this Mac. **Add** tries the server first and keeps it only once it answered with its tools, which go to the runs
+  that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using: the row
+  says **Waiting for your sign-in** with **Open the sign-in page**, the service's own page, which sends you back to
+  Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through `[server] reach`), and
+  the row turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself with the service as
+  a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before
+  they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words
+  that bring you back here (**Sign in again**). **Remove** takes a server of this page out, with its tools and its
+  sign-in; one set up elsewhere is removed there.
 
-A sign-in is told by its cookie alone: a session the site ended stays **Signed in** until its cookie expires.
+A sign-in is told by its cookie alone: a session the site ended stays **Signed in** until its cookie expires. Not in
+the services' list, as Dot cannot register with them by itself (checked 2026-10-15): GitHub, which takes a personal
+token (an `[[mcp]]` table with an `Authorization` header), Asana, Slack, Google and Box (clients registered by hand),
+and Vercel, Figma, Canva and Atlassian (approved clients only, or lists of allowed ones).
 
 ## MCP servers
 
@@ -2279,8 +2297,10 @@ headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; header
 ```
 
 `dotx mcp list` starts every configured server and shows its tools, or why it does not start. Only tools are used (no
-resources, prompts, sampling or OAuth). The tool list is read when Dot starts; a server that dies is started again by
-the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+resources, prompts or sampling). A server at a URL may sign in as MCP's authorization asks (OAuth): `oauth = true` has
+Dot send the token it keeps for it, which **Sign in again** on [Connect apps](#connect-apps) gets, and the servers added
+there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on Connect
+apps, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
 or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
 nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System names it
@@ -2464,6 +2484,8 @@ Anthropic one), a site under `[policy.spend]` that is not a bare host in lower c
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
 | `added-servers.json`                             | the MCP servers you added from other agents, by name and fingerprint |
+| `connected-servers.json`                         | the MCP servers you added on Connect apps, by address or command     |
+| `mcp-sign-ins/`                                  | what signing in to those servers gave: tokens and client (mode 0600) |
 | `opencode/`                                      | the OpenCode server Dot starts, the chats' sessions, the free models |
 | `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |
 | `browser-profile/`                               | the Chrome profile of the browser tools                              |

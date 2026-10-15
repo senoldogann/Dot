@@ -8,11 +8,13 @@ from dotagent.core.text import redact_secrets
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolSpec
 from dotagent.mcp.hub import McpHub, tool_parameters
+from dotagent.mcp.naming import PREFIX
 from dotagent.mcp.types import McpTool
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.tools.base import ACTING_MODES, ALL_MODES, PreparedCall, RegisteredTool, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.mcp_result import FENCE_OVERHEAD_CHARS, render_call_result
+from dotagent.tools.registry import ToolRegistry
 
 _NONCE_BYTES: int = 8
 _DESCRIPTION_CHARS: int = 1200
@@ -85,3 +87,11 @@ def _register(hub: McpHub, tool: McpTool) -> RegisteredTool:
 
 def build_mcp_tools(hub: McpHub) -> tuple[RegisteredTool, ...]:
     return tuple(_register(hub, tool) for tool in hub.tools)
+
+
+def refresh_mcp_tools(registry: ToolRegistry, hub: McpHub) -> None:
+    """Make the registry's MCP tools those of ``hub`` now, after a server joined or left it (item 279): the runs that
+    start after are offered them, and a run keeps the tools it started with."""
+    for name in [name for name in registry.tools if name.startswith(PREFIX)]:
+        del registry.tools[name]
+    registry.tools.update({tool.exposed_name: _register(hub, tool) for tool in hub.tools})

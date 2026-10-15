@@ -849,6 +849,64 @@ class ConnectionsView(FrozenModel):
     headless: bool
 
 
+type McpOrigin = Literal["config", "plugin", "elsewhere", "connected"]
+type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signing_in"]
+
+
+class McpServerView(FrozenModel):
+    """One MCP server Dot has, as Connect apps shows it (item 279). ``origin`` is where it is set up: Dot's config, a
+    plugin, another agent of the Mac (Skills › Found elsewhere), or Connect apps itself, the only place that removes
+    one. ``address`` is its URL or its command. ``state``: its tools are offered to runs (``ready``, with ``tools``,
+    their names on the server), it was left out (``error`` says why), it is switched off in the config, or Dot tries it
+    now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the
+    owner's account, and Sign in again renews that."""
+
+    name: str
+    origin: McpOrigin
+    address: str
+    service: str | None
+    state: McpServerState
+    tools: tuple[str, ...]
+    error: str | None
+    link: str | None
+    signs_in: bool
+
+
+class McpServiceView(FrozenModel):
+    """A service of Connect apps' catalogue (``mcp/catalogue.py``), with whether Dot has its server already."""
+
+    id: str
+    name: str
+    does: str
+    url: str
+    signs_in: bool
+    added: bool
+
+
+class McpServersView(FrozenModel):
+    """``GET /mcp/servers``: every MCP server Dot has, those of its config first, and the catalogue's services."""
+
+    servers: tuple[McpServerView, ...]
+    services: tuple[McpServiceView, ...]
+
+
+class McpServerAdd(FrozenModel):
+    """``POST /mcp/servers``: a service of the catalogue (``service``), or a server by ``name`` and ``address``, a URL
+    (over SSE when its path ends in ``/sse``, else streamable HTTP) or a command line. ``origin`` is the page's own
+    origin, where the authorization server sends the browser back after a sign-in."""
+
+    service: str | None
+    name: str | None
+    address: str | None
+    origin: str
+
+
+class McpReconnect(FrozenModel):
+    """``POST /mcp/servers/{name}/connect``: the page's own origin, as in :class:`McpServerAdd`."""
+
+    origin: str
+
+
 class KeyView(FrozenModel):
     """The API key of one provider as the Settings page shows it; the value never leaves the daemon. ``source`` is where
     the key in use comes from (``None``: it is not set), ``saved`` whether Dot's ``.env`` file holds one (the page saves

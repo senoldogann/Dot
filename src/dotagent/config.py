@@ -437,7 +437,8 @@ class McpServerConfig(FrozenModel):
 
     Values of ``env`` and ``headers`` may refer to secrets as ``${NAME}``; they are looked up like API keys
     (environment, ``.env``, Keychain). ``allow`` lists the server's tools to offer to the model (empty: all of them, up
-    to a limit).
+    to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Connect apps
+    (item 279): Dot then sends the access token it keeps for the server and renews it.
     """
 
     name: str = Field(pattern=MCP_NAME_PATTERN)
@@ -447,6 +448,7 @@ class McpServerConfig(FrozenModel):
     url: str | None = Field(default=None, pattern=r"^https?://\S+$")
     headers: dict[str, str] = Field(default_factory=dict)
     transport: McpTransport | None = None
+    oauth: bool = False
     allow: list[str] = Field(default_factory=list)
     enabled: bool = True
     startup_timeout_s: float = Field(default=60.0, gt=0)
@@ -471,6 +473,8 @@ class McpServerConfig(FrozenModel):
             raise ValueError("args and env belong to a command; a url takes headers")
         if self.url is None and self.headers:
             raise ValueError("headers belong to a url; a command takes args and env")
+        if self.url is None and self.oauth:
+            raise ValueError("oauth belongs to a url; a command signs in by its own environment")
         return self
 
 

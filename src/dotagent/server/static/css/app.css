@@ -1390,6 +1390,41 @@ a.pill:hover {
   flex: 1 1 220px;
 }
 
+/* An MCP server's address may be a long URL or command without a space: it breaks anywhere rather than widen the page
+   (item 279). The form that adds one by its address sits under the servers, its fields side by side when they fit. */
+.connect-address {
+  word-break: break-all;
+}
+
+.connect-add {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 16px;
+  padding: var(--pad-row);
+  border-top: 1px solid var(--border);
+}
+
+.connect-add > .field {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+.connect-add > .field:nth-child(2) {
+  flex-grow: 3;
+}
+
+.connect-add-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 720px) {
+  .connect-add-actions {
+    flex-basis: 100%;
+  }
+}
+
 /* ---------- lists ---------- */
 
 .list-row {
