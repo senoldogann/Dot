@@ -5212,7 +5212,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
-| 274 | A streamed message is drawn as it will stay                                           | in progress |         |
+| 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
 | 275 | On a phone the page fits the screen and holds still                                   | planned     |         |
 | 276 | The view of Dot's computer comes back by itself                                       | planned     |         |
 | 277 | Every chat wears a creature, its last message under its name                          | planned     |         |
@@ -12018,7 +12018,7 @@ size, the level's word in sight and chosen from its menu, the box's text 16 px o
 
 ### 274. A streamed message is drawn as it will stay
 
-**Status: in progress.** Built on `item-274-stream-drawn`.
+**Status: done.** Merged as `428ad94` (PR #316; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `timeline.js`: a live message is drawn in the frame after a piece comes, as the formatted
 prose it ends as (`prose.js`' `blockNode`), and a block read from the same lines as at the draw before stays as it was
@@ -12944,3 +12944,4 @@ before it, the model's next run without the third.
 - 2026-10-15 (Opus 5.5): item 267 merged as `a8c5cb0` (PR #313; no Linear issue, the connector was signed out): Settings › Phone gives a one-time pairing code (eight characters of Crockford's base32, ten minutes, five tries) that the sign-in screen of an app added to a phone's home screen trades for the token over the one public route besides the health check and the proof; only what can be a code is sent, so a token pasted into the code's field stays on the phone; neither the code nor the token is logged.
 - 2026-10-15 (Opus 5.5): item 272 merged as `2aa0600` (PR #314; no Linear issue, the connector was signed out): where the Settings tabs and the pane do not fit side by side, the tabs are one row that scrolls sideways with the open tab brought into sight and its edge fading while more lie beyond, and the row stays under the bar while the page scrolls; side by side they stay a column.
 - 2026-10-15 (Opus 5.5): item 273 merged as `0eb267f` (PR #315; no Linear issue, the connector was signed out): the bar beside a closed sidebar holds its opener alone, the emergency stop staying in the sidebar's foot; the side panel's switch and the drawer's close are the sidebar's buttons, 36 px with a 19 px icon; the reasoning pill keeps its level's word at every width; on a phone and on any touch screen the composer's text is at least 16 px, so that iOS does not zoom into it, and the bar's buttons are 36 px.
+- 2026-10-15 (Opus 5.5): item 274 merged as `428ad94` (PR #316; no Linear issue, the connector was signed out): a live message is drawn as the formatted prose it ends as, at most once a frame, the blocks already written left as they were drawn (2 ms a draw at 35,000 characters with the CPU four times slower, 31 ms drawn whole), its caret at the end of its text, its end moving nothing; the arrow down no longer flashes, nor does the follow stop, when the page's own scroll comes after the conversation grew.
