@@ -5,8 +5,8 @@ with the open tab in sight, and the row stays under the bar while the page scrol
 top of its pane. Side by side, the tabs are a column. Before, the row wrapped into four rows on a phone and scrolled
 away with the page.
 
-The bar and the composer (item 273): the bar beside a closed sidebar holds its opener alone, the emergency stop in the
-sidebar's foot; the sidebar's buttons and the side panel's switch and close are one size; the reasoning pill shows its
+The bar and the composer (item 273): the bar beside a closed sidebar holds its opener alone, and neither holds the
+emergency stop, which is in Settings › System (item 289); the sidebar's buttons and the side panel's switch and close are one size; the reasoning pill shows its
 level's word, chosen from its menu; on a phone the box's text is 16 px and the bar's buttons a finger's size, and the bar
 holds them all. Before, the stop stood beside the opener, the panel's buttons were smaller, the level folded to a brain
 under 600 px of bar and the box's text was 15 px.
@@ -257,7 +257,7 @@ async def _bar_and_composer(
     bar: Locator = page.locator("header.stagebar")
     sidebar: Locator = page.locator(".sidebar")
 
-    # The bar beside a closed sidebar holds its opener alone; the stop is in the sidebar's foot.
+    # The bar beside a closed sidebar holds its opener alone; the emergency stop is in Settings › System (item 289).
     if await sidebar.get_by_role("button", name="Hide sidebar").is_visible():
         await sidebar.get_by_role("button", name="Hide sidebar").click()
     show: Locator = bar.get_by_role("button", name="Show sidebar")
@@ -265,7 +265,8 @@ async def _bar_and_composer(
     await expect(bar.get_by_role("button", name="Emergency stop")).to_have_count(0)
     assert await _size(show) == _SWITCH_PX
     await show.click()
-    await expect(sidebar.get_by_role("button", name="Emergency stop")).to_be_visible()
+    await expect(sidebar.get_by_role("button", name="Hide sidebar")).to_be_visible()
+    await expect(sidebar.get_by_role("button", name="Emergency stop")).to_have_count(0)
     assert await _size(sidebar.get_by_role("button", name="Hide sidebar")) == _SWITCH_PX
     await page.screenshot(path=str(shots / f"sidebar-{width}-{scheme}.png"))
     await sidebar.get_by_role("button", name="Hide sidebar").click()

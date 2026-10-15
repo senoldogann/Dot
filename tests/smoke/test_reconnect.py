@@ -14,7 +14,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Error, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -378,7 +378,8 @@ async def test_a_stream_gone_silent_is_cut_and_followed_again(runtime: Runtime) 
 
 async def test_a_phone_back_from_the_background_follows_again_at_once_and_quietly(runtime: Runtime) -> None:
     async with async_playwright() as playwright:
-        # Chrome, and WebKit as Safari on the phone.
+        # Chrome, and WebKit as Safari on the phone; what either page throws is kept.
+        errors: list[str] = []
         for engine in ("chromium", "webkit"):
             proxy: Proxy = Proxy()
             await proxy.start()
@@ -394,8 +395,7 @@ async def test_a_phone_back_from_the_background_follows_again_at_once_and_quietl
                     viewport={"width": 390, "height": 844}, color_scheme="light", reduced_motion="reduce"
                 )
                 page: Page = await context.new_page()
-                errors: list[Error] = []
-                page.on("pageerror", errors.append)
+                page.on("pageerror", lambda error: errors.append(str(error)))
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.clock.install()
                 await page.goto(ui_url("127.0.0.1", proxy.port, TOKEN))
