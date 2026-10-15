@@ -6,7 +6,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
-from dotagent.config import JudgeProvider, ModelReference, ModelsConfig, ResumeMode
+from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
@@ -376,7 +376,7 @@ class BrowserRaiseRequest(FrozenModel):
 class BrowserDebugPortRequest(FrozenModel):
     """The port of this Mac on which Dot's own Chrome takes DevTools connections (item 265); 0 for none."""
 
-    debug_port: int = Field(ge=0, le=65535)
+    debug_port: DebugPort
 
 
 class KeyRequest(FrozenModel):

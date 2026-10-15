@@ -46,6 +46,18 @@ def _spend_site(value: str) -> str:
     return value
 
 
+# The lowest port Dot's own Chrome may take DevTools connections on (item 265): the ports below are the well-known ones
+# of the system's services.
+DEBUG_PORT_MIN: int = 1024
+
+
+def _debug_port(value: int) -> int:
+    """A DevTools port of ``[browser] debug_port`` (item 265): 0 for none, else one from :data:`DEBUG_PORT_MIN` up."""
+    if 0 < value < DEBUG_PORT_MIN:
+        raise ValueError(f"a DevTools port is 0 for none or from {DEBUG_PORT_MIN} to 65535")
+    return value
+
+
 # The smallest context size a model's runs may be given (item 250, [models] context): the budget every run had before
 # 2026-10-11. A run's first step alone sends its instructions, its tools and the request (29,294 tokens at the median
 # of 48 runs, measured 2026-10-15), so a smaller budget would summarise a run after its first few steps.
@@ -54,6 +66,7 @@ CONTEXT_FLOOR: int = 48_000
 type ServiceAddress = Annotated[str, AfterValidator(_service_address)]
 type ModelReference = Annotated[str, AfterValidator(_model_reference)]
 type SpendSite = Annotated[str, AfterValidator(_spend_site)]
+type DebugPort = Annotated[int, Field(ge=0, le=65535), AfterValidator(_debug_port)]
 type ContextSize = Annotated[int, Field(ge=CONTEXT_FLOOR)]
 
 
@@ -266,7 +279,7 @@ class BrowserConfig(FrozenModel):
     raise_window: bool
     # The port of this Mac on which Dot's own Chrome also takes DevTools connections, from a run's scripts (item 265);
     # 0 for none.
-    debug_port: int = Field(ge=0, le=65535)
+    debug_port: DebugPort
     # A page Chrome can open: from a small phone's to a 4K screen's.
     viewport_width: int = Field(ge=320, le=3840)
     viewport_height: int = Field(ge=240, le=2160)

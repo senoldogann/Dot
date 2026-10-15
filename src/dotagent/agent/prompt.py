@@ -340,13 +340,15 @@ _DELEGATED: str = (
     "you could not verify."
 )
 
-# Where the run's scripts reach Dot's own Chrome (item 265).
+# Where the run's scripts reach Dot's own Chrome (item 265), told to a run with a tool that runs its scripts.
 _DEVTOOLS: str = (
-    "Dot's Chrome also takes DevTools connections at {address} while it runs (it starts with your first browser "
-    "call): a script of yours can drive it with the Chrome DevTools Protocol (Playwright's connect_over_cdp, "
-    "Puppeteer's connect) for what the browser tools do not do. Work in tabs your script opens, and leave the tabs "
-    "of the browser tools to them."
+    "Dot's Chrome also takes DevTools connections at {address} once one of your browser calls has started it: a "
+    "script of yours can drive it with the Chrome DevTools Protocol for what the browser tools do not do (Playwright's "
+    "connect_over_cdp with no_defaults=True, noDefaults in Node, so that Dot's downloads stay as they are; Puppeteer's "
+    "connect with defaultViewport: null). Work in tabs your script opens, and leave the tabs of the browser tools to "
+    "them."
 )
+_SCRIPT_TOOLS: frozenset[str] = frozenset({"shell", "terminal_send"})
 
 _MCP_TOOL_PREFIX: str = "mcp__"
 
@@ -446,7 +448,7 @@ def _environment(inputs: PromptInputs) -> str:
     # A delegated run has no ask_user, so it has no questions to leave.
     if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_LEFT_QUESTIONS}")
-    if inputs.devtools is not None:
+    if inputs.devtools is not None and not _SCRIPT_TOOLS.isdisjoint(inputs.tool_names):
         lines.append(f"- {_DEVTOOLS.format(address=inputs.devtools)}")
     return "\n".join(lines)
 

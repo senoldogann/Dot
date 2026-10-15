@@ -41,8 +41,12 @@ class BrowserPool:
 
     async def set_debug_port(self, port: int) -> None:
         """The port Dot's own Chrome takes DevTools connections on (item 265), for every session: the own Chrome of a
-        campaign takes it as well."""
-        for session in (self.main, *self._others.values()):
+        campaign takes it as well. Every session is checked before any changes, so a session that refuses the port
+        leaves all of them as they were."""
+        sessions: tuple[BrowserSession, ...] = (self.main, *self._others.values())
+        for session in sessions:
+            await session.check_debug_port(port)
+        for session in sessions:
             await session.set_debug_port(port)
 
     async def aclose(self) -> None:

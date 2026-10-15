@@ -938,10 +938,11 @@ function buildBrowser(isDisposed) {
         " with the Chrome DevTools Protocol, and the run is told so. 0 turns it off.",
       );
     } else if (view.debug_port !== 0) {
-      portHint.textContent = "Kept for Own Chrome: with My Chrome, scripts reach your Chrome through its own remote debugging. 0 turns it off.";
+      portHint.textContent =
+        "Runs that work in Dot's own Chrome, such as a campaign's, are told this port; with My Chrome, scripts reach your Chrome through its own remote debugging. 0 turns it off.";
     } else {
       portHint.textContent =
-        "A port of this Mac on which Dot's own Chrome also takes DevTools connections, so a run's scripts can drive it (Playwright, Puppeteer). It asks for no token: any program on this Mac can use it while Dot's Chrome runs. Another program on the port keeps Dot's Chrome from starting, so no script drives another Chrome.";
+        "A port of this Mac, from 1024 up, on which Dot's own Chrome also takes DevTools connections, so a run's scripts can drive it (Playwright, Puppeteer). It asks for no token: any program on this Mac can use it while Dot's Chrome runs. Dot's Chrome does not start while another program holds the port.";
     }
   }
 
@@ -950,9 +951,9 @@ function buildBrowser(isDisposed) {
       return;
     }
     const wanted = text.trim() === "" ? 0 : Number(text.trim());
-    if (!Number.isInteger(wanted) || wanted < 0 || wanted > 65535) {
+    if (!Number.isInteger(wanted) || (wanted !== 0 && (wanted < 1024 || wanted > 65535))) {
       paintPort();
-      toast("error", "A port is a whole number from 1 to 65535, or 0 for none.");
+      toast("error", "A port is a whole number from 1024 to 65535, or 0 for none.");
       return;
     }
     if (wanted === view.debug_port) {

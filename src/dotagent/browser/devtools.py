@@ -1,7 +1,7 @@
 """The DevTools port of Dot's own Chrome (item 265): with ``[browser] debug_port`` set, Chrome takes DevTools
 connections on that port of this Mac's loopback address besides Playwright's pipe, so that a run's scripts can drive
-it with the Chrome DevTools Protocol. A port another program holds keeps Dot's Chrome from starting, so that a script
-told the address never drives another Chrome.
+it with the Chrome DevTools Protocol. Dot's Chrome does not start while another program holds the port; a script
+reaches whatever listens there, which is Dot's Chrome while it runs.
 """
 
 import errno
@@ -17,15 +17,19 @@ _PROBE_TIMEOUT_S: float = 0.5
 
 def port_is_taken(port: int) -> bool:
     """Whether a program of this Mac holds ``port`` of the loopback address: one that listens there (also on every
-    address), or one bound to it without listening, so that Chrome could not listen there itself."""
+    address), or one bound to it without listening, so that Chrome could not listen there itself. A port that cannot
+    be checked raises a :class:`BrowserError` with the reason."""
     try:
         with socket.create_connection((LOOPBACK, port), timeout=_PROBE_TIMEOUT_S):
             return True
-    except TimeoutError:
+    except (TimeoutError, ConnectionResetError):
+        # A program holds the port without answering, or answers by dropping the connection.
         return True
     except ConnectionRefusedError:
         # Nothing listens there; a program may still be bound to it.
         pass
+    except OSError as error:
+        raise _unchecked(port, error) from error
     # Bound as servers bind (Chromium's among them), so that a port the connections of a closed Chrome still wait on
     # is free, as it is to Chrome.
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -35,8 +39,17 @@ def port_is_taken(port: int) -> bool:
         except OSError as error:
             if error.errno == errno.EADDRINUSE:
                 return True
-            raise
+            raise _unchecked(port, error) from error
     return False
+
+
+def _unchecked(port: int, error: OSError) -> BrowserError:
+    """The error of a DevTools port this Mac did not let Dot check, with the system's reason."""
+    return BrowserError(
+        f"port {port} of this Mac could not be checked for DevTools connections: {error.strerror or error}; "
+        "choose another port in Settings › Browser, or 0 for none",
+        {"debug_port": port, "errno": error.errno, "error": str(error)},
+    )
 
 
 def port_taken(port: int) -> BrowserError:

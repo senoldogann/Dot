@@ -2,8 +2,9 @@
 set, Dot's Chrome answers the DevTools Protocol on that port of this Mac, and a script connected there sees the tab a run
 opened and works in a tab of its own while the session goes on; a port another program holds stops the start with an
 error that names it, and no Chrome is left on the profile. Through the API of a served daemon the port is set, kept in
-the config file, and refused when it is taken or out of range; Settings › Browser shows and sets it in Chrome, wide and
-on a phone, light and dark. Before, Dot's Chrome took no connection but Playwright's pipe.
+the config file, and refused when it is taken or out of range (below 1024 too); Settings › Browser shows and sets it
+in Chrome, wide and on a phone, light and dark. A browser session that refuses the port leaves every session of the
+pool as it was. Before, Dot's Chrome took no connection but Playwright's pipe.
 
 No network and no model service is used.
 """
@@ -209,7 +210,8 @@ async def test_the_api_sets_the_port_keeps_it_and_refuses_a_taken_one(own_home: 
             assert refused.status_code == 422 and f"port {taken} of this Mac is taken" in refused.text
         assert (await client.get("/browser")).json()["debug_port"] == port
         assert f"debug_port = {port}\n" in (own_home / "config.toml").read_text(encoding="utf-8")
-        assert (await client.post("/browser/debug-port", json={"debug_port": 70000})).status_code == 422
+        for out_of_range in (80, 70000):
+            assert (await client.post("/browser/debug-port", json={"debug_port": out_of_range})).status_code == 422
         off: httpx.Response = await client.post("/browser/debug-port", json={"debug_port": 0})
         assert (off.json()["debug_port"], off.json()["devtools_address"]) == (0, None)
         assert "debug_port = 0\n" in (own_home / "config.toml").read_text(encoding="utf-8")
@@ -235,7 +237,7 @@ async def test_settings_shows_the_port_and_sets_it(own_home: Path, tmp_path: Pat
                 )
                 assert await field.input_value() == "0"
                 setting: Locator = page.locator(".setting", has=field)
-                assert "keeps Dot's Chrome from starting" in (await setting.text_content() or "")
+                assert "does not start while another program holds the port" in (await setting.text_content() or "")
                 assert await setting.evaluate("(row) => row.getBoundingClientRect().right <= window.innerWidth")
                 await field.fill(str(port))
                 await field.press("Enter")
@@ -244,7 +246,7 @@ async def test_settings_shows_the_port_and_sets_it(own_home: Path, tmp_path: Pat
                 await page.screenshot(path=tmp_path / f"devtools-port-{width}-{scheme}.png")
                 await field.fill("0")
                 await field.press("Enter")
-                await setting.get_by_text("keeps Dot's Chrome from starting").wait_for()
+                await setting.get_by_text("does not start while another program holds the port").wait_for()
                 assert "debug_port = 0\n" in (own_home / "config.toml").read_text(encoding="utf-8")
                 await page.close()
         finally:

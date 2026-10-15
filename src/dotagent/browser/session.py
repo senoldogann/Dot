@@ -318,8 +318,8 @@ class BrowserSession:
 
     async def _launch_own(self) -> _Opened:
         """Start Dot's own Chrome on its own profile, taking DevTools connections on ``[browser] debug_port`` when
-        one is set (item 265): a port another program holds stops the start, so that no script told the address drives
-        another Chrome."""
+        one is set (item 265): a port another program holds stops the start, so that a script told the address does not
+        reach that program instead."""
         config: BrowserConfig = self._config
         holder: int | None = await asyncio.to_thread(profile_holder_pid, self._profile)
         if holder is not None:
@@ -506,23 +506,33 @@ class BrowserSession:
 
     async def set_debug_port(self, port: int) -> None:
         """The port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), from its next start: Dot's
-        own Chrome, when it runs on another port, is closed, so that the next call starts it on this one. Refused while
-        a thread is in the middle of a step, as a switch is, and when another program holds the port; nothing changes
-        then."""
+        own Chrome, when it runs on another port, is closed, so that the next call starts it on this one. Refused as
+        :meth:`check_debug_port` refuses; nothing changes then."""
         async with self._launch_lock:
-            if self._closed:
-                raise BrowserError("the browser session was closed", {})
+            await self._refuse_debug_port(port)
             if port == self._config.debug_port:
                 return
-            if port and await asyncio.to_thread(port_is_taken, port):
-                raise port_taken(port)
-            busy: list[JsonValue] = [thread_id for thread_id, thread in self._threads.items() if thread.lock.locked()]
-            if busy:
-                raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
             if self._config.mode == "own":
                 await self._let_go()
             self._config = self._config.model_copy(update={"debug_port": port})
             _log.info("browser_debug_port", mode=self._config.mode, debug_port=port)
+
+    async def check_debug_port(self, port: int) -> None:
+        """Raise the error :meth:`set_debug_port` would refuse ``port`` with, changing nothing: the session was closed,
+        a thread is in the middle of a step (as for a switch), or another program holds the port."""
+        async with self._launch_lock:
+            await self._refuse_debug_port(port)
+
+    async def _refuse_debug_port(self, port: int) -> None:
+        if self._closed:
+            raise BrowserError("the browser session was closed", {})
+        if port == self._config.debug_port:
+            return
+        if port and await asyncio.to_thread(port_is_taken, port):
+            raise port_taken(port)
+        busy: list[JsonValue] = [thread_id for thread_id, thread in self._threads.items() if thread.lock.locked()]
+        if busy:
+            raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
 
     async def switch(self, config: BrowserConfig, profile_dir: Path) -> None:
         """Work in the Chrome that ``config`` and ``profile_dir`` name from the next call on: the current one is let go
