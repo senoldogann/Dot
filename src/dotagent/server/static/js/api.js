@@ -199,12 +199,29 @@ export async function request(method, path, body) {
   }
 }
 
+// A pairing code as the daemon reads it (server/pairing.py): eight characters of Crockford's base32, the spaces and
+// dashes left out, O read as 0 and I and L as 1.
+const CODE_ALPHABET = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
+const CODE_CHARS = 8;
+const CODE_READ_AS = { O: "0", I: "1", L: "1" };
+
+/** Whether `text` can be a pairing code (item 267). An access token never can. */
+export function canBePairingCode(text) {
+  const chars = [...text.toUpperCase()].filter((char) => char !== " " && char !== "-").map((char) => CODE_READ_AS[char] ?? char);
+  return chars.length === CODE_CHARS && chars.every((char) => CODE_ALPHABET.includes(char));
+}
+
 /**
  * Trade a pairing code from Settings › Phone for the access token (item 267), for an app on a phone's home screen,
  * whose storage is its own. Only the code is sent; the token brought back is proven as any other before it is used.
+ * The daemon is not proven before the code goes, so what cannot be a code is not sent at all: a token pasted into the
+ * code's field would go to whatever answers on the port.
  */
 export async function pairWithCode(code) {
   const path = "/phone/pair";
+  if (!canBePairingCode(code)) {
+    throw new Error("That is not a pairing code: a code is 8 letters and digits, as Settings › Phone shows it. An access token goes in the field below.");
+  }
   let response;
   try {
     response = await fetch(`/api${path}`, {

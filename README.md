@@ -1737,9 +1737,12 @@ Phone, on the Mac or in Safari where Dot is open, shows one with **Pair a phone*
 (Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a new code
 takes the place of the one before, and five wrong tries use a code up. The app trades it for the token (`POST
 /api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host and Origin checks
-hold for it as for any other) and proves the daemon with it as with any token. `POST /api/phone/pairing` gives a code,
-`GET /api/phone` the addresses. Neither the code nor the token is logged. The phone reaches Dot while the Mac is on and
-awake.
+hold for it as for any other) and proves the daemon with it as with any token. The daemon is not proven before a code
+goes, so the screen sends nothing that cannot be a code: a token pasted into the code's field stays on the phone. A code
+is as good as the token while it lasts: whoever reads it and reaches the port first is let in, so it is asked for when
+the phone is at hand, and a phone that the code then refuses means that someone else used it. `POST /api/phone/pairing`
+gives a code, `GET /api/phone` the addresses. Neither the code nor the token is logged. The phone reaches Dot while the
+Mac is on and awake.
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. A page loaded from them while the daemon is out of reach says so and tries again by itself (item 200):

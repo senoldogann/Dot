@@ -3,7 +3,8 @@ whose storage is its own, trades it for the access token. Through the API a code
 to be traded, is traded once, in the case and the dashes a person types it, and five wrong tries or a newer code use it
 up; the guard still turns away another site's page, and the phone's address comes from ``[server] reach``. In Chrome,
 a page signed in on the Mac gets a code from Settings › Phone, and a phone with no token types it on the sign-in screen
-and is let in; a wrong code is told. Wide and on a phone, light and dark. Before, the sign-in screen took the token only.
+and is let in; a wrong code is told, and a token typed where the code goes is not sent. Wide and on a phone, light
+and dark. Before, the sign-in screen took the token only.
 
 No network and no model service is used.
 """
@@ -145,6 +146,13 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     )
     await phone.goto(f"{address}/")
     field: Locator = phone.get_by_role("textbox", name="Pairing code")
+    # A token typed where the code goes is never sent: the daemon is not proven before a code goes.
+    tried: list[str] = []
+    phone.on("request", lambda request: tried.append(request.url) if request.url.endswith("/phone/pair") else None)
+    await field.fill(TOKEN)
+    await phone.get_by_role("button", name="Pair", exact=True).click()
+    await expect(phone.locator(".signin .note.bad")).to_contain_text("That is not a pairing code")
+    assert tried == []
     await field.fill("0000-0000")
     await phone.get_by_role("button", name="Pair", exact=True).click()
     await expect(phone.locator(".signin .note.bad")).to_contain_text("the pairing code is wrong, used or out of date")
