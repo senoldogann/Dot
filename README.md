@@ -286,7 +286,9 @@ is the answer (a small model that is offered both writes the call out as text).
   a summary far too long, an error or a timeout, the run's own model writes it, and while the fast model is paused after
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
-  and the timeline says so with the reason. Next to the summary a continuity note keeps the
+  and the event says so with the reason. The conversation shows no note of a compaction (item 260): the Details panel
+  counts them and says how many checks flagged something, and the Cost panel keeps the summaries' share. Next to the
+  summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
