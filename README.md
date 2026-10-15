@@ -1344,8 +1344,9 @@ line of its own there, before the step's calls (item 246, after T3 Code), or out
 step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the model thinks
 and "Thought" once it is done, the start of the thought beside it; opened, the whole thought: up to 12,000 characters
 of it, of a longer one its start and its end, its secrets masked; it is there when the page is loaded again. A step
-asked again from its start drops what its failed try streamed. The answer of the run is the last
-message, with a copy button (its icon turns to a check once the answer is on the clipboard), when it came and how the
+asked again from its start drops what its failed try streamed. A message streams as it will stay (item 274): formatted
+as it comes, drawn at most once a frame with the parts already written left as they are, its caret at the end of its
+text, so that its end moves nothing. The answer of the run is the last message, with a copy button (its icon turns to a check once the answer is on the clipboard), when it came and how the
 run ended under it; how long the run took shows where the pointer rests on it (on a touch screen it always shows). A
 copy out of the conversation keeps its markdown, as T3 Code's does (item 206): a selection that starts in a message or
 an answer goes on the clipboard as the markdown it was written in, a list as a list, a table as a table and code in its
@@ -1353,7 +1354,8 @@ fence, with the formatted copy alongside for the applications that read it; the 
 out, and a copy within a block of code is its code. The box stands at the foot of the window from the first message, the
 conversation filling the space above it from the top, and is the same frame as the home's, with the attach button and
 the send in its bar; what you typed there and did not send waits for you. While the end of the conversation, or its
-answer, is below the window, a round arrow just above the composer leads there. At the left of the conversation a column
+answer, is below the window, a round arrow just above the composer leads there; it stays away while the page follows a
+working run down, as the page does until you scroll up. At the left of the conversation a column
 of short marks stands for your messages, one mark for each, top to bottom (item 201, after T3 Code's): resting the
 pointer on it shows the message nearest to it and the start of its answer, a click goes to that message, and from the
 keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are darker. The column needs a
