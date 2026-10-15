@@ -183,6 +183,13 @@ class JudgeUnavailablePayload(Payload):
     error: str
 
 
+class EmbeddingFailedPayload(Payload):
+    """The start of a run found its notes or its skills by their words alone: the embedding service failed (item 256)."""
+
+    purpose: Literal["notes", "skills"]
+    error: str
+
+
 class JudgeErrorPayload(Payload):
     """TypeSafe rejected a request of the judge or of judge_items, or answered outside its reference: an error of the
     code or the model, not an outage, so nothing is paused."""
@@ -435,6 +442,12 @@ class TerminalUi:
                 helper = HelperUnavailablePayload.model_validate(data)
                 entry: Unavailable = Unavailable(model=helper.model, reason=helper.reason, until=helper.until)
                 self._line(self._paint(f"  ⚠ helper {unavailable_text(entry, time.time())} cannot answer", "33"))
+            case "embedding_failed":
+                lost = EmbeddingFailedPayload.model_validate(data)
+                found: str = "skills listed" if lost.purpose == "skills" else "notes recalled"
+                self._line(
+                    self._paint(f"  ⚠ {found} by their words alone: the embedding service failed ({lost.error})", "33")
+                )
             case "judge_error":
                 rejected = JudgeErrorPayload.model_validate(data)
                 self._line(self._paint(f"  ⚠ TypeSafe rejected a request: {rejected.error}", "33"))

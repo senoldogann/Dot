@@ -20,7 +20,7 @@ from dotagent.core.types import JsonObject
 from dotagent.llm.connector import get_json, post_json
 from dotagent.llm.http import build_client, request_context
 from dotagent.llm.openai import request_headers
-from dotagent.llm.provider_errors import classify_generic, classify_openai
+from dotagent.llm.provider_errors import classify_ollama, classify_openai
 from dotagent.llm.wire import get_str
 from dotagent.memory.ranking import Vector, unit_vector
 from dotagent.secrets import require_secret, resolve_secret
@@ -132,7 +132,7 @@ class OllamaEmbedder:
         }
         url: str = f"{self._config.base_url.rstrip('/')}{_OLLAMA_EMBED_PATH}"
         answer: JsonObject = await post_json(
-            self._client, url, self._headers, payload, classify_generic, _RETRY, "ollama.embed"
+            self._client, url, self._headers, payload, classify_ollama, _RETRY, "ollama.embed"
         )
         return parse_embeddings(answer, len(texts), request_context(url, payload))
 

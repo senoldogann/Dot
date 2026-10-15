@@ -5194,11 +5194,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 253 | The line of what a yolo run did without asking says its reason once                   | done        | 0250d88 |
 | 254 | A model the plan does not include is paused at once                                   | done        | 8e6cbfb |
 | 255 | The typed judge switches on and off in Settings                                       | done        | b3cddbc |
-| 256 | A failed embedding never fails a run                                                  | planned     |         |
+| 256 | A failed embedding never fails a run                                                  | in progress |         |
 | 257 | A schedule's run knows its earlier runs                                               | planned     |         |
 | 258 | Only reasoning levels the gateway honours are offered                                 | done        | 3118d17 |
 | 259 | Ultrathink and ultracode as words in the composer                                     | done        | 4a37ee7 |
-| 260 | The compaction notes leave the conversation                                           | in progress |         |
+| 260 | The compaction notes leave the conversation                                           | done        | a8d8641 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11433,7 +11433,21 @@ levels (258) first, since the words of 259 are only as true as the levels behind
 
 ### 256. A failed embedding never fails a run
 
-**Status: planned.**
+**Status: in progress.** Built on `item-256-embedding-fallback`.
+
+**As built (2026-10-15).** A run's start had two embedding calls without a guard: the recall of its notes and
+the ranking of its skills by meaning (more skills than `[skills] listed`, `HelpVectors.closest`); the owner's run
+failed after its notes were recalled, which leaves the second, and Ollama's 400 whose words are the failed
+request to its runner was not retried. `core/errors.py`: `ProviderRunnerError`; `llm/provider_errors.py`:
+`classify_ollama` makes a 400 or a 5xx one whose words are a request to the loopback that broke off (`runner_lost`,
+reset, refused or EOF), and `llm/http.py` retries it as a broken connection; the embedder reads Ollama's answers with
+`classify_ollama`. `agent/loop.py`: `_start_notes` recalls the notes by their words alone (`memory/service.py`
+`words_only`) and `_close_skills` lists the skills by their words when the embedding service still fails, each with
+an `embedding_failed` event and warning; `timeline.js` shows it as a warning line and `cli_ui.py` as a line of the
+terminal. The memory's own calls (a save, a search of the tool) keep failing loudly, as tool errors the run reads.
+README: the memory's search paragraph. Tests: `tests/unit/test_provider_errors.py` (the runner's 400 retried,
+another 400 and a 404 with the runner's words not) and
+`tests/smoke/test_embedding_failure.py` (new; a stand-in Ollama whose runner breaks off on every embedding).
 
 **What.** A memory recall or a playbook match whose embedding call fails (the local Ollama runner reset, a `tokenize`
 error, a connection reset) is retried once and then falls back to the text search, with a warning in the log
@@ -11511,7 +11525,7 @@ nothing, wide and on a phone, light and dark, with a WebKit copy. Fails on the c
 
 ### 260. The compaction notes leave the conversation
 
-**Status: in progress.** Built on `item-260-quiet-compaction`.
+**Status: done.** Merged as `a8d8641` (PR #302; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `timeline.js`: the `compacted` handler counts the root run's compactions and the checks
 that flagged something and tells `onCompacted({ count, flagged })`; no note. `views/run.js`: the counts are kept with
@@ -12239,3 +12253,4 @@ Fails on the code of before.
 - 2026-10-15 (Opus 5.5): item 255 merged as `b3cddbc` (PR #299; no Linear issue, the connector was signed out): the typed judge switches on and off in Settings › API keys, on the row of TypeSafe's key, and takes effect at once; `GET` and `PUT /api/judge` carry the switch and write `[judge] provider`; the step router leaves a paused fast model out of the models it offers the judge.
 - 2026-10-15 (Opus 5.5): item 258 merged as `3118d17` (PR #300; no Linear issue, the connector was signed out): OpenCode Go's catalog offers no reasoning level for DeepSeek's four models (the chat route thinks the same at every label, measured), so the Reasoning pill, Settings and the API offer them none and Ultrathink and Ultracode do not show for them; the models whose level holds keep theirs.
 - 2026-10-15 (Opus 5.5): item 259 merged as `4a37ee7` (PR #301; no Linear issue, the connector was signed out): the word ultrathink or ultracode typed in the composer (a whole word, any case) is the choice for one message of item 251 where the model offers its level: the Reasoning pill reads it and the frame wears a gradient ring; editing a queued message or steering arms nothing.
+- 2026-10-15 (Opus 5.5): item 260 merged as `a8d8641` (PR #302; no Linear issue, the connector was signed out): the timeline shows no note for a compaction: the Details panel's Context fact counts the compactions of the run and of its helpers, and the event stays in the run's record and the API.
