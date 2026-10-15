@@ -1,5 +1,5 @@
 """The redactor masks the secrets it knows by their forms and keeps the words around them, and leaves look-alikes alone
-(item 214). Every sample is made up, and those in the form of a real service's key are put together at run time, so no
+(items 214 and 241). Every sample is made up, and those in the form of a real service's key are put together at run time, so no
 file holds one whole."""
 
 import base64
@@ -36,6 +36,24 @@ _MASKED: list[tuple[str, str]] = [
     (f"OPENAI {'sk-' + 'proj-' + _LETTERS[:24]}", "OPENAI ***"),
     (f"Authorization: Bearer {_LETTERS[:24]}", "Authorization: ***"),
     (f"api_key={_LETTERS[:12]}", "api_key=***"),
+    (f"charge with {'sk' + '_live_' + _LETTERS[:24]}", "charge with ***"),
+    (f"restricted {'rk' + '_test_' + _LETTERS[:24]}", "restricted ***"),
+    (f"webhook {'wh' + 'sec_' + _LETTERS[:32]}", "webhook ***"),
+    (f"push with {'gl' + 'pat-' + _LETTERS[:20]}", "push with ***"),
+    (f"publish with {'np' + 'm_' + _LETTERS[:36]}", "publish with ***"),
+    (f"hub {'h' + 'f_' + _LETTERS[:34]} read", "hub *** read"),
+    (f"twilio {'S' + 'K' + '0123456789abcdef' * 2}", "twilio ***"),
+    (f"mail {'S' + 'G.' + _LETTERS[:22] + '.' + _LETTERS[:43]}", "mail ***"),
+    (
+        f"AccountName=dot;{'Account' + 'Key'}={_LETTERS * 2}==;EndpointSuffix=core.windows.net",
+        "AccountName=dot;AccountKey=***",
+    ),
+    ('"private_key_id": "' + "0123456789abcdef" * 2 + '"', '"private_key_id": "***"'),
+    (f"Authorization: token {_LETTERS[:40]}", "Authorization: token ***"),
+    (f'{{"authorization": "ApiKey {_LETTERS[:32]}"}}', '{"authorization": "ApiKey ***"}'),
+    (f"Authorization: {_LETTERS[:40]}", "Authorization: ***"),
+    (f"Cookie: sessionid={_LETTERS[:32]}; theme=dark\nnext", "Cookie: ***\nnext"),
+    (f"Set-Cookie: sid={_LETTERS[:24]}; Path=/; HttpOnly", "Set-Cookie: ***"),
 ]
 _KEPT: list[str] = [
     '"max_tokens": 4096',
@@ -47,6 +65,11 @@ _KEPT: list[str] = [
     "passwords: 3 were reused",
     "pwd=/Users/someone/project",
     "AKIA alone is no key",
+    "the risk_live_dashboard01 panel",
+    "hf_hub_download(repo_id, filename)",
+    "npm_config_registry=https://registry.npmjs.org/",
+    "Cookie: the browser keeps it until it expires",
+    "Authorization: required for every request",
 ]
 
 

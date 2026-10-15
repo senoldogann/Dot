@@ -5179,6 +5179,9 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 238 | The side panel at the window's edge                                                  | done        | f9e6799 |
 | 239 | The meter says why the budget is smaller than the window                             | done        | 75bcb6e |
 | 240 | Dot's own work leaves a paused fast model out                                        | done        | 87b5cfc |
+| 241 | The redactor masks more keys, any Authorization and cookies                          | in progress |         |
+| 242 | The approval card and the reviewer see the whole command                             | planned     |         |
+| 243 | A run that goes on from another keeps its taint                                      | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -10900,6 +10903,71 @@ rate-limit or key error: the run's own model writes the summary at once, and `we
 until when the fast model cannot answer. Before, each asked it anyway and spent the connector's retries first: on the
 owner's record of four days, 122 calls of the fast model failed on its rate limit, 19 to 31 s each (24.8 s at the
 median), 107 of them within the pause of the one before, and each summary then took 27.6 s more on the run's own model.
+
+## Part 39: what a second review found (planned 2026-10-15)
+
+The owner's thirty-ninth word, on 2026-10-15: a second review of Dot, made at `c5aeed3`, to be checked, and what holds
+of it fixed, but never at the cost of Dot's freedom or of what was built for its autonomy: better autonomy, fast,
+successful and like a person.
+
+**Status (2026-10-15): planned.** Each finding was checked on the code at `82e95b3`, and the playbooks on the owner's
+record by kinds and numbers only. Three hold. The redactor, which masks what goes into the log, the events, the errors
+the API answers with, the lessons and the digests of playbooks, left ten of thirteen made-up keys of common services in
+the text, and the credentials of an Authorization header of a scheme other than Basic or Bearer. An approval card shows
+the first 300 characters of what an action targets, and the reviewer of an `auto` run reads 1,500, so a long command is
+shown and reviewed in part. A run's taint, which says that content third parties can author is in its context and has an
+outward-facing action confirmed, lives in memory only: the run that resumes another after a restart starts untainted,
+and so does the run Dot starts in a chat to say that a command in the background ended, although that message is Dot's
+and only an instruction of the owner restores trust. Left as they are, by the owner's word: a new message of the owner
+and a steer restore trust, as before; playbooks are still learned from runs that read the web, as most are (4 of the 5
+on the owner's Mac, from 19 of the 22 task runs that ended done).
+
+**The shape of this part.** Three items, each a pull request of its own: the redactor first, as it is the smallest; then
+the approval card and the reviewer; then the taint. None asks the owner more than before: the owner's messages start
+runs as they did, and a run that goes on from another is checked as that run was.
+
+### How to start part 39 (the handoff prompt)
+
+> Read ROADMAP.md part 39 and the status table of part 9 (rows 241 to 243). One item at a time, in order; the protocol
+> of part 5 (branch, gate, PR, Linear MYP issue when the connector is signed in, squash merge, hash in the table, log
+> line) is unchanged. Give each change a test that fails on the code of before. Tests never start a real model call
+> or read the other agents' files of the Mac. Never touch the owner's data directory except to read it, by the kinds
+> and numbers of what is stored, and to restart the daemon when `/api/status` shows no active run; PLAN.md stays
+> untracked. The owner reads Turkish; everything written is English.
+
+### 241. The redactor masks more keys, any Authorization and cookies
+
+**Status: in progress.**
+
+**As built (2026-10-15).** `redact_secrets` (`core/text.py`) has a pattern for the keys of Stripe (secret and
+restricted, live and test, and its webhook secrets), GitLab, npm, Hugging Face, Twilio and SendGrid, each by the prefix
+its service gives it and only where a word starts; one for the credentials of an Authorization header of any other
+scheme or of none, 16 characters or more, which keeps the scheme; and one for the cookies of a Cookie or Set-Cookie
+header, with the attributes among them. `AccountKey` and `private_key_id` are among the names whose value is masked.
+Tests: `tests/unit/test_redaction.py`, 15 more made-up secrets (those in the form of a real service's key put together
+at run time) and 5 more look-alikes; on the code of before the 15 stayed in the text.
+
+**What.** The redactor also masks Stripe's secret and restricted keys and its webhook secrets, the tokens of GitLab, npm
+and Hugging Face, a Twilio API key, SendGrid's keys, an Azure account key, the `private_key_id` of a Google service
+account, the credentials of an Authorization header of any scheme or of none, and the cookies of a Cookie or Set-Cookie
+header. Words that only look like them are left alone.
+
+### 242. The approval card and the reviewer see the whole command
+
+**Status: planned.**
+
+**What.** An approval card shows the whole of what an action targets, wrapped, in a box that scrolls when it is long;
+the reviewer of an `auto` run reads up to 12,000 characters of what an action targets, and of a longer target its start
+and its end, with how much was left out between.
+
+### 243. A run that goes on from another keeps its taint
+
+**Status: planned.**
+
+**What.** A run's events say whether it was tainted: each `tool_result` after its result, and `run_queued` as the run
+starts. A run that resumes another starts tainted when that one was at the cut, and so does a run Dot starts in a chat
+to say that a command in the background ended, when the chat's last run ended tainted. A message of the owner starts a
+run untainted and a steer clears the taint, as before.
 
 ## Log
 

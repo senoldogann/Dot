@@ -6,28 +6,36 @@ from datetime import datetime
 
 from pydantic import JsonValue
 
-# What a pattern matches is masked; one with two groups keeps them (a URL up to the colon before its password, or the
-# name of a secret and what stands between it and its value) and masks the rest.
+# What a pattern matches is masked; one with two groups keeps them (a URL up to the colon before its password, the
+# name of a secret and what stands between it and its value, or a header up to its credentials) and masks the rest.
 _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     # A private key in PEM, to its end or to the end of the text.
     re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\Z)"),
     # The password of a URL: scheme://user:password@host.
     re.compile(r"(?i)\b([a-z][a-z0-9+.\-]{0,30}://[^\s/@:]+)(:)[^\s/]+(?=@[^\s/@]+)"),
     # Keys and tokens by the forms their services give them: OpenAI's and Anthropic's; GitHub's, an AWS access key id,
-    # a Google API key, Slack's and a JSON web token (tried only where a run of its letters starts).
+    # a Google API key, Slack's and a JSON web token (tried only where a run of its letters starts); Stripe's secret and
+    # restricted keys and its webhook secrets, GitLab's tokens, npm's, Hugging Face's, a Twilio API key and SendGrid's.
     re.compile(r"sk-[A-Za-z0-9_\-]{16,}"),
     re.compile(
         r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}|(?:AKIA|ASIA)[0-9A-Z]{16}\b"
         r"|AIza[0-9A-Za-z_\-]{35}|xox[abprs]-[0-9A-Za-z\-]{10,}"
         r"|(?<![A-Za-z0-9_\-])eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,})"
     ),
-    # The credentials of an Authorization header.
+    re.compile(
+        r"\b(?:[rs]k_(?:live|test)_[0-9A-Za-z]{10,}|whsec_[0-9A-Za-z+/=]{20,}|gl(?:pat|dt|rt)-[0-9A-Za-z_\-]{20,}"
+        r"|npm_[0-9A-Za-z]{36}\b|hf_[0-9A-Za-z]{30,}|SK[0-9a-fA-F]{32}\b|SG\.[0-9A-Za-z_\-]{16,}\.[0-9A-Za-z_\-]{16,})"
+    ),
+    # The credentials of an Authorization header: Basic ones, a bearer token, and those of any other scheme or of none.
     re.compile(r"(?i)(authorization\"?\s*[:=]\s*\"?basic)(\s+)[A-Za-z0-9+/=]{4,}"),
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{16,}"),
+    re.compile(r"(?i)(authorization\"?\s*[:=]\s*\"?)((?:[a-z][a-z0-9\-]*\s+)?)[A-Za-z0-9._~+/=\-]{16,}"),
+    # The cookies of a Cookie or Set-Cookie header, with the attributes among them.
+    re.compile(r"(?i)\b((?:set-)?cookie)(\"?\s*:\s*\"?)[^\s=;\"]+=[^\s;\"]*(?:;\s*[^\s=;\"]+(?:=[^\s;\"]*)?)*"),
     # The value of key=value or "key": "value" whose key names a secret, and a password's however short it is.
     re.compile(
-        r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:api[_-]?key|access[_-]?key|private[_-]?key|secret|token|password|passwd"
-        r"|credentials?))(\"?\s*[:=]\s*\"?)[^\s\"',}]{8,}"
+        r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:api[_-]?key|access[_-]?key|account[_-]?key|private[_-]?key(?:[_-]?id)?"
+        r"|secret|token|password|passwd|credentials?))(\"?\s*[:=]\s*\"?)[^\s\"',}]{8,}"
     ),
     re.compile(r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:password|passwd))(\"?\s*[:=]\s*\"?)[^\s\"',}]+"),
 )
@@ -83,8 +91,9 @@ def truncate_tail(text: str, max_chars: int) -> str:
 
 
 def redact_secrets(text: str) -> str:
-    """Mask secrets (item 214): keys and tokens by their known forms, private keys, the credentials of an Authorization
-    header, the password of a URL, and the value of a ``key=value`` whose key names a secret."""
+    """Mask secrets (items 214 and 241): keys and tokens by their known forms, private keys, the credentials of an
+    Authorization header of any scheme, the cookies of a Cookie or Set-Cookie header, the password of a URL, and the
+    value of a ``key=value`` whose key names a secret."""
     masked: str = text
     for pattern in _SECRET_PATTERNS:
         masked = pattern.sub(_mask_match, masked)
