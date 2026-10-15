@@ -5204,7 +5204,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 263 | A run runs JavaScript in its own tab                                                  | done        | 24a22d2 |
 | 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
-| 266 | A batch carries several public or social actions while no pace is set                 | in progress |         |
+| 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
 | 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | planned     |         |
 | 268 | Office files show in the side panel as Quick Look draws them                          | planned     |         |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | planned     |         |
@@ -11762,7 +11762,7 @@ environment, and so that no window or tab is mistaken.
 
 ### 266. A batch carries several public or social actions while no pace is set
 
-**Status: in progress.** Built on `item-266-social-batch`.
+**Status: done.** Merged as `ab56000` (PR #310; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `policy/pace.py`: `pace_is_set` (a number in an hour or a day, or for public actions a
 spacing) and `paced_in_batch` (the classes with a pace set that keep a batch of more than one public or social step to
@@ -12587,3 +12587,4 @@ fails on the code of before.
 - 2026-10-15 (Opus 5.5): item 263 merged as `24a22d2` (PR #307; no Linear issue, the connector was signed out): `browser_eval` runs JavaScript in the page of the run's own tab, in Dot's Chrome or the owner's, and gives back its value as JSON (an expression, a function or an awaited promise, `timeout_s` 30 s by default); a thrown error and a timeout fail the call, a page the script leads to is let land and the address rules hold after it; the value is fenced and untrusted; a `browser_click` of medium risk (the cautious preset asks, research runs lack it); its descriptions are kept short (about 200 tokens) and the system prompt is unchanged.
 - 2026-10-15 (Opus 5.5): item 264 merged as `10eb5d5` (PR #308; no Linear issue, the connector was signed out): Dot's own Chrome starts without Playwright's `--disable-extensions` (as it already did without `--enable-automation`), so an extension installed in its profile from the Chrome Web Store loads and stays; the offline smoke suite on the stack top (561 passed, 1 skipped) and CI were clean.
 - 2026-10-15 (Opus 5.5): item 265 merged as `dbb21d5` (PR #309; no Linear issue, the connector was signed out): `[browser] debug_port` (0 for none, else 1024 to 65535; Settings › Browser) has Dot's own Chrome also take DevTools connections on that port of 127.0.0.1, and a run in Dot's Chrome with a tool that runs scripts is told the address, to connect with `connect_over_cdp` and `no_defaults=True`; Dot's Chrome does not start while another program holds the port, and the pool checks every session before it changes any. A review of 263 to 266 found the first commit's claim that a script never drives another Chrome too strong, ports below 1024 taken and the pool's change not atomic; the second commit fixed them. CI was clean.
+- 2026-10-15 (Opus 5.5): item 266 merged as `ab56000` (PR #310; no Linear issue, the connector was signed out): `browser_act` lets a batch carry several follows, likes, posts or messages while `[policy.pace]` sets no limit for their kind (the default), counted once by the gate; with a pace set for a kind it carries, one per batch as before, and the refusal names the paced kinds and says that a script in the page would go around the owner's pace. The prompt's line that sent such actions one per call is gone, so every run's prompt is shorter. CI and the pace tests were clean.
