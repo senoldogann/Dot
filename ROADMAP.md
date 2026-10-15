@@ -11996,7 +11996,8 @@ switch and, on a phone, the drawer's close all 36 px with a 19 px icon; the leve
 chosen from its menu; every button inside the bar; the box's text 16 px on a phone and 15 px wide; once in WebKit) and
 `tests/smoke/test_desktop_lights.py` (the closed sidebar's bar holds no stop). They fail on the code of before: the stop
 in the bar; with `app.css` alone as before, the level's word hidden; with `inspector.js` alone, a 32 px switch with a
-15 px icon.
+15 px icon. `test_composer.py` (the composer's bar 36 px high on a phone, 32 px wide) and `test_run_stop.py` (the stop
+in the sidebar's foot, never in the bar) follow the new sizes and place.
 
 **What.** The bar beside a closed sidebar holds its opener alone: the emergency stop is in the sidebar's foot, a tap
 away. The side panel's switch and its close are the sidebar's size (36 px, a 19 px icon). On a phone the box's text is
