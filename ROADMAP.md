@@ -5214,7 +5214,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
 | 275 | On a phone the page fits the screen and holds still                                   | in progress |         |
-| 276 | The view of Dot's computer comes back by itself                                       | planned     |         |
+| 276 | The view of Dot's computer comes back by itself                                       | in progress |         |
 | 277 | Every chat wears a creature, its last message under its name                          | planned     |         |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | planned     |         |
@@ -12150,7 +12150,20 @@ top of the seen page while the keyboard pans it.
 
 ### 276. The view of Dot's computer comes back by itself
 
-**Status: planned.**
+**Status: in progress.** Built on `item-276-view-comes-back`.
+
+**As built (2026-10-15).** `api.js`: `watchInView` reads a stream whose events stand alone while the page is in view:
+out of sight it closes the stream and waits for the page to come back; a stream that breaks, or that `sse` cuts after
+45 s of silence, is made again after the pause `follow` takes (0.5 s, doubling to 8 s, the shortest again once a stream
+is taken); a refused stream (401, 404) ends the read with the error, as in `follow` (`refused`, shared with it); a fault
+in showing one frame is told as in `follow`. `computer.js`: the view reads its screencast through it, so only a refused
+stream ends it with the toast "The view of Dot's computer stopped"; before, any break or silence of the stream did, and
+a phone breaks or stalls a page's streams whenever the app is put away. README: Dot's computer. Tests:
+`tests/smoke/test_takeover.py` (one new test): in Chrome and in WebKit at a phone's width, the view's stream broken at
+the network once and then silent until the page's clock jumps 46 s (a phone put away and taken up again) is made again
+with no toast and shows the frame of the third stream; watched again and put out of sight, no stream is asked for while
+out of sight, even past the stall, and the next comes once the page is back. It fails on the code of before (no second
+stream is asked for) and with the wait for the page taken out (a fifth stream is asked for while out of sight).
 
 **What.** The live view of the run's browser is made again when its stream breaks or goes silent, after the same pause
 as the run's own stream, with no toast; it stops while the page is out of sight and starts again when it is back. A
