@@ -3405,7 +3405,8 @@ details[open] > summary .chev {
   color: var(--faint);
 }
 
-/* The pill that closes a delegated run's conversation: the model, the time, whether its parent works, the way back. */
+/* The pill of a delegated run, in its dock where the composer would be (item 244): the model, the time, whether its
+   parent works, the way back. */
 .child-foot-row {
   display: flex;
   justify-content: center;
@@ -3601,11 +3602,12 @@ details[open] > summary .chev {
   background: linear-gradient(to top, var(--bg) 72%, transparent);
 }
 
-/* A dock with nothing to type in (a delegated run): room for the arrow, nothing else. */
-.dock.dock-bare {
-  margin-top: 0;
-  padding: 0 0 44px;
-  background: transparent;
+/* A dock with nothing to type in (a delegated run's, item 244) holds the run's pill; the commands at work in its chat
+   close their sheet above the pill, with no frame to draw over its lower edge. */
+.dock.dock-bare .background-work {
+  margin-bottom: var(--space-2);
+  padding-bottom: var(--space-1);
+  border-radius: var(--radius-lg);
 }
 
 /* The commands at work in a chat (item 229), after T3 Code's line of background work: a sheet as the queue's, right
