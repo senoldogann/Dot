@@ -3,6 +3,8 @@ finds the cookie database that a real Chrome writes.
 
 The window and the automated sessions both run on the mock keychain, so no Keychain item is touched; the test fails when
 the two disagree about the key, because the automated Chrome then cannot read the cookie the window saved.
+
+Dot's own Chrome starts without Playwright's --disable-extensions, so the extensions installed in its profile load.
 """
 
 import asyncio
@@ -185,3 +187,25 @@ async def test_a_close_of_chrome_that_fails_still_stops_the_driver_and_frees_the
         holder: int | None = profile_holder_pid(profile)
         if holder is not None:
             os.kill(holder, signal.SIGKILL)
+
+
+async def test_dots_own_chrome_starts_without_the_switch_that_turns_extensions_off(
+    profile: Path, headless_config: BrowserConfig, tmp_path: Path
+) -> None:
+    """Item 264: Playwright starts Chrome with --disable-extensions, which keeps the extensions installed in Dot's
+    profile from loading; Dot's own Chrome is started without it, and still without the bar of automated software."""
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
+    try:
+        assert await session.stored_cookie_count() == 0
+        holder: int | None = profile_holder_pid(profile)
+        assert holder is not None
+        listing: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            "/bin/ps", "-ww", "-o", "args=", "-p", str(holder), stdout=asyncio.subprocess.PIPE
+        )
+        output, _ = await listing.communicate()
+        switches: list[str] = output.decode().split()
+        assert "--remote-debugging-pipe" in switches, switches
+        assert "--disable-extensions" not in switches
+        assert "--enable-automation" not in switches
+    finally:
+        await session.aclose()

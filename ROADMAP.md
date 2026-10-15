@@ -5201,8 +5201,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 260 | The compaction notes leave the conversation                                           | done        | a8d8641 |
 | 261 | My Chrome opens Chrome when it is closed                                              | done        | aaf2132 |
 | 262 | The sandbox of a run's commands switches on and off in Settings                       | done        | eb6b1dc |
-| 263 | A run runs JavaScript in its own tab                                                  | in progress |         |
-| 264 | Dot's own Chrome loads extensions                                                     | planned     |         |
+| 263 | A run runs JavaScript in its own tab                                                  | done        | 24a22d2 |
+| 264 | Dot's own Chrome loads extensions                                                     | in progress |         |
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | planned     |         |
 | 266 | A batch carries several public or social actions while no pace is set                 | planned     |         |
 
@@ -11669,7 +11669,7 @@ they want it.
 
 ### 263. A run runs JavaScript in its own tab
 
-**Status: in progress.** Built on `item-263-browser-eval`.
+**Status: done.** Merged as `24a22d2` (PR #307; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `browser/driver.py`: `run_script` evaluates the script with Playwright's `page.evaluate`
 within the time the call names and tells apart a value (its JSON, `null` for none), an error (the message without
@@ -11706,7 +11706,13 @@ address; its classification under the presets. As built.
 
 ### 264. Dot's own Chrome loads extensions
 
-**Status: planned.**
+**Status: in progress.** Built on `item-264-extensions`.
+
+**As built (2026-10-15).** `browser/session.py`: `_launch_own` leaves out `--disable-extensions` with
+`--enable-automation` (`_PLAYWRIGHT_SWITCHES_LEFT_OUT`); Playwright's other switches stay. README: the paragraph after
+the keychain one, under `own`. Tests: `tests/smoke/test_browser_profile.py` reads the switches of the headless Chrome
+Dot started (`ps` of the process that holds the profile): Playwright's pipe, neither switch. It fails on the code of
+before.
 
 **What.** Dot's own Chrome starts without Playwright's `--disable-extensions`, so an extension installed in its profile
 works there, as it does in the owner's Chrome.
@@ -12450,3 +12456,4 @@ limit for that kind of action; with a limit set, one per batch as before, so tha
 - 2026-10-15 (Opus 5.5): item 257 merged as `9e5cd51` (PR #304; no Linear issue, the connector was signed out): a firing's first message carries, in front of the goal, the dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 3), quoted and marked as what the schedule found before, while the run keeps the goal alone as its record; with `same_chat` a firing goes on in the chat of the one before; a firing that reads a tainted earlier run starts tainted.
 - 2026-10-15 (Opus 5.5): item 261 merged as `aaf2132` (PR #305; no Linear issue, the connector was signed out): in Settings › Browser, My Chrome chosen while Chrome is closed opens it as a click on its icon does (`open -b com.google.Chrome`, for Chrome's own data directory only), waits for it to start and listen, and goes on as before; the card says what the switch waits for and reads Chrome again after a failed one; runs, campaigns and `dotx browser attach` open nothing.
 - 2026-10-15 (Opus 5.5): item 262 merged as `eb6b1dc` (PR #306; no Linear issue, the connector was signed out): Settings › Rules switches the macOS sandbox of the commands, terminal sessions, AppleScript and searches of runs that are not yolo on and off from the next one on, without a restart (`GET` and `PUT /api/shell/sandbox`, kept as `[shell] sandbox`); switching it on where `sandbox-exec` does not start is refused; a yolo run is never sandboxed, and the default stays on.
+- 2026-10-15 (Opus 5.5): item 263 merged as `24a22d2` (PR #307; no Linear issue, the connector was signed out): `browser_eval` runs JavaScript in the page of the run's own tab, in Dot's Chrome or the owner's, and gives back its value as JSON (an expression, a function or an awaited promise, `timeout_s` 30 s by default); a thrown error and a timeout fail the call, a page the script leads to is let land and the address rules hold after it; the value is fenced and untrusted; a `browser_click` of medium risk (the cautious preset asks, research runs lack it); its descriptions are kept short (about 200 tokens) and the system prompt is unchanged.
