@@ -151,6 +151,7 @@ from dotagent.agent.verify import (
     with_outcomes,
 )
 from dotagent.agent.vision import text_for_blind_model
+from dotagent.browser.devtools import devtools_address
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AgentConfig
 from dotagent.core.errors import (
@@ -1524,6 +1525,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         else []
     )
     listing: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
+    browser: BrowserSession = await browser_of(runtime, run)
     system: Message = system_message(
         build_system_prompt(
             collect_prompt_inputs(
@@ -1546,6 +1548,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 else AgentBrief(name=agent_record.name, role=agent_record.role, instructions=agent_record.instructions),
                 [AgentBrief(name=member.name, role=member.role, instructions="") for member in team],
                 owner_prompt_lines(await owner_section(runtime.store)),
+                devtools_address(browser.config),
             )
         )
     )
@@ -1573,7 +1576,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,
-        browser=await browser_of(runtime, run),
+        browser=browser,
         run_id=run.id,
         agent_id=run.agent_id,
         thread_id=run.thread_id,

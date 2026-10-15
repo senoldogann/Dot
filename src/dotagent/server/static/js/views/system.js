@@ -839,7 +839,8 @@ const BROWSER_MODES = [
 /**
  * Which Chrome the agent browses with. Switching to "My Chrome" needs Chrome to allow remote debugging, which only the
  * user can switch on; the card shows what Chrome allows right now and how to change it. A Chrome that is closed is
- * opened by the switch (item 261), and while the switch is under way the card says what it waits for.
+ * opened by the switch (item 261), and while the switch is under way the card says what it waits for. The DevTools
+ * port (item 265) has Dot's own Chrome take connections from a run's scripts too.
  */
 function buildBrowser(isDisposed) {
   let view = null;
@@ -868,6 +869,25 @@ function buildBrowser(isDisposed) {
       }
     },
   });
+  const port = el("input", {
+    class: "input port-input mono",
+    type: "text",
+    inputmode: "numeric",
+    maxlength: "5",
+    autocomplete: "off",
+    spellcheck: "false",
+    placeholder: "0",
+    disabled: true,
+    "aria-label": "DevTools port",
+  });
+  port.addEventListener("change", () => attempt(() => choosePort(port.value)));
+  port.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      event.preventDefault();
+      port.blur();
+    }
+  });
+  const portHint = el("div", { class: "hint" });
   const reload = el(
     "button",
     { class: "btn ghost sm", type: "button", title: "Look at Chrome again", "aria-label": "Look again", onclick: () => attempt(load) },
@@ -907,9 +927,61 @@ function buildBrowser(isDisposed) {
     );
   }
 
+  // The port as the daemon has it, and where a run's scripts reach Dot's Chrome, or why they do not.
+  function paintPort() {
+    port.value = String(view.debug_port);
+    port.disabled = false;
+    if (view.devtools_address !== null) {
+      portHint.replaceChildren(
+        "A run's scripts drive Dot's Chrome at ",
+        el("code", { class: "mono" }, view.devtools_address),
+        " with the Chrome DevTools Protocol, and the run is told so. 0 turns it off.",
+      );
+    } else if (view.debug_port !== 0) {
+      portHint.textContent =
+        "Runs that work in Dot's own Chrome, such as a campaign's, are told this port; with My Chrome, scripts reach your Chrome through its own remote debugging. 0 turns it off.";
+    } else {
+      portHint.textContent =
+        "A port of this Mac, from 1024 up, on which Dot's own Chrome also takes DevTools connections, so a run's scripts can drive it (Playwright, Puppeteer). It asks for no token: any program on this Mac can use it while Dot's Chrome runs. Dot's Chrome does not start while another program holds the port.";
+    }
+  }
+
+  async function choosePort(text) {
+    if (view === null) {
+      return;
+    }
+    const wanted = text.trim() === "" ? 0 : Number(text.trim());
+    if (!Number.isInteger(wanted) || (wanted !== 0 && (wanted < 1024 || wanted > 65535))) {
+      paintPort();
+      toast("error", "A port is a whole number from 1024 to 65535, or 0 for none.");
+      return;
+    }
+    if (wanted === view.debug_port) {
+      paintPort();
+      return;
+    }
+    port.disabled = true;
+    let changed;
+    try {
+      changed = await api.post("/browser/debug-port", { debug_port: wanted });
+    } catch (error) {
+      if (!isDisposed()) {
+        paintPort();
+      }
+      throw error;
+    }
+    if (isDisposed()) {
+      return;
+    }
+    view = changed;
+    paint();
+    toast("ok", wanted === 0 ? "Dot's Chrome takes no DevTools connections." : `Dot's Chrome takes DevTools connections on port ${wanted} from its next start.`);
+  }
+
   function paint() {
     modes.set(view.mode);
     raise.paint();
+    paintPort();
     const port = view.port === null ? "" : `, port ${view.port}`;
     facts.replaceChildren(
       entry("Chrome", view.chrome_running ? "running" : "not running"),
@@ -993,6 +1065,12 @@ function buildBrowser(isDisposed) {
         ),
       ),
       raise.element,
+      el(
+        "div",
+        { class: "setting" },
+        el("div", { class: "row" }, el("span", { class: "grow" }, "DevTools port of Dot's Chrome"), port),
+        portHint,
+      ),
       facts,
       waiting,
       problem,

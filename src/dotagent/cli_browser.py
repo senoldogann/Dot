@@ -28,9 +28,9 @@ _CHECK_THREAD: str = "attach-check"
 
 async def _readable_cookies(config: BrowserConfig, server: ServerConfig, profile: Path) -> int:
     """Open the profile in a hidden Chrome of its own, whatever ``[browser] mode`` says, and count the cookies that
-    Chrome can read."""
+    Chrome can read. It takes no DevTools connections: the port is the daemon's Chrome's."""
     session: BrowserSession = BrowserSession(
-        config.model_copy(update={"headless": True, "mode": "own"}), server, profile, downloads_dir()
+        config.model_copy(update={"headless": True, "mode": "own", "debug_port": 0}), server, profile, downloads_dir()
     )
     try:
         return await session.stored_cookie_count()

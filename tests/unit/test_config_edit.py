@@ -1,6 +1,7 @@
-"""Switching ``[browser] mode`` and ``raise_window``, the default model (``[models] main``, item 199), the models of Dot's
-own work (``[models] fast``, ``review`` and ``vision``, item 232) and whether the daemon resumes the runs it cut off
-(``[agent] resume``, item 231), in the user's config.toml: the comments and the other settings stay as written."""
+"""Switching ``[browser] mode``, ``raise_window`` and ``debug_port`` (item 265), the default model (``[models] main``,
+item 199), the models of Dot's own work (``[models] fast``, ``review`` and ``vision``, item 232) and whether the daemon
+resumes the runs it cut off (``[agent] resume``, item 231), in the user's config.toml: the comments and the other
+settings stay as written."""
 
 import stat
 import tomllib
@@ -131,6 +132,12 @@ def test_raise_window_is_added_or_replaced_like_the_mode_and_the_mode_stays(tmp_
     assert path.read_text(encoding="utf-8") == '[browser]\nraise_window = true\nmode = "attach"\n'
     set_browser_mode(path, "own")
     assert path.read_text(encoding="utf-8") == '[browser]\nraise_window = true\nmode = "own"\n'
+
+
+def test_the_devtools_port_is_written_as_a_number_below_the_header() -> None:
+    written: str = with_browser_setting('[browser]\nmode = "own"\n', "debug_port", 9222)
+    assert written == '[browser]\ndebug_port = 9222\nmode = "own"\n'
+    assert tomllib.loads(written)["browser"] == {"debug_port": 9222, "mode": "own"}
 
 
 def test_a_raise_window_written_as_a_string_is_replaced_by_the_boolean(tmp_path: Path) -> None:

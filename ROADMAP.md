@@ -5202,8 +5202,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 261 | My Chrome opens Chrome when it is closed                                              | done        | aaf2132 |
 | 262 | The sandbox of a run's commands switches on and off in Settings                       | done        | eb6b1dc |
 | 263 | A run runs JavaScript in its own tab                                                  | done        | 24a22d2 |
-| 264 | Dot's own Chrome loads extensions                                                     | in progress |         |
-| 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | planned     |         |
+| 264 | Dot's own Chrome loads extensions                                                     | done        | 10eb5d5 |
+| 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | in progress |         |
 | 266 | A batch carries several public or social actions while no pace is set                 | planned     |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -11706,7 +11706,7 @@ address; its classification under the presets. As built.
 
 ### 264. Dot's own Chrome loads extensions
 
-**Status: in progress.** Built on `item-264-extensions`.
+**Status: done.** Merged as `10eb5d5` (PR #308; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `browser/session.py`: `_launch_own` leaves out `--disable-extensions` with
 `--enable-automation` (`_PLAYWRIGHT_SWITCHES_LEFT_OUT`); Playwright's other switches stay. README: the paragraph after
@@ -11723,12 +11723,33 @@ works there, as it does in the owner's Chrome.
 
 ### 265. Dot's own Chrome can take DevTools connections from a run's scripts
 
-**Status: planned.**
+**Status: in progress.** Built on `item-265-debug-port`.
+
+**As built (2026-10-15).** `config.py`, `defaults.toml`: `[browser] debug_port` (0 for none, else 1024 to 65535).
+`browser/devtools.py` (new): `port_is_taken` (a program that listens on the loopback port, or is bound to it; a port the
+system does not let Dot check is an error with the reason), `port_taken` (the error that names the port),
+`devtools_switches` (`--remote-debugging-port`) and `devtools_address` (Dot's own Chrome with a port set, else none).
+`browser/session.py`: `_launch_own` refuses a taken port before Chrome starts and has Chrome listen on it;
+`set_debug_port` closes Dot's own Chrome open on another port, so that the next call starts it on the new one, and
+refuses a taken port or a thread in the middle of a step, changing nothing. `browser/pool.py`: the port goes to every
+session, each checked before any changes (`check_debug_port`). `config_edit.py`: `debug_port`.
+`server/routes_browser.py` and `views.py`: `POST /api/browser/debug-port` (409 while runs are active), `debug_port` and
+`devtools_address` in the browser's view. `views/system.js`, `settings.css`: the port field of Settings › Browser and
+what it does. `agent/prompt.py`, `agent/loop.py`: the run's environment names the address when its browser is Dot's own
+Chrome with a port and it has a tool that runs its scripts (`shell`, `terminal_send`), with `connect_over_cdp` and
+`no_defaults` (Dot's downloads stay as they are) or Puppeteer's `connect` with `defaultViewport: null`.
+`cli_browser.py`: `import-chrome`'s check Chrome takes no port. README (the browser section, the API table). Tests:
+`tests/smoke/test_devtools_port.py` (new; a headless Chrome answers `/json/version` and `connect_over_cdp` on the port,
+sees the run's tab and works in a tab of its own while the session goes on; a taken port stops the start with its name
+and leaves the profile free; the API sets, keeps and refuses; Settings in Chrome wide and on a phone, light and dark,
+with a WebKit copy run and deleted), `tests/unit/test_devtools.py` (new; the address, the range and the prompt line),
+`tests/unit/test_browser_pool.py` (a session that refuses leaves every session as it was) and
+`tests/unit/test_config_edit.py`. They fail on the code of before. The other tests that build a prompt pass no address.
 
 **What.** `[browser] debug_port` (0, off, by default), set in Settings › Browser: Dot's own Chrome also listens for
 DevTools on that port of this Mac, and a run whose browser is Dot's Chrome is told the address, so that a script it
-writes (Playwright's `connect_over_cdp`) drives the same Chrome. A port another program holds is refused before Chrome
-starts, so that a script never drives another Chrome.
+writes (Playwright's `connect_over_cdp`) drives the same Chrome. Dot's Chrome does not start while another program holds
+the port.
 
 **Why.** The run asked for it, to work through the Chrome DevTools Protocol with the Playwright already in Dot's
 environment, and so that no window or tab is mistaken.
@@ -12457,3 +12478,4 @@ limit for that kind of action; with a limit set, one per batch as before, so tha
 - 2026-10-15 (Opus 5.5): item 261 merged as `aaf2132` (PR #305; no Linear issue, the connector was signed out): in Settings › Browser, My Chrome chosen while Chrome is closed opens it as a click on its icon does (`open -b com.google.Chrome`, for Chrome's own data directory only), waits for it to start and listen, and goes on as before; the card says what the switch waits for and reads Chrome again after a failed one; runs, campaigns and `dotx browser attach` open nothing.
 - 2026-10-15 (Opus 5.5): item 262 merged as `eb6b1dc` (PR #306; no Linear issue, the connector was signed out): Settings › Rules switches the macOS sandbox of the commands, terminal sessions, AppleScript and searches of runs that are not yolo on and off from the next one on, without a restart (`GET` and `PUT /api/shell/sandbox`, kept as `[shell] sandbox`); switching it on where `sandbox-exec` does not start is refused; a yolo run is never sandboxed, and the default stays on.
 - 2026-10-15 (Opus 5.5): item 263 merged as `24a22d2` (PR #307; no Linear issue, the connector was signed out): `browser_eval` runs JavaScript in the page of the run's own tab, in Dot's Chrome or the owner's, and gives back its value as JSON (an expression, a function or an awaited promise, `timeout_s` 30 s by default); a thrown error and a timeout fail the call, a page the script leads to is let land and the address rules hold after it; the value is fenced and untrusted; a `browser_click` of medium risk (the cautious preset asks, research runs lack it); its descriptions are kept short (about 200 tokens) and the system prompt is unchanged.
+- 2026-10-15 (Opus 5.5): item 264 merged as `10eb5d5` (PR #308; no Linear issue, the connector was signed out): Dot's own Chrome starts without Playwright's `--disable-extensions` (as it already did without `--enable-automation`), so an extension installed in its profile from the Chrome Web Store loads and stays; the offline smoke suite on the stack top (561 passed, 1 skipped) and CI were clean.

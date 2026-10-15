@@ -342,6 +342,11 @@
   max-width: 220px;
 }
 
+/* The DevTools port of Dot's Chrome (item 265): five digits. */
+.port-input {
+  max-width: 96px;
+}
+
 /* The controls page (#/controls): the colour swatches and the rows of controls. */
 .swatches {
   display: grid;

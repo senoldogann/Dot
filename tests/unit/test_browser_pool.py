@@ -1,10 +1,15 @@
 """The browser pool (item 32): the daemon's session for its own mode, one session kept per other mode, no Chrome
-started by making them."""
+started by making them; a DevTools port one session refuses changes none of them (item 265)."""
 
+import socket
 from pathlib import Path
 
+import pytest
+
 from dotagent.browser.pool import BrowserPool
+from dotagent.browser.session import BrowserSession
 from dotagent.config import load_default_config
+from dotagent.core.errors import BrowserError
 
 
 def test_the_pool_keeps_one_session_per_mode_and_starts_none(tmp_path: Path) -> None:
@@ -16,3 +21,18 @@ def test_the_pool_keeps_one_session_per_mode_and_starts_none(tmp_path: Path) -> 
     assert attached is not pool.main and attached.config.mode == "attach"
     assert pool.session_for("attach") is attached
     assert not pool.main.connected and not attached.connected
+
+
+async def test_a_port_one_session_refuses_leaves_every_session_as_it_was(tmp_path: Path) -> None:
+    pool: BrowserPool = BrowserPool(load_default_config().browser, load_default_config().server, tmp_path)
+    attached: BrowserSession = pool.session_for("attach")
+    await attached.aclose()
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port: int = int(probe.getsockname()[1])
+    try:
+        with pytest.raises(BrowserError, match="the browser session was closed"):
+            await pool.set_debug_port(port)
+        assert (pool.main.config.debug_port, attached.config.debug_port) == (0, 0)
+    finally:
+        await pool.aclose()

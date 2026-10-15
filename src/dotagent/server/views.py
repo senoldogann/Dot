@@ -6,7 +6,7 @@ from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_vali
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS
 from dotagent.agent.lessons import RunLessons
-from dotagent.config import JudgeProvider, ModelReference, ModelsConfig, ResumeMode
+from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
 from dotagent.help.elsewhere import FoundElsewhere
@@ -371,6 +371,12 @@ class BrowserRaiseRequest(FrozenModel):
     """Whether Dot's Chrome is brought to the front while a run works (item 97)."""
 
     raise_window: bool
+
+
+class BrowserDebugPortRequest(FrozenModel):
+    """The port of this Mac on which Dot's own Chrome takes DevTools connections (item 265); 0 for none."""
+
+    debug_port: DebugPort
 
 
 class KeyRequest(FrozenModel):
@@ -771,7 +777,9 @@ class DeletedThreads(FrozenModel):
 class BrowserView(FrozenModel):
     """Which Chrome the browser tools work in (``mode`` is the live one, which a switch changes without a restart),
     whether one is started or connected now, and what the files of the Chrome of the user say: whether it runs and
-    allows remote debugging, and on which port. ``inspect_page`` is where the user switches that on."""
+    allows remote debugging, and on which port. ``inspect_page`` is where the user switches that on. ``debug_port``
+    is the port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), and ``devtools_address`` where
+    a run's scripts reach it: set while the main session is Dot's own Chrome and a port is."""
 
     mode: BrowserMode
     connected: bool
@@ -781,6 +789,8 @@ class BrowserView(FrozenModel):
     inspect_page: str
     attach_timeout_s: float
     raise_window: bool
+    debug_port: int
+    devtools_address: str | None
 
 
 class KeyView(FrozenModel):
