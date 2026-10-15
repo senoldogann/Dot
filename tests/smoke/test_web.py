@@ -329,6 +329,47 @@ async def test_a_refused_connection_is_tried_twice_and_the_error_names_its_cause
     assert "ConnectionRefusedError" in str(failure.value.context["error"])
 
 
+def _hanging_up(received: list[str]) -> ThreadingHTTPServer:
+    """A server that reads a POST into ``received`` and hangs up without an answer, like one that did the work and
+    lost the line."""
+
+    class HangUp(BaseHTTPRequestHandler):
+        def do_POST(self) -> None:
+            received.append(self.rfile.read(int(self.headers["Content-Length"])).decode())
+            self.close_connection = True
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    return ThreadingHTTPServer(("127.0.0.1", 0), HangUp)
+
+
+async def test_a_post_the_server_got_is_not_sent_again_and_one_never_sent_is(settings: Path) -> None:
+    received: list[str] = []
+    server: ThreadingHTTPServer = _hanging_up(received)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    closed: socket.socket = socket.socket()
+    closed.bind(("127.0.0.1", 0))
+    refusing: int = closed.getsockname()[1]
+    closed.close()
+    client: WebClient = WebClient(load_config(settings).web, (), ())
+    try:
+        with pytest.raises(WebTransportError) as dropped:
+            await client.post_json(f"http://127.0.0.1:{server.server_address[1]}/search", {}, b'{"q": "x"}', 1000)
+        started: float = time.perf_counter()
+        with pytest.raises(WebTransportError) as refused:
+            await client.post_json(f"http://127.0.0.1:{refusing}/search", {}, b'{"q": "y"}', 1000)
+        waited: float = time.perf_counter() - started
+    finally:
+        await client.aclose()
+        server.shutdown()
+        server.server_close()
+    assert dropped.value.context["error_type"] == "RemoteProtocolError"
+    assert received == ['{"q": "x"}']
+    assert refused.value.context["error_type"] == "ConnectError"
+    assert waited >= 0.15  # it was tried twice: the pause between the tries is 0.2 to 0.4 s
+
+
 @pytest.mark.internet
 async def test_search_results_stay_inside_a_fence_and_pages_can_be_read(runtime: Runtime) -> None:
     found, action = await _call(runtime, "web_search", {"query": "Python programming language", "max_results": 5})

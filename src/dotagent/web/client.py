@@ -3,7 +3,7 @@
 import asyncio
 import http.cookiejar
 import socket
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
 from urllib.parse import urljoin, urlsplit
 
@@ -54,7 +54,7 @@ def request_headers(method: str, user_agent: str, extra: Mapping[str, str]) -> d
     }
 
 
-# A connection that could not be opened has sent nothing, so another try is safe even for a POST.
+# Failures in transit, which another try can help with.
 _TRANSIENT_ERRORS: tuple[type[httpx.HTTPError], ...] = (
     httpx.ConnectError,
     httpx.ConnectTimeout,
@@ -65,6 +65,8 @@ _TRANSIENT_ERRORS: tuple[type[httpx.HTTPError], ...] = (
     httpx.WriteError,
     httpx.RemoteProtocolError,
 )
+# The failures before any byte of the request was sent: a connection that could not be opened or taken from the pool.
+_UNSENT_ERRORS: tuple[type[httpx.HTTPError], ...] = (httpx.ConnectError, httpx.ConnectTimeout, httpx.PoolTimeout)
 
 
 @dataclass(frozen=True)
@@ -103,6 +105,12 @@ def _cause_chain(exc: BaseException) -> str:
 
 def _is_transient(exc: Exception) -> bool:
     return isinstance(exc, WebTransportError)
+
+
+def _was_unsent(exc: Exception) -> bool:
+    """Whether ``exc`` failed a request before it was sent. Only then does a POST try again: a POST the server got may
+    have been done (a search the API bills) even when its answer was lost on the way back."""
+    return isinstance(exc, WebTransportError) and isinstance(exc.__cause__, _UNSENT_ERRORS)
 
 
 def _no_hint(exc: Exception) -> float | None:
@@ -241,7 +249,8 @@ class WebClient:
         raise WebError("too many redirects", {"url": _shown(url), "redirects": len(visited), "limit": _MAX_REDIRECTS})
 
     async def post_json(self, url: str, headers: Mapping[str, str], body: bytes, max_bytes: int) -> FetchedDocument:
-        """POST a JSON body to an API; redirects are not followed."""
+        """POST a JSON body to an API; redirects are not followed, and the request is tried again only when it was not
+        sent (a connection that could not be opened)."""
         exchange: _Exchange = await self._exchange(
             "POST", url, {**headers, "Content-Type": "application/json"}, body, max_bytes
         )
@@ -255,7 +264,8 @@ class WebClient:
         async def attempt() -> _Exchange:
             return await self._exchange_once(method, url, headers, content, max_bytes)
 
-        return await retry_async(attempt, _is_transient, _no_hint, _RETRY, f"web {method}")
+        retryable: Callable[[Exception], bool] = _is_transient if method == "GET" else _was_unsent
+        return await retry_async(attempt, retryable, _no_hint, _RETRY, f"web {method}")
 
     def _require_allowed(self, url: str) -> None:
         verdict = check_url(url, self._allowed_hosts, self._blocked_hosts)
