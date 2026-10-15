@@ -1737,6 +1737,12 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
    signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store
    and go when their push service says they are gone. Settings › General › Notifications off drops the subscription.
 
+On a phone the page holds still (item 275). Every page fits the screen's width: a long link, path or word breaks, and
+code and tables scroll in their own frame. No text field is under 16 px, so iOS never zooms into one; a double tap does
+not zoom, and the page does not stretch past its ends. The app added to the home screen runs to the screen's edges, and
+the bar, the sidebar, the composer and the side panel keep out of the rounded corners, the notch and the home
+indicator. The bar stays at the top of what is seen, also while the keyboard is up.
+
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
 that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›
 Phone, on the Mac or in Safari where Dot is open, shows one with **Pair a phone**, eight characters in two groups

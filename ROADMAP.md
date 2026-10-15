@@ -5213,7 +5213,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
-| 275 | On a phone the page fits the screen and holds still                                   | planned     |         |
+| 275 | On a phone the page fits the screen and holds still                                   | in progress |         |
 | 276 | The view of Dot's computer comes back by itself                                       | planned     |         |
 | 277 | Every chat wears a creature, its last message under its name                          | planned     |         |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | planned     |         |
@@ -12114,7 +12114,24 @@ mind and do not tie new work to the Mac where they need not.
 
 ### 275. On a phone the page fits the screen and holds still
 
-**Status: planned.**
+**Status: in progress.** Built on `item-275-phone-holds-still`.
+
+**As built (2026-10-15).** `index.html`: `viewport-fit=cover`. `app.css`: `--safe-top`, `--safe-right`,
+`--safe-bottom` and `--safe-left` over `env(safe-area-inset-*)`, kept out of by the bar and the sidebar's head
+(`shell.css`), the sidebar's foot, the stage turned sideways, the composer's dock, the side panel as a drawer
+(`run.css`) and the toasts; on `html`, `touch-action: manipulation` and `overscroll-behavior: none`; on a phone and on
+any touch screen every input, select and textarea at least `--touch-text` (`max(16px, 1em)`), the composer's box
+keeping its own size over it; a select clips its chosen label (WebKit drew it past the box and counted it in the row's
+width, so Settings › Models slid 51 px on an iPhone SE); a note breaks a path or a command too long for its line
+(Settings › API keys slid 143 px). `layout.js`: `holdBarInSight` moves the bar down by the visual viewport's offset,
+which iOS's keyboard pans, so the bar stays at the top of what is seen. README: the phone. Tests:
+`tests/smoke/test_phone_fit.py` (new): in WebKit as an iPhone SE and an iPhone 17 Pro Max and in Chrome as a Pixel 7,
+the meta viewport and touch on, no page slides sideways and no text field is under 16 px on Activity, the new chat, a
+run whose message holds a long link, a long line of code, a wide table and a long word, Agents, Campaigns, the eleven
+Settings tabs, the sidebar open and the sign-in; with an iPhone's safe areas set (47 px at the top, 34 at the bottom),
+the bar, the sidebar's head, Settings in its foot, the composer and the side panel keep out of them; a pan of the visual
+viewport by 300 px takes the bar 300 px down and back. They fail on the code of before: fields of 14 px (the search of
+the chats first), `touch-action: auto`, the bar at 0 under the top safe area, and the bar left behind by the pan.
 
 **What.** The page uses the screen's safe areas (`viewport-fit=cover`; the bar, the sidebar's foot, the composer and
 the side panel keep out of the rounded corners and the home indicator, through `--safe-*` tokens over
