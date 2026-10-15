@@ -16,6 +16,7 @@ from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.roles import ModelRole
 from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
 from dotagent.mcp.types import McpFailure
+from dotagent.notify.keys import keys_problem
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
@@ -1046,8 +1047,17 @@ class PushKeyView(FrozenModel):
 
 
 class PushKeysPart(FrozenModel):
+    """The keys a push to the subscription is encrypted with; keys that cannot encrypt anything are refused here."""
+
     p256dh: str = Field(min_length=1, max_length=200)
     auth: str = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def _usable(self) -> Self:
+        problem: str | None = keys_problem(self.p256dh, self.auth)
+        if problem is not None:
+            raise ValueError(problem)
+        return self
 
 
 class PushSubscribeRequest(FrozenModel):

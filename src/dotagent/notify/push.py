@@ -2,8 +2,8 @@
 the send to a subscription's push service, and the watcher that sends every subscription what the web UI's desktop
 notifications say: an approval or a question a run asked or left, the end of a run, a campaign that ended by itself, a
 firing a schedule missed, a start of the daemon after the one before it did not end cleanly. The subscriptions come
-from the web UI (``POST /api/push/subscriptions``) and live in the store; one whose push service says it is gone is
-deleted."""
+from the web UI (``POST /api/push/subscriptions``, which refuses keys that cannot encrypt a message) and live in the
+store; one whose push service says it is gone, or whose keys cannot encrypt a message, is deleted."""
 
 import asyncio
 import json
@@ -22,6 +22,7 @@ from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, CampaignEnded
 from dotagent.core.errors import DotError
 from dotagent.core.types import FrozenModel
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
+from dotagent.notify.keys import keys_problem
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, ScheduleMissed
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, PushSubscription, RunRecord
@@ -200,8 +201,8 @@ async def _next_event(queue: asyncio.Queue[EventRecord], stopping: asyncio.Event
 
 
 async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> None:
-    """Send one event to every subscription; a subscription its push service calls gone is deleted, any other
-    refusal is logged and the rest still get theirs."""
+    """Send one event to every subscription; a subscription whose keys cannot encrypt it or whose push service calls
+    it gone is deleted, any other refusal is logged and the rest still get theirs."""
     message: PushMessage | None = (
         notice_message(event)
         if event.run_id == SYSTEM_RUN_ID
@@ -210,6 +211,11 @@ async def push_event(store: Store, keys: PushKeys, event: EventRecord) -> None:
     if message is None:
         return
     for subscription in await store.list_push_subscriptions():
+        problem: str | None = keys_problem(subscription.p256dh, subscription.auth)
+        if problem is not None:
+            await store.delete_push_subscription(subscription.endpoint)
+            log.warning("push_subscription_unusable", endpoint=subscription.endpoint, problem=problem)
+            continue
         try:
             await send_push(keys, subscription, message)
         except PushError as error:

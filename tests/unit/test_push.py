@@ -1,12 +1,16 @@
 """Web push (item 52): the key pair is made once and kept private, an event of a run or of Dot itself becomes the
 message the phone shows (or none), and a subscription's push service that says gone makes the subscription go."""
 
+import base64
 import stat
 from pathlib import Path
 
 import pytest
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
 
 from dotagent.events import SYSTEM_RUN_ID
+from dotagent.notify.keys import keys_problem
 from dotagent.notify.push import (
     PushError,
     PushKeys,
@@ -244,3 +248,17 @@ async def test_subscriptions_are_kept_by_endpoint_and_deleted(tmp_path: Path) ->
         assert [s.endpoint for s in await store.list_push_subscriptions()] == ["https://push.example/b"]
     finally:
         await store.close()
+
+
+def test_keys_that_cannot_encrypt_a_message_are_named() -> None:
+    point: bytes = (
+        ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    )
+    p256dh: str = base64.urlsafe_b64encode(point).decode("ascii")
+    auth: str = base64.urlsafe_b64encode(b"0123456789abcdef").decode("ascii")
+    assert keys_problem(p256dh, auth) is None
+    assert keys_problem(p256dh.rstrip("="), auth.rstrip("=")) is None
+    off_curve: str = base64.urlsafe_b64encode(b"\x04" + bytes(64)).decode("ascii")
+    assert keys_problem(off_curve, auth) == "p256dh is not a point of P-256"
+    assert keys_problem("!!!", auth) == "p256dh is not 65 bytes in URL-safe base64"
+    assert keys_problem(p256dh, "c2hvcnQ") == "auth is not 16 bytes in URL-safe base64"
