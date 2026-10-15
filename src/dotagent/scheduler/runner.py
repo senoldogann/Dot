@@ -6,7 +6,8 @@ import time
 from zoneinfo import ZoneInfo
 
 from dotagent.agent.manager import RunManager, thread_title
-from dotagent.agent.reflection import Reflection, last_reflection, reflection_due, summary_line
+from dotagent.agent.reflection import last_reflection, record_reflection_failure, reflection_due
+from dotagent.agent.reflection_record import Reflection, summary_line
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
@@ -158,14 +159,17 @@ class Scheduler:
         self._reflecting = asyncio.create_task(self._reflect(now), name="reflection")
 
     async def _reflect(self, now: float) -> None:
-        """Task body of a reflection: its outcome is logged; a failure is logged with what failed and the next attempt
-        is the next daily time."""
+        """Task body of a reflection: its outcome is logged; a failure is logged with what failed and kept for the owner
+        (:func:`dotagent.agent.reflection.record_reflection_failure`: the Activity list and ``dotx stats`` show it until
+        a reflection is done), and the next attempt is the next daily time."""
         try:
             reflection: Reflection = await self._manager.reflect(now)
         except DotError as exc:
             log.error("reflection_failed", error=exc.message, context=exc.context)
-        except Exception:
+            await record_reflection_failure(self._runtime.store, now, exc.message)
+        except Exception as exc:
             log.exception("reflection crashed")
+            await record_reflection_failure(self._runtime.store, now, f"{type(exc).__name__}: {exc}")
         else:
             log.info("reflection_fired", summary=summary_line(reflection))
 

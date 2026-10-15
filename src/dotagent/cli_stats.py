@@ -5,8 +5,16 @@ import asyncio
 import sys
 import time
 from collections.abc import Sequence
+from datetime import datetime
 from typing import Literal
 
+from dotagent.agent.reflection_record import (
+    REFLECTION_FAILED_KEY,
+    REFLECTION_KEY,
+    Reflection,
+    ReflectionFailure,
+    summary_line,
+)
 from dotagent.cli_commands import Command, StatsCommand
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path
@@ -28,6 +36,7 @@ from dotagent.store.stats import (
     collect_run_costs,
     collect_statistics,
     gui_share,
+    read_kv,
 )
 
 _DAY_S: float = 86400.0
@@ -208,7 +217,7 @@ def render_learning(learning: LearningStats) -> list[str]:
     lines: list[str] = [
         "Learning",
         f"  lessons: {learning.lessons_proposed} proposed, {learning.lessons_saved} saved, "
-        f"{learning.lessons_dismissed} dismissed",
+        f"{learning.lessons_dismissed} dismissed, failed on {learning.lessons_failed} runs",
         f"  notes handed to {learning.runs_handed_notes} runs"
         + (
             "; " + ", ".join(f"{score.memory_id} to {score.handed} ({score.done} done)" for score in learning.notes)
@@ -216,7 +225,7 @@ def render_learning(learning: LearningStats) -> list[str]:
             else ""
         ),
         f"  playbooks: {learning.playbooks_written} written, {learning.playbooks_retired} retired, "
-        f"read by {learning.runs_reading_playbooks} runs",
+        f"{learning.playbooks_failed} failed, read by {learning.runs_reading_playbooks} runs",
     ]
     for comparison in learning.comparisons:
         lines.append(
@@ -266,8 +275,31 @@ async def cmd_stats(command: StatsCommand) -> int:
         return 0
     since: float = time.time() - command.days * _DAY_S
     stats: RunStatistics = await asyncio.to_thread(collect_statistics, db_path(), since)
-    sys.stdout.write("\n".join(render_stats(stats, command.days, command.by)) + "\n")
+    lines: list[str] = render_stats(stats, command.days, command.by)
+    if command.by != "site":
+        last: str | None = await asyncio.to_thread(read_kv, db_path(), REFLECTION_KEY)
+        failed: str | None = await asyncio.to_thread(read_kv, db_path(), REFLECTION_FAILED_KEY)
+        lines.append(
+            render_reflection(
+                None if last is None else Reflection.model_validate_json(last),
+                None if failed is None else ReflectionFailure.model_validate_json(failed),
+            )
+        )
+    sys.stdout.write("\n".join(lines) + "\n")
     return 0
+
+
+def _when(at: float) -> str:
+    return datetime.fromtimestamp(at).astimezone().strftime("%Y-%m-%d %H:%M")
+
+
+def render_reflection(last: Reflection | None, failed: ReflectionFailure | None) -> str:
+    """The line of the nightly reflection: when it was last done and what it did, and the last one that failed since,
+    with what failed."""
+    done: str = "never done" if last is None else f"last done {_when(last.at)}: {summary_line(last)}"
+    if failed is not None and (last is None or last.at < failed.at):
+        return f"  reflection: {done}; failed {_when(failed.at)}: {failed.error}"
+    return f"  reflection: {done}"
 
 
 async def dispatch(command: Command) -> int:

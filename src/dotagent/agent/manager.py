@@ -26,12 +26,13 @@ from dotagent.agent.campaign import (
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.keep_going import keep_going_ask
-from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
+from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
-from dotagent.agent.playbooks import learn_playbook, playbook_case
-from dotagent.agent.reflection import Reflection, reflect
+from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, playbook_case
+from dotagent.agent.reflection import reflect
+from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     CutOff,
@@ -43,7 +44,7 @@ from dotagent.agent.resume import (
     resume_note,
     resumes_on_start,
 )
-from dotagent.agent.review import reviewer_for
+from dotagent.agent.review import reviewer_for, shorten_reason
 from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.session import BrowserSession
 from dotagent.config import ResumeMode
@@ -192,6 +193,11 @@ def goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | 
     is done (item 132), on every model, whatever was chosen; otherwise as chosen. A delegated run, a campaign's session,
     a resumed run and one that an answer starts do not come here: they keep the goal mode they are given."""
     return True if mode != "chat" and keep_going_ask(goal) is not None else goal_mode
+
+
+def _crash(exc: Exception) -> str:
+    """An unexpected error as the owner reads it on a run's page: its kind and its words, secrets masked."""
+    return shorten_reason(redact_secrets(f"{type(exc).__name__}: {exc}"))
 
 
 async def _uncancelled[T](work: Coroutine[object, object, T]) -> T:
@@ -2158,20 +2164,28 @@ class RunManager:
 
     async def _distil(self, run: RunRecord, status: RunStatus) -> None:
         """Task body of the playbook work of a run that ended (:func:`dotagent.agent.playbooks.learn_playbook`).
-        Unexpected exceptions are logged with their traceback; the run keeps its end either way."""
+        Unexpected exceptions are logged with their traceback and left on the run as a ``playbook_failed`` event, which
+        its page and ``dotx stats`` show; the run keeps its end either way."""
         try:
             await learn_playbook(self._runtime, run, status)
-        except Exception:
+        except Exception as exc:
             log.exception("playbook crashed", run_id=run.id)
+            await self._runtime.bus.emit(
+                run.id, PLAYBOOK_FAILED, {"host": "", "error": f"The skill work failed: {_crash(exc)}"}, True
+            )
         finally:
             self._distilling.pop(run.id, None)
 
     async def _learn(self, case: LessonCase) -> None:
-        """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback;
-        the run keeps its end either way."""
+        """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback
+        and left on the run as a ``lessons_failed`` event, which its page and ``dotx stats`` show; the run keeps its
+        end either way."""
         try:
             await learn(self._runtime, self._deciding, case)
-        except Exception:
+        except Exception as exc:
             log.exception("lessons crashed", run_id=case.run_id)
+            await self._runtime.bus.emit(
+                case.run_id, LESSONS_FAILED, {"error": f"The lessons of this run failed: {_crash(exc)}"}, True
+            )
         finally:
             self._learning.pop(case.run_id, None)

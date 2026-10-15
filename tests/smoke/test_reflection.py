@@ -22,7 +22,8 @@ import pytest_asyncio
 
 from dotagent.agent.lessons import LESSON_TAG, LESSONS_PROPOSED
 from dotagent.agent.manager import RunManager
-from dotagent.agent.reflection import REFLECTION_KEY, Reflection, last_reflection, reflection_cron, summary_line
+from dotagent.agent.reflection import last_reflection, reflection_cron
+from dotagent.agent.reflection_record import REFLECTION_KEY, Reflection, summary_line
 from dotagent.agent.review import LESSONS_TOOL, OWNER_TOOL, VET_TOOL
 from dotagent.config import AppConfig, load_default_config
 from dotagent.core.errors import NotFoundError

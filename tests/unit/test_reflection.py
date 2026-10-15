@@ -2,13 +2,13 @@
 tell it, which lesson notes say the same or rest, and what it writes."""
 
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
 
 from dotagent.agent.reflection import (
-    Reflection,
     _Result,
     call_facts,
     digest_of,
@@ -17,16 +17,20 @@ from dotagent.agent.reflection import (
     journal_span,
     journal_text,
     read_outside,
+    record_reflection_failure,
     reflection_cron,
     reflection_due,
-    summary_line,
+    reflection_failure,
     to_retire,
     to_retire_by_score,
     wants_reflection,
 )
+from dotagent.agent.reflection_record import REFLECTION_KEY, Reflection, ReflectionFailure, summary_line
 from dotagent.agent.verify import CallFact
+from dotagent.cli_stats import render_reflection
 from dotagent.config import AppConfig, load_default_config
 from dotagent.memory.service import OwnerSection, owner_lines_within, owner_prompt_lines
+from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord, MemoryScore, RunRecord, RunStatus
 
 ZONE: ZoneInfo = ZoneInfo("Europe/Helsinki")
@@ -279,3 +283,30 @@ def test_the_owner_lines_are_flattened_capped_in_count_and_cut_at_the_budget() -
     assert len(owner_lines_within([f"line {n}" for n in range(20)], 1500)) == 12
     section: OwnerSection = OwnerSection(dot_lines=("Works late.",), owner_lines=("I read Turkish.",), updated_at=1.0)
     assert owner_prompt_lines(section) == ("(you said) I read Turkish.", "Works late.")
+
+
+async def test_a_failed_reflection_is_shown_until_one_after_it_is_done(tmp_path: Path) -> None:
+    """O25/O3 of the code review: a reflection that failed was only logged, so learning could stop unseen."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        assert await reflection_failure(store) is None
+        await record_reflection_failure(store, 100.0, "the embedder is down for key sk-" + "a" * 24)
+        failed: ReflectionFailure | None = await reflection_failure(store)
+        assert failed is not None and failed.at == 100.0 and failed.error == "the embedder is down for key ***"
+        done: Reflection = Reflection(
+            at=200.0,
+            since=100.0,
+            runs_read=1,
+            lessons_written=0,
+            merged=0,
+            retired=0,
+            journal=None,
+            owner_updated=False,
+        )
+        assert render_reflection(None, failed).endswith(": the embedder is down for key ***")
+        await store.kv_set(REFLECTION_KEY, done.model_dump_json())
+        assert await reflection_failure(store) is None
+        assert render_reflection(done, failed).startswith("  reflection: last done ")
+        assert "failed" not in render_reflection(done, failed)
+    finally:
+        await store.close()

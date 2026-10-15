@@ -38,10 +38,12 @@ NO_LEARNING: LearningStats = LearningStats(
     lessons_proposed=0,
     lessons_saved=0,
     lessons_dismissed=0,
+    lessons_failed=0,
     runs_handed_notes=0,
     notes=(),
     playbooks_written=0,
     playbooks_retired=0,
+    playbooks_failed=0,
     runs_reading_playbooks=0,
     comparisons=(),
 )
@@ -438,9 +440,9 @@ async def test_the_learning_section_scores_the_notes_handed_to_runs_and_compares
     assert comparison.unread.runs == 1 and comparison.unread.acts_per_run == 4.0
     lines: list[str] = render_learning(learning)
     assert lines[0] == "Learning"
-    assert lines[1] == "  lessons: 2 proposed, 1 saved, 0 dismissed"
+    assert lines[1] == "  lessons: 2 proposed, 1 saved, 0 dismissed, failed on 0 runs"
     assert lines[2] == f"  notes handed to 2 runs; {note.id} to 2 (1 done)"
-    assert lines[3] == "  playbooks: 1 written, 0 retired, read by 1 runs"
+    assert lines[3] == "  playbooks: 1 written, 0 retired, 0 failed, read by 1 runs"
     assert lines[4].startswith("  x.com: with its playbook 1 runs, 2.0 acts and ")
 
 

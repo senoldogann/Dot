@@ -95,7 +95,10 @@ WHERE {{scope}} AND e.kind = 'tool_result'
 _LEARNING_EVENTS_SQL: str = """
 SELECT e.kind, COUNT(*), COALESCE(SUM(json_array_length(json_extract(e.data, '$.lessons'))), 0)
 FROM runs r JOIN events e ON e.run_id = r.id
-WHERE {scope} AND e.kind IN ('lessons_proposed', 'lesson_saved', 'lesson_dismissed', 'playbook_written', 'playbook_retired')
+WHERE {scope} AND e.kind IN (
+    'lessons_proposed', 'lesson_saved', 'lesson_dismissed', 'lessons_failed', 'playbook_written', 'playbook_retired',
+    'playbook_failed'
+)
 GROUP BY e.kind
 """
 # One row per note the runs were handed: the note, the runs handed it, and how many of them ended done.
@@ -418,17 +421,20 @@ class PlaybookComparison(FrozenModel):
 
 
 class LearningStats(FrozenModel):
-    """What the runs of the window learned and were handed: the lessons proposed, saved and dismissed; the notes
-    handed to runs with how those runs ended (the most handed first, at most ``_NOTES_SHOWN``); the playbooks
-    written and retired, the runs that read one, and per host the comparison of item 89."""
+    """What the runs of the window learned and were handed: the lessons proposed, saved and dismissed, and the runs
+    whose lessons failed (to be drawn, checked or saved); the notes handed to runs with how those runs ended (the most
+    handed first, at most ``_NOTES_SHOWN``); the playbooks written, retired and failed, the runs that read one, and per
+    host the comparison of item 89."""
 
     lessons_proposed: int
     lessons_saved: int
     lessons_dismissed: int
+    lessons_failed: int
     runs_handed_notes: int
     notes: tuple[NoteScore, ...]
     playbooks_written: int
     playbooks_retired: int
+    playbooks_failed: int
     runs_reading_playbooks: int
     comparisons: tuple[PlaybookComparison, ...]
 
@@ -1022,10 +1028,12 @@ def learning_stats(rows: _Rows) -> LearningStats:
         lessons_proposed=counts.get("lessons_proposed", (0, 0))[1],
         lessons_saved=counts.get("lesson_saved", (0, 0))[0],
         lessons_dismissed=counts.get("lesson_dismissed", (0, 0))[0],
+        lessons_failed=counts.get("lessons_failed", (0, 0))[0],
         runs_handed_notes=rows.runs_handed,
         notes=note_scores(rows.uses),
         playbooks_written=counts.get("playbook_written", (0, 0))[0],
         playbooks_retired=counts.get("playbook_retired", (0, 0))[0],
+        playbooks_failed=counts.get("playbook_failed", (0, 0))[0],
         runs_reading_playbooks=len(rows.playbook_reads),
         comparisons=playbook_comparisons(rows.runs, rows.run_acts, rows.playbook_reads),
     )
@@ -1058,6 +1066,17 @@ def _statistics(rows: _Rows) -> RunStatistics:
         channels=channel_stats(tools),
         learning=learning_stats(rows),
     )
+
+
+def read_kv(database: Path, key: str) -> str | None:
+    """The value the store keeps under ``key`` (the last reflection, the last that failed), read on a read-only
+    connection, or ``None``. Blocking."""
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            row: tuple[object, ...] | None = connection.execute("SELECT value FROM kv WHERE key = ?", (key,)).fetchone()
+    except sqlite3.Error as error:
+        raise StoreError("the store could not be read", {"database": str(database), "error": str(error)}) from error
+    return None if row is None else str(row[0])
 
 
 def collect_statistics(database: Path, since: float) -> RunStatistics:

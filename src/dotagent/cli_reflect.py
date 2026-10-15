@@ -5,7 +5,7 @@ import sys
 import time
 
 from dotagent.agent.manager import RunManager
-from dotagent.agent.reflection import Reflection, summary_line
+from dotagent.agent.reflection_record import Reflection, summary_line
 from dotagent.cli_commands import Command, ReflectCommand
 from dotagent.config import load_user_config
 from dotagent.core.errors import InvalidValueError

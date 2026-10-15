@@ -36,12 +36,24 @@ from dotagent.agent.lessons import (
     same_way_round,
     stored_signals,
 )
-from dotagent.agent.review import OwnerDraft, OwnerRequest, OwnerWriter, goal_digest, owner_writer_for
+from dotagent.agent.reflection_record import (
+    REFLECTION_FAILED_KEY,
+    REFLECTION_KEY,
+    Reflection,
+    ReflectionFailure,
+)
+from dotagent.agent.review import (
+    OwnerDraft,
+    OwnerRequest,
+    OwnerWriter,
+    goal_digest,
+    owner_writer_for,
+    shorten_reason,
+)
 from dotagent.agent.verify import CallFact
 from dotagent.core.errors import StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets
-from dotagent.core.types import FrozenModel
 from dotagent.evals import EVAL_SOURCE
 from dotagent.memory.ranking import Vector
 from dotagent.memory.service import (
@@ -65,7 +77,6 @@ from dotagent.store.models import EventRecord, MemoryRecord, MemoryScore, RunRec
 
 log = get_logger(__name__)
 
-REFLECTION_KEY: str = "reflection.last"
 REFLECTION_OFF: str = "off"
 # The first reflection reads the runs of the last day.
 _FIRST_WINDOW_S: float = 86400.0
@@ -88,22 +99,6 @@ _ENDED: frozenset[RunStatus] = frozenset({"done", "failed", "cancelled"})
 # A stored run read content third parties can author when a tool result of it was of one of these kinds or came over
 # one of these channels (the loop knows it for sure; the store keeps the kind and the channel of every result).
 _OUTSIDE_CHANNELS: frozenset[str] = frozenset({"web", "browser"})
-
-
-class Reflection(FrozenModel):
-    """What a reflection did: it read the runs that ended between ``since`` and ``at``, ``lessons_written`` lessons
-    were proposed or saved from them, ``merged`` lesson notes were folded into another, ``retired`` were rested, and
-    ``journal`` is the id of the day's journal note (``None`` when nothing happened)."""
-
-    at: float
-    since: float
-    runs_read: int
-    lessons_written: int
-    merged: int
-    retired: int
-    journal: str | None
-    # Whether the owner section (what Dot knows about the owner, item 93) was rewritten.
-    owner_updated: bool
 
 
 class _Result(BaseModel):
@@ -300,17 +295,6 @@ def _own(notes: Sequence[MemoryRecord]) -> list[MemoryRecord]:
     return [note for note in notes if note.source_run is not None]
 
 
-def summary_line(reflection: Reflection) -> str:
-    """``Reflected on 7 runs: 2 lessons, 1 merged, 1 retired.``"""
-    runs: str = "1 run" if reflection.runs_read == 1 else f"{reflection.runs_read} runs"
-    parts: list[str] = [
-        f"{reflection.lessons_written} {'lesson' if reflection.lessons_written == 1 else 'lessons'}",
-        f"{reflection.merged} merged",
-        f"{reflection.retired} retired",
-    ]
-    return f"Reflected on {runs}: {', '.join(parts)}."
-
-
 def _date(at: float, zone: ZoneInfo) -> str:
     return datetime.fromtimestamp(at, tz=zone).strftime("%Y-%m-%d")
 
@@ -348,6 +332,27 @@ async def last_reflection(store: Store) -> Reflection | None:
         return Reflection.model_validate_json(raw)
     except ValidationError as exc:
         raise StoreError("the last reflection cannot be read", {"key": REFLECTION_KEY, "error": str(exc)}) from exc
+
+
+async def record_reflection_failure(store: Store, at: float, error: str) -> None:
+    """Keep that the reflection at ``at`` failed with ``error`` (secrets masked), for the owner to see."""
+    failure: ReflectionFailure = ReflectionFailure(at=at, error=shorten_reason(redact_secrets(error)))
+    await store.kv_set(REFLECTION_FAILED_KEY, failure.model_dump_json())
+
+
+async def reflection_failure(store: Store) -> ReflectionFailure | None:
+    """The last reflection that failed, while no reflection after it is done; ``None`` otherwise."""
+    raw: str | None = await store.kv_get(REFLECTION_FAILED_KEY)
+    if raw is None:
+        return None
+    try:
+        failure: ReflectionFailure = ReflectionFailure.model_validate_json(raw)
+    except ValidationError as exc:
+        raise StoreError(
+            "the last failed reflection cannot be read", {"key": REFLECTION_FAILED_KEY, "error": str(exc)}
+        ) from exc
+    last: Reflection | None = await last_reflection(store)
+    return failure if last is None or last.at < failure.at else None
 
 
 async def _asked_already(store: Store, run_id: str) -> bool:

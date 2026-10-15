@@ -8,7 +8,8 @@ from datetime import datetime
 
 from dotagent.agent.lessons import LESSON_TAG
 from dotagent.agent.manager import RunManager
-from dotagent.agent.reflection import Reflection, last_reflection, summary_line
+from dotagent.agent.reflection import last_reflection, reflection_failure
+from dotagent.agent.reflection_record import Reflection, ReflectionFailure, summary_line
 from dotagent.memory.service import JOURNAL_TAG
 from dotagent.server.views import ActivityRow, ActivityView
 from dotagent.store.db import Store
@@ -259,6 +260,27 @@ def _reflection_row(reflection: Reflection) -> ActivityRow:
     )
 
 
+def _reflection_failed_row(failure: ReflectionFailure) -> ActivityRow:
+    """The reflection that failed today, among what ended: it says what failed and opens the Memory page."""
+    return ActivityRow(
+        id="reflection",
+        section="recent",
+        kind="reflection",
+        title=f"The nightly review failed: {failure.error}",
+        detail="it is tried again at its next time; dotx reflect runs it now",
+        channel="",
+        since=failure.at,
+        href="#/memory",
+        run_id=None,
+        status="failed",
+        minutes=None,
+        tokens=None,
+        steps=None,
+        parent_run_id=None,
+        actor_id=None,
+    )
+
+
 async def activity_view(store: Store, manager: RunManager, now: float) -> ActivityView:
     """The three sections at ``now``: waiting (the approvals and questions runs wait for, the questions runs left for
     the user, the runs the user holds),
@@ -308,7 +330,10 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
         if run.status in _ENDED and run.finished_at is not None and run.finished_at >= today and run.id not in under:
             recent.append(await _run_row(store, run, "recent", "run", "", _title(run.goal)))
     reflection: Reflection | None = await last_reflection(store)
-    if reflection is not None and reflection.at >= today:
+    failed: ReflectionFailure | None = await reflection_failure(store)
+    if failed is not None and failed.at >= today:
+        recent.append(_reflection_failed_row(failed))
+    elif reflection is not None and reflection.at >= today:
         recent.append(_reflection_row(reflection))
     waiting.sort(key=lambda row: row.since)
     working.sort(key=lambda row: row.since)
