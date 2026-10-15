@@ -1,8 +1,9 @@
 """Changing one setting of the user's ``config.toml`` in place: a ``[browser]`` one (the mode, or whether Chrome is
 raised), the default model, ``[models] main`` (item 199), a model of Dot's own work, ``[models] fast``, ``review`` or
 ``vision`` (item 232), whether the daemon resumes on its own the runs it cut off, ``[agent] resume`` (item 231), or the
-context size of a model, a key of ``[models.context]`` (item 250), so the comments and the other settings stay as
-written."""
+context size of a model, a key of ``[models.context]`` (item 250), whether the typed judge answers, ``[judge] provider``
+(item 255), or whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), so the comments and
+the other settings stay as written."""
 
 import os
 import re
@@ -30,12 +31,13 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["agent", "browser", "judge", "models"]
+type ConfigTable = Literal["agent", "browser", "judge", "models", "shell"]
 type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal["mode", "raise_window"]
 type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]
-type SettingKey = AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting
+type ShellSetting = Literal["sandbox"]
+type SettingKey = AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting | ShellSetting
 type SettingValue = str | bool | int
 
 
@@ -210,6 +212,12 @@ def set_judge_provider(path: Path, provider: JudgeProvider) -> None:
     """Write ``[judge] provider``, whether the typed judge answers through TypeSafe or answers nothing, into the config
     file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "judge", "provider", provider)
+
+
+def set_shell_sandbox(path: Path, on: bool) -> None:
+    """Write ``[shell] sandbox``, whether the processes of a run outside yolo start in the macOS sandbox, into the config
+    file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "shell", "sandbox", on)
 
 
 def set_setting(path: Path, table: ConfigTable, key: SettingKey, value: SettingValue) -> None:

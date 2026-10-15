@@ -164,8 +164,8 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
             return _secret_action(session, lines, rest, ctx)
         if run_sandbox(ctx).commands and not session.sandboxed:
             raise ToolInputError(
-                f"{session.id} was opened by a yolo run, outside the sandbox the commands of this run start in: "
-                "open a terminal of this run with terminal_open.",
+                f"{session.id} was opened outside the sandbox the commands of this run start in (by a yolo run, or "
+                "while the sandbox was off): open a terminal of this run with terminal_open.",
                 {"session": session.id, "command": session.command},
             )
         if not lines:

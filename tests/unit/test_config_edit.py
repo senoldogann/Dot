@@ -16,6 +16,7 @@ from dotagent.config_edit import (
     set_judge_provider,
     set_resume,
     set_role_model,
+    set_shell_sandbox,
     with_browser_mode,
     with_browser_setting,
 )
@@ -204,3 +205,13 @@ def test_the_judges_provider_is_written_under_judge_and_the_rest_stays(tmp_path:
     assert path.read_text(encoding="utf-8") == (
         '[judge]\nprovider = "none"  # mine\ntimeout_s = 5\n\n[models]\nprovider = "x"\n'
     )
+
+
+def test_the_sandbox_is_written_under_shell_as_a_boolean_and_the_rest_stays(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text('[models]\nmain = "ollama:x"\n', encoding="utf-8")
+    set_shell_sandbox(path, False)
+    assert path.read_text(encoding="utf-8") == '[models]\nmain = "ollama:x"\n\n[shell]\nsandbox = false\n'
+    path.write_text("[shell]\npass_env = []  # mine\nsandbox = false\n\n[web]\nsandbox = 1\n", encoding="utf-8")
+    set_shell_sandbox(path, True)
+    assert path.read_text(encoding="utf-8") == "[shell]\npass_env = []  # mine\nsandbox = true\n\n[web]\nsandbox = 1\n"

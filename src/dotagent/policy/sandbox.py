@@ -9,7 +9,8 @@ token, settings, database, browser profiles and journals), changing what it load
 renaming or removing a folder above any of them, which would move them away from the paths the profile names. The search
 tools may not read the user's protected locations either: a search has no reason to, while the programs a shell runs
 (ssh, git, a cloud CLI) read their own credentials there. macOS refuses such a call with "Operation not permitted",
-whatever path, link or letter case names the file.
+whatever path, link or letter case names the file. ``[shell] sandbox = false`` starts them without it, and Settings ›
+Rules switches it while the daemon runs (:class:`SwitchedSandbox`).
 
 What the sandbox costs: macOS starts no program that runs as root from inside it (``ps``, ``top``, ``sudo``,
 ``crontab``). What it does not cover: a process that has another program act for it (Terminal through ``open``, a job
@@ -22,10 +23,13 @@ import asyncio
 from pathlib import Path
 
 from dotagent.core.errors import ConfigError
+from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 
 SANDBOX_EXEC: str = "/usr/bin/sandbox-exec"
 _CHECKED_PROGRAM: str = "/usr/bin/true"
+
+log = get_logger(__name__)
 
 
 class Sandbox(FrozenModel):
@@ -92,15 +96,43 @@ async def check_sandbox(sandbox: Sandbox) -> None:
         except OSError as error:
             raise ConfigError(
                 "the macOS sandbox for the processes of a run cannot start; [shell] sandbox = false runs them without it",
-                {"program": SANDBOX_EXEC, "error": str(error)},
+                {"program": words[0], "error": str(error)},
             ) from error
         _, stderr = await process.communicate()
         if process.returncode != 0:
             raise ConfigError(
                 "the macOS sandbox refused its profile; [shell] sandbox = false runs the processes of a run without it",
                 {
-                    "program": SANDBOX_EXEC,
+                    "program": words[0],
                     "returncode": process.returncode,
                     "stderr": stderr.decode("utf-8", errors="replace")[:500],
                 },
             )
+
+
+class SwitchedSandbox:
+    """Where the processes of a run start outside yolo, as ``[shell] sandbox`` said at the daemon's start or as the owner
+    switched it since in Settings › Rules (item 262). The sandbox is built at start whatever the setting, and checked to
+    start each time it is switched on, so that a Mac without ``sandbox-exec`` refuses the switch rather than every process
+    of a run."""
+
+    def __init__(self, built: Sandbox, on: bool) -> None:
+        self._built: Sandbox = built
+        self._on: bool = on
+
+    @property
+    def on(self) -> bool:
+        return self._on
+
+    def current(self) -> Sandbox:
+        """The sandbox a process of a run outside yolo starts in now: the built one, or :data:`UNSANDBOXED` while off."""
+        return self._built if self._on else UNSANDBOXED
+
+    async def switch(self, on: bool) -> None:
+        """Start the processes of runs outside yolo in the sandbox, or without it, from the next one on; a process or a
+        terminal session already started keeps where it started. Switching it on starts its profiles first
+        (:func:`check_sandbox`): when they do not start, nothing changes and the error says why."""
+        if on:
+            await check_sandbox(self._built)
+        self._on = on
+        log.info("sandbox_switched", on=on)

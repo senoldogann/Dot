@@ -76,6 +76,6 @@ class ToolContext:
 
 
 def run_sandbox(ctx: ToolContext) -> Sandbox:
-    """Where the processes of the run start: in the sandbox of the runtime, or as they are in a yolo run, whose lines
-    the guard lets change Dot's own files as well."""
-    return UNSANDBOXED if ctx.approvals == "yolo" else ctx.runtime.sandbox
+    """Where the processes of the run start: in the sandbox of the runtime while it is on, or as they are in a yolo run,
+    whose lines the guard lets change Dot's own files as well."""
+    return UNSANDBOXED if ctx.approvals == "yolo" else ctx.runtime.sandbox.current()

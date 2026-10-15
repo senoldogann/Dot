@@ -389,6 +389,7 @@ terminal_idle_s = 1800.0
 # macOS sandbox that keeps them out of Dot's own files: its keys, token, settings, database, browser profiles and
 # journals, and what it loads and runs (plugins, skills, playbooks, the emergency stop). macOS starts no program that
 # runs as root inside it (ps, top, sudo). false starts them without it; the shell guard still reads every line.
+# Settings › Rules switches it while the daemon runs, from the next command on, and writes it here.
 sandbox = true
 
 [web]

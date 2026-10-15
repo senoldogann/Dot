@@ -16,7 +16,14 @@ from dotagent.agent.playbooks import PlaybookEntry, drop_playbook, list_playbook
 from dotagent.agent.scaffold import context_budget, context_ceiling, context_choices, summarise_point
 from dotagent.agent.sizes import ContextSizes
 from dotagent.config import CONTEXT_FLOOR, AgentConfig, AppConfig, JudgeConfig, ModelsConfig
-from dotagent.config_edit import set_context_size, set_default_model, set_judge_provider, set_resume, set_role_model
+from dotagent.config_edit import (
+    set_context_size,
+    set_default_model,
+    set_judge_provider,
+    set_resume,
+    set_role_model,
+    set_shell_sandbox,
+)
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -91,6 +98,8 @@ from dotagent.server.views import (
     ResumeRequest,
     ResumeView,
     RoleModelRequest,
+    SandboxRequest,
+    SandboxView,
     SkillShareRequest,
     StatusView,
 )
@@ -310,6 +319,24 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         ctx.runtime.judge.set_provider(request.provider)
         await asyncio.to_thread(set_judge_provider, config_path(), request.provider)
         return judge_now()
+
+    @router.get("/shell/sandbox")
+    async def sandbox() -> SandboxView:
+        return SandboxView(sandbox=ctx.runtime.sandbox.on)
+
+    @router.put("/shell/sandbox")
+    async def switch_sandbox(request: SandboxRequest) -> SandboxView:
+        """Start the processes of runs outside yolo in the macOS sandbox, or without it, from the next one on (item
+        262): the config file keeps it as ``[shell] sandbox``. Switching it on where its profiles do not start is
+        refused, and so is a config file that cannot be changed: the sandbox is then as it was."""
+        before: bool = ctx.runtime.sandbox.on
+        await ctx.runtime.sandbox.switch(request.sandbox)
+        try:
+            await asyncio.to_thread(set_shell_sandbox, config_path(), request.sandbox)
+        except (ConfigError, OSError):
+            await ctx.runtime.sandbox.switch(before)
+            raise
+        return SandboxView(sandbox=ctx.runtime.sandbox.on)
 
     @router.post("/models/roles")
     async def choose_role_model(request: RoleModelRequest) -> ModelsConfig:
