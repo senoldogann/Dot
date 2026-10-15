@@ -84,6 +84,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `helpers`           | models a run may ask for advice or hand a part of its work to (see below)                 | `[]`                        |
 | `standby`           | models a run moves to when its own model cannot answer (see below)                        | `[]`                        |
 | `helper_cooldown_s` | how long a model that could not answer is left out of `helpers` and `standby`             | `600`                       |
+| `context`           | a model's context size where it is not `[agent] context_tokens` (see below); Settings › Models sets it | `{}`         |
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
@@ -93,6 +94,21 @@ can do its work: those that call tools for `fast` and `review`, those that see f
 next call of that work on, with no restart (a run under way keeps the review model it started with for its goal check,
 its second opinion and its approvals), and the config file keeps it with the rest of the file as it was; a model that
 cannot do the work is refused, and nothing changes (`POST /api/models/roles`).
+
+**Context size.** Beside each model's window, Settings › Models sets the context size of the model's runs (item 250):
+how much of a run each step sends the model before Dot summarizes its older part. The menu offers Dot's default
+(`[agent] context_tokens`, 96 000, or three quarters of the window when that is less) and the sizes from 48 000 up to
+three quarters of the window; a choice holds from the model's next run, with no restart, and the config file keeps it
+in `[models.context]` (`"anthropic:claude-opus-5-5" = 192000`) with the rest of the file as it was. A larger size means
+fewer summaries, each of which drops detail of the older part and takes a call of the fast model, and more input a step:
+steps that are answered more slowly and cost more on a key billed by the token. **Why** opens, under the model's row,
+what the size does; the window and where it comes from (the provider's API, the windows the provider publishes as
+Dot's table keeps them, an assumption for a model neither names, or the window Dot asks Ollama for); the default, the
+most and the least; and what the model's runs of the last 30 days measured (`GET /api/models/context`): the steps and
+the runs, the input of a step at the median, for 95 % of the steps and at most, the share the provider served from its
+cache, the input of a run's first step, the summaries, and the seconds of a step by its input. A size below 48 000 (a
+run's first step alone sends its instructions, its tools and the request) or past three quarters of the window is
+refused, and nothing changes (`PUT /api/models/context`).
 
 **Helpers and standby.** `helpers` lists models, best first, that a run may turn to. The `consult` tool asks one of them
 a question and returns its answer, fenced as advice; `delegate` can run a part of the work on one of them. A helper has
@@ -231,13 +247,15 @@ is the answer (a small model that is offered both writes the call out as text).
 
 - Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the fast
   model (`[models] fast`, the side work the run's slower model need not do), so a run stays inside its context budget:
-  `context_tokens` (96 000 by default), or three quarters of the model's window when that is less. A wider budget means
+  `context_tokens` (96 000 by default) or the model's own context size (Settings › Models, item 250), or three
+  quarters of the model's window when that is less. A wider budget means
   fewer summaries in a long run and more input tokens a step (up to twice as many at the end of a long run); 48 000 was
   the default before 2026-10-11, and an owner on a metered key who weighs tokens over summaries sets it back. The
   summary may use a tenth of the budget and never more than 1 500 words, so a long run's summary does not grow with
   each compaction until every step compacts, and does not cost the fast model minutes of writing. A compaction keeps as
   many of the newest messages as fit next to the system prompt, the tool definitions and its note in 85 % of the size at
-  which it starts (`context_summarise_share` of `context_tokens`, or the whole budget when the window leaves less), and
+  which it starts (`context_summarise_share` of `context_tokens` or of the model's own size, or the whole budget when
+  the window leaves less), and
   never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
   a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section is
   asked again once with the missing sections named and the first draft carried along; when the fast model gives no text,
@@ -273,9 +291,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   page shows it): `[providers.ollama] num_ctx` (65 536) for a model that runs on this Mac, where it sets the memory of
   the model's cache, and `num_ctx_cloud` (262 144) for a cloud model, whose tag is `cloud` or ends in `-cloud`
   (`kimi-k3:cloud`, `gpt-oss:120b-cloud`) and which runs on Ollama's servers; where the model's own window is larger,
-  the table shows it beside the one Dot asks for ("262k tokens of 1.0M", item 221). OpenAI's and OpenCode Go's
-  windows come from Dot's tables of their models, kept to their published pages; Anthropic's from its list of models. When three quarters of the window is less
-  than `context_tokens`, the run's budget
+  the table shows it beside the one Dot asks for ("of 262k (own 1.0M)", items 221 and 250). OpenAI's and OpenCode
+  Go's windows come from Dot's tables of their models, kept to their published pages; Anthropic's from its list of
+  models. When three quarters of the window is less than `context_tokens`, the run's budget
   is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same proportion (never below 2000
   characters). The text of a page or an application window in a browser or desktop result takes what is left next to the
   rest of the result, and never less than half the result, so a small window shortens a page instead of leaving it out.
@@ -1321,10 +1339,12 @@ of the daemon or a run moved to a standby model leaves them as they are (a chat 
 next run starts). They are not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run
 under way keeps its own: while it works, the pills step back and say that they wait for the next follow-up. Beside the
 send, a ring after T3 Code's shows how much of the run's context budget its last step filled (item 222): the tokens that
-step sent the model against `context_tokens`, or three quarters of the window when that is less, past which Dot
-summarizes the older part of the run; it turns to the warning colour past 80 % and to the danger colour past the budget,
-and a click shows the figures, the model's window, and why the budget is smaller than the window (each step sends the
-model the whole run again, so a run kept within it is answered sooner and costs less) and where it is set (item 239). It
+step sent the model against the run's budget (`context_tokens` or the model's own context size, or three quarters of
+the window when that is less); it turns to the warning colour past 80 % and to the danger colour past the budget, and a
+click shows the figures, the point past which Dot summarizes the older part of the run, the model's window, and why
+the budget is smaller than the window (each step sends the model the whole run again, so a run kept within it is
+answered sooner and costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen
+for the model in Settings › Models, which the timeline notes too. It
 reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut off offers
 **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the model and
 its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool calls (with
@@ -1562,6 +1582,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
+| `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
+| `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |

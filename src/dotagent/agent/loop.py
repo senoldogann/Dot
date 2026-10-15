@@ -127,6 +127,7 @@ from dotagent.agent.scaffold import (
     require_room,
     scaffold_event,
     scaffold_for,
+    summarise_point,
     surface_for,
 )
 from dotagent.agent.stepmodel import (
@@ -573,20 +574,19 @@ async def _fit_context(
     specs: tuple[ToolSpec, ...],
     ratio: float,
     ledger: RunLedger,
-    context_tokens: int,
+    scaffold: Scaffold,
 ) -> tuple[list[Message], int, RunLedger]:
-    """Keep the prompt inside the run's budget of ``context_tokens``: drop stale screenshots, shorten old output, then
+    """Keep the prompt inside the run's budget (``scaffold``): drop stale screenshots, shorten old output, then
     compact. The messages a compaction keeps and the parts of its note are sized to the budget, so that a compaction
     leaves room for the steps after it."""
     config: AgentConfig = agent.runtime.config.agent
+    context_tokens: int = scaffold.context_tokens
     current: list[Message] = drop_old_images(history, config.keep_recent_screenshots)
     estimated: int = round(estimate_tokens([system, *current], specs) * ratio)
     if estimated > context_tokens * config.context_elide_share:
         current = shrink_old_tool_results(current, config.keep_recent_tool_results)
         estimated = round(estimate_tokens([system, *current], specs) * ratio)
-    # The compaction point (item 87): context_summarise_share of the configured budget, or the run's whole budget when
-    # a small window cut it under that, since a budget that small has no share to spare.
-    summarise_at: float = min(config.context_tokens * config.context_summarise_share, context_tokens)
+    summarise_at: float = summarise_point(config, scaffold.chosen, context_tokens)
     if estimated > summarise_at:
         # The budget in the units of estimate_tokens, before its calibration against the provider's counts.
         plain: float = context_tokens / ratio
@@ -1194,7 +1194,10 @@ async def _fitted(
     if offers_tools and not info.tools:
         return "it cannot call tools"
     scaffold: Scaffold = scaffold_for(
-        runtime.config.agent, info, await runtime.store.model_profile(target.label, PROFILE_RUNS)
+        runtime.config.agent,
+        info,
+        await runtime.store.model_profile(target.label, PROFILE_RUNS),
+        runtime.context_sizes.of(target.label),
     )
     try:
         require_room(scaffold, fixed_tokens)
@@ -1394,7 +1397,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     info: ModelInfo = await runtime.router.model_info(ref)
     if not info.tools and run.mode != "chat":
         raise ConfigError("the selected model cannot call tools", {"model": ref.label, "mode": run.mode})
-    scaffold: Scaffold = scaffold_for(config, info, await runtime.store.model_profile(ref.label, PROFILE_RUNS))
+    scaffold: Scaffold = scaffold_for(
+        config, info, await runtime.store.model_profile(ref.label, PROFILE_RUNS), runtime.context_sizes.of(ref.label)
+    )
     surface, surface_reason = surface_for(config, scaffold)
     specs: tuple[ToolSpec, ...] = specs_for_mode(runtime.registry, run.mode) if info.tools else ()
     if run.parent_run_id is not None:
@@ -1635,9 +1640,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         step_system: Message = (
             await _with_plan(agent, system) if config.plan_each_turn and run.mode != "chat" else system
         )
-        history, estimated, ledger = await _fit_context(
-            agent, history, step_system, offered, ratio, ledger, scaffold.context_tokens
-        )
+        history, estimated, ledger = await _fit_context(agent, history, step_system, offered, ratio, ledger, scaffold)
         routed: _Candidate | None = (
             None
             if route_skip or not candidates

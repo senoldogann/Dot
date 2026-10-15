@@ -6,7 +6,7 @@ from pydantic import JsonValue
 
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel
-from dotagent.llm.types import Effort, ModelInfo
+from dotagent.llm.types import Effort, ModelInfo, WindowSource
 
 # Meaning of every reasoning label on one scale, so a neutral effort can be matched to the closest label of a model.
 # ``none`` is the word OpenAI uses for ``off``; ``on`` stands for the default amount of thinking of a plain switch.
@@ -39,11 +39,12 @@ class ModelTraits(FrozenModel):
     """Static facts about one model.
 
     ``efforts`` are its reasoning labels (fewer than two means there is no choice); ``thinking_toggle`` marks models
-    whose Messages route takes an explicit thinking switch.
+    whose Messages route takes an explicit thinking switch; ``window_source`` says where ``context_length`` comes from.
     """
 
     vision: bool
     context_length: int
+    window_source: WindowSource
     max_output_tokens: int
     efforts: tuple[str, ...]
     reasoning: bool
@@ -115,6 +116,7 @@ def info_from_traits(model: str, traits: ModelTraits, free: bool) -> ModelInfo:
         thinking=traits.reasoning,
         context_length=traits.context_length,
         own_context_length=None,
+        window_source=traits.window_source,
         efforts=efforts_of(traits),
         free=free,
     )

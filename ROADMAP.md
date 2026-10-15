@@ -5187,8 +5187,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 246 | Each step's thinking is a block that folds                                           | done        | 5ef5a7b |
 | 247 | The repository has a licence, a security policy and Dependabot                       | done        | 66f49a3 |
 | 248 | A run a restart cut off goes on by itself by default                                 | done        | 8d3efd5 |
-| 249 | What the review model declines to write goes to the run's own model                  | in progress |         |
-| 250 | Each model's context size can be set in Settings                                     | planned     |         |
+| 249 | What the review model declines to write goes to the run's own model                  | done        | 0416d83 |
+| 250 | Each model's context size can be set in Settings                                     | in progress |         |
 | 251 | Ultrathink and Ultracode in the reasoning menu                                       | planned     |         |
 | 252 | The plan at the end of the request, if an eval shows it holds                        | planned     |         |
 
@@ -11163,7 +11163,7 @@ leaves every such run to the owner, as before.
 
 ### 249. What the review model declines to write goes to the run's own model
 
-**Status: in progress.**
+**Status: done.** Merged as `0416d83` (PR #293; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `review.py` asks with `_decide_passing_on`: a question the review model declines (its
 provider ends the reply as a refusal, item 225) goes to each of the other models the writer was given, in turn, until
@@ -11181,7 +11181,36 @@ that is another model. Other failures stay as they are, and an approval or a goa
 
 ### 250. Each model's context size can be set in Settings
 
-**Status: planned.**
+**Status: in progress.**
+
+**As built (2026-10-15).** `[models.context]` names a model's context size where it is not `[agent] context_tokens`
+(`ModelsConfig.context`, at least `CONTEXT_FLOOR`, 48,000: the budget of before 2026-10-11, above the 29,294 tokens a
+run's first step sends at the median of 48 runs measured that day); `ContextSizes` keeps them on the runtime, so a
+choice holds from the model's next run with no restart. `scaffold.py`: `context_budget` takes the chosen size, still cut
+to three quarters of the window; `summarise_point` is `context_summarise_share` of the configured size (before, of
+`[agent] context_tokens` whatever the model, so a larger size would still have summarised at 81,600); `context_choices`
+are the sizes Settings offers (48k, 64k, 128k, 192k, 256k, 384k, 512k, 768k up to the ceiling, the ceiling itself, the
+chosen one); the `scaffold` event says `chosen` and `summarise_at`; with `tool_surface = "auto"` a budget under
+`[agent] context_tokens` groups the tools, and the reason says whether the window or the chosen size made it so (a
+chosen size the window cut to a budget still above it keeps them whole, as no size does). The run start, a step routed
+to another model and a move to a standby model each take that model's size. A model's window says where it comes from
+(`WindowSource`: the provider's API, Dot's table of the windows the provider publishes, an assumption, or the window Dot
+asks Ollama for). `PUT /api/models/context` checks the size against the floor and the ceiling and writes it with
+`config_edit.set_context_size` (a quoted key and an integer in a table of its own, or the line taken out for the
+default, the file checked again as for every other setting); `GET /api/models/context` reads what the model's runs of
+the last 30 days measured (`store/stats.py` `ContextEvidence`, the steps that reported their input; each bucket of
+seconds says where it starts, as the empty ones are left out), and the configured models the API reports carry the sizes
+chosen since. Settings › Models: a menu of the sizes beside each model's window (with the model's own beside the one Dot
+asks Ollama for, item 221), and **Why**, a row under the model's with what the size does, the window and its source, the
+default and the measurement that set it (item 55), the most and the least, and the model's numbers: the steps and the
+runs, the input of a step at the median, for 95 % of the steps and at most, the share served from the cache, the first
+step, the summaries and the seconds of a step by its input; on a phone it stays in sight as the table scrolls sideways
+and ends before the faded edge. The composer's meter says the point past which the run summarizes and the size chosen
+for the model, and the timeline notes it, and the window when it cut that size. Tests:
+`tests/unit/test_context_sizes.py`, `tests/smoke/test_context_sizes.py` (the API, the file, a run started after a choice
+and after it was taken out, the Settings menu and the Why row wide and on a phone, light and dark),
+`tests/smoke/test_scaffold.py` (the budget, the tool output and the point of summary a chosen size gives the real loop)
+and `tests/smoke/test_context_meter.py`; on the code of before they fail.
 
 **What.** Settings › Models sets each model's context size, from a floor up to three quarters of its window, or leaves
 it to Dot's default. Beside it: the window and where that number comes from, the budget Dot uses and why, what a larger
@@ -11893,3 +11922,4 @@ plan steps marked done without evidence hold.
 - 2026-10-15 (Opus 5.5): item 246 merged as `5ef5a7b` (PR #287; no Linear issue, the connector was signed out): each step's thinking is a block with a brain that folds and unfolds, "Thinking…" while the model thinks and "Thought" once it is done, among its step's calls or before its message; the `assistant` event keeps the thinking, its secrets masked, up to 12,000 characters, and a step the loop asks again drops what its failed try streamed. Part 40 is done.
 - 2026-10-15 (Opus 5.5): item 247 merged as `66f49a3` (PR #288; no Linear issue, the connector was signed out): the repository has the MIT licence, a security policy that sends reports through GitHub's private vulnerability reporting, now on, a weekly Dependabot configuration and the notice of the icons' licence.
 - 2026-10-15 (Opus 5.5): item 248 merged as `8d3efd5` (PR #292; no Linear issue, the connector was signed out): a run that a restart, a crash or a shutdown cut off goes on by itself by default, when the calls it cut off only read and it was cut off at most 30 minutes before.
+- 2026-10-15 (Opus 5.5): item 249 merged as `0416d83` (PR #293; no Linear issue, the connector was signed out): a run's lessons and its skill that the review model declines to write go to the run's own model, and the owner section to the model of the newest run it reads; an approval and the goal check keep asking the review model alone.

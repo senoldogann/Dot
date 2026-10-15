@@ -1,13 +1,15 @@
 """Changing one setting of the user's ``config.toml`` in place: a ``[browser]`` one (the mode, or whether Chrome is
 raised), the default model, ``[models] main`` (item 199), a model of Dot's own work, ``[models] fast``, ``review`` or
-``vision`` (item 232), or whether the daemon resumes on its own the runs it cut off, ``[agent] resume`` (item 231), so
-the comments and the other settings stay as written."""
+``vision`` (item 232), whether the daemon resumes on its own the runs it cut off, ``[agent] resume`` (item 231), or the
+context size of a model, a key of ``[models.context]`` (item 250), so the comments and the other settings stay as
+written."""
 
 import os
 import re
 import tempfile
 import threading
 import tomllib
+from collections.abc import Callable
 from pathlib import Path
 from typing import Literal
 
@@ -18,6 +20,10 @@ from dotagent.llm.roles import ModelRole
 from dotagent.store.models import BrowserMode
 
 _TABLE_HEADER: re.Pattern[str] = re.compile(r"^\s*\[")
+# A key TOML takes without quotes; any other (a model reference has a colon) is written in double quotes.
+_BARE_KEY: re.Pattern[str] = re.compile(r"[A-Za-z0-9_-]+")
+# The table of the context sizes of models (item 250).
+_CONTEXT_TABLE: str = "models.context"
 _FILE_MODE: int = 0o600
 # One edit at a time in this process: each reads the file, edits it and replaces it, so two at once (the browser mode
 # and raise_window changed together from the web UI) would keep only the later one.
@@ -29,48 +35,98 @@ type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal["mode", "raise_window"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]
 type SettingKey = AgentSetting | BrowserSetting | ModelsSetting
-type SettingValue = str | bool
+type SettingValue = str | bool | int
 
 
 def _literal(value: SettingValue) -> str:
-    return ("true" if value else "false") if isinstance(value, bool) else f'"{value}"'
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value) if isinstance(value, int) else f'"{value}"'
 
 
-def _header(table: ConfigTable) -> re.Pattern[str]:
-    return re.compile(rf"^\s*\[\s*{table}\s*\]\s*(#.*)?$")
+def _written_key(key: str) -> str:
+    """``key`` as this module writes it: bare where TOML takes it so, else in double quotes."""
+    return key if _BARE_KEY.fullmatch(key) else f'"{key}"'
 
 
-def _key_line(key: SettingKey) -> re.Pattern[str]:
-    return re.compile(rf"^\s*{key}\s*=")
+def _key_pattern(key: str) -> str:
+    """``key`` as a line of the file may write it: bare, or in double or single quotes."""
+    quoted: str = f"\"{re.escape(key)}\"|'{re.escape(key)}'"
+    return f"(?:{re.escape(key)}|{quoted})" if _BARE_KEY.fullmatch(key) else f"(?:{quoted})"
 
 
-def _key_value(key: SettingKey) -> re.Pattern[str]:
-    return re.compile(rf"""^(\s*{key}\s*=\s*)("[^"]*"|'[^']*'|true|false)(.*)$""")
+def _header(table: str) -> re.Pattern[str]:
+    """The header of ``table``, a dotted name for a table within a table (``models.context``)."""
+    name: str = r"\s*\.\s*".join(re.escape(part) for part in table.split("."))
+    return re.compile(rf"^\s*\[\s*{name}\s*\]\s*(#.*)?$")
 
 
-def _replaced_line(line: str, key: SettingKey, setting: str) -> str:
+def _key_line(key: str) -> re.Pattern[str]:
+    return re.compile(rf"^\s*{_key_pattern(key)}\s*=")
+
+
+def _key_value(key: str) -> re.Pattern[str]:
+    return re.compile(rf"""^(\s*{_key_pattern(key)}\s*=\s*)("[^"]*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*)(.*)$""")
+
+
+def _replaced_line(line: str, key: str, setting: str) -> str:
     """``line`` (a ``key = ...`` line) with its value replaced by ``setting``, a trailing comment kept."""
     match: re.Match[str] | None = _key_value(key).match(line)
     if match is None:
-        return f"{key} = {setting}"
+        return f"{_written_key(key)} = {setting}"
     return f"{match.group(1)}{setting}{match.group(3)}"
+
+
+def _table_lines(lines: list[str], table: str) -> tuple[int, int] | None:
+    """The index of the header of ``table`` among ``lines`` and of the line after its last, or ``None`` without one."""
+    header: re.Pattern[str] = _header(table)
+    start: int | None = next((index for index, line in enumerate(lines) if header.match(line)), None)
+    if start is None:
+        return None
+    end: int = next((index for index in range(start + 1, len(lines)) if _TABLE_HEADER.match(lines[index])), len(lines))
+    return start, end
+
+
+def _key_index(lines: list[str], bounds: tuple[int, int], key: str) -> int | None:
+    key_line: re.Pattern[str] = _key_line(key)
+    return next((index for index in range(bounds[0] + 1, bounds[1]) if key_line.match(lines[index])), None)
+
+
+def _with_value(text: str, table: str, key: str, setting: str) -> str:
+    """``text`` with ``[table] key`` set to the TOML literal ``setting``; nothing else changes."""
+    lines: list[str] = text.splitlines()
+    bounds: tuple[int, int] | None = _table_lines(lines, table)
+    line: str = f"{_written_key(key)} = {setting}"
+    if bounds is None:
+        separator: list[str] = [""] if lines and lines[-1].strip() else []
+        return "\n".join([*lines, *separator, f"[{table}]", line]) + "\n"
+    existing: int | None = _key_index(lines, bounds, key)
+    if existing is None:
+        return "\n".join([*lines[: bounds[0] + 1], line, *lines[bounds[0] + 1 :]]) + "\n"
+    return "\n".join([*lines[:existing], _replaced_line(lines[existing], key, setting), *lines[existing + 1 :]]) + "\n"
+
+
+def _without_value(text: str, table: str, key: str) -> str:
+    """``text`` without the line of ``[table] key``, the table's header kept; ``text`` itself when it has none."""
+    lines: list[str] = text.splitlines()
+    bounds: tuple[int, int] | None = _table_lines(lines, table)
+    existing: int | None = None if bounds is None else _key_index(lines, bounds, key)
+    if existing is None:
+        return text
+    return "\n".join([*lines[:existing], *lines[existing + 1 :]]) + "\n"
 
 
 def with_setting(text: str, table: ConfigTable, key: SettingKey, value: SettingValue) -> str:
     """``text`` (the contents of a config.toml) with ``[table] key`` set to ``value``; nothing else changes."""
-    setting: str = _literal(value)
-    lines: list[str] = text.splitlines()
-    header: re.Pattern[str] = _header(table)
-    start: int | None = next((index for index, line in enumerate(lines) if header.match(line)), None)
-    if start is None:
-        separator: list[str] = [""] if lines and lines[-1].strip() else []
-        return "\n".join([*lines, *separator, f"[{table}]", f"{key} = {setting}"]) + "\n"
-    end: int = next((index for index in range(start + 1, len(lines)) if _TABLE_HEADER.match(lines[index])), len(lines))
-    key_line: re.Pattern[str] = _key_line(key)
-    existing: int | None = next((index for index in range(start + 1, end) if key_line.match(lines[index])), None)
-    if existing is None:
-        return "\n".join([*lines[: start + 1], f"{key} = {setting}", *lines[start + 1 :]]) + "\n"
-    return "\n".join([*lines[:existing], _replaced_line(lines[existing], key, setting), *lines[existing + 1 :]]) + "\n"
+    return _with_value(text, table, key, _literal(value))
+
+
+def with_context_size(text: str, model: str, tokens: int | None) -> str:
+    """``text`` with the context size of ``model`` (``provider:model``) in ``[models.context]`` set to ``tokens``, or
+    left out for ``None``; nothing else changes."""
+    if tokens is None:
+        return _without_value(text, _CONTEXT_TABLE, model)
+    return _with_value(text, _CONTEXT_TABLE, model, _literal(tokens))
 
 
 def with_browser_setting(text: str, key: BrowserSetting, value: SettingValue) -> str:
@@ -83,15 +139,29 @@ def with_browser_mode(text: str, mode: BrowserMode) -> str:
     return with_setting(text, "browser", "mode", mode)
 
 
-def _without_setting(settings: JsonObject, table: ConfigTable, key: SettingKey) -> JsonObject:
-    """``settings`` with the one value this module changes left out, and its table too when that leaves it empty (a
-    file without the table and a file with an empty one are the same settings), to compare a file before and after."""
-    values: object = settings.get(table)
+def _without(settings: JsonObject, keys: tuple[str, ...]) -> JsonObject:
+    """``settings`` with the one value at ``keys`` (its tables, then its key) left out, and each of its tables that this
+    leaves empty too (a file without the table and a file with an empty one are the same settings), to compare a file
+    before and after."""
+    first, *rest = keys
+    if not rest:
+        return {key: value for key, value in settings.items() if key != first}
+    values: object = settings.get(first)
     if not isinstance(values, dict):
         return settings
-    others: JsonObject = {key_: value for key_, value in settings.items() if key_ != table}
-    remaining: JsonObject = {key_: value for key_, value in values.items() if key_ != key}
-    return {**others, table: remaining} if remaining else others
+    others: JsonObject = {key: value for key, value in settings.items() if key != first}
+    remaining: JsonObject = _without(values, tuple(rest))
+    return {**others, first: remaining} if remaining else others
+
+
+def _value_at(settings: JsonObject, keys: tuple[str, ...]) -> object:
+    """The value at ``keys`` in ``settings``, ``None`` where there is none."""
+    value: object = settings
+    for key in keys:
+        if not isinstance(value, dict):
+            return None
+        value = value.get(key)
+    return value
 
 
 def _parse(text: str, path: Path) -> JsonObject:
@@ -101,10 +171,9 @@ def _parse(text: str, path: Path) -> JsonObject:
         raise ConfigError("config file is not valid TOML", {"path": str(path), "error": str(error)}) from error
 
 
-def _by_hand(table: ConfigTable, key: SettingKey, value: SettingValue, path: Path, reason: str) -> ConfigError:
+def _by_hand(by_hand: str, path: Path, reason: str) -> ConfigError:
     return ConfigError(
-        f"the config file could not be changed automatically; add {key} = {_literal(value)} under [{table}] by hand",
-        {"path": str(path), "reason": reason},
+        f"the config file could not be changed automatically; {by_hand} by hand", {"path": str(path), "reason": reason}
     )
 
 
@@ -140,19 +209,49 @@ def set_setting(path: Path, table: ConfigTable, key: SettingKey, value: SettingV
     """Write ``[table] key = value`` into the config file at ``path`` (created when missing). The result is parsed again
     before it replaces the file: it must hold the new value and every other setting unchanged, or nothing is
     written."""
+    _edit(
+        path,
+        (table, key),
+        value,
+        lambda text: with_setting(text, table, key, value),
+        f"add {key} = {_literal(value)} under [{table}]",
+    )
+
+
+def set_context_size(path: Path, model: str, tokens: int | None) -> None:
+    """Write the context size of ``model`` into ``[models.context]`` of the config file at ``path`` (created when
+    missing), or take it out for ``None``; the result is checked as :func:`set_setting` checks its own."""
+    _edit(
+        path,
+        ("models", "context", model),
+        tokens,
+        lambda text: with_context_size(text, model, tokens),
+        f"remove {_written_key(model)} from [{_CONTEXT_TABLE}]"
+        if tokens is None
+        else f"add {_written_key(model)} = {tokens} under [{_CONTEXT_TABLE}]",
+    )
+
+
+def _edit(
+    path: Path, keys: tuple[str, ...], value: SettingValue | None, change: Callable[[str], str], by_hand: str
+) -> None:
+    """Replace the config file at ``path`` with ``change`` of its text, once the result, parsed again, holds ``value`` at
+    ``keys`` (nothing there for ``None``) and every other setting unchanged; else nothing is written and the error says
+    to do ``by_hand`` by hand."""
     with _EDITING:
         before: str = path.read_text(encoding="utf-8") if path.exists() else ""
         old_settings: JsonObject = _parse(before, path)
-        after: str = with_setting(before, table, key, value)
+        after: str = change(before)
         try:
             new_settings: JsonObject = tomllib.loads(after)
         except tomllib.TOMLDecodeError as error:
-            raise _by_hand(table, key, value, path, f"the edited file is not valid TOML: {error}") from error
-        values: object = new_settings.get(table)
-        if not isinstance(values, dict) or values.get(key) != value:
-            raise _by_hand(table, key, value, path, "the edited file does not hold the new value")
-        if _without_setting(new_settings, table, key) != _without_setting(old_settings, table, key):
-            raise _by_hand(table, key, value, path, "the edit changed another setting")
+            raise _by_hand(by_hand, path, f"the edited file is not valid TOML: {error}") from error
+        held: object = _value_at(new_settings, keys)
+        # A type of its own as well: TOML's true is not an integer 1, nor a string "true".
+        if held != value or (value is not None and type(held) is not type(value)):
+            raise _by_hand(by_hand, path, "the edited file does not hold the new value")
+        if _without(new_settings, keys) != _without(old_settings, keys):
+            raise _by_hand(by_hand, path, "the edit changed another setting")
         path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
         descriptor, temporary = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
         try:

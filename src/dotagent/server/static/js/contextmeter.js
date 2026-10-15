@@ -1,8 +1,8 @@
 // The context meter of a run's composer (item 222), after T3 Code's: a ring of how much of the run's context budget its
 // last step filled, and on a click what that is: the tokens the step sent the model against the budget past which Dot
 // summarizes the older part of the run, the model's whole window, and why the budget is smaller and where it is set
-// (item 239). The run's scaffold event gives the budget and the window, each step's assistant event what its prompt
-// held; nothing is asked of the model.
+// (item 239), and the context size chosen for the model in Settings › Models (item 250). The run's scaffold event gives
+// the budget, the window and the size, each step's assistant event what its prompt held; nothing is asked of the model.
 
 import { compact, el, svg } from "./dom.js";
 import { anchoredPopover } from "./popover.js";
@@ -12,12 +12,16 @@ const NEAR_SHARE = 0.8;
 
 /**
  * The meter for the composer whose box is `frame` (where its panel opens). Returns `element` (a button, hidden until the
- * meter knows the budget and a step's prompt), `setBudget(contextTokens, window)` (the scaffold event's; `window` is
- * null when the provider does not say), `setUsed(tokens)` (what a step sent) and `dispose()`.
+ * meter knows the budget and a step's prompt), `setBudget({ contextTokens, window, chosen, summariseAt })` (the scaffold
+ * event's; `window` is null when the provider does not say, `chosen` when no size was chosen for the model, and
+ * `summariseAt`, the prompt past which the run summarizes, for a run of before item 250), `setUsed(tokens)` (what a
+ * step sent) and `dispose()`.
  */
 export function createContextMeter({ frame }) {
   let budget = null;
   let modelWindow = null;
+  let chosen = null;
+  let summariseAt = null;
   let used = null;
   const fill = svg("circle", { class: "context-ring-fill", cx: "9", cy: "9", r: "7", pathLength: "100", "stroke-dasharray": "0 100" });
   const ring = svg(
@@ -45,17 +49,26 @@ export function createContextMeter({ frame }) {
       el(
         "p",
         { class: "context-meter-text" },
-        `The run's last step sent the model ${used.toLocaleString("en-GB")} tokens. Past ${budget.toLocaleString("en-GB")}, the run's budget, Dot summarizes its older part.`,
+        summariseAt === null
+          ? `The run's last step sent the model ${used.toLocaleString("en-GB")} tokens. Past ${budget.toLocaleString("en-GB")}, the run's budget, Dot summarizes its older part.`
+          : `The run's last step sent the model ${used.toLocaleString("en-GB")} tokens. Past ${summariseAt.toLocaleString("en-GB")}, Dot summarizes its older part, so the run stays within its budget of ${budget.toLocaleString("en-GB")}.`,
       ),
       modelWindow === null ? null : el("p", { class: "context-meter-text" }, `The model holds ${modelWindow.toLocaleString("en-GB")} tokens.`),
-      // Why the budget is smaller than the window, and where it is set (item 239).
-      el(
-        "p",
-        { class: "context-meter-text" },
-        "Each step sends the model the whole run again, so a run kept within its budget is answered sooner and costs less. ",
-        el("code", null, "[agent] context_tokens"),
-        " in config.toml sets the budget, up to three quarters of the model's window.",
-      ),
+      // Why the budget is smaller than the window, and where it is set (items 239 and 250).
+      chosen === null
+        ? el(
+            "p",
+            { class: "context-meter-text" },
+            "Each step sends the model the whole run again, so a run kept within its budget is answered sooner and costs less. ",
+            el("code", null, "[agent] context_tokens"),
+            " in config.toml sets the budget, and Settings › Models one model's own, up to three quarters of the model's window.",
+          )
+        : el(
+            "p",
+            { class: "context-meter-text" },
+            "Each step sends the model the whole run again, so a run kept within its budget is answered sooner and costs less. ",
+            `The context size chosen for this model in Settings › Models, ${chosen.toLocaleString("en-GB")} tokens, sets the budget, up to three quarters of its window.`,
+          ),
     ];
   }
 
@@ -78,9 +91,11 @@ export function createContextMeter({ frame }) {
 
   return {
     element,
-    setBudget(contextTokens, windowTokens) {
+    setBudget({ contextTokens, window: windowTokens, chosen: chosenTokens, summariseAt: summariseTokens }) {
       budget = contextTokens;
       modelWindow = windowTokens;
+      chosen = chosenTokens;
+      summariseAt = summariseTokens;
       paint();
     },
     setUsed(tokens) {

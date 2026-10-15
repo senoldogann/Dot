@@ -83,6 +83,7 @@ class Models:
                 thinking=model == "thinker",
                 context_length=_CONTEXT_LENGTH,
                 own_context_length=None,
+                window_source="assumed",
                 efforts=("low", "medium", "high") if model == "thinker" else (),
                 free=False,
             )

@@ -15,6 +15,9 @@ Effort = Literal["off", "on", "minimal", "low", "medium", "high", "xhigh", "max"
 # How fast a model writes its answer (item 223): ``fast`` is the faster output some Claude models offer at a higher
 # price (``llm/anthropic.py``), ``standard`` every other model's.
 Speed = Literal["standard", "fast"]
+# Where a model's window comes from (item 250): its provider's API names it, Dot's table of the windows its provider
+# publishes holds it, Dot assumes it for a model neither names, or it is the window Dot asks Ollama for (num_ctx).
+WindowSource = Literal["provider", "published", "assumed", "asked"]
 
 INVALID_ARGUMENTS_KEY: str = "__invalid_arguments__"
 
@@ -106,8 +109,9 @@ class StreamDelta(FrozenModel):
 class ModelInfo(FrozenModel):
     """What a model offers. ``context_length`` is the number of tokens one request (prompt and reply) can hold, ``None``
     when the provider does not say; ``own_context_length`` is the model's own window where Dot asks for less of it (an
-    Ollama model past ``num_ctx``), else ``None``. ``efforts`` are its reasoning levels, lowest first; fewer than two
-    means no choice. ``free``: the provider serves it at no cost."""
+    Ollama model past ``num_ctx``), else ``None``; ``window_source`` says where ``context_length`` comes from, ``None``
+    with it. ``efforts`` are its reasoning levels, lowest first; fewer than two means no choice. ``free``: the provider
+    serves it at no cost."""
 
     id: str
     vision: bool
@@ -115,6 +119,7 @@ class ModelInfo(FrozenModel):
     thinking: bool
     context_length: int | None
     own_context_length: int | None
+    window_source: WindowSource | None
     efforts: tuple[Effort, ...]
     free: bool
 

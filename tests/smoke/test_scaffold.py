@@ -1,6 +1,7 @@
 """The scaffold in the real loop: a model with a small window gets a context budget and tool output cut to fit it and
-compacts where a model with a large window does not; a model of the weak tier is reminded of its goal every few steps;
-a window too small for the fixed part of the prompt refuses the run before the model is asked anything.
+compacts where a model with a large window does not; a context size chosen for the model sets the budget, the tool
+output and the point of summary of its next run (item 250); a model of the weak tier is reminded of its goal every few
+steps; a window too small for the fixed part of the prompt refuses the run before the model is asked anything.
 
 No network and no model service is used: the scripted model plays the run, reports the window each case needs, writes
 the summaries of a compaction, and reports as the size of each prompt the size the loop estimates for it.
@@ -214,6 +215,12 @@ async def _play_with(config: AppConfig, login_env: dict[str, str], model: Window
     )
 
 
+def _sized(context: dict[str, int]) -> AppConfig:
+    """The configuration of these runs with ``context`` as the context sizes chosen for models (item 250)."""
+    config: AppConfig = _config({}, 6)
+    return config.model_copy(update={"models": config.models.model_copy(update={"context": context})})
+
+
 def _turn(*calls: ScriptedCall) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=calls)
 
@@ -242,17 +249,39 @@ def _said(request: ChatRequest) -> str:
     return "\n".join(message.content for message in request.messages)
 
 
-def _scaffold(window: int | None, context_tokens: int, output_chars: int, cut: bool) -> JsonObject:
+def _scaffold(
+    window: int | None, chosen: int | None, context_tokens: int, summarise_at: int, output_chars: int, cut: bool
+) -> JsonObject:
     return {
         "model": SCRIPTED_MODEL,
         "window": window,
+        "chosen": chosen,
         "context_tokens": context_tokens,
+        "summarise_at": summarise_at,
         "tool_output_chars": output_chars,
         "cut_to_window": cut,
         "tier": "standard",
         "reason": '[agent] scaffold is "fixed"',
         "reminder_every": None,
     }
+
+
+async def test_a_size_chosen_for_the_model_sets_the_budget_the_tool_output_and_the_point_of_summary(
+    login_env: dict[str, str],
+) -> None:
+    # Above [agent] context_tokens the budget and the point of summary rise and the tool output stays at its most;
+    # below it all three fall in proportion; past three quarters of the window the window cuts the size (item 250).
+    turns: list[ScriptedTurn] = _reading(2)
+    large: Played = await _play(_sized({SCRIPTED_MODEL: 192_000}), login_env, 1_000_000, turns)
+    small: Played = await _play(_sized({SCRIPTED_MODEL: 64_000}), login_env, 1_000_000, turns)
+    cut: Played = await _play(_sized({SCRIPTED_MODEL: 192_000}), login_env, 204_800, turns)
+    other: Played = await _play(_sized({"anthropic:claude-opus-5-5": 192_000}), login_env, 1_000_000, turns)
+    assert large.scaffolds == (_scaffold(1_000_000, 192_000, 192_000, 163_200, 12_000, False),)
+    assert small.scaffolds == (_scaffold(1_000_000, 64_000, 64_000, 54_400, 8_000, False),)
+    assert cut.scaffolds == (_scaffold(204_800, 192_000, 153_600, 153_600, 12_000, True),)
+    # A size chosen for another model leaves this one's as [agent] context_tokens has it.
+    assert other.scaffolds == (_scaffold(1_000_000, None, 96_000, 81_600, 12_000, False),)
+    assert {large.record.status, small.record.status, cut.record.status, other.record.status} == {"done"}
 
 
 async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_compacts_to_stay_inside(
@@ -266,8 +295,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     small: Played = await _play(_config({}, 6), login_env, 28_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(28_000, 21_000, 2625, True),)
-    assert roomy.scaffolds == (_scaffold(None, 96_000, 12_000, False),)
+    assert small.scaffolds == (_scaffold(28_000, None, 21_000, 21_000, 2625, True),)
+    assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
     small_pages: list[str] = _pages(small)
@@ -419,7 +448,7 @@ async def test_a_window_too_small_for_the_fixed_part_of_the_prompt_refuses_the_r
 ) -> None:
     # Three quarters of 4096 tokens cannot hold even the system prompt.
     played: Played = await _play(_config({}, 6), login_env, 4096, [DONE])
-    assert played.scaffolds == (_scaffold(4096, 3072, 2000, True),)
+    assert played.scaffolds == (_scaffold(4096, None, 3072, 3072, 2000, True),)
     assert played.record.status == "failed"
     assert "the model's window is too small for the system prompt and the tool definitions" in played.record.result
     assert played.steps == ()

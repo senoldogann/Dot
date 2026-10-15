@@ -313,44 +313,224 @@ function reasoningControl(model) {
   return reasoningSelect(model, `Reasoning level of ${model.ref}`);
 }
 
-/** The window a model gets, and its own beside it when Dot asks for less of it (item 221). */
-function contextCell(model) {
-  if (model.context_length === null) {
-    return el("td", { class: "muted" }, NOT_SET);
-  }
-  const used = `${compact(model.context_length)} tokens`;
-  if (model.own_context_length === null) {
-    return el("td", { class: "muted" }, used);
-  }
-  const title = `Dot asks for ${model.context_length.toLocaleString()} tokens ([providers.ollama] num_ctx or num_ctx_cloud); the model takes ${model.own_context_length.toLocaleString()}.`;
-  return el("td", { class: "muted", title }, `${used} of ${compact(model.own_context_length)}`);
+// The days of runs the context evidence of a model is drawn from (routes_system.py).
+const EVIDENCE_DAYS = 30;
+// Where a model's window comes from (llm/types.py WindowSource), as the context facts say it.
+const WINDOW_SOURCES = {
+  provider: (provider) => `${providerLabel(provider)} gives it for the model.`,
+  published: (provider) => `${providerLabel(provider)} publishes it; Dot keeps it in its table of models.`,
+  assumed: (provider) => `${providerLabel(provider)} does not say it, so Dot assumes it.`,
+  asked: () => "It is the window Dot asks Ollama to give the model: [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model.",
+};
+
+function tokens(count) {
+  return count.toLocaleString("en-GB");
 }
 
-function modelRow(model, mainModel) {
-  return el(
-    "tr",
-    null,
+/** The sizes a model's context may be given (item 250): Dot's default first, then the others, the largest marked. */
+function sizeOptions(context) {
+  return [
+    el("option", { value: "" }, `${compact(context.default)} (default)`),
+    ...context.sizes.map((size) => el("option", { value: String(size) }, size === context.ceiling ? `${compact(size)} (most)` : compact(size))),
+  ];
+}
+
+/** What a model's context size does and where its numbers come from (item 250). */
+function contextFacts(model) {
+  const context = model.context;
+  const provider = providerOf(model.ref);
+  const own = model.own_context_length === null ? "" : ` The model's own window is ${tokens(model.own_context_length)} tokens; a larger num_ctx gives it more of it.`;
+  const cut = context.default < context.configured ? `; three quarters of this model's window cut it to ${tokens(context.default)}` : "";
+  return [
     el(
-      "td",
+      "p",
       null,
-      el("span", { class: "mono" }, model.ref),
-      model.ref === mainModel ? el("span", { class: "badge b-info" }, "default") : null,
+      "Each step sends the model the whole run again: its instructions, its tools, the request and all that was done since. ",
+      `Once a step sends more than ${tokens(context.summarise_at)} tokens, Dot summarizes the run's older part, so the run stays within its ${tokens(context.tokens)}.`,
     ),
-    el("td", null, capabilities(model)),
-    el("td", { class: "reasoning-cell" }, reasoningControl(model)),
-    contextCell(model),
+    el(
+      "p",
+      null,
+      "A larger size means fewer summaries, and each summary drops detail of the older part and takes a call of the fast model. ",
+      "But every step then sends more, so it is answered more slowly and costs more on a key that is billed by the token. A smaller size works the other way round.",
+    ),
+    el(
+      "dl",
+      { class: "context-facts" },
+      el("dt", null, "Window"),
+      el(
+        "dd",
+        null,
+        model.context_length === null
+          ? `${providerLabel(provider)} does not say how many tokens the model holds, so no size can be chosen for it.`
+          : `${tokens(model.context_length)} tokens. ${WINDOW_SOURCES[model.window_source](provider)}${own}`,
+      ),
+      el("dt", null, "Largest size"),
+      el(
+        "dd",
+        null,
+        context.ceiling === null
+          ? NOT_SET
+          : `${tokens(context.ceiling)} tokens, three quarters of the window: the rest is room for the reply and for the error of Dot's count of the tokens.`,
+      ),
+      el("dt", null, "Dot's default"),
+      el(
+        "dd",
+        null,
+        `${tokens(context.configured)} tokens, [agent] context_tokens in config.toml, for every model without a size of its own${cut}. `,
+        "Dot comes with 96,000: in a run of 41 steps it measured, 48,000 summarized twice and 96,000 not once, while each step sent a quarter more.",
+      ),
+      el("dt", null, "Smallest size"),
+      el("dd", null, `${tokens(context.floor)} tokens: a run's first step alone sends its instructions, its tools and the request.`),
+    ),
+    // The native replaceChildren writes a null as text: the note of a window too small for any size is left out instead.
+    ...(context.sizes.length === 0 && context.ceiling !== null
+      ? [el("p", { class: "hint" }, "Three quarters of this window are below the smallest size, so its runs keep Dot's default; for an Ollama model a larger num_ctx gives it more.")]
+      : []),
+  ];
+}
+
+/** The seconds of a step by its input, as a small table: the buckets the model's steps fell in. */
+function bucketTable(buckets) {
+  const rows = buckets.map((bucket) => {
+    const label = bucket.up_to === null ? `over ${compact(bucket.above)}` : bucket.above === 0 ? `up to ${compact(bucket.up_to)}` : `${compact(bucket.above)} to ${compact(bucket.up_to)}`;
+    return el("tr", null, el("td", null, label), el("td", null, tokens(bucket.steps)), el("td", null, `${bucket.seconds_median.toFixed(1)} s`));
+  });
+  return el(
+    "table",
+    { class: "table context-buckets" },
+    el("thead", null, el("tr", null, el("th", null, "A step's input"), el("th", null, "Steps"), el("th", null, "Seconds at the median"))),
+    el("tbody", null, rows),
   );
 }
 
-function modelTable(provider, mainModel) {
+/** What the model's runs of the last 30 days measured (GET /api/models/context). */
+function evidenceFacts(evidence) {
+  if (evidence.steps === 0) {
+    return [el("p", { class: "hint" }, `Nothing is measured yet: no step of this model answered in the last ${EVIDENCE_DAYS} days.`)];
+  }
+  const sent = `A step sent ${tokens(evidence.input_median)} tokens at the median, ${tokens(evidence.input_p95)} or fewer in 95% of steps and ${tokens(evidence.input_max)} at most.`;
+  const cached = evidence.cached_share === null ? "" : ` ${Math.round(evidence.cached_share * 100)}% of it the provider served from its cache.`;
+  const first = evidence.first_step_median === null ? "" : ` A run's first step sent ${tokens(evidence.first_step_median)} at the median.`;
+  const summaries =
+    evidence.compactions === 0
+      ? "No run was summarized."
+      : `${plural(evidence.compactions, "summary", "summaries")} in ${plural(evidence.compacted_runs, "run", "runs")}.`;
+  return [
+    el("p", null, `${plural(evidence.steps, "step", "steps")} in ${plural(evidence.runs, "run", "runs")}. ${sent}${cached}${first}`),
+    el("p", null, summaries),
+    bucketTable(evidence.buckets),
+  ];
+}
+
+/**
+ * The context size of a model's runs (item 250): a menu of the sizes it may be given, Dot's default first, beside its
+ * window, and a Why button that opens a row under the model's with what the size does and what the model's runs of the
+ * last 30 days measured. A model whose window allows no other size shows its budget as text. A choice holds from the
+ * model's next run; the menu shows what the daemon answered, and `remember(model)` keeps it for the models' list.
+ */
+function contextControl(initial, remember) {
+  let model = initial;
+  const name = modelName(model.ref);
+  // Every other character spelled out by its code, so that two references never share an id.
+  const whyId = `context-why-${[...model.ref].map((char) => (/[A-Za-z0-9-]/.test(char) ? char : `_${char.codePointAt(0).toString(16)}_`)).join("")}`;
+  const select = el("select", { class: "select sm", "aria-label": `Context size of ${model.ref}` });
+  const why = el("button", { class: "btn ghost sm", type: "button", "aria-expanded": "false", "aria-controls": whyId, "aria-label": `Why: the context size of ${model.ref}` }, "Why");
+  const evidence = el("div", { class: "context-evidence" });
+  const facts = el("div", { class: "context-why-facts" });
+  const body = el("div", { class: "context-why-body" }, el("h4", null, `Context size of ${name}`), facts, el("h4", null, `This model's runs, last ${EVIDENCE_DAYS} days`), evidence);
+  const row = el("tr", { class: "context-why", id: whyId, hidden: true }, el("td", { colspan: "4" }, body));
+  const text = el("span", null);
+  const windowText = el("span", { class: "muted" });
+  const cell = el("td", { class: "context-cell" }, el("span", { class: "row" }, select, text, windowText, why));
+
+  function paint() {
+    const context = model.context;
+    const choosable = context.sizes.length > 0;
+    select.hidden = !choosable;
+    text.hidden = choosable;
+    if (choosable) {
+      select.replaceChildren(...sizeOptions(context));
+      select.value = context.chosen === null ? "" : String(context.chosen);
+    }
+    text.textContent = compact(context.tokens);
+    // The window, and the model's own beside it when Dot asks Ollama for less of it (item 221).
+    const own = model.context_length === null || model.own_context_length === null ? null : model.own_context_length;
+    windowText.textContent = model.context_length === null ? "" : own === null ? `of ${compact(model.context_length)}` : `of ${compact(model.context_length)} (own ${compact(own)})`;
+    windowText.title = own === null ? "" : `Dot asks for ${tokens(model.context_length)} tokens ([providers.ollama] num_ctx or num_ctx_cloud); the model takes ${tokens(own)}.`;
+    facts.replaceChildren(...contextFacts(model));
+  }
+
+  async function loadEvidence() {
+    evidence.replaceChildren(inlineLoading());
+    try {
+      const found = await api.get(`/models/context?model=${encodeURIComponent(model.ref)}`);
+      evidence.replaceChildren(...evidenceFacts(found));
+    } catch (error) {
+      evidence.replaceChildren(inlineError(error, () => attempt(loadEvidence)));
+    }
+  }
+
+  why.addEventListener("click", () => {
+    const open = row.hidden;
+    row.hidden = !open;
+    why.setAttribute("aria-expanded", String(open));
+    if (open) {
+      attempt(loadEvidence);
+    }
+  });
+
+  // Each choice is sent once the one before it was answered, so the last one made holds.
+  let making = Promise.resolve();
+  select.addEventListener("change", () => {
+    const size = select.value === "" ? null : Number(select.value);
+    making = making.then(() =>
+      attempt(async () => {
+        try {
+          model = await api.put("/models/context", { model: model.ref, tokens: size });
+          remember(model);
+          forgetModels();
+          toast("ok", size === null ? `${name} gets Dot's default context size from its next run.` : `${name} gets a context size of ${tokens(size)} tokens from its next run.`);
+        } finally {
+          paint();
+        }
+      }),
+    );
+  });
+
+  paint();
+  return { cell, row };
+}
+
+function modelRows(model, mainModel, remember) {
+  const context = contextControl(model, remember);
+  return [
+    el(
+      "tr",
+      null,
+      el(
+        "td",
+        null,
+        el("span", { class: "mono" }, model.ref),
+        model.ref === mainModel ? el("span", { class: "badge b-info" }, "default") : null,
+      ),
+      el("td", null, capabilities(model)),
+      el("td", { class: "reasoning-cell" }, reasoningControl(model)),
+      context.cell,
+    ),
+    context.row,
+  ];
+}
+
+function modelTable(provider, mainModel, remember) {
   return el(
     "div",
-    { class: "table-scroll" },
+    { class: "table-scroll models-scroll" },
     el(
       "table",
       { class: "table wide" },
       el("thead", null, el("tr", null, el("th", null, "Model"), el("th", null, "Can"), el("th", null, "Reasoning"), el("th", null, "Context"))),
-      el("tbody", null, provider.models.map((model) => modelRow(model, mainModel))),
+      el("tbody", null, provider.models.map((model) => modelRows(model, mainModel, remember))),
     ),
   );
 }
@@ -388,14 +568,14 @@ function problemNote(provider, inUse) {
   );
 }
 
-function providerBody(provider, mainModel, inUse) {
+function providerBody(provider, mainModel, inUse, remember) {
   if (provider.error !== null) {
     return problemNote(provider, inUse);
   }
   if (provider.models.length === 0) {
     return el("div", { class: "hint" }, "This provider lists no models.");
   }
-  return modelTable(provider, mainModel);
+  return modelTable(provider, mainModel, remember);
 }
 
 // The badge of a provider that answered with a refusal: of its key (HTTP 401) or of the access (HTTP 403).
@@ -412,7 +592,7 @@ function problemBadge(provider, inUse) {
 }
 
 /** One provider as a fold: open when it owns the default model or fails, so the cause is in sight. */
-function providerBlock(provider, mainModel, inUse) {
+function providerBlock(provider, mainModel, inUse, remember) {
   const ownsMain = provider.models.some((model) => model.ref === mainModel);
   return foldGroup({
     id: `system-models-${provider.provider}`,
@@ -423,7 +603,7 @@ function providerBlock(provider, mainModel, inUse) {
       provider.error === null ? el("span", { class: "hint" }, plural(provider.models.length, "model", "models")) : null,
       problemBadge(provider, inUse),
     ),
-    body: providerBody(provider, mainModel, inUse),
+    body: providerBody(provider, mainModel, inUse, remember),
     openByDefault: ownsMain || isFailing(provider, inUse),
   });
 }
@@ -578,8 +758,17 @@ function buildModels(isDisposed) {
     for (const { role, control } of roles) {
       control.paint(providers, status === null ? "" : status.models[role]);
     }
-    list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider))));
+    list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider), remember)));
     cueTables();
+  }
+
+  // A context size chosen in a model's row (item 250): the list keeps the model as the daemon answered, so the tables
+  // built again later show it; the rows built now show it already.
+  function remember(updated) {
+    providers = providers.map((provider) => ({ ...provider, models: provider.models.map((model) => (model.ref === updated.ref ? updated : model)) }));
+    if (painted !== null) {
+      painted = { ...painted, providers };
+    }
   }
 
   async function load() {

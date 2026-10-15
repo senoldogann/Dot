@@ -1130,7 +1130,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         meter.setUsed(inputTokens);
       }
     },
-    onScaffold: ({ context_tokens: contextTokens, window: modelWindow }) => meter.setBudget(contextTokens, modelWindow),
+    onScaffold: (scaffold) => meter.setBudget(scaffold),
     onCalls: ({ calls, failed }) => {
       seen.calls = calls;
       seen.failed = failed;

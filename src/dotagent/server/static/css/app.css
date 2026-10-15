@@ -852,6 +852,91 @@ a.pill:hover {
   width: 10.5rem;
 }
 
+/* The context size of a model (item 250): its menu, its window and the Why button on one line; the menus line up. */
+.context-cell .select {
+  width: 8.5rem;
+}
+
+/* The row that says what a model's context size does. Its text wraps; on a narrow window the table scrolls sideways
+   and the text stays in sight, no wider than the part of the table in sight (the scroll box's width, less the cell's
+   padding on each side), so that it can keep its place however far the table is scrolled. */
+.models-scroll {
+  container-type: inline-size;
+}
+
+.table.wide tr.context-why > td {
+  height: auto;
+  white-space: normal;
+  background: var(--surface-2);
+}
+
+/* It stays in sight while the table scrolls sideways, and ends before the 40px the edge fades over (.table-scroll). */
+.context-why-body {
+  position: sticky;
+  left: 16px;
+  display: grid;
+  gap: 8px;
+  max-width: min(76ch, calc(100cqi - 56px));
+  padding: 4px 0 8px;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+.context-why-body h4 {
+  margin: 4px 0 0;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+  color: var(--text);
+}
+
+.context-why-body p {
+  margin: 0;
+}
+
+.context-why-facts,
+.context-evidence {
+  display: grid;
+  gap: 8px;
+}
+
+.context-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 16px;
+  margin: 0;
+}
+
+.context-facts dt {
+  color: var(--muted);
+}
+
+.context-facts dd {
+  margin: 0;
+}
+
+.table.context-buckets {
+  width: auto;
+  justify-self: start;
+}
+
+.table.context-buckets th,
+.table.context-buckets td {
+  height: auto;
+  padding: 4px 24px 4px 0;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 600px) {
+  .context-facts {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+
+  .context-facts dd {
+    margin-bottom: 8px;
+  }
+}
+
 .input.mono,
 .textarea.mono {
   font-family: var(--mono);

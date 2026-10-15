@@ -35,6 +35,7 @@ def render_profile(profile: ModelProfile, scaffold: Scaffold) -> list[str]:
         ]
     )
     window: str = "not reported by its provider" if scaffold.window is None else f"{scaffold.window:,} tokens"
+    chosen: str = "" if scaffold.chosen is None else f" (its size of {scaffold.chosen:,} chosen in Settings › Models)"
     reminders: str = (
         "no reminders of the goal"
         if scaffold.reminder_every is None
@@ -43,7 +44,7 @@ def render_profile(profile: ModelProfile, scaffold: Scaffold) -> list[str]:
     return [
         *measured,
         "Its next run:",
-        f"  window {window}, context budget {scaffold.context_tokens:,} tokens, "
+        f"  window {window}, context budget {scaffold.context_tokens:,} tokens{chosen}, "
         f"tool output up to {scaffold.tool_output_chars:,} characters",
         f"  tier {scaffold.tier}: {scaffold.reason}",
         f"  {reminders}",
@@ -59,7 +60,8 @@ async def cmd_models_profile(command: ModelsProfileCommand) -> int:
     finally:
         await router.aclose()
     profile: ModelProfile = await asyncio.to_thread(read_model_profile, db_path(), ref.label, PROFILE_RUNS)
-    sys.stdout.write("\n".join(render_profile(profile, scaffold_for(config.agent, info, profile))) + "\n")
+    scaffold: Scaffold = scaffold_for(config.agent, info, profile, config.models.context.get(ref.label))
+    sys.stdout.write("\n".join(render_profile(profile, scaffold)) + "\n")
     return 0
 
 
