@@ -6,7 +6,7 @@ from fastapi import APIRouter
 from pydantic import JsonValue
 
 from dotagent.browser.attach import INSPECT_PAGE, ChromeState, inspect_chrome
-from dotagent.browser.modes import adopt_mode
+from dotagent.browser.modes import adopt_mode, open_users_chrome
 from dotagent.browser.session import BrowserSession
 from dotagent.config_edit import set_browser_mode, set_browser_setting
 from dotagent.core.errors import RunConflict
@@ -41,7 +41,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
             raise RunConflict("the browser cannot be switched while runs are active", {"active_runs": active})
-        await adopt_mode(session, request.mode)
+        await adopt_mode(session, request.mode, open_users_chrome)
         await asyncio.to_thread(set_browser_mode, config_path(), request.mode)
         return await state()
 

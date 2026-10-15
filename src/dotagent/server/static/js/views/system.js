@@ -833,17 +833,24 @@ function buildTokenCard() {
 
 const BROWSER_MODES = [
   { id: "own", label: "Own Chrome", hint: "A Chrome profile of Dot's own, signed in to nothing" },
-  { id: "attach", label: "My Chrome", hint: "The Chrome you have open, with your profiles and sign-ins" },
+  { id: "attach", label: "My Chrome", hint: "Your Chrome, with your profiles and sign-ins; Dot opens it when it is closed" },
 ];
 
 /**
  * Which Chrome the agent browses with. Switching to "My Chrome" needs Chrome to allow remote debugging, which only the
- * user can switch on; the card shows what Chrome allows right now and how to change it.
+ * user can switch on; the card shows what Chrome allows right now and how to change it. A Chrome that is closed is
+ * opened by the switch (item 261), and while the switch is under way the card says what it waits for.
  */
 function buildBrowser(isDisposed) {
   let view = null;
   const facts = el("dl", { class: "kv kv-pairs" }, inlineLoading());
   const problem = el("div", { class: "note bad", hidden: true }, icon("alert"), el("span"));
+  const waiting = el(
+    "div",
+    { class: "note", role: "status", hidden: true },
+    icon("clock"),
+    el("span", null, "Connecting to your Chrome; Dot opens it when it is closed. When Chrome asks whether Dot may connect, choose Allow."),
+  );
   const steps = el("ol", { class: "browser-steps" });
   const modes = segmented(BROWSER_MODES, BROWSER_MODES[0].id, (id) => attempt(() => choose(id)));
   const raise = switchSetting({
@@ -913,46 +920,58 @@ function buildBrowser(isDisposed) {
     steps.replaceChildren(
       copyStep(),
       el("li", null, "Chrome asks once whether Dot may connect; choose Allow."),
-      el("li", null, "Choose My Chrome above, or run ", el("code", { class: "mono" }, "dotx browser attach"), " in a terminal."),
+      el("li", null, "Choose My Chrome above (Dot opens Chrome when it is closed), or run ", el("code", { class: "mono" }, "dotx browser attach"), " in a terminal while Chrome is open."),
     );
   }
 
-  async function load() {
+  // Read how Chrome stands now and paint it; false when the card is gone or the read failed, whose error it shows.
+  async function read() {
     try {
       const found = await api.get("/browser");
       if (isDisposed()) {
-        return;
+        return false;
       }
       view = found;
     } catch (error) {
       if (!isDisposed()) {
         facts.replaceChildren(inlineError(error, () => attempt(load)));
       }
-      return;
+      return false;
     }
-    problem.hidden = true;
     paint();
+    return true;
+  }
+
+  async function load() {
+    if (await read()) {
+      problem.hidden = true;
+    }
   }
 
   async function choose(id) {
     if (view === null || id === view.mode) {
       return;
     }
+    problem.hidden = true;
+    waiting.hidden = id !== "attach";
     let changed;
     try {
       changed = await api.post("/browser/mode", { mode: id });
     } catch (error) {
       if (!isDisposed()) {
+        waiting.hidden = true;
         modes.set(view.mode);
         complain(error.message);
+        // The switch may have opened Chrome meanwhile: the facts say how it stands now.
+        await read();
       }
       return;
     }
     if (isDisposed()) {
       return;
     }
+    waiting.hidden = true;
     view = changed;
-    problem.hidden = true;
     paint();
     toast("ok", `Browsing with ${BROWSER_MODES.find((mode) => mode.id === view.mode).label}.`);
   }
@@ -975,6 +994,7 @@ function buildBrowser(isDisposed) {
       ),
       raise.element,
       facts,
+      waiting,
       problem,
       el("div", { class: "stack tight" }, el("div", { class: "section-label" }, "To let Dot join your Chrome"), steps),
     ),

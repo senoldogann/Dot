@@ -5195,10 +5195,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 254 | A model the plan does not include is paused at once                                   | done        | 8e6cbfb |
 | 255 | The typed judge switches on and off in Settings                                       | done        | b3cddbc |
 | 256 | A failed embedding never fails a run                                                  | done        | a9f8b68 |
-| 257 | A schedule's run knows its earlier runs                                               | in progress |         |
+| 257 | A schedule's run knows its earlier runs                                               | done        | 9e5cd51 |
 | 258 | Only reasoning levels the gateway honours are offered                                 | done        | 3118d17 |
 | 259 | Ultrathink and ultracode as words in the composer                                     | done        | 4a37ee7 |
 | 260 | The compaction notes leave the conversation                                           | done        | a8d8641 |
+| 261 | My Chrome opens Chrome when it is closed                                              | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -11463,7 +11464,7 @@ a smoke test of a run whose embedder fails (the run ends done). They fail on the
 
 ### 257. A schedule's run knows its earlier runs
 
-**Status: in progress.** Built on `item-257-schedule-memory`.
+**Status: done.** Merged as `9e5cd51` (PR #304; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-15).** `scheduler/history.py` (new): `history_digest` and `firing_opening`; the answers are
 quoted with `<` escaped, so none closes the digest, and `Digest` names the runs it shows. `agent/manager.py`
@@ -11569,6 +11570,50 @@ Fails on the code of before.
 > Linear connector is signed out, so say so in the PR. Measure, never assume, that a provider honours a level before
 > offering it; keep the owner's quota and plan details out of the file. UI changes are checked wide and on a phone,
 > light and dark, in Chrome and WebKit.
+
+## Part 45: My Chrome opens Chrome (planned 2026-10-15)
+
+The owner's forty-fifth word, on 2026-10-15: in Settings › Browser a click on My Chrome is not taken, and the card says
+"Chrome is not running; open Chrome and try again".
+
+**Status (2026-10-15): planned.** Measured on this Mac, read only and without names: no Chrome ran when the owner
+clicked, and Chrome's own switch for remote debugging was off (`devtools.remote_debugging.user-enabled` is false in its
+`Local State`). The switch was refused at its first check, rightly; but the message stopped at a step Dot can take
+itself, and a Chrome opened by hand would have met the second refusal (remote debugging off) only at the next click.
+
+### 261. My Chrome opens Chrome when it is closed
+
+**Status: in progress.** Built on `item-261-open-chrome`.
+
+**As built (2026-10-15).** `browser/modes.py`: `reach_chrome` opens a closed Chrome with the opener it is given and
+waits until it runs (`START_TIMEOUT_S`, 30 s) and, while its remote debugging is on, listens (`LISTEN_TIMEOUT_S`, 10
+s); `open_users_chrome` runs `open -b com.google.Chrome` for Chrome's own data directory (`chrome_app_for`) and opens
+nothing for another (`DOT_CHROME_DIR`), whose message stays "Chrome is not running"; `adopt_mode` takes the opener.
+`core/paths.py`: `default_chrome_data_dir`. `browser/attach.py`: `CHROME_NOT_RUNNING`. `server/routes_browser.py`: the
+live switch opens with `open_users_chrome`. `views/system.js`: a note says what the switch waits for while it is under
+way, the card reads Chrome again after a failed one, and the steps and My Chrome's hint say that Dot opens Chrome.
+README: the paragraph of the live switch. Tests: `tests/smoke/test_browser_attach.py` (a closed Chrome opened and
+attached, the opener returning at once as `open` does; one opened with remote debugging off named so, the session
+unchanged; the card in Chrome, wide and on a phone, light and dark, with a WebKit copy run and deleted) and
+`tests/unit/test_attach.py` (an app is opened only for Chrome's own data directory).
+
+**What.** In Settings › Browser (and `POST /api/browser/mode`), choosing My Chrome while the owner's Chrome is closed
+opens Chrome, as a click on its icon does, waits for it, and goes on as before: with remote debugging on, Chrome asks
+for Allow and My Chrome is chosen; with it off, the note says how to turn it on and the card shows Chrome running.
+Runs, campaigns, the doctor and `dotx browser attach` open nothing.
+
+**Why.** The owner chose My Chrome and was told to open Chrome: Dot can take that step itself, and only Chrome's own
+switch and its Allow are left to the owner. A run never opens Chrome unasked: a scheduled run with nobody there would
+leave a Chrome waiting for a click.
+
+**Tests.** As built. The opening itself (`open -b`) is the owner's to see: the tests set `DOT_CHROME_DIR`, for which
+nothing is opened, and start a scratch Chrome in its place.
+
+### How to start part 45 (the handoff prompt)
+
+> Read ROADMAP.md part 45 and the status table of part 9 (row 261). The protocol of part 5 is unchanged; the Linear
+> connector is signed out, so say so in the PR. Tests never open the Chrome of the user: they set `DOT_CHROME_DIR`, for
+> which nothing is opened. UI changes are checked wide and on a phone, light and dark, in Chrome and WebKit.
 
 ## Log
 
@@ -12270,3 +12315,4 @@ Fails on the code of before.
 - 2026-10-15 (Opus 5.5): item 259 merged as `4a37ee7` (PR #301; no Linear issue, the connector was signed out): the word ultrathink or ultracode typed in the composer (a whole word, any case) is the choice for one message of item 251 where the model offers its level: the Reasoning pill reads it and the frame wears a gradient ring; editing a queued message or steering arms nothing.
 - 2026-10-15 (Opus 5.5): item 260 merged as `a8d8641` (PR #302; no Linear issue, the connector was signed out): the timeline shows no note for a compaction: the Details panel's Context fact counts the compactions of the run and of its helpers, and the event stays in the run's record and the API.
 - 2026-10-15 (Opus 5.5): item 256 merged as `a9f8b68` (PR #303; no Linear issue, the connector was signed out): Ollama's 400 or 5xx whose words are a reset, refused or cut-short request to its local runner is a `ProviderRunnerError` the retry policy asks again, the embedder included; when the embedding still fails at a run's start, notes are recalled and skills listed by their words alone, with an `embedding_failed` warning in the timeline and the terminal; the memory's own calls still fail loudly.
+- 2026-10-15 (Opus 5.5): item 257 merged as `9e5cd51` (PR #304; no Linear issue, the connector was signed out): a firing's first message carries, in front of the goal, the dated final answers of the schedule's last ended runs (`[scheduler] history_runs`, 3), quoted and marked as what the schedule found before, while the run keeps the goal alone as its record; with `same_chat` a firing goes on in the chat of the one before; a firing that reads a tainted earlier run starts tainted.
