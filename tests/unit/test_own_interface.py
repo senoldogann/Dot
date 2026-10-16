@@ -5,7 +5,9 @@ another port and the web stay open."""
 import pytest
 
 from dotagent.browser.safety import UrlVerdict, check_browser_url, forbidden_target, request_verdict
-from dotagent.config import ServerConfig
+from dotagent.config import AppConfig, ServerConfig, load_default_config
+from dotagent.core.errors import ToolInputError
+from dotagent.tools.browser import checked_url
 
 SERVER: ServerConfig = ServerConfig(host="127.0.0.1", port=8765, reach=["mac.tail1234.ts.net"])
 
@@ -27,14 +29,31 @@ SERVER: ServerConfig = ServerConfig(host="127.0.0.1", port=8765, reach=["mac.tai
         "http://localhost.:8765/",
         "https://mac.tail1234.ts.net/#/settings",
         "https://mac.tail1234.ts.net./",
-        # The other dots of Unicode and full-width digits, which a browser reads as IDNA does (the code review's Y1).
+        # The other dots of Unicode and full-width digits, which a browser reads as IDNA does, and percent escapes in a
+        # host, which it decodes first (the code review's Y1).
         "http://127\u30020\u30020\u30021:8765/",
         "http://\uff11\uff12\uff17.0.0.1:8765/",
+        "http://127%2e0%2e0%2e1:8765/",
+        "http://%31%32%37.0.0.1:8765/",
+        "http://localhost%2E:8765/",
     ],
 )
 def test_dots_own_interface_is_never_opened(url: str) -> None:
     verdict: UrlVerdict = check_browser_url(url, (), (), SERVER)
     assert not verdict.allowed and "Dot's own interface" in verdict.reason, verdict
+
+
+@pytest.mark.parametrize(
+    "raw",
+    ["127.0.0.1:8765", "localhost:8765/#/approvals", "\uff11\uff12\uff17.0.0.1:8765", "http://127%2e0%2e0%2e1:8765/"],
+)
+def test_the_address_checked_url_gives_the_browser_is_the_one_it_checked(raw: str) -> None:
+    """The code review's Y1: what the model wrote is made a whole address first (a bare host gets its scheme), and
+    that address, the one the browser is given, is the one checked."""
+    config: AppConfig = load_default_config()
+    with pytest.raises(ToolInputError, match="Dot's own interface"):
+        checked_url(raw, config)
+    assert checked_url("example.com", config) == "https://example.com"
 
 
 @pytest.mark.parametrize(
@@ -82,6 +101,8 @@ def test_what_a_page_made_itself_is_let_through_as_a_resource_only(url: str) -> 
         ("https://example.com\\@169.254.169.254/", "backslash"),
         ("http://2852039166/latest/meta-data/", "blocked list"),
         ("http://169.254.169.254./", "blocked list"),
+        ("http://169%2e254%2e169%2e254/latest/meta-data/", "blocked list"),
+        ("http://%ff%fe.example/", "cannot be read"),
     ],
 )
 def test_an_address_a_browser_reads_otherwise_is_refused_or_read_as_the_browser_does(url: str, reason: str) -> None:

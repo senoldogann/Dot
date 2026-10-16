@@ -37,7 +37,7 @@ _PURPOSES: dict[str, str] = {
     "schedule": "goals that run later, once or on a cron expression",
     "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",
     "memory_admin": "correcting or forgetting saved notes",
-    "team": "making a lasting teammate agent for a kind of work that recurs",
+    "team": "making a lasting teammate agent for a role the work needs again or in parallel",
     "pages": "showing a page you write in HTML in the conversation: charts, tables, diagrams, 3D views",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.

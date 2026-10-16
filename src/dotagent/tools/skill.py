@@ -116,7 +116,7 @@ def build_skill_tool() -> RegisteredTool:
         catalog: SkillCatalog = await asyncio.to_thread(
             load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
-        offered: tuple[Skill, ...] = await offered_to_run(config, catalog, ctx.run_id, ctx.agent_id)
+        offered: tuple[Skill, ...] = await offered_to_run(config, catalog, ctx.agent_id)
         found: Skill | None = next((entry for entry in offered if entry.name == args.name), None)
         if found is None:
             names: str = ", ".join(entry.name for entry in offered) or "none"

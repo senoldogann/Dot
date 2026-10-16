@@ -71,6 +71,9 @@ class ToolContext:
     output_chars: int
     facts: Callable[[], "RunFacts"]
     spawner: Spawner | None = None
+    # The names of the tools the run was given, which bound the agents it makes (item 307); ``None`` outside a run of
+    # the loop, which makes no agent.
+    run_tools: frozenset[str] | None = None
     # The hosts that refused this run's plain requests (item 98); the next fetch of one goes to the browser first.
     refused_hosts: RefusedHosts = field(default_factory=RefusedHosts)
 

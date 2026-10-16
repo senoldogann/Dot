@@ -5,8 +5,9 @@ import re
 import sqlite3
 import statistics
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from contextlib import closing
+from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
@@ -17,7 +18,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import CALL_EVENT, CallPurpose
 from dotagent.llm.types import INVALID_ARGUMENTS_KEY
 from dotagent.store.endings import ENDING_LABELS, Ending, classify_ending
-from dotagent.store.models import RunStatus
+from dotagent.store.models import WORKING_STATUSES, RunStatus
 from dotagent.tools.channels import CHANNELS, Channel, channel_of, is_gui
 
 _STATUS: TypeAdapter[RunStatus] = TypeAdapter(RunStatus)
@@ -331,11 +332,29 @@ class StepBand(FrozenModel):
     tokens_median: int | None
 
 
+class SiteOutcomes(FrozenModel):
+    """The finished runs that made an act call on a site and how many of them ended done (item 308)."""
+
+    runs: int
+    done: int
+
+
 class SiteStats(FrozenModel):
-    """What the act calls on one site (the page's host, or the application) did."""
+    """What the act calls on one site (the page's host, or the application) did, and how the runs that made them
+    ended (``outcomes``)."""
 
     site: str
     acts: ActStats
+    outcomes: SiteOutcomes
+
+
+class DayOutcomes(FrozenModel):
+    """The finished runs of one day (the day each started, in the Mac's zone) that made an act call on a site, and how
+    many of them ended done (item 308): how the browser and the desktop work goes from day to day."""
+
+    day: str
+    runs: int
+    done: int
 
 
 class ToolStats(FrozenModel):
@@ -446,6 +465,7 @@ class RunStatistics(FrozenModel):
     models: tuple[ModelStats, ...]
     tools: tuple[ToolStats, ...]
     sites: tuple[SiteStats, ...]
+    days: tuple[DayOutcomes, ...]
     channels: tuple[ChannelStats, ...]
     learning: LearningStats
 
@@ -837,14 +857,52 @@ def step_bands(samples: Sequence[StepSample]) -> tuple[StepBand, ...]:
     return tuple(bands)
 
 
-def site_stats(samples: Sequence[ActSample]) -> tuple[SiteStats, ...]:
-    """What the act calls did per site, the site with the most calls first (by name when the counts are equal); calls
-    that named no site are left out."""
+def site_stats(samples: Sequence[ActSample], outcomes: Mapping[str, SiteOutcomes]) -> tuple[SiteStats, ...]:
+    """What the act calls did per site, the site with the most calls first (by name when the counts are equal), with
+    how the runs that made them ended (``outcomes``, :func:`site_outcomes`); calls that named no site are left out."""
     sites: list[str] = list(dict.fromkeys(sample.site for sample in samples if sample.site != ""))
     found: list[SiteStats] = [
-        SiteStats(site=site, acts=act_stats([sample for sample in samples if sample.site == site])) for site in sites
+        SiteStats(
+            site=site,
+            acts=act_stats([sample for sample in samples if sample.site == site]),
+            outcomes=outcomes.get(site, SiteOutcomes(runs=0, done=0)),
+        )
+        for site in sites
     ]
     return tuple(sorted(found, key=lambda entry: (-entry.acts.acts, entry.site)))
+
+
+def _finished(runs: Sequence[tuple[object, ...]]) -> dict[str, tuple[bool, float]]:
+    """Each finished run of ``runs`` (rows of ``_RUNS_SQL``) by its id: whether it ended done, and when it started."""
+    return {str(run[6]): (run[1] == "done", _number(run[7], "created_at")) for run in runs if run[8] is not None}
+
+
+def site_outcomes(
+    runs: Sequence[tuple[object, ...]], run_acts: Sequence[tuple[object, ...]]
+) -> dict[str, SiteOutcomes]:
+    """Per site, the finished runs of ``runs`` that made an act call on it (``run_acts``, rows of ``_RUN_ACTS_SQL``)
+    and how many of them ended done; a run still at work counts once it ends."""
+    finished: dict[str, tuple[bool, float]] = _finished(runs)
+    on: dict[str, set[str]] = {}
+    for row in run_acts:
+        if row[1] not in (None, "") and str(row[0]) in finished:
+            on.setdefault(str(row[1]), set()).add(str(row[0]))
+    return {
+        site: SiteOutcomes(runs=len(ids), done=sum(1 for run_id in ids if finished[run_id][0]))
+        for site, ids in on.items()
+    }
+
+
+def day_outcomes(runs: Sequence[tuple[object, ...]], run_acts: Sequence[tuple[object, ...]]) -> tuple[DayOutcomes, ...]:
+    """Per day, the oldest first, the finished runs that started that day (in the Mac's zone) and made an act call on a
+    site, and how many of them ended done."""
+    finished: dict[str, tuple[bool, float]] = _finished(runs)
+    acted: set[str] = {str(row[0]) for row in run_acts if row[1] not in (None, "") and str(row[0]) in finished}
+    days: dict[str, list[bool]] = {}
+    for run_id in acted:
+        done, started = finished[run_id]
+        days.setdefault(datetime.fromtimestamp(started).date().isoformat(), []).append(done)
+    return tuple(DayOutcomes(day=day, runs=len(ends), done=sum(ends)) for day, ends in sorted(days.items()))
 
 
 def tool_stats(samples: Sequence[ToolSample]) -> tuple[ToolStats, ...]:
@@ -1062,10 +1120,67 @@ def _statistics(rows: _Rows) -> RunStatistics:
     return RunStatistics(
         models=tuple(sorted(stats, key=lambda entry: entry.runs, reverse=True)),
         tools=tool_stats(tools),
-        sites=site_stats(acts),
+        sites=site_stats(acts, site_outcomes(runs, rows.run_acts)),
+        days=day_outcomes(runs, rows.run_acts),
         channels=channel_stats(tools),
         learning=learning_stats(rows),
     )
+
+
+# What waits and will not move on by itself (the code review's O3-O6), read from the store as it is: a run at work is
+# one of these statuses.
+_AT_WORK: str = ", ".join(f"'{status}'" for status in sorted(WORKING_STATUSES))
+_SWITCHED_ON_SCHEDULES_SQL: str = "SELECT id, name FROM schedules WHERE enabled = 1"
+_STALE_SCHEDULES_SQL: str = (
+    "SELECT COUNT(*) FROM schedules s WHERE s.last_status IN ('starting', 'running') AND NOT EXISTS"
+    f" (SELECT 1 FROM runs r WHERE r.thread_id = s.thread_id AND r.status IN ({_AT_WORK}))"
+)
+_UNPLANNED_CAMPAIGNS_SQL: str = (
+    "SELECT COUNT(*) FROM campaigns c WHERE c.status = 'active' AND c.next_session_at IS NULL AND NOT EXISTS"
+    f" (SELECT 1 FROM runs r WHERE r.campaign_id = c.id AND r.status IN ({_AT_WORK}))"
+)
+_STALLED_QUEUES_SQL: str = (
+    "SELECT COUNT(DISTINCT q.thread_id) FROM queued_messages q"
+    " WHERE NOT EXISTS (SELECT 1 FROM queue_holds h WHERE h.thread_id = q.thread_id)"
+    f" AND NOT EXISTS (SELECT 1 FROM runs r WHERE r.thread_id = q.thread_id AND r.status IN ({_AT_WORK}))"
+)
+_HELD_QUEUES_SQL: str = (
+    "SELECT COUNT(DISTINCT q.thread_id) FROM queued_messages q JOIN queue_holds h ON h.thread_id = q.thread_id"
+)
+
+
+class StuckWork(FrozenModel):
+    """What waits and will not move on by itself (the code review's O3-O6), as the store has it: the switched-on
+    schedules by id with their names (for the failures of :mod:`dotagent.scheduler.failures`), the schedules marked as
+    starting or running a run with no run of theirs at work, the active campaigns with no session planned and none at
+    work, the chats whose queue holds messages with no run at work and no hold, which nothing moves on, and the chats
+    whose queue waits for the owner to resume it."""
+
+    schedules: dict[str, str]
+    stale_schedules: int
+    unplanned_campaigns: int
+    stalled_queues: int
+    held_queues: int
+
+
+def _count_of(connection: sqlite3.Connection, sql: str) -> int:
+    row: tuple[object, ...] = connection.execute(sql).fetchone()
+    return int(str(row[0]))
+
+
+def collect_stuck(database: Path) -> StuckWork:
+    """:class:`StuckWork`, read on a read-only connection, so a running daemon is not disturbed. Blocking."""
+    try:
+        with closing(sqlite3.connect(f"{database.as_uri()}?mode=ro", uri=True, timeout=_BUSY_TIMEOUT_S)) as connection:
+            return StuckWork(
+                schedules={str(row[0]): str(row[1]) for row in connection.execute(_SWITCHED_ON_SCHEDULES_SQL)},
+                stale_schedules=_count_of(connection, _STALE_SCHEDULES_SQL),
+                unplanned_campaigns=_count_of(connection, _UNPLANNED_CAMPAIGNS_SQL),
+                stalled_queues=_count_of(connection, _STALLED_QUEUES_SQL),
+                held_queues=_count_of(connection, _HELD_QUEUES_SQL),
+            )
+    except sqlite3.Error as error:
+        raise StoreError("the store could not be read", {"database": str(database), "error": str(error)}) from error
 
 
 def read_kv(database: Path, key: str) -> str | None:

@@ -171,38 +171,48 @@ async def _similar_notes(index: MemoryIndex, vector: Vector) -> tuple[MemoryHit,
 
 
 async def save_memory(
-    index: MemoryIndex, content: str, tags: Sequence[str], run_id: str | None, agent_id: str | None
+    index: MemoryIndex,
+    content: str,
+    tags: Sequence[str],
+    run_id: str | None,
+    agent_id: str | None,
+    expires_at: float | None,
 ) -> SavedMemory:
-    """Save a note, Dot's or, with ``agent_id``, an agent's own (:func:`visible_to`). The same text twice stays one
-    note (the tags are merged, the owner kept), saved one after the other or at once, as long as the saver is handed
-    the note that has it (another agent's note is not merged into); a resting note saved again is awake. A new note
-    comes back with the existing notes the saver is handed that are nearly the same, so the caller can retire the ones
-    that are outdated."""
+    """Save a note, Dot's or, with ``agent_id``, an agent's own (:func:`visible_to`), holding until ``expires_at``
+    (``None``: until it is changed). The same text twice stays one note (the tags are merged, the owner kept, the time
+    it holds is the latest save's), saved one after the other or at once, as long as the saver is handed the note that
+    has it (another agent's note is not merged into); a resting note saved again is awake. A new note comes back with
+    the existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are
+    outdated."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text, agent_id)
     if existing is not None:
-        return await _saved_again(index.store, existing, clean_tags)
+        return await _saved_again(index.store, existing, clean_tags, expires_at)
     vector: Vector | None = None
     similar: tuple[MemoryHit, ...] = ()
     if index.embedder is not None:
         await backfill(index)
         vector = (await index.embedder.embed([text]))[0]
         similar = tuple(hit for hit in await _similar_notes(index, vector) if visible_to(hit.record, agent_id))
-    record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector)
+    record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector, expires_at)
     if not created:
         # Another save of the text, by another run or process, added it meanwhile.
-        return await _saved_again(index.store, record, clean_tags)
+        return await _saved_again(index.store, record, clean_tags, expires_at)
     return SavedMemory(record=record, created=True, similar=similar)
 
 
-async def _saved_again(store: Store, existing: MemoryRecord, tags: tuple[str, ...]) -> SavedMemory:
-    """The note ``existing``, whose text was saved again with ``tags``: the tags are merged into its own, and a note
-    the reflection rested (tagged ``rest``) is awake, written anew now, since a run found it worth saving again."""
+async def _saved_again(
+    store: Store, existing: MemoryRecord, tags: tuple[str, ...], expires_at: float | None
+) -> SavedMemory:
+    """The note ``existing``, whose text was saved again with ``tags``, holding until ``expires_at``: the tags are
+    merged into its own, and a note the reflection rested (tagged ``rest``), or whose time ran out or changes, is
+    awake, written anew now, since a run found it worth saving again."""
     merged: tuple[str, ...] = normalize_tags([*existing.tags, *tags])
-    if REST_TAG in existing.tags:
+    if REST_TAG in existing.tags or existing.expires_at != expires_at:
         awake: tuple[str, ...] = tuple(tag for tag in merged if tag != REST_TAG)
-        return SavedMemory(record=await store.wake_memory(existing.id, awake, time.time()), created=False, similar=())
+        woken: MemoryRecord = await store.wake_memory(existing.id, awake, time.time(), expires_at)
+        return SavedMemory(record=woken, created=False, similar=())
     record: MemoryRecord = existing if merged == existing.tags else await store.set_memory_tags(existing.id, merged)
     return SavedMemory(record=record, created=False, similar=())
 
@@ -216,18 +226,27 @@ async def _distinctive_terms(store: Store, terms: tuple[str, ...], total: int) -
     return tuple(term for term in terms if counts[term] <= total * _MAX_NOTE_SHARE)
 
 
+def expired(record: MemoryRecord, now: float) -> bool:
+    """Whether the time a note was saved for has run out (item 306)."""
+    return record.expires_at is not None and record.expires_at <= now
+
+
 def resting(record: MemoryRecord, now: float, rest_days: int, score: MemoryScore | None, min_uses: int) -> bool:
-    """Whether a note rests: it is the agent's (the user's notes and the standing ones never rest) and either the
-    reflection retired it (tagged ``rest``), or no run was handed it in ``rest_days`` days since it was written, or
-    its ``score`` (how the runs handed it lately ended) is negative over at least ``min_uses`` runs. A resting note
-    is not handed to a run on its own; a search still finds it unless it was retired."""
+    """Whether a note rests: its time ran out (:func:`expired`), or it is the agent's (the user's notes and the
+    standing ones never rest otherwise) and either the reflection retired it (tagged ``rest``: unused, of no help, or
+    replaced by a newer note), or no run was handed it in ``rest_days`` days since it was last handed or written (item
+    306: a note handed once long ago goes stale like one never handed), or its ``score`` (how the runs handed it
+    lately ended) is negative over at least ``min_uses`` runs. A resting note is not handed to a run on its own; a
+    search still finds it unless it was retired or its time ran out."""
+    if expired(record, now):
+        return True
     if record.source_run is None or CORE_TAG in record.tags:
         return False
     if REST_TAG in record.tags:
         return True
     if score is not None and score.handed >= min_uses and score.done < score.failed:
         return True
-    return record.used_count == 0 and max(record.created_at, record.updated_at) < now - rest_days * 86400.0
+    return max(record.created_at, record.updated_at, record.last_used_at or 0.0) < now - rest_days * 86400.0
 
 
 async def recent_scores(index: MemoryIndex, memory_ids: Sequence[str], now: float) -> dict[str, MemoryScore]:
@@ -251,7 +270,7 @@ async def recall(index: MemoryIndex, query: str, limit: int) -> list[MemoryHit]:
     ``dotx memory``, the lesson writer's check for a note that says it already): the fusion of the two rankers, with
     the agent's notes lifted by how lately a run was handed them (:func:`dotagent.memory.ranking.ranked_by_use`,
     half-life ``[memory] use_half_life_days``) and by their score (:func:`recent_scores`), either way. A note the
-    reflection retired (tagged ``rest``) is never one."""
+    reflection retired (tagged ``rest``) is never one, nor one whose time ran out (:func:`expired`)."""
     return await _recall(index, query, limit, None, False)
 
 
@@ -279,12 +298,12 @@ async def _recall(index: MemoryIndex, query: str, limit: int, agent_id: str | No
         rankings.append([item.id for item in close])
         similarities = {item.id: item.similarity for item in close}
     scores: dict[str, float] = fused_scores(rankings)
+    now: float = time.time()
     candidates: list[MemoryRecord] = [
         record
         for record in await index.store.get_memories(list(scores))
-        if REST_TAG not in record.tags and (not scoped or visible_to(record, agent_id))
+        if REST_TAG not in record.tags and not expired(record, now) and (not scoped or visible_to(record, agent_id))
     ]
-    now: float = time.time()
     balances: dict[str, MemoryScore] = await recent_scores_for(
         index, [record.id for record in candidates], now, agent_id
     )
@@ -425,15 +444,22 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
     A goal is full of everyday words that match unrelated notes, so when embeddings are on only the notes whose
     meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones."""
     config: MemoryConfig = index.config
+    now: float = time.time()
     standing: list[MemoryRecord] = [
-        record for record in await index.store.memories_with_tag(CORE_TAG, _FETCH_NOTES) if visible_to(record, agent_id)
+        record
+        for record in await index.store.memories_with_tag(CORE_TAG, _FETCH_NOTES)
+        if visible_to(record, agent_id) and not expired(record, now)
     ]
     candidates: list[MemoryHit] = await recall_for(index, query, config.candidate_pool, agent_id)
     similarities: dict[str, float] = {hit.record.id: hit.similarity for hit in candidates if hit.similarity is not None}
     written: list[MemoryRecord] = await index.store.user_memories(_FETCH_NOTES)
     known: set[str] = {record.id for record in standing}
     users: list[MemoryRecord] = _closest_first(
-        [record for record in written if record.id not in known and visible_to(record, agent_id)],
+        [
+            record
+            for record in written
+            if record.id not in known and visible_to(record, agent_id) and not expired(record, now)
+        ],
         similarities,
         _FETCH_NOTES,
     )
@@ -445,7 +471,6 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
             hit for hit in candidates if hit.similarity is not None and hit.similarity >= config.inject_min_similarity
         ]
     )
-    now: float = time.time()
     balances: dict[str, MemoryScore] = await recent_scores_for(index, [hit.record.id for hit in related], now, agent_id)
     fresh: list[MemoryRecord] = [
         hit.record

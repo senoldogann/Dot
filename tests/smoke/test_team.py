@@ -1,8 +1,9 @@
 """The team (item 87) through the real loop and the API: a run of Dot's sends an agent a message with message_agent,
 the agent answers in a run of its own (its voice, its tools, the team source), the reply comes back as the tool's
 result, the Team page and the agent's page show the exchange, and the delegated row in Dot's chat wears the agent's
-face. An agent answers in the stricter of its own approvals and the sender's (item 135). No network and no model
-service: the scripted model plays both runs.
+face. An agent answers in the stricter of its own approvals and the sender's (item 135). Dot builds a team of its own
+within bounds, and a run in another chat uses it (item 307). No network and no model service: the scripted model plays
+every run.
 """
 
 import asyncio
@@ -16,6 +17,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, BrowserContext, Page, async_playwright
 
+from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -29,8 +31,9 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import RunRecord
+from dotagent.tools.campaign import CAMPAIGN_NOTE_TOOL
 from dotagent.tools.meta import FINISH_TOOL
-from dotagent.tools.team import MESSAGE_AGENT_TOOL, TEAM_SOURCE
+from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL, TEAM_SOURCE
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -271,3 +274,89 @@ async def test_an_agent_that_runs_yolo_answers_a_run_that_asks_by_asking(
             await manager.wait(run_id)
         (child,) = await runtime.store.list_child_runs(run_id)
         assert (child.status, child.approvals) == ("done", answered), (asked, child)
+
+
+def _make(name: str, role: str, tools: list[str]) -> ScriptedCall:
+    return ScriptedCall(
+        tool=CREATE_AGENT_TOOL,
+        arguments={"name": name, "role": role, "instructions": f"You are the team's {role.lower()}.", "tools": tools},
+    )
+
+
+async def _chat(client: httpx.AsyncClient, manager: RunManager, goal: str) -> str:
+    """A chat of its own, so that no lesson or skill is drawn at its end (only a task's are) and the script holds; it
+    ends with a reply in words, as a chat does, while the agents' runs it starts are tasks that end with finish."""
+    started = await client.post("/api/runs", json={"goal": goal, "approvals": "yolo", "mode": "chat"})
+    assert started.status_code == 201, started.text
+    run_id: str = started.json()["id"]
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(run_id)
+    return run_id
+
+
+async def test_dot_builds_a_team_within_its_bounds_and_a_run_of_another_chat_sends_it_work_by_name(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
+) -> None:
+    """Item 307: a run makes three agents, each with tools of its own (a tool the run lacks and a fourth agent are
+    refused), and sends one of them work at once; the Agents list shows the team as made by that run; a run in another
+    chat is told of the team and sends another member work by its name."""
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            ScriptedTurn(
+                text="",
+                calls=(
+                    _make("Reader", "Reads the sources", ["read_file"]),
+                    _make("Writer", "Writes the summary", ["write_file", "read_file"]),
+                    _make("Planner", "Plans the campaign", [CAMPAIGN_NOTE_TOOL]),
+                    _make("Checker", "Checks the summary", ["read_file"]),
+                    _make("Extra", "Does one thing too many", ["read_file"]),
+                ),
+            ),
+            _turn(MESSAGE_AGENT_TOOL, {"agent": "Reader", "message": "Read notes.txt and say what it holds."}),
+            _turn(FINISH_TOOL, {"answer": "It holds the plan.", "success": True}),
+            ScriptedTurn(text="The team is set up and Reader read the notes.", calls=()),
+        ],
+    )
+    asked: int = len(MODEL.requests)
+    builder: str = await _chat(client, manager, "Summarize the sources with a small team")
+    assert (await runtime.store.get_run(builder)).status == "done"
+    rows = (await client.get("/api/agents")).json()
+    made: dict[str, dict[str, object]] = {
+        row["record"]["name"]: row["record"] for row in rows if row["record"]["made_by"] == builder
+    }
+    assert {name: record["tools"] for name, record in made.items()} == {
+        "Reader": ["read_file"],
+        "Writer": ["write_file", "read_file"],
+        "Checker": ["read_file"],
+    }
+    # The two refusals came back as the results of their calls.
+    results: list[str] = [message.content for message in MODEL.requests[asked + 1].messages if message.role == "tool"]
+    assert f"an agent gets only tools this run has, not {CAMPAIGN_NOTE_TOOL}" in results
+    assert "a run makes at most 3 agents; send the work to the ones it made: Reader, Writer, Checker" in results
+    # Reader answered in a run of its own, in its voice, with Dot's instructions and no tool beyond its own.
+    readers: ChatRequest = MODEL.requests[asked + 2]
+    assert _system(readers).startswith("You are Reader, an agent Dot made: Reads the sources.")
+    assert "Dot's instructions to you" in _system(readers)
+    assert {spec.name for spec in readers.tools} <= {"read_file", *AGENT_CORE_TOOLS}
+    (child,) = await runtime.store.list_child_runs(builder)
+    assert (child.agent_id, child.status, child.result) == (made["Reader"]["id"], "done", "It holds the plan.")
+
+    # A run in another chat is told of the team and sends Writer work by its name.
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn(MESSAGE_AGENT_TOOL, {"agent": "writer", "message": "Write a two-line summary of the plan."}),
+            _turn(FINISH_TOOL, {"answer": "Line one. Line two.", "success": True}),
+            ScriptedTurn(text="Writer wrote the summary.", calls=()),
+        ],
+    )
+    asked = len(MODEL.requests)
+    user: str = await _chat(client, manager, "Get the summary written")
+    assert (await runtime.store.get_run(user)).thread_id != (await runtime.store.get_run(builder)).thread_id
+    system: str = _system(MODEL.requests[asked])
+    assert "  - Reader: Reads the sources" in system and "  - Writer: Writes the summary" in system
+    (written,) = await runtime.store.list_child_runs(user)
+    assert (written.agent_id, written.status, written.result) == (made["Writer"]["id"], "done", "Line one. Line two.")
+    for record in made.values():
+        assert (await client.delete(f"/api/agents/{record['id']}")).status_code == 204

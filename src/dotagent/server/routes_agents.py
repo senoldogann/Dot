@@ -31,10 +31,31 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
     """A request whose model parses and whose tools are among the ``known`` ones."""
     if request.model != "":
         parse_model_ref(request.model)
-    unknown: list[str] = sorted(set(request.tools) - known)
+    unknown: list[str] = sorted(set(request.tools or ()) - known)
     if unknown:
         raise InvalidValueError("an agent names tools that do not exist", {"tools": ", ".join(unknown)})
     return request
+
+
+def new_agent_tools(said: list[str] | None) -> tuple[str, ...]:
+    """The tools a new agent may use, as an :class:`AgentRequest` said them (``said``): every tool (empty) for
+    ``None``, the named ones otherwise. An empty list keeps the tools an agent has, and a new one has none to keep."""
+    if said is None:
+        return ()
+    if not said:
+        raise InvalidValueError(
+            "a new agent has no tools to keep: name the tools it may use, or leave tools out for every tool",
+            {"tools": "[]"},
+        )
+    return tuple(said)
+
+
+def changed_agent_tools(said: list[str] | None, saved: tuple[str, ...]) -> tuple[str, ...]:
+    """The tools an agent may use after a change that said ``said`` (:class:`AgentRequest`): every tool (empty) for
+    ``None``, the ones it has (``saved``) for an empty list, the named ones otherwise (the code review's Y5)."""
+    if said is None:
+        return ()
+    return tuple(said) if said else saved
 
 
 async def dot_record(store: Store) -> AgentRecord:
@@ -103,7 +124,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.model,
             checked.effort,
             checked.approvals,
-            checked.tools,
+            new_agent_tools(checked.tools),
             None,
             checked.look,
         )
@@ -124,6 +145,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot is not an agent to change", {"agent_id": agent_id})
         checked: AgentRequest = _checked(request, known)
+        saved: AgentRecord = await store.get_agent(agent_id)
         return await store.update_agent(
             agent_id,
             checked.name,
@@ -132,7 +154,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.model,
             checked.effort,
             checked.approvals,
-            checked.tools,
+            changed_agent_tools(checked.tools, saved.tools),
             checked.look,
         )
 

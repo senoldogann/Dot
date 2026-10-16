@@ -84,11 +84,17 @@ export function approvalsPicker(onPaint, kept) {
     paint();
   });
   const warning = el("div", { class: "note warn", hidden: true }, icon("bolt"), el("span", null, YOLO_NOTE));
+  // The mode `onPaint` was told last: `sync()` comes with every status update, and the composer's pill is drawn again
+  // only when the mode it shows changed (item 310).
+  let told;
 
   function paint() {
     control.element.dataset.mode = String(control.value());
     warning.hidden = control.value() !== "yolo";
-    onPaint(control.value());
+    if (control.value() !== told) {
+      told = control.value();
+      onPaint(told);
+    }
   }
 
   paint();

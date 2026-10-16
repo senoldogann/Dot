@@ -36,6 +36,8 @@ from dotagent.tools.context import ToolContext
 
 _TIMEOUT_S: float = 60.0
 _SUMMARY_CHARS: int = 200
+# The longest a note may be saved for a while: past a few years a fact is one that holds until it changes.
+_MOST_VALID_DAYS: int = 3650
 
 
 def _clip(text: str, limit: int) -> str:
@@ -98,6 +100,18 @@ class SaveArgs(ToolArgs):
         max_length=6,
         description=f"Optional short topic words. Use '{CORE_TAG}' only for a standing rule every run must know.",
     )
+    valid_days: int | None = Field(
+        default=None,
+        ge=1,
+        le=_MOST_VALID_DAYS,
+        description=("Days a short-lived fact stays true (a trip, a deadline, an offer); none for a lasting one."),
+    )
+
+
+def expiry_of(valid_days: int | None, now: float) -> float | None:
+    """When a note saved ``now`` for ``valid_days`` stops holding (item 306); ``None`` for one that holds until it
+    changes."""
+    return None if valid_days is None else now + valid_days * 86400.0
 
 
 def _save_tool() -> RegisteredTool:
@@ -107,7 +121,10 @@ def _save_tool() -> RegisteredTool:
 
     async def run(args: SaveArgs, ctx: ToolContext) -> ToolResult:
         # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94).
-        saved: SavedMemory = await save_memory(ctx.runtime.memory, args.content, args.tags, ctx.run_id, None)
+        expires_at: float | None = expiry_of(args.valid_days, time.time())
+        saved: SavedMemory = await save_memory(
+            ctx.runtime.memory, args.content, args.tags, ctx.run_id, None, expires_at
+        )
         return ok(render_saved(saved))
 
     return make_tool(

@@ -11,6 +11,7 @@ from dotagent.agent.lessons import (
     LessonView,
     RunLessons,
     _says_it,
+    contains_secret,
     kept_lessons,
     lesson_problem,
     lessons_of,
@@ -58,6 +59,8 @@ def _note(content: str) -> MemoryRecord:
         agent_id=None,
         used_count=0,
         last_used_at=None,
+        expires_at=None,
+        replaced_by=None,
     )
 
 
@@ -177,7 +180,7 @@ def test_a_signal_is_one_short_line_without_secrets() -> None:
     ],
 )
 def test_a_lesson_is_one_line_without_secrets_addresses_or_home_paths(text: str, problem: str | None) -> None:
-    assert lesson_problem(text, MAX_CHARS) == problem
+    assert lesson_problem(text, MAX_CHARS, ()) == problem
 
 
 def test_a_text_repeats_another_with_the_same_words_or_mostly_the_same_search_terms() -> None:
@@ -214,7 +217,38 @@ def test_kept_lessons_drop_what_is_not_a_lesson_and_every_repeat() -> None:
         CSV_LESSON,
     ]
     known: tuple[str, ...] = (GOAL, "Before every commit, run the tests with pytest -q.")
-    assert kept_lessons(proposed, known, MAX_CHARS) == (LESSON, CSV_LESSON)
+    assert kept_lessons(proposed, known, MAX_CHARS, ()) == (LESSON, CSV_LESSON)
+
+
+# A secret Dot holds, as :func:`dotagent.secrets.known_secrets` gives it.
+HELD: str = "MARKER-7f3c9a1e2b"
+
+
+@pytest.mark.parametrize(
+    ("text", "found"),
+    [
+        ("Log in with password: hunter2 on the staging site.", True),
+        (f"The staging site takes the key {HELD} in its header.", True),
+        ("Call the API with the key sk-abcdefghijklmnopqrstuvwx in the header.", True),
+        ("export API_KEY='abcdef1234567890xyz' before running the importer.", True),
+        ("Plan the week on the task-management-2024 board before Monday.", False),
+        ("The shop's risk-free-returns-for-thirty-days page lists the window.", False),
+        ("CSS mask-image-set-for-the-header-logo needs a PNG fallback.", False),
+    ],
+)
+def test_a_secret_is_found_by_its_key_its_value_or_its_form_and_no_word_with_sk_in_it_is_one(
+    text: str, found: bool
+) -> None:
+    assert contains_secret(text, (HELD,)) is found
+
+
+def test_a_lesson_on_the_task_management_board_is_kept_and_one_with_a_value_dot_holds_is_not() -> None:
+    board: str = "Plan the week on the task-management-2024 board before Monday."
+    held: str = f"The staging site takes the key {HELD} in its header."
+    assert kept_lessons([board, held], (), MAX_CHARS, (HELD,)) == (board,)
+    assert lesson_problem(held, MAX_CHARS, (HELD,)) == "a secret"
+    # Only its value tells this one: no key names a secret in it and it has no known form.
+    assert lesson_problem(held, MAX_CHARS, ()) is None
 
 
 def test_no_lessons_were_drawn_from_a_run_without_lesson_events() -> None:

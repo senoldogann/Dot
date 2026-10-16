@@ -7,9 +7,10 @@ away with the page.
 
 The bar and the composer (item 273): the bar beside a closed sidebar holds its opener alone, and neither holds the
 emergency stop, which is in Settings › System (item 289); the sidebar's buttons and the side panel's switch and close are one size; the reasoning pill shows its
-level's word, chosen from its menu; on a phone the box's text is 16 px and the bar's buttons a finger's size, and the bar
-holds them all. Before, the stop stood beside the opener, the panel's buttons were smaller, the level folded to a brain
-under 600 px of bar and the box's text was 15 px.
+level's word, chosen from its menu; on a phone the bar's buttons are a finger's size and the bar holds them all, and the
+box's text keeps the size chosen for it in a window of any width without a touch screen (item 311; the 16 px a touch
+screen needs is in test_phone_fit.py). Before, the stop stood beside the opener, the panel's buttons were smaller and the
+level folded to a brain under 600 px of bar.
 
 On a phone, light and dark, at a laptop's width and at a wide one. No network and no model service is used: the runs are
 a scripted model's.
@@ -283,8 +284,10 @@ async def _bar_and_composer(
     for control in await composer_bar.locator("button:visible").all():
         assert _inside(await _box(control), await _box(composer_bar)), await control.get_attribute("aria-label")
     phone: bool = width < 720
+    # A window without a touch screen zooms into no field, so the box keeps the size chosen for it at every width (item
+    # 311); a phone's floor is in test_phone_fit.py.
     text_px: str = await box.evaluate("(field) => getComputedStyle(field).fontSize")
-    assert text_px == ("16px" if phone else "15px"), text_px
+    assert text_px == "15px", text_px
     if phone:
         assert (await _size(page.get_by_role("button", name="Start")))[:2] == (36, 36)
     await page.screenshot(path=str(shots / f"composer-{width}-{scheme}.png"))

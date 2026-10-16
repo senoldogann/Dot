@@ -5,6 +5,14 @@ import asyncio
 import time
 from zoneinfo import ZoneInfo
 
+from dotagent.agent.learning_health import (
+    LEARNED,
+    LearningOutcome,
+    check_learning,
+    failed_with,
+    quiet_limit,
+    record_learning,
+)
 from dotagent.agent.manager import RunManager, thread_title
 from dotagent.agent.reflection import last_reflection, record_reflection_failure, reflection_due
 from dotagent.agent.reflection_record import Reflection, summary_line
@@ -15,6 +23,7 @@ from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE, ScheduleMissed
+from dotagent.scheduler.failures import record_firing_failure, record_firing_started
 from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
@@ -74,7 +83,8 @@ class Scheduler:
         self._reflecting: asyncio.Task[None] | None = None
 
     async def start(self) -> asyncio.Task[None]:
-        """Begin ticking in the background; what an earlier process left unfinished is marked as interrupted.
+        """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
+        run, whose watch went with that process) is marked as interrupted and logged.
 
         Returns the task of the loop, so the caller can notice when it ends.
         """
@@ -84,6 +94,7 @@ class Scheduler:
         for record in await store.list_schedules():
             if record.last_status in _UNFINISHED:
                 await store.set_schedule_status(record.id, "interrupted")
+                log.warning("schedule_interrupted", schedule_id=record.id, status=record.last_status)
         self._loop = asyncio.create_task(self._tick_forever(), name="scheduler")
         return self._loop
 
@@ -122,10 +133,11 @@ class Scheduler:
         that is, and start the reflection when its time has come. A campaign's session is never skipped as overdue:
         the campaign goes on where it stopped. While the owner's emergency stop is engaged, no campaign starts a
         session (each waits for the release; the stop is looked at before each one) and no schedule fires
-        (:meth:`_fire`). The three are done each on its own: one that fails is logged where it failed and keeps the
-        others from nothing, and the failures are raised together at the end, as an ``ExceptionGroup``."""
+        (:meth:`_fire`). Learning that has stopped by the clock is told to the owner (:meth:`_check_learning`). The
+        parts are done each on its own: one that fails is logged where it failed and keeps the others from nothing, and
+        the failures are raised together at the end, as an ``ExceptionGroup``."""
         failures: list[Exception] = []
-        for part in (self._fire_due, self._start_due_sessions, self._reflect_if_due):
+        for part in (self._fire_due, self._start_due_sessions, self._reflect_if_due, self._check_learning):
             try:
                 await part(now)
             except Exception as exc:
@@ -158,20 +170,41 @@ class Scheduler:
         self._reflected_from = now
         self._reflecting = asyncio.create_task(self._reflect(now), name="reflection")
 
+    async def _check_learning(self, now: float) -> None:
+        """Tell the owner when no reflection went well for too long, though none ended since
+        (:func:`dotagent.agent.learning_health.check_learning`). A record that cannot be read is logged: it keeps the
+        scheduler from nothing."""
+        try:
+            await check_learning(
+                self._runtime.store, self._runtime.bus, now, quiet_limit(self._runtime.config.agent.reflection_time)
+            )
+        except StoreError as error:
+            log.error("learning_not_checked", error=error.message)
+
     async def _reflect(self, now: float) -> None:
-        """Task body of a reflection: its outcome is logged; a failure is logged with what failed and kept for the owner
+        """Task body of a reflection, and the one place its errors end (review O25): its outcome is logged and kept in
+        the record of how learning fares (:func:`dotagent.agent.learning_health.record_learning`, which tells the owner
+        when learning has stopped); a failure is also kept with what failed
         (:func:`dotagent.agent.reflection.record_reflection_failure`: the Activity list and ``dotx stats`` show it until
-        a reflection is done), and the next attempt is the next daily time."""
+        a reflection is done), and the next attempt is the next daily time. A store that cannot keep them is logged."""
         try:
             reflection: Reflection = await self._manager.reflect(now)
         except DotError as exc:
             log.error("reflection_failed", error=exc.message, context=exc.context)
-            await record_reflection_failure(self._runtime.store, now, exc.message)
+            outcome: LearningOutcome = failed_with(exc.message)
         except Exception as exc:
             log.exception("reflection crashed")
-            await record_reflection_failure(self._runtime.store, now, f"{type(exc).__name__}: {exc}")
+            outcome = failed_with(f"{type(exc).__name__}: {exc}")
         else:
             log.info("reflection_fired", summary=summary_line(reflection))
+            outcome = LEARNED
+        quiet_s: float | None = quiet_limit(self._runtime.config.agent.reflection_time)
+        try:
+            if outcome.error is not None:
+                await record_reflection_failure(self._runtime.store, now, outcome.error)
+            await record_learning(self._runtime.store, self._runtime.bus, "reflection", now, outcome, quiet_s)
+        except StoreError as error:
+            log.error("learning_not_recorded", work="reflection", state=outcome.state, error=error.message)
 
     async def _tick_forever(self) -> None:
         """Tick every ``tick_s`` seconds. A tick that failed is tried again at the next one; :data:`FAILED_TICKS_TO_END`
@@ -193,18 +226,22 @@ class Scheduler:
     async def _fire_alone(self, record: ScheduleRecord, now: float) -> None:
         """Fire one schedule as the store has it now: one deleted, switched off or moved since the tick listed it does
         not fire. One that cannot fire (its time zone or its times cannot be read, the store failed for it) keeps the
-        reason as its status and is tried again at the next tick, and the other schedules and the daemon go on (item
-        116)."""
+        reason as its status, counts it (:func:`dotagent.scheduler.failures.record_firing_failure`) and is tried again
+        at the next tick, and the other schedules and the daemon go on (item 116)."""
         try:
             current: ScheduleRecord | None = await self._still_due(record.id, now)
             if current is not None:
                 await self._fire(current, now)
         except DotError as exc:
             log.error("schedule_fire_failed", schedule_id=record.id, error=exc.message, context=exc.context)
-            await self._runtime.store.set_schedule_status(record.id, f"failed to fire: {exc.message}")
+            failed: str = f"failed to fire: {exc.message}"
+            await self._runtime.store.set_schedule_status(record.id, failed)
+            await record_firing_failure(self._runtime.store, record.id, now, failed)
         except Exception as exc:
             log.exception("schedule_fire_crashed", schedule_id=record.id)
-            await self._runtime.store.set_schedule_status(record.id, f"failed to fire: {type(exc).__name__}")
+            crashed: str = f"failed to fire: {type(exc).__name__}"
+            await self._runtime.store.set_schedule_status(record.id, crashed)
+            await record_firing_failure(self._runtime.store, record.id, now, crashed)
 
     async def _still_due(self, schedule_id: str, now: float) -> ScheduleRecord | None:
         """The schedule as the store has it now, when it is still switched on and due at ``now``; ``None`` when it was
@@ -269,8 +306,9 @@ class Scheduler:
         carried: tuple[str, ...] = (
             digest.run_ids if made else tuple(run.id for run in await store.list_runs(1, thread_id))
         )
+        started: RunRecord | None = None
         try:
-            run: RunRecord = await self._manager.start_firing(
+            started = await self._manager.start_firing(
                 record.goal,
                 firing_opening(told, digest),
                 record.mode,
@@ -286,21 +324,15 @@ class Scheduler:
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
             await store.set_schedule_status(record.id, failed)
-            # A chat made for the firing goes with its run that did not start; the chat it went on in stays.
-            if made:
-                try:
-                    await store.delete_threads([thread_id])
-                except DotError as left:
-                    # The thread of a run whose failed start the store did not take yet stays; the missed firing is
-                    # told.
-                    log.error(
-                        "schedule_thread_not_deleted",
-                        schedule_id=record.id,
-                        error=left.message,
-                        context=left.context,
-                    )
+            await record_firing_failure(store, record.id, now, failed)
             await self._tell_missed(record, failed)
             return
+        finally:
+            # A chat made for the firing goes with its run that did not start, however the start failed; the chat it
+            # went on in stays.
+            if started is None and made:
+                await self._drop_chat(record.id, thread_id)
+        run: RunRecord = started
         if await _emergency_stop_engaged():
             log.warning("schedule_run_stopped_emergency_stop", schedule_id=record.id, run_id=run.id)
             self._manager.end_by_emergency_stop(run.id)
@@ -311,6 +343,7 @@ class Scheduler:
         watcher.add_done_callback(self._watcher_done)
         try:
             await store.set_schedule_status(record.id, "running")
+            await record_firing_started(store, record.id)
         except DotError as exc:
             # The run started all the same; its watch writes how it ended.
             log.error(
@@ -352,6 +385,14 @@ class Scheduler:
         thread: ThreadRecord = await store.create_thread(title, SCHEDULE_SOURCE)
         await store.link_schedule_thread(thread.id, record.id)
         return thread.id, True
+
+    async def _drop_chat(self, schedule_id: str, thread_id: str) -> None:
+        """Delete the chat made for a firing whose run did not start. One the store does not take stays, logged: the
+        missed firing is told all the same."""
+        try:
+            await self._runtime.store.delete_threads([thread_id])
+        except DotError as left:
+            log.error("schedule_thread_not_deleted", schedule_id=schedule_id, error=left.message, context=left.context)
 
     async def _tell_missed(self, record: ScheduleRecord, status: str) -> None:
         """Tell the owner that the schedule ``record`` (as it was before this firing) missed it, with ``status`` saying

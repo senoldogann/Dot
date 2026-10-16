@@ -116,7 +116,7 @@ async def test_a_compacted_run_continues_on_the_chosen_model_without_repeating_o
 ) -> None:
     run: RunRecord = await _start_and_wait_until_running(runtime, manager, GOAL)
     # A note the user writes while the run works (Settings › Memory) reaches the run at its next step.
-    await save_memory(runtime.memory, f"The user's favourite colour is {COLOUR}.", ["aboutme"], None, None)
+    await save_memory(runtime.memory, f"The user's favourite colour is {COLOUR}.", ["aboutme"], None, None, None)
     async with asyncio.timeout(RUN_TIMEOUT_S):
         finished: RunRecord = await manager.wait(run.id)
     assert finished.status == "done", finished.result

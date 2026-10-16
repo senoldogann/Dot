@@ -551,6 +551,8 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         agent_id=row["agent_id"],
         used_count=row["used_count"],
         last_used_at=row["last_used_at"],
+        expires_at=row["expires_at"],
+        replaced_by=row["replaced_by"],
     )
 
 
@@ -628,6 +630,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("used_count", "INTEGER NOT NULL DEFAULT 0"),
     ("last_used_at", "REAL"),
     ("agent_id", "TEXT"),
+    # Item 306: notes held until they were changed, and none was put aside for a newer one.
+    ("expires_at", "REAL"),
+    ("replaced_by", "TEXT"),
 )
 # Columns of ``schedules`` added later: NULL means "what the configuration says when the schedule fires", which is how
 # the schedules of an older database ran.
@@ -860,6 +865,19 @@ class Store:
             (key, value),
         )
         await self._db.commit()
+
+    @_writing
+    async def kv_update(self, key: str, update: Callable[[str | None], str]) -> str:
+        """Set ``key`` to what ``update`` makes of its value (``None`` while it has none), read and written in one write
+        that no other one interleaves; returns the value set."""
+        row: aiosqlite.Row | None = await self._one("SELECT value FROM kv WHERE key = ?", (key,))
+        value: str = update(None if row is None else str(row["value"]))
+        await self._db.execute(
+            "INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+        await self._db.commit()
+        return value
 
     # ----- threads and messages ------------------------------------------------------------
 
@@ -1752,6 +1770,16 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def run_sites(self, run_id: str) -> list[str]:
+        """The sites a run's calls reached (the ``site`` of its ``tool_result`` events: page hosts and applications),
+        the one it reached most often first (item 308)."""
+        rows = await self._all(
+            "SELECT json_extract(data, '$.site') AS site FROM events WHERE run_id = ? AND kind = 'tool_result'"
+            " AND coalesce(json_extract(data, '$.site'), '') != '' GROUP BY site ORDER BY COUNT(*) DESC, site",
+            (run_id,),
+        )
+        return [str(row["site"]) for row in rows]
+
     async def read_outside(self, run_id: str, kinds: Sequence[str], channels: Sequence[str]) -> bool:
         """Whether a run read content third parties can author, from every one of its ``tool_result`` events: one of
         ``kinds`` or over one of ``channels``, or one the run made while it was tainted."""
@@ -2281,7 +2309,8 @@ class Store:
         agent_id: str | None,
         vector: Sequence[float] | None,
     ) -> MemoryRecord:
-        record: MemoryRecord = await self._insert_memory(content, tags, source_run, agent_id, vector)
+        """Add a note that holds until it is changed."""
+        record: MemoryRecord = await self._insert_memory(content, tags, source_run, agent_id, vector, None)
         await self._db.commit()
         return record
 
@@ -2292,10 +2321,11 @@ class Store:
         source_run: str | None,
         agent_id: str | None,
         vector: Sequence[float] | None,
+        expires_at: float | None,
     ) -> tuple[MemoryRecord, bool]:
         """Add a note unless one that a run of ``agent_id`` is handed has this text already (saved meanwhile, in this
         process or another; :meth:`find_memory_by_content`): the look and the add are one transaction. Returns the note
-        with the text and whether it was added."""
+        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never."""
         outcome: list[tuple[MemoryRecord, bool]] = []
 
         async def statements() -> None:
@@ -2303,7 +2333,9 @@ class Store:
             if row is not None:
                 outcome.append((_memory(row), False))
             else:
-                outcome.append((await self._insert_memory(content, tags, source_run, agent_id, vector), True))
+                outcome.append(
+                    (await self._insert_memory(content, tags, source_run, agent_id, vector, expires_at), True)
+                )
 
         await self._unit(statements)
         return outcome[0]
@@ -2315,6 +2347,7 @@ class Store:
         source_run: str | None,
         agent_id: str | None,
         vector: Sequence[float] | None,
+        expires_at: float | None,
     ) -> MemoryRecord:
         """The statements that add a note, in the caller's transaction."""
         now: float = time.time()
@@ -2328,12 +2361,14 @@ class Store:
             agent_id=agent_id,
             used_count=0,
             last_used_at=None,
+            expires_at=expires_at,
+            replaced_by=None,
         )
         tag_text: str = ",".join(record.tags)
         await self._db.execute(
-            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?)",
-            (record.id, content, tag_text, now, now, source_run, agent_id),
+            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at),
         )
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -2448,11 +2483,29 @@ class Store:
         return None if row is None else _memory(row)
 
     @_writing
-    async def wake_memory(self, memory_id: str, tags: Sequence[str], when: float) -> MemoryRecord:
-        """Give a note ``tags`` and write it anew at ``when`` (its ``updated_at``): a resting lesson learnt again is
-        awake, and its rest is counted from now. Its text and vector stay."""
+    async def wake_memory(
+        self, memory_id: str, tags: Sequence[str], when: float, expires_at: float | None
+    ) -> MemoryRecord:
+        """Give a note ``tags`` and write it anew at ``when`` (its ``updated_at``), holding until ``expires_at``: a
+        resting lesson learnt again is awake, its rest is counted from now, and no newer note replaces it. Its text and
+        vector stay."""
         tag_text: str = ",".join(tags)
-        await self._db.execute("UPDATE memories SET tags = ?, updated_at = ? WHERE id = ?", (tag_text, when, memory_id))
+        await self._db.execute(
+            "UPDATE memories SET tags = ?, updated_at = ?, expires_at = ?, replaced_by = NULL WHERE id = ?",
+            (tag_text, when, expires_at, memory_id),
+        )
+        await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    @_writing
+    async def retire_memory(self, memory_id: str, tags: Sequence[str], replaced_by: str) -> MemoryRecord:
+        """Put a note aside for the newer note ``replaced_by`` (item 306): it rests with ``tags`` (which hold ``rest``)
+        and says what replaced it; its text, its vector and ``updated_at`` stay, as with :meth:`set_memory_tags`."""
+        tag_text: str = ",".join(tags)
+        await self._db.execute(
+            "UPDATE memories SET tags = ?, replaced_by = ? WHERE id = ?", (tag_text, replaced_by, memory_id)
+        )
         await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
         await self._db.commit()
         return await self.get_memory(memory_id)
@@ -2488,11 +2541,16 @@ class Store:
         )
         return [_memory(row) for row in rows]
 
+    async def handed_memory_ids(self, run_id: str) -> set[str]:
+        """The notes run ``run_id`` was handed so far, however it was handed them (item 308)."""
+        rows = await self._all("SELECT DISTINCT memory_id FROM memory_uses WHERE run_id = ?", (run_id,))
+        return {str(row["memory_id"]) for row in rows}
+
     @_writing
     async def mark_memories_used(self, run_id: str, memory_ids: Sequence[str], when: float, how: MemoryUseHow) -> None:
         """Count one more use of each note, at ``when``, and record that run ``run_id`` was handed it (``how``: at its
-        start, by a search, or as a changed note); the note's ``updated_at`` stays. The use is scored once the run
-        ends (:meth:`close_memory_uses`)."""
+        start, by a search, as a changed note, or as a lesson of a site it reached); the note's ``updated_at`` stays.
+        The use is scored once the run ends (:meth:`close_memory_uses`)."""
         if not memory_ids:
             return
         marks: str = ",".join("?" for _ in memory_ids)
@@ -2510,7 +2568,8 @@ class Store:
         """The notes the owner saved as lessons from a run's page (a ``lesson_saved`` event by the owner)."""
         rows = await self._all(
             "SELECT json_extract(data, '$.memory_id') AS memory_id FROM events"
-            " WHERE kind = 'lesson_saved' AND json_extract(data, '$.by') = 'owner'",
+            # An event stored before ``by`` was written is the owner's (``_SavedData``).
+            " WHERE kind = 'lesson_saved' AND coalesce(json_extract(data, '$.by'), 'owner') = 'owner'",
             (),
         )
         return {str(row["memory_id"]) for row in rows if row["memory_id"] is not None}

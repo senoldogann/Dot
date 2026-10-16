@@ -5243,6 +5243,14 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 302 | Lessons are saved on their own, after a second look                                   | in progress |         |
 | 303 | Memory, lessons and skills: the audit's fixes                                         | in progress |         |
 | 304 | The code review's second fixes                                                        | in progress |         |
+| 305 | Runs side by side keep to each other's apps, files and browser, by every path          | in progress |         |
+| 306 | Stale knowledge steps aside on its own: notes, lessons and skills                      | in progress |         |
+| 307 | Dot builds its own team within its bounds, listed under Agents                         | in progress |         |
+| 308 | What was learned on a site comes back there; the stats show the trend                  | in progress |         |
+| 309 | The daemon serves the pages it started with, so pages and API never part               | in progress |         |
+| 310 | A chat whose helpers work writes on its page only what changed                         | in progress |         |
+| 311 | On an iPhone and an iPad a field has the size it has on the Mac                        | in progress |         |
+| 312 | A compaction is a quiet line in the chat, with the context's size before and after     | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12972,16 +12980,204 @@ that a flaky test of item 300 turned out to be. Each fix has a test that fails o
   (`GIT_SSH_COMMAND`, `PAGER`, `DYLD_INSERT_LIBRARIES`, ...), `git -c` and `git config` with settings that run
   something, and a part of a path only the running line knows in front of a protected location are judged or ask.
   `tests/unit/test_shell_policy.py` (19 new hidden or protected lines).
-- The sandbox's writes (`policy/sandbox.py`, `tools/shell.py`): in the sandbox, a shell command the guard reads as
-  plain work in its workspace writes only there, in the temporary folders and in `[shell] allow_write` (the caches of
-  the usual developer tools by default). The network is not held: a gate for new hosts is a decision of its own. The
-  owner's `config.toml` has the sandbox off, so the owner's runs are unchanged. `tests/unit/test_sandbox_profile.py`
-  (a real `sandbox-exec`).
 - K2 follow-up (`browser/session.py`): a new tab's redirect guard was begun twice, and the second call returned while
   the first was still setting it up, so the tab's first navigation could reach Dot's interface by a redirect (9 reads
   of 160 before, none of 150 after). One set-up is shared and awaited by each caller, and a refused navigation's reset
   to a blank page is tried again when Chrome's error page interrupts it. `tests/smoke/test_browser_boundary.py` (ten
   reads with the guard's session slowed: ten reached the interface before).
+
+## Part 53: runs that respect each other, memory that sheds the stale, Dot's own team, better each day (2026-10-16)
+
+The owner's sixty-first word, on 2026-10-16: "1. Birden fazla session calısırken birbirleinini browswerlerşne ve
+islemlerine saygı göstermeliler 2. Memory ve learng process Gerçektke kusursuz olmalı ve eskiyen bilgi otomatik atılmalı
+cıkarılmalı 3. Ajanımız kendine agent takımı oluşturabilmeli ve o agentler agents altında listelenmeli gerektiğinde
+kullanabilmeli Browser kullanımı ve computer use her gün daha iyi gelişmeli." (Several sessions at work must respect
+each other's browsers and work; memory and learning must be flawless, and stale knowledge must be thrown out on its own;
+Dot must be able to build a team of agents for itself, listed under Agents, and use it when needed; browser and computer
+use must get better every day.) Built in the worktree `item-305-sessions-memory-teams` from `3202bb6` with main's
+uncommitted work as its base, not committed: the owner ports it. The progress record, with every command and its output,
+is `reports/oturum-hafiza-ekip-2026-10-16.md` (kept out of the repository).
+
+### 305. Runs side by side keep to each other's apps, files and browser, by every path
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** Item 301's footprints had gaps a second run could walk through: a batch of desktop steps was
+checked only for its first application; an AppleScript drove any application without a footprint; app names matched
+by case; the conflict check and the footprint were apart, so two runs waiting for approval could both go; a shell
+command changed files without a trace; a run that ended took its changes with it, so a run of another chat could write
+over them unread; and the browser's mode and debugging port could change under another chat's run between its steps.
+
+**As built (2026-10-16).** `agent/peers.py`: `Peers.take` (the check and the footprint in one step, right before the
+call, also after an approval), `take_app` (each step of a desktop batch), app names without regard to case, the
+applications a script names (`tools/apple.py` `script_apps`, System Events left out), the files of an ended run kept for
+the other chats' runs at work (`left`) until they read them, and a deleted folder that covers its files.
+`policy/shell.py`: `ShellAssessment.changes`, the files a line writes or deletes as far as it names them (redirects,
+`rm`, `cp`/`mv`/`install`/`ditto`/`rsync`/`ln`, `tee`, `truncate`, `sed -i`), which never change the judgement (427
+lines of the shell tests judged the same before and after); the shell lines of an AppleScript count the same, also in a
+script that drives free applications. `browser/session.py` `threads_in_use`: the mode and the debugging port wait for
+the other chats' runs. The prompt: leave the other runs' apps and files to them, and stop or kill no process or app the
+run did not start. README: How a run works. Tests: `tests/unit/test_peers.py` (eleven new), `tests/smoke/test_peers.py`
+(a write approved after another chat's run changed the file is refused).
+
+### 306. Stale knowledge steps aside on its own: notes, lessons and skills
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** A note that had been handed to a run once never rested again; nothing could say a fact holds only
+for a while; a note a newer one contradicted stayed handed beside it; the nightly fold deleted the lesson it folded
+away; and a skill retired twice under one name lost its first copy, as a new skill could take a retired one's name.
+
+**As built (2026-10-16).** Nothing that happens on its own deletes: what goes stale rests, says why on the Memory page,
+and can be woken. `memories.expires_at` and `replaced_by` (added columns); `memory_save` `valid_days` (1 to 3650), and
+the model reads "holds until"; an expired note rests whoever wrote it and is neither handed nor found; Dot's notes rest
+`rest_days` after they were last handed or written; the nightly reflection asks the review model about each newer note
+and the closest older note of Dot's (`outdated_pairs`; never the owner's notes, the lessons the owner saved or `core`;
+at most 12 a night; the older stays when in doubt) and rests the outdated one with `replaced_by`; the fold rests the
+lesson it folds away instead of deleting it; a retired skill keeps its folder and its name. The Memory page says
+"Holds until", "Ran out" or "Replaced by another note", and the Resting hint sits under its name. README: Memory, the
+nightly reflection. Tests: `tests/unit/test_memory_ranking.py`, `test_reflection.py` (the pairs, with each guard),
+`test_playbooks.py`; `tests/smoke/test_memory.py`, `test_outdated_notes.py`, `test_reflection.py`,
+`test_lesson_merge.py`.
+
+### 307. Dot builds its own team within its bounds, listed under Agents
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The owner's data held no agent and no `create_agent` call: the prompt offered a teammate only for
+work that recurs, an agent a run made could get any tool and any model, and its runs read the run's instructions as
+"The owner's instructions to you".
+
+**As built (2026-10-16).** `tools/team.py`: an agent a run makes gets only tools the run has (`ToolContext.run_tools`;
+with none named, an agent's run gives its own bound and Dot's run every tool), a helper model or the run's own, at most
+three a run, none in a research run; the refusals name what they refuse. `agent/prompt.py`: `AgentBrief.made_by_dot`,
+so such an agent opens with "an agent Dot made" and "Dot's instructions to you"; the Team section tells a run to build
+the team the work needs (roles, parallel parts), each member with only the tools of its role, to send several messages
+at once, and to reuse a member before making one. The Agents page says "the agents you or Dot made". README: Agents.
+Tests: `tests/unit/test_team.py`, `test_agents.py`, `test_tool_groups.py`; `tests/smoke/test_team.py` (a chat makes
+three agents, a tool the run lacks and a fourth agent are refused, a member answers in its voice and bounds, and a run
+of another chat sends a member work by name).
+
+### 308. What was learned on a site comes back there; the stats show the trend
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** A learned skill knew its site, but a lesson did not, and a run was handed lessons only by its goal's
+words: a run whose goal did not name the site it went to was not handed what was learned there. `dotx stats` counted
+the act calls of each site but not how the runs on it ended, nor any trend.
+
+**As built (2026-10-16).** `agent/sites.py`: a lesson is tagged with the sites and applications of its run that it names
+(`site-amazon-com`, `site-notes`: the host without `www.` and its main label, or the application's name), and a run that
+first reaches a site or drives an application (one site however its name is written: `www.x.com` and `x.com`)
+(`agent/executor.py` `reached_sites`, the applications an AppleScript names included) is handed after that step the
+lessons tagged with it it was not handed (five at most) and the learned skills written there that its instructions did
+not list (three at most), the lessons counted as handed (`memory_uses.how = 'site'`); the timeline says where they were
+learned. `store/stats.py`: per site the finished runs that acted there and the share done, and per day the same for
+every site (`dotx stats` Sites and By day). README: Memory, `dotx stats`. Tests: `tests/unit/test_sites.py`,
+`test_run_statistics.py`, `test_store_writes.py` (a site's lessons are counted under the store's write lock);
+`tests/smoke/test_site_knowledge.py` (browser: a chat opens a page served on this Mac and is handed its lesson and its
+skill, and not another site's), `tests/smoke/test_lessons.py` (browser: a lesson that names the page's host, kept by the
+second look or saved anyway, carries its tag).
+
+### 309. The daemon serves the pages it started with, so pages and API never part
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The owner's word on 2026-10-16: "mobilde sohbetlere girildiğinde ekteki hatayı alıyorum bunuda
+düzelt lütfen aymı şekil web ve desktopda da ve memory sayfasina girdigimizde not found hatasi geliyor bu problemide bul
+düzelt" (opening a chat on the phone shows the attached error, "undefined is not an object (evaluating 'text.replace')",
+and so it does on the web and the desktop; the Memory page says "Not Found"). The daemon had run since 2026-10-15 21:57
+with the Python of `427c51e`; two merges (`b4e554f`, `3202bb6`) and a batch of work ported in at 08:18 changed the code
+under it, and it was not started again. The UI files were read from disk on every request, so the pages were today's
+while the API was the day before's: a chat's page clips `detail.title` (item 295), which that daemon does not send
+(`clip(undefined)`), and the Memory page reads `/api/memories/learning`, a route it does not have (404). The digest of
+the pages (item 190) was taken at the start while the files were served as they were later, so no page said it was out
+of date. Both errors were reproduced in a throw-away home with the Python of `427c51e` and today's pages, and neither
+with today's tree whole. A tool's cache in `static/js` (`.mypy_cache`, 20 MB) was served and counted in the digest too.
+
+**As built (2026-10-16).** `server/kept_pages.py`: `keep_pages` reads the pages when the app is made, hidden files left
+out; `ServedPages` serves them as `StaticFiles(html=True)` served the folder (GET and HEAD, `/` and a folder's
+`index.html` behind its `/`, 304 to an ETag the browser holds, 404, 405); `pages_build` is the digest of the kept pages,
+so the status tells what is served. `server/app.py` mounts them instead of the folder. The owner chose this over the
+files read live, and to port items 305 to 309 and restart the daemon once. README: the web UI. Tests:
+`tests/unit/test_pages_build.py` (the digest leaves hidden files out; a file changed, added or removed on disk after the
+start is served as it was or not at all; 304, HEAD, 405 and a folder's redirect), `tests/smoke/test_server.py` (the app
+`create_app` makes serves `js/dom.js` as it was, after the file changed, and its status tells the digest of then).
+
+### 310. A chat whose helpers work writes on its page only what changed
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The owner's word on 2026-10-16: "Sayfa kendini sürekli render ediyor belirli araliklarla acaba
+subagentlerden dolayi mi yoksa baska bir sey mi sürekli. mesela [a screenshot] su an bir sohbet calisiyor." (the page
+draws itself again and again at intervals, is it the helpers or something else; a chat is running now), with a phone's
+screenshots of a chat whose three helpers worked and of Settings › Models. On a daemon served in a throw-away home,
+whose stand-in model has a chat hand three helpers a part each, the chat's page in Chrome changed 2074 times on screen
+in ten seconds at 390 px, 1798 of them a text put in place of one that read the same, and 2057 times at 1280 px (1743).
+Every event of the chat and of its helpers drew each helper's row and time, the head of their group, the line over the
+composer and a helper's card again; a `textContent` set to the text it already holds is a new text node, laid out and
+painted anew. A helper's line read `step N` at each reply of its model and lost its tool's name until the tool started.
+Settings › Models and Rules, Activity and Agents changed nothing on screen in ten seconds each while the chat and its
+helpers worked, before as after: the redraw the owner saw on Models was not reproduced.
+
+**As built (2026-10-16).** `dom.js` `setText` writes a node's text only when it reads otherwise. The timeline (a group's
+head, the helpers' head, a helper's row and its time), a helper's card, the line over the composer, the details, the
+cost card, the helpers' list, the count of the helpers' pill, the composer's pills, the inspector's tab counts, the
+sidebar's ages and working times, a background command's time and the shell's connection and waiting count write through
+it, or keep what they drew and draw it again only when it changed (a helper's line, a helper card's model, the details'
+status, calls, tokens and context, the cost card, the approvals picker's report). A reply whose model calls a tool
+leaves the helper's line to that tool's start, so the tool's name stays until the next tool. Measured the same way
+after: 207 changes on screen in ten seconds at 390 px and 194 at 1280 px, none of them a text written again as it was
+(the helpers' times, their lines and the time over the composer). Tests: `tests/smoke/test_quiet_helpers.py` (browser: a
+chat hands three helpers a part each, and for four seconds at 390 px no text on its page is written again as it read,
+while the helpers' time and every helper's line move on; on the code before it fails with 3456 texts written again in
+those four seconds).
+
+### 311. On an iPhone and an iPad a field has the size it has on the Mac
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The owner's word on 2026-10-16: "Ayrica mobil tasarim harika olmus fakat bazi placeholderlar
+text-size olarak cok büyük görünüyor ve drodpown menu icindeki deger [a screenshot] umarim desktop ve web tarafida bunu
+kadar harika ve temiz olur, her bir sayfa cok lnemki. Kolay kullanilabilinir, bulunabilinir ve dogru calisan" (the
+phone's design came out great, but some placeholders look far too big, and so does the value in a dropdown; may the
+desktop and the web be as great and clean, every page easy to use, to find and working right), with screenshots of
+Settings › Models and Settings › Rules on their iPhone. Item 275 gave every field at least 16 px on a touch screen and
+in a window up to 720 px wide, so that iOS would not zoom the page into a field as it gets the focus. In WebKit as an
+iPhone 17 Pro Max the selects of Models, the fields of Rules and the composer were 16 px, a model's select beside its 14
+px label, where the Mac has 13, 14 and 15 px; a window on the Mac up to 720 px wide had them at 16 px too, with no touch
+to zoom.
+
+**As built (2026-10-16).** `boot.js`: on an iPhone or an iPad (an iPad that asks for the desktop's pages says it is a
+Mac with a touch screen) the viewport allows no scale past the first (`maximum-scale=1`), so that iOS has no room to
+zoom into a field, and the page carries `data-focus-zoom="off"`; `app.css` keeps the 16 px floor for the other touch
+screens (`pointer: coarse`) only, so a window on the Mac keeps its fields' sizes at any width. Measured after in WebKit
+as an iPhone 17 Pro Max: Models' selects 13 px, Rules' fields 14 and 13 px, the composer 15 px, as on the Mac; Chrome as
+a Pixel 7 keeps 16 px. Not verified on a device: that iOS 26 does not zoom into a field under 16 px once the viewport
+says `maximum-scale=1` (the WebKit of these tests is not iOS's and cannot show it), and whether a pinch still zooms the
+app on the home screen. README: the composer, the phone. Tests: `tests/smoke/test_phone_fit.py` (on an iPhone the
+viewport holds the scale on every page and a field has the size it has on the Mac, 13, 14 and 15 px; on a Pixel 7 16 px;
+both fail on the code before), `test_phone_pages.py` (the composer keeps its chosen size, 15 px, at every width).
+
+### 312. A compaction is a quiet line in the chat, with the context's size before and after
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The owner's word on 2026-10-16: "ve chat icinde compacted olayini ekteki fotgoraftaki gibi
+gösterelim eger mümkünse chat icinde" (show the compaction in the chat as in the attached picture, if possible), with a
+screenshot of Codex's conversation: a rule across the column with "Context compacted 401K → 17.1K tokens" in its middle.
+Since item 260 the conversation showed nothing of a compaction (the Details panel counts them), and the `compacted`
+event did not say the size of the context.
+
+**As built (2026-10-16).** `agent/loop.py`: the `compacted` event carries the estimated size of the prompt before and
+after the compaction (`tokens_before`, `tokens_after`, calibrated as the budget is). `timeline.js`: a compaction of the
+run is a line across the conversation where it happened, an icon of arrows pointing in (`minimize`, Lucide's) and
+"Context compacted 401k → 17k tokens", or "Context compacted" for an event of before; it ends the group of steps it
+falls in, as a note does. The Details panel's count and its checks stay (item 260). `app.css` `.compaction-line`.
+README: How a run works. Tests: `tests/smoke/test_quiet_compaction.py` (browser: a run that compacted twice shows the
+two lines, the first with the sizes, wide and on a phone, light and dark, and no note of the summary or its check),
+`tests/smoke/test_scaffold.py` (in the real loop each compaction says the sizes, smaller after and inside the budget);
+on the code before they fail with no line and `KeyError: 'tokens_before'`.
 
 ## Log
 
@@ -13719,3 +13915,7 @@ that a flaky test of item 300 turned out to be. Each fix has a test that fails o
 - 2026-10-16 (Opus 5.5): item 298 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): Dot's computer opens over the whole phone with its address, Dot has control and Take over.
 - 2026-10-16 (Opus 5.5): item 299 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): a resumed turn opens with a bolt, Dot restarted and resumed this turn, which opens to how the run was cut off.
 - 2026-10-16 (Opus 5.5): item 300 merged as `3202bb6` (PR #325; no Linear issue, the connector was signed out): in Dot's own Chrome every request is checked, each redirect hop and a popup's first request too; the daemon refuses a cross-site navigation to its interface; `terminal_send` no longer blocks the daemon on a program that does not read; a learned skill's YAML is written by the YAML library, and an unreadable one is left out. Items 284 and 301 to 304 are built on `item-300-tools-and-learning`; item 76's reading is still due on or after 2026-10-18.
+- 2026-10-16 (Opus 5.5): items 305 to 308 built in the worktree `item-305-sessions-memory-teams` from `3202bb6` with main's uncommitted work as its base, and not committed. Two read-only reviews against the done criteria found two defects (`mark_memories_used` had lost the store's write lock, and a script that names a free application skipped the check of the files it changes), both fixed with a test that fails without the fix. The progress record, with the commands and their output and the one change no test reaches (a batch of desktop steps stopping at another run's application, which needs a screen), is `reports/oturum-hafiza-ekip-2026-10-16.md`.
+- 2026-10-16 (Opus 5.5): item 309, for the owner's word that a chat on the phone stopped with `text.replace` and the Memory page said Not Found: the daemon, started at `427c51e`, served the pages from disk, which had moved on (a run's `title`, the route `/memories/learning`); it now serves the pages it read when it started. With the owner's go-ahead, items 305 to 309 were copied into main's working tree at 14:38 EEST (61 changed and 5 new files; the 768 files of the worktree equal in main) and the daemon was restarted once at 14:38:30. A run of a schedule, hung since 01:52 in an OpenCode bash call that never answered, was cut off by the restart; a schedule started the same task again in a new chat. Nothing committed; the record is the same report.
+- 2026-10-16 (Opus 5.5): items 310 and 311, for the owner's word that the page draws itself again and again while a chat runs and that a phone's placeholders and a dropdown's value look too big. Every event of a chat and its helpers wrote each helper's row, their group's head and the line over the composer again with the same text (1798 of 2074 changes on screen in ten seconds at 390 px); now only what changed is written (207 changes, none the same). On an iPhone and an iPad the viewport allows no scale past the first and a field has the size it has on the Mac (13, 14 and 15 px where it was 16); other touch screens keep the 16 px floor, and a narrow window on the Mac no longer has it. Built in the worktree `item-305-sessions-memory-teams`, not committed; the record is `reports/yeniden-cizim-ve-alan-boyutu-2026-10-16.md`.
+- 2026-10-16 (Opus 5.5): item 312, for the owner's word to show a compaction in the chat as Codex does: a quiet line where it happened with the context's size before and after ("Context compacted 401k → 17k tokens"), the `compacted` event carrying the two sizes. Built in the worktree `item-305-sessions-memory-teams`, not committed. The owner's same word and the one before it (xAI's Grok Bot, Codex's plugins and skills pages, the composer's plugins) are answered by a plan not yet taken into this roadmap: `reports/grok-bot-ve-codex-plani-2026-10-16.md`.

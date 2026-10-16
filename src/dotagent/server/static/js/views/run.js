@@ -15,7 +15,7 @@ import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
-import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, showAfter } from "../dom.js";
+import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -1180,7 +1180,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       if (!signal.aborted) {
         inspector.setCount("agents", count === 0 ? "" : String(count));
         helpersButton.hidden = count === 0;
-        helpersCount.textContent = String(count);
+        setText(helpersCount, String(count));
       }
     } catch (error) {
       if (!signal.aborted) {

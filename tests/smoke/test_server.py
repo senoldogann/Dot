@@ -1,4 +1,4 @@
-"""The local server end to end, against a real runtime: the guard, the JSON API and the event streams.
+"""The local server end to end, against a real runtime: the guard, the JSON API, the event streams and the pages.
 
 Requests reach the application through an ASGI transport, except the tests of live streams, which go through a real
 uvicorn server on a free port. The runs use the real local Ollama server and a cloud model; the tests that need it are
@@ -9,6 +9,7 @@ import asyncio
 import base64
 import io
 import secrets
+import shutil
 import time
 from collections.abc import AsyncIterator
 from contextlib import aclosing
@@ -36,10 +37,11 @@ from dotagent.desktop.perms import check_permissions, responsible_program
 from dotagent.desktop.types import Permissions
 from dotagent.llm.types import ChatProvider, ImageData, Message
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.server.app import create_app
+from dotagent.server.app import STATIC_DIR, create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.guard import daemon_proof
+from dotagent.server.kept_pages import keep_pages
 from dotagent.server.links import ui_url
 from dotagent.server.views import PermissionsView
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
@@ -310,6 +312,29 @@ async def test_pages_carry_strict_headers_and_there_is_no_interactive_documentat
     assert (await client.get("/api/status")).headers["cache-control"] == "no-store"
     for path in ("/docs", "/redoc", "/openapi.json", "/api/openapi.json"):
         assert (await client.get(path)).status_code == 404, path
+
+
+async def test_the_pages_are_served_as_they_were_when_the_daemon_started(
+    runtime: Runtime, manager: RunManager, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 309: the UI files the daemon serves, and the digest its status tells of them, are those it read when it
+    started. A file changed on disk afterwards (a merge, a batch of work ported in) waits for the next start, so that
+    the pages never ask this daemon's API for what only a newer one answers."""
+    pages: Path = tmp_path / "static"
+    shutil.copytree(STATIC_DIR, pages, ignore=shutil.ignore_patterns(".*"))
+    monkeypatch.setattr("dotagent.server.app.STATIC_DIR", pages)
+    started: str = keep_pages(pages).build
+    app = create_app(_context(runtime, manager, PORT, asyncio.Event()))
+    script: Path = pages / "js" / "dom.js"
+    kept: str = await asyncio.to_thread(script.read_text, encoding="utf-8")
+    newer: str = "export function clip(text) { return text.replace(/\\s+/g, ' '); }\n"
+    await asyncio.to_thread(script.write_text, newer, encoding="utf-8")
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url=BASE, headers={"Authorization": f"Bearer {TOKEN}"}
+    ) as http:
+        served: httpx.Response = await http.get("/js/dom.js")
+        assert (served.status_code, served.text) == (200, kept)
+        assert (await http.get("/api/status")).json()["pages"] == started != keep_pages(pages).build
 
 
 async def test_a_malformed_request_is_answered_with_what_is_wrong(client: httpx.AsyncClient) -> None:

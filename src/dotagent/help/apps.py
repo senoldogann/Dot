@@ -158,6 +158,25 @@ def _app(bundle: Path, info: dict[str, object]) -> HelpItem:
     )
 
 
+def app_identities(roots: Sequence[Path]) -> dict[str, frozenset[str]]:
+    """The bundle ids of the applications in ``roots`` (the ``.app`` bundles right in each one), by each name a script
+    may call one by, case folded: its bundle's name without ``.app``, its ``CFBundleName`` and its
+    ``CFBundleDisplayName``. A name two applications share names both."""
+    found: dict[str, set[str]] = {}
+    for root in roots:
+        if not root.is_dir():
+            continue
+        for bundle in sorted(root.glob("*.app")):
+            info: dict[str, object] | None = bundle_info(bundle)
+            identifier: object = None if info is None else info.get("CFBundleIdentifier")
+            if info is None or not isinstance(identifier, str):
+                continue
+            for name in (bundle.stem, info.get("CFBundleName"), info.get("CFBundleDisplayName")):
+                if isinstance(name, str) and name.strip():
+                    found.setdefault(name.strip().casefold(), set()).add(identifier)
+    return {name: frozenset(identifiers) for name, identifiers in found.items()}
+
+
 def scriptable_apps(roots: Sequence[Path]) -> list[HelpItem]:
     """The scriptable applications in ``roots`` (the ``.app`` bundles right in each one; a root that does not exist
     holds none), each name once: of two applications with one name, only the one of the first root counts, scriptable

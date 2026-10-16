@@ -69,6 +69,7 @@ _FAMILIES: dict[str, str] = {
     "playbooks-list": "dotagent.cli_playbooks",
     "playbooks-show": "dotagent.cli_playbooks",
     "playbooks-drop": "dotagent.cli_playbooks",
+    "playbooks-trust": "dotagent.cli_playbooks",
     "prune": "dotagent.cli_prune",
     "undo": "dotagent.cli_undo",
     "eval-list": "dotagent.cli_eval",
@@ -284,6 +285,10 @@ def build_parser() -> argparse.ArgumentParser:
     playbooks_show.add_argument("playbook", help="the name shown by 'dotx playbooks list'")
     playbooks_drop = playbooks_commands.add_parser("drop", help="remove a playbook, active or retired")
     playbooks_drop.add_argument("playbook", help="the name shown by 'dotx playbooks list'")
+    playbooks_trust = playbooks_commands.add_parser(
+        "trust", help="offer a playbook learned from third-party content, or of unknown origin, with all its steps"
+    )
+    playbooks_trust.add_argument("playbook", help="the name shown by 'dotx playbooks list'")
 
     prune = commands.add_parser(
         "prune", help="find the screenshot files that no chat names any more and the free space in the database file"

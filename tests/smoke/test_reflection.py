@@ -26,7 +26,6 @@ from dotagent.agent.reflection import last_reflection, reflection_cron
 from dotagent.agent.reflection_record import REFLECTION_KEY, Reflection, summary_line
 from dotagent.agent.review import LESSONS_TOOL, OWNER_TOOL, VET_TOOL
 from dotagent.config import AppConfig, load_default_config
-from dotagent.core.errors import NotFoundError
 from dotagent.core.paths import db_path
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -340,10 +339,10 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
             LESSON_STOPPED: stopped.id,
         }
 
-        # The older twin was folded into the newer, which kept both notes' tags; the stale lesson rests and a search no
-        # longer finds it, while the Memory page still lists it.
-        with pytest.raises(NotFoundError):
-            await store.get_memory(older.id)
+        # The older twin was folded into the newer, which kept both notes' tags, and rests naming it (item 306); the stale
+        # lesson rests and a search no longer finds it, while the Memory page still lists it.
+        twin: MemoryRecord = await store.get_memory(older.id)
+        assert REST_TAG in twin.tags and twin.replaced_by == newer.id
         assert (await store.get_memory(newer.id)).tags == ("lesson", "pdf")
         rested: MemoryRecord = await store.get_memory(stale.id)
         assert rested.tags == (LESSON_TAG, REST_TAG)

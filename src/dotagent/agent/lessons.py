@@ -34,6 +34,7 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
+from dotagent.agent.learning_health import LEARNED, SKIPPED, LearningOutcome, failed_with
 from dotagent.agent.review import (
     LessonProposal,
     LessonRequest,
@@ -46,15 +47,17 @@ from dotagent.agent.review import (
     lesson_writer_for,
     shorten_reason,
 )
+from dotagent.agent.sites import site_tags
 from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
 from dotagent.core.errors import DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.text import fold_search, redact_secrets
+from dotagent.core.text import fold_search, redact_known, redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.memory.service import MemoryHit, SavedMemory, normalize_text, recall_for, save_memory
 from dotagent.memory.words import lowercase, search_terms
 from dotagent.runtime import Runtime
+from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, RunMode, RunStatus
 
@@ -234,16 +237,23 @@ def run_signals(
     return tuple(_one_line(redact_secrets(line)) for line in lines)
 
 
-def lesson_problem(text: str, max_chars: int) -> str | None:
+def contains_secret(text: str, secrets: Sequence[str]) -> bool:
+    """Whether ``text`` holds a secret (review Y3): one of ``secrets``, the values Dot holds
+    (:func:`dotagent.secrets.known_secrets`), word for word, the value of a key that names a secret, or a key or a
+    token of a known form; "task-management" and "risk-free" are no ``sk-`` key (review Y4)."""
+    return redact_known(text, secrets) != text
+
+
+def lesson_problem(text: str, max_chars: int, secrets: Sequence[str]) -> str | None:
     """Why ``text`` is not a lesson by itself, or ``None`` when it may be one. ``max_chars`` is the longest a lesson may
-    be."""
+    be; ``secrets`` are the values Dot holds (:func:`contains_secret`)."""
     if "\n" in text.strip():
         return "more than one line"
     if len(text) < _MIN_CHARS:
         return "too short"
     if len(text) > max_chars:
         return "too long"
-    if redact_secrets(text) != text:
+    if contains_secret(text, secrets):
         return "a secret"
     if _EMAIL.search(text) is not None:
         return "an e-mail address"
@@ -286,13 +296,17 @@ def repeats(text: str, other: str) -> bool:
     return bool(both) and len(mine & theirs) / len(both) >= _SAME_TERMS
 
 
-def kept_lessons(proposed: Sequence[str], known: Sequence[str], max_chars: int) -> tuple[str, ...]:
+def kept_lessons(
+    proposed: Sequence[str], known: Sequence[str], max_chars: int, secrets: Sequence[str]
+) -> tuple[str, ...]:
     """The lessons of ``proposed`` that are kept, in order: the ones :func:`lesson_problem` finds nothing wrong with
-    that repeat neither an earlier lesson nor a ``known`` text (the goal, the saved notes)."""
+    (``secrets`` are the values Dot holds) that repeat neither an earlier lesson nor a ``known`` text (the goal, the
+    saved notes)."""
     kept: list[str] = []
     for text in proposed:
         lesson: str = text.strip()
-        if lesson_problem(lesson, max_chars) is None and not any(repeats(lesson, other) for other in (*kept, *known)):
+        problem: str | None = lesson_problem(lesson, max_chars, secrets)
+        if problem is None and not any(repeats(lesson, other) for other in (*kept, *known)):
             kept.append(lesson)
     return tuple(kept)
 
@@ -331,7 +345,10 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
         )
     )
     kept: tuple[str, ...] = kept_lessons(
-        proposal.lessons, (case.goal, *known), min(_MAX_CHARS, runtime.config.memory.max_chars)
+        proposal.lessons,
+        (case.goal, *known),
+        min(_MAX_CHARS, runtime.config.memory.max_chars),
+        await asyncio.to_thread(known_secrets),
     )
     threshold: float = runtime.config.memory.similar_threshold
     fresh: list[str] = []
@@ -343,9 +360,12 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     return tuple(fresh)
 
 
-async def _failed(runtime: Runtime, run_id: str, error: DotError, what: str) -> None:
+async def _failed(runtime: Runtime, run_id: str, error: DotError, what: str) -> str:
+    """Say on the run that its lessons failed (``what``, and the error); returns what it says."""
     log.warning("lessons_failed", run_id=run_id, what=what, error=error.message, context=error.context)
-    await runtime.bus.emit(run_id, LESSONS_FAILED, {"error": f"{what}: {shorten_reason(error.message)}"}, True)
+    said: str = f"{what}: {shorten_reason(error.message)}"
+    await runtime.bus.emit(run_id, LESSONS_FAILED, {"error": said}, True)
+    return said
 
 
 async def _agent_of(store: Store, run_id: str) -> str | None:
@@ -387,15 +407,16 @@ async def vet_lessons(runtime: Runtime, case: LessonCase, lessons: tuple[str, ..
     return vetted(lessons, checked, vetting)
 
 
-async def _decide_all(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase, lessons: tuple[str, ...]) -> None:
+async def _decide_all(
+    runtime: Runtime, deciding: asyncio.Lock, case: LessonCase, lessons: tuple[str, ...]
+) -> str | None:
     """``auto``: save every lesson the second look keeps and dismiss the others with why, each under ``deciding`` and
     only while the owner has not decided it first. An error (a review model, an embedding service that fails) stops it,
-    and the lessons not decided stay proposed with the error."""
+    and the lessons not decided stay proposed with the error, which it returns (``None`` when there was none)."""
     try:
         left_out: tuple[str | None, ...] = await vet_lessons(runtime, case, lessons)
     except DotError as error:
-        await _failed(runtime, case.run_id, error, "The lessons of this run could not be checked")
-        return
+        return await _failed(runtime, case.run_id, error, "The lessons of this run could not be checked")
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
     for index, (lesson, why) in enumerate(zip(lessons, left_out, strict=True)):
         async with deciding:
@@ -406,11 +427,18 @@ async def _decide_all(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase
                 await _emit_dismissed(runtime, case.run_id, index, "auto", why)
                 continue
             try:
-                saved: SavedMemory = await save_memory(runtime.memory, lesson, (LESSON_TAG,), case.run_id, agent_id)
+                saved: SavedMemory = await save_memory(
+                    runtime.memory,
+                    lesson,
+                    await lesson_tags(runtime.store, case.run_id, lesson),
+                    case.run_id,
+                    agent_id,
+                    None,
+                )
             except DotError as error:
-                await _failed(runtime, case.run_id, error, "A lesson could not be saved")
-                return
+                return await _failed(runtime, case.run_id, error, "A lesson could not be saved")
             await _emit_saved(runtime, case.run_id, index, saved, "auto")
+    return None
 
 
 async def _emit_saved(runtime: Runtime, run_id: str, index: int, saved: SavedMemory, by: SavedBy) -> None:
@@ -426,16 +454,17 @@ async def _emit_dismissed(runtime: Runtime, run_id: str, index: int, by: SavedBy
     await runtime.bus.emit(run_id, LESSON_DISMISSED, {"index": index, "by": by, "reason": reason}, True)
 
 
-async def learn(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase) -> None:
+async def learn(runtime: Runtime, deciding: asyncio.Lock, case: LessonCase) -> LearningOutcome:
     """Draw the lessons of a run that ended and do with them what ``[agent] lessons`` says; ``auto`` saves each under
-    ``deciding``, the lock of the owner's decisions. A run along which nothing went wrong is not asked about. An error
-    on the way (a review model or an embedding service that fails, the review model's missing API key) ends it with a
-    ``lessons_failed`` event; the run keeps its end either way."""
+    ``deciding``, the lock of the owner's decisions. A run along which nothing went wrong is not asked about
+    (``skipped``). An error on the way (a review model or an embedding service that fails, the review model's missing
+    API key) ends it with a ``lessons_failed`` event and fails it; the run keeps its end either way."""
     signals: tuple[str, ...] = await stored_signals(runtime.store, case)
     if not signals:
         log.info("lessons_skipped", run_id=case.run_id, reason="nothing went wrong on the way")
-        return
-    await learn_from(runtime, deciding, case, signals)
+        return SKIPPED
+    drawn: DrawnLessons = await learn_from(runtime, deciding, case, signals)
+    return LEARNED if drawn.error is None else failed_with(drawn.error)
 
 
 async def stored_signals(store: Store, case: LessonCase) -> tuple[str, ...]:
@@ -448,23 +477,31 @@ async def stored_signals(store: Store, case: LessonCase) -> tuple[str, ...]:
     )
 
 
+class DrawnLessons(FrozenModel):
+    """The lessons proposed from a run (none when drawing them failed), and what failed on the way, if anything."""
+
+    lessons: tuple[str, ...]
+    error: str | None
+
+
 async def learn_from(
     runtime: Runtime, deciding: asyncio.Lock, case: LessonCase, signals: tuple[str, ...]
-) -> tuple[str, ...]:
-    """Draw the lessons of a run from ``signals`` and do with them what ``[agent] lessons`` says (see :func:`learn`);
-    the lessons proposed, none when drawing them failed."""
+) -> DrawnLessons:
+    """Draw the lessons of a run from ``signals`` and do with them what ``[agent] lessons`` says (see :func:`learn`)."""
     try:
         lessons: tuple[str, ...] = await draw_lessons(runtime, case, signals)
     except DotError as error:
-        await _failed(runtime, case.run_id, error, "The lessons of this run could not be drawn")
-        return ()
+        return DrawnLessons(
+            lessons=(), error=await _failed(runtime, case.run_id, error, "The lessons of this run could not be drawn")
+        )
     if not lessons:
         await runtime.bus.emit(case.run_id, LESSONS_NONE, {}, True)
-        return ()
+        return DrawnLessons(lessons=(), error=None)
     await runtime.bus.emit(case.run_id, LESSONS_PROPOSED, {"lessons": list(lessons), "tainted": case.tainted}, True)
-    if runtime.config.agent.lessons == "auto":
-        await _decide_all(runtime, deciding, case, lessons)
-    return lessons
+    decided: str | None = (
+        await _decide_all(runtime, deciding, case, lessons) if runtime.config.agent.lessons == "auto" else None
+    )
+    return DrawnLessons(lessons=lessons, error=decided)
 
 
 def lessons_of(
@@ -554,6 +591,12 @@ def _conflict(lesson: LessonView, run_id: str) -> RunConflict:
     )
 
 
+async def lesson_tags(store: Store, run_id: str, lesson: str) -> tuple[str, ...]:
+    """The tags of a lesson of the run ``run_id``: ``lesson``, and those of the sites and applications of the run the
+    lesson names (item 308, :func:`dotagent.agent.sites.site_tags`), so that a run reaching one is handed it."""
+    return (LESSON_TAG, *site_tags(lesson, await store.run_sites(run_id)))
+
+
 async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, index: int) -> SavedMemory:
     """Save a lesson of a run that is proposed, or that ``auto`` left out (Save anyway), as a note tagged ``lesson``
     whose source is the run and whose owner is the run's agent (the owner's choice); any other is a conflict. It holds
@@ -564,7 +607,12 @@ async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, ind
         if lesson.state == "saved" or (lesson.state == "dismissed" and lesson.by != "auto"):
             raise _conflict(lesson, run_id)
         saved: SavedMemory = await save_memory(
-            runtime.memory, lesson.text, (LESSON_TAG,), run_id, await _agent_of(runtime.store, run_id)
+            runtime.memory,
+            lesson.text,
+            await lesson_tags(runtime.store, run_id, lesson.text),
+            run_id,
+            await _agent_of(runtime.store, run_id),
+            None,
         )
         await _emit_saved(runtime, run_id, index, saved, "owner")
     return saved

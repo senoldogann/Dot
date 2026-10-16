@@ -154,7 +154,7 @@ def _skill(agent_id: str) -> Playbook:
         goal="Check the claim",
         written_at=time.time(),
         acting_steps=4,
-        read_outside=False,
+        tainted=False,
     )
 
 
@@ -172,7 +172,7 @@ async def _finished(client: httpx.AsyncClient, manager: RunManager, body: dict[s
     return run_id
 
 
-def _agent(tools: list[str]) -> dict[str, object]:
+def _agent(tools: list[str] | None) -> dict[str, object]:
     return {
         "name": "Scout",
         "role": "Finds and checks sources",
@@ -181,7 +181,6 @@ def _agent(tools: list[str]) -> dict[str, object]:
         "effort": None,
         "approvals": "yolo",
         "tools": tools,
-        "every_tool": not tools,
     }
 
 
@@ -295,7 +294,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
 
     # The agent learns for itself (item 94): a lesson of its run and a skill of its own reach its next run, in the
     # prompt's notes and under Skills, and not Dot's run; its page lists them, scored by its own runs.
-    await save_memory(runtime.memory, LESSON, ("lesson",), run_id, agent_id)
+    await save_memory(runtime.memory, LESSON, ("lesson",), run_id, agent_id, None)
     await asyncio.to_thread(write_playbook, playbooks_dir(), _skill(agent_id))
     MODEL.script = ScriptedProvider(_PROVIDER, [FINISH, FINISH])
     second_id: str = await _finished(client, manager, {"goal": "Find two sources on the matter", "agent_id": agent_id})
@@ -424,12 +423,17 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
 ) -> None:
     """The code review's Y5: the editor sent the tools it had listed, none while the list loaded or when it failed,
     and the server took none for every tool; the level of a model the page could not list was dropped too. Save waits
-    for the tools, a level the page cannot show is kept, and the server takes every tool only when it is said."""
-    unsaid = await client.post("/api/agents", json={**_agent([]), "every_tool": False})
+    for the tools, a level the page cannot show is kept, and the server takes every tool only for tools null: an empty
+    list keeps the tools an agent has, and a new agent has none to keep."""
+    unsaid = await client.post("/api/agents", json=_agent([]))
     assert unsaid.status_code == 422, unsaid.text
-    made = await client.post("/api/agents", json={**_agent(["shell"]), "model": "ollama:gone-model", "effort": "high"})
+    bounded: dict[str, object] = {**_agent(["shell"]), "model": "ollama:gone-model", "effort": "high"}
+    made = await client.post("/api/agents", json=bounded)
     assert made.status_code == 201, made.text
     agent_id: str = made.json()["id"]
+    unlisted = await client.put(f"/api/agents/{agent_id}", json={**bounded, "tools": []})
+    assert unlisted.status_code == 200, unlisted.text
+    assert unlisted.json()["tools"] == ["shell"]
     host: str = client.base_url.host
     port: int | None = client.base_url.port
     assert port is not None

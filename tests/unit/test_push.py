@@ -2,21 +2,26 @@
 message the phone shows (or none), and a subscription's push service that says gone makes the subscription go."""
 
 import base64
+import json
 import stat
 from pathlib import Path
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+from pywebpush import WebPushException
 
 from dotagent.events import SYSTEM_RUN_ID
+from dotagent.notify import push
 from dotagent.notify.keys import keys_problem
 from dotagent.notify.push import (
     PushError,
     PushKeys,
     PushMessage,
+    PushTotals,
     gone,
     notice_message,
+    push_event,
     push_message,
     read_or_create_keys,
 )
@@ -215,6 +220,16 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
                 state="failed",
             ),
         ),
+        (
+            "learning_stalled",
+            {"reason": "Drawing lessons from runs failed 3 times in a row: the embedder is down"},
+            PushMessage(
+                title="Dot's learning has stopped",
+                body="Drawing lessons from runs failed 3 times in a row: the embedder is down",
+                route="#/settings/memory",
+                state="failed",
+            ),
+        ),
         ("run_finished", {"status": "done", "result": "Done.", "needs": ""}, None),
     ],
 )
@@ -262,3 +277,68 @@ def test_keys_that_cannot_encrypt_a_message_are_named() -> None:
     assert keys_problem(off_curve, auth) == "p256dh is not a point of P-256"
     assert keys_problem("!!!", auth) == "p256dh is not 65 bytes in URL-safe base64"
     assert keys_problem(p256dh, "c2hvcnQ") == "auth is not 16 bytes in URL-safe base64"
+
+
+class _Answer:
+    """What a push service answers, as pywebpush hands it on in a ``WebPushException``."""
+
+    def __init__(self, status_code: int) -> None:
+        self.status_code: int = status_code
+        self.text: str = f"MARKER-answer-{status_code}"
+
+
+def _usable_keys() -> tuple[str, str]:
+    point: bytes = (
+        ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+    )
+    return base64.urlsafe_b64encode(point).decode("ascii"), base64.urlsafe_b64encode(b"0123456789abcdef").decode(
+        "ascii"
+    )
+
+
+@pytest.mark.asyncio
+async def test_each_subscription_is_pushed_on_its_own_and_the_caller_gets_the_totals(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The code review's Y15: one subscription that fails keeps no other from its message. A push service that calls a
+    subscription gone (410) or keys that cannot encrypt get it deleted; any other refusal is logged and counted, and
+    the subscription kept; the good one gets the message (pywebpush is a fake here: no push service is called)."""
+    answers: dict[str, int] = {"https://push.example/gone": 410, "https://push.example/refusing": 500}
+    taken: list[tuple[str, object]] = []
+
+    def webpush(subscription_info: dict[str, str], data: str, **signing: object) -> None:
+        endpoint: str = subscription_info["endpoint"]
+        if endpoint in answers:
+            raise WebPushException("Push failed", response=_Answer(answers[endpoint]))
+        taken.append((endpoint, json.loads(data)))
+
+    monkeypatch.setattr(push, "webpush", webpush)
+    keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        p256dh, auth = _usable_keys()
+        for endpoint in ("https://push.example/gone", "https://push.example/refusing", "https://push.example/good"):
+            await store.add_push_subscription(endpoint, p256dh, auth)
+        await store.add_push_subscription("https://push.example/unusable", "!!!", auth)
+        totals: PushTotals = await push_event(store, keys, _notice("daemon_restarted", {"runs_cut_off": 0}))
+        assert totals == PushTotals(sent=1, failed=1, removed=2)
+        assert taken == [
+            (
+                "https://push.example/good",
+                {
+                    "title": "Dot restarted after an unexpected stop",
+                    "body": "No run was cut off.",
+                    "route": "#/activity",
+                    "state": "failed",
+                },
+            )
+        ]
+        assert [kept.endpoint for kept in await store.list_push_subscriptions()] == [
+            "https://push.example/refusing",
+            "https://push.example/good",
+        ]
+        # An event the phone is not told of reaches no push service.
+        assert await push_event(store, keys, _notice("run_started", {})) == PushTotals(sent=0, failed=0, removed=0)
+        assert len(taken) == 1
+    finally:
+        await store.close()

@@ -1,6 +1,5 @@
 """The ASGI application: the JSON API, the live streams and the browser UI, behind the local guard."""
 
-import hashlib
 import mimetypes
 from pathlib import Path
 
@@ -8,7 +7,6 @@ from fastapi import FastAPI, Request
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from pydantic import JsonValue, TypeAdapter
 from starlette.exceptions import HTTPException
 
@@ -31,6 +29,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
+from dotagent.server.kept_pages import KeptPages, ServedPages, keep_pages
 from dotagent.server.routes_agents import agents_router
 from dotagent.server.routes_browser import browser_router
 from dotagent.server.routes_campaigns import campaigns_router
@@ -51,8 +50,6 @@ from dotagent.server.views import ErrorView
 log = get_logger(__name__)
 
 STATIC_DIR: Path = Path(__file__).parent / "static"
-# How many hex digits of the digest of the pages (:func:`pages_build`) a page compares.
-_BUILD_DIGITS: int = 16
 _JSON_LIST: TypeAdapter[list[JsonValue]] = TypeAdapter(list[JsonValue])
 _SERVER_FAULT: int = 500
 # The words of an error that is not one of Dot's own, as a response carries them; the log keeps them whole.
@@ -87,24 +84,14 @@ def _error_response(status: int, message: str, context: dict[str, JsonValue]) ->
     return JSONResponse(ErrorView(message=message, context=context).model_dump(mode="json"), status_code=status)
 
 
-def pages_build(directory: Path) -> str:
-    """What the pages under ``directory`` are: a digest of every file's place and bytes, which changes with any of them.
-    The daemon tells it with its status, so that a page loaded from other pages (before an update) says so."""
-    digest = hashlib.sha256()
-    for path in sorted(path for path in directory.rglob("*") if path.is_file()):
-        digest.update(path.relative_to(directory).as_posix().encode())
-        digest.update(b"\0")
-        digest.update(path.read_bytes())
-        digest.update(b"\0")
-    return digest.hexdigest()[:_BUILD_DIGITS]
-
-
 def create_app(ctx: ServerContext) -> FastAPI:
-    """Build the application for one running Dot; the guard wraps everything, the UI files answer last."""
+    """Build the application for one running Dot; the guard wraps everything, the UI files answer last, as they were
+    when it was built (item 309, :mod:`dotagent.server.kept_pages`)."""
+    pages: KeptPages = keep_pages(STATIC_DIR)
     app: FastAPI = FastAPI(title="Dot", version=__version__, docs_url=None, redoc_url=None, openapi_url=None)
     app.include_router(health_router())
     app.include_router(proof_router(ctx.token))
-    app.include_router(system_router(ctx, pages_build(STATIC_DIR)))
+    app.include_router(system_router(ctx, pages.build))
     app.include_router(runs_router(ctx))
     app.include_router(queue_router(ctx))
     app.include_router(threads_router(ctx))
@@ -164,5 +151,5 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.add_middleware(LocalGuard, token=ctx.token, port=ctx.port, reach=frozenset(ctx.runtime.config.server.reach))
     # The web app manifest has a type of its own that the platform's table may not know.
     mimetypes.add_type("application/manifest+json", ".webmanifest")
-    app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="ui")
+    app.mount("/", ServedPages(pages), name="ui")
     return app

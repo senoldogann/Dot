@@ -2,6 +2,7 @@
 a yolo run (item 135), a paste is typing, and a long typed text goes through the clipboard only into a known field that
 is not secure."""
 
+import plistlib
 from pathlib import Path
 
 import pytest
@@ -14,6 +15,7 @@ from dotagent.desktop.actions import Inspection, StepEnv, _pastes, refuse_secret
 from dotagent.desktop.input import parse_chord
 from dotagent.desktop.safety import AppRole, StepContext, app_role, assess_step, enters_text, window_role
 from dotagent.desktop.types import AppInfo, Step
+from dotagent.help.apps import app_identities
 from dotagent.policy.elements import Element, StepAssessment
 from dotagent.policy.engine import auto_review
 from dotagent.policy.types import ActionInfo
@@ -170,4 +172,20 @@ def test_keys_for_a_ref_go_only_to_its_application_when_it_holds_the_keyboard(
 def test_a_script_that_names_or_computes_a_password_manager_reaches_secrets(script: str, reaches: bool) -> None:
     """The code review's Y10: only ``tell application "X"`` was read, so ``tell app``, a bundle id, a process of System
     Events or a target the script computes drove a password manager with no question."""
-    assert (secrets_reason(script) is not None) is reaches, secrets_reason(script)
+    assert (secrets_reason(script, {}) is not None) is reaches, secrets_reason(script, {})
+
+
+def test_an_application_a_script_names_is_known_by_its_bundle_id(tmp_path: Path) -> None:
+    """The code review's Y10: a name was matched against the names of password managers alone, so one under another
+    name on this Mac ("Vault", a renamed 1Password) passed; its bundle id says what it is."""
+    for name, bundle_id in (("Vault", "com.1password.1password"), ("Notes", "com.apple.Notes")):
+        contents: Path = tmp_path / f"{name}.app" / "Contents"
+        contents.mkdir(parents=True)
+        info: dict[str, str] = {"CFBundleIdentifier": bundle_id, "CFBundleName": name}
+        (contents / "Info.plist").write_bytes(plistlib.dumps(info))
+    identities: dict[str, frozenset[str]] = app_identities((tmp_path,))
+    assert identities["vault"] == frozenset({"com.1password.1password"})
+    renamed: str = 'tell application "Vault" to activate'
+    assert secrets_reason(renamed, {}) is None
+    assert secrets_reason(renamed, identities) == "it names 'Vault', which holds passwords or keys"
+    assert secrets_reason('tell application "Notes" to get name of every note', identities) is None

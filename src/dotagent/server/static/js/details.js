@@ -2,7 +2,7 @@
 // with, its approvals, the campaign it is a session of, the work it did and how long it took. The run page's top bar
 // shows none of them (item 120). The facts that never change are written once; `paint` brings the others up to date.
 
-import { compact, copyText, dateTimeFull, duration, el, modelName, plural } from "./dom.js";
+import { compact, copyText, dateTimeFull, duration, el, modelName, plural, setText } from "./dom.js";
 import { askedLabel } from "./efforts.js";
 import { icon } from "./icons.js";
 import { panelSection, statusBadge } from "./panels.js";
@@ -80,20 +80,30 @@ export function createDetails(run, agent, campaign, keepGoing) {
   const element = card.element;
   element.setAttribute("aria-label", "Details");
 
+  // What each fact was drawn from: the card is painted every second while the run works, and a fact is drawn again only
+  // when it changed (item 310); a status badge drawn again starts its motion again.
+  const drawn = new Map();
+  function draw(node, from, build) {
+    if (drawn.get(node) !== from) {
+      drawn.set(node, from);
+      node.replaceChildren(...build());
+    }
+  }
+
   function paint(state) {
-    status.replaceChildren(statusBadge(state.status));
-    model.textContent = state.model === "" ? "Default" : modelName(state.model);
+    draw(status, state.status, () => [statusBadge(state.status)]);
+    setText(model, state.model === "" ? "Default" : modelName(state.model));
     model.title = state.model;
-    turns.textContent = String(state.steps);
-    calls.replaceChildren(...[el("span", null, String(state.calls)), ...(state.failed === 0 ? [] : [el("span", null, `${state.failed} failed`)])]);
-    tokens.replaceChildren(el("span", null, `${compact(state.input)} in`), el("span", null, `${compact(state.output)} out`));
+    setText(turns, String(state.steps));
+    draw(calls, `${state.calls} ${state.failed}`, () => [el("span", null, String(state.calls)), ...(state.failed === 0 ? [] : [el("span", null, `${state.failed} failed`)])]);
+    draw(tokens, `${compact(state.input)} ${compact(state.output)}`, () => [el("span", null, `${compact(state.input)} in`), el("span", null, `${compact(state.output)} out`)]);
     const compacted = state.compactions === 0 ? "Never compacted" : `Compacted ${plural(state.compactions, "time", "times")}`;
-    context.replaceChildren(
+    draw(context, `${state.compactions} ${state.flagged}`, () => [
       el("span", null, compacted),
       ...(state.flagged === 0 ? [] : [el("span", null, `${plural(state.flagged, "check", "checks")} flagged`)]),
-    );
+    ]);
     const end = state.finishedAt === null ? Date.now() / 1000 : state.finishedAt;
-    took.textContent = duration(Math.max(0, end - run.created_at));
+    setText(took, duration(Math.max(0, end - run.created_at)));
   }
 
   return { element, paint };

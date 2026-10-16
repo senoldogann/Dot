@@ -14,17 +14,14 @@ from dotagent.config import ShellConfig
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.text import truncate_middle
 from dotagent.policy.paths import classify_path, expand_path
-from dotagent.policy.sandbox import Sandbox, confined_words
 from dotagent.policy.shell import ShellAssessment, assess_shell
-from dotagent.policy.types import ActionInfo, Flag, Risk
+from dotagent.policy.types import ActionInfo, Flag
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool
 from dotagent.tools.context import ToolContext, run_sandbox
 
 _HEAD_BYTES: int = 64 * 1024
 _TAIL_BYTES: int = 192 * 1024
 _DRAIN_GRACE_S: float = 0.4
-# What the guard reads as plain work, which the sandbox holds to the run's workspace when it carries no flag.
-_PLAIN_RISKS: frozenset[Risk] = frozenset({"safe", "low"})
 _SECRET_NAME_PARTS: tuple[str, ...] = ("KEY", "TOKEN", "SECRET", "PASSWORD", "PASSWD", "CREDENTIAL", "AUTH")
 _FIXED_ENV: dict[str, str] = {
     "TERM": "dumb",
@@ -190,16 +187,8 @@ def _classify_shell(
         summary=f"Run: {preview} ({'; '.join(assessment.reasons)})",
         target=args.command,
         flags=flags,
+        changes=assessment.changes,
     )
-
-
-def command_confinement(sandbox: Sandbox, assessment: ShellAssessment, workspace: Path) -> tuple[str, ...]:
-    """The words a command of a run starts with: held to ``workspace`` (:func:`confined_words`) when the guard reads it
-    as plain work there, no more than low risk and no flag; else the run's sandbox as it is, so that a line that names
-    a place outside writes there once the guard has let it through."""
-    if assessment.risk in _PLAIN_RISKS and not assessment.flags:
-        return confined_words(sandbox, workspace)
-    return sandbox.commands
 
 
 def build_shell_tool() -> RegisteredTool:
@@ -212,12 +201,8 @@ def build_shell_tool() -> RegisteredTool:
         if not await asyncio.to_thread(cwd.is_dir):
             raise ToolExecutionError("working directory does not exist", {"cwd": str(cwd)})
         timeout_s: int = min(args.timeout_s or shell_config.default_timeout_s, shell_config.max_timeout_s)
-        assessment: ShellAssessment = assess_shell(
-            args.command, cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
-        )
-        confinement: tuple[str, ...] = command_confinement(run_sandbox(ctx), assessment, ctx.workspace)
         code, output, seconds, timed_out = await run_command(
-            args.command, confinement, cwd, ctx.runtime.shell_env, timeout_s
+            args.command, run_sandbox(ctx).commands, cwd, ctx.runtime.shell_env, timeout_s
         )
         header: str = (
             f"[timed out after {timeout_s}s and was killed]" if timed_out else f"[exit {code} in {seconds:.1f}s]"
@@ -225,7 +210,10 @@ def build_shell_tool() -> RegisteredTool:
         body: str = output.strip()
         text: str = f"{header}\n{body}" if body else header
         # What a line that reached the network printed was written by other people: the run reads it as untrusted.
-        return ToolResult(text=text, images=(), is_error=timed_out or code != 0, untrusted=assessment.fetches)
+        fetched: bool = assess_shell(
+            args.command, cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
+        ).fetches
+        return ToolResult(text=text, images=(), is_error=timed_out or code != 0, untrusted=fetched)
 
     return make_tool(
         name="shell",
@@ -237,9 +225,7 @@ def build_shell_tool() -> RegisteredTool:
             "(an eval, a long build) goes to terminal_open with background: this chat is told when it ends. Outside "
             "yolo, while the owner keeps the sandbox on, the command runs in a macOS sandbox that keeps "
             "it out of Dot's own files, and macOS starts no program that runs as root there (ps, top, sudo): there "
-            "use pgrep -lf and lsof instead of ps. There a command that names no place outside the workspace may "
-            "write only in the workspace, the temporary folders and the folders the owner allowed: to write "
-            "elsewhere, name the place in the command (cp, mv, a redirect), which is then judged."
+            "use pgrep -lf and lsof instead of ps."
         ),
         args_model=ShellArgs,
         modes=ACTING_MODES,

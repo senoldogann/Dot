@@ -182,6 +182,12 @@ def missing_sections(summary: str) -> tuple[str, ...]:
     return tuple(section for section, heading in _HEADINGS if heading.search(summary) is None)
 
 
+def with_empty_sections(summary: str, missing: Sequence[str]) -> str:
+    """``summary`` with an empty heading for each section of ``missing`` (review O9): a summary that still lacks one
+    after it was asked for again keeps every heading the steps after it read, empty where it said nothing."""
+    return "\n".join([summary.rstrip(), *(f"{section}:" for section in missing)])
+
+
 def spellings(name: str, home: str) -> tuple[str, ...]:
     """``name`` and the other ways a Mac writes the same path: ``~`` for the home folder ``home`` and ``home`` for
     ``~``, and ``/tmp`` or ``/var`` with or without ``/private`` before them. An address or an id is only itself."""

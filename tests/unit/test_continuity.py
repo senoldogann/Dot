@@ -16,6 +16,7 @@ from dotagent.agent.continuity import (
     summary_part,
     with_actions,
     with_compaction,
+    with_empty_sections,
     with_instruction,
 )
 from dotagent.agent.executor import _group_calls
@@ -341,3 +342,13 @@ def test_history_text_holds_tool_arguments() -> None:
 )
 def test_a_section_counts_only_where_a_line_opens_it(summary: str, missing: tuple[str, ...]) -> None:
     assert missing_sections(summary) == missing
+
+
+def test_a_summary_still_lacking_sections_gets_an_empty_heading_for_each() -> None:
+    """Review O9: asked for again and still without them, the summary keeps every heading the steps after it read."""
+    summary: str = "GOAL: x\nDONE: y\nSTATE: z\n"
+    lacking: tuple[str, ...] = missing_sections(summary)
+    assert lacking == ("PROBLEMS", "NEXT")
+    filled: str = with_empty_sections(summary, lacking)
+    assert filled == "GOAL: x\nDONE: y\nSTATE: z\nPROBLEMS:\nNEXT:"
+    assert missing_sections(filled) == ()

@@ -18,7 +18,7 @@ RunMode = Literal["task", "chat", "research"]
 # Whose words a chat's last line in the sidebar is: the owner's message, or the answer to it (item 277).
 ChatLineRole = Literal["user", "assistant"]
 # How a run was handed a note: at its start, by a memory_search call, or as a note changed while it ran.
-MemoryUseHow = Literal["start", "search", "live"]
+MemoryUseHow = Literal["start", "search", "live", "site"]
 # ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
 # expired; answering it carries the work on in its thread).
 ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
@@ -293,7 +293,9 @@ class QueuedMessage(FrozenModel):
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
-    ``last_used_at`` say how often and when a run was handed it."""
+    ``last_used_at`` say how often and when a run was handed it. ``expires_at`` is when a note saved for a while stops
+    holding (item 306), ``None`` for one that holds until it is changed; ``replaced_by`` is the newer note that made it
+    outdated, when the reflection put it aside for that (item 306)."""
 
     id: str
     content: str
@@ -304,6 +306,8 @@ class MemoryRecord(FrozenModel):
     agent_id: str | None
     used_count: int
     last_used_at: float | None
+    expires_at: float | None
+    replaced_by: str | None
 
 
 class MemoryScore(FrozenModel):

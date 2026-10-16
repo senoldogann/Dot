@@ -1,7 +1,11 @@
 """AppleScript and JavaScript for Automation: drive the applications that can be scripted, far faster than their windows."""
 
+import asyncio
+import functools
 import re
 import secrets
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
@@ -10,9 +14,10 @@ from dotagent.core.text import truncate_middle
 from dotagent.desktop.render import fence_screen
 from dotagent.desktop.safety import is_secrets_app
 from dotagent.desktop.script import ScriptLanguage, run_osascript
+from dotagent.help.apps import APP_ROOTS, app_identities
 from dotagent.policy.shell import ShellAssessment, assess_applescript, script_reaches_shell
 from dotagent.policy.types import ActionInfo, ActionKind, Flag, Risk
-from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool, mark_untrusted, ok
+from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_live_tool, mark_untrusted, ok
 from dotagent.tools.context import ToolContext, run_sandbox
 
 APPLE_SCRIPT_TOOL: str = "apple_script"
@@ -31,6 +36,14 @@ _COMPUTED_TARGET: re.Pattern[str] = re.compile(
     r"""|\bprocesses\s*(?:\.byName\s*\(|\[)\s*(?=[^"'`\s])""",
     re.IGNORECASE,
 )
+# An application a script names as its target: `tell application "Notes"`, `app "Mail"`, a process of System Events
+# (`process "Safari"`), or `Application("Numbers")` in JavaScript.
+_NAMED_APP: re.Pattern[str] = re.compile(
+    r"""\b(?:application|app|process)\s+"((?:[^"\\]|\\.)+)"|\bApplication\s*\(\s*(["'`])((?:(?!\2).)+)\2\s*\)""",
+    re.IGNORECASE,
+)
+# The application scripts reach the others through; it is no application a run works in.
+_SYSTEM_EVENTS: str = "system events"
 
 
 class AppleScriptArgs(ToolArgs):
@@ -40,13 +53,36 @@ class AppleScriptArgs(ToolArgs):
     )
 
 
-def secrets_reason(script: str) -> str | None:
-    """Why ``script`` may drive an application that holds passwords or keys, or None: one named in any of its strings
-    (as an application, a bundle id or a process of System Events, however the script spells its target), or a target
-    it computes, which could be one (the code review's Y10)."""
+def _changed_at(folder: Path) -> int:
+    try:
+        return folder.stat().st_mtime_ns
+    except FileNotFoundError:
+        return 0
+
+
+@functools.lru_cache(maxsize=1)
+def _identities_as_of(folders: tuple[tuple[Path, int], ...]) -> Mapping[str, frozenset[str]]:
+    """:func:`dotagent.help.apps.app_identities` of ``folders``, each with the time it last changed: read again once
+    one changed, as it does when an application is added, removed or renamed in it."""
+    return app_identities(tuple(folder for folder, _ in folders))
+
+
+def installed_identities() -> Mapping[str, frozenset[str]]:
+    """The bundle ids of this Mac's applications by the names a script may call them by. The first call reads every
+    application's Info.plist (a tenth of a second on a Mac with a few hundred), so it is called off the event loop."""
+    return _identities_as_of(tuple((folder, _changed_at(folder)) for folder in APP_ROOTS))
+
+
+def secrets_reason(script: str, identities: Mapping[str, frozenset[str]]) -> str | None:
+    """Why ``script`` may drive an application that holds passwords or keys, or None: one named in any of its strings,
+    as an application of this Mac known by its bundle id (``identities``, :func:`installed_identities`, so a password
+    manager under another name is one too), as a bundle id, or as a process of System Events or by the name of a
+    password manager, however the script spells its target; or a target it computes, which could be one (the code
+    review's Y10)."""
     for match in _STRING.finditer(script):
         text: str = next(group for group in match.groups() if group is not None)
-        if is_secrets_app(text, text):
+        known: frozenset[str] = identities.get(text.strip().casefold(), frozenset())
+        if is_secrets_app(text, text) or any(is_secrets_app(text, bundle) for bundle in known):
             return f"it names {truncate_middle(text, _PREVIEW_CHARS)!r}, which holds passwords or keys"
     if _COMPUTED_TARGET.search(script) is not None:
         return (
@@ -55,14 +91,25 @@ def secrets_reason(script: str) -> str | None:
     return None
 
 
-def _classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
+def script_apps(script: str) -> tuple[str, ...]:
+    """The applications ``script`` names as its targets, each once in the order it names them, System Events left out
+    (item 305: the applications a run drives with a script are held as those it drives with its clicks)."""
+    kept: dict[str, str] = {}
+    for match in _NAMED_APP.finditer(script):
+        name: str = (match.group(1) or match.group(3)).strip()
+        if name and name.casefold() != _SYSTEM_EVENTS:
+            kept.setdefault(name.casefold(), name)
+    return tuple(kept.values())
+
+
+def _classify(args: AppleScriptArgs, ctx: ToolContext, identities: Mapping[str, frozenset[str]]) -> ActionInfo:
     assessment: ShellAssessment = assess_applescript(
         args.script, ctx.workspace, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
     )
     risk: Risk = assessment.risk
     flags: tuple[Flag, ...] = assessment.flags
     reasons: tuple[str, ...] = assessment.reasons
-    secrets: str | None = secrets_reason(args.script)
+    secrets: str | None = secrets_reason(args.script, identities)
     if secrets is not None:
         risk = "high"
         flags = tuple(dict.fromkeys((*flags, "secret_access")))
@@ -76,12 +123,14 @@ def _classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
         summary=f"Run {args.language}: {preview} ({'; '.join(reasons)})",
         target=args.script,
         flags=flags,
+        changes=assessment.changes,
     )
 
 
 def build_apple_tool() -> RegisteredTool:
-    def classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
-        return _classify(args, ctx)
+    async def classify(args: AppleScriptArgs, ctx: ToolContext) -> ActionInfo:
+        identities: Mapping[str, frozenset[str]] = await asyncio.to_thread(installed_identities)
+        return _classify(args, ctx, identities)
 
     async def run(args: AppleScriptArgs, ctx: ToolContext) -> ToolResult:
         language: ScriptLanguage = args.language
@@ -93,7 +142,7 @@ def build_apple_tool() -> RegisteredTool:
             ok("\n".join((header, fence_screen("script result", body, secrets.token_hex(_NONCE_BYTES)))))
         )
 
-    return make_tool(
+    return make_live_tool(
         name=APPLE_SCRIPT_TOOL,
         description=(
             "Run an AppleScript (or JavaScript for Automation) with osascript and return its result as text. For "

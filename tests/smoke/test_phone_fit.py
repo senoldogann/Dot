@@ -1,15 +1,17 @@
 """On a phone the page fits the screen and holds still (item 275), on a served daemon, in WebKit as the narrowest and
 the widest iPhone and in Chrome as a Pixel, with the meta viewport and touch on. No page of Dot slides sideways, every
 Settings tab, a run whose message holds a long link, a long line of code and a wide table, and the sidebar open among
-them, and no text field there is under 16 px, below which iOS zooms the page into the field that gets the focus. With
-the safe areas of an iPhone added to the home screen, the bar, the sidebar's head and foot, the composer and the side
-panel keep out of them. While the keyboard pans the page, the bar stays at the top of what is seen. Before, Settings ›
-Models slid 51 px on an iPhone SE, the names, the selects, the searches and the sign-in's fields were 13 or 14 px, the
-sidebar's foot sat 8 px from the screen's bottom edge whatever the safe area, and the bar went out of sight with a pan.
-A page that iOS 26 leaves panned after the keyboard (item 293) keeps the dock, the sidebar and the side panel on what is
-seen too; before, they stood on the window, out of sight at the top by the pan and leaving a band of its height at the
-foot, as on the owner's iPhone. With the keyboard up, the dock and the sidebar stand on it, also where iOS shrinks
-`innerHeight` and not the box what is fixed stands in, which put them under the keyboard in the iOS 26.5 simulator.
+them, and no page lets the phone zoom into the field that gets the focus: on an iPhone the viewport allows no scale past
+the first and a field has the size it has on the Mac (item 311; before, every field was 16 px, a model's select 2 px
+over its 14 px label), on another phone no text field is under 16 px. With the safe areas of an iPhone added to the home
+screen, the bar, the sidebar's head and foot, the composer and the side panel keep out of them. While the keyboard pans
+the page, the bar stays at the top of what is seen. Before, Settings › Models slid 51 px on an iPhone SE, the names, the
+selects, the searches and the sign-in's fields were 13 or 14 px, the sidebar's foot sat 8 px from the screen's bottom
+edge whatever the safe area, and the bar went out of sight with a pan. A page that iOS 26 leaves panned after the
+keyboard (item 293) keeps the dock, the sidebar and the side panel on what is seen too; before, they stood on the
+window, out of sight at the top by the pan and leaving a band of its height at the foot, as on the owner's iPhone. With
+the keyboard up, the dock and the sidebar stand on it, also where iOS shrinks `innerHeight` and not the box what is
+fixed stands in, which put them under the keyboard in the iOS 26.5 simulator.
 
 No network and no model service is used: the model is a scripted one.
 """
@@ -108,7 +110,8 @@ _FIT: str = """() => {
     .filter((node) => parseFloat(getComputedStyle(node).fontSize) < 16)
     .map((node) => (node.getAttribute('aria-label') ?? node.getAttribute('placeholder') ?? node.className) + ' '
       + getComputedStyle(node).fontSize);
-  return { wider: root.scrollWidth - root.clientWidth, slid, small };
+  const viewport = document.querySelector('meta[name="viewport"]').content.split(',').map((part) => part.trim());
+  return { wider: root.scrollWidth - root.clientWidth, slid, small, held: viewport.includes('maximum-scale=1') };
 }"""
 # A visual viewport that the test pans and shortens, as iOS's keyboard does, and as iOS 26 leaves it panned once the
 # keyboard has gone (item 293); with the keyboard, `innerHeight` shrinks as iOS 26.5 shrinks it.
@@ -142,6 +145,8 @@ class Fit(TypedDict):
     wider: float
     slid: float
     small: list[str]
+    # Whether the viewport allows no scale past the first, which keeps iOS from zooming into a field.
+    held: bool
 
 
 @pytest.fixture
@@ -207,18 +212,21 @@ async def _phone(playwright: Playwright, browser: Browser, device: str, address:
     return page
 
 
-async def _misfits(page: Page, where: str) -> list[str]:
+async def _misfits(page: Page, where: str, iphone: bool) -> list[str]:
     fit: Fit = await page.evaluate(_FIT)
     found: list[str] = []
     if fit["wider"] > 0 or fit["slid"] > 0:
         found.append(f"{where}: {fit['wider']} px wider than the screen, slides {fit['slid']} px")
-    if fit["small"]:
+    if iphone and not fit["held"]:
+        found.append(f"{where}: the viewport lets iOS zoom into a field under 16 px")
+    if not iphone and fit["small"]:
         found.append(f"{where}: fields under 16 px: {fit['small']}")
     return found
 
 
 async def _pages_of(playwright: Playwright, browser: Browser, device: str, address: str, run_id: str) -> list[str]:
     page: Page = await _phone(playwright, browser, device, address)
+    iphone: bool = device.startswith("iPhone")
     found: list[str] = []
     hashes: list[str] = ["#/activity", "#/runs", f"#/runs/{run_id}", "#/agents", "#/campaigns"]
     hashes.extend(f"#/settings/{tab}" for tab in TABS)
@@ -226,23 +234,23 @@ async def _pages_of(playwright: Playwright, browser: Browser, device: str, addre
         await page.goto(f"{address}/{where}")
         await expect(page.locator("main.page")).not_to_be_empty()
         await page.wait_for_timeout(300)
-        found.extend(await _misfits(page, f"{device} {where}"))
+        found.extend(await _misfits(page, f"{device} {where}", iphone))
     await page.goto(f"{address}/#/runs/{run_id}")
     await expect(page.get_by_text("Column 9")).to_be_visible()
     await page.get_by_role("button", name="Show sidebar").click()
     await expect(page.get_by_role("complementary", name="Sidebar")).to_be_visible()
-    found.extend(await _misfits(page, f"{device} the sidebar"))
+    found.extend(await _misfits(page, f"{device} the sidebar", iphone))
     await page.context.close()
     signed_out = await browser.new_context(**playwright.devices[device])
     sign_in: Page = await signed_out.new_page()
     await sign_in.goto(f"{address}/")
     await expect(sign_in.locator("input").first).to_be_visible()
-    found.extend(await _misfits(sign_in, f"{device} the sign-in"))
+    found.extend(await _misfits(sign_in, f"{device} the sign-in", iphone))
     await signed_out.close()
     return found
 
 
-async def test_no_page_slides_sideways_or_has_a_field_under_16_px_on_a_phone(own_home: Path) -> None:
+async def test_no_page_slides_sideways_or_lets_the_phone_zoom_into_a_field(own_home: Path) -> None:
     async with _served(own_home) as (manager, address), async_playwright() as playwright:
         async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
             made: httpx.Response = await client.post(
@@ -254,8 +262,7 @@ async def test_no_page_slides_sideways_or_has_a_field_under_16_px_on_a_phone(own
                     "model": "",
                     "effort": None,
                     "approvals": None,
-                    "tools": [],
-                    "every_tool": True,
+                    "tools": None,
                 },
             )
             assert made.status_code == 201, made.text
@@ -284,6 +291,34 @@ async def test_no_page_slides_sideways_or_has_a_field_under_16_px_on_a_phone(own
             finally:
                 await browser.close()
         assert found == [], "\n".join(found)
+
+
+async def test_on_an_iphone_a_field_has_the_size_it_has_on_the_mac(own_home: Path) -> None:
+    """The fields of the owner's screenshots of Settings (item 311): on their iPhone a model's select, the rule's
+    words and the composer's box have the sizes they have on the Mac, 13, 14 and 15 px; on a Pixel, where only 16 px
+    keeps the page from zooming into a field, they are 16 px."""
+    fields: tuple[tuple[str, str], ...] = (
+        ("#/settings/models", "Default model"),
+        ("#/settings/rules", "The rule in your words"),
+        ("#/runs", "Goal"),
+    )
+    sizes: dict[str, list[str]] = {}
+    async with _served(own_home) as (_, address), async_playwright() as playwright:
+        for engine, device in (("webkit", _OWNERS_PHONE), ("chromium", "Pixel 7")):
+            browser: Browser = await getattr(playwright, engine).launch(
+                **({"channel": "chrome"} if engine == "chromium" else {}), headless=True
+            )
+            try:
+                page: Page = await _phone(playwright, browser, device, address)
+                sizes[device] = []
+                for where, label in fields:
+                    await page.goto(f"{address}/{where}")
+                    field: Locator = page.locator(f'[aria-label="{label}"]').first
+                    await expect(field).to_be_visible()
+                    sizes[device].append(await field.evaluate("(node) => getComputedStyle(node).fontSize"))
+            finally:
+                await browser.close()
+    assert sizes == {_OWNERS_PHONE: ["13px", "14px", "15px"], "Pixel 7": ["16px", "16px", "16px"]}
 
 
 async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_safe_areas(

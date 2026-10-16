@@ -3,11 +3,12 @@ for its lessons. With ``propose`` they wait on the run until the owner saves or 
 ``auto`` (the default) each gets a second look that sees the goal and the lessons and never the page the run read, the
 kept ones are saved as notes and the others left out with why, also after a run that read a web page, where a lesson
 with a link is left out before it is asked; Undo forgets a saved one and Save anyway keeps one left out; a lesson that
-a saved note already says is dropped. With lessons off, or after a run along which nothing went wrong, nothing is
-asked.
+a saved note already says is dropped; a lesson that names a site the run's browser reached carries the site's tag
+(item 308). With lessons off, or after a run along which nothing went wrong, nothing is asked.
 
 No model service is used: the scripted model plays the runs and answers for the review model too, the web page is
-served on this machine and the memory has no embeddings (see ``eval_config``).
+served on this machine and the memory has no embeddings (see ``eval_config``); the browser is a headless Chrome with a
+profile of its own.
 """
 
 import asyncio
@@ -26,6 +27,7 @@ import pytest_asyncio
 from dotagent.agent.lessons import LessonView, RunLessons, run_lessons
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import LESSONS_TOOL, VET_TOOL
+from dotagent.agent.sites import site_tag
 from dotagent.config import AppConfig, LessonsMode, load_default_config
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -130,6 +132,21 @@ def _config(lessons: LessonsMode) -> AppConfig:
             "agent": config.agent.model_copy(update={"lessons": lessons}),
             "models": config.models.model_copy(update={"review": SCRIPTED_MODEL}),
             "web": config.web.model_copy(update={"allow_private_hosts": True}),
+        }
+    )
+
+
+def _no_model_service(config: AppConfig) -> AppConfig:
+    """``config`` with every model role the scripted model and Ollama's address a closed port: a run that uses the
+    browser reaches no model service."""
+    return config.model_copy(
+        update={
+            "models": config.models.model_copy(
+                update={"main": SCRIPTED_MODEL, "fast": SCRIPTED_MODEL, "vision": SCRIPTED_MODEL}
+            ),
+            "providers": config.providers.model_copy(
+                update={"ollama": config.providers.ollama.model_copy(update={"base_url": "http://127.0.0.1:9"})}
+            ),
         }
     )
 
@@ -387,6 +404,26 @@ async def test_a_run_that_read_a_web_page_saves_only_the_lessons_the_second_look
         memory_id: str | None = lessons.lessons[0].memory_id
         assert memory_id is not None and (await store.get_memory(memory_id)).content == LESSON
         assert await store.count_memories() == 1
+
+
+@pytest.mark.browser
+async def test_a_lesson_that_names_a_site_the_run_reached_is_saved_with_the_sites_tag(
+    login_env: dict[str, str], site: str
+) -> None:
+    """Item 308: kept by the second look or saved anyway by the owner, a lesson that names the host the run's browser
+    reached carries the host's tag, by which a later run that reaches it is handed the lesson."""
+    opened: ScriptedCall = ScriptedCall(tool="browser_open", arguments={"url": f"{site}/notes"})
+    first: str = "On 127.0.0.1 the notes page lists the newest note first."
+    second: str = "On 127.0.0.1 a note opens in the same tab; go back to reach the list."
+    turns: list[ScriptedTurn] = [*_stumbles(NOTES, (opened,)), _lessons(first, second), _vet(None, "about one page")]
+    async with _home(_no_model_service(_config("auto")), login_env, turns) as home:
+        run: RunRecord = await _run(home)
+        lessons: RunLessons | None = await run_lessons(home.runtime.store, run.id)
+        assert lessons is not None
+        assert [(lesson.state, lesson.by) for lesson in lessons.lessons] == [("saved", "auto"), ("dismissed", "auto")]
+        tags: tuple[str, ...] = ("lesson", site_tag("127.0.0.1"))
+        assert (await home.runtime.store.get_memory(str(lessons.lessons[0].memory_id))).tags == tags
+        assert (await home.manager.save_lesson(run.id, 1)).record.tags == tags
 
 
 async def test_undo_forgets_a_lesson_saved_on_its_own_and_save_anyway_keeps_one_left_out(

@@ -53,7 +53,7 @@ from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory
 from dotagent.notify.push import PushKeys, read_or_create_keys
 from dotagent.plugins.catalog import load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
-from dotagent.policy.paths import expand_protected, temporary_places
+from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox
 from dotagent.scheduler.timing import resolve_zone
 from dotagent.secrets import resolve_secret
@@ -227,12 +227,10 @@ async def _confined_paths(config: AppConfig) -> tuple[tuple[Path, ...], tuple[Pa
 
 async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> SwitchedSandbox:
     """The sandbox the processes of a run start in outside yolo: a command kept out of Dot's guarded files and from
-    changing ``dot_paths``, a search out of every ``protected`` location too, and a command held to its workspace
-    writing there, in the temporary folders and in [shell] allow_write only. It is built whatever [shell] sandbox says,
+    changing ``dot_paths``, a search out of every ``protected`` location too. It is built whatever [shell] sandbox says,
     so that Settings can switch it on later, and checked to start when it is on."""
     sealed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _guarded_files())
-    writable: tuple[Path, ...] = await asyncio.to_thread(expand_protected, config.shell.allow_write, temporary_places())
-    built: Sandbox = build_sandbox(sealed, protected, dot_paths, writable)
+    built: Sandbox = build_sandbox(sealed, protected, dot_paths)
     if config.shell.sandbox:
         await check_sandbox(built)
     return SwitchedSandbox(built, config.shell.sandbox)

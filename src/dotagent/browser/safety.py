@@ -9,7 +9,7 @@ import re
 import socket
 from collections.abc import Sequence
 from typing import get_args
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from dotagent.browser.snapshot import SnapshotLine, parse_snapshot
 from dotagent.browser.types import SecretField, SecretKind, Step, StepAction
@@ -102,12 +102,13 @@ def host_matches(host: str, entries: Sequence[str]) -> bool:
 
 
 def browser_host(host: str) -> str | None:
-    """``host`` as a browser reads it, so the checks judge the host the request goes to (the code review's Y1): a name
-    with the other dots of Unicode (``127。0。0。1``) and its full-width letters read as IDNA does, lower case, and an
-    IPv4 address in any spelling (``2852039166``, ``0x7f.1``, ``127.1``) as its four numbers. None for a host IDNA
-    cannot read."""
+    """``host`` as a browser reads it, so the checks judge the host the request goes to (the code review's Y1): its
+    percent escapes decoded first (``127%2e0%2e0%2e1``), a name with the other dots of Unicode (``127。0。0。1``) and
+    its full-width letters read as IDNA does, lower case, and an IPv4 address in any spelling (``2852039166``,
+    ``0x7f.1``, ``127.1``) as its four numbers. None for a host IDNA cannot read, as one whose escapes are no UTF-8."""
+    decoded: str = unquote(host)
     try:
-        name: str = host.lower() if host.isascii() else host.encode("idna").decode("ascii").lower()
+        name: str = decoded.lower() if decoded.isascii() else decoded.encode("idna").decode("ascii").lower()
     except UnicodeError:
         return None
     try:

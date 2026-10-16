@@ -8,6 +8,16 @@ from collections.abc import Sequence
 from datetime import datetime
 from typing import Literal
 
+from dotagent.agent.learning_health import (
+    LEARNING_HEALTH_KEY,
+    LEARNING_WORKS,
+    WORK_NAMES,
+    LearningHealth,
+    parse_health,
+    quiet_limit,
+    stall_reason,
+    work_health,
+)
 from dotagent.agent.reflection_record import (
     REFLECTION_FAILED_KEY,
     REFLECTION_KEY,
@@ -16,13 +26,16 @@ from dotagent.agent.reflection_record import (
     summary_line,
 )
 from dotagent.cli_commands import Command, StatsCommand
+from dotagent.config import load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path
+from dotagent.scheduler.failures import SCHEDULE_FAILURES_KEY, FiringFailure, FiringFailures, parse_failures
 from dotagent.store.endings import ENDING_LABELS
 from dotagent.store.stats import (
     ActStats,
     ChannelStats,
     CompactionStats,
+    DayOutcomes,
     LearningStats,
     ModelStats,
     RunCosts,
@@ -30,11 +43,13 @@ from dotagent.store.stats import (
     SearchCount,
     SiteStats,
     StepBand,
+    StuckWork,
     TimeStats,
     ToolStats,
     WebFailures,
     collect_run_costs,
     collect_statistics,
+    collect_stuck,
     gui_share,
     read_kv,
 )
@@ -194,20 +209,36 @@ def render_channels(channels: Sequence[ChannelStats]) -> list[str]:
 
 
 def render_sites(sites: Sequence[SiteStats]) -> list[str]:
-    """The sites table: per page host or application, what the act calls on it did, the busiest first."""
+    """The sites table: per page host or application, what the act calls on it did and how the runs that made them
+    ended, the busiest first."""
     if not sites:
         return ["Sites: no act call named a site (the browser and desktop act calls record one since item 22)."]
     width: int = max(len("site"), *(len(entry.site) for entry in sites))
-    header: str = f"  {'site':<{width}}  {'acts':>6}  {'one step':>8}  {'failed':>6}  {'median s':>8}"
+    header: str = (
+        f"  {'site':<{width}}  {'acts':>6}  {'one step':>8}  {'failed':>6}  {'median s':>8}  {'runs':>5}  {'done':>5}"
+    )
     rows: list[str] = [
         f"  {entry.site:<{width}}  {entry.acts.acts:>6}  {_percent(entry.acts.single, entry.acts.acts):>8}  "
-        f"{_percent(entry.acts.failed, entry.acts.acts):>6}  {_seconds(entry.acts.seconds_median):>8}"
+        f"{_percent(entry.acts.failed, entry.acts.acts):>6}  {_seconds(entry.acts.seconds_median):>8}  "
+        f"{entry.outcomes.runs:>5}  {_percent(entry.outcomes.done, entry.outcomes.runs):>5}"
         for entry in sites
     ]
     return [
-        "Sites, from the browser and desktop act calls (one step: a round trip spent on a single action):",
+        "Sites, from the browser and desktop act calls (one step: a round trip spent on a single action; runs: the "
+        "finished runs that acted there, done: the share of them that ended done):",
         header,
         *rows,
+    ]
+
+
+def render_days(days: Sequence[DayOutcomes]) -> list[str]:
+    """The trend of the browser and desktop work (item 308): per day, the finished runs that acted on a site and the
+    share of them that ended done."""
+    if not days:
+        return ["By day: no finished run acted on a site."]
+    return [
+        "By day, the finished runs that acted on a site (the day each started):",
+        *(f"  {entry.day}  {entry.runs:>4} runs  {_percent(entry.done, entry.runs):>5} done" for entry in days),
     ]
 
 
@@ -251,6 +282,7 @@ def render_stats(stats: RunStatistics, days: int, by: Literal["model", "site", "
         lines.extend(["", *render_channels(stats.channels)])
     if by != "model":
         lines.extend(["", *render_sites(stats.sites)] if by == "all" else render_sites(stats.sites))
+        lines.extend(["", *render_days(stats.days)])
     if by != "site":
         lines.extend(["", *render_learning(stats.learning)])
     return lines
@@ -285,6 +317,12 @@ async def cmd_stats(command: StatsCommand) -> int:
                 None if failed is None else ReflectionFailure.model_validate_json(failed),
             )
         )
+        health: str | None = await asyncio.to_thread(read_kv, db_path(), LEARNING_HEALTH_KEY)
+        quiet_s: float | None = quiet_limit((await asyncio.to_thread(load_user_config)).agent.reflection_time)
+        lines.extend(render_learning_health(parse_health(health), time.time(), quiet_s))
+        stuck: StuckWork = await asyncio.to_thread(collect_stuck, db_path())
+        failing: str | None = await asyncio.to_thread(read_kv, db_path(), SCHEDULE_FAILURES_KEY)
+        lines.extend(render_stuck(stuck, parse_failures(failing)))
     sys.stdout.write("\n".join(lines) + "\n")
     return 0
 
@@ -300,6 +338,57 @@ def render_reflection(last: Reflection | None, failed: ReflectionFailure | None)
     if failed is not None and (last is None or last.at < failed.at):
         return f"  reflection: {done}; failed {_when(failed.at)}: {failed.error}"
     return f"  reflection: {done}"
+
+
+def render_learning_health(health: LearningHealth | None, now: float, quiet_s: float | None) -> list[str]:
+    """How learning fares (:mod:`dotagent.agent.learning_health`): when each work last went well, its failures in a
+    row since with the last error, and, when learning has stopped, why and whether the owner was told."""
+    if health is None:
+        return ["  learning health: nothing recorded yet"]
+    lines: list[str] = []
+    for work in LEARNING_WORKS:
+        state = work_health(health, work)
+        went: str = "never went well" if state.last_success is None else f"last went well {_when(state.last_success)}"
+        failing: str = (
+            f"; {state.failures_in_row} failed in a row, the last {_when(state.last_failure)}: {state.last_error}"
+            if state.failures_in_row > 0 and state.last_failure is not None
+            else ""
+        )
+        lines.append(f"  {WORK_NAMES[work].lower()}: {went}{failing}")
+    reason: str | None = stall_reason(health, now, quiet_s)
+    if reason is not None:
+        told: str = "" if health.told_at is None else f" (the owner was told {_when(health.told_at)})"
+        lines.append(f"  learning has stopped: {reason}{told}")
+    return lines
+
+
+def render_stuck(stuck: StuckWork, failures: FiringFailures) -> list[str]:
+    """What waits and will not move on by itself (the code review's O3-O6), counted: the switched-on schedules whose
+    firings fail (:mod:`dotagent.scheduler.failures`), each with how many in a row and the last error; the schedules
+    marked as running a run none of theirs is at work on; the active campaigns with no session planned; and the chats
+    whose queued messages nothing moves on. The chats whose queue waits for the owner are counted apart: they wait for
+    a resume, not for a fix."""
+    failing: list[tuple[str, FiringFailure]] = [
+        (stuck.schedules[schedule_id], failure)
+        for schedule_id, failure in failures.schedules.items()
+        if schedule_id in stuck.schedules
+    ]
+    parts: dict[str, int] = {
+        "failing schedules": len(failing),
+        "schedules marked running with no run at work": stuck.stale_schedules,
+        "active campaigns with no session planned": stuck.unplanned_campaigns,
+        "chat queues nothing moves on": stuck.stalled_queues,
+    }
+    said: str = ", ".join(f"{what}: {number}" for what, number in parts.items() if number)
+    lines: list[str] = [f"  stuck: {sum(parts.values())}" + (f" ({said})" if said else "")]
+    lines.extend(
+        f"    {name}: {failure.failures_in_row} firings failed in a row, the last {_when(failure.last_failure_at)}: "
+        f"{failure.last_error}"
+        for name, failure in failing
+    )
+    if stuck.held_queues:
+        lines.append(f"  chat queues held until you resume them: {stuck.held_queues}")
+    return lines
 
 
 async def dispatch(command: Command) -> int:

@@ -8,7 +8,7 @@
 
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
-import { clip, clock, compact, dateTime, duration, el, plural } from "./dom.js";
+import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { helperCard } from "./helpercard.js";
@@ -161,6 +161,14 @@ function describeCall(tool, args) {
 }
 
 /** An empty group of tool steps that starts at `ts` (seconds); it is "working" until something ends it. */
+/** The line a compaction leaves in the conversation (item 312): "Context compacted", and the size of the context
+ * before and after it where the event says them (an event of before item 312 does not). */
+function compactionLine(data) {
+  const sized = typeof data.tokens_before === "number" && typeof data.tokens_after === "number";
+  const text = sized ? `Context compacted ${compact(data.tokens_before)} → ${compact(data.tokens_after)} tokens` : "Context compacted";
+  return el("div", { class: "compaction-line" }, icon("minimize"), el("span", null, text));
+}
+
 function buildGroup(ts) {
   const state = el("span", { class: "steps-state" });
   const title = el("span", { class: "steps-title" });
@@ -181,13 +189,13 @@ function paintGroup(group) {
     group.state.replaceChildren(live ? el("span", { class: "spinner" }) : icon("check"));
   }
   const model = group.modelSeconds > 0 ? ` (model ${duration(group.modelSeconds)})` : "";
-  group.title.textContent = live ? "Working…" : `Worked for ${duration(Math.max(group.end - group.start, group.longest))}${model}`;
-  group.count.textContent = plural(group.calls, "tool call", "tool calls");
+  setText(group.title, live ? "Working…" : `Worked for ${duration(Math.max(group.end - group.start, group.longest))}${model}`);
+  setText(group.count, plural(group.calls, "tool call", "tool calls"));
   const troubles = [group.failedCalls > 0 ? `${group.failedCalls} failed` : "", group.cutCalls > 0 ? `${group.cutCalls} cut off` : ""];
   group.failed.hidden = group.failedCalls === 0 && group.cutCalls === 0;
-  group.failed.textContent = troubles.filter((text) => text !== "").join(" · ");
+  setText(group.failed, troubles.filter((text) => text !== "").join(" · "));
   group.latest.hidden = !live;
-  group.latest.textContent = live ? group.last : "";
+  setText(group.latest, live ? group.last : "");
 }
 
 /**
@@ -330,10 +338,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     const live = helpers.some((helper) => helper.ended === null);
     const began = Math.min(...helpers.map((helper) => helper.began));
     const ended = live ? now : Math.max(...helpers.map((helper) => helper.ended));
-    flock.group.title.textContent = plural(helpers.length, "helper", "helpers");
-    flock.group.state.textContent = flockState(helpers.map((helper) => helper.status));
+    setText(flock.group.title, plural(helpers.length, "helper", "helpers"));
+    setText(flock.group.state, flockState(helpers.map((helper) => helper.status)));
     flock.group.state.classList.toggle("bad", !live && helpers.some((helper) => helper.status === "failed"));
-    flock.group.time.textContent = duration(Math.max(ended - began, 0));
+    setText(flock.group.time, duration(Math.max(ended - began, 0)));
   }
 
   /**
@@ -473,7 +481,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       calls: 0,
     };
     card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
-    const panel = { node, face, status, meta, progress, time, steps: 0, helper, flock: null };
+    // `line`: the facts its last line shows (see paintChild).
+    const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     scopes.set(runId, scope);
     liveChildren.add(scope);
@@ -481,10 +490,15 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     return scope;
   }
 
-  /** The row of a delegated run as it stands at `ts`: its last line as facts and the time it has taken. */
+  /** The row of a delegated run as it stands at `ts`: its last line as facts, drawn again only when they changed (item
+   * 310), and the time it has taken. */
   function paintChild(scope, ts, facts) {
-    scope.panel.progress.replaceChildren(...facts.map((fact) => el("span", null, fact)));
-    scope.panel.time.textContent = duration(Math.max(ts - scope.began, 0));
+    const line = facts.join("\n");
+    if (scope.panel.line !== line) {
+      scope.panel.line = line;
+      scope.panel.progress.replaceChildren(...facts.map((fact) => el("span", null, fact)));
+    }
+    setText(scope.panel.time, duration(Math.max(ts - scope.began, 0)));
   }
 
   /** The row of the delegated run of `scope` shows that the run ended with `status` at `ts` after `steps` steps, its
@@ -540,11 +554,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   /** The row of every delegated run that has not ended says how long it has worked at `now` (seconds): the page calls
    * this every second while the run works, so a folded row's time counts on between the events of its run, as T3 Code
    * counts a working subagent's (item 123), and as an event comes. The card a row shows follows (item 226), and so does
-   * the head of the group the row is in (item 245). */
+   * the head of the group the row is in (item 245). What reads the same as before is not written again (item 310): the
+   * page calls this on every event of the run and its helpers. */
   function tick(now) {
     const flocks = new Set();
     for (const scope of liveChildren) {
-      scope.panel.time.textContent = duration(Math.max(now - scope.began, 0));
+      setText(scope.panel.time, duration(Math.max(now - scope.began, 0)));
       flocks.add(scope.panel.flock);
     }
     for (const flock of flocks) {
@@ -754,7 +769,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       settleThought(scope, data);
       if (scope.panel !== null) {
         scope.panel.steps = Math.max(scope.panel.steps, data.step);
-        scope.panel.progress.textContent = `step ${scope.panel.steps}`;
+        // A turn that calls a tool has its line painted by its first call, so the tool's name does not go and come back
+        // at every step (item 310).
+        if (!data.tool_calls.some((name) => name !== FINISH_TOOL)) {
+          paintChild(scope, record.ts, [`step ${scope.panel.steps}`]);
+        }
       }
       const bubble = scope.live !== null && scope.live.step === data.step ? scope.live : null;
       scope.live = null;
@@ -1078,7 +1097,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     memories(scope, record) {
       const count = plural(record.data.ids.length, "memory", "memories");
       const tokens = typeof record.data.tokens === "number" ? `, ${plural(record.data.tokens, "token", "tokens")}` : "";
-      const text = record.data.live === true ? `Picked up ${count} saved while the run worked` : `Recalled ${count}${tokens}`;
+      // Item 308: the lessons of a site the run just reached say where they were learned.
+      const text =
+        record.data.live === true
+          ? `Picked up ${count} saved while the run worked`
+          : typeof record.data.site === "string"
+            ? `Recalled ${count} learned on ${record.data.site}`
+            : `Recalled ${count}${tokens}`;
       note(scope, record.ts, "database", text, "");
     },
 
@@ -1088,8 +1113,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "database", `${what} by their words alone: the embedding service failed — ${clip(record.data.error, 240)}`, "warn");
     },
 
-    // A compaction is counted for the Details panel, not told in the conversation (item 260); the Cost panel has the
-    // summaries' share, and the event keeps the model, the method and the check.
+    // A compaction is a quiet line across the conversation where it happened, with the size of the context before and
+    // after it (item 312, after Codex's); the Details panel counts the compactions and the checks that flagged
+    // something (item 260), the Cost panel has the summaries' share, and the event keeps the model, the method and the
+    // check.
     compacted(scope, record) {
       if (scope.runId !== rootRunId) {
         return;
@@ -1100,6 +1127,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         compactions.flagged += 1;
       }
       onCompacted({ ...compactions });
+      place(scope, compactionLine(record.data), record.ts);
     },
 
     // A side question (/btw) and its answer: shown in the conversation, never part of the run's own context.

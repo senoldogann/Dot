@@ -321,14 +321,16 @@ is the answer (a small model that is offered both writes the call out as text).
   a summary far too long, an error or a timeout, the run's own model writes it, and while the fast model is paused after
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
-  and the event says so with the reason. The conversation shows no note of a compaction (item 260): the Details panel
-  counts them and says how many checks flagged something, and the Cost panel keeps the summaries' share. Next to the
-  summary a continuity note keeps the
+  and the event says so with the reason. In the conversation a compaction is a quiet line across the column where it
+  happened, with the size of the context before and after it ("Context compacted 401k → 17k tokens", item 312); the
+  Details panel counts them and says how many checks flagged something (item 260), and the Cost panel keeps the
+  summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
   ellipsis of a cut value, or one lengthened by a fragment counts as known). The `compacted` event names the model,
-  how the summary came about, the attempts it took and what the check found.
+  how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
+  and after it (`tokens_before`, `tokens_after`).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
 `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only with
 evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it read
@@ -414,9 +416,18 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   which other runs are at work, with their goals, the sites of their pages, the applications they drive and the files
   they changed, whenever that changes. A call that would type or click in an application another run acted in within
   the last 120 s, or change a file another run changed since this run last read it (or that it never read), does
-  nothing and tells the model why, so that it works elsewhere or reads the file again first. Only the runs of one daemon
-  know each other (`dotx run` in a terminal has its own), and what a shell command changes leaves no trace here, as it
-  names no file the way the file tools do.
+  nothing and tells the model why, so that it works elsewhere or reads the file again first. Item 305 closes the other
+  paths to the same app and file: a batch of desktop steps stops at the step that moves to an application another run
+  holds (the steps before it stay done); the applications an AppleScript names count as driven, so a script into one is
+  refused the same way; app names match whatever their case; the check and the footprint are one step taken right before
+  the call runs, again after a wait for your approval; the files a shell or terminal command, or a shell line of an
+  AppleScript (also one that drives a free application), writes or deletes (a redirect, `cp`, `mv`, `rm`, `tee`,
+  `sed -i`, ... and a whole folder for `rm -r`) count as changed by it, as far as the line names them; the files a run
+  changed stay its own for the other chats' runs at work after it ends, until they read them again; and the browser's
+  mode and its debugging port do not change while another chat's run is at work. The prompt tells each run to leave the
+  other runs' apps and files to them and to stop, kill or quit no process or app it did not start. Only the runs of one
+  daemon know each other (`dotx run` in a terminal has its own), a path only the running line knows (`$(...)`,
+  `find -delete`, git) leaves no footprint, and a process killed by name (`pkill`) is kept to only by the prompt.
 - Runs, their events and their conversations are stored in a SQLite database (WAL mode; the daemon writes through one
   connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives an
   error; a token count that cannot be written is logged, not fatal to the run), so the web UI can replay them. The end
@@ -781,13 +792,6 @@ Dot's, not yours. A message you send starts a run unmarked.
   ("Sandbox for a run's commands", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
   file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
   start is refused, and nothing changes.
-- In the sandbox, a shell command whose line names no place outside its workspace (the guard reads it as no more than
-  low risk, with no flag: a script, a build, an install into the project) is held further: it may write only in the
-  workspace, the temporary folders and `[shell] allow_write` (by default the caches of the usual developer tools:
-  `~/Library/Caches`, `~/.cache`, `~/.npm`, Cargo's and Go's, Xcode's DerivedData), so what its programs write elsewhere
-  is refused. A line that names the place (`cp`, `mv`, a redirect, a clone into a folder) is judged by the guard, which
-  may ask, and writes there as before; so does a terminal session, whose lines are judged one by one, and an
-  AppleScript. The network is not held: a gate for new hosts is a decision of its own.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`
@@ -895,19 +899,17 @@ or your own words. The run reads which option you chose, and whether it was the 
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
   moving the mouse, the rest of the batch is not run
 
-> **The shell guardrail is best-effort; the sandbox holds Dot's own files and where a plain command writes.** Dot reads
-> a shell command before it runs it and judges what it would touch: it reads the line as the shell does (quotes,
-> comments, here-documents, the commands substituted into it, a `case` inside one, a `cd` however it is spelt, a
-> variable, a link it makes, a wrapper such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings
-> and variables that make git or another program run a command line), compares paths without case, and treats what it
-> cannot read (a command named by a substitution or a pattern, `eval` of one, a setting of git it does not know, a line
-> it cannot parse) as a destructive step outside the workspace, which every preset asks about. It does not follow what a
-> recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps those out of
-> Dot's own files, and the writes of a line that names no place outside to its workspace, the temporary folders and
-> `[shell] allow_write`, but it does not keep them from reading your files, and a shell can do more than any analysis
-> can foresee. Treat Dot as a user of your
-> account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
-> `cautious` on a machine where a mistake would be expensive.
+> **The shell guardrail is best-effort; the sandbox holds only Dot's own files.** Dot reads a shell command before it
+> runs it and judges what it would touch: it reads the line as the shell does (quotes, comments, here-documents, the
+> commands substituted into it, a `case` inside one, a `cd` however it is spelt, a variable, a link it makes, a wrapper
+> such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings and variables that make git or another
+> program run a command line), compares paths without case, and treats what it cannot read (a command named by a
+> substitution or a pattern, `eval` of one, a setting of git it does not know, a line it cannot parse) as a destructive
+> step outside the workspace, which every preset asks about. It does not follow what a recursive command does inside the
+> folders it walks, nor the code of a script it runs; the sandbox keeps those out of Dot's own files, not out of yours,
+> and a shell can do more than any analysis can foresee. Treat Dot as a user of your account with the rights of your
+> account: keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a machine where a
+> mistake would be expensive.
 
 ## Autonomy: approvals, goal mode and the end of a run
 
@@ -1118,10 +1120,15 @@ included, with how the run ended as one more signal and in words that say it did
 draws none), and it reads whether such a run read content others can write from all its results; it folds the lesson
 notes of one agent that say the same, the same way round, into the newer one, or into the older one when you saved
 that one yourself (by the embeddings when both have one, by the words otherwise, compared off the daemon's event loop;
-a resting lesson is left alone, so one learnt again does not take its rest, and two you saved stay two); it rests a
+a resting lesson is left alone, so one learnt again does not take its rest, and two you saved stay two; the one
+folded away rests and names the one it was folded into, so nothing the reflection does deletes a note); it rests a
 lesson that no run was handed, and that was not written again, for `lesson_rest_days` (60), or whose score says it did
 not help (handed to `[memory] score_min_uses` runs in the last `score_days`, more of which failed than ended done); a
-lesson you saved yourself is never folded away nor retired. It rests a lesson by tagging
+lesson you saved yourself is never folded away nor retired. It also puts aside a note of Dot's that a newer note,
+written or changed since the last reflection, made outdated (item 306): the review model reads each such pair of notes
+close in meaning (at most 12 a night; your notes, the lessons you saved and the `core` notes are never the older one)
+and keeps the older one when in doubt; the one it calls outdated rests, names the note that replaced it (the Memory page
+says "Replaced by another note") and the log line `note_outdated` says which. It rests a lesson by tagging
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
 `lesson_retired` says which reason with the numbers; and when anything happened it writes a journal note, tagged
 `journal`, of the day it read: the day of the middle of that time, so the reflection at 03:30 names the day before ("On
@@ -1184,8 +1191,10 @@ the median call; a **step model call by step number** line gives the median seco
 steps 1 to 5, 6 to 10, 11 to 20, 21 to 40 and from 41 on of their runs, which shows how much a run slows down as its
 context grows. The Time table ends with the share of the input tokens the provider served from its cache. A **Sites**
 table follows, per site (the host of the page for a browser act, the application for a desktop one, both recorded in
-the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed and the
-median call. `--by site` prints the sites table only, `--by model` everything but it. Acts and steps recorded before
+the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed, the
+median call, and the finished runs that acted there with the share of them that ended done (item 308). **By day**
+follows: per day, the finished runs that acted on a site and the share done, which shows whether the browser and the
+desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 
 The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of
@@ -1333,11 +1342,13 @@ has stopped without closing (a network that changed, a Mac that slept): the page
 Between tries the page waits half a second, then longer, up to 8 seconds, and from half a second again once a stream is
 made; a page that comes back into view, or a browser back on the network, tries at once. The rules page reads its rules
 again when one is added, switched or deleted on another page. A page loaded before Dot was updated says so in a banner,
-with **Load again**: the daemon's status tells what the pages it serves are (`pages`, a digest of their files at its
-start), and the page compares it with what it was loaded from. A run delegated by another run sits under the run that
-delegated it, in both the sidebar and the Activity page, with its steps so far and its channel; the parent's row says
-how many runs it delegated. In the chat, the delegated run's card carries a chip with its progress ("step 3 ·
-web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
+with **Load again**: the daemon's status tells what the pages it serves are (`pages`, a digest of their files), and the
+page compares it with what it was loaded from. The daemon serves the pages as it read them when it started, hidden files
+left out (item 309): files changed on disk while it runs (a merge, a batch of work ported in) wait for its next start,
+so that a page never asks the daemon's API for a field or a route only a newer daemon has. A run delegated by another
+run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps so far and its
+channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries a chip with its
+progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
@@ -1362,8 +1373,9 @@ shows, the Goal mode switch and Keep going, see [Autonomy](#autonomy-approvals-g
 the warn ink, on no fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no
 ground until the pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the
 agent's name go and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273),
-so on a phone the bar is still one line. On a phone, and on any touch screen, the box's text is at least 16 px, as iOS
-zooms the page into a box whose text is smaller, and the bar's buttons are 36 px. While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a
+so on a phone the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen
+for it, at least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller
+one (item 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a
 pick or Escape or a click outside closes it. The model's menu (item 208, after T3 Code's) has a rail on its left, a star
 for the favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the
 models of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model
@@ -1839,8 +1851,10 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
    General › Notifications off drops the subscription.
 
 On a phone the page holds still (item 275). Every page fits the screen's width: a long link, path or word breaks, and
-code and tables scroll in their own frame. No text field is under 16 px, so iOS never zooms into one; a double tap does
-not zoom, and the page does not stretch past its ends. The app added to the home screen runs to the screen's edges, and
+code and tables scroll in their own frame. No page lets the phone zoom into the field that gets the focus: on an iPhone
+and an iPad the viewport allows no scale past the first, so a field has the size it has on the Mac (item 311), and on
+another touch screen no text field is under 16 px. A double tap does not zoom, and the page does not stretch past its
+ends. The app added to the home screen runs to the screen's edges, and
 the bar, the sidebar, the composer and the side panel keep out of the rounded corners, the notch and the home
 indicator. The bar stays at the top of what is seen, also while the keyboard is up, and the composer, the drawers and
 the dialogs stand on what is seen too: iOS 26 can leave the page panned once the keyboard has gone, which left a band
@@ -2089,13 +2103,21 @@ dotx memory reindex      # embed every note again, for example after changing [m
   context window, at most `inject_tokens` (1500; the cap alone when the provider does not say the window). Each of
   these groups first gets its own share, a quarter of the budget, and what is left then goes to them in the same order,
   so many notes of yours do not crowd out the agent's lessons. A note that does not fit is passed over, a shorter one
-  after it may still fit, and `memory_search` finds the rest. The run's
+  after it may still fit, and `memory_search` finds the rest. A lesson is also tagged with the sites and applications
+  of its run that it names (`site-amazon-com`, `site-notes`; item 308), and when a run first reaches a site or drives
+  an application, its next step is handed the lessons tagged with it that it was not handed yet (at most five) and the
+  learned skills written there that its instructions did not list (at most three), counted as handed like the notes
+  it started with; the timeline says "Recalled 2 memories learned on www.amazon.com". The run's
   timeline says how many notes it recalled and the tokens they took.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
-  (90) rests: the Memory page lists it under "Resting", a search still finds it, but runs no longer start with it on
-  its own. Your notes and the `core` ones never rest. Under each note the page says how the runs it was handed to
+  (90), counted from when it was last handed or written, rests: the Memory page lists it under "Resting", a search
+  still finds it, but runs no longer start with it on its own. Your notes and the `core` ones never rest that way.
+- A note can hold for a while (item 306): `memory_save` takes `valid_days` for a fact that is true only so long (a
+  trip, a deadline, an offer). The model is told until when it holds ("holds until 2026-10-20"); once that day passes
+  the note rests, whoever wrote it, and neither a run nor a search is handed it; the Memory page says "Holds until …",
+  then "Ran out …". Saving the same note again wakes it with the new time. Under each note the page says how the runs it was handed to
   ended ("Handed to 5 runs, 4 done"); every use is recorded with the run's end, which `dotx stats` reads.
 - What Dot knows about you opens the memory part of every prompt: a short section the nightly reflection keeps (your
   language, hours, tools and sites, the ways you ask, the limits you set), rewritten each night from its previous
@@ -2227,9 +2249,13 @@ A run can make a teammate itself (item 99). The `create_agent` tool (a name, a r
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,
 like saving a note: `ask` asks once the run has read untrusted content, `yolo` makes it); the agent lasts after the
 run, its record keeps the run that made it, and the Agents page marks it "Made by Dot". The prompt's Team section
-tells a run with no teammate that it may make one for a kind of work that recurs and deserves a role of its own,
-never for a single step; `message_agent` is offered whenever `create_agent` is, so a teammate made mid-run can be
-messaged at once. Every step, a run that may message the team learns of the agents that joined since it started
+tells a run with no team that when the work splits into roles (finding sources, writing, checking) or into parts
+that recur, it makes the teammates it needs, each with only the tools its role needs, and sends them the parts with
+`message_agent` (several at once work in parallel); with a team, it reuses a member before it makes one, never for a
+single step. An agent a run makes can do no more than the run (item 307): only tools the run has (with none named, an
+agent's run gives its own bound and Dot's run every tool), a helper model or the run's own, at most three a run, and a
+research run makes none; its runs open with "an agent Dot made" and "Dot's instructions to you", not yours.
+`message_agent` is offered whenever `create_agent` is, so a teammate made mid-run can be messaged at once. Every step, a run that may message the team learns of the agents that joined since it started
 (made by it, by you or by another run) through a note with their names and roles. Delegated runs and the runs that
 answer a message make no agents.
 
@@ -2702,8 +2728,7 @@ and what Chrome does to a tab in the background. The web UI (chats, their select
 including the Browser one) ran in a headless Chromium against the static files and a mocked API, and the API itself in
 the server smoke tests; the two were not run together against a live daemon. No model worked from a real skill or plugin
 folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
-- The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files and holds
-  the writes of a plain command to its workspace, the temporary folders and `[shell] allow_write`, nothing more (see
+- The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files only (see
   [Safety](#safety)).
 - The token goes only to a server that proves it holds it, but a page that another program served at the daemon's
   address reads what the browser keeps for that address, the token among it (see

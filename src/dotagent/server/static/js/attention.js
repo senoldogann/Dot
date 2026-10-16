@@ -194,6 +194,10 @@ function tellAboutMissedFiring(event) {
   tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed" });
 }
 
+function tellAboutLearningStalled(event) {
+  tell({ title: "Dot's learning has stopped", body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed" });
+}
+
 /** What a failure to notify costs: nothing but a line in the console, so it never stops the page from updating. */
 function onLifecycleEvent(event) {
   try {
@@ -208,6 +212,8 @@ function onLifecycleEvent(event) {
       tellAboutCampaign(event);
     } else if (event.kind === "schedule_missed") {
       tellAboutMissedFiring(event);
+    } else if (event.kind === "learning_stalled") {
+      tellAboutLearningStalled(event);
     }
   } catch (error) {
     console.warn("could not notify", error);

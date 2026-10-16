@@ -26,6 +26,13 @@ from dotagent.agent.campaign import (
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.keep_going import keep_going_ask
+from dotagent.agent.learning_health import (
+    LearningOutcome,
+    LearningWork,
+    failed_with,
+    quiet_limit,
+    record_learning,
+)
 from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
@@ -2185,30 +2192,44 @@ class RunManager:
         if task is not None:
             await task
 
-    async def _distil(self, run: RunRecord, status: RunStatus) -> None:
-        """Task body of the playbook work of a run that ended (:func:`dotagent.agent.playbooks.learn_playbook`).
-        Unexpected exceptions are logged with their traceback and left on the run as a ``playbook_failed`` event, which
-        its page and ``dotx stats`` show; the run keeps its end either way."""
+    async def _record_learning(self, work: LearningWork, outcome: LearningOutcome) -> None:
+        """Keep how a piece of learning work ended in the record of how learning fares
+        (:func:`dotagent.agent.learning_health.record_learning`), which tells the owner when learning has stopped. A
+        store that cannot keep it is logged: the work has ended either way."""
+        quiet_s: float | None = quiet_limit(self._runtime.config.agent.reflection_time)
         try:
-            await learn_playbook(self._runtime, run, status)
-        except Exception as exc:
-            log.exception("playbook crashed", run_id=run.id)
-            await self._runtime.bus.emit(
-                run.id, PLAYBOOK_FAILED, {"host": "", "error": f"The skill work failed: {_crash(exc)}"}, True
-            )
+            await record_learning(self._runtime.store, self._runtime.bus, work, time.time(), outcome, quiet_s)
+        except StoreError as error:
+            log.error("learning_not_recorded", work=work, state=outcome.state, error=error.message)
+
+    async def _distil(self, run: RunRecord, status: RunStatus) -> None:
+        """Task body of the playbook work of a run that ended (:func:`dotagent.agent.playbooks.learn_playbook`), and
+        the one place its errors end (review O25): the work says on the run what it expected to fail; anything else is
+        logged with its traceback and left on the run as a ``playbook_failed`` event, which its page and ``dotx stats``
+        show. Every outcome goes to the record of how learning fares; the run keeps its end either way."""
+        try:
+            try:
+                outcome: LearningOutcome = await learn_playbook(self._runtime, run, status)
+            except Exception as exc:
+                log.exception("playbook crashed", run_id=run.id)
+                outcome = failed_with(f"The skill work failed: {_crash(exc)}")
+                await self._runtime.bus.emit(run.id, PLAYBOOK_FAILED, {"host": "", "error": outcome.error}, True)
+            await self._record_learning("playbooks", outcome)
         finally:
             self._distilling.pop(run.id, None)
 
     async def _learn(self, case: LessonCase) -> None:
-        """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback
-        and left on the run as a ``lessons_failed`` event, which its page and ``dotx stats`` show; the run keeps its
-        end either way."""
+        """Task body of drawing the lessons of a run that ended (:func:`dotagent.agent.lessons.learn`), and the one
+        place its errors end (review O25): the work says on the run what it expected to fail; anything else is logged
+        with its traceback and left on the run as a ``lessons_failed`` event, which its page and ``dotx stats`` show.
+        Every outcome goes to the record of how learning fares; the run keeps its end either way."""
         try:
-            await learn(self._runtime, self._deciding, case)
-        except Exception as exc:
-            log.exception("lessons crashed", run_id=case.run_id)
-            await self._runtime.bus.emit(
-                case.run_id, LESSONS_FAILED, {"error": f"The lessons of this run failed: {_crash(exc)}"}, True
-            )
+            try:
+                outcome: LearningOutcome = await learn(self._runtime, self._deciding, case)
+            except Exception as exc:
+                log.exception("lessons crashed", run_id=case.run_id)
+                outcome = failed_with(f"The lessons of this run failed: {_crash(exc)}")
+                await self._runtime.bus.emit(case.run_id, LESSONS_FAILED, {"error": outcome.error}, True)
+            await self._record_learning("lessons", outcome)
         finally:
             self._learning.pop(case.run_id, None)

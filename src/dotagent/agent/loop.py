@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -40,9 +40,10 @@ from dotagent.agent.continuity import (
     summary_part,
     with_actions,
     with_compaction,
+    with_empty_sections,
     with_instruction,
 )
-from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls
+from dotagent.agent.executor import ToolOutcome, batch_steps, execute_calls, reached_sites
 from dotagent.agent.gate import RunGate
 from dotagent.agent.helpers import (
     MODEL_SWITCHED_EVENT,
@@ -131,6 +132,7 @@ from dotagent.agent.scaffold import (
     summarise_point,
     surface_for,
 )
+from dotagent.agent.sites import SiteKnowledge, new_sites, site_knowledge, site_note, site_tag
 from dotagent.agent.stepmodel import (
     STEP_ROUTE_FAILED_EVENT,
     STEP_ROUTED_EVENT,
@@ -167,7 +169,7 @@ from dotagent.core.errors import (
 )
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
-from dotagent.core.text import CHARS_PER_TOKEN, redact_secrets, truncate_middle
+from dotagent.core.text import CHARS_PER_TOKEN, redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
 from dotagent.llm.calls import CallOrigin
@@ -206,8 +208,9 @@ from dotagent.memory.service import (
 )
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
+from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
-from dotagent.skills.types import SKILL_TOOL, SkillCatalog
+from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
 from dotagent.store.models import AgentRecord, CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
 from dotagent.store.stats import ACT_TOOLS
@@ -493,8 +496,9 @@ async def _compact(
     is seen, not hidden.
 
     The ledger and the plan are pinned into the note in about ``part_chars`` characters; the model's summary is checked
-    against ``head``. When neither model writes one, the note carries the newest ``part_chars`` characters of the
-    transcript instead and says so.
+    against ``head``, and a section it still lacks after it was asked for again goes into the note as an empty heading,
+    which the check names (review O9). When neither model writes one, the note carries the newest ``part_chars``
+    characters of the transcript instead and says so.
     """
     own: ModelRef = parse_model_ref(agent.run.model)
     fast: ModelRef = parse_model_ref(agent.runtime.roles.fast())
@@ -518,11 +522,13 @@ async def _compact(
         writer = own
         text, own_attempts, problem = await _model_summary(agent, own, transcript, context_tokens)
         attempts += own_attempts
+    # The summary stays in the run's context and its record: the secrets Dot holds, and any of a known form, are
+    # masked in it (review Y3).
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
     if text is None:
         reason: str = problem if problem is not None else "no reply"
-        note: str = continuity_note(
-            ledger, plan, part_chars, mechanical_summary(transcript, reason, part_chars), "mechanical, no model", None
-        )
+        mechanical: str = redact_known(mechanical_summary(transcript, reason, part_chars), secrets)
+        note: str = continuity_note(ledger, plan, part_chars, mechanical, "mechanical, no model", None)
         return Compaction(
             note=user_message(note, ()),
             method="mechanical",
@@ -532,12 +538,21 @@ async def _compact(
             fast_problem=fast_problem,
             check=None,
         )
-    check: ContinuityCheck = check_continuity(text, history_text(head), ledger, str(Path.home()))
+    summary: str = redact_known(text, secrets)
+    check: ContinuityCheck = check_continuity(summary, history_text(head), ledger, str(Path.home()))
+    if check.missing_sections:
+        log.warning(
+            "summary_sections_left_empty",
+            run_id=agent.run.id,
+            model=writer.label,
+            sections=list(check.missing_sections),
+        )
+        summary = with_empty_sections(summary, check.missing_sections)
     author: str = (
         f"written by you, {writer.label}" if writer.label == own.label else f"written by the fast model {writer.label}"
     )
     return Compaction(
-        note=user_message(continuity_note(ledger, plan, part_chars, text, author, check), ()),
+        note=user_message(continuity_note(ledger, plan, part_chars, summary, author, check), ()),
         method="model",
         model=writer.label,
         attempts=attempts,
@@ -547,11 +562,17 @@ async def _compact(
     )
 
 
-def _compaction_event(compaction: Compaction, summarised: int, ledger: RunLedger) -> JsonObject:
+def _compaction_event(
+    compaction: Compaction, summarised: int, ledger: RunLedger, tokens_before: int, tokens_after: int
+) -> JsonObject:
+    """The data of a ``compacted`` event; ``tokens_before`` and ``tokens_after`` are the estimated size of the prompt
+    before and after the compaction, which the conversation shows (item 312)."""
     check: ContinuityCheck | None = compaction.check
     return {
         "summarised_messages": summarised,
         "compaction": ledger.compactions,
+        "tokens_before": tokens_before,
+        "tokens_after": tokens_after,
         "method": compaction.method,
         "model": compaction.model,
         "attempts": compaction.attempts,
@@ -611,6 +632,7 @@ async def _fit_context(
             ledger = with_compaction(ledger)
             part_chars: int = round(plain * _SUMMARY_SHARE * CHARS_PER_TOKEN)
             compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars)
+            before: int = estimated
             current = [compaction.note, *tail]
             estimated = round(estimate_tokens([system, *current], specs) * ratio)
             if compaction.check is not None and not compaction.check.ok:
@@ -622,7 +644,7 @@ async def _fit_context(
                     unverified=list(compaction.check.unverified),
                 )
             await agent.runtime.bus.emit(
-                agent.run.id, "compacted", _compaction_event(compaction, len(head), ledger), True
+                agent.run.id, "compacted", _compaction_event(compaction, len(head), ledger, before, estimated), True
             )
     if current != history:
         await agent.runtime.store.replace_messages(agent.run.thread_id, current)
@@ -769,6 +791,26 @@ async def _goal_query(runtime: Runtime, run: RunRecord) -> str:
     earlier: list[RunRecord] = await runtime.store.list_runs(_QUERY_EARLIER_RUNS + 1, run.thread_id)
     goals: list[str] = [record.goal for record in earlier if record.id != run.id and record.parent_run_id is None]
     return "\n".join([run.goal, *goals[:_QUERY_EARLIER_RUNS]])
+
+
+async def _arrival_note(
+    agent: AgentRun, sites: Sequence[str], offered: Sequence[Skill], listed: Set[str]
+) -> str | None:
+    """The note of what earlier runs learned on ``sites``, which the run just reached for the first time (item 308),
+    its lessons counted as handed to the run; ``None`` when they bring nothing. ``offered`` are the skills the run is
+    offered, ``listed`` the names of those its instructions list."""
+    runtime: Runtime = agent.runtime
+    run: RunRecord = agent.run
+    handed: set[str] = await runtime.store.handed_memory_ids(run.id)
+    known: tuple[SiteKnowledge, ...] = await site_knowledge(runtime, run.agent_id, sites, offered, listed, handed)
+    if not known:
+        return None
+    ids: list[str] = [note.id for entry in known for note in entry.lessons]
+    if ids:
+        await runtime.store.mark_memories_used(run.id, ids, time.time(), "site")
+        where: str = ", ".join(entry.site for entry in known if entry.lessons)
+        await runtime.bus.emit(run.id, "memories", {"ids": [*ids], "site": where}, True)
+    return site_note(known)
 
 
 def _new_memories_note(live: LiveNotes) -> str:
@@ -1481,7 +1523,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     for problem in skills.problems:
         log.warning("skill_skipped", run_id=run.id, path=str(problem.path), reason=problem.reason)
-    skills = skills.model_copy(update={"skills": await offered_to_run(runtime.config, skills, run.id, run.agent_id)})
+    skills = skills.model_copy(update={"skills": await offered_to_run(runtime.config, skills, run.agent_id)})
     if not skills.skills:
         specs = tuple(spec for spec in specs if spec.name != SKILL_TOOL)
     if config.consult_max_per_run == 0:
@@ -1507,6 +1549,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name != USE_TOOLS_TOOL)
     callable_tools: ToolRegistry = _run_tools(runtime.registry, run.mode, specs)
     memory_seen_at: float = time.time()
+    # The tags of the sites the run reached so far (item 308): the first time it reaches one, it is handed what was
+    # learned there.
+    sites_seen: set[str] = set()
     # The last note about the other runs at work (item 301); empty while there were none.
     peers_said: str = ""
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
@@ -1548,8 +1593,18 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 helpers,
                 None
                 if agent_record is None
-                else AgentBrief(name=agent_record.name, role=agent_record.role, instructions=agent_record.instructions),
-                [AgentBrief(name=member.name, role=member.role, instructions="") for member in team],
+                else AgentBrief(
+                    name=agent_record.name,
+                    role=agent_record.role,
+                    instructions=agent_record.instructions,
+                    made_by_dot=agent_record.made_by is not None,
+                ),
+                [
+                    AgentBrief(
+                        name=member.name, role=member.role, instructions="", made_by_dot=member.made_by is not None
+                    )
+                    for member in team
+                ],
                 owner_prompt_lines(await owner_section(runtime.store)),
                 devtools_address(browser.config),
             )
@@ -1593,6 +1648,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         # The facts as they stand when a tool asks: each step replaces them.
         facts=lambda: facts,
         spawner=agent.spawner,
+        run_tools=frozenset(spec.name for spec in specs),
     )
     checker: GoalChecker | None = (
         goal_checker_for(
@@ -1888,6 +1944,22 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 (outcome for outcome in outcomes if outcome.call.name == FINISH_TOOL and not outcome.result.is_error),
                 None,
             )
+            arrived: tuple[str, ...] = new_sites(
+                (
+                    site
+                    for outcome in outcomes
+                    if not outcome.result.is_error
+                    for site in reached_sites(outcome.call, outcome.action)
+                ),
+                sites_seen,
+            )
+            sites_seen.update(site_tag(site) for site in arrived)
+            if arrived and finished is None:
+                arrival: str | None = await _arrival_note(
+                    agent, arrived, skills.skills, frozenset(skill.name for skill in listing.skills)
+                )
+                if arrival is not None:
+                    history.append(await _stored_note(agent, arrival))
             if finished is not None:
                 ended = _finish_result(finished)
             elif past_limit is not None:

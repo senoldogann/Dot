@@ -1803,20 +1803,22 @@ a.pill:hover {
   user-select: none;
 }
 
-/* On a phone, and on any touch screen, no text field's text is under --touch-text (item 275), and the composer's box,
-   whose size the owner chooses, never under it either, its copy keeping the same size and leading (item 273). */
-@media (max-width: 720px), (pointer: coarse) {
-  :root :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select, textarea) {
+/* On a touch screen no text field's text is under --touch-text (item 275), and the composer's box, whose size the owner
+   chooses, never under it either, its copy keeping the same size and leading (item 273): below it a phone zooms the page
+   into the field that gets the focus. Not on an iPhone or an iPad, whose viewport boot.js keeps from zooming into a field
+   (`data-focus-zoom="off"`, item 311): there a field has the size it has in a window on the Mac. */
+@media (pointer: coarse) {
+  :root:not([data-focus-zoom="off"]) :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select, textarea) {
     font-size: max(var(--touch-text), 1em);
   }
 
-  .composer {
+  :root:not([data-focus-zoom="off"]) .composer {
     --composer-touch-size: max(var(--touch-text), var(--composer-size));
     --composer-touch-leading: calc(var(--composer-touch-size) * var(--composer-leading-ratio));
   }
 
-  :root .composer .textarea,
-  :root .composer .composer-mirror {
+  :root:not([data-focus-zoom="off"]) .composer .textarea,
+  :root:not([data-focus-zoom="off"]) .composer .composer-mirror {
     font-size: var(--composer-touch-size);
     line-height: var(--composer-touch-leading);
   }
@@ -3263,6 +3265,26 @@ details[open] > summary .chev {
 
 .note.warn {
   color: var(--warn);
+}
+
+/* A compaction in the conversation (item 312, after Codex's): a quiet rule across the column, its words and the sizes
+   in the middle. */
+.compaction-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.compaction-line::before,
+.compaction-line::after {
+  content: "";
+  flex: 1;
+  min-width: var(--space-4);
+  border-top: 1px solid var(--border);
 }
 
 .note.bad {

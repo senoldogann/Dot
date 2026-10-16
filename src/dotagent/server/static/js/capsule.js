@@ -3,7 +3,7 @@
 // the run works. T3 Code's line also counts the queued messages; Dot's queue has a banner of its own right under the
 // line, which says it. A wider page tells the same in the conversation and the side panel, and shows no line (app.css).
 
-import { duration, el } from "./dom.js";
+import { duration, el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { flockState } from "./timeline.js";
 
@@ -31,9 +31,9 @@ export function createCapsule({ onWork, onHelpers }) {
       markFor = work.dataset.state;
       workMark.replaceChildren(icon(waiting ? "bell" : "circleDashed"));
     }
-    workText.textContent = waiting ? "Waiting for you" : `Working ${duration(Math.max(now - since, 0))}`;
+    setText(workText, waiting ? "Waiting for you" : `Working ${duration(Math.max(now - since, 0))}`);
     helpers.hidden = !working || statuses.length === 0;
-    helpersText.textContent = flockState(statuses);
+    setText(helpersText, flockState(statuses));
     element.hidden = !working;
   }
 

@@ -12,6 +12,7 @@ from typing import Literal
 
 from dotagent.core.errors import ConfigError, MissingSecretError
 from dotagent.core.paths import env_file_path
+from dotagent.core.text import KNOWN_SECRET_MIN_CHARS
 from dotagent.core.types import FrozenModel
 
 KEYCHAIN_SERVICE: str = "dot-agent"
@@ -22,6 +23,9 @@ _TAIL_CHARS: int = 4
 _TAIL_MIN_CHARS: int = 16
 
 type SecretSource = Literal["environment", "env_file", "keychain"]
+
+# The values :func:`resolve_secret` returned in this process, for :func:`known_secrets`.
+_resolved: set[str] = set()
 
 
 class SecretState(FrozenModel):
@@ -119,14 +123,23 @@ def _from_keychain(name: str) -> str | None:
 
 
 def resolve_secret(name: str) -> str | None:
-    """Return the secret called ``name`` from the first source that has it, else ``None``."""
-    from_env: str | None = os.environ.get(name)
-    if from_env:
-        return from_env
-    from_file: str | None = _from_env_file(env_file_path(), name)
-    if from_file:
-        return from_file
-    return _from_keychain(name)
+    """Return the secret called ``name`` from the first source that has it, else ``None``. The value is one of
+    :func:`known_secrets` from then on."""
+    found: str | None = os.environ.get(name) or _from_env_file(env_file_path(), name) or _from_keychain(name)
+    if found:
+        _resolved.add(found)
+    return found or None
+
+
+def known_secrets() -> tuple[str, ...]:
+    """The secrets Dot holds, to be masked wherever they stand (review Y3,
+    :func:`dotagent.core.text.redact_known`): the values :func:`resolve_secret` returned in this process and every
+    value of ``<home>/.env``, each once, the longest first, none shorter than
+    :data:`~dotagent.core.text.KNOWN_SECRET_MIN_CHARS`. None of them is ever logged or put in an error."""
+    path: Path = env_file_path()
+    saved: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
+    values: set[str] = {value for value in (*_resolved, *saved.values()) if len(value) >= KNOWN_SECRET_MIN_CHARS}
+    return tuple(sorted(values, key=len, reverse=True))
 
 
 def _tail(value: str) -> str:

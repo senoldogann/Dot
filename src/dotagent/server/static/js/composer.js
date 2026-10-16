@@ -9,7 +9,7 @@
 import { api } from "./api.js";
 import { SEND_KEY, valueOf } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
-import { el } from "./dom.js";
+import { el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { markdownMirror } from "./mirror.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
@@ -381,8 +381,8 @@ export function composerPill({ id, caption, value, icon: mark }) {
   return {
     element,
     setValue: (text, extra) => {
-      valueNode.textContent = text;
-      extraNode.textContent = extra;
+      setText(valueNode, text);
+      setText(extraNode, extra);
       extraNode.hidden = extra === "";
     },
     setIcon: (node) => {

@@ -5,7 +5,7 @@
 // so, with Read again.
 
 import { api } from "./api.js";
-import { clip, duration, el } from "./dom.js";
+import { clip, duration, el, setText } from "./dom.js";
 import { onLifecycle, onStreamBack } from "./state.js";
 import { attempt, confirmDialog } from "./ui.js";
 
@@ -69,7 +69,7 @@ export function backgroundWork({ threadId }) {
   function tick() {
     const now = Date.now() / 1000;
     for (const { session, time } of shown) {
-      time.textContent = took(session, now);
+      setText(time, took(session, now));
     }
   }
 

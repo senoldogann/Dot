@@ -277,6 +277,12 @@ def main_page_of(request: Request) -> Page | None:
     return page if frame == page.main_frame else None
 
 
+def threads_in_use(threads: Mapping[str, ThreadTabs], kept: frozenset[str]) -> list[str]:
+    """The chats whose tabs a switch of the browser would close under them: one in the middle of a step, and one whose
+    run is at work between two of its calls (``kept``, item 305), which would find its pages gone."""
+    return [thread_id for thread_id, thread in threads.items() if thread.lock.locked() or thread_id in kept]
+
+
 def threads_to_release(threads: Mapping[str, ThreadTabs], cutoff: float, kept: frozenset[str]) -> list[str]:
     """The chats whose tabs the idle reaper releases: unused since ``cutoff`` and not in use now, unless a run of the
     chat is at work (``kept``): a run that waits for an answer or for a long command finds its pages as it left them."""
@@ -657,7 +663,7 @@ class BrowserSession:
 
     async def check_debug_port(self, port: int) -> None:
         """Raise the error :meth:`set_debug_port` would refuse ``port`` with, changing nothing: the session was closed,
-        a thread is in the middle of a step (as for a switch), or another program holds the port."""
+        a chat's run is at work in the browser (as for a switch), or another program holds the port."""
         async with self._launch_lock:
             await self._refuse_debug_port(port)
 
@@ -668,18 +674,19 @@ class BrowserSession:
             return
         if port and await asyncio.to_thread(port_is_taken, port):
             raise port_taken(port)
-        busy: list[JsonValue] = [thread_id for thread_id, thread in self._threads.items() if thread.lock.locked()]
+        busy: list[JsonValue] = [*threads_in_use(self._threads, self._kept())]
         if busy:
             raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
 
     async def switch(self, config: BrowserConfig, profile_dir: Path) -> None:
         """Work in the Chrome that ``config`` and ``profile_dir`` name from the next call on: the current one is let go
         of first (Dot's own Chrome is closed; in the Chrome of the user the tabs Dot opened are closed and the connection
-        is dropped). Refused while a thread is in the middle of a step, so no run loses the page it works on."""
+        is dropped). Refused while a chat's run is at work in it (:func:`threads_in_use`), so no run loses the page it works
+        on."""
         async with self._launch_lock:
             if self._closed:
                 raise BrowserError("the browser session was closed", {})
-            busy: list[JsonValue] = [thread_id for thread_id, thread in self._threads.items() if thread.lock.locked()]
+            busy: list[JsonValue] = [*threads_in_use(self._threads, self._kept())]
             if busy:
                 raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
             await self._let_go()

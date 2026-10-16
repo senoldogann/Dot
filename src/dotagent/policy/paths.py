@@ -56,15 +56,10 @@ def within(path: Path, prefix: Path) -> bool:
     return folded == root or folded.startswith(f"{root}/") or root == ""
 
 
-def temporary_places() -> tuple[Path, ...]:
-    """The temporary folders, resolved: what a path inside of counts as ``temp``."""
+def _is_temp(path: Path) -> bool:
     roots: list[Path] = [Path(os.path.realpath(prefix)) for prefix in _TEMP_PREFIXES]
     roots.append(Path(os.path.realpath(tempfile.gettempdir())))
-    return tuple(dict.fromkeys(roots))
-
-
-def _is_temp(path: Path) -> bool:
-    return any(within(path, root) for root in temporary_places())
+    return any(within(path, root) for root in roots)
 
 
 def _is_system(path: Path) -> bool:

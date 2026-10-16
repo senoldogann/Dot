@@ -54,7 +54,9 @@ def _reason(error: SkillError) -> str:
     return error.message if not details else f"{error.message} ({dumps_compact(details)})"
 
 
-def _read_skill(file: Path, source: str) -> Skill:
+def read_skill(file: Path, source: str) -> Skill:
+    """The skill ``file`` holds; one that cannot be read as UTF-8 text, or is no skill the loader reads, raises
+    :class:`SkillError`."""
     try:
         text: str = file.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError) as exc:
@@ -85,7 +87,7 @@ def load_catalog(roots: Sequence[SkillRoot]) -> SkillCatalog:
                 continue
             seen.add(real)
             try:
-                skill: Skill = _read_skill(file, root.source)
+                skill: Skill = read_skill(file, root.source)
             except SkillError as exc:
                 problems.append(SkillProblem(path=file, reason=_reason(exc)))
                 continue

@@ -1,13 +1,25 @@
 """The team (item 87): the prompt lists the agents a run may message, an agent is found by name, a reply is rendered
-as the tool's result, and the harness settings of the paper have their defaults."""
+as the tool's result, and the harness settings of the paper have their defaults. An agent a run makes gets no tool the
+run lacks and no model but a helper or the run's own (item 307)."""
 
 from pathlib import Path
 
+import pytest
+
 from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
 from dotagent.config import load_default_config
+from dotagent.core.errors import ToolInputError
 from dotagent.store.models import AgentRecord, RunRecord
 from dotagent.tools.context import DelegateOutcome
-from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL, find_agent, render_reply
+from dotagent.tools.team import (
+    CREATE_AGENT_TOOL,
+    MESSAGE_AGENT_TOOL,
+    agent_model,
+    agent_tools,
+    build_team_tools,
+    find_agent,
+    render_reply,
+)
 
 SCOUT: AgentRecord = AgentRecord(
     id="agt_1",
@@ -23,7 +35,9 @@ SCOUT: AgentRecord = AgentRecord(
     made_by=None,
     look=None,
 )
-TEAM: tuple[AgentBrief, ...] = (AgentBrief(name="Scout", role="Finds and checks sources", instructions=""),)
+TEAM: tuple[AgentBrief, ...] = (
+    AgentBrief(name="Scout", role="Finds and checks sources", instructions="", made_by_dot=False),
+)
 
 
 def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
@@ -61,10 +75,12 @@ def test_the_prompt_lists_the_team_only_when_the_run_may_message_it() -> None:
 
 def test_the_prompt_offers_to_make_a_teammate_when_the_run_may_and_says_so_without_any() -> None:
     alone: str = _prompt([MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL], ())
-    assert "# Team" in alone and "no agents yet" in alone and "make one with create_agent" in alone
+    assert "# Team" in alone and "no team yet" in alone and "make the teammates it needs with create_agent" in alone
     assert "  - Scout" not in alone
     together: str = _prompt([MESSAGE_AGENT_TOOL, CREATE_AGENT_TOOL], TEAM)
-    assert "  - Scout: Finds and checks sources" in together and "make a new teammate with create_agent" in together
+    assert "  - Scout: Finds and checks sources" in together and "Make a new teammate with create_agent" in together
+    # Item 307: the team is not said to be the owner's, as Dot may have made it.
+    assert "The owner made" not in together and "reuse one before you make one" in together
     # Without the message tool there is no team to speak of, create or not.
     assert "# Team" not in _prompt([CREATE_AGENT_TOOL], ())
 
@@ -119,3 +135,30 @@ def test_a_reply_names_the_agent_and_fences_what_an_untrusted_run_wrote() -> Non
 def test_the_harness_settings_of_the_paper_have_its_defaults() -> None:
     agent = load_default_config().agent
     assert (agent.context_elide_share, agent.context_summarise_share, agent.plan_each_turn) == (0.6, 0.85, True)
+
+
+def test_an_agent_a_run_makes_gets_only_tools_the_run_has_and_with_none_named_its_makers_bound() -> None:
+    """Item 307: an agent made in a run can do no more than the run that made it."""
+    run_tools: frozenset[str] = frozenset({"shell", "read_file", "web_search"})
+    assert agent_tools(["read_file", "web_search", "read_file"], run_tools, ()) == ("read_file", "web_search")
+    with pytest.raises(ToolInputError) as refused:
+        agent_tools(["read_file", "desktop_act"], run_tools, ())
+    assert refused.value.message == "an agent gets only tools this run has, not desktop_act"
+    # None named: Dot's run (no bound) gives every tool; an agent's bounded run gives its own bound.
+    assert agent_tools([], run_tools, ()) == ()
+    assert agent_tools([], run_tools, ("read_file",)) == ("read_file",)
+
+
+def test_a_research_run_makes_no_agent_and_may_still_message_one() -> None:
+    """Item 307: a run that only reads does not make a lasting teammate with tools to act."""
+    modes: dict[str, frozenset[str]] = {tool.spec.name: frozenset(tool.modes) for tool in build_team_tools()}
+    assert modes[CREATE_AGENT_TOOL] == {"task", "chat"} and "research" in modes[MESSAGE_AGENT_TOOL]
+
+
+def test_an_agent_a_run_makes_runs_on_a_helper_model_or_the_runs_own_or_the_configured_one() -> None:
+    allowed: list[str] = ["openai:gpt-5-mini", "anthropic:claude-sonnet-5-5"]
+    assert agent_model("", allowed) == ""
+    assert agent_model(" openai:gpt-5-mini ", allowed) == "openai:gpt-5-mini"
+    with pytest.raises(ToolInputError) as refused:
+        agent_model("anthropic:claude-opus-5-5", allowed)
+    assert "(openai:gpt-5-mini, anthropic:claude-sonnet-5-5)" in refused.value.message

@@ -3,7 +3,7 @@
 // one of a page that Dot's update left out of date.
 
 import { QUIET_BREAK_MS } from "./api.js";
-import { el, showAfter } from "./dom.js";
+import { el, setText, showAfter } from "./dom.js";
 import { releaseFailsafe } from "./failsafe.js";
 import { icon } from "./icons.js";
 import { followSeen, PHONE, setSidebarOpen, sidebarOpen, trackStagebar } from "./layout.js";
@@ -47,10 +47,10 @@ function buildIndicators() {
     pills: [waiting, connection],
     banners: [banner, updated],
     paint(snapshot) {
-      waitingCount.textContent = String(snapshot.approvals.length);
+      setText(waitingCount, String(snapshot.approvals.length));
       waiting.hidden = snapshot.approvals.length === 0;
       dot.className = `live-dot ${snapshot.stream}`;
-      connectionLabel.textContent = STREAM_LABEL[snapshot.stream];
+      setText(connectionLabel, STREAM_LABEL[snapshot.stream]);
       // The connection shows while it is being made or lost; a live one says nothing (item 120), nor does a break that
       // mends at once (item 286). The runs that work are counted in the sidebar's Working section.
       showConnection(snapshot.stream !== "live");

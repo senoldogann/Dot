@@ -159,7 +159,7 @@ function agentForm({ record, onSaved, onCancel }) {
     .catch((error) => {
       console.warn("the models could not be listed", error);
     });
-  // Saved only once the tools are listed: a form without them would send none, which is no bound at all.
+  // Saved only once the tools are listed: without them the form cannot say which tools the agent may use.
   let toolsListed = false;
   const toolsLoaded = api
     .get("/tools")
@@ -195,8 +195,8 @@ function agentForm({ record, onSaved, onCancel }) {
       model: model.value,
       effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
-      tools: picked,
-      every_tool: picked.length === 0,
+      // None picked is every tool, said as null: an empty list keeps the tools an agent has (the code review's Y5).
+      tools: picked.length === 0 ? null : picked,
       look: look.value(),
     };
     save.disabled = true;
@@ -286,7 +286,7 @@ function mountList(root, ctx) {
   const newButton = el("button", { class: "btn primary", type: "button", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
   const teamLink = el("a", { class: "btn ghost", href: "#/team", title: "Today's messages between agents" }, icon("branch"), el("span", { class: "label" }, "Team"));
   root.append(
-    pageHead("Agents", "Dot, and the agents you made: each with a face, a role and its own chats.", el("div", { class: "cluster" }, teamLink, newButton)),
+    pageHead("Agents", "Dot, and the agents you or Dot made: each with a face, a role and its own chats.", el("div", { class: "cluster" }, teamLink, newButton)),
     editorSlot,
     holder,
   );

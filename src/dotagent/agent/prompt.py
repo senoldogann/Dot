@@ -23,11 +23,13 @@ from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 
 class AgentBrief(FrozenModel):
-    """What the prompt says of the agent a run belongs to (item 86)."""
+    """What the prompt says of the agent a run belongs to (item 86). ``made_by_dot`` is whether a run of Dot's made it
+    (item 307): its instructions are then Dot's, not the owner's."""
 
     name: str
     role: str
     instructions: str
+    made_by_dot: bool
 
 
 class PromptInputs(FrozenModel):
@@ -310,7 +312,8 @@ _SECRETS_ENTERED: str = (
 _CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the target is \
 the right one.
 - Other runs of Dot may work at the same time on this Mac, in other chats; a note names them and what they hold. Leave \
-the apps they drive and the files they change to them.
+the apps they drive and the files they change to them, and stop, kill or quit no process or app you did not start: a \
+server, a watcher or a window may be another run's work.
 
 # Communication
 - Answer in the language the user writes in. Be brief and concrete; no filler, no restating the task.
@@ -573,35 +576,37 @@ def _team_section(team: Sequence[AgentBrief], tool_names: Sequence[str]) -> str:
         return "\n".join(
             [
                 "# Team",
-                "- The owner has no agents yet. For a kind of work that recurs and deserves a role of its own "
-                "(checking sources, writing copy, watching a site), make one with create_agent: it lasts beyond this "
-                "run, has its own page under Agents, and answers message_agent in runs of its own. Never make one "
-                "for a single step.",
+                "- You have no team yet. When the work splits into roles (finding sources, writing copy, checking) or "
+                "into parts that recur, make the teammates it needs with create_agent, each with only the tools its "
+                "role needs, and send them the parts with message_agent; they stay under Agents for later runs. Never "
+                "make one for a single step.",
             ]
         )
     lines: list[str] = [
         "# Team",
-        "- The owner made agents that work with you. Send one a message with message_agent when a part of the work "
-        "fits its role better than yours; it works in a run of its own, cannot see this conversation, and its reply "
-        "comes back as the result. The team:",
+        "- Agents work with you. Send one a message with message_agent when a part of the work fits its role better "
+        "than yours (several at once work in parallel); it works in a run of its own, cannot see this conversation, "
+        "and its reply comes back as the result. The team:",
         *(f"  - {member.name}: {member.role}" if member.role else f"  - {member.name}" for member in team),
     ]
     if may_make:
         lines.append(
-            "- You may make a new teammate with create_agent for a kind of work that recurs and none of them covers; "
-            "it lasts beyond this run. Never make one for a single step."
+            "- Make a new teammate with create_agent for a role the work needs that none of them covers; reuse one "
+            "before you make one, and never make one for a single step."
         )
     return "\n".join(lines)
 
 
 def _agent_section(agent: AgentBrief | None) -> str:
-    """The agent's own voice, first: who it is and what the owner told it (item 86)."""
+    """The agent's own voice, first: who it is and what the owner told it (item 86), or Dot, for an agent a run of Dot's
+    made (item 307)."""
     if agent is None:
         return ""
-    lines: list[str] = [f"You are {agent.name}, an agent the owner made: {agent.role}".rstrip(": ") + "."]
+    maker, whose = ("Dot", "Dot's") if agent.made_by_dot else ("the owner", "The owner's")
+    lines: list[str] = [f"You are {agent.name}, an agent {maker} made: {agent.role}".rstrip(": ") + "."]
     if agent.instructions.strip():
         lines.append(
-            f"The owner's instructions to you, which you follow within the rules below:\n{agent.instructions.strip()}"
+            f"{whose} instructions to you, which you follow within the rules below:\n{agent.instructions.strip()}"
         )
     return "\n".join(lines)
 

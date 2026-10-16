@@ -17,18 +17,22 @@ from zoneinfo import ZoneInfo
 import httpx
 import pytest
 import pytest_asyncio
+from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.verify import new_facts
+from dotagent.cli_commands import StatsCommand
+from dotagent.cli_stats import cmd_stats
 from dotagent.config import ModelsConfig, load_config
 from dotagent.core.errors import ConfigError, StoreError, ToolExecutionError, ToolInputError
-from dotagent.core.paths import failsafe_path, workspace_dir
+from dotagent.core.paths import db_path, failsafe_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.events import SYSTEM_RUN_ID, EventBus, Subscription
 from dotagent.llm.types import Effort, Speed
 from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
+from dotagent.scheduler.failures import SCHEDULE_FAILURES_KEY, FiringFailures, parse_failures, record_firing_failure
 from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_schedule, edit_schedule
 from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
@@ -42,6 +46,7 @@ from dotagent.store.models import (
     ScheduleRecord,
     ThreadRecord,
 )
+from dotagent.store.stats import StuckWork, collect_stuck
 from dotagent.tools.base import PreparedCall, ToolResult
 from dotagent.tools.context import ToolContext
 from dotagent.tools.registry import tools_for_mode
@@ -534,6 +539,128 @@ async def test_a_schedule_whose_running_status_was_not_written_is_free_once_its_
         await scheduler.drain()
     assert manager.goals == [GOAL, GOAL]
     assert (await runtime.store.get_schedule(recurring.id)).last_status != "skipped: the previous run was still going"
+
+
+class _FailsThenStarts(_StartsAndEnds):
+    """Starts a firing's run as :class:`_StartsAndEnds` does once two starts failed: one with Dot's own error, one with
+    a crash."""
+
+    def __init__(self, runtime: Runtime) -> None:
+        super().__init__(runtime)
+        self.failures: list[Exception] = [ConfigError("the model is gone", {}), RuntimeError("the start crashed")]
+
+    async def start_firing(
+        self,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        carried: tuple[str, ...],
+    ) -> RunRecord:
+        if self.failures:
+            raise self.failures.pop(0)
+        return await super().start_firing(
+            goal, opening, mode, model, thread_id, effort, speed, approvals, goal_mode, carried
+        )
+
+
+async def test_a_firing_that_fails_is_counted_leaves_no_chat_and_the_schedule_fires_again(runtime: Runtime) -> None:
+    """The code review's O3-O6: a firing whose run does not start, with Dot's error or with a crash, leaves no chat
+    behind either way and counts in a row with its error, which ``dotx stats`` shows; the next firing starts its run
+    and clears the count."""
+    threads_before: int = len(await runtime.store.list_threads(1000))
+    recurring: ScheduleRecord = await _schedule(runtime, _cron("Flaky", "*/5 * * * *"))
+    manager: _FailsThenStarts = _FailsThenStarts(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    try:
+        await scheduler.tick(_planned(recurring) + 5)
+        once: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
+        await scheduler.tick(_planned(once) + 5)
+        twice: ScheduleRecord = await runtime.store.get_schedule(recurring.id)
+        counted: FiringFailures = parse_failures(await runtime.store.kv_get(SCHEDULE_FAILURES_KEY))
+        threads_after_failures: int = len(await runtime.store.list_threads(1000))
+        await scheduler.tick(_planned(twice) + 5)
+        manager.ends.set()
+        fired: ScheduleRecord = await _until_over(runtime, recurring.id)
+    finally:
+        await scheduler.drain()
+    assert once.last_status == "failed to start: the model is gone"
+    assert twice.last_status == "failed to fire: RuntimeError"
+    failing = counted.schedules[recurring.id]
+    assert (failing.failures_in_row, failing.last_error) == (2, "failed to fire: RuntimeError")
+    assert threads_after_failures == threads_before
+    assert (fired.last_status, manager.goals) == ("done", [GOAL])
+    assert recurring.id not in parse_failures(await runtime.store.kv_get(SCHEDULE_FAILURES_KEY)).schedules
+
+
+async def test_a_schedule_left_starting_or_running_is_marked_interrupted_and_logged_as_the_scheduler_starts(
+    runtime: Runtime,
+) -> None:
+    """The code review's O3-O6: a schedule whose run was watched by the process before this one is not left running."""
+    running: ScheduleRecord = await _schedule(runtime, _cron("Left running", "0 9 * * *"))
+    starting: ScheduleRecord = await _schedule(runtime, _cron("Left starting", "0 10 * * *"))
+    ended: ScheduleRecord = await _schedule(runtime, _cron("Ended", "0 11 * * *"))
+    await runtime.store.set_schedule_status(running.id, "running")
+    await runtime.store.set_schedule_status(starting.id, "starting")
+    await runtime.store.set_schedule_status(ended.id, "done")
+    scheduler: Scheduler = Scheduler(runtime, RunManager(runtime))
+    with capture_logs() as logs:
+        await scheduler.start()
+        await scheduler.stop()
+    statuses: list[str] = [
+        (await runtime.store.get_schedule(record.id)).last_status for record in (running, starting, ended)
+    ]
+    assert statuses == ["interrupted", "interrupted", "done"]
+    told: list[tuple[object, object]] = [
+        (entry["schedule_id"], entry["status"]) for entry in logs if entry["event"] == "schedule_interrupted"
+    ]
+    assert sorted(map(str, told)) == sorted(map(str, [(running.id, "running"), (starting.id, "starting")]))
+
+
+async def test_dotx_stats_counts_what_waits_and_will_not_move_on_by_itself(
+    runtime: Runtime, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """The code review's O3-O6: a schedule marked running with no run at work, an active campaign with no session
+    planned, a chat whose queued message nothing moves on and one held for the owner are counted; a schedule whose
+    firings fail is named with how many in a row and its error."""
+    before: StuckWork = await asyncio.to_thread(collect_stuck, db_path())
+    stale: ScheduleRecord = await _schedule(runtime, _cron("Left running", "0 9 * * *"))
+    await runtime.store.set_schedule_status(stale.id, "running")
+    failing: ScheduleRecord = await _schedule(runtime, _cron("Flaky", "0 10 * * *"))
+    await record_firing_failure(runtime.store, failing.id, time.time(), "failed to start: the model is gone")
+    leads: ThreadRecord = await runtime.store.create_thread("Leads", "campaign")
+    campaign: CampaignRecord = await runtime.store.create_campaign(
+        "Leads", "Find fifty leads.", leads.id, f"ollama:{MODEL}", "medium", "standard", None, "ask", (), "own"
+    )
+    stalled: ThreadRecord = await runtime.store.create_thread("Stalled", "test")
+    held: ThreadRecord = await runtime.store.create_thread("Held", "test")
+    for thread in (stalled, held):
+        await runtime.store.add_queued(
+            thread.id, "Then say pong.", (), "research", None, None, "standard", None, None, None, None, "test"
+        )
+    await runtime.store.hold_queue(held.id)
+    try:
+        after: StuckWork = await asyncio.to_thread(collect_stuck, db_path())
+        assert await cmd_stats(StatsCommand(name="stats", days=1, by="model", run=None)) == 0
+        printed: str = capsys.readouterr().out
+    finally:
+        await runtime.store.set_campaign_status(campaign.id, "stopped", None)
+        await runtime.store.delete_threads([stalled.id, held.id])
+    added: tuple[int, int, int, int] = (
+        after.stale_schedules - before.stale_schedules,
+        after.unplanned_campaigns - before.unplanned_campaigns,
+        after.stalled_queues - before.stalled_queues,
+        after.held_queues - before.held_queues,
+    )
+    assert added == (1, 1, 1, 1)
+    assert "failing schedules: 1" in printed
+    assert "    Flaky: 1 firings failed in a row, the last " in printed
+    assert "the model is gone" in printed
 
 
 async def test_a_one_time_schedule_overdue_fires_late_saying_when_it_was_due(runtime: Runtime) -> None:
