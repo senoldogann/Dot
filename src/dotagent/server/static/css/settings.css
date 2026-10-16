@@ -1115,3 +1115,67 @@
     min-height: 44px;
   }
 }
+
+/* On a phone (item 331) a colour scheme's card draws a phone, upright: no sidebar, the message and the answer across its
+   screen and the composer at its foot. The themes stand two a row, their orbs a finger's size, so that a 320 px screen
+   holds two too. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .wire {
+    width: 60%;
+    margin-inline: auto;
+    aspect-ratio: 9 / 16;
+    border-radius: var(--radius);
+  }
+
+  .wire-side {
+    display: none;
+  }
+
+  .wire-bubble {
+    top: 10%;
+    right: 12%;
+    width: 50%;
+    height: 6%;
+  }
+
+  .wire-line {
+    left: 12%;
+    height: 3%;
+  }
+
+  .wire-line:nth-child(3) {
+    top: 22%;
+    width: 64%;
+  }
+
+  .wire-line:nth-child(4) {
+    top: 28%;
+    width: 44%;
+  }
+
+  .wire-composer {
+    inset: auto 10% 6%;
+    height: 10%;
+  }
+
+  .theme-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .theme-orbs {
+    gap: var(--space-1);
+  }
+
+  .orb {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Under 360 px the orbs are 36 px, each still a 44 px button with its ring, two to a card a little over 90 px wide. */
+@media (pointer: coarse) and (max-width: 359.98px) {
+  .orb {
+    width: 36px;
+    height: 36px;
+  }
+}

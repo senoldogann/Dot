@@ -1649,8 +1649,10 @@ the default; Wide, 1152 px; Full); **Density**, how close the rows, cards and li
 two switches that follow the theme picked for light until you set them yourself: fold the tool steps (on in all but
 Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how long the sidebar and the details panel
 take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never slide), and "Faces that move"
-(below). **Type**: the interface's font (Inter, the system's, or families typed, which go before Inter so that no glyph
-goes missing) and its size (13 to 17 px around 14, every text size scaled with it); the answers' font (the theme's,
+(below). **Text** (item 331): one **Text size** under a line of an answer, the size of the body on this device, every
+text size scaled with it: on a phone 14 to 20 px around 16, as iOS's own, and elsewhere 13 to 17 px around 14; each
+device keeps its own. **Type**: the interface's font (Inter, the system's, or families typed, which go before Inter so
+that no glyph goes missing); the answers' font (the theme's,
 which is a serif in Paper, the interface's, or a serif); the composer's font (the interface's, a serif, the code's, or
 families typed) and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed)
 and the size of an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on)
@@ -1931,7 +1933,7 @@ the scheme on screen.
 
 On a phone Dot reads at a phone's size and takes a finger (item 329). On a touch screen of a phone's width (720 px and
 under, or under 500 px high on its side) the body is 16 px, as iOS's own text, a hint 15 px, and only the times, badges
-and the like are 13 px; Settings › Appearance's interface size still scales them all, and code keeps the size chosen
+and the like are 13 px; Settings › Appearance's Text size still scales them all, and code keeps the size chosen
 for it. Everything that is tapped is 44 px each way at least, as Apple asks, but a link inside a line of text: the
 buttons and fields, the bar's and the sidebar's buttons and rows, the menus, the tabs and the heads of the steps. The
 composer's round buttons keep their look in a clear ring that makes them so, and the switch is iOS's size; a tap
@@ -1941,7 +1943,9 @@ sizes. Where a page names a setting of the config file, it says what it is in wo
 On a phone the settings open on a list of their pages in groups, as T3 Code's do (item 330): Interface, Models, How Dot
 works and This Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and
 schedules there are). A row opens its page on its own, the bar naming it and "All settings" at its top to go back, and
-a card's name stands over the card. In a Mac's window the settings keep their tabs down the left side.
+a card's name stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone
+Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's
+16 px (item 331).
 
 At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under

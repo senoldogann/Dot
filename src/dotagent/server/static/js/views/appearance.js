@@ -628,7 +628,25 @@ function motionCard() {
   return { element, dispose: () => REDUCED_MOTION.removeEventListener("change", paintMotion) };
 }
 
-/** The type (item 127): the families and sizes of the interface, the answers, the composer and the code. */
+/** The text (item 331, after T3 Code's): a line of an answer over the size of every text, the body's on this device. */
+function textCard() {
+  const size = rangeOf({
+    label: "Text size",
+    hint: "Messages, labels and headings grow and shrink with it. 16 px is a phone's own and 14 px a Mac's; each device keeps its own.",
+    setting: INTERFACE_SIZE,
+    min: INTERFACE_SIZE.least,
+    max: INTERFACE_SIZE.most,
+    step: 1,
+    unit: " px",
+  });
+  return section(
+    "Text",
+    el("div", { class: "card-pad stack" }, preview("answers", "Good morning. The weekly report is ready, and two things wait for you."), size.element),
+  );
+}
+
+/** The type (item 127): the families of the interface, the answers, the composer and the code, and the sizes of the last
+ * two. */
 function typeCard() {
   const interfaceFont = familySetting({
     label: "Interface font",
@@ -638,15 +656,6 @@ function typeCard() {
       { id: "", label: "Inter" },
       { id: "system", label: "The system's" },
     ],
-  });
-  const interfaceSize = rangeOf({
-    label: "Interface size",
-    hint: "Every text of the interface grows or shrinks with it; 14 px is Dot's own, which a phone reads at 16 px.",
-    setting: INTERFACE_SIZE,
-    min: 13,
-    max: 17,
-    step: 1,
-    unit: " px",
   });
   const answers = choiceSetting({
     label: "Answers",
@@ -713,7 +722,6 @@ function typeCard() {
       "div",
       { class: "card-pad stack" },
       interfaceFont.element,
-      interfaceSize.element,
       preview("interface", "Dot reads the page, fills in the form and asks before it sends."),
       answers.element,
       preview("answers", "The report is ready: three files changed, and the tests pass."),
@@ -737,6 +745,7 @@ export function mount(root) {
   const motion = motionCard();
   const others = [
     section("Colour scheme", el("div", { class: "card-pad" }, schemes.element)),
+    textCard(),
     look.element,
     motion.element,
     typeCard().element,
@@ -747,7 +756,7 @@ export function mount(root) {
     }
   });
   root.append(
-    paneHead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the interface, the motion and the type. Themes of your own are kept by Dot, for every browser.", null),
+    paneHead("How Dot looks in this browser: the colour scheme, a theme for light and one for dark, the size of the text, the interface, the motion and the type. Themes of your own are kept by Dot, for every browser.", null),
     others[0],
     themes.element,
     ...others.slice(1),

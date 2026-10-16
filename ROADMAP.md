@@ -5259,6 +5259,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 328 | A phone that comes back to Dot finds it calm                                           | in progress |         |
 | 329 | On a phone Dot reads at a phone's size and takes a finger                              | in progress |         |
 | 330 | On a phone the settings are a list of their tabs in groups                             | in progress |         |
+| 331 | On a phone Appearance draws phones, two themes a row and one Text size                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13511,6 +13512,39 @@ is called" a word a line beside its field.
   the phone's fails on the card. `test_phone_type` measures the list too (329's sizes and targets); `test_phone_pages`
   checks the row of tabs in a laptop's window, where it still is.
 - Not verified on a device: how the list and the pages feel in the owner's hand.
+
+### 331. On a phone Appearance draws phones, two themes a row and one Text size
+
+**Status: in progress.** On the branch `items-328-phone`, after item 330; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** T3 Code's Appearance on the owner's phone: the colour schemes drawn as phones, the themes two a row,
+each with a light and a dark sphere and its name, and one Text card, a sample line over a "Text size" in points that
+messages, labels and headings follow, 16 by default. Dot's Type card had an "Interface size" of 13 to 17 px around 14,
+which already scaled every text of the interface, the answers too (a phone read 14 as its 16 since item 329); its
+schemes were drawn as Mac windows, and an iPhone SE had one theme a row.
+
+**As built (2026-10-17).**
+
+- **Text.** A Text card under Themes: a line of an answer over **Text size**, the size of the body on this device, every
+  text size scaled by it over the device's own. On a phone (item 329's: a touch screen 720 px wide or less, or under
+  500 px high on its side) it runs from 14 to 20 px around 16, as iOS's own; elsewhere from 13 to 17 px around 14, as
+  before. It is kept in the browser under the key it had (`dot.sizeInterface`), so each device has its own; on a phone
+  a value kept from before is read as the body's size, and one outside 14 to 20 gives way to 16. `boot.js` reckons it
+  the same way before the first paint. The unit stays px, Dot's for every size (a px on an iPhone is a point). The Type
+  card keeps the families, the composer's size and the code's.
+- **Schemes.** On a phone a scheme's card draws a phone, upright: no sidebar, the message and the answer across its
+  screen and the composer at its foot; a Mac's window draws a window, as before.
+- **Themes.** On a phone the gallery is two a row, an iPhone SE's too: the orbs are 40 px (36 under 360 px), each still
+  a 44 px button with its ring.
+- README: the Text card, under Settings › Appearance.
+- Tests: `tests/smoke/test_phone_text.py` (WebKit as the owner's iPhone 17 Pro Max and an iPhone SE): a fresh phone's
+  Text size reads 16 in 14 to 20 and the body is 16 px; at 18 the answer, a row of the sidebar and a label of the
+  settings grow by 18/16 together; after a reload it is 18, and with main.js held back boot.js alone puts 18/16 on the
+  page; the schemes' drawings are upright, the first two themes stand on one line and nothing is wider than the
+  screen; a Mac's window draws a window. Against the pages before this item both fail. `test_interface_settings`
+  moves the slider by its new name; a Mac's 13 to 17 around 14 is as before.
+- Not verified on a device.
 
 ## Log
 

@@ -146,12 +146,20 @@ export const PANEL_MOTION = {
 
 export const INTERFACE_FONT = family("dot.fontInterface", "--font", ["system"], "var(--family-inter)");
 
-/** The interface's size, 13 to 17 px: the seven sizes of the type scaled by it over Dot's 14. */
+// A phone, as app.css draws one (item 329): a touch screen 720 px wide or less, or under 500 px high on its side.
+const PHONE_TYPE = window.matchMedia("(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)");
+// The body's own size on this device and the sizes it may be given: iOS's 16 px on a phone, Dot's 14 elsewhere.
+const BODY = PHONE_TYPE.matches ? { own: 16, least: 14, most: 20 } : { own: 14, least: 13, most: 17 };
+
+/** The size of the body's text on this device (item 331), which the seven sizes of the type are scaled by over the
+ * device's own; kept in this browser, so that each device has its own. */
 export const INTERFACE_SIZE = {
   key: "dot.sizeInterface",
-  initial: 14,
-  parse: wholeIn(13, 17, 1),
-  paint: (value) => (value === 14 ? dropToken("--type-scale") : setToken("--type-scale", String(value / 14))),
+  initial: BODY.own,
+  least: BODY.least,
+  most: BODY.most,
+  parse: wholeIn(BODY.least, BODY.most, 1),
+  paint: (value) => (value === BODY.own ? dropToken("--type-scale") : setToken("--type-scale", String(value / BODY.own))),
 };
 
 /** The answers' voice: the theme's (serif in Paper), the interface's font, or serif. */
