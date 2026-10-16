@@ -1615,8 +1615,9 @@ providers](#models-and-providers)), **Browser** (which Chrome Dot browses with a
 Dot at and a pairing code for its home-screen app; see [Dot on the phone](#dot-on-the-phone)) and **System** (the
 daemon, the emergency stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
 the browser. The tabs sit beside their content when the window has the room and above it otherwise, in one row that
-scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); the earlier
-addresses of the memory, schedules, rules and system pages lead to their tabs.
+scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are
+a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the phone](#dot-on-the-phone)).
+The earlier addresses of the memory, schedules, rules and system pages lead to their tabs.
 
 Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this browser. **Colour scheme** is three cards,
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and
@@ -1936,6 +1937,11 @@ buttons and fields, the bar's and the sidebar's buttons and rows, the menus, the
 composer's round buttons keep their look in a clear ring that makes them so, and the switch is iOS's size; a tap
 anywhere on a setting's row turns its switch, and a step's duration shows without a hover. An iPad and a Mac keep their
 sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
+
+On a phone the settings open on a list of their pages in groups, as T3 Code's do (item 330): Interface, Models, How Dot
+works and This Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and
+schedules there are). A row opens its page on its own, the bar naming it and "All settings" at its top to go back, and
+a card's name stands over the card. In a Mac's window the settings keep their tabs down the left side.
 
 At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under

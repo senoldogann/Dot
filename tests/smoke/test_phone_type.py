@@ -294,6 +294,7 @@ async def test_every_page_on_a_phone_reads_at_a_phones_size_and_takes_a_finger(o
             ("team", "#/team"),
             ("campaigns", "#/campaigns"),
             ("connect", "#/connect"),
+            ("settings", "#/settings"),
             *[(f"settings {tab}", f"#/settings/{tab}") for tab in _SETTINGS],
         ]
         browser: Browser = await playwright.webkit.launch(headless=True)

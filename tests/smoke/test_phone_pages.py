@@ -1,9 +1,9 @@
 """Dot's pages on a phone (items 272 and up), on a served daemon in Chrome.
 
-Settings (item 272): where the tabs and the pane do not fit side by side, the tabs are one row that scrolls sideways,
-with the open tab in sight, and the row stays under the bar while the page scrolls; a tab chosen from it opens at the
-top of its pane. Side by side, the tabs are a column. Before, the row wrapped into four rows on a phone and scrolled
-away with the page.
+Settings (item 272): in a window wider than a phone where the tabs and the pane do not fit side by side, the tabs are
+one row that scrolls sideways, with the open tab in sight, and the row stays under the bar while the page scrolls; a tab
+chosen from it opens at the top of its pane. Side by side, the tabs are a column. Before, the row wrapped into four rows
+and scrolled away with the page. On a phone the settings are a list of their tabs (item 330, test_phone_settings.py).
 
 The bar and the composer (item 273): the bar beside a closed sidebar holds its opener alone, and neither holds the
 emergency stop, which is in Settings › System (item 289); the sidebar's buttons and the side panel's switch and close are one size; the reasoning pill shows its
@@ -59,6 +59,8 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (390, "dark"),
     (1280, "light"),
 )
+# A laptop's window with the sidebar open: the tabs and the pane do not fit side by side, and a phone's list is not used.
+_ROW_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"))
 # Wide enough for the tabs and the pane side by side, the sidebar open.
 _WIDE: int = 1680
 
@@ -231,7 +233,7 @@ async def test_the_settings_tabs_are_one_row_that_stays_where_they_do_not_fit_be
     async with _served(own_home) as (_, address), async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
-            for size in _SHOTS:
+            for size in _ROW_SHOTS:
                 await _settings_row(browser, address, size, tmp_path)
             await _settings_column(browser, address)
         finally:

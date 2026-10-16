@@ -5258,6 +5258,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
 | 328 | A phone that comes back to Dot finds it calm                                           | in progress |         |
 | 329 | On a phone Dot reads at a phone's size and takes a finger                              | in progress |         |
+| 330 | On a phone the settings are a list of their tabs in groups                             | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13473,6 +13474,43 @@ and some hints named the config file's keys (`[agent] context_tokens in config.t
   16 px and the composer its own 15 px. `test_phone_return`: the curtain's title to the pixel. `test_context_sizes` and
   `test_context_meter`: the hints' words.
 - Not verified on a device: how the sizes and the 44 px rows feel in the owner's hand.
+
+### 330. On a phone the settings are a list of their tabs in groups
+
+**Status: in progress.** On the branch `items-328-phone`, after item 329; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The same word of the owner (item 328), with T3 Code's phone app beside it: its settings open on a
+list of groups, each a card of rows with a mark, a name, what the page holds and an arrow, and a row opens its page with
+a way back. Dot's settings on a phone were the tabs in one row that scrolls sideways (item 272) over the open tab's pane,
+`#/settings` was General, and every card held its name inside its surface. On an iPhone SE, General squeezed "What Dot
+is called" a word a line beside its field.
+
+**As built (2026-10-17).**
+
+- **A phone** is a window 720 px wide or less, as for the rest of the phone's layout (`layout.js` `PHONE`, items 294 to
+  298). A phone on its side and a Mac keep the rail or the row of tabs.
+- **The list.** On a phone `#/settings` is four groups of rows, eleven in all: Interface (General, Appearance), Models
+  (Models, API keys), How Dot works (Rules, Memory, Skills, Schedules) and This Mac (Browser, Phone, System). A group's
+  name stands over its card; a row is the tab's mark, its name, what it holds and an arrow, 48 px high, a hairline
+  between rows. Appearance tells the theme on screen, Models the main model, Memory how many notes Dot keeps and
+  Schedules how many schedules there are; the two counts are read as the list opens.
+- **A tab's page.** A row opens its tab as a page of its own: the bar names the tab, "All settings" at its top leads back
+  to the list, and the rail is not drawn. A card's name stands over the card, out of its surface, as a group's name over
+  the list, and the card's ground is its body's; every card with a name has one body (a survey of the eleven tabs).
+- **A Mac.** `#/settings` leads to General in the place of the address it was opened at, so one step back is the page
+  before. The rail, the bar's "Settings" and the cards are as before.
+- **General's names.** Where a name's row has no room for its words whole and the field, as on an iPhone SE, the field
+  goes under the words.
+- README: the list, under "Dot on the phone".
+- Tests: `tests/smoke/test_phone_settings.py` (WebKit as the owner's iPhone 17 Pro Max and as an iPhone SE, 440 and 320
+  px): the list's groups, its rows and their four values; each of the eleven rows opens its tab, the bar naming it, the
+  way back shown and the rail hidden, and the way back leads to the list; Appearance's first card has its name over it;
+  no page is wider than the screen. In a Mac's window `#/settings` from the sidebar leads to General with the rail, and
+  one step back is the page before. Against the pages before this item both tests fail, and without the cards' rules
+  the phone's fails on the card. `test_phone_type` measures the list too (329's sizes and targets); `test_phone_pages`
+  checks the row of tabs in a laptop's window, where it still is.
+- Not verified on a device: how the list and the pages feel in the owner's hand.
 
 ## Log
 
