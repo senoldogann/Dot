@@ -19,7 +19,16 @@ from urllib.parse import urlsplit
 import pytest
 import pytest_asyncio
 import uvicorn
-from playwright.async_api import Browser, Page, Playwright, Response, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    CDPSession,
+    Frame,
+    Page,
+    Playwright,
+    Response,
+    async_playwright,
+)
 from starlette.types import Message, Receive, Scope, Send
 from test_browser import act, ref_of
 
@@ -33,6 +42,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 _TOKEN: str = "boundary-test-token"
 _STARTUP_S: float = 10.0
+_READS: int = 10
+_SLOW_CDP_S: float = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -338,10 +349,23 @@ async def test_a_link_that_redirects_to_the_interface_is_stopped(
     assert _InsideHandler.arrivals.items == []
 
 
-async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(browser: BrowserSession, site: str) -> None:
+async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(
+    browser: BrowserSession, site: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each read navigates a new tab, whose guard is also begun when Chrome announces the tab. With Chrome slow to open
+    the guard's session, reads in a row show that none navigates before its tab's guard is up (measured 2026-10-16:
+    a read could navigate while the guard begun for its tab was still under way, and its redirect reached Dot's port)."""
+    open_session = BrowserContext.new_cdp_session
+
+    async def slow_session(context: BrowserContext, page: Page | Frame) -> CDPSession:
+        await asyncio.sleep(_SLOW_CDP_S)
+        return await open_session(context, page)
+
+    monkeypatch.setattr(BrowserContext, "new_cdp_session", slow_session)
     port: int | None = urlsplit(site).port
-    with pytest.raises(ForbiddenUrlError):
-        await browser.read_page(f"http://localhost:{port}/hop")
+    for read in range(_READS):
+        with pytest.raises(ForbiddenUrlError):
+            await browser.read_page(f"http://localhost:{port}/hop?read={read}")
     assert _InsideHandler.arrivals.items == []
 
 

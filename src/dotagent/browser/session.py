@@ -381,8 +381,9 @@ class BrowserSession:
         # frame that the rules refused last, which the error page the page then shows is about.
         self._answering: set[asyncio.Task[None]] = set()
         self._refusals: dict[Page, _Refusal] = {}
-        # The pages of Dot's own Chrome whose requests a Fetch session of their own judges (:meth:`_guard_hops`).
-        self._guarded: set[Page] = set()
+        # The pages of Dot's own Chrome whose requests a Fetch session of their own judges (:meth:`_guard_hops`), each
+        # with the setting up of its session, which a navigation of the page waits for.
+        self._guarded: dict[Page, asyncio.Task[None]] = {}
         self._reaper: asyncio.Task[None] | None = None
         self._closed: bool = False
         # The front of the Mac around Dot's own Chrome (item 118): Chrome's process, the application that had the front
@@ -1102,18 +1103,30 @@ class BrowserSession:
         """Ask Chrome about every request of ``page`` through a Fetch session of the tab's own, redirect hops included:
         the route of the context is asked about the first address of a navigation only (measured 2026-10-15: of
         localhost → 302 → Dot's port, the route saw localhost and Chrome fetched Dot's port). A frame of another site,
-        which Chrome runs as a target of its own, is not reached from here; the route sees its first requests."""
-        if page in self._guarded:
-            return
-        self._guarded.add(page)
-        page.on("close", self._forget_page)
+        which Chrome runs as a target of its own, is not reached from here; the route sees its first requests.
+
+        The session is set up once per page, and every call returns only once Chrome has it: a navigation that starts
+        before then is not asked about at all (measured 2026-10-16: the guard begun when Chrome announced a new tab was
+        still under way when the tab's first navigation started, and a redirect hop of one such navigation in five
+        reached Dot's port)."""
+        guarding: asyncio.Task[None] | None = self._guarded.get(page)
+        if guarding is None:
+            guarding = asyncio.create_task(self._set_up_guard(page))
+            self._guarded[page] = guarding
+            page.on("close", self._forget_page)
+        await asyncio.shield(guarding)
+
+    async def _set_up_guard(self, page: Page) -> None:
+        """The Fetch session of :meth:`_guard_hops`. One that could not be set up is forgotten, so that the next call
+        tries again. Closing the browser does not cancel it: it fails as the browser goes, and its callers get that
+        failure rather than a cancellation of their own."""
         try:
             cdp: CDPSession = await page.context.new_cdp_session(page)
             main: str | None = main_frame_id(await cdp.send("Page.getFrameTree"))
             cdp.on("Fetch.requestPaused", partial(self._on_paused, cdp, page, main))
             await cdp.send("Fetch.enable", {"patterns": _FETCH_PATTERNS})
         except PlaywrightError:
-            self._guarded.discard(page)
+            self._guarded.pop(page, None)
             raise
 
     async def _guard_quietly(self, page: Page) -> None:
@@ -1131,7 +1144,7 @@ class BrowserSession:
             )
 
     def _forget_page(self, page: Page) -> None:
-        self._guarded.discard(page)
+        self._guarded.pop(page, None)
         self._refusals.pop(page, None)
 
     def _on_paused(self, cdp: CDPSession, page: Page, main: str | None, event: Mapping[str, object]) -> None:
@@ -1193,6 +1206,18 @@ class BrowserSession:
                 raise
             raise refused from error
 
+    async def _blank(self, page: Page) -> None:
+        """Reset ``page`` to a blank page after a refusal. Chrome's error page for the refused request can commit after
+        the refusal is reported and interrupt the reset, which is then tried again as any interrupted navigation is."""
+        config: BrowserConfig = self._config
+        await navigate(
+            page,
+            "about:blank",
+            _ms(config.navigation_timeout_s),
+            config.navigation_attempts,
+            config.navigation_backoff_ms,
+        )
+
     async def _enforce_landing(self, tab: Tab) -> None:
         """A redirect or click may have ended on a URL the rules forbid; leave it before anything is read from it. One
         the rules refused on the way shows Chrome's error page, which is left the same way."""
@@ -1203,7 +1228,7 @@ class BrowserSession:
             if refused is None:
                 add_note(tab, "the page failed to load (Chrome error page)")
                 return
-            await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+            await self._blank(tab.page)
             raise ForbiddenUrlError(
                 "the page was sent to a URL that may not be opened; the request was refused and the tab was reset to "
                 "a blank page",
@@ -1216,7 +1241,7 @@ class BrowserSession:
             # The page is where it may be: a refusal on the way there, which it then left, is over.
             self._refusals.pop(tab.page, None)
             return
-        await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+        await self._blank(tab.page)
         raise ForbiddenUrlError(
             "the page ended up on a URL that may not be opened; the tab was reset to a blank page",
             landed,
@@ -1232,7 +1257,7 @@ class BrowserSession:
             status: int | None = await self._navigate_checked(tab.page, url, config.navigation_attempts)
         except ForbiddenUrlError as refused:
             # The tab shows Chrome's error page for the refused request; it is left as a page the rules forbid is.
-            await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+            await self._blank(tab.page)
             raise ForbiddenUrlError(
                 f"{refused.message}; the tab was reset to a blank page",
                 refused.url,
