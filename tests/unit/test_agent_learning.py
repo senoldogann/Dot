@@ -68,6 +68,7 @@ def _playbook(kind: str, agent_id: str | None) -> Playbook:
         goal=kind,
         written_at=1_700_000_000.0,
         acting_steps=3,
+        read_outside=False,
     )
 
 

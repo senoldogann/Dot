@@ -348,6 +348,7 @@ def _learned(agent_id: str) -> Playbook:
         goal="Check the claim",
         written_at=1_760_000_000.0,
         acting_steps=4,
+        read_outside=False,
     )
 
 

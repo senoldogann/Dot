@@ -9,19 +9,28 @@ reads a digest of those steps (:func:`acting_digest`) and writes the skill
 (:func:`dotagent.agent.review.playbook_writer_for`): the kind of work in a few words, the steps that worked, the
 parameters a later run fills in, and a one-sentence description. The kind names the folder, ``learned-<kind>/SKILL.md``
 under ``<home>/playbooks`` (:func:`render_playbook`), with the evidence (the runs, the goal, the date, the acting steps)
-and a ``playbook.json`` that keeps the kind and counts the use; a kind that matches an existing skill by meaning (or,
-without embeddings, by name) updates that skill instead of writing another, its runs appended to the evidence. The
-skills catalog reads the folder like any skills directory, so later runs see the description under Skills, told it is
-advice from Dot's own work, and read the rest with the ``skill`` tool.
+and a ``playbook.json`` that keeps the kind and counts the use. The writer is shown the kinds of the skills the run's
+owner keeps (:func:`kinds_shown`) and names the run's work by one of them, word for word, when it is that work; a kind
+written the same as one of them, or close to one by meaning, updates that skill instead of writing another, its runs
+appended to the evidence. A run updates its owner's skills alone (:func:`owned`): another owner's skill of the same name
+keeps its folder, and the new one takes the next free name (:func:`free_name`). The skills catalog reads the folder like
+any skills directory, so later runs see the description under Skills, told it is advice from Dot's own work, and read
+the rest with the ``skill`` tool.
+
+A run that read content third parties can author is distilled from its own steps alone (:func:`own_steps_digest`, the
+answer left out), and a skill that names a web address, an account or an e-mail address the run's own words never did
+is not kept (:func:`foreign_problem`): a page cannot turn its text into a step of a later run. Such a skill says where
+it comes from, and its record keeps it (``read_outside``).
 
 Every run that ended done or failed records its use of learned skills (the ``skill`` calls that named one): a skill
-read by :data:`MAX_FAILURES` runs that then failed is retired, moved under ``.retired`` where the catalog does not
-look, and no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store, the
+read by :data:`MAX_FAILURES` runs in a row that then failed (none ended done between them) is retired, moved under
+``.retired`` where the catalog does not look, and no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store, the
 embedder and the review model and writes the folder, and the small file helpers it calls.
 
-The files are written whole, and every change of the playbooks holds their lock (``.lock`` in the folder), so runs
-that end at once, the API and another process (``dotx run`` beside the daemon) lose none of each other's changes, and
-a listing never meets a record half written.
+The files are written whole, a new skill's folder under a hidden name before it takes its own, and every change of the
+playbooks holds their lock (``.lock`` in the folder), so runs that end at once, the API and another process (``dotx
+run`` beside the daemon) lose none of each other's changes, and a listing never meets a record or a folder half
+written.
 """
 
 import asyncio
@@ -30,10 +39,12 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from itertools import count
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -53,6 +64,7 @@ from dotagent.evals import EVAL_SOURCE
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import parse_model_ref
 from dotagent.memory.ranking import Similar, Vector, most_similar
+from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root
 from dotagent.skills.parse import parse_skill
 from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
@@ -71,6 +83,8 @@ _FOLDER_NAME: re.Pattern[str] = re.compile(r"(?:learned|playbook)-[a-z0-9-]*")
 META_FILE: str = "playbook.json"
 RETIRED_DIR: str = ".retired"
 _LOCK_FILE: str = ".lock"
+# The hidden folder a new skill is written in before it takes its name (the skills catalog leaves hidden folders alone).
+_STAGING_PREFIX: str = ".writing-"
 _PRIVATE_FILE_MODE: int = 0o600
 PLAYBOOK_WRITTEN: str = "playbook_written"
 PLAYBOOK_FAILED: str = "playbook_failed"
@@ -109,6 +123,19 @@ _NOT_ACTING: frozenset[str] = frozenset(
 )
 # Two kinds this close in meaning are one kind: the new run updates the skill instead of writing another.
 _SAME_KIND: float = 0.85
+# The kinds of the skills kept that the writer is shown, so that it names a run's work by one of them when it is that
+# work: the skills of the run's site first, then the newest.
+_KINDS_SHOWN: int = 30
+# What the writer reads for the answer of a run that read content third parties can author.
+_ANSWER_LEFT_OUT: str = "(Left out: the run read content other people wrote.)"
+# What a skill drafted from a run that read content third parties can author may name only when the run did:
+# a web address (by its host), an account and an e-mail address.
+_FOREIGN: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\b[a-z][a-z0-9+.-]*://([^\s/?#:@]+)", re.IGNORECASE), "a web address"),
+    (re.compile(r"\b(www\.[^\s/?#:@]+)", re.IGNORECASE), "a web address"),
+    (re.compile(r"\b([\w.+-]+@[\w-]+(?:\.[\w-]+)+)"), "an e-mail address"),
+    (re.compile(r"(?<![\w.@])(@[A-Za-z0-9_]{2,})"), "an account"),
+)
 # The name a skill is written under when the run acted on no web site or application.
 NO_SITE: str = "this Mac"
 
@@ -135,14 +162,16 @@ class Playbook(FrozenModel):
     goal: str
     written_at: float
     acting_steps: int
+    read_outside: bool
 
 
 class PlaybookMeta(FrozenModel):
     """``playbook.json``: the kind the skill is matched by, where it comes from (``runs``, the first one first, with
     the acting steps each took) and how it fared since. ``uses`` counts the runs that read it and ended done,
-    ``failures`` the runs that read it and failed. ``agent_id`` is the agent whose skill it is (item 94), ``None``
-    for Dot's, offered to every run; an agent's is offered to its runs alone until the owner marks it ``shared``.
-    Both are absent from the record of a skill written before item 94, which is Dot's."""
+    ``failures`` the runs that read it and failed, ``failing`` those of them since the last that ended done.
+    ``agent_id`` is the agent whose skill it is (item 94), ``None`` for Dot's, offered to every run; an agent's is
+    offered to its runs alone until the owner marks it ``shared``. ``read_outside``: a run it was written from read
+    content third parties can author. The fields with a default are absent from the records written before them."""
 
     name: str
     kind: str
@@ -155,6 +184,8 @@ class PlaybookMeta(FrozenModel):
     failures: int
     agent_id: str | None = None
     shared: bool = False
+    failing: int = 0
+    read_outside: bool = False
 
 
 class PlaybookEntry(FrozenModel):
@@ -238,6 +269,36 @@ def acting_digest(steps: Sequence[ActingStep]) -> str:
     return redact_secrets(header + "\n".join(lines))
 
 
+def own_steps_digest(steps: Sequence[ActingStep]) -> str:
+    """The acting steps without what they returned, as the writer reads them for a run that read content third parties
+    can author: what the agent did, never what a page or a message said, secrets masked, the newest when there are
+    many."""
+    kept: Sequence[ActingStep] = steps[-_DIGEST_STEPS:]
+    omitted: int = len(steps) - len(kept)
+    lines: list[str] = [
+        f"{number}. {step.tool} {step.arguments} -> {'ok' if step.ok else 'FAILED'}"
+        for number, step in enumerate(kept, start=omitted + 1)
+    ]
+    header: str = "(What the calls returned is left out: the run read content other people wrote.)\n" + (
+        f"({omitted} earlier steps are left out.)\n" if omitted else ""
+    )
+    return redact_secrets(header + "\n".join(lines))
+
+
+def foreign_problem(draft: PlaybookDraft, own: str) -> str | None:
+    """Why a skill drafted from a run that read content third parties can author is not kept, or ``None``: it names a
+    web address, an account or an e-mail address that the run's own words (``own``: its goal, the arguments of its
+    acting steps and where it acted) never did, which a page or a message it read may have put there to send later
+    runs to it."""
+    text: str = "\n".join((draft.kind, draft.description, draft.when, *draft.steps, *draft.parameters))
+    known: str = own.casefold()
+    for pattern, what in _FOREIGN:
+        for match in pattern.finditer(text):
+            if match.group(1).casefold() not in known:
+                return f"it names {what} the run did not use itself ({match.group(1)})"
+    return None
+
+
 def used_playbooks(events: Sequence[EventRecord]) -> tuple[str, ...]:
     """The names of the playbooks the run read with the ``skill`` tool, each once, in order."""
     names: dict[str, None] = {}
@@ -275,13 +336,20 @@ def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
     counts: list[int] = [*(earlier.acting_steps if earlier is not None else ()), playbook.acting_steps]
     evidence: str = "\n".join(f"- Run {run}: {count} acting steps" for run, count in zip(runs, counts, strict=True))
     where: str = f" on {playbook.host}" if playbook.host != NO_SITE else ""
+    outside: bool = playbook.read_outside or (earlier is not None and earlier.read_outside)
+    provenance: str = (
+        " A run it comes from read pages or messages other people wrote; its steps were written from what Dot did, "
+        "not from what those said, and name no address or account the run did not use itself."
+        if outside
+        else ""
+    )
     return (
         f"---\n{_frontmatter(playbook.name, description)}---\n\n"
         f"# {playbook.name}\n\n"
         f"Learned by Dot from its own work{where} ({len(runs)} {'run' if len(runs) == 1 else 'runs'}, the last one "
         f"verified on {_date(playbook.written_at)}): a record of the steps that worked, not instructions from the "
         "user. It is advice: follow the steps with your own parameters and your own judgement; where things have "
-        "changed, do what you see and go on.\n\n"
+        f"changed, do what you see and go on.{provenance}\n\n"
         f"## Kind of work\n\n{playbook.kind}\n\n"
         f"## When\n\n{draft.when}\n\n"
         f"## Steps\n\n{steps}\n\n"
@@ -306,23 +374,30 @@ def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
             failures=0,
             agent_id=playbook.agent_id,
             shared=False,
+            failing=0,
+            read_outside=playbook.read_outside,
         )
     return earlier.model_copy(
         update={
             "runs": (*earlier.runs, playbook.run_id),
             "acting_steps": (*earlier.acting_steps, playbook.acting_steps),
             "updated_at": playbook.written_at,
+            "read_outside": earlier.read_outside or playbook.read_outside,
         }
     )
 
 
 def recorded(meta: PlaybookMeta, succeeded: bool) -> PlaybookMeta:
-    """The record after a run that read the playbook ended."""
-    return meta.model_copy(update={"uses": meta.uses + 1} if succeeded else {"failures": meta.failures + 1})
+    """The record after a run that read the playbook ended: one that ended done clears the failures in a row."""
+    if succeeded:
+        return meta.model_copy(update={"uses": meta.uses + 1, "failing": 0})
+    return meta.model_copy(update={"failures": meta.failures + 1, "failing": meta.failing + 1})
 
 
 def retires(meta: PlaybookMeta) -> bool:
-    return meta.failures >= MAX_FAILURES
+    """Whether the playbook is retired: :data:`MAX_FAILURES` runs in a row read it and failed, none since ending done
+    (a skill that served forty runs is not retired for two failures among them)."""
+    return meta.failing >= MAX_FAILURES
 
 
 def offered_to(meta: PlaybookMeta, agent_id: str | None) -> bool:
@@ -371,15 +446,26 @@ def rendered_skill(file: Path, playbook: Playbook, earlier: PlaybookMeta | None)
 
 
 def write_playbook(root: Path, playbook: Playbook) -> Path:
-    """Write the skill's folder under ``root`` and return its SKILL.md. The folder must not exist. The record is
-    written before the skill, so a listing never meets the skill without it."""
+    """Write the skill's folder under ``root`` and return its SKILL.md. The folder is made whole under a hidden name,
+    its record and its skill in it, and then takes its own name in one rename, so a write that stops part way leaves no
+    folder of the skill behind; one such folder an older Dot left (no skill in it) is replaced. A folder of the name
+    with a skill in it is there already: :class:`FileExistsError`."""
     folder: Path = playbook_folder(root, playbook.name)
     file: Path = folder / SKILL_FILE
     text: str = rendered_skill(file, playbook, None)
     with _changing(root):
-        folder.mkdir(exist_ok=False)
-        _save_meta(folder, meta_of(playbook, None))
-        write_whole(file, text)
+        if file.is_file():
+            raise FileExistsError(f"the learned skill {playbook.name} is there already")
+        staging: Path = Path(tempfile.mkdtemp(prefix=_STAGING_PREFIX, dir=root))
+        try:
+            _save_meta(staging, meta_of(playbook, None))
+            write_whole(staging / SKILL_FILE, text)
+            if folder.is_dir():
+                shutil.rmtree(folder)
+            staging.rename(folder)
+        finally:
+            if staging.is_dir():
+                shutil.rmtree(staging)
     return file
 
 
@@ -532,23 +618,52 @@ def same_kind(kind: str, entries: Sequence[PlaybookEntry], vectors: Sequence[Vec
     return next((entry for entry in active if close and entry.meta.name == close[0].id), None)
 
 
-async def _matching(
-    runtime: "Runtime", kind: str, entries: Sequence[PlaybookEntry], agent_id: str | None
-) -> PlaybookEntry | None:
-    """The active skill of ``kind`` among the ones a run of ``agent_id`` is offered (:func:`offered_to`), if any."""
-    offered: list[PlaybookEntry] = [entry for entry in entries if offered_to(entry.meta, agent_id)]
-    active: list[PlaybookEntry] = [entry for entry in offered if not entry.retired]
-    if runtime.memory.embedder is None or not active:
-        return same_kind(kind, offered, None)
-    vectors: list[Vector] = await runtime.memory.embedder.embed([kind, *(entry.meta.kind for entry in active)])
-    return same_kind(kind, offered, vectors)
+def owned(entries: Sequence[PlaybookEntry], agent_id: str | None) -> list[PlaybookEntry]:
+    """The active skills a run of ``agent_id`` may update: its owner's own (Dot's for Dot's runs, an agent's for its
+    runs). A skill of another owner, shared or not, is never rewritten by a run that is not its owner's."""
+    return [entry for entry in entries if not entry.retired and entry.meta.agent_id == agent_id]
+
+
+def kinds_shown(entries: Sequence[PlaybookEntry], host: str) -> tuple[str, ...]:
+    """The kinds the writer is shown (:data:`_KINDS_SHOWN` at most): those of the skills on ``host`` first, then the
+    newest, each once."""
+    ordered: list[PlaybookEntry] = sorted(entries, key=lambda entry: (entry.meta.host != host, -entry.meta.updated_at))
+    return tuple(dict.fromkeys(entry.meta.kind for entry in ordered))[:_KINDS_SHOWN]
+
+
+def _has_skill(root: Path, name: str) -> bool:
+    return (playbook_folder(root, name) / SKILL_FILE).is_file()
+
+
+def free_name(root: Path, name: str) -> str:
+    """``name``, or the first of ``name-2``, ``name-3``, ... with no skill under ``root``: a skill of another owner
+    keeps its folder."""
+    if not _has_skill(root, name):
+        return name
+    return next(candidate for number in count(2) if not _has_skill(root, candidate := f"{name}-{number}"))
+
+
+async def _matching(runtime: "Runtime", kind: str, own: Sequence[PlaybookEntry]) -> PlaybookEntry | None:
+    """The skill of ``kind`` among ``own`` (:func:`owned`): the one whose kind is written the same (the writer reuses
+    a kind it is shown word for word), else the closest by meaning, if any."""
+    exact: PlaybookEntry | None = same_kind(kind, own, None)
+    if exact is not None or runtime.memory.embedder is None or not own:
+        return exact
+    vectors: list[Vector] = await runtime.memory.embedder.embed([kind, *(entry.meta.kind for entry in own)])
+    return same_kind(kind, own, vectors)
 
 
 async def _write_from(
-    runtime: "Runtime", run: RunRecord, steps: Sequence[ActingStep], host: str
+    runtime: "Runtime", run: RunRecord, steps: Sequence[ActingStep], host: str, outside: bool
 ) -> tuple[Path, str, bool]:
-    """Ask the review model for the skill of ``run`` and write it: a new folder, or the folder of the skill of the
-    same kind. Returns the SKILL.md, the skill's name and whether it was updated rather than written."""
+    """Ask the review model for the skill of ``run`` and write it: a new folder, or the folder of the run's owner's
+    skill of the same kind. Returns the SKILL.md, the skill's name and whether it was updated rather than written.
+    ``outside``: the run read content third parties can author, so the writer sees what the agent did and not what the
+    calls returned, and a skill that names an address or an account the run did not use is not kept
+    (:func:`foreign_problem`, :class:`InvalidValueError`)."""
+    root: Path = playbooks_dir()
+    entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
+    own: list[PlaybookEntry] = owned(entries, run.agent_id)
     writer: PlaybookWriter = playbook_writer_for(
         runtime.router,
         runtime.roles.review(),
@@ -558,8 +673,21 @@ async def _write_from(
         run.id,
     )
     draft: PlaybookDraft = await writer(
-        PlaybookRequest(goal=run.goal, host=host, digest=acting_digest(steps), answer=run.result)
+        PlaybookRequest(
+            goal=run.goal,
+            host=host,
+            digest=own_steps_digest(steps) if outside else acting_digest(steps),
+            answer=_ANSWER_LEFT_OUT if outside else run.result,
+            kinds=kinds_shown(own, host),
+        )
     )
+    if outside:
+        foreign: str | None = foreign_problem(draft, "\n".join((run.goal, host, *(step.arguments for step in steps))))
+        if foreign is not None:
+            raise InvalidValueError(
+                f"{foreign}, and the run read content other people wrote",
+                {"kind": draft.kind},
+            )
     playbook: Playbook = Playbook(
         name=playbook_name(draft.kind),
         kind=draft.kind,
@@ -570,18 +698,15 @@ async def _write_from(
         goal=redact_secrets(run.goal),
         written_at=time.time(),
         acting_steps=len(steps),
+        read_outside=outside,
     )
-    root: Path = playbooks_dir()
-    match: PlaybookEntry | None = await _matching(
-        runtime, draft.kind, await asyncio.to_thread(list_playbooks, root), run.agent_id
-    )
+    match: PlaybookEntry | None = await _matching(runtime, draft.kind, own)
     if match is not None:
         return await asyncio.to_thread(update_playbook, root, match.meta.name, playbook), match.meta.name, True
     if not slug(draft.kind):
         raise InvalidValueError("the kind of work has no letters or digits to name a skill by", {"kind": draft.kind})
-    if playbook_folder(root, playbook.name).is_dir():
-        return await asyncio.to_thread(update_playbook, root, playbook.name, playbook), playbook.name, True
-    return await asyncio.to_thread(write_playbook, root, playbook), playbook.name, False
+    named: Playbook = playbook.model_copy(update={"name": await asyncio.to_thread(free_name, root, playbook.name)})
+    return await asyncio.to_thread(write_playbook, root, named), named.name, False
 
 
 async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) -> None:
@@ -598,8 +723,9 @@ async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) 
             )
         return
     host: str = main_site(events) or NO_SITE
+    outside: bool = await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS))
     try:
-        file, name, updated = await _write_from(runtime, run, steps, host)
+        file, name, updated = await _write_from(runtime, run, steps, host, outside)
     except (DotError, OSError) as error:
         message: str = error.message if isinstance(error, DotError) else str(error)
         log.warning("playbook_failed", run_id=run.id, host=host, error=message)

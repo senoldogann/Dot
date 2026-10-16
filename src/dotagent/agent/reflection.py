@@ -69,7 +69,7 @@ from dotagent.memory.service import (
     save_memory,
     set_owner_section,
 )
-from dotagent.policy.types import TAINTING_KINDS
+from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.scheduler.timing import next_firing
 from dotagent.store.db import Store
@@ -96,9 +96,6 @@ _OWNER_GOALS: int = 30
 # How many lessons the journal names.
 _JOURNAL_LESSONS: int = 3
 _ENDED: frozenset[RunStatus] = frozenset({"done", "failed", "cancelled"})
-# A stored run read content third parties can author when a tool result of it was of one of these kinds or came over
-# one of these channels (the loop knows it for sure; the store keeps the kind and the channel of every result).
-_OUTSIDE_CHANNELS: frozenset[str] = frozenset({"web", "browser"})
 
 
 class _Result(BaseModel):
@@ -196,7 +193,7 @@ def call_facts(results: Sequence[_Result]) -> tuple[tuple[CallFact, ...], tuple[
 
 def read_outside(results: Sequence[_Result]) -> bool:
     """Whether a stored run read content third parties can author, as far as its results tell."""
-    return any(result.kind in TAINTING_KINDS or result.channel in _OUTSIDE_CHANNELS for result in results)
+    return any(result.kind in TAINTING_KINDS or result.channel in OUTSIDE_CHANNELS for result in results)
 
 
 def stored_case(run: RunRecord, events: Sequence[EventRecord], tainted: bool) -> LessonCase:
@@ -373,7 +370,7 @@ async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRec
         case: LessonCase = stored_case(
             run,
             await runtime.store.events_of_kind(run.id, "tool_result", _RESULTS_READ),
-            await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(_OUTSIDE_CHANNELS)),
+            await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS)),
         )
         ending: str | None = ending_signal(run.status, run.result)
         signals: tuple[str, ...] = (*await stored_signals(runtime.store, case), *(() if ending is None else (ending,)))

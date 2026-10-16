@@ -296,9 +296,10 @@ lesson_rest_days = 60
 # After a task run of its own that ended done (its answer checked, or its goal found achieved) with at least
 # skill_min_steps acting steps, the review model distils how it got there into a learned skill: a folder
 # learned-<kind>/SKILL.md under <home>/playbooks with the kind of work, the steps, the parameters and the evidence,
-# offered to later runs like a skill and read as advice. A later run of the same kind (matched by meaning) updates the
-# skill instead of writing another. A skill read by two runs that then failed is retired (moved under .retired) and no
-# longer offered; Settings › Skills lists them with Drop. dotx stats counts the skills written, retired and read, and
+# offered to later runs like a skill and read as advice. A later run of the same kind (the writer is shown the kinds
+# kept; matched by name or meaning) updates its owner's skill instead of writing another; a run that read content
+# other people wrote is distilled from its own steps alone, and its skill names no address or account the run did not
+# use. A skill read by two runs in a row that then failed is retired (moved under .retired) and no longer offered; Settings › Skills lists them with Drop. dotx stats counts the skills written, retired and read, and
 # compares the runs that read one on a host with the runs on that host that did not. false distils nothing.
 playbooks = true
 skill_min_steps = 4

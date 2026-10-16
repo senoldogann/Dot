@@ -85,6 +85,9 @@ RESEARCH_KINDS: frozenset[ActionKind] = READ_ONLY_KINDS | {"notes_write", "memor
 TAINTING_KINDS: frozenset[ActionKind] = frozenset(
     {"network", "browser_read", "browser_navigate", "desktop_observe", "mcp", "mcp_read"}
 )
+# A stored run read content third parties can author when a tool result of it was of one of the kinds above or came
+# over one of these channels (the loop knows it for sure; the store keeps the kind and the channel of every result).
+OUTSIDE_CHANNELS: frozenset[str] = frozenset({"web", "browser"})
 
 # Flags whose consequences reach beyond the machine, or beyond the run (persistence: what is remembered or scheduled
 # shapes every later run; upload: what a command sends to a server, a push, a form, a remote copy); untrusted input must

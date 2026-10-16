@@ -154,6 +154,7 @@ def _skill(agent_id: str) -> Playbook:
         goal="Check the claim",
         written_at=time.time(),
         acting_steps=4,
+        read_outside=False,
     )
 
 

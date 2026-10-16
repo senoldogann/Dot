@@ -2501,16 +2501,23 @@ arguments and the start of its result; failed calls marked) the model names the 
 steps that worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and
 a one-sentence description. The skill is a folder `learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
 work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps, the
-date), plus a `playbook.json` that keeps the kind and counts its use. A later run of the same kind (matched by the
-meaning of the kind when embeddings are on, by its name otherwise) updates the skill rather than writing another: the
-steps are the newer run's, the evidence keeps every run. Later runs see it under Skills like any skill (its source is
-`learned`) with a note that it is advice from Dot's own work, to follow with their own parameters and judgement, and
-read it with the `skill` tool. Every run that ended done or failed counts the learned skills it read; one read by two
-runs that then failed is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that
+date), plus a `playbook.json` that keeps the kind and counts its use; the folder is written whole under a hidden name
+and then takes its own. The model is shown the kinds of the skills the run's owner keeps (those of the run's site first)
+and names the run's work by one of them, word for word, when it is that work, so a later run of the same kind (the same
+kind, or one close in meaning when embeddings are on) updates the skill rather than writing another: the steps are the
+newer run's, the evidence keeps every run. A run updates its owner's skills alone (Dot's runs Dot's, an agent's runs
+the agent's); another owner's skill of the same name keeps its folder, and the new one takes the next free name
+(`learned-<kind>-2`). Later runs see it under Skills like any skill (its source is `learned`) with a note that it is
+advice from Dot's own work, to follow with their own parameters and judgement, and read it with the `skill` tool. Every
+run that ended done or failed counts the learned skills it read; one read by two runs in a row that then failed (none
+ended done between them) is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that
 fails, or a folder that cannot be written, leaves a `playbook_failed` event on the run; a written or updated one a
-`playbook_written` event and a retired one a `playbook_retired` event. The distillation reads pages third parties wrote,
-so the skill never takes an instruction from them as a step, and never holds a secret, a one-time code, an e-mail
-address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the retired
+`playbook_written` event and a retired one a `playbook_retired` event. A run that read content third parties can author
+(a web page, a message, a result of an MCP server) is distilled from its own steps alone: the model sees each call and
+whether it worked, never what it returned nor the run's answer; a skill that names a web address, an account or an
+e-mail address the run's own goal and calls never did is not kept (`playbook_failed` says why), and the skill says
+where it comes from (`read_outside` in its record). The skill never takes an instruction from a page as a step, and
+never holds a secret, a one-time code, an e-mail address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the retired
 ones apart, an agent's with its name and Share) with Drop, each list in a box that keeps its size and scrolls inside
 past its first rows (item 218); `dotx playbooks list` shows them with their use,
 `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. Delegated runs,

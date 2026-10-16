@@ -366,6 +366,7 @@ def _learned(number: int) -> Playbook:
         goal=f"When is library {number:02d} open?",
         written_at=1_700_000_000.0 + number,
         acting_steps=2,
+        read_outside=False,
     )
 
 
