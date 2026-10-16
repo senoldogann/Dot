@@ -3,7 +3,7 @@
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
-import { clip, debounce, el, modelName } from "../dom.js";
+import { clip, debounce, el, modelName, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
@@ -15,7 +15,7 @@ const LIFECYCLE_KINDS = new Set(["run_started", "run_finished"]);
 const RELOAD_DELAY_MS = 400;
 const GOAL_PREVIEW_CHARS = 220;
 const REPEATS = [
-  { id: "cron", label: "Repeats", hint: "Fires again and again on a cron schedule" },
+  { id: "cron", label: "Repeats", hint: "Fires again and again on a schedule" },
   { id: "once", label: "Once", hint: "Fires a single time" },
 ];
 const CRON_PRESETS = [
@@ -429,7 +429,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       field("Time zone", zone, "A name such as Europe/Istanbul; empty uses the configured zone."),
       field("Earlier runs it knows", history, "Each run starts with the dated answers of the last runs, to build on them instead of doing the same work again."),
       field("Chat", chat, "In the same chat each run reads the conversation of the runs before it instead."),
-      record === null ? null : el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled),
+      record === null ? null : switchRow(el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled), enabled),
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Runs"), el("div", { class: "cluster" }, repeats.element)),
       cronField,
       atField,

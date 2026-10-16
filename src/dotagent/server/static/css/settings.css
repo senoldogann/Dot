@@ -987,3 +987,12 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* On a phone a tab of the row, a key's page and a rule's example are a finger's height (item 329). */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .settings-tab,
+  .key-page,
+  .rule-example {
+    min-height: 44px;
+  }
+}

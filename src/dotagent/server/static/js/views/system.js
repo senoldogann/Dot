@@ -378,8 +378,9 @@ function contextFacts(model) {
       el(
         "dd",
         null,
-        `${tokens(context.configured)} tokens, [agent] context_tokens in config.toml, for every model without a size of its own${cut}. `,
-        "Dot comes with 96,000: in a run of 41 steps it measured, 48,000 summarized twice and 96,000 not once, while each step sent a quarter more.",
+        `${tokens(context.configured)} tokens, for every model without a size of its own${cut}. `,
+        "Dot comes with 96,000: in a run of 41 steps it measured, 48,000 summarized twice and 96,000 not once, while each step sent a quarter more. ",
+        el("span", { class: "faint" }, "In the config file: [agent] context_tokens."),
       ),
       el("dt", null, "Smallest size"),
       el("dd", null, `${tokens(context.floor)} tokens: a run's first step alone sends its instructions, its tools and the request.`),

@@ -5,7 +5,7 @@
 // by the page for the next follow-up (item 133). A third switch makes a task a campaign (Keep going until done); it is
 // chosen for one goal, so it is never kept.
 
-import { el } from "./dom.js";
+import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
 import { segmented } from "./panels.js";
 import { readPref, writePref } from "./prefs.js";
@@ -118,7 +118,7 @@ export function approvalsPicker(onPaint, kept) {
 export function standingPicker(onToggle) {
   let on = false;
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Keep going until done" });
-  const element = pick("Keep going", toggle);
+  const element = switchRow(pick("Keep going", toggle), toggle);
   element.title = STANDING_HINT;
   const note = el("div", { class: "composer-note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
 
@@ -154,7 +154,7 @@ export function goalModePicker(kept) {
     return kept.read() ?? (status !== null && status.goal_mode);
   }
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
-  const element = pick("Goal mode", toggle);
+  const element = switchRow(pick("Goal mode", toggle), toggle);
   element.title = GOAL_MODE_HINT;
 
   function paint() {

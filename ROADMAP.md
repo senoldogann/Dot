@@ -5257,6 +5257,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | in progress |         |
 | 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
 | 328 | A phone that comes back to Dot finds it calm                                           | in progress |         |
+| 329 | On a phone Dot reads at a phone's size and takes a finger                              | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13423,6 +13424,55 @@ update left out of date sat in the bar and pushed the page down.
   put away: through it the stream came back at once (3 of 7 runs failed before, 5 of 5 passed after).
 - Not verified on a device: the status bar of an app on the home screen with `theme-color`, and how often iOS lets the
   page go.
+
+### 329. On a phone Dot reads at a phone's size and takes a finger
+
+**Status: in progress.** On the branch `items-328-phone`, after item 328; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The same word of the owner (item 328): every page should read and be understood better on the
+phone. Measured in WebKit as the owner's iPhone 17 Pro Max and as an iPhone SE, light and dark, on 21 pages and the open
+sidebar of a home with chats, agents, schedules and notes: the body was 14 px as on the Mac and most text 13 or 14 px.
+On the iPhone 17 Pro Max in the light scheme, on 16 of the 22 views fewer than one character in ten was 15 px or more
+(Agents 0.3 %), 1,296 characters were under 13 px, and 333 controls were under 44 px each way, the radios drawn for a
+screen reader alone left out (15 on General, where the plan's first count, which took 36 such radios in, said 51). The
+switch was 34 by 20 px and only the switch itself turned it, a step's duration showed only under a hovering pointer,
+and some hints named the config file's keys (`[agent] context_tokens in config.toml`, `[judge] provider = "typesafe"`,
+`[server] reach`).
+
+**As built (2026-10-17).**
+
+- **A phone** is a touch screen (`pointer: coarse`) 720 px wide or less, or under 500 px high on its side; an iPad and a
+  Mac keep their sizes.
+- **Text.** `app.css` gives a phone its own seven sizes: 13, 15, 16, 17, 19, 22 and 26 px for xs to 2xl (a Mac's are 12,
+  13, 14, 15, 17, 20 and 24), still scaled by Settings › Appearance's interface size, whose hint says so. The names of
+  the looks, the labels of a list of facts (`.kv dt`), the line about a turn's latest step and the sidebar's lines of
+  what a run does and how many it delegated read at a hint's size there. Code keeps the size chosen for it (13 px).
+- **Touch.** Everything tapped is 44 px each way at least: the buttons, the fields, a segmented control's choices
+  (their sides 8 px, so Activity's four filters fit an iPhone SE), the menus' rows, the steps' heads, the bar's and the
+  sidebar's buttons and rows, the settings' tabs, the folds, the home's titles, the capsule, the range (its knob 28 px)
+  and the context meter. The composer's round buttons keep their 36 px in a clear ring. The switch is iOS's, a 52 by 32
+  px track in a 64 by 44 px box, and `dom.js` `switchRow` lets a tap anywhere on a setting's row, a pick of the
+  composer's menu or the schedule's "Switched on" turn its switch. The bar's tool pill draws its hairline inside its
+  edge, so it is as tall as the way back, and the curtain's title (item 328) now stands to the pixel where the page's
+  does.
+- **Hover.** A step's duration shows on a screen with no pointer to hover.
+- **Words.** The context budget's two hints, TypeSafe's key and the phone's address name the setting in words, the key
+  after it in faint type ("In the config file: [agent] context_tokens."); a repeating schedule fires "on a schedule".
+  "YOLO", "Typed judge (Jev)", "DevTools port" and "Cron expression" stay: names the people who use them know, each
+  with its plain hint beside it.
+- Measured again on the same 22 views, both iPhones, both schemes: no character under 13 px, no control under 44 px,
+  nothing wider than the screen, and on every view at least 90 % of the characters at 15 px or more (the least, 90.2 %,
+  on Schedules; code apart). In a 1280 px window every view uses the sizes it used before.
+- README: the phone's sizes, under "Dot on the phone".
+- Tests: `tests/smoke/test_phone_type.py` (WebKit as both iPhones): on 20 pages and the open sidebar no text under 13
+  px, at least nine characters in ten at 15 px or more (code apart), nothing tapped under 44 px but a link inside a line
+  of text; a step's duration without a hover; a tap on a setting's words turns its switch, and the switch is 64 by 44 px;
+  in a Mac's window the seven sizes, the body and the switch are as before. Against the pages before this item it fails
+  on every page, on the duration and on the row. `test_phone_fit`: on the owner's iPhone the fields are a phone's 15 and
+  16 px and the composer its own 15 px. `test_phone_return`: the curtain's title to the pixel. `test_context_sizes` and
+  `test_context_meter`: the hints' words.
+- Not verified on a device: how the sizes and the 44 px rows feel in the owner's hand.
 
 ## Log
 

@@ -2,7 +2,7 @@
 // and the blocks that fold away.
 
 import { setStageTitle } from "./stage.js";
-import { el } from "./dom.js";
+import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 import { attempt } from "./ui.js";
@@ -218,7 +218,7 @@ export function switchSetting({ label, hint, read, write, onToggled }) {
       }),
   });
   const note = el("div", { class: "hint" }, hint);
-  const element = el("div", { class: "setting" }, el("div", { class: "row" }, el("span", { class: "grow" }, label), toggle), note);
+  const element = el("div", { class: "setting" }, switchRow(el("div", { class: "row" }, el("span", { class: "grow" }, label), toggle), toggle), note);
   return {
     element,
     toggle,

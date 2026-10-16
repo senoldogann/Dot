@@ -641,7 +641,7 @@ function typeCard() {
   });
   const interfaceSize = rangeOf({
     label: "Interface size",
-    hint: "Every text of the interface grows or shrinks with it; 14 px is Dot's own.",
+    hint: "Every text of the interface grows or shrinks with it; 14 px is Dot's own, which a phone reads at 16 px.",
     setting: INTERFACE_SIZE,
     min: 13,
     max: 17,

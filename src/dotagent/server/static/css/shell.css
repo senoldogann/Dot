@@ -871,3 +871,37 @@
     height: 20px;
   }
 }
+
+/* On a phone the bar's and the sidebar's buttons and the sidebar's rows are a finger's size (item 329): a chat's menu
+   button takes the row's right end. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .side-btn,
+  .side-link,
+  .side-run,
+  .side-fold,
+  .side-search-input {
+    min-height: 44px;
+  }
+
+  .side-more {
+    right: 0;
+    width: 44px;
+    height: 44px;
+  }
+
+  .side-chat > .side-run {
+    padding-right: 44px;
+  }
+
+  /* What a run does now and how many runs it delegated read at a hint's size; the ages and times stay the smallest. */
+  .side-activity-detail,
+  .side-children-fold {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
+  }
+}

@@ -376,9 +376,9 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                         "1,000,000 tokens. Ollama gives it for the model.",
                         "750,000 tokens, three quarters of the window: the rest is room for the reply and for the error "
                         "of Dot's count of the tokens.",
-                        "96,000 tokens, [agent] context_tokens in config.toml, for every model without a size of its "
-                        "own. Dot comes with 96,000: in a run of 41 steps it measured, 48,000 summarized twice and "
-                        "96,000 not once, while each step sent a quarter more.",
+                        "96,000 tokens, for every model without a size of its own. Dot comes with 96,000: in a run "
+                        "of 41 steps it measured, 48,000 summarized twice and 96,000 not once, while each step sent a "
+                        "quarter more. In the config file: [agent] context_tokens.",
                         "48,000 tokens: a run's first step alone sends its instructions, its tools and the request.",
                     ]
                 )

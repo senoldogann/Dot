@@ -98,6 +98,20 @@ export function keepChildren(parent, nodes) {
   }
 }
 
+/**
+ * Let a tap anywhere on `row` turn the switch `toggle` in it, as a row of iOS's settings does (item 329): a tap on a
+ * control of the row, the switch among them, is that control's own. Returns `row`.
+ */
+export function switchRow(row, toggle) {
+  row.classList.add("switch-row");
+  row.addEventListener("click", (event) => {
+    if (event.target.closest("a, button, input, select, textarea, summary") === null) {
+      toggle.click();
+    }
+  });
+  return row;
+}
+
 /** Show `node` once what it tells has held for `ms`, and hide it as soon as it no longer holds: returns `set(shown)`.
  * `ms` is a number, or a function that tells it when the wait starts. A break of the connection that mends within it
  * (a phone back from the background) shows nothing (items 286 and 328). */

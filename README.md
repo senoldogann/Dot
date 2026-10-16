@@ -1928,6 +1928,15 @@ them. The curtain lifts once the chat is there, and says that Dot connects only 
 (the status bar of an app on the home screen, Safari's tab bar) takes the colour of the page's ground, in the theme and
 the scheme on screen.
 
+On a phone Dot reads at a phone's size and takes a finger (item 329). On a touch screen of a phone's width (720 px and
+under, or under 500 px high on its side) the body is 16 px, as iOS's own text, a hint 15 px, and only the times, badges
+and the like are 13 px; Settings › Appearance's interface size still scales them all, and code keeps the size chosen
+for it. Everything that is tapped is 44 px each way at least, as Apple asks, but a link inside a line of text: the
+buttons and fields, the bar's and the sidebar's buttons and rows, the menus, the tabs and the heads of the steps. The
+composer's round buttons keep their look in a clear ring that makes them so, and the switch is iOS's size; a tap
+anywhere on a setting's row turns its switch, and a step's duration shows without a hover. An iPad and a Mac keep their
+sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
+
 At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
 the thumb. A chat's bar has a round way back to that list, the chat's title over the agent and the model, and its tools

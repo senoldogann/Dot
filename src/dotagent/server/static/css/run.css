@@ -1403,3 +1403,10 @@ dialog.computer-full::backdrop {
 .computer-full .computer-pill {
   margin-top: 4px;
 }
+
+/* On a phone the line about a turn's latest step reads at a hint's size, as T3 Code's folded steps do (item 329). */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .steps-latest {
+    font-size: var(--text-sm);
+  }
+}
