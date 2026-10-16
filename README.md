@@ -764,6 +764,13 @@ Dot's, not yours. A message you send starts a run unmarked.
   ("Sandbox for a run's commands", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
   file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
   start is refused, and nothing changes.
+- In the sandbox, a shell command whose line names no place outside its workspace (the guard reads it as no more than
+  low risk, with no flag: a script, a build, an install into the project) is held further: it may write only in the
+  workspace, the temporary folders and `[shell] allow_write` (by default the caches of the usual developer tools:
+  `~/Library/Caches`, `~/.cache`, `~/.npm`, Cargo's and Go's, Xcode's DerivedData), so what its programs write elsewhere
+  is refused. A line that names the place (`cp`, `mv`, a redirect, a clone into a folder) is judged by the guard, which
+  may ask, and writes there as before; so does a terminal session, whose lines are judged one by one, and an AppleScript.
+  The network is not held: a gate for new hosts is a decision of its own.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`
@@ -871,13 +878,17 @@ or your own words. The run reads which option you chose, and whether it was the 
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
   moving the mouse, the rest of the batch is not run
 
-> **The shell guardrail is best-effort; the sandbox holds only Dot's own files.** Dot reads a shell command before it
-> runs it and judges what it would touch: it reads the line as the shell does (quotes, comments, here-documents, the
-> commands substituted into it, a `cd`, a variable, a link it makes, a wrapper such as `bash -c`, `env` or `xargs`),
-> compares paths without case, and treats what it cannot read (a command named by a substitution, `eval` of one, a line
+> **The shell guardrail is best-effort; the sandbox holds Dot's own files and where a plain command writes.** Dot reads
+> a shell command before it runs it and judges what it would touch: it reads the line as the shell does (quotes,
+> comments, here-documents, the commands substituted into it, a `case` inside one, a `cd` however it is spelt, a
+> variable, a link it makes, a wrapper such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings
+> and variables that make git or another program run a command line), compares paths without case, and treats what it
+> cannot read (a command named by a substitution or a pattern, `eval` of one, a setting of git it does not know, a line
 > it cannot parse) as a destructive step outside the workspace, which every preset asks about. It does not follow what a
 > recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps those out of
-> Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of your
+> Dot's own files, and the writes of a line that names no place outside to its workspace, the temporary folders and
+> `[shell] allow_write`, but it does not keep them from reading your files, and a shell can do more than any analysis
+> can foresee. Treat Dot as a user of your
 > account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
 > `cautious` on a machine where a mistake would be expensive.
 
@@ -2657,7 +2668,8 @@ and what Chrome does to a tab in the background. The web UI (chats, their select
 including the Browser one) ran in a headless Chromium against the static files and a mocked API, and the API itself in
 the server smoke tests; the two were not run together against a live daemon. No model worked from a real skill or plugin
 folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
-- The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files only (see
+- The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files and holds
+  the writes of a plain command to its workspace, the temporary folders and `[shell] allow_write`, nothing more (see
   [Safety](#safety)).
 - The token goes only to a server that proves it holds it, but a page that another program served at the daemon's
   address reads what the browser keeps for that address, the token among it (see

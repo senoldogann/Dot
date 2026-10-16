@@ -374,6 +374,8 @@ class ShellConfig(FrozenModel):
     # At least the longest wait of a terminal read, so that no session is closed while it is read.
     terminal_idle_s: float = Field(ge=60)
     sandbox: bool
+    # The folders besides the workspace and the temporary ones where a command held to its workspace may write.
+    allow_write: list[str]
 
     @model_validator(mode="after")
     def _default_within_max(self) -> Self:

@@ -409,6 +409,18 @@ terminal_idle_s = 1800.0
 # runs as root inside it (ps, top, sudo). false starts them without it; the shell guard still reads every line.
 # Settings › Rules switches it while the daemon runs, from the next command on, and writes it here.
 sandbox = true
+# In the sandbox, a shell command that names no place outside its workspace (a script, a build, an install into the
+# project) may write only in the workspace, the temporary folders and these folders, the caches of the usual developer
+# tools; a line that names a place outside (cp, mv, a redirect) is judged and writes there as before.
+allow_write = [
+  "~/Library/Caches",
+  "~/.cache",
+  "~/.npm",
+  "~/.cargo/registry",
+  "~/.cargo/git",
+  "~/go/pkg",
+  "~/Library/Developer/Xcode/DerivedData",
+]
 
 [web]
 # "auto" climbs a ladder of engines until one answers: the hosted web_search API of Ollama when OLLAMA_API_KEY is set
