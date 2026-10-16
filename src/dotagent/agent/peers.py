@@ -4,8 +4,9 @@ others and leaves what they hold alone.
 Every run's tool calls that went through leave a footprint here (:meth:`Peers.saw`): the sites of its pages, the Mac
 applications it drives, the files it read and the files it changed. Before a call, :meth:`Peers.conflict` refuses what
 would step on another run at work: typing or clicking in an application another run drove within ``APP_HOLD_S``, and
-changing a file another run changed after this one last read it (or that this one never read). The tabs need nothing
-here: each chat has its own and no tool reaches another chat's (:mod:`dotagent.browser.session`). A run's loop tells its
+changing a file another run changed after this one last read it (or that this one never read). The tabs need no
+footprint: each chat has its own and no tool reaches another chat's (:mod:`dotagent.browser.session`); the browser's
+idle reaper keeps the tabs of the chats with a run at work (:meth:`Peers.threads`). A run's loop tells its
 model who the others are and what they hold (:func:`peers_note`) whenever that changes. What a shell command changes
 leaves no footprint: it names no file the way the file tools do.
 
@@ -85,6 +86,10 @@ class Peers:
 
     def end(self, run_id: str) -> None:
         self._runs.pop(run_id, None)
+
+    def threads(self) -> frozenset[str]:
+        """The chats of the runs at work, whose tabs stay open however long they idle."""
+        return frozenset(run.thread_id for run in self._runs.values())
 
     def saw(self, run_id: str, tool: str, action: ActionInfo) -> None:
         """Note what a call of the run that went through touched."""

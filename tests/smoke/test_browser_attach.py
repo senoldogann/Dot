@@ -33,7 +33,7 @@ from dotagent.browser.login import chrome_arguments
 from dotagent.browser.modes import adopt_mode, browser_data_dir
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.safety import refuse_secret_field
-from dotagent.browser.session import BrowserSession, RenderedDocument
+from dotagent.browser.session import BrowserSession, RenderedDocument, no_runs_at_work
 from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
@@ -273,7 +273,9 @@ async def chrome(data_dir: Path, site: str) -> AsyncIterator[ScratchChrome]:
 async def test_the_agent_works_in_tabs_of_its_own_and_the_tabs_of_the_user_stay(
     chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
-    session: BrowserSession = BrowserSession(attach_config, SERVER, chrome.data_dir, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
     try:
         attachment: Attachment = await session.attachment()
         assert re.match(r"\d+\.", attachment.browser_version), attachment
@@ -305,7 +307,9 @@ async def test_the_agent_works_in_tabs_of_its_own_and_the_tabs_of_the_user_stay(
 async def test_a_page_is_read_quietly_in_a_tab_behind_the_users_and_the_tab_closes_after(
     chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
-    session: BrowserSession = BrowserSession(attach_config, SERVER, chrome.data_dir, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
     try:
         assert session.quiet_reads and not session.human_like
         rendered: RenderedDocument = await session.read_page(f"{site}/other")
@@ -324,7 +328,9 @@ async def test_a_page_is_read_quietly_in_a_tab_behind_the_users_and_the_tab_clos
 async def test_a_tab_the_user_opens_meanwhile_is_not_taken_over(
     chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
-    session: BrowserSession = BrowserSession(attach_config, SERVER, chrome.data_dir, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
     try:
         await session.open_url("agent", f"{site}/")
         await open_tab_as_the_user(chrome.port, f"{site}/other")
@@ -340,7 +346,9 @@ async def test_a_tab_the_user_opens_meanwhile_is_not_taken_over(
 async def test_a_tab_that_a_tab_of_the_agent_opens_is_the_agents_and_closes_with_it(
     chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
-    session: BrowserSession = BrowserSession(attach_config, SERVER, chrome.data_dir, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
     try:
         view: PageView = await session.open_url("agent", f"{site}/")
         opened: ActOutcome = await session.act(
@@ -357,7 +365,7 @@ async def test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrom
     data_dir: Path, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
     first: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
-    session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
     try:
         await session.open_url("agent", f"{site}/")
         await stop_chrome(first)
@@ -381,7 +389,9 @@ async def test_a_connection_that_chrome_refuses_is_reported_without_the_secret_p
 ) -> None:
     wrong: str = "00000000-0000-4000-8000-000000000000"
     (chrome.data_dir / _PORT_FILE).write_text(f"{chrome.port}\n/devtools/browser/{wrong}\n", encoding="utf-8")
-    session: BrowserSession = BrowserSession(attach_config, SERVER, chrome.data_dir, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
     try:
         with pytest.raises(BrowserError, match="did not accept the connection") as raised:
             await session.attachment()
@@ -395,7 +405,7 @@ async def test_a_session_moves_between_dots_own_chrome_and_the_chrome_of_the_use
     chrome: ScratchChrome, own_config: BrowserConfig, own_home: Path, site: str
 ) -> None:
     own_profile: Path = browser_data_dir("own")
-    session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads")
+    session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads", no_runs_at_work)
     try:
         assert (session.mode, session.connected) == ("own", False)
         home_page: PageView = await session.open_url("own", f"{site}/")
@@ -429,7 +439,7 @@ async def test_a_switch_that_chrome_refuses_leaves_the_session_where_it_was(
     wrong: str = "00000000-0000-4000-8000-000000000000"
     (chrome.data_dir / _PORT_FILE).write_text(f"{chrome.port}\n/devtools/browser/{wrong}\n", encoding="utf-8")
     own_profile: Path = browser_data_dir("own")
-    session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads")
+    session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads", no_runs_at_work)
     try:
         with pytest.raises(BrowserError, match="did not accept the connection"):
             await adopt_mode(session, "attach", never_opened)
@@ -448,7 +458,9 @@ async def test_a_switch_to_the_chrome_of_the_user_while_it_is_closed_opens_it_fi
     async def open_as_a_click_does(directory: Path) -> None:
         opened.append(await spawn_chrome(directory, f"{site}/mine"))
 
-    session: BrowserSession = BrowserSession(own_config, SERVER, browser_data_dir("own"), own_home / "downloads")
+    session: BrowserSession = BrowserSession(
+        own_config, SERVER, browser_data_dir("own"), own_home / "downloads", no_runs_at_work
+    )
     try:
         assert profile_holder_pid(data_dir) is None
         await adopt_mode(session, "attach", open_as_a_click_does)
@@ -475,7 +487,7 @@ async def test_a_chrome_opened_with_its_remote_debugging_off_is_named_and_the_se
         opened.append(await spawn_chrome_without_debugging(directory, f"{site}/mine"))
 
     own_profile: Path = browser_data_dir("own")
-    session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads")
+    session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads", no_runs_at_work)
     try:
         with pytest.raises(BrowserError, match="does not allow remote debugging"):
             await adopt_mode(session, "attach", open_as_a_click_does)

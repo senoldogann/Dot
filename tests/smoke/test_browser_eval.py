@@ -25,7 +25,7 @@ from test_browser_attach import ScratchChrome, start_chrome, stop_chrome
 from dotagent.agent.gate import RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ScriptRun
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
@@ -97,7 +97,11 @@ async def browser(
     browser_config: BrowserConfig, tmp_path_factory: pytest.TempPathFactory
 ) -> AsyncIterator[BrowserSession]:
     session: BrowserSession = BrowserSession(
-        browser_config, SERVER, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads")
+        browser_config,
+        SERVER,
+        tmp_path_factory.mktemp("profile"),
+        tmp_path_factory.mktemp("downloads"),
+        no_runs_at_work,
     )
     yield session
     await session.aclose()
@@ -195,7 +199,7 @@ async def test_a_script_runs_in_the_agents_own_tab_of_the_chrome_of_the_user(
     site: str, data_dir: Path, attach_config: BrowserConfig, tmp_path: Path
 ) -> None:
     chrome: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
-    session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
     try:
         await session.open_url("agent", f"{site}/")
         run: ScriptRun = await session.run_script("agent", _LIST, 10.0)

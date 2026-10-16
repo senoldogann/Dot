@@ -1,4 +1,5 @@
-"""Item 301: what the runs at work at the same time hold, what a run may not do to another's, and what its note says."""
+"""Item 301: what the runs at work at the same time hold, what a run may not do to another's, and what its note says;
+and the tabs of a chat with a run at work, which the browser's idle reaper keeps (review G5)."""
 
 from pathlib import Path
 
@@ -6,6 +7,8 @@ import pytest
 
 from dotagent.agent import peers as peers_module
 from dotagent.agent.peers import Peers, PeerView, peers_note
+from dotagent.browser.pages import ThreadTabs
+from dotagent.browser.session import threads_to_release
 from dotagent.policy.types import ActionInfo, ActionKind
 
 _WORKSPACE: Path = Path("/Users/someone/Library/Application Support/Dot/workspace")
@@ -84,3 +87,20 @@ def test_the_note_names_each_other_run_and_what_it_holds() -> None:
     )
     assert peers_note(peers.others("nobody"), _WORKSPACE).count("\n- ") == 2
     assert peers_note((), _WORKSPACE) == ""
+
+
+async def test_the_tabs_of_a_chat_with_a_run_at_work_outlive_their_idle_time() -> None:
+    """Of the chats whose tabs idled past the cutoff, the reaper releases the one with no run at work; the one whose run
+    waits (for an answer, for a long command) and the one in use now keep theirs."""
+    peers: Peers = _two_runs()
+    peers.end("run-b")
+    busy: ThreadTabs = ThreadTabs(last_used=10.0)
+    await busy.lock.acquire()
+    threads: dict[str, ThreadTabs] = {
+        "thread-a": ThreadTabs(last_used=10.0),
+        "thread-b": ThreadTabs(last_used=10.0),
+        "thread-c": busy,
+        "thread-d": ThreadTabs(last_used=99.0),
+    }
+    assert peers.threads() == frozenset({"thread-a"})
+    assert threads_to_release(threads, 50.0, peers.threads()) == ["thread-b"]

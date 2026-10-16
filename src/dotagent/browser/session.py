@@ -14,7 +14,7 @@ import contextlib
 import re
 import secrets
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -277,6 +277,21 @@ def main_page_of(request: Request) -> Page | None:
     return page if frame == page.main_frame else None
 
 
+def threads_to_release(threads: Mapping[str, ThreadTabs], cutoff: float, kept: frozenset[str]) -> list[str]:
+    """The chats whose tabs the idle reaper releases: unused since ``cutoff`` and not in use now, unless a run of the
+    chat is at work (``kept``): a run that waits for an answer or for a long command finds its pages as it left them."""
+    return [
+        thread_id
+        for thread_id, thread in threads.items()
+        if thread.last_used < cutoff and not thread.lock.locked() and thread_id not in kept
+    ]
+
+
+def no_runs_at_work() -> frozenset[str]:
+    """The chats a session works for when no run does (``dotx browser``): none, so every idle chat is released."""
+    return frozenset()
+
+
 def blocked_by_rules(error: BrowserError) -> bool:
     """Whether a navigation failed because a request of it was refused by the URL rules: Chrome reports an aborted or
     failed request as ``net::ERR_BLOCKED_BY_CLIENT``."""
@@ -363,8 +378,17 @@ class BrowserSession:
     fails with a ``BrowserError`` and the next call starts or connects again; nothing is retried behind the model's
     back, because a click must not repeat."""
 
-    def __init__(self, config: BrowserConfig, server: ServerConfig, profile_dir: Path, downloads_dir: Path) -> None:
+    def __init__(
+        self,
+        config: BrowserConfig,
+        server: ServerConfig,
+        profile_dir: Path,
+        downloads_dir: Path,
+        kept: Callable[[], frozenset[str]],
+    ) -> None:
         self._config: BrowserConfig = config
+        # The chats whose tabs the idle reaper keeps: those of the runs at work (:func:`threads_to_release`).
+        self._kept: Callable[[], frozenset[str]] = kept
         # Whose interface the browser never opens (:func:`check_browser_url`).
         self._server: ServerConfig = server
         self._profile: Path = profile_dir
@@ -719,13 +743,12 @@ class BrowserSession:
         while True:
             await asyncio.sleep(_REAP_INTERVAL_S)
             cutoff: float = time.monotonic() - self._config.tab_idle_s
-            for thread_id, thread in list(self._threads.items()):
-                if thread.last_used < cutoff and not thread.lock.locked():
-                    _log.info("browser_idle_thread_released", thread_id=thread_id)
-                    try:
-                        await self.release_thread(thread_id)
-                    except Exception:
-                        _log.exception("browser_idle_release_failed", thread_id=thread_id)
+            for thread_id in threads_to_release(self._threads, cutoff, self._kept()):
+                _log.info("browser_idle_thread_released", thread_id=thread_id)
+                try:
+                    await self.release_thread(thread_id)
+                except Exception:
+                    _log.exception("browser_idle_release_failed", thread_id=thread_id)
 
     async def attachment(self) -> Attachment:
         """The Chrome of the user that this session works in; connects first when it is not connected yet."""

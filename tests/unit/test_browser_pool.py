@@ -7,13 +7,15 @@ from pathlib import Path
 import pytest
 
 from dotagent.browser.pool import BrowserPool
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.config import load_default_config
 from dotagent.core.errors import BrowserError
 
 
 def test_the_pool_keeps_one_session_per_mode_and_starts_none(tmp_path: Path) -> None:
-    pool: BrowserPool = BrowserPool(load_default_config().browser, load_default_config().server, tmp_path)
+    pool: BrowserPool = BrowserPool(
+        load_default_config().browser, load_default_config().server, tmp_path, no_runs_at_work
+    )
     assert pool.main.config.mode == "own"
     assert pool.session_for(None) is pool.main
     assert pool.session_for("own") is pool.main
@@ -24,7 +26,9 @@ def test_the_pool_keeps_one_session_per_mode_and_starts_none(tmp_path: Path) -> 
 
 
 async def test_a_port_one_session_refuses_leaves_every_session_as_it_was(tmp_path: Path) -> None:
-    pool: BrowserPool = BrowserPool(load_default_config().browser, load_default_config().server, tmp_path)
+    pool: BrowserPool = BrowserPool(
+        load_default_config().browser, load_default_config().server, tmp_path, no_runs_at_work
+    )
     attached: BrowserSession = pool.session_for("attach")
     await attached.aclose()
     with socket.socket() as probe:

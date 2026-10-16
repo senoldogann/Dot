@@ -32,7 +32,7 @@ from playwright.async_api import (
 from starlette.types import Message, Receive, Scope, Send
 from test_browser import act, ref_of
 
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import PageView, ScriptRun, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import ForbiddenUrlError
@@ -266,7 +266,11 @@ async def browser(
     browser_config: BrowserConfig, server_config: ServerConfig, tmp_path_factory: pytest.TempPathFactory
 ) -> AsyncIterator[BrowserSession]:
     session: BrowserSession = BrowserSession(
-        browser_config, server_config, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads")
+        browser_config,
+        server_config,
+        tmp_path_factory.mktemp("profile"),
+        tmp_path_factory.mktemp("downloads"),
+        no_runs_at_work,
     )
     yield session
     await session.aclose()

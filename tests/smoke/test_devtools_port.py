@@ -28,7 +28,7 @@ from playwright.async_api import Browser, BrowserContext, Locator, Page, async_p
 from dotagent.agent.manager import RunManager
 from dotagent.browser.devtools import devtools_address, port_is_taken
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ScriptRun
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
@@ -102,7 +102,7 @@ async def test_dots_chrome_takes_devtools_connections_on_the_port(site: str, pro
     config: BrowserConfig = _config(tmp_path, _free_port())
     address: str | None = devtools_address(config)
     assert address == f"http://127.0.0.1:{config.debug_port}"
-    session: BrowserSession = BrowserSession(config, SERVER, profile, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(config, SERVER, profile, tmp_path / "downloads", no_runs_at_work)
     try:
         await session.open_url("run", f"{site}/")
         async with httpx.AsyncClient() as client:
@@ -134,7 +134,9 @@ async def test_a_port_another_program_holds_stops_the_start_and_is_named(profile
         holder.listen()
         port: int = int(holder.getsockname()[1])
         assert port_is_taken(port)
-        session: BrowserSession = BrowserSession(_config(tmp_path, port), SERVER, profile, tmp_path / "downloads")
+        session: BrowserSession = BrowserSession(
+            _config(tmp_path, port), SERVER, profile, tmp_path / "downloads", no_runs_at_work
+        )
         try:
             with pytest.raises(BrowserError, match=f"port {port} of this Mac is taken by another program"):
                 await session.stored_cookie_count()

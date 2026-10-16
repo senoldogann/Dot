@@ -342,7 +342,8 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             if typesafe_key is not None or config.judge.provider == "typesafe"
             else None
         )
-        browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir())
+        peers: Peers = Peers()
+        browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir(), peers.threads)
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -377,7 +378,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             schedule_zone=schedule_zone,
             undo_dir=undo_dir(),
             notify=show_notification,
-            peers=Peers(),
+            peers=peers,
         )
         cleanup.pop_all()
     return runtime

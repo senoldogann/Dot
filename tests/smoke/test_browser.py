@@ -24,7 +24,7 @@ from playwright.async_api import async_playwright
 
 from dotagent.browser.render import render_page_view
 from dotagent.browser.safety import parse_element, refuse_secret_field
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ActOutcome, PageView, Step, TextWait
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
@@ -238,7 +238,9 @@ def browser_config(tmp_path_factory: pytest.TempPathFactory) -> BrowserConfig:
 async def browser(
     browser_config: BrowserConfig, tmp_path_factory: pytest.TempPathFactory, downloads: Path
 ) -> AsyncIterator[BrowserSession]:
-    session: BrowserSession = BrowserSession(browser_config, SERVER, tmp_path_factory.mktemp("profile"), downloads)
+    session: BrowserSession = BrowserSession(
+        browser_config, SERVER, tmp_path_factory.mktemp("profile"), downloads, no_runs_at_work
+    )
     yield session
     await session.aclose()
 
@@ -413,7 +415,11 @@ async def test_the_interface_of_dot_is_never_opened(browser_config: BrowserConfi
     port: int | None = urlsplit(site).port
     assert port is not None
     session: BrowserSession = BrowserSession(
-        browser_config, SERVER.model_copy(update={"port": port}), tmp_path / "profile", tmp_path / "downloads"
+        browser_config,
+        SERVER.model_copy(update={"port": port}),
+        tmp_path / "profile",
+        tmp_path / "downloads",
+        no_runs_at_work,
     )
     try:
         with pytest.raises(BrowserError) as refused:
@@ -518,7 +524,9 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
     config: BrowserConfig = browser_config.model_copy(update={"blocked_hosts": ["localhost"]})
     (tmp_path / "profile").mkdir()
     (tmp_path / "downloads").mkdir()
-    session: BrowserSession = BrowserSession(config, SERVER, tmp_path / "profile", tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(
+        config, SERVER, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work
+    )
     try:
         view: PageView = await session.open_url("blocked", f"{site}/to-blocked")
         await act(session, "blocked", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
@@ -794,7 +802,9 @@ async def test_a_click_and_a_batch_of_five_clicks_stay_fast(
     config: BrowserConfig = browser_config.model_copy(update={"settle_quiet_ms": quiet_ms})
     (tmp_path / "profile").mkdir()
     (tmp_path / "downloads").mkdir()
-    session: BrowserSession = BrowserSession(config, SERVER, tmp_path / "profile", tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(
+        config, SERVER, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work
+    )
     try:
         view: PageView = await session.open_url("timing", f"{site}/")
         click: Step = Step(action="click", ref=ref_of(view.body, 'button "Increment"'))

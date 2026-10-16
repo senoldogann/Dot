@@ -8,7 +8,7 @@ from pathlib import Path
 from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
 from dotagent.browser.login import open_profile_for_login
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import Attachment
 from dotagent.cli_commands import (
     BrowserAttachCommand,
@@ -30,7 +30,11 @@ async def _readable_cookies(config: BrowserConfig, server: ServerConfig, profile
     """Open the profile in a hidden Chrome of its own, whatever ``[browser] mode`` says, and count the cookies that
     Chrome can read. It takes no DevTools connections: the port is the daemon's Chrome's."""
     session: BrowserSession = BrowserSession(
-        config.model_copy(update={"headless": True, "mode": "own", "debug_port": 0}), server, profile, downloads_dir()
+        config.model_copy(update={"headless": True, "mode": "own", "debug_port": 0}),
+        server,
+        profile,
+        downloads_dir(),
+        no_runs_at_work,
     )
     try:
         return await session.stored_cookie_count()
@@ -83,7 +87,7 @@ async def cmd_browser_attach(command: BrowserAttachCommand) -> int:
         "Your other tabs are not touched.\n"
     )
     session: BrowserSession = BrowserSession(
-        config.model_copy(update={"mode": "attach"}), settings.server, data_dir, downloads_dir()
+        config.model_copy(update={"mode": "attach"}), settings.server, data_dir, downloads_dir(), no_runs_at_work
     )
     try:
         attachment: Attachment = await session.attachment()
