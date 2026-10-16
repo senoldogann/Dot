@@ -56,6 +56,10 @@ _LITERAL_OPERATORS: str = ""
 _HIDE_OPERATORS: dict[int, int] = str.maketrans(_OPERATOR_CHARS, _LITERAL_OPERATORS)
 _SHOW_OPERATORS: dict[int, int] = str.maketrans(_LITERAL_OPERATORS, _OPERATOR_CHARS)
 _WORD_BREAKS: str = " \t\n;&|()<>"
+# What stands before a reserved word where a command begins, and after ``case`` (its word follows) and ``esac``.
+_COMMAND_START: tuple[str, ...] = ("", " ", "\t", "\n", ";", "&", "|", "(")
+_CASE_ENDS: tuple[str, ...] = (" ", "\t", "\n")
+_ESAC_ENDS: tuple[str, ...] = ("", " ", "\t", "\n", ";", "&", "|", ")")
 # A word only the running line knows (what a substitution prints, what an unknown pipe passes on), and the temp path a
 # plain ``mktemp`` prints, which a later ``rm -rf "$dir"`` may remove.
 _SUBSTITUTED: str = "$__dot_substituted__"
@@ -87,6 +91,8 @@ _EXPANDS_AS_CODE: re.Pattern[str] = re.compile(r"\$\{\([^)]*e[^)]*\)|@P\}")
 _VARIABLE: re.Pattern[str] = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*)|([$!?#]))")
 # Variables the shell sets as the line runs: numbers, or values the line does not show.
 _NUMERIC_VARIABLES: frozenset[str] = frozenset({"RANDOM", "SECONDS", "LINENO", "EPOCHSECONDS", "PPID", "UID", "EUID"})
+# Any expansion of a word, for one :func:`_expansions` cannot spell out (``${HOME%/}``, a substitution's stand-in).
+_UNKNOWN_EXPANSION: re.Pattern[str] = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9$!?#@*-])")
 _RUNTIME_VARIABLES: frozenset[str] = frozenset({"_", "OLDPWD", "REPLY"})
 _BRACES: re.Pattern[str] = re.compile(r"\{([^{},]*(?:,[^{},]*)+)\}")
 _NAME: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
@@ -103,6 +109,47 @@ _KEYWORDS: frozenset[str] = frozenset(
 )
 _HEADERS: frozenset[str] = frozenset({"for", "select", "case", "foreach"})
 _DECLARERS: frozenset[str] = frozenset({"export", "local", "declare", "typeset", "readonly", "integer", "float"})
+# The commands whose name holds a glob character and is not a pattern.
+_TEST_COMMANDS: frozenset[str] = frozenset({"[", "[["})
+# Variables whose value a program runs as a command line (git's ssh, pager and editor, ``less``'s preprocessor), and
+# ones that make a program load code from where they point or take settings that run commands.
+_COMMAND_VARIABLES: frozenset[str] = frozenset(
+    {
+        "GIT_SSH_COMMAND",
+        "GIT_SSH",
+        "GIT_PAGER",
+        "PAGER",
+        "MANPAGER",
+        "GIT_EDITOR",
+        "GIT_SEQUENCE_EDITOR",
+        "EDITOR",
+        "VISUAL",
+        "FCEDIT",
+        "GIT_EXTERNAL_DIFF",
+        "GIT_ASKPASS",
+        "SSH_ASKPASS",
+        "SUDO_ASKPASS",
+        "LESSOPEN",
+        "LESSCLOSE",
+        "PROMPT_COMMAND",
+        "BROWSER",
+        "RSYNC_RSH",
+    }
+)
+_LOADING_VARIABLES: frozenset[str] = frozenset(
+    {
+        "BASH_ENV",
+        "ENV",
+        "ZDOTDIR",
+        "DYLD_INSERT_LIBRARIES",
+        "LD_PRELOAD",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_EXEC_PATH",
+    }
+)
 
 _WRAPPERS: frozenset[str] = frozenset(
     {
@@ -120,8 +167,44 @@ _WRAPPERS: frozenset[str] = frozenset(
         "noglob",
         "nocorrect",
         "watch",
+        "xcrun",
+        "script",
+        "unbuffer",
+        "taskpolicy",
+        "gtimeout",
+        "gnice",
+        "gstdbuf",
     }
 )
+# What a wrapper is past its options: the command it runs, after its duration (``timeout 5 rm``) or the file it logs to
+# (``script -q log rm``).
+_WRAPPER_SKIPS: dict[str, int] = {"timeout": 1, "gtimeout": 1, "script": 1}
+# The precommand modifiers that run a builtin of the shell itself, so ``builtin cd ~`` moves the line as ``cd ~`` does.
+_BUILTIN_MODIFIERS: frozenset[str] = frozenset({"builtin", "command", "noglob", "nocorrect"})
+# Tools that run the command their operands name, after a word of their own (``uv run pytest``, ``bundle exec rake``)
+# or at once (``npx``, ``bunx``). Their options that take a value are many and not all known here, so each operand
+# may begin the command, and each such reading is judged.
+_RUNNERS: dict[str, frozenset[str]] = {
+    "uv": frozenset({"run"}),
+    "poetry": frozenset({"run"}),
+    "pipenv": frozenset({"run"}),
+    "pdm": frozenset({"run"}),
+    "hatch": frozenset({"run"}),
+    "rye": frozenset({"run"}),
+    "conda": frozenset({"run"}),
+    "bundle": frozenset({"exec"}),
+    "rbenv": frozenset({"exec"}),
+    "pyenv": frozenset({"exec"}),
+    "asdf": frozenset({"exec"}),
+    "mise": frozenset({"exec", "x"}),
+    "direnv": frozenset({"exec"}),
+    "npm": frozenset({"exec"}),
+    "pnpm": frozenset({"exec", "dlx"}),
+    "yarn": frozenset({"exec", "dlx"}),
+    "npx": frozenset(),
+    "bunx": frozenset(),
+    "uvx": frozenset(),
+}
 _PRIVILEGE_WRAPPERS: frozenset[str] = frozenset({"sudo", "doas", "su", "pkexec"})
 # The options of a wrapper that take a value, so that the value is not taken for the command it runs.
 _WRAPPER_VALUES: dict[str, frozenset[str]] = {
@@ -132,6 +215,12 @@ _WRAPPER_VALUES: dict[str, frozenset[str]] = {
     "stdbuf": frozenset({"-i", "-o", "-e", "--input", "--output", "--error"}),
     "caffeinate": frozenset({"-t", "-w"}),
     "exec": frozenset({"-a"}),
+    "xcrun": frozenset({"-sdk", "--sdk", "-toolchain", "--toolchain"}),
+    "script": frozenset({"-t", "-T"}),
+    "taskpolicy": frozenset({"-c", "-d", "-g", "-t", "-l", "-p"}),
+    "gtimeout": frozenset({"-s", "-k", "--signal", "--kill-after"}),
+    "gnice": frozenset({"-n", "--adjustment"}),
+    "gstdbuf": frozenset({"-i", "-o", "-e", "--input", "--output", "--error"}),
     "arch": frozenset({"-arch", "-e", "-d"}),
     "watch": frozenset({"-n", "--interval"}),
     "sudo": frozenset(
@@ -593,10 +682,21 @@ def _given_text(text: str) -> _Input:
 # ---------- reading the line ----------
 
 
+def _reserved_word(text: str, index: int, word: str, ends: tuple[str, ...]) -> bool:
+    """Whether the reserved word ``word`` starts at ``index`` of ``text``, where a command begins, followed by one of
+    ``ends``."""
+    before: str = text[index - 1 : index]
+    after: str = text[index + len(word) : index + len(word) + 1]
+    return text.startswith(word, index) and before in _COMMAND_START and after in ends
+
+
 def _closing_paren(text: str, start: int) -> int:
-    """The index of the ``)`` that closes a ``(`` opened just before ``start``, past quotes and nested parentheses;
-    the end of ``text`` when it never closes."""
+    """The index of the ``)`` that closes a ``(`` opened just before ``start``, past quotes, nested parentheses and the
+    patterns of a ``case`` (in ``$(case x in x) rm ;; esac)`` the first ``)`` ends a pattern, and the substitution
+    goes on to its ``esac``); the end of ``text`` when it never closes."""
     depth: int = 1
+    # The depth each ``case`` not yet ended by its ``esac`` stands at: a ``)`` there ends one of its patterns.
+    cases: list[int] = []
     quote: str | None = None
     index: int = start
     while index < len(text):
@@ -611,10 +711,16 @@ def _closing_paren(text: str, start: int) -> int:
             quote = char
         elif char == "(":
             depth += 1
+        elif char == ")" and cases and cases[-1] == depth:
+            pass
         elif char == ")":
             depth -= 1
             if depth == 0:
                 return index
+        elif _reserved_word(text, index, "case", _CASE_ENDS):
+            cases.append(depth)
+        elif _reserved_word(text, index, "esac", _ESAC_ENDS) and cases:
+            cases.pop()
         index += 1
     return len(text)
 
@@ -1087,7 +1193,12 @@ def _path_class(raw: str, scope: ShellScope) -> PathClass:
 
 
 def _reaches_protected(raw: str, scope: ShellScope) -> bool:
+    """Whether ``raw`` can name a protected location. A part only the running line knows stands for the home folder,
+    where the protected locations are (``${HOME%/}/.ssh``, ``$(echo ~)/.ssh``)."""
     classes: list[PathClass] | None = _path_classes(raw, scope)
+    if classes is None:
+        home: str = str(Path.home())
+        classes = _path_classes(_UNKNOWN_EXPANSION.sub(lambda _: home, raw), scope)
     return classes is not None and "protected" in classes
 
 
@@ -1163,6 +1274,29 @@ def _linked(scope: ShellScope, args: list[str]) -> ShellScope:
     return replace(scope, links=(*scope.links, *made))
 
 
+def _past_modifiers(words: list[str]) -> list[str]:
+    """``words`` past the precommand modifiers in front of a builtin (``builtin cd``, ``command -p cd``)."""
+    rest: list[str] = words
+    while rest and rest[0] in _BUILTIN_MODIFIERS:
+        rest = rest[1:]
+        while rest and rest[0].startswith("-") and rest[0] != "-":
+            rest = rest[1:]
+    return rest
+
+
+def _line_scope(line: str, scope: ShellScope) -> ShellScope:
+    """The scope ``line`` leaves when the shell runs it in place (``eval``): its simple commands in turn. A line that
+    cannot be parsed may have moved anywhere, which the home folder stands for."""
+    tokens: list[str] | None = _tokenize(_read(line).text)
+    if tokens is None:
+        return _with_places(scope, [*scope.cwds, Path.home()])
+    state: ShellScope = scope
+    for _, segment in _commands(tokens):
+        words, _, _, _ = _split_redirects(segment, ())
+        state = _next_scope(words, state)
+    return state
+
+
 def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     """The scope after one simple command: the directories a ``cd`` or ``pushd`` may have moved the line to, the
     values an assignment, ``export`` or ``for`` gave a variable, the links an ``ln -s`` made."""
@@ -1179,8 +1313,10 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     while count < len(plain) and _ENV_ASSIGNMENT.fullmatch(plain[count]):
         count += 1
     assigned: ShellScope = _assign_words(scope, plain[:count])
-    rest: list[str] = plain[count:]
+    rest: list[str] = _past_modifiers(plain[count:])
     command: str = Path(rest[0]).name if rest else ""
+    if command == "eval":
+        return _line_scope(" ".join(rest[1:]), assigned)
     if command in ("cd", "pushd"):
         operands: list[str] = _positional(rest[1:])
         wanted: bool = len(operands) == 1 and operands[0] != "-"
@@ -1362,7 +1498,53 @@ def _protected_words(words: list[str], scope: ShellScope) -> list[Finding]:
     return []
 
 
-_GIT_GLOBAL_WITH_VALUE: frozenset[str] = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace"})
+_GIT_GLOBAL_WITH_VALUE: frozenset[str] = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
+)
+# The settings a git line may give (``git -c``, ``git config``) without asking: none of them runs a command, loads a
+# file or sends to another address, as ``core.fsmonitor``, ``core.sshCommand``, ``core.pager``, ``alias.*``,
+# ``include.path`` and ``url.*.insteadOf`` do. Matched without letter case, as git reads a key.
+_GIT_SAFE_KEYS: frozenset[str] = frozenset(
+    {
+        "user.name",
+        "user.email",
+        "core.quotepath",
+        "core.autocrlf",
+        "core.safecrlf",
+        "core.eol",
+        "core.filemode",
+        "core.ignorecase",
+        "core.precomposeunicode",
+        "core.abbrev",
+        "core.whitespace",
+        "init.defaultbranch",
+        "pull.rebase",
+        "pull.ff",
+        "push.default",
+        "push.autosetupremote",
+        "fetch.prune",
+        "rebase.autosquash",
+        "rebase.autostash",
+        "merge.conflictstyle",
+        "diff.noprefix",
+        "diff.renames",
+        "diff.algorithm",
+        "diff.colormoved",
+        "commit.verbose",
+        "gc.auto",
+        "maintenance.auto",
+        "safe.directory",
+        "protocol.version",
+    }
+)
+_GIT_SAFE_KEY_PREFIXES: tuple[str, ...] = ("color.", "advice.", "log.", "status.", "column.", "i18n.", "blame.")
+# What ``git config`` is given besides a key and a value: the options that only read, and the ones that take a value.
+_GIT_CONFIG_READS: frozenset[str] = frozenset(
+    {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "--get-color", "--get-colorbool", "-l", "--list"}
+)
+_GIT_CONFIG_REMOVES: frozenset[str] = frozenset({"--unset", "--unset-all", "--remove-section"})
+_GIT_CONFIG_VALUES: frozenset[str] = frozenset({"-f", "--file", "--blob", "--type", "--default", "--comment"})
+_GIT_CONFIG_VERBS: frozenset[str] = frozenset({"get", "list", "set", "unset", "rename-section", "remove-section"})
 _GIT_READ_ONLY: frozenset[str] = frozenset(
     {
         "status",
@@ -1408,8 +1590,54 @@ def _git_scope(args: list[str], rest: list[str], scope: ShellScope) -> ShellScop
     return where
 
 
+def _git_safe_key(key: str) -> bool:
+    folded: str = key.casefold()
+    return folded in _GIT_SAFE_KEYS or folded.startswith(_GIT_SAFE_KEY_PREFIXES)
+
+
+def _git_settings(globals_: list[str]) -> list[str]:
+    """The keys the global options of a git line (``globals_``, before its subcommand) set for it: ``-c key=value``,
+    ``--config-env key=VAR``; an ``--exec-path`` that moves where git finds its commands counts as an unknown key."""
+    keys: list[str] = []
+    for index, arg in enumerate(globals_):
+        if arg in ("-c", "--config-env") and index + 1 < len(globals_):
+            keys.append(globals_[index + 1].partition("=")[0])
+        elif arg.startswith("--config-env="):
+            keys.append(arg.removeprefix("--config-env=").partition("=")[0])
+        elif arg.startswith("--exec-path="):
+            keys.append("--exec-path")
+    return keys
+
+
+def _git_config_key(rest: list[str]) -> str | None:
+    """The key a ``git config`` line (``rest`` follows ``config``) sets; None when it only reads or removes."""
+    if any(arg in _GIT_CONFIG_READS or arg in _GIT_CONFIG_REMOVES for arg in rest):
+        return None
+    operands: list[str] = []
+    index: int = 0
+    while index < len(rest):
+        if rest[index] in _GIT_CONFIG_VALUES:
+            index += 2
+            continue
+        if not rest[index].startswith("-"):
+            operands.append(rest[index])
+        index += 1
+    if "--rename-section" in rest or operands[:1] == ["rename-section"]:
+        # The section's new name is what the settings under it become.
+        return operands[-1] if operands else None
+    if operands[:1] and operands[0] in _GIT_CONFIG_VERBS:
+        return operands[1] if operands[0] == "set" and len(operands) > 1 else None
+    return operands[0] if operands else None
+
+
 def _assess_git(args: list[str], scope: ShellScope) -> Finding:
     sub, rest = _git_subcommand(args)
+    settings: list[str] = _git_settings(args[: len(args) - len(rest)])
+    if sub == "config":
+        settings.extend(key for key in [_git_config_key(rest)] if key is not None)
+    unsafe: list[str] = [key for key in settings if not _git_safe_key(key)]
+    if unsafe:
+        return _unknown(f"git is given {', '.join(unsafe)}, a setting that can make it run a command or load a file")
     where: ShellScope = _git_scope(args, rest, scope)
     outside: tuple[Flag, ...] = () if _cwd_class(where) in ("workspace", "temp") else ("outside_workspace",)
     destructive_args: set[str] = {"--hard", "--force", "-f", "-fd", "-fdx", "-df", "-D", "--delete", "drop", "clear"}
@@ -1997,6 +2225,12 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         return _assess_shell_call(command, args, scope, given)
     if command == "eval":
         return _assess_all(" ".join(args), scope)
+    if command == "trap":
+        return _assess_trap(args, scope)
+    if command in _RUNNERS:
+        ran: list[Finding] | None = _assess_runner(command, args, scope, given)
+        if ran is not None:
+            return ran
     if command == "xargs":
         return _assess_xargs(args, scope, given)
     if command in ("rm", "rmdir", "unlink", "shred", "srm"):
@@ -2097,13 +2331,50 @@ def _assess_wrapped(command: str, args: list[str], scope: ShellScope, given: _In
         if parts is None:
             return [_unknown("env -S is given a string that cannot be parsed")]
         return _assess_simple([*parts, *words], here, given)
-    if command == "timeout":
-        return _assess_simple(rest[1:], scope, given)
+    if command in _WRAPPER_SKIPS:
+        return _assess_simple(rest[_WRAPPER_SKIPS[command] :], scope, given)
     if command == "watch":
         return _assess_all(" ".join(rest), scope)
     if command == "command" and any(name in ("-v", "-V") for name, _ in options):
         return [_finding("safe", (), "command -v")]
+    if command == "xcrun" and any(name in ("-f", "--find") for name, _ in options):
+        return [_finding("safe", (), "xcrun --find")]
     return _assess_simple(rest, scope, given)
+
+
+def _assignment_findings(word: str, scope: ShellScope) -> list[Finding]:
+    """What the assignment ``word`` (``NAME=value``) sets up for the programs it reaches: a command line one of them
+    runs, judged now, or code one of them loads, which cannot be read."""
+    if not _ENV_ASSIGNMENT.fullmatch(word):
+        return []
+    name, _, value = word.partition("=")
+    if name in _COMMAND_VARIABLES:
+        return _assess_all(value, scope)
+    if name in _LOADING_VARIABLES:
+        return [_unknown(f"sets {name}, which makes programs load or run what it names")]
+    return []
+
+
+def _assess_trap(args: list[str], scope: ShellScope) -> list[Finding]:
+    """``trap`` keeps its first operand as a command line that runs later (on a signal, or when the shell exits), which
+    is judged now; ``-l`` and ``-p`` only print, and ``-`` resets."""
+    operands: list[str] = args[1:] if args[:1] == ["--"] else args
+    if not operands or operands[0] in ("-l", "-p", "-", ""):
+        return [_finding("safe", (), "trap")]
+    return _assess_all(operands[0], scope)
+
+
+def _assess_runner(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding] | None:
+    """A tool of :data:`_RUNNERS` judged by the command it runs, read from each operand after its own word; None when
+    it is not running one (``uv sync``, ``npm test``)."""
+    words: frozenset[str] = _RUNNERS[command]
+    operands: list[int] = [index for index, arg in enumerate(args) if not arg.startswith("-")]
+    if words:
+        if not operands or args[operands[0]] not in words:
+            return None
+        operands = operands[1:]
+    readings: list[Finding] = [found for index in operands for found in _assess_simple(args[index:], scope, given)]
+    return [_finding("low", (), f"runs {command}"), *readings]
 
 
 def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
@@ -2115,13 +2386,21 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
         return []
     head: str = plain[0]
     if _ENV_ASSIGNMENT.fullmatch(head):
-        return _assess_simple(plain[1:], scope, given)
+        return [*_assignment_findings(head, scope), *_assess_simple(plain[1:], scope, given)]
+    if len(head) > 1 and head.startswith("="):
+        # zsh puts the path of the command in place of ``=rm``.
+        return _assess_simple([head[1:], *plain[1:]], scope, given)
     names: list[str] | None = _expansions(head, scope)
     if names is None:
         return [_unknown("runs a command whose name is only known when the line runs")]
     if names != [head]:
         return [found for name in names for found in _assess_simple([*name.split(), *plain[1:]], scope, given)]
+    if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
+        return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
     command: str = Path(head).name
+    if command in _DECLARERS:
+        declared: list[Finding] = [found for word in plain[1:] for found in _assignment_findings(word, scope)]
+        return [*declared, *_assess_command(command, plain[1:], scope, given)]
     if command in _PRIVILEGE_WRAPPERS:
         return _assess_privileged(command, plain[1:], scope, given)
     if command in _WRAPPERS:
