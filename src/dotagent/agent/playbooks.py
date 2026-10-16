@@ -837,3 +837,47 @@ async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) 
         run.id, PLAYBOOK_WRITTEN, {"name": name, "host": host, "path": str(file), "updated": updated}, True
     )
     return LEARNED
+
+
+def unsavable(run: RunRecord, steps: int) -> str | None:
+    """Why ``run``, which took ``steps`` acting steps, gives no skill at the owner's word (item 318), or ``None`` when
+    it does: a run of its own (not a delegated run, an eval nor a run of OpenCode's agent, whose tools a skill of Dot's
+    cannot name) that ended done after at least one acting step."""
+    if run.parent_run_id is not None:
+        return "a delegated run's work belongs to the run that delegated it"
+    if run.source == EVAL_SOURCE:
+        return "an eval's run gives no skill"
+    if parse_model_ref(run.model).provider == OPENCODE_PROVIDER:
+        return "OpenCode's agent used tools that a skill of Dot's cannot name"
+    if run.status != "done":
+        return f"it ended {run.status}, and only a run that ended done gives a skill"
+    if steps == 0:
+        return "it took no acting step, so it did nothing a skill could repeat"
+    return None
+
+
+async def save_playbook(runtime: "Runtime", run: RunRecord) -> tuple[str, bool]:
+    """Write the skill of ``run`` at the owner's word (item 318's Save skill), as :func:`learn_playbook` writes one when
+    a run ends, however few its acting steps were. Returns the skill's name and whether the owner's skill of its kind
+    was updated rather than a new one written. With learned skills off (``[agent] playbooks``), which no run is then
+    offered, and for a run that gives no skill (:func:`unsavable`), it is refused, with why; a review model that fails,
+    or a folder that cannot be written, fails it."""
+    if not runtime.config.agent.playbooks:
+        raise InvalidValueError(
+            "learned skills are off ([agent] playbooks), so no run would be offered a skill saved now: turn them on "
+            "first",
+            {"run_id": run.id},
+        )
+    events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _EVENTS_READ)
+    steps: tuple[ActingStep, ...] = acting_steps(events)
+    why: str | None = unsavable(run, len(steps))
+    if why is not None:
+        raise InvalidValueError(f"this run cannot be saved as a skill: {why}", {"run_id": run.id})
+    host: str = main_site(events) or NO_SITE
+    tainted: bool = await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS))
+    file, name, updated = await _write_from(runtime, run, steps, host, tainted)
+    log.info("playbook_saved", run_id=run.id, name=name, host=host, path=str(file), updated=updated, tainted=tainted)
+    await runtime.bus.emit(
+        run.id, PLAYBOOK_WRITTEN, {"name": name, "host": host, "path": str(file), "updated": updated}, True
+    )
+    return name, updated

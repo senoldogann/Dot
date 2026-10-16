@@ -11,13 +11,15 @@ import pytest
 
 from dotagent.core.errors import NotFoundError, RunConflict
 from dotagent.store.db import Store
-from dotagent.store.models import QueuedMessage, ThreadRecord
+from dotagent.store.models import NO_PICKS, QueuedMessage, ThreadRecord
 
 STARTING: str = "starting as its chat's next run"
 
 
 async def _queued(store: Store, thread: ThreadRecord, text: str) -> QueuedMessage:
-    return await store.add_queued(thread.id, text, [], "task", None, None, "standard", None, None, None, None, "test")
+    return await store.add_queued(
+        thread.id, text, [], "task", None, None, "standard", None, NO_PICKS, None, None, None, "test"
+    )
 
 
 async def _texts(store: Store, thread: ThreadRecord) -> list[str]:

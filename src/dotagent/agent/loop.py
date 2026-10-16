@@ -68,6 +68,7 @@ from dotagent.agent.limits import (
     limits_of,
 )
 from dotagent.agent.peers import peers_note
+from dotagent.agent.picks import PICKS_EVENT, picked_groups, picks_event_data, with_picks
 from dotagent.agent.plan import (
     EMPTY_PLAN,
     PLAN_EVENT,
@@ -160,6 +161,7 @@ from dotagent.config import AgentConfig
 from dotagent.core.errors import (
     ConfigError,
     DotError,
+    InvalidValueError,
     MissingSecretError,
     ProviderError,
     ProviderTransportError,
@@ -212,7 +214,16 @@ from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
-from dotagent.store.models import AgentRecord, CampaignRecord, EventRecord, MemoryRecord, RunMode, RunRecord
+from dotagent.store.models import (
+    NO_PICKS,
+    AgentRecord,
+    CampaignRecord,
+    EventRecord,
+    MemoryRecord,
+    RunMode,
+    RunPicks,
+    RunRecord,
+)
 from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
@@ -222,6 +233,7 @@ from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_to
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
+from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 
 log = get_logger(__name__)
@@ -319,15 +331,19 @@ _SWITCH_NOTE: str = (
 class RunOpening(FrozenModel):
     """How a run starts: ``text`` is its first message to the model (its goal, or the note of a resumed run), ``files``
     the attachments that came with it, ``resumed`` what a resumed run takes over from the run it resumes, ``once`` the
-    choice for one message it was asked with (item 251), which the run keeps (``RunRecord.once``), and ``carried`` the
+    choice for one message it was asked with (item 251), which the run keeps (``RunRecord.once``), ``carried`` the
     earlier runs whose words its opening or its chat brings it without the owner's message (a schedule's firing, item
-    257), whose taint it starts with."""
+    257), whose taint it starts with, and ``picks`` what the owner picked in the composer for the message (item 318),
+    which the manager checked (``RunManager._check_picks``). A run that goes on from another (resumed, or started by an
+    answer that came after its run ended) opens without picks: the first run's message, with the picks' lines and
+    skills, stays in the chat's history, and with grouped tools ``use_tools`` turns a picked server's group on."""
 
     text: str
     files: tuple[StoredAttachment, ...]
     resumed: Resumption | None
     once: OneMessage | None
     carried: tuple[str, ...]
+    picks: RunPicks
 
 
 @dataclass(frozen=True)
@@ -782,6 +798,22 @@ def _turned_on(outcomes: Sequence[ToolOutcome], hidden: Mapping[str, str], on: f
         if outcome.call.name in hidden or (outcome.call.name == USE_TOOLS_TOOL and not outcome.result.is_error)
     )
     return tuple(dict.fromkeys(group for group in named if group not in on))
+
+
+async def _opening_text(opening: RunOpening, offered: Sequence[Skill], room: int) -> str:
+    """The run's first message to the model: its opening's text, then what the owner picked for it (item 318), each
+    picked skill's instructions within ``room`` characters as the ``skill`` tool gives them. A picked skill no longer
+    ``offered`` to the run (taken away since the message was sent) fails the run, which says why."""
+    if opening.picks == NO_PICKS:
+        return opening.text
+    by_name: dict[str, Skill] = {skill.name: skill for skill in offered}
+    gone: list[str] = [name for name in opening.picks.skills if name not in by_name]
+    if gone:
+        raise InvalidValueError(
+            f"the skills {', '.join(gone)} picked for this message are no longer offered to it", {"skills": list(gone)}
+        )
+    skills: list[str] = [await skill_instructions(by_name[name], room) for name in opening.picks.skills]
+    return with_picks(opening.text, opening.picks, skills)
 
 
 async def _goal_query(runtime: Runtime, run: RunRecord) -> str:
@@ -1617,17 +1649,27 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     history: list[Message] = repair_history(
         await runtime.store.load_messages(run.thread_id, config.keep_recent_screenshots)
     )
-    # The tool groups that are on; they only grow. A grouped run starts with core and the groups its thread used.
+    # The tool groups that are on; they only grow. A grouped run starts with core, the groups its thread used and the
+    # servers the owner picked for its message (item 318).
     on: frozenset[str] = (
-        frozenset({CORE_GROUP, *used_groups(history)}) & frozenset(groups) if grouped else frozenset(groups)
+        frozenset({CORE_GROUP, *used_groups(history), *picked_groups(opening.picks)}) & frozenset(groups)
+        if grouped
+        else frozenset(groups)
     )
     if grouped:
         await runtime.bus.emit(run.id, "tool_groups", groups_event(0, groups, on, (), surface_reason), True)
     goal: Message = await message_with_attachments(
-        runtime, run.thread_id, run.id, opening.text, opening.files, info.vision
+        runtime,
+        run.thread_id,
+        run.id,
+        await _opening_text(opening, skills.skills, scaffold.tool_output_chars),
+        opening.files,
+        info.vision,
     )
     if opening.files:
         await runtime.bus.emit(run.id, ATTACHMENTS_EVENT, {"files": attachment_summary(opening.files)}, True)
+    if opening.picks != NO_PICKS:
+        await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(opening.picks), True)
     history.append(goal)
     await runtime.store.append_messages(run.thread_id, [goal])
     history.append(await _stored_note(agent, clock_note(datetime.now().astimezone())))

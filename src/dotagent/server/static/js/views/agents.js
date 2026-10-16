@@ -490,9 +490,11 @@ function agentComposer(record, ctx) {
           thread_id: null,
           attachments: attachments.ids(),
           agent_id: record.id,
+          ...frame.picks.body(),
         };
         const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
         keys.sent();
+        frame.picks.sent();
         frame.clear();
         ctx.navigate(`/runs/${created.id}`);
       });

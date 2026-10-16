@@ -65,8 +65,9 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * go back to the daemon's), `speed` (`read()`, "fast" or "standard"; `write(speed)`: fast mode, which a run asks for
  * only of a model that has it, item 223), `approvals` and `goalMode` (as `approvalsPicker` and `goalModePicker` take
  * them).
- * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after goal mode, `onMode(id)` runs
- * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then).
+ * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after the approvals, `onMode(id)` runs
+ * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then). Goal mode's switch is a
+ * row of the frame's "+" menu (item 318), and a chat, which has neither, hides it and Plan first.
  *
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
  * `ready()` (resolves once the models are loaded), `value()` (what the next message starts its run with: `{ mode, model,
@@ -106,11 +107,12 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     optionsPill.setTone(shown === "yolo" ? "warn" : null);
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));
+  frame.addMenuItems(() => [goalMode.element]);
   const optionsMenu = anchoredPopover({
     anchor: optionsPill.element,
     frame: frame.element,
     label: "Options",
-    build: () => [approvals.element, goalMode.element, ...more(), approvals.warning],
+    build: () => [approvals.element, ...more(), approvals.warning],
   });
 
   // The mode (item 108): a pill with the mode's icon, its menu the three modes with what each does. A chat has no goal
@@ -128,6 +130,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     modeId = id;
     paintMode();
     goalMode.setAvailable(id !== "chat");
+    frame.picks.setPlanAvailable(id !== "chat");
   }
   function setMode(id) {
     showMode(id);
@@ -156,6 +159,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   });
   paintMode();
   goalMode.setAvailable(modeId !== "chat");
+  frame.picks.setPlanAvailable(modeId !== "chat");
 
   // The model: the daemon's default until one is picked, worn with its provider's mark (item 108).
   const modelPill = composerPill({ id: "model", caption: "Model", value: "", icon: null });

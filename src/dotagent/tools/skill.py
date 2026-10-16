@@ -103,6 +103,14 @@ def render_skill(skill: Skill, files: Sequence[str], nonce: str, start: int, roo
     return "\n".join(lines)
 
 
+async def skill_instructions(skill: Skill, room: int) -> str:
+    """The first part of ``skill``'s instructions, with its files, as the ``skill`` tool gives them within ``room``
+    characters: for a run that starts with a skill the owner picked (item 318)."""
+    ready: Skill = with_python(skill, shlex.quote(sys.executable))
+    files: list[str] = await asyncio.to_thread(files_of_skill, ready.root)
+    return render_skill(ready, files, secrets.token_hex(_NONCE_BYTES), 0, room)
+
+
 def build_skill_tool() -> RegisteredTool:
     def classify(args: SkillArgs, ctx: ToolContext) -> ActionInfo:
         return ActionInfo(

@@ -5,6 +5,7 @@ import { actorFace } from "./actors.js";
 import { sentFiles } from "./attachments.js";
 import { faceStateAtEnd } from "./face.js";
 import { icon } from "./icons.js";
+import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
 import { toast } from "./ui.js";
 
@@ -99,6 +100,12 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
 /** The files that came with the message `message` (a `userMessage`), once they are known: over its foot. */
 export function showMessageFiles(message, files) {
   message.querySelector(".message-foot").before(sentFiles(files));
+}
+
+/** What the owner picked for the message `message` in the composer (item 318; `picks`, a `picks` event's data), once
+ * it is known: over its foot, after its files. */
+export function showMessagePicks(message, picks) {
+  message.querySelector(".message-foot").before(sentPicks(picks));
 }
 
 /**

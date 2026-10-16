@@ -10,7 +10,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.server import UI_SOURCE
 from dotagent.server.context import ServerContext
 from dotagent.server.sending import send_once
-from dotagent.server.views import QueueEditRequest, QueueMessageRequest, QueueOrderRequest, QueueView
+from dotagent.server.views import QueueEditRequest, QueueMessageRequest, QueueOrderRequest, QueueView, picks_of
 from dotagent.store.db import Store
 from dotagent.store.models import QueuedMessage
 
@@ -46,6 +46,7 @@ def queue_router(ctx: ServerContext) -> APIRouter:
                 request.effort,
                 request.speed,
                 request.once,
+                picks_of(request.plugins, request.skills, request.plan_first),
                 request.approvals,
                 request.goal_mode,
                 request.agent_id,

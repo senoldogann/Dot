@@ -1,5 +1,6 @@
 """The shapes the HTTP interface takes and gives. Records of the store are returned as they are."""
 
+from collections.abc import Sequence
 from typing import Annotated, Literal, Self
 
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
@@ -34,6 +35,7 @@ from dotagent.store.models import (
     MemoryScore,
     QueuedMessage,
     RunMode,
+    RunPicks,
     RunRecord,
     RunStatus,
     ScheduleRecord,
@@ -43,6 +45,10 @@ from dotagent.undo.restore import UndoAction, UndoState
 _GOAL_CHARS: int = 50_000
 _TEXT_CHARS: int = 20_000
 _NAME_CHARS: int = 120
+# What the composer picks for one message (item 318): at most this many servers and skills, each by its name.
+MAX_PICKED_PLUGINS: int = 8
+MAX_PICKED_SKILLS: int = 4
+PickedName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)]
 _KEY_CHARS: int = 1000
 # Base64 takes four characters for every three bytes.
 _UPLOAD_B64_CHARS: int = (MAX_ATTACHMENT_BYTES + 2) // 3 * 4
@@ -160,9 +166,10 @@ class StartRunRequest(FrozenModel):
     """Start a run. ``model``, ``effort``, ``approvals`` and ``goal_mode`` left out take the configured ones; ``speed``
     is ``fast`` for fast mode, on a model that has it (item 223); ``once`` is a choice for this message only (item 251):
     ``ultrathink`` asks the model for its Max level, ``ultracode`` for its Extra high level and tells the run to split
-    its independent parts across delegated runs, while the chat keeps ``effort``. ``standing`` ("Keep going until
-    done") starts a campaign on the goal instead, with this run as its opening session: a task, without goal mode (see
-    ``RunManager.start_campaign``)."""
+    its independent parts across delegated runs, while the chat keeps ``effort``. ``plugins``, ``skills`` and
+    ``plan_first`` are what the owner picked in the composer for this message (item 318, :func:`picks_of`).
+    ``standing`` ("Keep going until done") starts a campaign on the goal instead, with this run as its opening session:
+    a task, without goal mode and without picks (see ``RunManager.start_campaign``)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: RunMode = "task"
@@ -179,12 +186,17 @@ class StartRunRequest(FrozenModel):
     # The agent the run belongs to (item 86); None for Dot. Not with standing.
     agent_id: str | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+    plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
+    skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
+    plan_first: bool = False
     key: MessageKey | None = None
 
     @model_validator(mode="after")
     def _fits_standing(self) -> Self:
         if self.standing and self.agent_id is not None:
             raise ValueError("a campaign (standing) is Dot's own: it cannot be started for an agent")
+        if self.standing and (self.plugins or self.skills or self.plan_first):
+            raise ValueError("plugins, skills and Plan first go with a message, not with a campaign (standing)")
         if self.browser is not None and not self.standing:
             raise ValueError("browser chooses the Chrome of a campaign: it goes with standing only")
         return self
@@ -232,7 +244,23 @@ class QueueMessageRequest(FrozenModel):
     goal_mode: bool | None = None
     agent_id: str | None = None
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
+    plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
+    skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
+    plan_first: bool = False
     key: MessageKey | None = None
+
+
+def picks_of(plugins: Sequence[str], skills: Sequence[str], plan_first: bool) -> RunPicks:
+    """The picks a message names (item 318), each name once, in the order they were picked."""
+    return RunPicks(plugins=tuple(dict.fromkeys(plugins)), skills=tuple(dict.fromkeys(skills)), plan_first=plan_first)
+
+
+class SavedSkill(FrozenModel):
+    """A skill saved from a run at the owner's word (item 318): its name, and whether the owner's skill of its kind was
+    updated rather than a new one written."""
+
+    name: str
+    updated: bool
 
 
 class QueueEditRequest(FrozenModel):

@@ -1,17 +1,20 @@
 // What the three composers share (the new chat's, the run's dock and the agent's page): one frame with the box that
-// grows with its text, the attached files under it and a bar of pills; Enter sends and Shift+Enter breaks a line, or
-// ⌘Enter sends and Enter breaks it, as Settings › General chooses (item 230); `/`
+// grows with its text, the attached files and the picks under it and a bar of pills; Enter sends and Shift+Enter breaks
+// a line, or ⌘Enter sends and Enter breaks it, as Settings › General chooses (item 230); `/`
 // at the start of a word opens the slash menu of commands, skills and MCP tools (slash.js says what it offers; this
 // file draws it and listens to the keys, after the APG combobox pattern: the arrows move, Enter and Tab pick, Escape
-// closes, letters filter); a draft keeps the text and the ready files in this browser until they are sent. The markdown
-// in the box shows as it reads, its marks quiet (mirror.js, item 207).
+// closes, letters filter); the "+" opens the menu that adds files and picks plugins and skills for the message (item
+// 318, picks.js); a draft keeps the text, the ready files and the picks in this browser until they are sent. The
+// markdown in the box shows as it reads, its marks quiet (mirror.js, item 207).
 
 import { api } from "./api.js";
 import { SEND_KEY, valueOf } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
-import { el, setText } from "./dom.js";
+import { clip, el, setText } from "./dom.js";
 import { icon } from "./icons.js";
 import { markdownMirror } from "./mirror.js";
+import { arePicks, createPicks, pickMark } from "./picks.js";
+import { anchoredPopover } from "./popover.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
 import { filterGroups, paletteGroups, replaceSlashWord, slashWord } from "./slash.js";
 
@@ -19,7 +22,8 @@ const DRAFT_PREFIX = "dot.draft.";
 // The draft key of a new chat's composer.
 export const NEW_CHAT_DRAFT = "home";
 
-/** The draft kept under `key` (`{ text, files }`), or null when there is none or it is not one. */
+/** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
+ * there is none or it is not one. */
 function readDraft(key) {
   const stored = readPref(`${DRAFT_PREFIX}${key}`);
   if (stored === null) {
@@ -27,7 +31,7 @@ function readDraft(key) {
   }
   try {
     const parsed = JSON.parse(stored);
-    if (typeof parsed.text === "string" && Array.isArray(parsed.files)) {
+    if (typeof parsed.text === "string" && Array.isArray(parsed.files) && (parsed.picks === undefined || arePicks(parsed.picks))) {
       return parsed;
     }
   } catch (error) {
@@ -37,8 +41,8 @@ function readDraft(key) {
   return null;
 }
 
-/** Keep `draft` (`{ text, files }`) as the draft of the composer of `draftKey`, which takes it up when it is next made:
- * a message a rewind gave back (item 282). */
+/** Keep `draft` (`{ text, files }`, and `picks` when it has some) as the draft of the composer of `draftKey`, which
+ * takes it up when it is next made: a message a rewind gave back (item 282). */
 export function keepDraft(draftKey, draft) {
   writePref(`${DRAFT_PREFIX}${draftKey}`, JSON.stringify(draft));
 }
@@ -59,9 +63,10 @@ function loadPalette() {
 /** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`), autosize up to `maxPx`, the slash
  * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer) and the
  * markdown it holds shown under it; `edited()` runs after a pick of the menu changed the text, as the input event does
- * after typing. Returns the menu element and the box's field (the box with its markdown under it) to place in the
- * composer's frame, `autosize()`, to call after any change of the text, and `dispose()`. */
-export function wireComposer(textarea, { maxPx, send, commands, edited }) {
+ * after typing, and `picked(pick)` after a skill or a tool was picked for the message (`{ kind, name }`, item 318).
+ * Returns the menu element and the box's field (the box with its markdown under it) to place in the composer's frame,
+ * `autosize()`, to call after any change of the text, and `dispose()`. */
+export function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
   const menu = el("div", { class: "slash-menu", role: "listbox", id: `slash-${Math.random().toString(36).slice(2, 8)}`, hidden: true });
   textarea.setAttribute("aria-controls", menu.id);
   textarea.setAttribute("aria-expanded", "false");
@@ -138,6 +143,9 @@ export function wireComposer(textarea, { maxPx, send, commands, edited }) {
     textarea.focus();
     if (typeof item.run === "function") {
       item.run();
+    }
+    if (item.pick !== undefined) {
+      picked(item.pick);
     }
   }
 
@@ -226,20 +234,39 @@ export function wireComposer(textarea, { maxPx, send, commands, edited }) {
   };
 }
 
+// A skill's description in the "+" menu is cut to this many characters.
+const PICK_HINT_CHARS = 90;
+
+/** A row of the "+" menu that picks the server or the skill `name` (`kind`) for the message, or takes it away: its
+ * mark, its name with `hint` under it, and a tick while it is picked. */
+function pickRow(kind, name, hint, selected, onPick) {
+  return el(
+    "button",
+    { class: "pop-option", type: "button", role: "option", "aria-selected": String(selected), onclick: onPick },
+    pickMark(kind, name),
+    el("span", { class: "pop-option-text" }, el("span", null, name), hint === "" ? null : el("span", { class: "pop-option-hint" }, hint)),
+    icon("check"),
+  );
+}
+
 /**
  * The frame the composers share (item 115): the slash menu over it, the box (one line, `boxLabel` its name, growing
- * with its text up to `maxPx`), the attached files in a row under the box, then one bar: the attach button, the
- * `options` row for the pills (app.css keeps the mode at the left and sends the rest to the right) and the round send
- * button (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on Enter and on the button.
+ * with its text up to `maxPx`), the attached files and the picks (item 318) in rows under the box, then one bar: the
+ * "+" that opens the menu of Add files, the rows the composer adds (`addMenuItems`), Plan first and the MCP servers and
+ * skills to pick, the `options` row for the pills (app.css keeps the mode at the left and sends the rest to the right)
+ * and the round send button (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on Enter and on the button.
  * `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until `clear()` after a send.
  * `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens. The frame carries
  * `data-empty` while the box holds no text, so the send rests quiet. `setStop(handler)` (item 120) turns the send into a
  * Stop, a round button in the danger colour with a square, while the box holds no text and no file: pressed, it runs
  * `handler`; a word typed or a file listed (a long paste among them, item 269) brings the send back, and
  * `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
- * `options`, `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs
- * `watcher()` after every change of the text, a clear among them, and returns what stops it; item 259), `clear()`
- * and `dispose()`.
+ * `picks` (picks.js: `body()` goes into the message's request, `sent()` once a message that starts a run went),
+ * `addMenuItems(build)` (`build(close)` gives the composer's own rows of the "+" menu each time it opens; `close()`
+ * closes it), `options`,
+ * `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs `watcher()` after
+ * every change of the text, a clear among them, and returns what stops it; item 259), `clear()` (the text and the
+ * files; the picks wait for `picks.sent()`) and `dispose()`.
  */
 export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener }) {
   const textarea = el("textarea", { class: "textarea", rows: "1", placeholder, "aria-label": boxLabel });
@@ -251,11 +278,11 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       return;
     }
     const files = attachments.ready();
-    if (textarea.value.trim() === "" && files.length === 0) {
+    if (textarea.value.trim() === "" && files.length === 0 && picks.count() === 0) {
       clearPref(key);
       return;
     }
-    writePref(key, JSON.stringify({ text: textarea.value, files }));
+    writePref(key, JSON.stringify({ text: textarea.value, files, picks: picks.saved() }));
   }
 
   // A file listed or taken away keeps the draft and repaints the send: with a file there it is never a Stop.
@@ -265,6 +292,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   }
 
   const attachments = createAttachments({ dropTarget: element, input: textarea, onChange: filesChanged });
+  const picks = createPicks({ onChange: keep });
   const sendText = el("span", { class: "label" }, sendLabel);
   const arrow = icon("arrowUp");
   const square = icon("stop");
@@ -299,8 +327,89 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     }
   }
 
-  const wired = wireComposer(textarea, { maxPx, send, commands, edited });
-  element.append(wired.menu, wired.field, attachments.list, attachments.picker, el("div", { class: "composer-bar" }, attachments.button, options, sendButton));
+  const wired = wireComposer(textarea, { maxPx, send, commands, edited, picked: (pick) => picks.add(pick.kind, pick.name) });
+  const plusButton = el("button", { class: "btn ghost sm plus-button", type: "button", title: "Add files, plugins and skills", "aria-label": "Add" }, icon("plus"));
+  // The rows each composer adds to the "+" menu (goal mode, Save skill), and the palette its plugins and skills come
+  // from, asked for when the menu first opens.
+  const menuItems = [];
+  let palette = null;
+  let paletteProblem = null;
+
+  function pickLists() {
+    if (paletteProblem !== null) {
+      return [el("div", { class: "pop-note" }, `Plugins and skills could not be loaded: ${paletteProblem}`)];
+    }
+    if (palette === null) {
+      loadPalette().then(
+        (loaded) => {
+          palette = loaded;
+          plusMenu.repaint();
+        },
+        (error) => {
+          paletteProblem = error.message;
+          plusMenu.repaint();
+        },
+      );
+      return [el("div", { class: "pop-note" }, "Loading plugins and skills…")];
+    }
+    const toggled = (kind, name) => () => {
+      picks.toggle(kind, name);
+      plusMenu.repaint();
+    };
+    return [
+      el(
+        "div",
+        { class: "pop-group" },
+        el("div", { class: "pop-heading" }, "Plugins"),
+        palette.servers.length === 0
+          ? el("div", { class: "pop-note" }, "No MCP server is connected.")
+          : el(
+              "div",
+              { role: "listbox", "aria-label": "Plugins", "aria-multiselectable": "true" },
+              palette.servers.map((server) =>
+                pickRow("plugin", server.name, `${server.tools.length} ${server.tools.length === 1 ? "tool" : "tools"}`, picks.has("plugin", server.name), toggled("plugin", server.name)),
+              ),
+            ),
+      ),
+      el(
+        "div",
+        { class: "pop-group" },
+        el("div", { class: "pop-heading" }, "Skills"),
+        palette.skills.length === 0
+          ? el("div", { class: "pop-note" }, "No skill is installed.")
+          : el(
+              "div",
+              { role: "listbox", "aria-label": "Skills", "aria-multiselectable": "true" },
+              palette.skills.map((skill) => pickRow("skill", skill.name, clip(skill.description, PICK_HINT_CHARS), picks.has("skill", skill.name), toggled("skill", skill.name))),
+            ),
+      ),
+    ];
+  }
+
+  const plusMenu = anchoredPopover({
+    anchor: plusButton,
+    frame: element,
+    label: "Add",
+    build: () => [
+      el(
+        "button",
+        {
+          class: "pop-option",
+          type: "button",
+          onclick: () => {
+            plusMenu.close();
+            attachments.picker.click();
+          },
+        },
+        icon("paperclip"),
+        el("span", { class: "pop-option-text" }, el("span", null, "Add files"), el("span", { class: "pop-option-hint" }, "Or drop or paste them into the box")),
+      ),
+      ...menuItems.flatMap((build) => build(plusMenu.close)),
+      picks.planRow(),
+      ...pickLists(),
+    ],
+  });
+  element.append(wired.menu, wired.field, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, options, sendButton));
   sendButton.addEventListener("click", () => (stopping() ? stop() : send()));
 
   function onInput() {
@@ -317,6 +426,9 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   if (draft !== null) {
     textarea.value = draft.text;
     attachments.restore(draft.files);
+    if (draft.picks !== undefined) {
+      picks.restore(draft.picks);
+    }
     // The box measures its text once it is on the page.
     requestAnimationFrame(wired.autosize);
   }
@@ -326,6 +438,10 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     element,
     textarea,
     attachments,
+    picks,
+    addMenuItems: (build) => {
+      menuItems.push(build);
+    },
     options,
     sendButton,
     setSendLabel: (text) => {
@@ -346,11 +462,11 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       edited();
       wired.autosize();
       attachments.clear();
-      if (key !== null) {
-        clearPref(key);
-      }
+      // What the draft keeps now: nothing, or the picks a steer left for the next message.
+      keep();
     },
     dispose: () => {
+      plusMenu.dispose();
       wired.dispose();
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);

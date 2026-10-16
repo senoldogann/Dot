@@ -27,7 +27,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import RunRecord
+from dotagent.store.models import NO_PICKS, RunRecord
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -207,7 +207,7 @@ async def test_a_runs_page_shows_a_message_queued_while_its_connection_was_broke
             await expect(queue).to_be_hidden()
             await _break(page, server)
             await manager.queue(
-                run.thread_id, QUEUED, (), "task", None, None, "standard", None, None, None, None, UI_SOURCE
+                run.thread_id, QUEUED, (), "task", None, None, "standard", None, NO_PICKS, None, None, None, UI_SOURCE
             )
             await _mend(page, server)
             await expect(queue.locator(".queue-text")).to_have_text([QUEUED], timeout=_CAUGHT_UP_MS)

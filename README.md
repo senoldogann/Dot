@@ -1395,13 +1395,13 @@ nests under it), then "and N more in Activity", and the page scrolls to what doe
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
 and `due`. The composer is one frame on a 24 px corner with a soft shadow under it: the goal in a box of one line that
-grows with it, the files attached under it, then one bar that never wraps: the attach button and the mode (Task, Chat or
-Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent exists
+grows with it, the files attached and the picks under it, then one bar that never wraps: the **+** and the mode (Task,
+Chat or Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent exists
 (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's default or
 one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser per model)
 and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill always
-shows, the Goal mode switch and Keep going, see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in
-the warn ink, on no fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no
+shows, and Keep going, see [Autonomy](#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
+fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no
 ground until the pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the
 agent's name go and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273),
 so on a phone the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen
@@ -1429,9 +1429,31 @@ here and in the box of a run: the page sends each new message with a key of its 
 message sent again with what its first sending made. `/` at the start of a word opens the slash menu over the box: the
 commands of the composer (`/task`, `/chat`, `/research` here; `/btw` in the box of a run), the skills by name with their
 description, and each MCP server with its tools, read from the daemon as a run reads them (`GET /api/palette`); letters
-filter, the arrows move, Enter or Tab picks and Escape closes. A skill picked reads "use the skill NAME: " in the box, a
-tool its name, a command does its work. A run that waits for your approval shows above the composer, as a card, and
-moves it down only when the cards do not fit there.
+filter, the arrows move, Enter or Tab picks and Escape closes. A skill picked is a chip under the box, a tool the chip of
+its server, as from the **+** (below), and the slash word goes; a command does its work. A run that waits for your
+approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
+
+The **+** at the left of the bar (item 318, after Codex's composer) opens **Add files**, in the box of a run **Save
+skill**, the **Goal mode** switch and **Plan first**, then **Plugins**, the MCP servers with tools (a connected app's
+among them), and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked, there or in the slash menu,
+is a chip under the box in a colour of its name, which its × takes away; Plan first is a chip too, and a chat has neither
+it nor goal mode. The picks go with the message (`plugins`, `skills` and `plan_first` of `POST /api/runs`, and of a
+message the queue holds), and once it is sent they stand under it as chips (the run's `picks` event); a message that
+steers the run under way leaves them for the next one, and the page says so, and a queued message with picks is not
+steered into the run at work: it stays queued to start a run of its own. A run sent with picks starts with each
+picked server's tool group on from its first step when its tools are grouped (with every tool offered they are on
+anyway), and its first message is your words, then a line that names the servers to use, Plan first's (write the plan
+with `update_plan`, then ask with `ask_user` and act once you agree: the prompt asks it, nothing holds the run's tools
+back), and each picked skill's instructions as the `skill` tool gives them; the run's goal stays your words. Picks a run
+cannot start with are refused, with why, and nothing starts: a server that is not connected or none of whose tools the
+run may use (its mode's, within its agent's bounds), a skill it is not offered, Plan first in a chat or under YOLO (a
+YOLO run does not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is OpenCode's own
+agent. A run that goes on from another (Resume, or an answer that came after its run ended) starts without the picks:
+the first message, with their lines and skills, stays in the chat, and with grouped tools `use_tools` turns a picked
+server's group on. **Save skill** (`POST /api/runs/{id}/skill`) has the review model
+write the skill of the run as a learned skill, as one is written when a run ends, also after fewer acting steps than
+`[agent] skill_min_steps`; it is refused while learned skills are off, and for a run that did not end done or took no
+acting step, a delegated run, an eval's and one of OpenCode's agent.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it

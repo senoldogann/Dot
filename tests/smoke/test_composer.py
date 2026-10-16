@@ -1,7 +1,7 @@
 """The composer (items 64, 104 and 115): typing ``/`` on the new chat page opens the menu of commands and skills,
-letters filter it, the arrows move, Enter picks without sending, Escape closes; Shift+Enter breaks a line. The bar's
-pills open the Model and the Options menus; a draft survives a navigation; the bar keeps one line from the desk to the
-phone. Wide and on a phone."""
+letters filter it, the arrows move, Enter picks without sending (a skill as a chip, item 318), Escape closes;
+Shift+Enter breaks a line. The bar's pills open the Model and the Options menus, and the "+" goal mode; a draft
+survives a navigation; the bar keeps one line from the desk to the phone. Wide and on a phone."""
 
 import asyncio
 import time
@@ -165,7 +165,12 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await expect(menu.locator("[role=option][aria-selected=true]")).to_contain_text("scan-catalogue")
                 await goal.press("Enter")
                 await expect(menu).to_be_hidden()
-                await expect(goal).to_have_value("use the skill scan-catalogue: ")
+                # A skill is picked for the message as a chip (item 318): the slash word goes and nothing is typed.
+                await expect(goal).to_have_value("")
+                chip = page.locator(".composer .pick-chip[data-kind='skill']")
+                await expect(chip).to_have_attribute("data-name", "scan-catalogue")
+                await chip.get_by_role("button", name="Remove scan-catalogue").click()
+                await expect(chip).to_have_count(0)
                 await expect(page).to_have_url(f"http://{host}:{port}/#/runs")
                 # A slash inside a word opens nothing; one after a space does, and Escape closes it.
                 await goal.type("a/b")
@@ -264,13 +269,19 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await mode_pill.click()
                 await modes.get_by_role("option", name="Task").click()
                 await expect(mode_pill).to_contain_text("Task")
-                # The Options pill carries the approvals as its value and opens the approvals, goal mode and keep going.
+                # The "+" holds goal mode (item 318); the Options pill carries the approvals as its value and opens the
+                # approvals and keep going.
+                await page.get_by_role("button", name="Add", exact=True).click()
+                plus = page.locator(".composer .composer-popover[aria-label='Add']")
+                await expect(plus.get_by_role("switch", name="Goal mode")).to_be_visible()
+                await page.keyboard.press("Escape")
+                await expect(plus).to_be_hidden()
                 options_pill = page.locator(".composer-pill[data-pill='options']")
                 await expect(options_pill).to_contain_text("Ask")
                 await options_pill.click()
                 popover = page.locator(".composer .composer-popover[aria-label='Options']")
                 await expect(popover.get_by_role("group", name="Approvals")).to_be_visible()
-                await expect(popover.get_by_role("switch", name="Goal mode")).to_be_visible()
+                await expect(popover.get_by_role("switch", name="Goal mode")).to_have_count(0)
                 await expect(popover.get_by_role("switch", name="Keep going until done")).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"options-menu-{width}.png"), animations="disabled")
                 await popover.get_by_role("button", name="YOLO").click()

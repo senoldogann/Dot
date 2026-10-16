@@ -37,6 +37,7 @@ from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_sche
 from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
 from dotagent.store.models import (
+    NO_PICKS,
     CampaignRecord,
     ChatChoices,
     EventRecord,
@@ -641,7 +642,19 @@ async def test_dotx_stats_counts_what_waits_and_will_not_move_on_by_itself(
     held: ThreadRecord = await runtime.store.create_thread("Held", "test")
     for thread in (stalled, held):
         await runtime.store.add_queued(
-            thread.id, "Then say pong.", (), "research", None, None, "standard", None, None, None, None, "test"
+            thread.id,
+            "Then say pong.",
+            (),
+            "research",
+            None,
+            None,
+            "standard",
+            None,
+            NO_PICKS,
+            None,
+            None,
+            None,
+            "test",
         )
     await runtime.store.hold_queue(held.id)
     try:

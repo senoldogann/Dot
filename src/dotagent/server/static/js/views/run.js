@@ -22,7 +22,7 @@ import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
 import { createQueue } from "../queue.js";
-import { showMessageFiles, userMessage } from "../messages.js";
+import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
 import { emptyPanel, errorPanel, loadingPanel, panelSection } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
@@ -481,6 +481,41 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     listener: null,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
+  // Save skill (item 318): what this run did, written as a skill by the review model, as item 92 writes one when a run
+  // ends; once the run has ended, since only a run that ended done after an acting step gives one.
+  let savingSkill = false;
+  async function saveSkill() {
+    savingSkill = true;
+    try {
+      await attempt(async () => {
+        const saved = await api.post(`/runs/${runId}/skill`, null);
+        toast("ok", `${saved.updated ? "Updated" : "Saved"} the skill ${saved.name}.`);
+      });
+    } finally {
+      savingSkill = false;
+    }
+  }
+  frame.addMenuItems((close) => [
+    el(
+      "button",
+      {
+        class: "pop-option",
+        type: "button",
+        disabled: active || savingSkill,
+        onclick: () => {
+          close();
+          saveSkill();
+        },
+      },
+      icon("download"),
+      el(
+        "span",
+        { class: "pop-option-text" },
+        el("span", null, savingSkill ? "Saving the skill…" : "Save skill"),
+        el("span", { class: "pop-option-hint" }, active ? "Once the run has ended" : "What this run did, as a skill to use again"),
+      ),
+    ),
+  ]);
   // How much of its context budget the run's last step filled (item 222), beside the send.
   const meter = createContextMeter({ frame: frame.element });
   send.before(meter.element);
@@ -564,7 +599,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       approvals: heldChoice(start.approvals),
       goalMode: heldChoice(start.goal_mode),
     },
-    optionsTitle: "Approvals and goal mode",
+    optionsTitle: "Approvals",
     more: () => [],
     onMode: () => input.focus(),
     onChange: keepChoices,
@@ -728,17 +763,22 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         goal_mode: chosen.goal_mode,
         agent_id: run.agent_id,
         attachments: files,
+        ...frame.picks.body(),
       };
       await queue.add({ ...body, key: keys.of("queue", run.thread_id, body) });
       keys.sent();
       choices.sent();
+      frame.picks.sent();
       return null;
     }
     if (active) {
-      // A steer joins the run under way, which keeps its level: an armed choice for one message waits for a message
-      // that starts a run, and the person is told (item 259).
+      // A steer joins the run under way, which keeps its level and its tools: an armed choice for one message and the
+      // picks (item 318) wait for a message that starts a run, and the person is told (item 259).
       if (choices.value().once !== null) {
         toast("ok", "Steered: the run under way keeps its level. Ultrathink and Ultracode wait for a message that starts a run.");
+      }
+      if (frame.picks.count() > 0) {
+        toast("ok", "Steered: the run under way keeps its tools. Plugins, skills and Plan first wait for a message that starts a run.");
       }
       const entry = holdMessage(text);
       const body = { text, attachments: files };
@@ -766,10 +806,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       thread_id: run.thread_id,
       agent_id: run.agent_id,
       attachments: files,
+      ...frame.picks.body(),
     };
     const next = await api.post("/runs", { ...body, key: keys.of("run", body) });
     keys.sent();
     choices.sent();
+    frame.picks.sent();
     return next.id;
   }
 
@@ -1232,6 +1274,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       screenButton.hidden = false;
     },
     onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
+    onGoalPicks: goalMessage === null ? null : (picks) => showMessagePicks(goalMessage, picks),
   });
   const problem =
     historyProblem === null

@@ -1,5 +1,6 @@
 // The slash menu's words, without the page: which word of the composer is a slash word, what the menu offers for it
-// and what a pick puts into the text. composer.js draws the menu and listens to the keys.
+// and what a pick puts into the text, or picks for the message (item 318). composer.js draws the menu and listens to
+// the keys.
 
 /** The slash word the caret is in: `{ start, word }` with the word after the slash (may be empty), or null. A slash word
  * starts the text or follows white space, so a slash inside a path or an address opens nothing. */
@@ -13,7 +14,8 @@ export function slashWord(text, caret) {
 }
 
 /** The groups of the menu: the commands of the composer, then the skills, then each MCP server's tools, each item with
- * its label (what is typed to find it), its hint and what a pick inserts. */
+ * its label (what is typed to find it), its hint and what a pick does: a command inserts its words or acts, a skill
+ * and a tool are picked for the message as a chip (`pick`: the skill, or the tool's server), and the slash word goes. */
 export function paletteGroups(commands, palette) {
   const groups = [];
   if (commands.length > 0) {
@@ -26,7 +28,7 @@ export function paletteGroups(commands, palette) {
         id: `skill-${skill.name}`,
         label: skill.name,
         hint: skill.description,
-        insert: `use the skill ${skill.name}: `,
+        pick: { kind: "skill", name: skill.name },
       })),
     });
   }
@@ -34,7 +36,7 @@ export function paletteGroups(commands, palette) {
     for (const server of palette.servers) {
       groups.push({
         title: `MCP · ${server.name}`,
-        items: server.tools.map((tool) => ({ id: `tool-${tool.name}`, label: tool.name, hint: tool.description, insert: `${tool.name} ` })),
+        items: server.tools.map((tool) => ({ id: `tool-${tool.name}`, label: tool.name, hint: tool.description, pick: { kind: "plugin", name: server.name } })),
       });
     }
   }
