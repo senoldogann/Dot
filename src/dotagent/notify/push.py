@@ -1,7 +1,8 @@
 """Web push to the owner's phone (item 52): the VAPID key pair the daemon signs with, the message an event turns into,
 the send to a subscription's push service, and the watcher that sends every subscription what the web UI's desktop
-notifications say: an approval or a question a run asked or left, the end of a run, a campaign that ended by itself, a
-firing a schedule missed, a start of the daemon after the one before it did not end cleanly. The subscriptions come
+notifications say: an approval or a question a run asked or left, a draft written for the owner to send, the end of a
+run, a campaign that ended by itself, a firing a schedule missed, a start of the daemon after the one before it did not
+end cleanly. The subscriptions come
 from the web UI (``POST /api/push/subscriptions``, which refuses keys that cannot encrypt a message) and live in the
 store; one whose push service says it is gone, or whose keys cannot encrypt a message, is deleted."""
 
@@ -22,11 +23,12 @@ from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT, CampaignEnded
 from dotagent.agent.learning_health import LEARNING_STALLED_EVENT, LearningStalled
 from dotagent.core.errors import DotError
 from dotagent.core.types import FrozenModel
+from dotagent.drafts.service import DRAFT_CREATED_EVENT
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
 from dotagent.notify.keys import keys_problem
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, ScheduleMissed
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, PushSubscription, RunRecord
+from dotagent.store.models import DraftRecord, EventRecord, PushSubscription, RunRecord
 
 log = structlog.get_logger(__name__)
 
@@ -41,6 +43,7 @@ _GONE: frozenset[int] = frozenset({404, 410})
 _ASKED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
 _ASKING_TITLE: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
 _FINISHED_TITLE: dict[str, str] = {"done": "A run is done", "failed": "A run failed", "cancelled": "A run was stopped"}
+_DRAFT_TITLE: dict[str, str] = {"mail": "Dot drafted an email", "message": "Dot drafted a message"}
 type PushState = Literal["idle", "waiting", "done", "failed"]
 # What sending one message to one subscription came to: taken, refused or unreachable (kept), or deleted.
 type PushOutcome = Literal["sent", "failed", "removed"]
@@ -48,6 +51,7 @@ _FINISHED_STATE: dict[str, PushState] = {"done": "done", "failed": "failed"}
 PUSH_KINDS: frozenset[str] = frozenset(
     {
         *_ASKED_KINDS,
+        DRAFT_CREATED_EVENT,
         "run_finished",
         CAMPAIGN_ENDED_EVENT,
         SCHEDULE_MISSED_EVENT,
@@ -116,9 +120,9 @@ def _cut_off(runs: int) -> str:
 
 
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
-    """The message an event of a run is worth, or ``None``: an approval or a question asked or left; the end of a run of
-    its own (the sub-runs of a run stay quiet, as in the web UI), with the first line of its result; the end of a
-    campaign by itself."""
+    """The message an event of a run is worth, or ``None``: an approval or a question asked or left; a draft written
+    for the owner to send (item 314); the end of a run of its own (the sub-runs of a run stay quiet, as in the web UI),
+    with the first line of its result; the end of a campaign by itself."""
     if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
         args: object = event.data.get("args")
@@ -127,6 +131,15 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
         text: str = question if severity == "question" and isinstance(question, str) else str(summary or "")
         title: str = _ASKING_TITLE.get(str(severity), "Dot asks for approval")
         return PushMessage(title=title, body=_shorten(text), route=f"#/runs/{run.id}", state="waiting")
+    if event.kind == DRAFT_CREATED_EVENT:
+        draft: DraftRecord = DraftRecord.model_validate(event.data)
+        about: str = draft.subject if draft.channel == "mail" else draft.body
+        return PushMessage(
+            title=_DRAFT_TITLE[draft.channel],
+            body=_shorten(f"To {', '.join(draft.to)}: {about}"),
+            route=f"#/runs/{run.id}",
+            state="waiting",
+        )
     if event.kind == "run_finished" and run.parent_run_id is None:
         status: str = str(event.data.get("status", ""))
         result: object = event.data.get("result")

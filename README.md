@@ -513,6 +513,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `ask_user`, `finish`, `use_tools`                                            |
 | Pages           | `show_page`                                                                                                        |
+| Drafts          | `draft_message`                                                                                                    |
 | Skills          | `skill`, `find_help`                                                                                               |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
@@ -622,6 +623,33 @@ end will wake Dot. A command stopped there, closed by the run or ended by the da
 run or a campaign's session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends
 with its run: a command in the background lives as long as the daemon.
 
+### Drafts
+
+`draft_message` writes an email (Mail) or an iMessage (Messages) for you to send (item 314, after Grok's drafts): a
+card in the conversation, where it was written, with the recipients, the subject and the words. **Send email** or
+**Send message** hands it over as it stands; **Edit** turns the card into a form first, and **Discard** drops it, after
+asking, with nothing sent. Nothing goes out before Send, whatever the run's approvals, a `yolo` run's too: a draft is
+how a run has you look first, and the run goes on at once without waiting for your answer. Writing a draft changes
+nothing outside Dot, so the policy allows it (a `notes_write` action, `safe`); a key in it, in an address too, is
+refused as it is anywhere else. The tool is in the `drafts` group, and its tool result tells the model not to send the same message
+another way. While two or more drafts wait, each card has a tick, and a bar after the last of them sends the ticked
+ones together, one after the other, each with its own words. A draft can be answered long after its run ended, and on
+another screen: an open page shows the answer as it comes (the lifecycle stream carries `draft_decided`), and the
+phone hears of every new draft ("Dot drafted an email", with the recipients and the subject), as the web UI's
+notification says it.
+
+Send gives the draft to `osascript` with a fixed script for Mail or Messages; the recipients and the words reach the
+script as its arguments, never as words of the script (`drafts/scripts.py`), and after `--`, so that a subject or a
+message that starts with a dash is not read as an option of `osascript` (`-e` would add a line of script). A send the application refuses leaves the
+draft "Not sent" with what the application said, and **Send again** retries it; a second press, here or on another
+screen, finds it taken (409). A draft the daemon was handing over when it stopped is marked "Not sent" at its next
+start, as whether it went out is not known: look in Mail's Sent mailbox or the conversation in Messages before you send
+it again. Drafts are kept in the `drafts` table and go with their chat, or with the events of their run when those age
+out. The API: `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc", "subject", "body"}`: the words that
+go; a message has no cc and no subject) and `POST /api/drafts/{id}/discard`. The scripts were not run against Mail or
+Messages themselves, which would send for real: the tests give them to a stand-in of `osascript` that writes down what
+it was handed.
+
 ## What leaves this Mac
 
 Dot sends nothing to the people who make it: there is no telemetry, no crash report and no check for updates. What
@@ -650,9 +678,9 @@ leaves the Mac is what a run needs, sent where the configuration points:
   the texts they judge; with `[judge] provider = "typesafe"` the judge of clicks and checks sends what it judges (a
   button's words, the page's address without its query, its title and visible text). `[judge] provider` is `"none"` by
   default.
-- **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question or the
-  result and the page to open, encrypted for that phone's browser and carried by its maker's push service (see
-  [Dot on the phone](#dot-on-the-phone)).
+- **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question, of a
+  draft's recipients and subject (a message's words, item 314) or of the result, and the page to open, encrypted for
+  that phone's browser and carried by its maker's push service (see [Dot on the phone](#dot-on-the-phone)).
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; none is
   set up by default (see [MCP servers](#mcp-servers)).
 
@@ -994,7 +1022,10 @@ progress is `continue`. A delegated run and a campaign's session keep their own 
 answer starts and a follow-up on the run's page keep the run's. Whatever the model, every task and research run outside
 a campaign is told to keep acting while the goal leaves work it can do, not to stop to report progress or to offer what
 the goal asks for, and to take an ask to keep going at its word. This is not **Keep going** in the composer's Options,
-which makes the goal a campaign worked on in sessions (see [Campaigns](#campaigns)).
+which makes the goal a campaign worked on in sessions (see [Campaigns](#campaigns)). Every run, a chat's too, is told
+that when it hesitates to do what it was asked, or a part of it, it says so at once, with what holds it back and what
+it can do instead, and asks you or goes on with the part it can do, instead of looking into the matter on its own
+first (item 327).
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
@@ -1754,7 +1785,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
-| `GET /memories`, `GET /memories/search`, `POST /memories`, `PATCH\|DELETE /memories/{id}` | notes                                             |
+| `GET /memories`, `GET /memories/search`, `POST /memories`, `GET\|PATCH\|DELETE /memories/{id}` | notes                                         |
+| `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
@@ -2087,7 +2119,13 @@ Dot keeps short notes between runs: facts about you, your machine and how you li
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
 UI, where Settings › Memory lists the notes changed last first, 30 at a time with **Load more** for the next, in a
 box that keeps its size and scrolls inside past its first notes (item 218); forgetting, correcting or adding a note
-keeps the notes read and the list where it was, and a correction open on another note stays open (item 204).
+keeps the notes read and the list where it was, and a correction open on another note stays open (item 204). In a
+run's conversation, a note the run saves, corrects (`memory_update`) or forgets leaves a quiet line where it happened,
+what changed and the first words of the note: "Saved to memory", "Updated memory" or "Removed from memory" (item 313,
+after Grok's "Updated memory"). The line of a saved or corrected note opens Settings › Memory with that note first,
+to read, correct or forget (`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note forgotten since is said to
+be gone. A note saved again, or a call that failed, changed nothing and leaves no line. The line names no agent: a
+note a run saves is Dot's, for every run (item 94).
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -2233,6 +2271,25 @@ with the agent's own section ("You are Scout, an agent the owner made: ..." and 
 rules, which still hold; its tools are the ones the agent names plus finishing, asking you and turning tool groups on.
 The run's page wears the agent's face and name in the bar with a chip to its page; its rows on the Activity page and
 in the sidebar wear the face too. Deleting an agent leaves its chats, its lessons and its learned skills to Dot.
+
+An agent can start from a template (item 315). Under the list, **Start from a template** shows eight: Sales
+Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health and Chief
+of Staff, each with its face, its role, what it needs of the Mac and the schedule it suggests. **Use template** makes
+the agent in one click and opens its page; it is then an agent like any other, to change in the editor. Every
+template's instructions say that what leaves the Mac for a person is a draft for you to send (`draft_message`, see
+[Drafts](#drafts)). Sales Outbound, Talent Scout, Paid Media and Product Performance work on the web and in files
+and name their tools: the web, Dot's Chrome, files, memory, plans, pages and `draft_message`, none of which drives
+Mail, Messages or a terminal; a Send pressed on a web page is an external send, under your approvals. Expense Manager,
+Bug Reproduction, Account Health and Chief of Staff read your mail, calendar or code and have every tool. A suggested
+schedule is only words on the card; Schedules makes one. An agent's page has **Export** in its bar: a file
+`<name>.dot-agent.json` with the agent's name, role, instructions, model, reasoning level, approvals, tools and look
+(`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An agent whose name, role
+or instructions hold a secret is not exported, and the page says to take it out first: a value Dot holds (any value
+of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a password by its form,
+as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such a file, in this home or another, and
+opens it; a file that names a tool this home lacks is refused with the tool's name. The API: `GET
+/api/agent-templates`, `POST /api/agent-templates/{id}/use`, `GET /api/agents/{id}/export` and `POST
+/api/agents/import` (422 for Dot, for a secret, and for a file that is not an agent's or names tools not here).
 
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An

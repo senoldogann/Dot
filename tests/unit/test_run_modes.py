@@ -137,6 +137,18 @@ def test_the_prompt_keeps_the_model_from_asking_permission_for_an_action() -> No
         assert "Never use it to ask permission for an action" in _prompt(mode, False), mode
 
 
+def test_a_run_that_hesitates_over_what_it_was_asked_says_so_at_once() -> None:
+    """Item 327: a run that hesitates over the work says what holds it back and asks, instead of looking into it on its
+    own first; in every kind of run and under every approval mode."""
+    rule: str = "If you hesitate to do what was asked, or a part of it, say so at once instead of looking into it"
+    kinds: tuple[RunMode, ...] = ("chat", "task", "research")
+    for kind in kinds:
+        assert rule in _in_mode(kind), kind
+    modes: tuple[ApprovalMode, ...] = ("ask", "auto", "yolo")
+    for mode in modes:
+        assert rule in _prompt(mode, False), mode
+
+
 def test_the_prompt_names_the_day_and_a_note_after_the_goal_the_time_so_the_prompt_stays_the_same_all_day() -> None:
     today: list[str] = [line for line in _prompt("ask", False).splitlines() if line.startswith("- Today:")]
     assert len(today) == 1 and re.search(r"\d{2}:\d{2}", today[0]) is None, today

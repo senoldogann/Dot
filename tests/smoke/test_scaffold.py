@@ -316,14 +316,15 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     login_env: dict[str, str],
 ) -> None:
     # Forty pages fill the small budget even when the system prompt is all of the fixed part of the prompt. The window
-    # leaves the fixed part of the prompt (the core tools of items 41 and 34, the page tool of item 193, and the skill
-    # tool with the skills that come with Dot of item 196 included) room for two pages after every compaction; what a
-    # compaction keeps grows a little each time, so a smaller window would end up compacting at every step.
+    # leaves the fixed part of the prompt (the core tools of items 41 and 34, the page tool of item 193, the skill tool
+    # with the skills that come with Dot of item 196 and the draft tool of item 314 included) room for two pages after
+    # every compaction; what a compaction keeps grows a little each time, so a smaller window would end up compacting
+    # at every step.
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 28_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 29_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(28_000, None, 21_000, 21_000, 2625, True),)
+    assert small.scaffolds == (_scaffold(29_000, None, 21_750, 21_750, 2719, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -334,7 +335,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 2625 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 2719 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
@@ -346,8 +347,8 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for compaction in small.compactions:
         before, after = compaction["tokens_before"], compaction["tokens_after"]
         assert isinstance(before, int) and isinstance(after, int), compaction
-        assert after < before and after <= 21_000, compaction
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 21_000
+        assert after < before and after <= 21_750, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 21_750
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [

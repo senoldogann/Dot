@@ -22,6 +22,11 @@ MemoryUseHow = Literal["start", "search", "live", "site"]
 # ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
 # expired; answering it carries the work on in its thread).
 ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
+# The application a draft goes out with (item 314): ``mail`` an email by Mail, ``message`` an iMessage by Messages.
+DraftChannel = Literal["mail", "message"]
+# ``waiting``: for the owner to send or discard it; ``sending``: handed to the application; ``failed``: the application
+# refused it, and the owner may send it again or discard it; ``sent`` and ``discarded`` are final.
+DraftStatus = Literal["waiting", "sending", "sent", "discarded", "failed"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 # ``active``: its sessions go on; ``achieved``: the goal checker accepted its evidence, or the owner said so;
 # ``stopped``: the owner stopped it (also with the emergency stop of desktop control, which ends its session), or it ran
@@ -243,6 +248,23 @@ class ApprovalRecord(FrozenModel):
     args: JsonObject
     decided_by: str | None
     note: str
+
+
+class DraftRecord(FrozenModel):
+    """An email or a message a run wrote for the owner (item 314). Nothing goes out until the owner presses Send, and
+    then with the recipients and words as they stand on the card; ``error`` says why the last send failed."""
+
+    id: str
+    run_id: str
+    channel: DraftChannel
+    to: tuple[str, ...]
+    cc: tuple[str, ...]
+    subject: str
+    body: str
+    status: DraftStatus
+    created_at: float
+    decided_at: float | None
+    error: str | None
 
 
 class ShownPage(FrozenModel):

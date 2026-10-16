@@ -14,10 +14,15 @@ _SCRIPT_CONTEXT_CHARS: int = 600
 _REAP_TIMEOUT_S: float = 5.0
 
 
-async def run_osascript(language: ScriptLanguage, script: str, confinement: tuple[str, ...], timeout_s: float) -> str:
+async def run_osascript(
+    language: ScriptLanguage, script: str, argv: tuple[str, ...], confinement: tuple[str, ...], timeout_s: float
+) -> str:
     """The script's result as text, ``osascript`` started by ``confinement`` (the words of a run's sandbox, or
-    none). A script that waits for an Automation approval the user never sees times out; one whose wait is cancelled (a
-    stopped run, the tool's own timeout) is killed, so it never goes on acting on the Mac without its run."""
+    none). ``argv`` reaches the script's ``run`` handler as its arguments, so that values go in as they are, never as
+    words of the script: after ``--``, since ``osascript`` reads a first argument that starts with a dash as one of its
+    options, ``-e`` and a line of script among them. A script that waits for an Automation approval the user never
+    sees times out; one whose wait is cancelled (a stopped run, the tool's own timeout) is killed, so it never goes on
+    acting on the Mac without its run."""
     process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
         *confinement,
         _OSASCRIPT,
@@ -25,6 +30,8 @@ async def run_osascript(language: ScriptLanguage, script: str, confinement: tupl
         language,
         "-e",
         script,
+        "--",
+        *argv,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

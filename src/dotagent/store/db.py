@@ -45,6 +45,9 @@ from dotagent.store.models import (
     CampaignEntryKind,
     CampaignRecord,
     ChatChoices,
+    DraftChannel,
+    DraftRecord,
+    DraftStatus,
     EventRecord,
     MemoryRecord,
     MemoryScore,
@@ -106,6 +109,12 @@ CREATE TABLE IF NOT EXISTS approvals (
     args TEXT NOT NULL, decided_by TEXT, note TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
+CREATE TABLE IF NOT EXISTS drafts (
+    id TEXT PRIMARY KEY, run_id TEXT NOT NULL, channel TEXT NOT NULL, recipients TEXT NOT NULL, cc TEXT NOT NULL,
+    subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, decided_at REAL,
+    error TEXT
+);
+CREATE INDEX IF NOT EXISTS drafts_status ON drafts(status, created_at);
 CREATE TABLE IF NOT EXISTS shown_pages (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, title TEXT NOT NULL, html TEXT NOT NULL, created_at REAL NOT NULL
 );
@@ -495,6 +504,29 @@ def _approval(row: aiosqlite.Row) -> ApprovalRecord:
         args=parse_json_object(row["args"], "approval args"),
         decided_by=row["decided_by"],
         note=row["note"],
+    )
+
+
+def _addresses(value: object) -> tuple[str, ...]:
+    """The stored recipients of a draft: a JSON array of addresses."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise StoreError("a stored draft has recipients that are not a list of addresses", {"recipients": repr(value)})
+    return tuple(value)
+
+
+def _draft(row: aiosqlite.Row) -> DraftRecord:
+    return DraftRecord(
+        id=row["id"],
+        run_id=row["run_id"],
+        channel=row["channel"],
+        to=_addresses(parse_json_value(row["recipients"], "draft recipients")),
+        cc=_addresses(parse_json_value(row["cc"], "draft cc")),
+        subject=row["subject"],
+        body=row["body"],
+        status=row["status"],
+        created_at=row["created_at"],
+        decided_at=row["decided_at"],
+        error=row["error"],
     )
 
 
@@ -1018,6 +1050,7 @@ class Store:
         await self._db.execute(f"{doomed} DELETE FROM events WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM approvals WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM shown_pages WHERE run_id IN (SELECT id FROM doomed)", named)
+        await self._db.execute(f"{doomed} DELETE FROM drafts WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"DELETE FROM messages WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM message_archive WHERE thread_id IN ({marks})", named)
@@ -1118,11 +1151,13 @@ class Store:
 
     @_writing
     async def delete_events_of_runs_ended_before(self, before: float) -> int:
-        """Delete the events of the runs that ended before ``before``, and the pages they showed; the runs stay.
-        Returns how many events went. The screenshots those events named become orphans for :meth:`orphan_images`."""
+        """Delete the events of the runs that ended before ``before``, and the pages they showed and the drafts they
+        wrote, which the conversation showed; the runs stay. Returns how many events went. The screenshots those events
+        named become orphans for :meth:`orphan_images`."""
         ended: str = "SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?"
         cursor = await self._db.execute(f"DELETE FROM events WHERE run_id IN ({ended})", (before,))
         await self._db.execute(f"DELETE FROM shown_pages WHERE run_id IN ({ended})", (before,))
+        await self._db.execute(f"DELETE FROM drafts WHERE run_id IN ({ended})", (before,))
         await self._db.commit()
         return cursor.rowcount
 
@@ -1926,6 +1961,108 @@ class Store:
                 "SELECT * FROM approvals WHERE status = ? ORDER BY created_at DESC LIMIT ?", (status, limit)
             )
         return [_approval(row) for row in rows]
+
+    @_writing
+    async def add_draft(
+        self, run_id: str, channel: DraftChannel, to: Sequence[str], cc: Sequence[str], subject: str, body: str
+    ) -> DraftRecord:
+        """Keep a draft a run wrote (item 314): it waits for the owner."""
+        record: DraftRecord = DraftRecord(
+            id=new_id("drf"),
+            run_id=run_id,
+            channel=channel,
+            to=tuple(to),
+            cc=tuple(cc),
+            subject=subject,
+            body=body,
+            status="waiting",
+            created_at=time.time(),
+            decided_at=None,
+            error=None,
+        )
+        await self._db.execute(
+            "INSERT INTO drafts(id, run_id, channel, recipients, cc, subject, body, status, created_at, decided_at, error)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
+            (
+                record.id,
+                run_id,
+                channel,
+                dumps_compact(list(record.to)),
+                dumps_compact(list(record.cc)),
+                subject,
+                body,
+                record.status,
+                record.created_at,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def get_draft(self, draft_id: str) -> DraftRecord:
+        row = await self._one("SELECT * FROM drafts WHERE id = ?", (draft_id,))
+        if row is None:
+            raise NotFoundError("draft not found", {"draft_id": draft_id})
+        return _draft(row)
+
+    async def list_drafts(self, status: DraftStatus, limit: int) -> list[DraftRecord]:
+        """The drafts in ``status``, newest first."""
+        rows = await self._all(
+            "SELECT * FROM drafts WHERE status = ? ORDER BY created_at DESC LIMIT ?", (status, limit)
+        )
+        return [_draft(row) for row in rows]
+
+    @_writing
+    async def claim_draft(
+        self, draft_id: str, to: Sequence[str], cc: Sequence[str], subject: str, body: str
+    ) -> DraftRecord:
+        """Take a draft that waits, or whose last send failed, for sending, with the recipients and words the owner
+        sends: it is ``sending`` from now on, so that a second press, here or on another screen, finds it taken."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE drafts SET status = 'sending', recipients = ?, cc = ?, subject = ?, body = ?, error = NULL"
+            " WHERE id = ? AND status IN ('waiting', 'failed')",
+            (dumps_compact(list(to)), dumps_compact(list(cc)), subject, body, draft_id),
+        )
+        await self._db.commit()
+        record: DraftRecord = await self.get_draft(draft_id)
+        if cursor.rowcount == 0:
+            raise RunConflict(f"the draft is {record.status}, not waiting", {"draft_id": draft_id})
+        return record
+
+    @_writing
+    async def settle_draft(self, draft_id: str, error: str | None) -> DraftRecord:
+        """End the send of a draft: ``sent``, or ``failed`` with the application's ``error``."""
+        await self._db.execute(
+            "UPDATE drafts SET status = ?, decided_at = ?, error = ? WHERE id = ? AND status = 'sending'",
+            ("sent" if error is None else "failed", time.time(), error, draft_id),
+        )
+        await self._db.commit()
+        return await self.get_draft(draft_id)
+
+    @_writing
+    async def discard_draft(self, draft_id: str) -> DraftRecord:
+        """Drop a draft that waits, or whose last send failed: nothing goes out."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE drafts SET status = 'discarded', decided_at = ? WHERE id = ? AND status IN ('waiting', 'failed')",
+            (time.time(), draft_id),
+        )
+        await self._db.commit()
+        record: DraftRecord = await self.get_draft(draft_id)
+        if cursor.rowcount == 0:
+            raise RunConflict(f"the draft is {record.status}, not waiting", {"draft_id": draft_id})
+        return record
+
+    @_writing
+    async def fail_sending_drafts(self, error: str) -> list[DraftRecord]:
+        """Mark ``failed`` with ``error`` the drafts a stopped daemon was sending, and return them: whether they went
+        out is not known, so none is sent again by itself."""
+        rows = await self._all("SELECT id FROM drafts WHERE status = 'sending'", ())
+        ids: list[str] = [str(row["id"]) for row in rows]
+        await self._db.execute(
+            "UPDATE drafts SET status = 'failed', decided_at = ?, error = ? WHERE status = 'sending'",
+            (time.time(), error),
+        )
+        await self._db.commit()
+        return [await self.get_draft(draft_id) for draft_id in ids]
 
     async def list_left_questions(self, run_id: str) -> list[ApprovalRecord]:
         """The questions ``run_id`` left for the user that are not answered or skipped yet, oldest first."""

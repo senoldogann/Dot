@@ -3,8 +3,9 @@
 The core group holds what most runs need: the files, the shell, the web, searching and saving notes, delegation,
 skills, the helper models and the meta tools (the plan, questions, finish). The other groups are named after what they reach: ``browser``
 (Chrome), ``desktop`` (the Mac's applications and AppleScript), ``schedule`` (goals that run later), ``memory_admin``
-(correcting and forgetting notes), ``pages`` (pages of HTML shown in the conversation) and one group per MCP server,
-``mcp__<server>``. Which groups are on is up to the loop; everything here is pure.
+(correcting and forgetting notes), ``pages`` (pages of HTML shown in the conversation), ``drafts`` (an email or a
+message for the owner to send) and one group per MCP server, ``mcp__<server>``. Which groups are on is up to the loop;
+everything here is pure.
 """
 
 from collections.abc import Sequence
@@ -27,6 +28,8 @@ _GROUP_OF_TOOL: dict[str, str] = {
     "apple_script": "desktop",
     "memory_update": "memory_admin",
     "memory_forget": "memory_admin",
+    # A draft is rare, and its card in the conversation is the whole of it (item 314).
+    "draft_message": "drafts",
     # Making a teammate is rare (item 99); the core group stays about a third of the tool definitions.
     "create_agent": "team",
     "show_page": "pages",
@@ -37,6 +40,7 @@ _PURPOSES: dict[str, str] = {
     "schedule": "goals that run later, once or on a cron expression",
     "terminal": "programs that ask questions, REPLs and servers that stay up, on a terminal of their own",
     "memory_admin": "correcting or forgetting saved notes",
+    "drafts": "an email or a message you write for the owner, who sends it from the conversation",
     "team": "making a lasting teammate agent for a role the work needs again or in parallel",
     "pages": "showing a page you write in HTML in the conversation: charts, tables, diagrams, 3D views",
 }

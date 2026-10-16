@@ -201,6 +201,11 @@ def memories_router(ctx: ServerContext) -> APIRouter:
     async def search_memories(query: Annotated[SearchQuery, Query()]) -> list[MemoryHit]:
         return await recall(index, query.q, query.limit)
 
+    # After the routes above: "owner", "learning" and "search" are not ids.
+    @router.get("/memories/{memory_id}")
+    async def get_memory(memory_id: str) -> MemoryRecord:
+        return await index.store.get_memory(memory_id)
+
     @router.post("/memories", status_code=201)
     async def add_memory(request: MemoryRequest) -> SavedMemory:
         return await save_memory(index, request.content, request.tags, None, None, None)

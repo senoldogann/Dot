@@ -67,6 +67,7 @@ from dotagent.tools.codes import build_code_tools
 from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools
+from dotagent.tools.drafts import build_draft_tool
 from dotagent.tools.files import build_file_tools
 from dotagent.tools.help import build_find_help_tool
 from dotagent.tools.judge_items import build_judge_items_tool
@@ -149,6 +150,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_web_tools(),
         build_notes_tools(),
         build_memory_tools(),
+        (build_draft_tool(),),
         build_schedule_tools(),
         build_campaign_tools(),
         build_delegate_tools(),

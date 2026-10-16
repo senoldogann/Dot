@@ -1299,11 +1299,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   loadActions();
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
-  // Lessons change after the run, and a question may be answered or skipped in another tab. A helper that starts or
-  // ends is read from the store too.
+  // Lessons change after the run, and a question may be answered or skipped in another tab, as a draft may be sent or
+  // discarded on another screen (item 314). A helper that starts or ends is read from the store too.
   const helpersChanged = debounce(() => reconcile(), HELPERS_SETTLE_MS);
   const stopLifecycle = onLifecycle((event) => {
-    if ((LESSON_KINDS.has(event.kind) || event.kind === "approval_decided") && event.run_id === runId) {
+    if (event.kind === "draft_decided") {
+      timeline.draft(event.data);
+    } else if ((LESSON_KINDS.has(event.kind) || event.kind === "approval_decided") && event.run_id === runId) {
       reconcile();
     } else if (HELPER_MOMENTS.has(event.kind) && event.run_id !== runId && (event.data.parent_run_id === runId || timeline.knows(event.run_id))) {
       helpersChanged();

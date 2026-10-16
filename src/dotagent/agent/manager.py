@@ -69,6 +69,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
 from dotagent.core.text import redact_json, redact_secrets, truncate_tail
 from dotagent.core.types import JsonObject
+from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage, Speed, user_message
@@ -293,8 +294,8 @@ class RunManager:
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
-        longer active, and their lock files; and hold the queue of each chat (:meth:`queue`) whose run the daemon's stop
-        did not cut. The runs of a process that lives (``dotx run`` in a terminal) go on, with the approvals they wait
+        longer active, the drafts the daemon was sending (item 314), and their lock files; and hold the queue of each
+        chat (:meth:`queue`) whose run the daemon's stop did not cut. The runs of a process that lives (``dotx run`` in a terminal) go on, with the approvals they wait
         on. Returns the number of runs closed."""
         store: Store = self._runtime.store
         directory: Path = run_owners_dir()
@@ -304,6 +305,7 @@ class RunManager:
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
         await store.expire_pending_approvals(_EXPIRED_ON_START)
+        await fail_unsettled_drafts(store, self._runtime.bus)
         await store.forget_stops_of_ended_runs()
         await self._hold_claims_of_gone(directory)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that

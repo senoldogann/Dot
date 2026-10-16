@@ -9,6 +9,7 @@
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
 import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
+import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { helperCard } from "./helpercard.js";
@@ -33,6 +34,11 @@ const RING_LABELS = { blocked: "waiting" };
 // keeps for its last line.
 const FLOCK_FACES = 3;
 const PREVIEW_CHARS = 240;
+// The memory tools' results that changed the memory, "Saved: [mem_x] …", and what their line in the conversation says
+// (item 313); a note saved again ("Already saved: …") changed nothing. The line shows this much of the note.
+const MEMORY_RESULT = /^(Saved|Updated|Forgot): \[([^\]\s]+)\]/;
+const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
+const MEMORY_WORDS_CHARS = 120;
 // How the helpers of a group stand, in the order a reader scans them, after T3 Code's: those under way first, then how
 // the others ended.
 const FLOCK_WORDS = [
@@ -160,7 +166,6 @@ function describeCall(tool, args) {
   return clip(detail === "" ? tool : `${tool} · ${detail}`, LATEST_CHARS);
 }
 
-/** An empty group of tool steps that starts at `ts` (seconds); it is "working" until something ends it. */
 /** The line a compaction leaves in the conversation (item 312): "Context compacted", and the size of the context
  * before and after it where the event says them (an event of before item 312 does not). */
 function compactionLine(data) {
@@ -169,6 +174,29 @@ function compactionLine(data) {
   return el("div", { class: "compaction-line" }, icon("minimize"), el("span", null, text));
 }
 
+/**
+ * The line a change of the memory leaves in the conversation (item 313, after Grok's "Updated memory"): what changed and
+ * the first words of the note, for a save and a change from the call's arguments, for a removal from the action's
+ * summary, which holds the words the note had. The line of a saved or changed note opens it in Settings › Memory; a
+ * removed note is gone. Null for a result that changed nothing: a failed call, a note saved again.
+ */
+function memoryLine(data, args) {
+  const found = data.kind === "memory_write" && data.ok ? MEMORY_RESULT.exec(data.text) : null;
+  if (found === null) {
+    return null;
+  }
+  const [, change, id] = found;
+  const words = change === "Forgot" ? data.summary.replace(/^Forget: /, "") : typeof args.content === "string" ? args.content : "";
+  const parts = [icon("database"), el("span", { class: "memory-change" }, MEMORY_CHANGES[change])];
+  if (words.trim() !== "") {
+    parts.push(el("span", { class: "memory-words" }, `“${clip(words, MEMORY_WORDS_CHARS)}”`));
+  }
+  return change === "Forgot"
+    ? el("div", { class: "note memory-line" }, ...parts)
+    : el("a", { class: "note memory-line", href: `#/settings/memory?note=${encodeURIComponent(id)}` }, ...parts);
+}
+
+/** An empty group of tool steps that starts at `ts` (seconds); it is "working" until something ends it. */
 function buildGroup(ts) {
   const state = el("span", { class: "steps-state" });
   const title = el("span", { class: "steps-title" });
@@ -217,16 +245,17 @@ function buildFlock() {
 
 /**
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
- * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it and
- * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row) and
- * `helperStatuses()` the statuses of the delegated runs; the
+ * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it,
+ * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
+ * `helperStatuses()` the statuses of the delegated runs and `draft(record)` paints a draft's card as the draft now
+ * stands (item 314: one answered after the run's stream ended); the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
  * event (its context budget, its model's window, the size chosen for the model and the prompt past which the run
  * summarizes), `onCalls({ calls, failed })` after every tool call of the run, `onCompacted({ count, flagged })` after
- * every compaction of the run (item 260: the conversation shows no note of one; `flagged` counts the checks that found
- * a section missing or a name the conversation never had),
+ * every compaction of the run (item 260; the conversation shows a quiet line where it happened, item 312; `flagged`
+ * counts the checks that found a section missing or a name the conversation never had),
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `onGoalFiles(files)` takes the files that came
@@ -242,6 +271,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   const liveChildren = new Set();
   let browserSeen = false;
   const totals = { calls: 0, failed: 0 };
+  // The cards of the drafts the runs wrote, by draft id, in the order they came (item 314): a decision repaints its card
+  // wherever it is; while two or more wait, a bar after the last of them sends the ticked ones together.
+  const drafts = new Map();
+  const draftBar = draftsBar(() => [...drafts.values()]);
 
   // `began` is when the run started; `boundary` is when the work since the last message started.
   function makeScope({ runId, actorId: actor, container, panel, parent, began }) {
@@ -711,7 +744,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     group.calls += 1;
     group.pending += 1;
     group.last = describeCall(call.tool, call.args);
-    const entry = { row, group };
+    const entry = { row, group, args: call.args };
     scope.calls.set(call.id, entry);
     if (scope.runId === rootRunId) {
       totals.calls += 1;
@@ -873,7 +906,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         showCall(scope, { id: data.call_id, tool: data.tool, args: finishArgs });
       }
       const entry = scope.calls.get(data.call_id) ?? showCall(scope, { id: data.call_id, tool: data.tool, args: {} });
-      const { row, group } = entry;
+      const { row, group, args } = entry;
       row.finish(data);
       if (scope.panel !== null) {
         scope.panel.helper.calls = Math.max(0, scope.panel.helper.calls - 1);
@@ -891,6 +924,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       paintGroup(group);
       for (const name of data.images) {
         onImage(name);
+      }
+      const remembered = memoryLine(data, args);
+      if (remembered !== null) {
+        place(scope, remembered, record.ts);
       }
     },
 
@@ -1130,6 +1167,21 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       place(scope, compactionLine(record.data), record.ts);
     },
 
+    // A draft a run wrote for the owner (item 314): a card where it was written, and the owner's Send or Discard on it,
+    // or a send that failed, which may come long after the run ended.
+    draft_created(scope, record) {
+      const made = draftCard(record.data, () => draftBar.paint());
+      drafts.set(record.data.id, made);
+      place(scope, made.node, record.ts);
+      draftBar.paint();
+      // An answer that came after the run's last event is not in the run's stream: the card reads the draft once.
+      made.refresh();
+    },
+
+    draft_decided(scope, record) {
+      drafts.get(record.data.id)?.update(record.data);
+    },
+
     // A side question (/btw) and its answer: shown in the conversation, never part of the run's own context.
     aside_question(scope, record) {
       place(scope, el("div", { class: "aside-question", dataset: { aside: record.data.id } }, el("span", { class: "aside-tag" }, "/btw"), el("span", null, record.data.text)), record.ts);
@@ -1282,5 +1334,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   const helper = (runId) => scopes.get(runId)?.panel?.helper ?? null;
   // The statuses of the run's delegated runs, in the order they started.
   const helperStatuses = () => [...scopes.values()].filter((scope) => scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
-  return { element, push, tick, settle, knows: (runId) => scopes.has(runId), helper, helperStatuses };
+  return {
+    element,
+    push,
+    tick,
+    settle,
+    knows: (runId) => scopes.has(runId),
+    helper,
+    helperStatuses,
+    draft: (record) => drafts.get(record.id)?.update(record),
+  };
 }

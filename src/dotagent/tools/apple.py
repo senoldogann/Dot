@@ -135,7 +135,7 @@ def build_apple_tool() -> RegisteredTool:
     async def run(args: AppleScriptArgs, ctx: ToolContext) -> ToolResult:
         language: ScriptLanguage = args.language
         timeout_s: float = ctx.runtime.config.desktop.osascript_timeout_s
-        result: str = await run_osascript(language, args.script, run_sandbox(ctx).commands, timeout_s)
+        result: str = await run_osascript(language, args.script, (), run_sandbox(ctx).commands, timeout_s)
         header: str = f"Script result · {len(result)} characters"
         body: str = result if result else "(the script returned nothing)"
         return mark_untrusted(

@@ -5251,6 +5251,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 310 | A chat whose helpers work writes on its page only what changed                         | in progress |         |
 | 311 | On an iPhone and an iPad a field has the size it has on the Mac                        | in progress |         |
 | 312 | A compaction is a quiet line in the chat, with the context's size before and after     | in progress |         |
+| 313 | A note a run saves, corrects or forgets is a quiet line in the chat                    | in progress |         |
+| 314 | A run drafts an email or a message; the owner sends, edits or discards it              | in progress |         |
+| 315 | An agent starts from one of eight templates and goes to another home as a file         | in progress |         |
+| 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13179,6 +13183,123 @@ two lines, the first with the sizes, wide and on a phone, light and dark, and no
 `tests/smoke/test_scaffold.py` (in the real loop each compaction says the sizes, smaller after and inside the budget);
 on the code before they fail with no line and `KeyError: 'tokens_before'`.
 
+### 313. A note a run saves, corrects or forgets is a quiet line in the chat
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The owner's word on 2026-10-16 asked for the features of xAI's Grok Bot in Dot, with two
+screenshots of its page (one of them a bot's chat with "Updated memory for Account Manager"), and for a plan; the
+owner chose the plan's group A the same day ("A: hafıza çizgisi, taslak kartı, şablonlar"), and this is its first
+item. A run's `memory_save`, `memory_update` and `memory_forget` were rows among its steps, folded away with their
+group; nothing in the conversation said that Dot's memory had changed. The plan:
+`reports/grok-bot-ve-codex-plani-2026-10-16.md`.
+
+**As built (2026-10-16).** `timeline.js`: a memory tool's result that changed the memory ("Saved: [mem_x] …",
+"Updated: …", "Forgot: …") leaves a line where it happened, a note with the memory's icon (`database`, as the tab
+has), what changed ("Saved to memory", "Updated memory", "Removed from memory") and the note's first words, cut to
+the line: for a save and a correction the call's words, for a removal the action's summary, which holds the words the
+note had. It ends the group of steps it falls in, as a note does. A note saved again ("Already saved: …") and a failed
+call leave none. The line names no agent: a note a run saves is Dot's, for every run (item 94). The line of a saved or
+corrected note is a link to `#/settings/memory?note=ID`; `views/memory.js` shows that note first, "The note from the
+conversation", with its correction and forget buttons, and, for a note forgotten since, that it is gone, which
+`GET /api/memories/{id}` (new, `routes_data.py`) tells with 404. `app.css` `.memory-line`. README: Memory, and the
+route in the API table.
+
+### 314. A run drafts an email or a message; the owner sends, edits or discards it
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The second item of the plan's group A, which the owner chose on 2026-10-16. xAI's Grok Bot writes
+an email as a draft its owner sends or discards, and sends several at once when told ("send the top 10"). Dot sent
+mail only through `apple_script`, a script the model wrote, which the policy judged and asked about; nothing let the
+owner read, change and send a message the run had written.
+
+**As built (2026-10-16).** A tool, `draft_message` (`tools/drafts.py`, group `drafts`): an email for Mail or an
+iMessage for Messages, with its recipients, copy, subject and words, checked before it is kept (an address, a phone
+number; a message has no cc and no subject). It is a `notes_write` action of `safe` risk: a draft changes nothing
+outside Dot; a key in it, in an address too, is refused (`exfiltration`). `drafts/service.py` keeps it in a new `drafts` table and
+tells the run's conversation (`draft_created`); the run goes on at once. `drafts.js`: its card, Send, Edit (the card
+becomes a form) and Discard (asked); a send the application refuses says why and is sent again; while two or more wait,
+each card has a tick and a bar after the last sends the ticked ones together (Grok's "send the top 10"). Send is the
+owner's press: `POST /api/drafts/{id}/send` with the words the card holds, `POST /api/drafts/{id}/discard`,
+`GET /api/drafts/{id}` (`routes_drafts.py`); the store takes a draft for sending once (`claim_draft`), so a second
+press, on another screen too, is a 409. The daemon hands it to `osascript` with a fixed script for Mail or Messages
+whose values are its arguments (`drafts/scripts.py`; `run_osascript` takes `argv` now), never words of the script,
+and come after `--`: `osascript` reads a first argument that starts with a dash as one of its options, so a body
+such as "- 2 tickets" failed and a subject that starts with `-e` would have added a line of script, run at the
+owner's Send (found by the code review; `tests/unit/test_osascript_argv.py` gives the real `osascript` such values
+with a script that only returns them, and fails without `--`).
+`draft_decided` tells the answer, on the run's events and on the lifecycle stream, since the run's own stream ends with
+the run: an open page repaints the card, and a card read from the history asks for the draft once. A draft the daemon
+was handing over when it stopped is "Not sent" at its next start (`RunManager.recover`), not sent again. The phone and
+the web UI's notification tell of a new draft ("Dot drafted an email", the recipients and the subject). Drafts go with
+their chat, or with their run's events when those age out. The tool's definition is kept short, 291 estimated tokens
+of every step that offers every tool (412 as first written); the small-window test of `test_scaffold.py` grew its
+window from 28,000 to 29,000 tokens for it, as for items 34, 193 and 196, since with the larger fixed part a
+compaction left room for one page only. README: Tools › Drafts, What leaves this Mac, the API table.
+Tests: `tests/smoke/test_drafts.py` (browser: six drafts of a scripted run; one changed and sent with a copy added,
+one discarded, one refused by the application and sent again, a message sent from a phone while the page on the Mac
+shows it sent, two ticked and sent together, the history as each ended, a second press refused; and a draft left
+sending by a stopped daemon), against a stand-in of `osascript` that writes down what it was given: no email or
+message left the Mac. On the page of before, the cards are not there. Not tested: the scripts against Mail and
+Messages themselves.
+
+### 315. An agent starts from one of eight templates and goes to another home as a file
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+
+**What was found.** The third item of the plan's group A, which the owner chose on 2026-10-16. xAI's Grok Bot offers
+ready-made agents for kinds of work (outbound sales, finding talent, paid media, expenses, product numbers, bug
+reports, account health, a chief of staff). Dot made an agent only from an empty editor, and an agent could not leave
+its home: nothing saved it as a file or made one from a file.
+
+**As built (2026-10-16).** `agent/templates.py`: eight templates (`AgentTemplate`), each a name, a role, instructions,
+the tools its agent may use, a face, what it needs of the Mac and a schedule to suggest. Every template's instructions
+say that whatever leaves the Mac for a person is a draft for the owner (`draft_message`, item 314). Sales Outbound,
+Talent Scout, Paid Media and Product Performance work on the web and in files and name their tools: the web, Dot's
+Chrome, files, memory, plans, pages and `draft_message`, none of which drives Mail, Messages or a terminal; Expense
+Manager, Bug Reproduction, Account Health and Chief of Staff read mail, calendars or code and have every tool. Account
+Health is a brown circle: an amber circle is Dot's own face. `GET /api/agent-templates` lists them; `POST
+/api/agent-templates/{id}/use` makes the agent (201), checked as any new agent. An agent goes out as an `AgentFile`
+(`GET /api/agents/{id}/export`: `format` `dot-agent`, `version` 1, the name, role, instructions, model, reasoning
+level, approvals, tools and look; not the id, memory, lessons, skills or chats); one whose name, role or instructions
+hold what `redact_known` would mask is refused with a 422 that does not repeat it: a secret Dot holds
+(`known_secrets`: every value of the home's `.env` and what the daemon read from the Keychain) or a key, a token or a
+password by its form (the code review found that `looks_like_key`, used first, let a Stripe or Google key, a GitHub
+fine-grained token and the home's own secrets through). Dot is not exported. `POST
+/api/agents/import` makes the same agent from the file; a tool the home lacks is refused with its name (`_checked`
+now names the tools). The Agents page: under the list, Start from a template, a card each (face, name, role, Needs,
+Schedule, Use template), one a row on a phone; Import in the head, with a file chooser; the agent's page has Export in
+its bar, which saves `<name>.dot-agent.json`. A suggested schedule is words on the card only. README: Agents. Tests:
+`tests/smoke/test_agent_templates.py` (browser, two homes one after the other: the eight cards at 1280 px light and
+390 px dark, each template made an agent with one click with the template's profile, every bounded template without
+a tool that drives Mail, Messages or a terminal, the bounds changed and every template's agent exported, one from its
+page, the file's fields exactly the profile, an agent holding a secret of the home's `.env` and one holding a key by
+its form refused, with no file saved from the page, then in a second home
+on a phone a file that is not JSON and a file naming a tool not there refused with the reason, and the exported file
+imported as the same agent, whose page opens with Edit, Export and Delete inside the phone's width). On the page of
+before, and with the routes of before alone, the test finds none of the eight cards; without the home's secrets, the
+agent holding one is exported.
+
+### 327. A run that hesitates over what it was asked says so at once
+
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed. Numbers 316 to 326 are
+the items of the plan `reports/grok-bot-ve-codex-plani-2026-10-16.md`, not yet taken into this roadmap.
+
+**What was found.** The owner's word of 2026-10-16: they asked a run on a Claude model to sit and pass a certification
+exam, and the run spent its steps on the exam's rules (a search, the exam guide, its terms of service twice) before it
+said anything; the owner had not asked for that. Dot's prompt sends no run to rules or terms: the model looked into
+them itself, since the work was to take an exam in the owner's place, which those terms forbid, and a note in memory
+recalled a like case. The owner was told that Dot is not changed to skip such a check or to sit an exam for them; what
+was wrong is that the run did not say at once what held it back. The owner chose that it should ("Hemen söylesin").
+
+**As built (2026-10-16).** `agent/prompt.py`, How to work: "If you hesitate to do what was asked, or a part of it, say
+so at once instead of looking into it on your own first: in a sentence, what holds you back and what you can do
+instead; then ask the user with ask_user, or go on with the part you can do." Every run gets it, a chat's too, under
+every approval mode. README: Autonomy. Test: `tests/unit/test_run_modes.py` (the rule in chat, task and research runs
+and under ask, auto and yolo); on the prompt of before it fails. Not tested: what a real model does with it, which only
+use shows, since the tests call no model.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -13919,3 +14040,11 @@ on the code before they fail with no line and `KeyError: 'tokens_before'`.
 - 2026-10-16 (Opus 5.5): item 309, for the owner's word that a chat on the phone stopped with `text.replace` and the Memory page said Not Found: the daemon, started at `427c51e`, served the pages from disk, which had moved on (a run's `title`, the route `/memories/learning`); it now serves the pages it read when it started. With the owner's go-ahead, items 305 to 309 were copied into main's working tree at 14:38 EEST (61 changed and 5 new files; the 768 files of the worktree equal in main) and the daemon was restarted once at 14:38:30. A run of a schedule, hung since 01:52 in an OpenCode bash call that never answered, was cut off by the restart; a schedule started the same task again in a new chat. Nothing committed; the record is the same report.
 - 2026-10-16 (Opus 5.5): items 310 and 311, for the owner's word that the page draws itself again and again while a chat runs and that a phone's placeholders and a dropdown's value look too big. Every event of a chat and its helpers wrote each helper's row, their group's head and the line over the composer again with the same text (1798 of 2074 changes on screen in ten seconds at 390 px); now only what changed is written (207 changes, none the same). On an iPhone and an iPad the viewport allows no scale past the first and a field has the size it has on the Mac (13, 14 and 15 px where it was 16); other touch screens keep the 16 px floor, and a narrow window on the Mac no longer has it. Built in the worktree `item-305-sessions-memory-teams`, not committed; the record is `reports/yeniden-cizim-ve-alan-boyutu-2026-10-16.md`.
 - 2026-10-16 (Opus 5.5): item 312, for the owner's word to show a compaction in the chat as Codex does: a quiet line where it happened with the context's size before and after ("Context compacted 401k → 17k tokens"), the `compacted` event carrying the two sizes. Built in the worktree `item-305-sessions-memory-teams`, not committed. The owner's same word and the one before it (xAI's Grok Bot, Codex's plugins and skills pages, the composer's plugins) are answered by a plan not yet taken into this roadmap: `reports/grok-bot-ve-codex-plani-2026-10-16.md`.
+- 2026-10-16 (Opus 5.5): items 310 to 312 copied into main's working tree, not committed, and the daemon restarted once when no run worked, as the owner chose: a first wait gave up at 18:16 with two runs at work, a second saw none at 18:42:04 and restarted it at 18:42:07 (pid 94260, from main's environment); the pages it serves are main's (`timeline.js`, `boot.js`, `views/run.js`, `app.css` and `run.css` alike byte for byte), the compaction line and the phone's field sizes among them.
+- 2026-10-16 (Opus 5.5): item 313, the first of the plan's group A, which the owner chose ("A: hafıza çizgisi, taslak kartı, şablonlar"): a note a run saves, corrects or forgets is a quiet line in the chat ("Saved to memory", "Updated memory", "Removed from memory" and the note's first words); the first two open Settings › Memory with the note on top, and a note forgotten since is said to be gone (`GET /api/memories/{id}`). Built in the worktree `item-305-sessions-memory-teams`, not committed; the record is `reports/a-grubu-2026-10-16.md`.
+- 2026-10-16 (Opus 5.5): item 314: a run drafts an email or a message with `draft_message`; its card in the chat sends it as it stands or changed, discards it, or sends several ticked ones together, and nothing goes out before Send. Tested against a stand-in of `osascript`: no email or message left the Mac, and the scripts were not run against Mail or Messages. The tool's definition was cut from 412 to 291 estimated tokens and the small-window test's window grew by 1,000 tokens. Built in the same worktree, not committed.
+- 2026-10-16 (Opus 5.5): item 315: the Agents page offers eight templates, each an agent in one click; an agent's page exports it as a file of its profile alone, refused while its words hold what looks like a key, and Import makes the same agent in another home, refusing a file whose tools that home lacks. Built in the same worktree, not committed.
+- 2026-10-16 (Opus 5.5): item 327, for the owner's word that a run asked to sit a certification exam looked into the exam's rules before saying anything: a run that hesitates over what it was asked now says at once what holds it back and what it can do instead, and asks or goes on with that part. Dot is not changed to skip such a check or to sit an exam in the owner's place. Built in the same worktree, not committed.
+- 2026-10-16 (Opus 5.5): items 313 to 315 reviewed against their done criteria by a read-only reviewer: 313 and 315 meet them; in 314 `osascript` read a first argument that starts with a dash as one of its options (a subject that starts with `-e` would have run as script at the owner's Send), so the values now come after `--`, and the export of 315 refuses every secret Dot holds and the forms the masking of secrets knows, not only the forms of `looks_like_key`. A draft's key check takes in its addresses too; a README sentence that called the first four templates of the list the bounded ones names the four.
+- 2026-10-16 (Opus 5.5): items 313 to 315 and 327 copied into main's working tree at 20:36, not committed, as the owner chose ("Aktar, boştayken yeniden başlat"): the 29 changed and 11 new files, each compared after the copy; before it, main's copies of the changed files were the worktree's starting point and its 740 other tracked files were the worktree's, so main holds what the gate tested. The daemon restarts once when no run works.
+- 2026-10-16 (Opus 5.5): the daemon restarted at 20:55:39 on the owner's word ("Kapat yeniden aç, session devam ediyor olması farketmez"), with two runs at work, after the wait for an idle moment was stopped: pid 56472, from main's environment, healthy at 20:55:46; the pages it serves are main's (`drafts.js`, `views/agents.js`, `timeline.js`, `views/memory.js`, `views/run.js`, `attention.js`, `icons.js` and `app.css` alike byte for byte), and both runs went on after it, each with events of its own since.

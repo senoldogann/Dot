@@ -249,6 +249,10 @@ export function mount(root, ctx) {
     ),
   );
   const restingCard = el("div", { class: "card list-box" });
+  // The note a line of a conversation leads to (item 313), named in the address after the tab's name: shown first, to be
+  // read, changed or forgotten there; a note forgotten since is said to be gone.
+  const askedId = new URLSearchParams(location.hash.split("?")[1] ?? "").get("note") ?? "";
+  const asked = el("div", { class: "stack tight", hidden: true, dataset: { asked: "" } });
   // The rows painted, by note id, with the hit each shows: a paint keeps the row of a note that did not change, so that
   // the page keeps its place and a note being corrected its form (item 204).
   let rowsShown = new Map();
@@ -337,6 +341,27 @@ export function mount(root, ctx) {
     await reload();
   }
 
+  async function loadAsked() {
+    if (askedId === "") {
+      return;
+    }
+    let shown;
+    try {
+      const record = await api.get(`/memories/${encodeURIComponent(askedId)}`);
+      shown = el("div", { class: "card list-box" }, memoryRow({ record, similarity: null, score: undefined }, rowActions));
+    } catch (error) {
+      if (error.status !== 404) {
+        throw error;
+      }
+      shown = el("div", { class: "note" }, icon("info"), el("span", null, "This note is no longer in memory: it was forgotten since."));
+    }
+    if (disposed) {
+      return;
+    }
+    asked.replaceChildren(el("div", { class: "section-label" }, "The note from the conversation"), shown);
+    asked.hidden = false;
+  }
+
   async function loadMore() {
     const mine = ticket;
     more.disabled = true;
@@ -379,12 +404,14 @@ export function mount(root, ctx) {
       }
     }
     await reload();
+    await loadAsked();
   }
 
   async function editNote(record, text, tagList) {
     await api.patch(`/memories/${record.id}`, { content: text, tags: tagList });
     toast("ok", "Note updated.");
     await reload();
+    await loadAsked();
   }
 
   const rowActions = {
@@ -503,6 +530,7 @@ export function mount(root, ctx) {
 
   root.append(
     paneHead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.", null),
+    asked,
     el(
       "section",
       { class: "card card-pad stack" },
@@ -531,6 +559,7 @@ export function mount(root, ctx) {
     el("div", { class: "cluster" }, more),
   );
   attempt(reload);
+  attempt(loadAsked);
   attempt(loadOwner);
   attempt(loadLearning);
   return () => {
