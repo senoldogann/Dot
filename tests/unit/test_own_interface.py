@@ -27,6 +27,9 @@ SERVER: ServerConfig = ServerConfig(host="127.0.0.1", port=8765, reach=["mac.tai
         "http://localhost.:8765/",
         "https://mac.tail1234.ts.net/#/settings",
         "https://mac.tail1234.ts.net./",
+        # The other dots of Unicode and full-width digits, which a browser reads as IDNA does (the code review's Y1).
+        "http://127\u30020\u30020\u30021:8765/",
+        "http://\uff11\uff12\uff17.0.0.1:8765/",
     ],
 )
 def test_dots_own_interface_is_never_opened(url: str) -> None:
@@ -70,3 +73,19 @@ def test_allowed_hosts_bind_the_pages_and_not_what_they_load() -> None:
 def test_what_a_page_made_itself_is_let_through_as_a_resource_only(url: str) -> None:
     assert request_verdict(url, False, (), (), SERVER).allowed
     assert not request_verdict(url, True, (), (), SERVER).allowed
+
+
+@pytest.mark.parametrize(
+    ("url", "reason"),
+    [
+        ("http://127.0.0.1:8765\\@example.com/", "backslash"),
+        ("https://example.com\\@169.254.169.254/", "backslash"),
+        ("http://2852039166/latest/meta-data/", "blocked list"),
+        ("http://169.254.169.254./", "blocked list"),
+    ],
+)
+def test_an_address_a_browser_reads_otherwise_is_refused_or_read_as_the_browser_does(url: str, reason: str) -> None:
+    """The code review's Y1: Python's parser read the host of ``http://127.0.0.1:8765\\@example.com/`` as example.com
+    where a browser goes to 127.0.0.1, and a blocked host written as one number passed the block list."""
+    verdict: UrlVerdict = check_browser_url(url, (), ("169.254.169.254",), SERVER)
+    assert not verdict.allowed and reason in verdict.reason, verdict

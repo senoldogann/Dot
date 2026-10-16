@@ -101,19 +101,42 @@ def host_matches(host: str, entries: Sequence[str]) -> bool:
     return any(lowered == entry or lowered.endswith(f".{entry}") for entry in (e.lower().lstrip(".") for e in entries))
 
 
+def browser_host(host: str) -> str | None:
+    """``host`` as a browser reads it, so the checks judge the host the request goes to (the code review's Y1): a name
+    with the other dots of Unicode (``127。0。0。1``) and its full-width letters read as IDNA does, lower case, and an
+    IPv4 address in any spelling (``2852039166``, ``0x7f.1``, ``127.1``) as its four numbers. None for a host IDNA
+    cannot read."""
+    try:
+        name: str = host.lower() if host.isascii() else host.encode("idna").decode("ascii").lower()
+    except UnicodeError:
+        return None
+    try:
+        # A browser reads an IPv4 address with one dot at its end as the address.
+        return str(ipaddress.IPv4Address(socket.inet_aton(name.removesuffix("."))))
+    except OSError:
+        return name
+
+
 def check_url(url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str]) -> UrlVerdict:
-    """Whether the browser may open ``url``: web pages only, never a blocked host, only allowed hosts when set."""
+    """Whether the browser may open ``url``: web pages only, never a blocked host, only allowed hosts when set. The host
+    is judged as a browser reads it (:func:`browser_host`), and an address a browser reads otherwise than this check is
+    refused: one with a backslash before its query, which a browser takes for ``/`` where Python's parser does not."""
     if url == "about:blank":
         return UrlVerdict(allowed=True, reason="blank page")
+    if "\\" in url.partition("#")[0].partition("?")[0]:
+        return UrlVerdict(allowed=False, reason="the URL holds a backslash, which a browser reads as /")
     try:
         parts = urlsplit(url)
-        host: str | None = parts.hostname
+        written: str | None = parts.hostname
     except ValueError as exc:
         return UrlVerdict(allowed=False, reason=f"malformed URL ({exc})")
     if parts.scheme not in _ALLOWED_SCHEMES:
         return UrlVerdict(allowed=False, reason=f"scheme {parts.scheme!r} is not allowed; only http and https open")
-    if not host:
+    if not written:
         return UrlVerdict(allowed=False, reason="the URL has no host")
+    host: str | None = browser_host(written)
+    if host is None:
+        return UrlVerdict(allowed=False, reason=f"host {written!r} cannot be read as a browser reads it")
     if host_matches(host, blocked_hosts):
         return UrlVerdict(allowed=False, reason=f"host {host!r} is on the blocked list (browser.blocked_hosts)")
     if allowed_hosts and not host_matches(host, allowed_hosts):
@@ -154,7 +177,7 @@ def forbidden_target(url: str, blocked_hosts: Sequence[str], server: ServerConfi
     except ValueError as exc:
         return UrlVerdict(allowed=False, reason=f"malformed URL ({exc})")
     # A browser reads one dot at the end of a host as none: 127.0.0.1. is 127.0.0.1, the address the token lives at.
-    host: str = (parts.hostname or "").removesuffix(".")
+    host: str = (browser_host(parts.hostname or "") or "").removesuffix(".")
     reached: int = port if port is not None else _DEFAULT_PORTS[parts.scheme]
     if host_matches(host, server.reach) or (reached == server.port and _is_loopback(host)):
         return UrlVerdict(allowed=False, reason="it is Dot's own interface, which a run never opens")

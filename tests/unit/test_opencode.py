@@ -9,6 +9,7 @@ import re
 from fnmatch import fnmatchcase
 from pathlib import Path
 
+import pytest
 from mcp.types import CallToolResult, ImageContent, TextContent
 from pydantic import JsonValue
 
@@ -25,7 +26,14 @@ from dotagent.opencode.events import (
     ToolSeen,
     read_event,
 )
-from dotagent.opencode.run import FREE_TIER_REFUSED, agent_failed, bridged_tools, meanwhile, permission_action
+from dotagent.opencode.run import (
+    FREE_TIER_REFUSED,
+    agent_failed,
+    bridged_tools,
+    local_target,
+    meanwhile,
+    permission_action,
+)
 from dotagent.opencode.server import PERMISSIONS, FreeModel, free_models, server_environment
 from dotagent.tools.base import ToolResult
 from dotagent.tools.browser import build_browser_tools
@@ -154,7 +162,11 @@ def test_a_permission_is_weighed_as_the_same_action_of_dots_own_tools(tmp_path: 
     fetch = permission_action(
         _asked("webfetch", ("https://example.com",), {"url": "https://example.com"}), workspace, (), ()
     )
-    assert (fetch.kind, fetch.target) == ("network", "https://example.com")
+    assert (fetch.kind, fetch.target, fetch.flags) == ("network", "https://example.com", ())
+    # A fetch whose address could carry data out is flagged as Dot's own web_fetch is (the code review's Y1).
+    long_url: str = "https://example.com/?q=" + "a" * 2100
+    carrying = permission_action(_asked("webfetch", (long_url,), {"url": long_url}), workspace, (), ())
+    assert carrying.flags == ("exfiltration",)
     unknown = permission_action(_asked("teleport", ("mars",), {}), workspace, (), ())
     assert (unknown.tool, unknown.risk) == ("opencode_teleport", "high")
 
@@ -269,3 +281,20 @@ def test_a_result_of_dots_tool_goes_back_with_its_pictures_and_its_failure() -> 
     text, image = result.content
     assert isinstance(text, TextContent) and text.text == "no such page"
     assert isinstance(image, ImageContent) and image.data == picture.data_b64 and image.mime_type == "image/png"
+
+
+@pytest.mark.parametrize(
+    ("url", "local"),
+    [
+        ("http://localhost:8765/", True),
+        ("http://127\u30020\u30020\u30021:8765/", True),
+        ("http://2852039166/latest/meta-data/", True),
+        ("http://10.0.0.1/admin", True),
+        ("http://[::ffff:192.168.1.1]/", True),
+        ("https://example.com/", False),
+        ("https://93.184.215.14/", False),
+    ],
+)
+def test_a_fetch_of_this_mac_or_its_network_is_seen_in_any_spelling(url: str, local: bool) -> None:
+    """The code review's Y1: OpenCode's webfetch reached addresses Dot's own web tools refuse."""
+    assert local_target(url) is local

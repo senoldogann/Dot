@@ -22,6 +22,7 @@ from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
@@ -36,7 +37,7 @@ from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOutcome, 
 from dotagent.agent.progress import can_ask_user, question_mode
 from dotagent.agent.scaffold import PROFILE_RUNS, Scaffold, scaffold_for
 from dotagent.agent.verify import RunFacts, new_facts
-from dotagent.browser.safety import UrlVerdict, check_url
+from dotagent.browser.safety import UrlVerdict, browser_host, check_url, host_matches, url_flags
 from dotagent.core.errors import (
     ApprovalRejected,
     HandedOff,
@@ -82,6 +83,7 @@ from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_action, write_action
 from dotagent.tools.groups import group_of
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
+from dotagent.web.addresses import is_public_address
 
 log = get_logger(__name__)
 
@@ -103,6 +105,10 @@ NO_SUBAGENT_NOTE: str = "Subagents are not available here: do this part of the w
 DOOM_LOOP_NOTE: str = (
     "You made the same call with the same input three times in a row; it will not give anything new. Try another way,"
     " or say what stops you."
+)
+# What the agent is told when its webfetch names this Mac or its network, which Dot's own web tools do not reach either.
+LOCAL_TARGET_NOTE: str = (
+    "That address is on this Mac or its local network, which the web tools do not open ([web] allow_private_hosts)."
 )
 _WEB_TOOLS: frozenset[str] = frozenset({"webfetch", "websearch", "codesearch"})
 # Dot's tools the agent gets besides its own (item 284): the groups of what OpenCode has no tool for, every connected
@@ -217,6 +223,22 @@ def _target_path(asked: PermissionAsked, workspace: Path) -> Path:
     return expand_path(raw.removesuffix("/*").removesuffix("*") or ".", workspace)
 
 
+def local_target(url: str) -> bool:
+    """Whether ``url`` names this Mac or its network by itself: ``localhost`` or a name under it, or an address that is
+    not public in any spelling a browser reads (the code review's Y1). A name that resolves to such an address is not
+    seen here, as OpenCode looks names up itself."""
+    host: str | None = browser_host(urlsplit(url).hostname or "")
+    if host is None:
+        return True
+    bare: str = host.removesuffix(".")
+    if host_matches(bare, ("localhost",)):
+        return True
+    try:
+        return not is_public_address(bare)
+    except ValueError:
+        return False
+
+
 def permission_action(
     asked: PermissionAsked, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]
 ) -> ActionInfo:
@@ -243,7 +265,9 @@ def permission_action(
             return read_action(tool, _target_path(asked, workspace), workspace, protected, dot_paths, "Read")
         case "webfetch":
             url: str = get_str(asked.metadata, "url") or _patterns(asked)
-            return ActionInfo(tool=tool, kind="network", risk="low", summary=f"Fetch {url}", target=url, flags=())
+            return ActionInfo(
+                tool=tool, kind="network", risk="low", summary=f"Fetch {url}", target=url, flags=url_flags(url)
+            )
         case "websearch" | "codesearch":
             query: str = get_str(asked.metadata, "query") or _patterns(asked)
             return ActionInfo(
@@ -546,6 +570,9 @@ class _Follow:
             )
             if not verdict.allowed:
                 await self.server.reply(event.request_id, self.directory, "reject", verdict.reason)
+                return
+            if not runtime.config.web.allow_private_hosts and local_target(action.target):
+                await self.server.reply(event.request_id, self.directory, "reject", LOCAL_TARGET_NOTE)
                 return
         asked_at: float = time.monotonic()
         try:
