@@ -5256,6 +5256,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 315 | An agent starts from one of eight templates and goes to another home as a file         | in progress |         |
 | 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | in progress |         |
 | 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
+| 328 | A phone that comes back to Dot finds it calm                                           | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13357,6 +13358,71 @@ instead; then ask the user with ask_user, or go on with the part you can do." Ev
 every approval mode. README: Autonomy. Test: `tests/unit/test_run_modes.py` (the rule in chat, task and research runs
 and under ask, auto and yolo); on the prompt of before it fails. Not tested: what a real model does with it, which only
 use shows, since the tests call no model.
+
+### 328. A phone that comes back to Dot finds it calm
+
+**Status: in progress.** On the branch `items-328-phone`, after `item-318-composer-picks`; not merged. The plan of this
+item and the ones after it (329 to 334) is `reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The owner's word of 2026-10-16, with five screenshots of T3 Code's phone app: "Web tarafinda mobilde
+hala istedigim sabiyeti ve netligi hisswdemiyorum. Uygulamayi arka plana atip baska seylere ugrasip tekrar dondugumde
+daha sakin gelen bir UI istiyorum" (on the phone they still miss the steadiness and clarity they want; coming back to
+the app from other things, they want it to come back calmer). Measured in WebKit as their iPhone 17 Pro Max, with a
+proxy acting out a phone's network: back from the background on a network that woke in 4 s, a chat's page said
+"Reconnecting" and put "Connection lost. Reconnecting…" into the conversation at about 2 s, which pushed it down 36 px
+until about 4 s, and then drew the page again (about 118 elements added and 92 taken out, every row of the sidebar made
+anew). Opened again after the page was let go, the page waited for the network for its own files, since the service
+worker asked the network first, then showed Dot's card with "Connecting to the daemon…", a blank page, a spinner's card
+for 3 s, and the chat at 5 s. The browser's bar was Dot's amber in both schemes, and the banner of a page that an
+update left out of date sat in the bar and pushed the page down.
+
+**As built (2026-10-16).**
+
+- **Back from the background.** `state.js` `quietBreak`: for 8 s after the page comes back into view or onto the
+  network (`RETURN_GRACE_MS`) a break of a stream says nothing; then the bar's pill shows, and on a chat's page a note
+  that floats under the bar in a slot of no height (`.connection-slot`), so nothing read moves. `dom.js` `keepChildren`
+  moves only the children that are out of place, and the sidebar keeps a chat's row while the chat and its family read
+  the same, so a read after the return draws again only what changed.
+- **Opened again.** `kept_pages.py` names the build of the pages in the `X-Dot-Pages` header of every file it serves,
+  a 304 too, and writes it in `index.html`'s `dot-pages` meta. `sw.js` keeps its copies by build (`dot-pages-<build>`,
+  one build at a time): a page whose network has not answered within 200 ms is answered from the copy, every file of it
+  from the same copy, and such a page writes nothing to the copies. `state.js` compares the page's own build with the
+  daemon's; at its start a page of another build loads again, once per build and tab, before it shows anything
+  (`main.js`). `waiting.js`: while Dot waits for the daemon, a curtain shows the chat it opens on, its bar and its
+  composer (the real `composerFrame`, with the draft) in the page's own classes. The run page keeps its title, the line
+  under it and its placeholder for it (`keepChatLook`) and says when it shows its chat (`dot:page-ready`); the curtain
+  lifts then, or after 3 s, and says that Dot connects only after 8 s. A wider window's curtain is the ground alone.
+  The reads at the start go together.
+- **The browser's bar.** `theme.js` `followBarColour` keeps one `theme-color` the colour of the page's ground as the
+  theme, the scheme and the system's scheme change; `index.html` names the default theme's two grounds for the first
+  paint.
+- **Out of date.** The banner floats under the bar, and the page loads again once it is out of sight.
+- **The row of Settings' tabs.** `views/settings.js` centres the open tab again once the fonts are in, unless the row
+  was moved meanwhile. A page opened on Settings has the curtain's bare ground, with no words that ask for the webfont
+  as "Connecting to the daemon…" did, so the font came in after the row was measured in the narrower fallback face,
+  and the open tab ended 17 px past the row's edge (found by `test_phone_pages`). With the font held back 0.8 s, the
+  file before this item left the open tab at 297–395 px in a row of 12–378 px, and this one puts it at 280–378 px.
+- README: the web UI's update banner and service worker, and the phone.
+- Tests: `tests/smoke/test_phone_return.py` (WebKit as the owner's iPhone, a proxy as its network). Back after 30 s
+  away on a network that wakes in 4 s: nothing at three heights of the screen moves, nothing says that the page
+  reconnects, the missed steps show within 2 s of the network, and the rows of the sidebar and of the helpers that did
+  not change are the same nodes; with the network away for 15 s the pill shows from 8 s and not before. Opened again
+  on a network that wakes in 4 s: at 500 ms the chat's title and composer stand where the page has them once it is
+  there (the composer to the pixel, the title within one), nothing says that Dot connects, no script or style sheet is
+  asked of the daemon (`/` and `/sw.js` are, against every file of the shell before), and the chat opens at its foot.
+  The bar is the ground's colour, light and dark. An outdated page's banner moves nothing, and the page loads again
+  once put away. `tests/unit/test_pages_build.py`: the build in the header, also of a 304, and in the meta.
+  Changed: `test_reconnect` gives the pill 10 s after a stop soon after a return, for the 8 s of quiet;
+  `test_pages_tell`'s pages run without the service worker, which once it controlled the page took the queue's read
+  past the test's route (6/6 with it blocked; why the pages before this item did not was not found).
+  `test_run_chrome` (two tests), `test_chat_choices` and `test_takeover` wait for the curtain to lift after a reload
+  on a chat: while it is up it carries the chat's bar, composer and layout in the page's classes, and a bare class
+  finds two. Found by holding the curtain its full 3 s over the 26 files that reload or open a second page: those four
+  failed, and pass with the wait, held and not. `test_phone_return`'s proxy closes on waking also a connection it
+  took while the network slept and that was still on its way to the daemon, which the page's timers make while it is
+  put away: through it the stream came back at once (3 of 7 runs failed before, 5 of 5 passed after).
+- Not verified on a device: the status bar of an app on the home screen with `theme-color`, and how often iOS lets the
+  page go.
 
 ## Log
 

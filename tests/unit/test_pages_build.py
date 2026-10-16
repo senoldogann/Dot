@@ -2,7 +2,8 @@
 status follows the bytes and the place of every file it serves, and nothing else (where the files are, when they were
 written, a hidden file), so that a page tells an update of Dot from a restart. The daemon serves the pages as it read
 them when it started, as Starlette's StaticFiles serves a folder: a file changed, added or removed on disk afterwards
-is served as it was, or not at all, until the daemon starts again."""
+is served as it was, or not at all, until the daemon starts again. Every file served names the build it is of, and Dot's
+own page carries it (item 328)."""
 
 from pathlib import Path
 
@@ -63,3 +64,18 @@ async def test_the_pages_served_are_those_read_when_the_daemon_started(tmp_path:
         folder: httpx.Response = await client.get("/help")
         assert (folder.status_code, folder.headers["location"]) == (307, "http://dot.test/help/")
         assert (await client.get("/help/")).text == "<p>Help</p>"
+
+
+async def test_every_page_names_its_build_and_dots_own_page_carries_it(tmp_path: Path) -> None:
+    """The phone's service worker keeps its copies by the build each file names, also when the file is answered 304, and
+    a page answered from a copy compares the build written in it with the daemon's."""
+    marked: str = '<head><meta name="dot-pages" content=""></head>'
+    pages: KeptPages = keep_pages(_pages(tmp_path / "pages", {**FILES, "index.html": marked}))
+    async with _client(pages) as client:
+        index: httpx.Response = await client.get("/")
+        assert index.text == f'<head><meta name="dot-pages" content="{pages.build}"></head>'
+        script: httpx.Response = await client.get("/js/main.js")
+        held: httpx.Response = await client.get("/js/main.js", headers={"if-none-match": script.headers["etag"]})
+        assert held.status_code == 304
+        assert [answer.headers["x-dot-pages"] for answer in (index, script, held)] == [pages.build] * 3
+        assert (await client.get("/", headers={"if-none-match": index.headers["etag"]})).status_code == 304

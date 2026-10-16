@@ -132,8 +132,13 @@ def _let_the_command_end() -> None:
 
 async def _signed_in(browser: Browser, address: str, width: int, scheme: Literal["light", "dark"]) -> Page:
     """A page of the daemon at ``address``, signed in, at ``width`` in ``scheme``."""
+    # Without the service worker: once it controls the page, the page's requests pass through it, past the routes a
+    # test puts in place.
     page: Page = await browser.new_page(
-        viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
+        viewport={"width": width, "height": 800},
+        color_scheme=scheme,
+        reduced_motion="reduce",
+        service_workers="block",
     )
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     await page.goto(ui_url(host, port, TOKEN))

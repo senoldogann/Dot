@@ -15,8 +15,9 @@ import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
 import { applyStoredDensity } from "./layout.js";
 import { readPref, writePref } from "./prefs.js";
-import { applyStoredScheme, applyStoredTheme } from "./theme.js";
+import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
 import { attempt, toast } from "./ui.js";
+import { openingCurtain, PAGE_READY_EVENT } from "./waiting.js";
 import * as activity from "./views/activity.js";
 import * as agents from "./views/agents.js";
 import * as team from "./views/team.js";
@@ -53,8 +54,17 @@ const ROUTES = [
   { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls },
 ];
 
+// The build a tab loaded again for as it opened, its pages being of another build than the daemon's (the service worker
+// answered from its copy while the network woke): once per build, so that a copy answered again does not load the page
+// again and again; the page then says that Dot was updated (item 328).
+const RELOADED_KEY = "dot.reloadedFor";
+// The longest the curtain stays over a chat's page that has not said it shows its chat (item 328).
+const CURTAIN_MAX_MS = 3000;
+
 const root = document.getElementById("app");
 let session = null;
+// The curtain over the page while Dot opens (waiting.js), lifted once the page shows what it was opened for.
+let curtain = null;
 
 function findRoute(path) {
   for (const route of ROUTES) {
@@ -99,6 +109,7 @@ function takeFragmentToken() {
 
 function screen(...children) {
   document.title = "Dot";
+  liftCurtain();
   root.replaceChildren(
     el(
       "div",
@@ -247,8 +258,56 @@ function renderFailed(error) {
   );
 }
 
-function renderConnecting() {
-  screen(el("div", { class: "row muted" }, el("div", { class: "spinner" }), el("span", null, "Connecting to the daemon…")));
+/** While Dot waits for the daemon as it opens: the curtain, with the chat's bar and composer when it opens on a chat
+ * this browser showed before. */
+function renderWaiting() {
+  liftCurtain();
+  const found = findRoute(currentPath());
+  curtain = openingCurtain(found !== null && found.route.layout === "run" ? found.params[0] : null);
+  root.replaceChildren(curtain.element);
+}
+
+function liftCurtain() {
+  if (curtain !== null) {
+    curtain.lift();
+    curtain = null;
+  }
+}
+
+/** Lift the curtain once the page of `layout` shows what it was opened for: a chat's page says so (PAGE_READY_EVENT),
+ * within CURTAIN_MAX_MS; every other page at once. */
+function liftWhenShown(layout) {
+  if (curtain === null) {
+    return;
+  }
+  if (layout !== "run") {
+    liftCurtain();
+    return;
+  }
+  const timer = setTimeout(liftCurtain, CURTAIN_MAX_MS);
+  document.addEventListener(
+    PAGE_READY_EVENT,
+    () => {
+      clearTimeout(timer);
+      liftCurtain();
+    },
+    { once: true },
+  );
+}
+
+/** Load the page again, once per build of the daemon's pages (`RELOADED_KEY`): whether it was loaded again. A tab whose
+ * storage is blocked cannot count, and is not. */
+function reloadForBuild(pages) {
+  try {
+    if (sessionStorage.getItem(RELOADED_KEY) === pages) {
+      return false;
+    }
+    sessionStorage.setItem(RELOADED_KEY, pages);
+  } catch {
+    return false;
+  }
+  location.reload();
+  return true;
 }
 
 // ------------------------------------------------------------------------------------------------ session
@@ -264,7 +323,12 @@ function beginSession() {
   const controller = new AbortController();
   const shell = buildShell({ homeRoute: DEFAULT_ROUTE });
   let disposeView = () => undefined;
-  root.replaceChildren(shell.element);
+  // The curtain stays over the page until the page shows what it was opened for.
+  if (curtain === null) {
+    root.replaceChildren(shell.element);
+  } else {
+    root.prepend(shell.element);
+  }
 
   function show() {
     disposeView();
@@ -307,6 +371,16 @@ function beginSession() {
     } catch (error) {
       console.error("page failed to open", error);
       shell.main.replaceChildren(el("div", { class: "card empty" }, icon("alert"), el("div", null, `This page failed to open: ${error.message}`)));
+      liftCurtain();
+    }
+    liftWhenShown(found.route.layout);
+  }
+
+  // A page that Dot's update left out of date loads again once it is out of sight, so that it is the new version when
+  // the owner comes back to it (item 328).
+  function reloadOutOfSight() {
+    if (document.visibilityState === "hidden" && getSnapshot().outdated) {
+      location.reload();
     }
   }
 
@@ -314,6 +388,7 @@ function beginSession() {
   shell.paint(getSnapshot());
   const stopAttention = watchAttention();
   window.addEventListener("hashchange", show);
+  document.addEventListener("visibilitychange", reloadOutOfSight);
   // Opened at no page, or as a home-screen app added before item 286: the last chat screen, in the address too.
   if (location.hash === "" || location.hash === "#" || (standalone() && location.hash === OLD_START)) {
     history.replaceState(null, "", `${location.pathname}${location.search}#${startPath()}`);
@@ -331,6 +406,8 @@ function beginSession() {
       stopPainting();
       stopAttention();
       window.removeEventListener("hashchange", show);
+      document.removeEventListener("visibilitychange", reloadOutOfSight);
+      liftCurtain();
       disposeView();
       disposeView = () => undefined;
       shell.dispose();
@@ -348,11 +425,9 @@ function handleAuthLost() {
 }
 
 async function connect() {
-  renderConnecting();
+  renderWaiting();
   try {
-    await refresh();
-    await loadLooks();
-    await loadOwnThemes();
+    await Promise.all([refresh(), loadLooks(), loadOwnThemes()]);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       clearToken();
@@ -368,6 +443,12 @@ async function connect() {
     return;
   }
   retryPause = RETRY_FIRST_MS;
+  // Pages of another build than the daemon's (a copy the service worker kept, answered while the network woke) load
+  // again before they show anything, so that they never meet an API they do not know (item 309).
+  const snapshot = getSnapshot();
+  if (snapshot.outdated && reloadForBuild(snapshot.status.pages)) {
+    return;
+  }
   beginSession();
 }
 
@@ -389,6 +470,7 @@ applyStoredTheme();
 applyStoredScheme();
 applyStoredDensity();
 applyStoredSettings();
+followBarColour();
 // The service worker keeps the shell files for when the Mac is out of reach and shows the pushes of the daemon; a
 // browser that has none (or an insecure address) simply has neither.
 if ("serviceWorker" in navigator) {

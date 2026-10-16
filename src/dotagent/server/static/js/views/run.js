@@ -3,7 +3,7 @@
 
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { agentList } from "../agentlist.js";
-import { api, follow, QUIET_BREAK_MS } from "../api.js";
+import { api, follow } from "../api.js";
 import { BUSY_SEND, valueOf } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { askForWords, readyToSend } from "../attachments.js";
@@ -13,7 +13,7 @@ import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
-import { composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../composer.js";
+import { CHAT_BOX_PX, composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
@@ -29,9 +29,10 @@ import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
-import { getSnapshot, onChange, onLifecycle, onStreamBack, readFailed } from "../state.js";
+import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, confirmDialog, toast } from "../ui.js";
+import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -42,7 +43,6 @@ const APPROVAL_WORDS = { auto: "Auto-approve", yolo: "YOLO" };
 const NEAR_BOTTOM_PX = 140;
 // "/btw" followed by the side question; the question may span lines.
 const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
-const MAX_INPUT_PX = 160;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
 // What cut a run off (agent/resume.py `CutOff`), as the line that offers to resume it says it (item 299).
@@ -291,8 +291,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       .catch((error) => console.warn("the parent run could not be loaded", error));
   }
   const connectionNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "Connection lost. Reconnecting…"));
-  // A break that mends at once, as when the page comes back into view, says nothing (item 286).
-  const showConnectionNote = showAfter(connectionNote, QUIET_BREAK_MS);
+  // A break that mends at once, as when the page comes back into view, says nothing (items 286 and 328); one that lasts
+  // is told over the conversation, never in its way: what is read does not move (item 328).
+  const showConnectionNote = showAfter(connectionNote, quietBreak);
+  const connectionSlot = el("div", { class: "connection-slot" }, connectionNote);
 
   // ------------------------------------------------------------------------------------ details and plan
   const details = createDetails(run, agent, detail.campaign, detail.keep_going);
@@ -473,7 +475,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     label: "Message",
     boxLabel: `Message for ${agent !== null ? agent.name : dotName()}`,
     placeholder: "",
-    maxPx: MAX_INPUT_PX,
+    maxPx: CHAT_BOX_PX,
     commands: [{ label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " }],
     send: () => submit(false),
     sendLabel: "Steer",
@@ -850,6 +852,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     // Short enough for one line of a phone's composer (item 111).
     const working = steers(false) ? "Steer this run, or /btw to ask on the side" : "Queue a message, or /btw to ask on the side";
     input.placeholder = active ? working : "Follow up, or /btw to ask on the side";
+    keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
     queue.setActive(active && !elsewhere);
@@ -1024,6 +1027,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   /** A phone's bar under the chat's title: the agent, or Helper on a helper's page, and the model the run uses now. */
   function paintHeading() {
     headingSub.textContent = `${parentId === null ? actorName : "Helper"} · ${modelName(model)}`;
+    keepLook();
+  }
+
+  // What a chat's own page shows in its bar and its composer, for the curtain of a phone that opens Dot on it again (item
+  // 328); a helper's page has no composer.
+  function keepLook() {
+    if (ownsMessages) {
+      keepChatLook(runId, headingTitle.textContent, headingSub.textContent, input.placeholder);
+    }
   }
 
   // The feet of the run's own messages (their time, a copy, a send again) wait for its answer (item 205).
@@ -1313,7 +1325,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     "div",
     { class: "run-thread" },
     el("h1", { class: "visually-hidden" }, run.goal),
-    connectionNote,
+    connectionSlot,
     problem,
     earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null)),
     goalMessage,
@@ -1442,6 +1454,7 @@ export function mount(root, ctx) {
       }
       const problem = error.status === 404 ? emptyPanel("Run not found", `No run has the id ${runId}.`) : errorPanel(error, () => attempt(open));
       root.replaceChildren(backLink(), problem);
+      shown();
       return;
     }
     let history = { earlier: [], later: [] };
@@ -1456,6 +1469,13 @@ export function mount(root, ctx) {
       return;
     }
     stopRun = showRun({ root, ctx, signal: controller.signal, detail, history, historyProblem, reload: () => attempt(open) });
+    shown();
+  }
+
+  // The page shows its chat, scrolled where it opens, or why it cannot (item 328): sent once the frame that scrolls it
+  // has run.
+  function shown() {
+    requestAnimationFrame(() => root.dispatchEvent(new CustomEvent(PAGE_READY_EVENT, { bubbles: true })));
   }
 
   attempt(open);

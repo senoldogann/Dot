@@ -130,6 +130,8 @@ async def test_the_head_and_the_panel_stay_in_sight_while_a_long_run_scrolls(
                 )
                 await page.goto(f"{address}/#/runs/{run.id}")
                 await page.reload()
+                # The curtain of a page opened on a chat (item 328) lifts once the chat shows.
+                await expect(page.locator(".waiting")).to_have_count(0)
                 await expect(page.locator(".stage-title")).to_be_visible()
                 await expect(page.locator("details.steps").first).to_be_visible()
                 await expect(page.locator("details.steps .steps-body").first).to_be_visible()
@@ -179,6 +181,8 @@ async def test_the_box_stands_at_the_windows_foot_under_a_short_conversation(
                 )
                 await page.goto(f"{address}/#/runs/{run.id}")
                 await page.reload()
+                # The curtain of a page opened on a chat (item 328) lifts once the chat shows.
+                await expect(page.locator(".waiting")).to_have_count(0)
                 await expect(page.locator(".dock .composer")).to_be_visible()
                 await expect(page.locator("main.page")).to_have_css("opacity", "1")
                 assert await page.evaluate("document.documentElement.scrollHeight") <= 800, (width, inspector)

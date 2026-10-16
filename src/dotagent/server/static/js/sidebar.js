@@ -9,7 +9,7 @@
 // delegated runs under it.
 
 import { ApiError, api, request } from "./api.js";
-import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, setText, workingFor } from "./dom.js";
+import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
 import { actorFace, lookOf } from "./actors.js";
 import { dotName, faceState } from "./face.js";
@@ -310,6 +310,11 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // same look in the same state: the list is painted again whenever a run starts or ends, and drawing two hundred
   // creatures anew took 180 ms with a phone's slower processor.
   const faces = new Map();
+  // The chats' rows and the sections of their days, kept from one painting of the list to the next while what they show
+  // is the same (item 328): the list read again as the page comes back leaves them standing, so their creatures go on
+  // breathing where they were. A row whose name is typed in it is made anew after.
+  const keptRows = new Map();
+  const keptGroups = new Map();
   const list = el("div", { class: "side-runs" });
   const ageTicker = setInterval(() => {
     for (const node of list.querySelectorAll(".side-age")) {
@@ -558,24 +563,52 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       list.replaceChildren(...emptyNote(), ...olderNote());
       return;
     }
-    list.replaceChildren(
-      ...groupChats(shown, new Date()).map((group) =>
-        el(
-          "section",
-          { class: "side-group" },
-          el("h3", { class: "side-label" }, group.label),
-          group.chats.map((chat) => {
+    const groups = groupChats(shown, new Date());
+    keepChildren(list, [
+      ...groups.map((group) => {
+        const section = keptGroups.get(group.label) ?? el("section", { class: "side-group" }, el("h3", { class: "side-label" }, group.label));
+        keptGroups.set(group.label, section);
+        keepChildren(section, [
+          section.firstChild,
+          ...group.chats.map((chat) => {
             if (selecting) {
               const pick = chatPick(chat, selected.has(chat.id), toggle, faceOf(chat));
               rowNodes.set(chat.id, pick);
               return pick;
             }
-            return chatEntry(chat, work.pinned.get(chat.id) ?? null);
+            return keptEntry(chat);
           }),
-        ),
-      ),
+        ]);
+        return section;
+      }),
       ...olderNote(),
-    );
+    ]);
+    const labels = new Set(groups.map((group) => group.label));
+    for (const label of keptGroups.keys()) {
+      if (!labels.has(label)) {
+        keptGroups.delete(label);
+      }
+    }
+    const listed = new Set(shown.map((chat) => chat.id));
+    for (const id of keptRows.keys()) {
+      if (!listed.has(id)) {
+        keptRows.delete(id);
+      }
+    }
+  }
+
+  // A chat's entry in the list as it was painted last, while what it shows is the same; else a new one (item 328).
+  function keptEntry(chat) {
+    const family = work.pinned.get(chat.id) ?? null;
+    const key = JSON.stringify([chat, family]);
+    const kept = keptRows.get(chat.id);
+    if (kept !== undefined && kept.key === key) {
+      rowNodes.set(chat.id, kept.link);
+      return kept.node;
+    }
+    const node = chatEntry(chat, family);
+    keptRows.set(chat.id, { key, node, link: rowNodes.get(chat.id) });
+    return node;
   }
 
   // The sections above the chats. Working's entries are all painted, the open chat's among them, and `markCurrent`
@@ -769,6 +802,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     });
     field.addEventListener("blur", () => end(true));
     renaming = chat.id;
+    keptRows.delete(chat.id);
     link.parentElement.replaceChildren(field);
     field.focus();
     field.select();

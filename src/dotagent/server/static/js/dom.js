@@ -81,9 +81,26 @@ export function setText(node, text) {
   }
 }
 
-/** A function that runs `fn` once `ms` after the last call. */
+/**
+ * Make `nodes` the children of `parent`, in their order, moving only what is out of place (item 328). A child that
+ * stays where it stood is not touched, so its animations go on and an open menu of it stays open; `replaceChildren`
+ * takes every child out and puts it back.
+ */
+export function keepChildren(parent, nodes) {
+  nodes.forEach((node, index) => {
+    const there = parent.childNodes[index] ?? null;
+    if (there !== node) {
+      parent.insertBefore(node, there);
+    }
+  });
+  while (parent.childNodes.length > nodes.length) {
+    parent.lastChild.remove();
+  }
+}
+
 /** Show `node` once what it tells has held for `ms`, and hide it as soon as it no longer holds: returns `set(shown)`.
- * A break of the connection that mends within `ms` (a phone back from the background) shows nothing (item 286). */
+ * `ms` is a number, or a function that tells it when the wait starts. A break of the connection that mends within it
+ * (a phone back from the background) shows nothing (items 286 and 328). */
 export function showAfter(node, ms) {
   let timer = null;
   return (shown) => {
@@ -92,14 +109,18 @@ export function showAfter(node, ms) {
       timer = null;
       node.hidden = true;
     } else if (node.hidden && timer === null) {
-      timer = setTimeout(() => {
-        timer = null;
-        node.hidden = false;
-      }, ms);
+      timer = setTimeout(
+        () => {
+          timer = null;
+          node.hidden = false;
+        },
+        typeof ms === "function" ? ms() : ms,
+      );
     }
   };
 }
 
+/** A function that runs `fn` once `ms` after the last call. */
 export function debounce(fn, ms) {
   let timer = null;
   return (...args) => {

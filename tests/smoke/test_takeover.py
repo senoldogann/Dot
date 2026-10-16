@@ -409,6 +409,8 @@ async def _the_sizes_set_the_panel(page: Page, tmp_path: Path) -> None:
     dragged: float = await _width(page, ".inspector")
     assert abs(dragged - (before - 200)) <= 2, (before, dragged)
     await page.reload()
+    # The curtain of a page opened on a chat (item 328) lifts once the chat shows.
+    await expect(page.locator(".waiting")).to_have_count(0)
     await expect(layout).to_have_attribute("data-stage", "custom")
     assert abs(await _width(page, ".inspector") - dragged) <= 2
     # The left arrow widens the panel a step; a double click gives it back its own width.

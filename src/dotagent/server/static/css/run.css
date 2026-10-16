@@ -120,6 +120,26 @@
   margin-top: 16px;
 }
 
+/* The note that the run's stream is lost floats under the bar, over the conversation: a slot of no height that stays
+   in sight while the conversation scrolls, so what is read never moves when it comes or goes (item 328). */
+.connection-slot {
+  position: sticky;
+  top: calc(var(--stagebar-h) + var(--space-2));
+  z-index: 15;
+  display: flex;
+  justify-content: center;
+  height: 0;
+}
+
+.connection-slot > .note {
+  height: max-content;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-float);
+}
+
 @media (max-width: 720px) {
   .run-main {
     min-height: calc(100vh - var(--stagebar-h) - 16px);

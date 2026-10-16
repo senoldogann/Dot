@@ -1374,7 +1374,9 @@ Between tries the page waits half a second, then longer, up to 8 seconds, and fr
 made; a page that comes back into view, or a browser back on the network, tries at once. The rules page reads its rules
 again when one is added, switched or deleted on another page. A page loaded before Dot was updated says so in a banner,
 with **Load again**: the daemon's status tells what the pages it serves are (`pages`, a digest of their files), and the
-page compares it with what it was loaded from. The daemon serves the pages as it read them when it started, hidden files
+page compares it with the build the daemon wrote in the page as it served it (its `dot-pages` meta, item 328). The
+banner floats under the bar, so nothing on the page moves, and a page left out of date loads again by itself once it is
+out of sight. The daemon serves the pages as it read them when it started, hidden files
 left out (item 309): files changed on disk while it runs (a merge, a batch of work ported in) wait for its next start,
 so that a page never asks the daemon's API for a field or a route only a newer daemon has. A run delegated by another
 run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps so far and its
@@ -1915,6 +1917,17 @@ the dialogs stand on what is seen too: iOS 26 can leave the page panned once the
 under the composer and the tops of the drawers under the status bar (item 293). On a touch screen a page leaves the
 caret for a tap as it opens, so the keyboard comes only when you ask for it.
 
+A phone that comes back to Dot finds it as it left it (item 328). Back from the background, the page makes its
+connections again without a word for 8 seconds, as long as a phone's network (a VPN such as Tailscale) takes to wake;
+only a connection still not there then shows the bar's pill and, on a chat's page, a note that floats under the bar
+over the conversation, so that nothing read moves as it comes and goes. What changed meanwhile is read again, and only
+what changed is drawn again: the sidebar and the helpers keep the rows that did not. Opened again after iOS let it go,
+Dot does not wait for the network either: the service worker answers from its copy (below), and while the page waits
+for the daemon a curtain shows the chat it opens on, its bar and its composer with the draft, where the chat's page has
+them. The curtain lifts once the chat is there, and says that Dot connects only after those 8 seconds. The browser's bar
+(the status bar of an app on the home screen, Safari's tab bar) takes the colour of the page's ground, in the theme and
+the scheme on screen.
+
 At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
 the thumb. A chat's bar has a round way back to that list, the chat's title over the agent and the model, and its tools
@@ -1939,7 +1952,10 @@ gives a code, `GET /api/phone` the addresses. Neither the code nor the token is 
 Mac is on and awake.
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
-under `/api`. A page loaded from them while the daemon is out of reach says so and tries again by itself (item 200):
+under `/api`. It keeps them by the build of the pages they are of, which the daemon names in the `X-Dot-Pages` header of
+every file, one build at a time (item 328): a page opened while the network has not answered within 200 ms is answered
+from that copy, every file of it from the same copy, and a page of another build than the daemon's loads again before it
+shows anything, so that it never meets an API it does not know. A page loaded from them while the daemon is out of reach says so and tries again by itself (item 200):
 after 2 seconds, then twice as long each time up to 30, and at once when the browser is back on the network or the page
 back in view, until the daemon answers. Without Tailscale, the same works on the Mac itself (`localhost` counts as
 secure) and on nothing else.

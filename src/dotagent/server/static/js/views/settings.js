@@ -51,10 +51,20 @@ export function mount(root, ctx) {
   const nav = el("nav", { class: "settings-nav", "aria-label": "Settings" }, links);
   root.append(el("div", { class: "settings-frame" }, el("div", { class: "settings" }, el("div", { class: "settings-side" }, nav), pane)));
   // In the row that scrolls sideways (a narrow window, item 272) the open tab is brought to its middle, and the row's
-  // edge fades while more tabs lie to the right.
-  const open = links[TABS.indexOf(tab)].getBoundingClientRect();
-  const row = nav.getBoundingClientRect();
-  nav.scrollLeft = open.left - row.left - (row.width - open.width) / 2;
+  // edge fades while more tabs lie to the right. A row drawn before the webfont came in was measured in the fallback
+  // face, which is narrower, so it is centred again once the fonts are in, unless it was moved meanwhile (item 328).
+  const centre = () => {
+    const open = links[TABS.indexOf(tab)].getBoundingClientRect();
+    const row = nav.getBoundingClientRect();
+    nav.scrollLeft += open.left - row.left - (row.width - open.width) / 2;
+  };
+  centre();
+  const centred = nav.scrollLeft;
+  document.fonts.ready.then(() => {
+    if (nav.isConnected && nav.scrollLeft === centred) {
+      centre();
+    }
+  });
   const stopCue = scrollCue(nav);
   const dispose = tab.mount(pane, ctx);
   // The bar names the page; the open tab names the pane.

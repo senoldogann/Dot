@@ -40,6 +40,9 @@ _STALL_WAIT_MS: float = 60_000
 _LONGEST_PAUSE_AFTER_S: float = 8.0
 # Far shorter than what is left of the pause a page is in when it is told to try at once.
 _AT_ONCE_MS: float = 3_000
+# Back in view, a page keeps a lost daemon to itself for 8 s (RETURN_GRACE_MS in static/js/state.js, item 328): a stop
+# soon after the return is told within this long.
+_TOLD_AFTER_RETURN_MS: float = 10_000
 _READ_CHUNK: int = 65_536
 # Narrower than this, the side menu is a drawer that its button opens.
 _DRAWER_BELOW: int = 860
@@ -239,10 +242,7 @@ async def _keep_shell_copy(page: Page) -> None:
     that opened Dot before has one."""
     await page.wait_for_function("() => navigator.serviceWorker.controller !== null")
     await page.reload()
-    await page.wait_for_function(
-        "async () => (await (await caches.open('dot-shell-v1')).keys()).some((request) =>"
-        " request.url.endsWith('/js/main.js'))"
-    )
+    await page.wait_for_function("async () => (await caches.match('/js/main.js')) !== undefined")
 
 
 async def _open_side_menu(page: Page, width: int) -> None:
@@ -334,7 +334,7 @@ async def test_a_page_back_in_view_or_back_on_the_network_tries_at_once(runtime:
             # Loaded while the daemon is down, the page waits longer each time it finds it down; back on the network,
             # it tries at once.
             await daemon.stop()
-            await expect(page.locator(".live-dot.reconnecting")).to_be_visible()
+            await expect(page.locator(".live-dot.reconnecting")).to_be_visible(timeout=_TOLD_AFTER_RETURN_MS)
             await page.reload()
             await expect(page.get_by_text(re.compile(r"Trying again in [78] s\."))).to_be_visible(timeout=_BACK_WAIT_MS)
             await _chat(runtime, "Pack the bags.")

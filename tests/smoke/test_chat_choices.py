@@ -308,6 +308,8 @@ async def test_a_chat_keeps_what_its_composer_chose_after_a_reload_and_in_anothe
 
             # A reload shows them, and so does another browser.
             await page.reload()
+            # The curtain of a page opened on a chat (item 328) lifts once the chat shows.
+            await expect(page.locator(".waiting")).to_have_count(0)
             await _shows(page, "Research", "thinker", "High", "Auto")
             await page.screenshot(path=str(tmp_path / "chat-choices-1280-light.png"), animations="disabled")
             other, other_errors = await _page(browser, address, 390, "dark")
