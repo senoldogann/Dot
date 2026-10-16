@@ -299,8 +299,9 @@ lesson_rest_days = 60
 # offered to later runs like a skill and read as advice. A later run of the same kind (the writer is shown the kinds
 # kept; matched by name or meaning) updates its owner's skill instead of writing another; a run that read content
 # other people wrote is distilled from its own steps alone, and its skill names no address or account the run did not
-# use. A skill read by two runs in a row that then failed is retired (moved under .retired) and no longer offered; Settings › Skills lists them with Drop. dotx stats counts the skills written, retired and read, and
-# compares the runs that read one on a host with the runs on that host that did not. false distils nothing.
+# use. A skill read by two runs in a row that then failed is retired (moved under .retired) and no longer offered;
+# Settings › Skills lists them with Drop. dotx stats counts the skills written, retired and read, and compares the runs
+# that read one on a host with the runs on that host that did not. false distils nothing.
 playbooks = true
 skill_min_steps = 4
 # Before write_file or edit_file changes a file, the run notes the change in its journal, and its first change to a file

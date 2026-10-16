@@ -5222,7 +5222,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | done        | 427c51e |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
-| 284 | OpenCode's agent uses Dot's own tools over MCP                                        | planned     |         |
+| 284 | OpenCode's agent uses Dot's own tools over MCP                                        | in progress |         |
 | 285 | A helper that starts late joins its siblings, and stopped ones stand still            | done        | 8aa45dd |
 | 286 | The phone comes back quietly, on the chat it was in                                   | done        | 8aa45dd |
 | 287 | Connect apps' sections give their lines room                                          | done        | 8aa45dd |
@@ -5238,7 +5238,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 297 | A line over a phone's composer: how long the run has worked, and its helpers          | done        | b4e554f |
 | 298 | Dot's computer opens over the whole phone, with its address and Take over             | done        | b4e554f |
 | 299 | A turn that goes on after Dot restarted says so, with a bolt                          | done        | b4e554f |
-| 300 | The code review's first fixes: requests, typing, a skill's YAML                       | in progress |         |
+| 300 | The code review's first fixes: requests, typing, a skill's YAML                       | done        | 3202bb6 |
+| 301 | Runs at work side by side keep to their own tabs, apps and files                      | in progress |         |
+| 302 | Lessons are saved on their own, after a second look                                   | in progress |         |
+| 303 | Memory, lessons and skills: the audit's fixes                                         | in progress |         |
+| 304 | The code review's second fixes                                                        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12482,7 +12486,7 @@ that, which left a stopped run's question pending on its page.
 
 ### 284. OpenCode's agent uses Dot's own tools over MCP
 
-**Status: planned.**
+**Status: in progress.** Built on `item-300-tools-and-learning` with part 52.
 
 **What.** OpenCode's agent gets Dot's own tools besides its own: Dot serves the tools a run may use (the browser, the
 Mac's desktop, memory, notes, schedules, …) as an MCP server of its own for that run, added to the run's OpenCode
@@ -12493,6 +12497,25 @@ as a call of Dot's own loop does.
 
 **Tests.** A run on a free model that opens a page in Dot's browser and reads it, live where OpenCode is installed;
 Zen's free tier must still answer with the MCP tools added (measured first).
+
+**As built (2026-10-16, part 52).** The refusal in the owner's picture (a free model that said it had no browser and
+could not leave its folder) came from an agent that had none of Dot's tools, only OpenCode's own; Zen's free tier
+refused nothing. `opencode/bridge.py` serves Dot's tools in the daemon as an MCP server on `127.0.0.1` (streamable
+HTTP, a free port), one door per chat (`dot_` and eight hex digits of the chat, a secret in each request's header); the
+OpenCode server Dot starts has the doors as remote MCP servers of its own, and a chat's session keeps to its own door by
+OpenCode's permission rules (`session_rules`), which hide the other doors' tools and instructions from its model
+(measured with OpenCode 1.19.1 and a free model: it listed and called its own door's tool only, and the free tier
+answered as without the server). The tools given (`opencode/run.py`, `bridged_tools`): the groups browser, desktop,
+schedule, memory_admin and pages, the connected apps, and `memory_save`, `memory_search`, `notify`, `ask_user` and
+`skill`, of those the run's mode and agent allow. A call runs as a call of Dot's own loop (`execute_calls`: the run's
+gate, the tool's time limit, the timeline under the tool's own name), and one still at work tells OpenCode so every
+20 s, which starts OpenCode's wait of 120 s again, so an approval the owner takes long over does not time it out. The
+door's instructions tell the agent it works inside Dot with these tools, and that the tabs and apps of other chats are
+theirs. README: the OpenCode provider. Tests: `tests/smoke/test_opencode_bridge.py` (real HTTP with the MCP client: a
+door's requests run its tools and nothing else reaches it; a call that outlasts a ping says it is still at work),
+`tests/unit/test_opencode.py` (the tools given, an agent bounded to some, a door per chat, a result's pictures and its
+failure), and live `tests/smoke/test_opencode_live.py::test_a_run_on_a_free_model_reads_a_page_in_dots_browser` (a
+free model opens a page of a local server in Dot's browser and answers with what it read).
 
 ### How to start part 50 (the handoff prompt)
 
@@ -12800,7 +12823,7 @@ uncommitted; item 300 ships them.
 
 ### 300. The code review's first fixes: requests, typing, a skill's YAML
 
-**Status: in progress.** Built on `item-300-review-first-fixes`.
+**Status: done.** Merged as `3202bb6` (PR #325; no Linear issue, the Linear connector was signed out).
 
 **What was found.** K2: a page in Dot's own Chrome could reach Dot's interface: a redirect from an allowed address to a
 refused one was never checked (only the first request was), a popup's first request escaped the page's route, and the
@@ -12823,6 +12846,142 @@ and the terminal. Tests: `tests/smoke/test_browser_boundary.py` (new: a redirect
 Dot's Chrome), `tests/smoke/test_terminal_input.py` (new: a program that does not read, 64 KB, then the error),
 `tests/unit/test_server_guard.py`, `tests/unit/test_own_interface.py`, `tests/unit/test_playbooks.py` (a `\d` in a
 description reads back; an unreadable SKILL.md is left out).
+
+The owner's other words are items 284 (part 50), 301, 302 and 303; the rest of the code review is item 304. They are
+built on `item-300-tools-and-learning`, one PR with 284. Items 268, 271, 280 and 281 come after it, and item 76's
+reading is due on or after 2026-10-18.
+
+### 301. Runs at work side by side keep to their own tabs, apps and files
+
+**Status: in progress.** Built on `item-300-tools-and-learning`.
+
+**What was found.** Each chat had tabs of its own that no tool of another chat's run reaches (`browser/session.py`),
+but a run knew nothing of the others at work: two runs could type in one application at once, and a run could write
+over a file another had just changed. The browser's idle reaper released a chat's tabs after `[browser] tab_idle_s`
+also while its run was at work (waiting for the owner's answer or for a long command), which then found its pages gone.
+
+**As built (2026-10-16).** `agent/peers.py` keeps the footprint of each run at work in the daemon (`Peers`, begun and
+ended by the run manager): the sites of its pages, the applications it drives and the files it read and changed, from
+each of its calls that went through (`agent/executor.py`). Before a call, `Peers.conflict` refuses, with why and
+without running or asking anything, typing or clicking in an application another run acted in within 120 s
+(`APP_HOLD_S`), and changing a file another run changed after this one last read it (or that it never read); the runs
+of one chat are not each other's peers. Each run's loop gives its model a note (`peers_note`) naming the other runs,
+their goals, sites, applications and changed files, whenever that changes, and the system prompt says to leave those
+to them. The idle reaper keeps the tabs of the chats with a run at work (`threads_to_release`, `Peers.threads`). What a
+shell command changes leaves no footprint (it names no file the way the file tools do), and `dotx run` in a terminal
+knows only its own runs. README: How a run works. Tests: `tests/unit/test_peers.py` (a changed file is written only
+after it is read again; an app another run drives is its own for a while; one chat's runs are not peers; the note; the
+tabs of a chat at work outlive their idle time), `tests/smoke/test_peers.py` (two scripted runs: the second leaves the
+file the first changed until it has read it).
+
+### 302. Lessons are saved on their own, after a second look
+
+**Status: in progress.** Built on `item-300-tools-and-learning`.
+
+**What.** The owner asked that what a session learned be saved at its end without asking, carefully and selectively.
+`[agent] lessons` was `propose` by default (each lesson waited on the run's page), and `auto` saved every lesson the
+filter kept, save after a run that read content others can write, whose lessons it only proposed.
+
+**As built (2026-10-16).** `lessons = "auto"` is the default (`defaults.toml`; the owner's `config.toml` does not set
+it). Each lesson the filter keeps gets a second look first (`agent/review.py`, `lesson_vetter_for`): one more call of
+the review model, in a session of its own, that is shown the goal and the lessons and nothing the run read. It keeps
+only know-how about how a tool, a command, a site, an application or a file format behaves, and leaves out what tells
+the agent to send, post, buy, sign in, contact someone, change a setting or go to an address, to trust some content or
+to skip a check, or what holds private data. After a run that read content others can write, a lesson with a link or
+an account name in it is left out before it is asked (`outside_problem`). The kept lessons are saved as notes tagged
+`lesson`; "Lessons from this run" on the run's page says "Saved on its own" with Undo, which forgets the note
+(`POST /api/runs/{id}/lessons/{index}/undo`), and a lesson left out says why, with Save anyway; a lesson is what its
+last decision made it. README: Lessons. Tests: `tests/smoke/test_lessons_card.py` (new, browser: the card on a wide
+dark page and on a light phone), `tests/smoke/test_lessons.py`, `tests/unit/test_lessons.py`,
+`tests/unit/test_agent_learning.py`.
+
+### 303. Memory, lessons and skills: the audit's fixes
+
+**Status: in progress.** Built on `item-300-tools-and-learning`.
+
+**What was found.** An audit of memory, lessons and learned skills for the owner's words ranked eleven defects: (1) a
+run that read pages could become a skill, with no check of where its steps came from (the code review's Y7); (2) one
+unreadable SKILL.md stopped every run (with the review's Y6, item 300); (3) the reflection read whether a run read
+content others can write from its newest 60 results only; (4) the reflection folded away and retired lessons the owner
+had saved; (5) a resting lesson saved again stayed resting; (6) a run updated another owner's skill of the same name;
+(7) the same text found another agent's note; (8) a run's `memory_update` makes the owner's note the run's, so that it
+can rest; (9) a skill retired on two failures in its life; (10) the reflection asked again about a run whose lessons
+were drawn and none kept; (11) a crash could leave a half-written skill folder. And the owner's 35 learned skills held
+12 of one kind of work: the kinds the model named the same work by were 0.66 to 0.83 apart by meaning (bge-m3), under
+the bar of 0.85, so every run wrote a new skill. The code review adds Y3 and Y4 (secrets the masking missed), Y19 (the
+merge of notes on the event loop) and learning that stopped unseen (its O25 with O3).
+
+**As built (2026-10-16).** Lessons and memory: (3) `Store.read_outside` reads all the run's results; (4) a lesson the
+owner saved is never folded away nor retired; (5) `wake_memory`; (7) the same text merges only into a note its saver is
+handed, and the lesson writer checks against the notes of the run's own agent; (10) `lessons_none` is recorded; (8) is
+left as it is (item 157: a run that rewrites a note makes it the run's). `core/text.py` (Y3, Y4): a secret in single
+quotes, a key with a word after the secret and a dict's `Authorization` are masked, a JSON field named for a secret is
+masked whole, and "task-management" is no OpenAI key. Y19: the duplicate check runs off the event loop (`math.sumprod`).
+A crash of a run's lessons or skill work leaves `lessons_failed` or `playbook_failed` on the run, a failed reflection is
+kept (`agent/reflection_record.py`) and stands in Activity until one after it is done, and `dotx stats` counts both and
+says when the reflection was last done. Skills (`agent/playbooks.py`): (1) a run that read content third parties can
+author (`OUTSIDE_CHANNELS`) is distilled from its own steps alone (`own_steps_digest`: each call and whether it worked,
+never what it returned nor the answer), a skill that names a web address, an account or an e-mail address its run's
+goal and calls never did is not kept (`foreign_problem`), and the record and SKILL.md say where it comes from
+(`read_outside`); the duplicates: the writer is shown the kinds its owner keeps (`kinds_shown`, the run's site first,
+30 at most) and names the run's work by one of them word for word, and the same kind updates that skill; (6) a run
+updates its owner's skills alone, and another owner's skill of the same name keeps its folder (`free_name`); (9) a
+skill retires after two failures in a row (`failing`); (11) a folder is written whole under a hidden name and renamed,
+and a half-made one an older Dot left is replaced. The owner's twelve skills of one kind are left as they are
+(Settings › Skills drops them). README: Lessons, Reflection, Learned skills. Tests: `tests/unit/test_playbooks.py`
+(the steps alone, the names a run never used, the record, failures in a row, another owner's folder, a folder whole or
+not at all), `tests/unit/test_reflection.py`, `tests/smoke/test_reflection.py`, `tests/smoke/test_lessons.py`,
+`tests/unit/test_redaction.py`, `tests/unit/test_run_statistics.py`, `tests/unit/test_agent_learning.py`. Not seen
+live: that the review model names a run's work by a kind it is shown (the paths around it are unit-tested).
+
+### 304. The code review's second fixes
+
+**Status: in progress.** Built on `item-300-tools-and-learning`.
+
+**What was found.** The rest of the code review's plan of fixes, each read again against the code first, and one leak
+that a flaky test of item 300 turned out to be. Each fix has a test that fails on the code before it.
+
+**As built (2026-10-16).**
+- O9 (`agent/continuity.py`): a section of a compaction summary counts only as a heading, so a summary without one is
+  asked again (`missing_sections` read "Next I will check it, which is done" as NEXT and DONE). `test_continuity.py`.
+- Y14 (`web/client.py`): a POST is tried again only when nothing was sent, so a billed search whose answer was lost is
+  not sent twice; a GET still tries again on any failure in transit. `tests/smoke/test_web.py`.
+- Y15 (`notify/keys.py`): a push subscription's keys are checked where it comes in (422) and before each send; one
+  stored before that check is deleted with a warning, and the others still get theirs (before, its `IndexError` ended
+  the push watcher until the daemon started again). `tests/smoke/test_phone.py`, `tests/unit/test_push.py`.
+- O3 to O6: a schedule's watch starts before its status is written, a campaign session that cannot start is planned
+  again after `campaign_gap_minutes` and its thread deleted, a stop that comes while a run's end is recorded lets the end
+  finish (the queue, the lessons and the skill work follow), and the check of dead `dotx` commands outlives an error of
+  the store. `test_scheduler.py`, `test_campaigns.py`, `test_queue.py`, `test_run_ends.py`.
+- Y5 (`server/views.py`, `views/agents.js`, `efforts.js`): an agent's tools are every tool only with `every_tool`, the
+  editor's Save waits for the tool list, and a level the form cannot show is kept as saved (in the schedule editor
+  too). `tests/smoke/test_agents.py`.
+- Y2 (`desktop/actions.py`): a type step's keys go out only while the ref's application holds the keyboard.
+  `tests/unit/test_desktop_secrets.py`, with the front application faked; the real desktop tests were not run (they
+  drive the owner's screen).
+- Y9 (`browser/snapshot.py`): a line's ref is one of the properties after its name, so a page that writes `[ref=e3]`
+  into a button's name does not give the button another's ref. `tests/unit/test_snapshot_diff.py`.
+- Y10 (`tools/apple.py`): an AppleScript that names a password manager in any form (an application, a bundle id, a
+  process) or a target it computes is high and `secret_access`. `tests/unit/test_desktop_secrets.py`.
+- Y1 (`browser/safety.py`): a host is read the way Chrome reads it (IDNA, numeric IPv4 spellings, a trailing dot), an
+  address with a backslash before its query is refused, and OpenCode's webfetch is refused this Mac and its network
+  unless `[web] allow_private_hosts`. `tests/unit/test_own_interface.py`, `tests/unit/test_opencode.py`.
+- Y11 (`policy/shell.py`): a case pattern's `)` inside a substitution, the wrappers and runners that run a command
+  (`xcrun`, `script`, `taskpolicy`, the GNU wrappers, `uv run`, `bundle exec`, `npx`, ...), `builtin cd` and `eval`,
+  a `trap`'s command line, zsh's `=cmd`, a command named by a pattern, variables a program runs or loads code from
+  (`GIT_SSH_COMMAND`, `PAGER`, `DYLD_INSERT_LIBRARIES`, ...), `git -c` and `git config` with settings that run
+  something, and a part of a path only the running line knows in front of a protected location are judged or ask.
+  `tests/unit/test_shell_policy.py` (19 new hidden or protected lines).
+- The sandbox's writes (`policy/sandbox.py`, `tools/shell.py`): in the sandbox, a shell command the guard reads as
+  plain work in its workspace writes only there, in the temporary folders and in `[shell] allow_write` (the caches of
+  the usual developer tools by default). The network is not held: a gate for new hosts is a decision of its own. The
+  owner's `config.toml` has the sandbox off, so the owner's runs are unchanged. `tests/unit/test_sandbox_profile.py`
+  (a real `sandbox-exec`).
+- K2 follow-up (`browser/session.py`): a new tab's redirect guard was begun twice, and the second call returned while
+  the first was still setting it up, so the tab's first navigation could reach Dot's interface by a redirect (9 reads
+  of 160 before, none of 150 after). One set-up is shared and awaited by each caller, and a refused navigation's reset
+  to a blank page is tried again when Chrome's error page interrupts it. `tests/smoke/test_browser_boundary.py` (ten
+  reads with the guard's session slowed: ten reached the interface before).
 
 ## Log
 
@@ -13559,3 +13718,4 @@ description reads back; an unreadable SKILL.md is left out).
 - 2026-10-16 (Opus 5.5): item 297 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): a line over a phone's composer says how long the run has worked, or that it waits, and how its helpers stand.
 - 2026-10-16 (Opus 5.5): item 298 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): Dot's computer opens over the whole phone with its address, Dot has control and Take over.
 - 2026-10-16 (Opus 5.5): item 299 merged as `b4e554f` (PR #324; no Linear issue, the connector was signed out): a resumed turn opens with a bolt, Dot restarted and resumed this turn, which opens to how the run was cut off.
+- 2026-10-16 (Opus 5.5): item 300 merged as `3202bb6` (PR #325; no Linear issue, the connector was signed out): in Dot's own Chrome every request is checked, each redirect hop and a popup's first request too; the daemon refuses a cross-site navigation to its interface; `terminal_send` no longer blocks the daemon on a program that does not read; a learned skill's YAML is written by the YAML library, and an unreadable one is left out. Items 284 and 301 to 304 are built on `item-300-tools-and-learning`; item 76's reading is still due on or after 2026-10-18.
