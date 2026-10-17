@@ -69,8 +69,9 @@ _SETTLE_S: float = 10.0
 _MAC_SIZES: list[str] = ["12px", "13px", "14px", "15px", "17px", "20px", "24px"]
 _MAC_BODY: str = "14px"
 _MAC_SWITCH: list[int] = [34, 20]
-# On a phone the switch's box is a finger's height around iOS's 52 by 32 px track.
-_PHONE_SWITCH: list[int] = [64, 44]
+# On a phone the switch's box is a finger's height around a 40 by 24 px track (item 337; iOS's 52 by 32 px before).
+_PHONE_SWITCH: list[int] = [48, 44]
+_PHONE_TRACK: list[int] = [40, 24]
 _DURATION: re.Pattern[str] = re.compile(r"\d")
 _ANSWER: str = (
     "## Lisbon, two nights under 400 EUR\n\n"
@@ -347,6 +348,7 @@ async def test_a_steps_duration_shows_and_a_settings_row_turns_its_switch_on_a_p
             await toggle.tap()
             await expect(toggle).to_have_attribute("aria-checked", str(was))
             assert await toggle.evaluate("(s) => [s.offsetWidth, s.offsetHeight]") == _PHONE_SWITCH
+            assert await toggle.evaluate("(s) => [s.clientWidth, s.clientHeight]") == _PHONE_TRACK
             await context.close()
         finally:
             await browser.close()

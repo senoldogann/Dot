@@ -50,8 +50,8 @@ under, or under 500 px high on its side) the body is 16 px, as iOS's own text, a
 and the like are 13 px; Settings › Appearance's Text size still scales them all, and code keeps the size chosen
 for it. Everything that is tapped is 44 px each way at least, as Apple asks, but a link inside a line of text: the
 buttons and fields, the bar's and the sidebar's buttons and rows, the menus, the tabs and the heads of the steps. The
-composer's round buttons keep their look in a clear ring that makes them so, and the switch is iOS's size; a tap
-anywhere on a setting's row turns its switch, and a step's duration shows without a hover. An iPad and a Mac keep their
+composer's round buttons keep their look in a clear ring that makes them so, and a switch's 40 by 24 px track sits in
+such a box (item 337); a tap anywhere on a setting's row turns its switch, and a step's duration shows without a hover. An iPad and a Mac keep their
 sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
 
 On a phone the settings open on a list of their pages in groups, as T3 Code's do (item 330): Interface, Models, How Dot
