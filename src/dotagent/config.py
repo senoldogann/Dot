@@ -145,11 +145,25 @@ class AnthropicConfig(FrozenModel):
     max_concurrent: int = Field(ge=1)
 
 
+class OpenRouterConfig(FrozenModel):
+    """OpenRouter (item 349): the models of many labs on one key. Its list of its models, which says what each model
+    can do, is kept for ``models_ttl_s`` without asking again."""
+
+    base_url: ServiceAddress
+    api_key_env: str
+    models_ttl_s: float = Field(gt=0, allow_inf_nan=False)
+    connect_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    read_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    attempts: int = Field(ge=1)
+    max_concurrent: int = Field(ge=1)
+
+
 class ProvidersConfig(FrozenModel):
     ollama: OllamaConfig
     openai: OpenAIConfig
     opencode_go: OpenCodeGoConfig
     anthropic: AnthropicConfig
+    openrouter: OpenRouterConfig
     opencode: OpenCodeConfig
 
 
@@ -625,6 +639,7 @@ def providers_by_key(config: AppConfig) -> dict[str, str]:
         providers.openai.api_key_env: "openai",
         providers.anthropic.api_key_env: "anthropic",
         providers.opencode_go.api_key_env: "opencode_go",
+        providers.openrouter.api_key_env: "openrouter",
         providers.ollama.api_key_env: "ollama",
         config.judge.api_key_env: JUDGE_SERVICE,
     }

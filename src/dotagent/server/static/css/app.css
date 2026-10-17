@@ -2799,6 +2799,10 @@ a.pill:hover {
   mask-image: url("../icons/providers/opencode_go.svg");
 }
 
+.provider-mark[data-provider="openrouter"] {
+  mask-image: url("../icons/providers/openrouter.svg");
+}
+
 .provider-mark[data-provider="generic"] {
   mask-image: url("../icons/providers/generic.svg");
 }

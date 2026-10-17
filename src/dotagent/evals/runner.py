@@ -97,6 +97,8 @@ def secret_names(config: AppConfig, models: Sequence[str]) -> tuple[str, ...]:
         names.append(config.providers.opencode_go.api_key_env)
     if "anthropic" in providers:
         names.append(config.providers.anthropic.api_key_env)
+    if "openrouter" in providers:
+        names.append(config.providers.openrouter.api_key_env)
     return tuple(names)
 
 
@@ -137,6 +139,8 @@ def required_secret_names(config: AppConfig, models: Sequence[str]) -> tuple[str
         names.append(config.providers.opencode_go.api_key_env)
     if "anthropic" in providers:
         names.append(config.providers.anthropic.api_key_env)
+    if "openrouter" in providers:
+        names.append(config.providers.openrouter.api_key_env)
     return tuple(names)
 
 

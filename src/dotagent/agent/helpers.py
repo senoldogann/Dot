@@ -67,6 +67,8 @@ def _key_name(providers: ProvidersConfig, provider: str) -> str | None:
             return providers.opencode_go.api_key_env
         case "anthropic":
             return providers.anthropic.api_key_env
+        case "openrouter":
+            return providers.openrouter.api_key_env
         case _:
             raise ConfigError("unknown provider", {"provider": provider})
 

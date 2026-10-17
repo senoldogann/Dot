@@ -1,7 +1,7 @@
 [project]
 name = "dotagent"
 version = "0.1.0"
-description = "Dot: an always-on autonomous agent for macOS with browser and computer use, on models from Ollama, OpenAI, OpenCode Go, Anthropic or OpenCode Zen."
+description = "Dot: an always-on autonomous agent for macOS with browser and computer use, on models from Ollama, OpenAI, OpenCode Go, Anthropic, OpenRouter or OpenCode Zen."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]

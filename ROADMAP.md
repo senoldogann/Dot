@@ -5276,8 +5276,9 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 343 | Computer use checks only what it needs, and "Google Chrome" is the Chrome Dot works in | done        | 1bf81a1 |
 | 344 | Settings › Browser opens Dot's own Chrome to sign in to sites                          | done        | 1bf81a1 |
 | 345 | A chat that goes on at another of its runs keeps its way back                          | done        | aa6093b |
-| 346 | A chat may leave out the lines of what ran without asking                              | in progress |         |
-| 347 | On a phone the text can be as small as 12 px                                           | in progress |         |
+| 346 | A chat may leave out the lines of what ran without asking                              | done        | a2f619b |
+| 347 | On a phone the text can be as small as 12 px                                           | done        | a2f619b |
+| 349 | OpenRouter: the models of many labs on one key                                         | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13932,7 +13933,7 @@ Activity on a WebKit iPhone and goes back to Activity (fails on `main`: "Show si
 
 ### 346. A chat may leave out the lines of what ran without asking
 
-**Status: in progress.** The owner's word of 2026-10-17: "Yolo modda streaming sırasında çıkan YOLO, not asked: click
+**Status: done (`a2f619b`).** The owner's word of 2026-10-17: "Yolo modda streaming sırasında çıkan YOLO, not asked: click
 f10e2420 'Yanıtla' — untrusted content is in context and this action reaches outside the Mac bu gibi uyarıları kapatıp
 açabilelim" (in yolo mode, lines such as "YOLO, not asked: …" that come during streaming: let us turn them off and on).
 **As built (2026-10-17).** Settings › General has a Chat card with "Show what ran without asking" (on by default, kept
@@ -13944,12 +13945,38 @@ back, wide and light, on a phone and dark).
 
 ### 347. On a phone the text can be as small as 12 px
 
-**Status: in progress.** The owner's word of 2026-10-17: "mobil tarafta font-size küçültebilmeyi daha fazla yapabilir
+**Status: done (`a2f619b`).** The owner's word of 2026-10-17: "mobil tarafta font-size küçültebilmeyi daha fazla yapabilir
 miyiz?" (on mobile, can the font size go smaller). **As built (2026-10-17).** Settings › Appearance › Text size on a
 phone runs from 12 px (14 before) to 20 px, the body's own 16 px; the seven sizes still scale together, the smallest
 under 10 px at 12. A field does not make the page zoom: an iPhone's and an iPad's viewport do not zoom into a field
 (item 311), and other touch screens keep a field at 16 px (item 275). Test: `test_phone_text.py` (the slider's ends,
 and at 12 px the answer, a row of the sidebar and a label of the settings shrink by 12/16 together).
+
+### 349. OpenRouter: the models of many labs on one key
+
+**Status: in progress.** The owner's word of 2026-10-17: "Ayrıca OpenRouter provider desteği istiyorum, bunu da kur."
+(and I want OpenRouter provider support, set it up too). **As built (2026-10-17).** `llm/openrouter.py`: a provider
+`openrouter` (`openrouter:<lab>/<model>`) over OpenRouter's Chat Completions, its key `OPENROUTER_API_KEY` in Settings ›
+API keys, `dotx auth`, `dotx setup` and `dotx doctor` (`GET /key`: what the key has spent and may spend, a free call).
+What a model can do comes from OpenRouter's own list of its models (`GET /models`, read again after
+`[providers.openrouter] models_ttl_s`): whether it reads images and calls tools, its context and output limits, whether
+it takes a temperature, its reasoning levels (`reasoning.supported_efforts`; read on 2026-10-17: 470 models, 399 with
+tools, 341 that reason), or a switch for one whose reasoning is not mandatory and names no levels. The level goes as
+OpenRouter's `reasoning` object; the reasoning details OpenRouter streams in pieces are joined into whole ones
+(`codec_chat.merge_details`, by type, index and id), shown as the model's thinking when it sends no string, and sent
+back on the same model's next step beside its tool calls (`ChatOptions.replay_details`), as OpenRouter asks; the chat
+routes of OpenAI and OpenCode Go do not read them. An error code inside a stream that is a status (OpenRouter's `402`
+for credits that ran out) is that status. A model whose id ends in `:free`, or whose prices are both zero, is free; a
+variant OpenRouter does not list (`:nitro`, `:floor`, `:online`) has its model's traits. A list of models or a key's
+page not shaped as OpenRouter documents it is a `ProviderProtocolError`, and `dotx doctor` checks a configured model
+against the list before asking about it, so a list that could not be read is the warning beside the provider's row. No
+`HTTP-Referer` or title header is sent. Tests: `tests/unit/test_openrouter.py` (the list's traits, a variant, the
+joined details, that only a codec that sends them back keeps them, the `reasoning` object, the details sent back only
+to the model that gave them, the status of a numeric code, answers of the wrong shape), `tests/smoke/test_openrouter.py`
+(a run through the real loop against a stand-in for OpenRouter's API on this Mac: the Bearer key, the level, a tool
+call, the details of the first step back on the second; the listing, the key's page, credits that ran out inside a
+stream and a refused key) and `tests/smoke/test_doctor.py` (a model whose list could not be read warns). Docs:
+`docs/models.md`, `docs/safety.md`, `docs/command-line.md`, `docs/development.md`, `.env.example`, the README.
 
 ## Log
 
@@ -14710,3 +14737,4 @@ and at 12 px the answer, a row of the sidebar and a label of the settings shrink
 - 2026-10-17 (Opus 5.5): PR #331 (items 339 to 344) merged as `1bf81a1` on the owner's go-ahead, the window of item 340 kept; main's checkout moved to it and the daemon restarted at 14:05:43 while no run worked.
 - 2026-10-17 (Opus 5.5): `test_dot_app`'s intermittent timeout on CI traced to its own shell, not the launcher: bash 3.2's `wait` misses a trapped SIGTERM that comes just before it waits (through the launcher, 1 run in 500 did not end within 2 s); the child now sleeps in short foreground steps (500 in 500, the slowest 135 ms). Item 345 on `items-345-back-follows`.
 - 2026-10-17 (Opus 5.5): PR #332 (item 345 and `test_dot_app`'s shell) merged as `aa6093b`. Items 346 and 347 on the owner's word of the same day, on `items-346-348`; item 348 (PyPI) on a branch of its own, as it touches `.github/workflows/`.
+- 2026-10-17 (Opus 5.5): PR #333 (items 346 and 347) merged as `a2f619b` after CI and the local gate (651 passed; the 6 tests that save a memory note failed while the local Ollama was not running, the same 6 as on `main` then); main's checkout moved to it and the daemon restarted at 16:14:49 while no run worked. Item 349 (OpenRouter) on `item-349-openrouter`, with a fresh-context review's findings fixed: only OpenRouter's codec keeps reasoning details, an answer of the wrong shape is a protocol error, the doctor checks a model against its list first, a variant id has its model's traits.

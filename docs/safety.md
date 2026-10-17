@@ -10,7 +10,8 @@ leaves the Mac is what a run needs, sent where the configuration points:
   every role (`main`, `vision`, `fast`, `review`) is a cloud model of Ollama: the Ollama server on this Mac passes each
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
-  OpenCode Go and Anthropic get it only when a role, a helper or a standby model names one of their models (see
+  OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
+  OpenRouter passes each call on to the lab whose model it is (see
   [Models and providers](models.md#models-and-providers)).
 - **To the embedding model: each note and each search of the memory.** It is Ollama's `bge-m3` on this Mac by default;
   with `[memory] embed_provider = "openai"` the texts go to OpenAI (see [Memory](memory-and-schedules.md#memory)).

@@ -39,6 +39,7 @@ CHOICES: tuple[ProviderChoice, ...] = (
     ProviderChoice(provider="openai", label="OpenAI", needs="an OpenAI API key"),
     ProviderChoice(provider="anthropic", label="Anthropic", needs="an Anthropic API key (the Claude models)"),
     ProviderChoice(provider="opencode_go", label="OpenCode Go", needs="an OpenCode Go API key"),
+    ProviderChoice(provider="openrouter", label="OpenRouter", needs="an OpenRouter API key (the models of many labs)"),
     ProviderChoice(
         provider="opencode", label="OpenCode Zen's free models", needs="no key; OpenCode (brew install opencode)"
     ),
@@ -55,6 +56,8 @@ def _key_name(config: AppConfig, provider: str) -> str | None:
             return config.providers.anthropic.api_key_env
         case "opencode_go":
             return config.providers.opencode_go.api_key_env
+        case "openrouter":
+            return config.providers.openrouter.api_key_env
         case _:
             return None
 

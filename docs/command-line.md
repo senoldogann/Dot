@@ -3,9 +3,10 @@
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the Office applications and the OneDrive folders of the skills that come with Dot
 (none is opened), the commands and secrets of the configured MCP servers (none is started), Ollama, the keys of OpenAI,
-OpenCode Go and Anthropic, the embedding model and the configured models, each of which its provider must serve to the
-key (Ollama and Anthropic answer for the model itself, OpenAI and OpenCode Go through the list of the models they
-serve), and says how to fix what is missing. It warns, without failing, when the review model is also the main model,
+OpenCode Go, Anthropic and OpenRouter (OpenRouter's row says what its key has spent), the embedding model and the
+configured models, each of which its provider must serve to the key (Ollama and Anthropic answer for the model itself,
+OpenAI, OpenCode Go and OpenRouter through the list of the models they serve), and says how to fix what is missing.
+It warns, without failing, when the review model is also the main model,
 when an MCP server's command or secret is missing (Dot starts without that server's tools), and when a provider's list
 of models could not be read or the Ollama server could not be reached, as the provider's own row says why (the models of
 an Ollama server out of reach are not asked, so the doctor does not wait out the retries of each). The examples below

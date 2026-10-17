@@ -13,6 +13,7 @@ painted by the page as a mask (`.provider-mark`), so they take the colour of the
   WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
   COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR
   OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+- openrouter.svg: from Lobe Icons as well, under the MIT License above.
 - generic.svg: Dot's own, for a provider without a mark; the licence of Dot.
 
 The marks are the trademarks of their owners and stand here only to name the provider a model comes from; no
