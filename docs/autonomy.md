@@ -37,7 +37,8 @@ like any other secret.
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
 and the note holds the reason), an `approval_auto` event and one line in the timeline of the run ("YOLO, not asked:
 click 'Reply' — untrusted content is in context and this action reaches outside the Mac"), so you can see afterwards
-what went through and why.
+what went through and why. Settings › General › Chat › "Show what ran without asking" leaves those lines out of a chat
+(item 346); the records and the events stay, and a refusal still shows.
 
 **What only yolo waives.** Secrets and exfiltration stay denied in `ask` and `auto`. Money and credentials stay yours
 there: Dot stops and asks you to do that step yourself, and the review model is never asked about them. A `yolo` run

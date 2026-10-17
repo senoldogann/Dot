@@ -175,6 +175,13 @@ async def test_a_phones_text_size_is_its_bodys_and_grows_every_text_together(own
             await page.reload()
             scale: str = await page.evaluate("() => document.documentElement.style.getPropertyValue('--type-scale')")
             assert float(scale) == _CHOSEN_PX / _OWN_PX
+            # boot.js takes the least size too (item 347: it read the phone's range as 14 to 20, and dropped 12).
+            await page.evaluate(f"() => localStorage.setItem('dot.sizeInterface', '{_LEAST_PX}')")
+            await page.reload()
+            least_scale: str = await page.evaluate(
+                "() => document.documentElement.style.getPropertyValue('--type-scale')"
+            )
+            assert least_scale != "" and float(least_scale) == _LEAST_PX / _OWN_PX
             await context.close()
         finally:
             await browser.close()
