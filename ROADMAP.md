@@ -5278,7 +5278,6 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 345 | A chat that goes on at another of its runs keeps its way back                          | done        | aa6093b |
 | 346 | A chat may leave out the lines of what ran without asking                              | in progress |         |
 | 347 | On a phone the text can be as small as 12 px                                           | in progress |         |
-| 348 | Dot can be published to PyPI as dotagent-macos, by a tag                               | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13952,20 +13951,6 @@ under 10 px at 12. A field does not make the page zoom: an iPhone's and an iPad'
 (item 311), and other touch screens keep a field at 16 px (item 275). Test: `test_phone_text.py` (the slider's ends,
 and at 12 px the answer, a row of the sidebar and a label of the settings shrink by 12/16 together).
 
-### 348. Dot can be published to PyPI as dotagent-macos, by a tag
-
-**Status: in progress.** The owner's word of 2026-10-17: "PyPI olayı ne, kayıt oldum ama ne yapacağız?" (what about
-PyPI: I signed up, what do we do), after approving publication on 2026-10-17 ("Paket PyPI'ye yayımlansın mı?",
-approved). **As built (2026-10-17).** `dotagent` and `dotx` are taken on PyPI (its JSON API answered 200;
-`dotagent-macos` 404); the distribution is `dotagent-macos`, the package it installs stays `dotagent`
-(`[tool.uv.build-backend] module-name`) and the command `dotx`. `.github/workflows/release.yml` builds on a tag `v*`
-whose version is `pyproject.toml`'s and uploads with `uv publish` through trusted publishing (`id-token: write`,
-environment `pypi`), so no token is kept. Checked: `uv build` with uv 0.13 makes the sdist and the wheel (the local uv
-0.10.9 could not unpack the sdist uv_build 0.13 writes; CI installs a current uv), the wheel holds the web UI, Dot.app's
-source, the defaults, the built-in skills and the evals, and `uv tool run --from <wheel> dotx --help` runs. Docs:
-`docs/development.md` › Releasing to PyPI, with the values of PyPI's pending publisher. The first upload waits for the
-owner: the pending publisher on pypi.org is theirs to add, and the first upload claims the name.
-
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -14724,4 +14709,4 @@ owner: the pending publisher on pypi.org is theirs to add, and the first upload 
 - 2026-10-17 (Opus 5.5): items 339 to 344 on the owner's word of the same day (smooth, fast browser use and computer use in the owner's Chrome), on `items-339-chrome` as PR #331, with an independent review's fixes (the reconnect notice beside the connection, Chrome's remote debugging refused to desktop steps). The full gate passes (670 smoke, 1739 unit). Not merged: the first browser_open of a chat is slower for the window of its own (criterion 3 against 4), the owner's call.
 - 2026-10-17 (Opus 5.5): PR #331 (items 339 to 344) merged as `1bf81a1` on the owner's go-ahead, the window of item 340 kept; main's checkout moved to it and the daemon restarted at 14:05:43 while no run worked.
 - 2026-10-17 (Opus 5.5): `test_dot_app`'s intermittent timeout on CI traced to its own shell, not the launcher: bash 3.2's `wait` misses a trapped SIGTERM that comes just before it waits (through the launcher, 1 run in 500 did not end within 2 s); the child now sleeps in short foreground steps (500 in 500, the slowest 135 ms). Item 345 on `items-345-back-follows`.
-- 2026-10-17 (Opus 5.5): PR #332 (item 345 and `test_dot_app`'s shell) merged as `aa6093b`. Items 346 to 348 on the owner's word of the same day, on `items-346-348`.
+- 2026-10-17 (Opus 5.5): PR #332 (item 345 and `test_dot_app`'s shell) merged as `aa6093b`. Items 346 and 347 on the owner's word of the same day, on `items-346-348`; item 348 (PyPI) on a branch of its own, as it touches `.github/workflows/`.

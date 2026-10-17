@@ -1,5 +1,5 @@
 [project]
-name = "dotagent-macos"
+name = "dotagent"
 version = "0.1.0"
 description = "Dot: an always-on autonomous agent for macOS with browser and computer use, on models from Ollama, OpenAI, OpenCode Go, Anthropic or OpenCode Zen."
 readme = "README.md"
@@ -55,10 +55,6 @@ dotx = "dotagent.cli:main"
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14.0"]
 build-backend = "uv_build"
-
-# The distribution is dotagent-macos on PyPI ("dotagent" was taken, item 348); the package it installs stays dotagent.
-[tool.uv.build-backend]
-module-name = "dotagent"
 
 [dependency-groups]
 dev = [

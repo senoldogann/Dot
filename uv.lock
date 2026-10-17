@@ -555,7 +555,7 @@ wheels = [
 ]
 
 [[package]]
-name = "dotagent-macos"
+name = "dotagent"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
