@@ -14,6 +14,7 @@ from dotagent.office import SheetCell, WorkbookContent
 from dotagent.previews import shown
 from dotagent.previews.paths import located_file, opens_on_mac, shown_kind
 from dotagent.previews.pdfpages import PageSize, page_png, page_sizes
+from dotagent.previews.quicklook import DrawnPage, drawn_pages
 from dotagent.previews.shown import TablePreview, TextPreview, shown_file
 
 
@@ -179,3 +180,19 @@ def test_a_pdf_page_is_drawn_at_the_width_asked_in_its_proportions(tmp_path: Pat
     with pytest.raises(InvalidValueError) as missing:
         page_png(pdf, 3, 600)
     assert missing.value.message == "the PDF has no such page"
+
+
+def test_a_workbooks_drawing_is_its_sheets_and_any_other_drawing_its_page() -> None:
+    # Quick Look's page of a workbook (item 268), as qlmanage wrote it on macOS: a tab per sheet that is not hidden.
+    workbook: str = (
+        '<div class="TabView" id="tabs"><div class="TabViewItem selected">'
+        '<div class="TabHeader">Budget &amp; plan</div>'
+        '<a href="Attachment7.html"></a></div><div class="TabViewItem"><div class="TabHeader">Notes</div>'
+        '<a href="Attachment3.html"></a></div><div class="TabViewItem"><div class="TabHeader">Odd</div>'
+        '<a href="../../secret.html"></a></div></div>'
+    )
+    assert drawn_pages(workbook) == (
+        DrawnPage(name="Budget & plan", file="Attachment7.html"),
+        DrawnPage(name="Notes", file="Attachment3.html"),
+    )
+    assert drawn_pages("<html><body><p>A letter</p></body></html>") == (DrawnPage(name="", file="Preview.html"),)

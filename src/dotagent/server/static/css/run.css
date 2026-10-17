@@ -894,6 +894,35 @@
   white-space: nowrap;
 }
 
+/* An Office file as Quick Look draws it, or what Dot reads of it (item 268). The drawing is a page of its own, on the
+   paper the Mac draws a document on, that fills the body and scrolls inside. */
+.file-views {
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.file-views[hidden] {
+  display: none;
+}
+
+.file-body[data-view="drawn"] {
+  display: flex;
+  overflow: hidden;
+  padding: 0;
+}
+
+.file-body[data-view="drawn"] > .hint {
+  padding: 16px;
+}
+
+.file-look {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--paper);
+}
+
 /* What the cell clicked holds, as a spreadsheet's formula bar says it. */
 .file-cell-line {
   display: flex;

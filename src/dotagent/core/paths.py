@@ -152,6 +152,11 @@ def opencode_dir() -> Path:
     return dot_home() / "opencode"
 
 
+def looks_dir() -> Path:
+    """The drawings Quick Look made of the Office files the panel showed (item 268), emptied at the daemon's start."""
+    return dot_home() / "looks"
+
+
 def connected_servers_path() -> Path:
     """Dot's record of the MCP servers the owner added on Customize › Plugins (items 279 and 316): each with its address or command."""
     return dot_home() / "connected-servers.json"
