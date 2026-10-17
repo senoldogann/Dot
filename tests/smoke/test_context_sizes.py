@@ -271,7 +271,8 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
         assert written.endswith(f'{_MODELS_TABLE}\n[models.context]\n"{SCRIPTED_MODEL}" = 192000\n'), written
         assert load_config(path).models.context == {SCRIPTED_MODEL: 192_000}
         assert (await _listed(http, SCRIPTED_MODEL))["context"]["chosen"] == 192_000
-        # A window Dot asks Ollama for: three quarters of it is Dot's default already, so the floor is the one other size.
+        # A window Dot asks Ollama for: three quarters of it is Dot's default already, so the floor is the one other
+        # size.
         assert (await _listed(http, _ASKED))["context"]["sizes"] == [48_000]
 
         back: httpx.Response = await http.put("/api/models/context", json={"model": SCRIPTED_MODEL, "tokens": None})
@@ -374,8 +375,8 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                 await expect(body.locator(".context-facts dd")).to_have_text(
                     [
                         "1,000,000 tokens. Ollama gives it for the model.",
-                        "750,000 tokens, three quarters of the window: the rest is room for the reply and for the error "
-                        "of Dot's count of the tokens.",
+                        "750,000 tokens, three quarters of the window: the rest is room for the reply and for the "
+                        "error of Dot's count of the tokens.",
                         "96,000 tokens, for every model without a size of its own. Dot comes with 96,000: in a run "
                         "of 41 steps it measured, 48,000 summarized twice and 96,000 not once, while each step sent a "
                         "quarter more. In the config file: [agent] context_tokens.",

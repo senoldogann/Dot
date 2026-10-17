@@ -1,6 +1,6 @@
-"""A message the pages send once (item 189): each new message of the pages carries a key of its own, and the message sent
-again with that key, after an answer that was lost, gets what its first sending made, instead of a second chat, run,
-queued message or steer."""
+"""A message the pages send once (item 189): each new message of the pages carries a key of its own, and the message
+sent again with that key, after an answer that was lost, gets what its first sending made, instead of a second chat,
+run, queued message or steer."""
 
 import time
 from collections.abc import Awaitable, Callable

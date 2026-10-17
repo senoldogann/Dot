@@ -1,9 +1,9 @@
 """Which process drives a run, so that a daemon that starts closes only the runs whose process is gone.
 
-The daemon and ``dotx run`` (``resume``, ``chat``) drive runs each in a process of its own, on one database. Each takes an
-owner before its first run: a lock file of its own under ``run-owners``, held with ``flock`` for as long as the process
-lives; the kernel lets the lock go when the process ends, however it ends. A run stores its owner, and a daemon that
-starts asks the lock of each owner of an active run whether it is still held. The descriptor is not inherited, so a
+The daemon and ``dotx run`` (``resume``, ``chat``) drive runs each in a process of its own, on one database. Each takes
+an owner before its first run: a lock file of its own under ``run-owners``, held with ``flock`` for as long as the
+process lives; the kernel lets the lock go when the process ends, however it ends. A run stores its owner, and a daemon
+that starts asks the lock of each owner of an active run whether it is still held. The descriptor is not inherited, so a
 program that a run started and that outlives its process does not keep the lock.
 """
 

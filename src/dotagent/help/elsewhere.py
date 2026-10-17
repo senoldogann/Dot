@@ -262,7 +262,8 @@ def copy_refusal(folder: Path, limit: CopyLimit) -> str | None:
 
 def copied_from(copy: Path) -> SkillCopy | None:
     """What the skill folder ``copy`` in Dot's skills folder says of the skill it was copied from, when Dot copied it
-    there from another agent; None when it did not, or when its marker cannot be read: then it is not Dot's to remove."""
+    there from another agent; None when it did not, or when its marker cannot be read: then it is not Dot's to
+    remove."""
     marker: Path = copy / ADDED_MARKER
     if copy.is_symlink() or marker.is_symlink() or not marker.is_file():
         return None

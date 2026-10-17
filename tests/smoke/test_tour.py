@@ -69,7 +69,8 @@ _SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
 # point at. Lessons are off: the scripted model has no reply left for drawing them.
 _STEPS: tuple[tuple[str, str], ...] = (
     (
-        "Listing the workspace first, to see what is there before counting anything; the names and the sizes come with it.",
+        "Listing the workspace first, to see what is there before counting anything; the names and the sizes come "
+        "with it.",
         "ls -la",
     ),
     (
@@ -77,7 +78,8 @@ _STEPS: tuple[tuple[str, str], ...] = (
         "ls -lt",
     ),
     (
-        "Checking the hidden entries too, since a dotfile counts as a file of the folder and the count must include it.",
+        "Checking the hidden entries too, since a dotfile counts as a file of the folder and the count must include "
+        "it.",
         "ls -A",
     ),
     (
@@ -85,7 +87,8 @@ _STEPS: tuple[tuple[str, str], ...] = (
         "pwd",
     ),
     (
-        "Measuring the folder, to say how much the three files weigh together and whether any of them is unexpectedly large.",
+        "Measuring the folder, to say how much the three files weigh together and whether any of them is unexpectedly "
+        "large.",
         "du -sh .",
     ),
     (
@@ -150,7 +153,8 @@ MODEL: _Recorder = _Recorder()
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[agent]\nplaybooks = true\nlessons = "off"\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n',
+        '[browser]\nheadless = true\n\n[agent]\nplaybooks = true\nlessons = "off"\n\n[models]\nmain = '
+        f'"{SCRIPTED_MODEL}"\n',
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
@@ -222,7 +226,8 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
         await page.wait_for_timeout(_SETTLE_MS)
         assert "Dot" in await page.title(), route
         faces: list[str] = await page.evaluate(
-            "[getComputedStyle(document.body).fontFamily, getComputedStyle(document.querySelector('code, .mono') ?? document.body).fontFamily]"
+            "[getComputedStyle(document.body).fontFamily, getComputedStyle(document.querySelector('code, .mono') ?? "
+            "document.body).fontFamily]"
         )
         assert faces[0].startswith('"Inter"') or faces[0].startswith("Inter"), faces
         await page.screenshot(path=str(out / f"{tag}-{name}.png"), full_page=False)
@@ -263,8 +268,8 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.wait_for_timeout(_SETTLE_MS)
             await expect(page.get_by_role("button", name="Jump to the answer")).to_be_visible()
             await page.screenshot(path=str(out / f"{tag}-run-top.png"), full_page=False)
-            # The side panel on its Run tab, the details first (items 84, 203): on a wide window beside the chat, on a phone
-            # a drawer.
+            # The side panel on its Run tab, the details first (items 84, 203): on a wide window beside the chat, on a
+            # phone a drawer.
             await page.get_by_role("button", name="Run details").click()
             await expect(page.locator(".inspector").get_by_role("tab", name="Run")).to_have_attribute(
                 "aria-selected", "true"
@@ -273,7 +278,8 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             await page.screenshot(path=str(out / f"{tag}-run-panel.png"), full_page=False)
             # The line under a section's title is not cut at the panel's compact width (item 111).
             clipped: list[str] = await page.locator(".inspector .panel-summary").evaluate_all(
-                "nodes => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => node.textContent)"
+                "nodes => nodes.filter((node) => node.scrollWidth > node.clientWidth + 1).map((node) => "
+                "node.textContent)"
             )
             assert clipped == [], clipped
             if await page.locator(".inspector[data-mode='docked']").is_visible():
@@ -398,7 +404,8 @@ async def test_every_page_in_both_schemes_at_both_widths(
 # Records, before any page script runs, the document's state at the moment the scheme lands on the page element.
 _WATCH_SCHEME: str = """
 localStorage.setItem("dot.scheme", "dark");
-// The page element does not exist yet when this runs, so the document is watched and the page element's attribute found.
+// The page element does not exist yet when this runs, so the document is watched and the page element's attribute
+// found.
 new MutationObserver(() => {
   if (window.__schemeAt === undefined && document.documentElement.dataset.scheme === "dark") {
     window.__schemeAt = document.readyState;
@@ -425,7 +432,8 @@ async def test_a_held_dark_scheme_is_on_the_page_before_the_first_paint(
             await _opened(page)
             await page.wait_for_timeout(_SETTLE_MS)
             state: list[str] = await page.evaluate(
-                "[window.__schemeAt, document.documentElement.dataset.scheme, getComputedStyle(document.body).backgroundColor]"
+                "[window.__schemeAt, document.documentElement.dataset.scheme, "
+                "getComputedStyle(document.body).backgroundColor]"
             )
             assert state[0] == "loading", state
             assert state[1] == "dark", state

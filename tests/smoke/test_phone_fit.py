@@ -117,7 +117,9 @@ _FIT: str = """() => {
 # keyboard has gone (item 293); with the keyboard, `innerHeight` shrinks as iOS 26.5 shrinks it.
 _KEYBOARD: str = """(() => {
   const seen = new EventTarget();
-  const inner = Object.getOwnPropertyDescriptor(window, 'innerHeight') ?? Object.getOwnPropertyDescriptor(Window.prototype, 'innerHeight');
+  const inner =
+    Object.getOwnPropertyDescriptor(window, 'innerHeight') ??
+    Object.getOwnPropertyDescriptor(Window.prototype, 'innerHeight');
   const full = () => inner.get.call(window);
   let top = 0;
   let shorter = 0;
@@ -137,7 +139,8 @@ _KEYBOARD: str = """(() => {
 
 
 def _edge(selector: str, side: str) -> str:
-    """A script that gives where the element `selector` is on the window, at its `side` (top or bottom), in whole pixels."""
+    """A script that gives where the element `selector` is on the window, at its `side` (top or bottom), in whole
+    pixels."""
     return f"Math.round(document.querySelector({selector!r}).getBoundingClientRect().{side})"
 
 

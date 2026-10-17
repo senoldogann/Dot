@@ -1,9 +1,9 @@
-"""A turn that goes on after Dot restarted says so as T3 Code's chat does (item 299), on a served daemon, in WebKit as the
-owner's iPhone. Two chats wait on a question when the daemon is shut down. When it starts again, the chat of the web UI
-goes on by itself: its turn opens with a line with a bolt, "Dot restarted and resumed this turn", which opens to how
-the run before it was cut off, how the call of its last step ended and the way to that run. The other chat waits for
-the owner: the line over its composer wears the bolt and says that Dot was shut down while the run worked, and its
-Continue opens the turn that goes on, under "Resumed this turn after Dot was shut down".
+"""A turn that goes on after Dot restarted says so as T3 Code's chat does (item 299), on a served daemon, in WebKit as
+the owner's iPhone. Two chats wait on a question when the daemon is shut down. When it starts again, the chat of the web
+UI goes on by itself: its turn opens with a line with a bolt, "Dot restarted and resumed this turn", which opens to how
+the run before it was cut off, how the call of its last step ended and the way to that run. The other chat waits for the
+owner: the line over its composer wears the bolt and says that Dot was shut down while the run worked, and its Continue
+opens the turn that goes on, under "Resumed this turn after Dot was shut down".
 
 The model is a scripted one; the daemon's stop and start are real, on one Dot home.
 """

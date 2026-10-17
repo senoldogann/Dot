@@ -208,7 +208,8 @@ def proof_router(token: str) -> APIRouter:
 
 
 def system_router(ctx: ServerContext, pages: str) -> APIRouter:
-    """The daemon's own routes; ``pages`` is what the pages it serves are (``dotagent.server.kept_pages.pages_build``)."""
+    """The daemon's own routes; ``pages`` is what the pages it serves are
+    (``dotagent.server.kept_pages.pages_build``)."""
     router: APIRouter = APIRouter(prefix="/api")
     config: AppConfig = ctx.runtime.config
 

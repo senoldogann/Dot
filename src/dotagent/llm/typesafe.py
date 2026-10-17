@@ -9,8 +9,8 @@ token and the body ``{"state", "model", "questions": {id: {"type", "instructions
 to 1 (yes); a Score answer is ``{"type": "score", "score": s, "confidence": c, "legend": {"0": level, ...},
 "probabilities": {"0": p, ...}}`` with ``s`` the expected level, from 0 for the first level to one less than their
 number for the last; a Choice answer is ``{"type": "choice", "choice": option, "confidence": c, "probabilities":
-{option: p, ...}}``, its question carrying the options as ``criteria: {option: description}``. A refused key is HTTP 401, a body it rejects 422, a rate limit 429 and an overloaded service 529;
-the last two are retried.
+{option: p, ...}}``, its question carrying the options as ``criteria: {option: description}``. A refused key is HTTP
+401, a body it rejects 422, a rate limit 429 and an overloaded service 529; the last two are retried.
 """
 
 import httpx

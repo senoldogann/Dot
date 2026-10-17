@@ -1,9 +1,9 @@
-"""The composer shows the markdown it holds (item 207). A copy of the box's text lies under the box with its marks quiet,
-bold words and headings heavier, code tinted and links in the colour of links, while the box keeps its own letters,
-clear, over it: the copy holds the box's text exactly, after typing, a pick of the slash menu, a draft brought back
-and a paste, and it lies letter for letter under the box's letters, in the new chat's box and in a chat's dock scrolled
-half way and to its end, which the pixels of both show; the composer is no higher for it. A real server, wide and on a
-phone, light and dark."""
+"""The composer shows the markdown it holds (item 207). A copy of the box's text lies under the box with its marks
+quiet, bold words and headings heavier, code tinted and links in the colour of links, while the box keeps its own
+letters, clear, over it: the copy holds the box's text exactly, after typing, a pick of the slash menu, a draft
+brought back and a paste, and it lies letter for letter under the box's letters, in the new chat's box and in a
+chat's dock scrolled half way and to its end, which the pixels of both show; the composer is no higher for it. A real
+server, wide and on a phone, light and dark."""
 
 import asyncio
 import io
@@ -70,7 +70,8 @@ _LEAST_STYLED: float = 0.001
 _PLAIN: str = """() => {
   const sheet = document.styleSheets[0];
   return [
-    ".composer-mirror, .composer-mirror * { color: var(--text) !important; -webkit-text-stroke-width: 0 !important; background: none !important; }",
+    ".composer-mirror, .composer-mirror * { color: var(--text) !important; -webkit-text-stroke-width: 0 !important; "
+      + "background: none !important; }",
     "::highlight(md-mark), ::highlight(md-address), ::highlight(md-link), ::highlight(md-strong), ::highlight(md-code) "
       + "{ color: var(--text) !important; background-color: transparent !important; text-shadow: none !important; }",
     ".composer-field.mirrored .textarea { caret-color: transparent !important; }",

@@ -1418,7 +1418,8 @@ async def test_a_live_stream_shows_a_run_as_it_happens_and_ends_with_it(
 async def test_a_live_stream_carries_the_runs_the_run_delegated_to(live: httpx.AsyncClient, runtime: Runtime) -> None:
     path, token = _secret_file(runtime.workspace)
     goal: str = (
-        f"Call the delegate tool exactly once, with mode task. Its goal must tell the sub-agent to read the file {path} "
+        "Call the delegate tool exactly once, with mode task. Its goal must tell the sub-agent to read the file "
+        f"{path} "
         "and report the exact text in it. When it has answered, call finish with the text it reported."
     )
     run: RunRecord = await _start(live, goal)
@@ -1497,9 +1498,9 @@ async def test_a_file_attached_in_the_web_ui_reaches_the_model(live: httpx.Async
 
 
 async def test_a_fault_and_a_path_that_does_not_exist_are_answered_as_json(live: httpx.AsyncClient) -> None:
-    """Item 178: an error that is not one of Dot's own (here the themes folder cannot be listed) and an answer of the web
-    framework itself (a path that does not exist) come in the shape of every other error of the API, which a page reads;
-    the fault is logged with its traceback. Before, the fault came as the plain text "Internal Server Error"."""
+    """Item 178: an error that is not one of Dot's own (here the themes folder cannot be listed) and an answer of the
+    web framework itself (a path that does not exist) come in the shape of every other error of the API, which a page
+    reads; the fault is logged with its traceback. Before, the fault came as the plain text "Internal Server Error"."""
     folder: Path = themes_dir()
     await asyncio.to_thread(folder.mkdir, parents=True, exist_ok=True)
     await asyncio.to_thread(folder.chmod, 0)

@@ -595,7 +595,8 @@ async def test_a_campaign_session_ranks_posts_with_the_weights_of_its_ledger_and
     # a: on topic, a person, no question (0.9, 0.9, 0.3); c: off topic, a person, a question (0.1, 0.9, 0.8); b: spam.
     assert [line.split()[1] for line in lines[1:]] == ["a", "c", "b"]
     assert lines[1] == (
-        "1. a 0.70 (topic 0.90, person 0.90, reply 0.30) @mara: Lost an afternoon to uv lock versus pip freeze in Python. N…"
+        "1. a 0.70 (topic 0.90, person 0.90, reply 0.30) @mara: Lost an afternoon to uv lock versus pip freeze in "
+        "Python. N…"
     )
     # The first ranking wrote the weights in the ledger, where the owner changes them.
     entries: list[CampaignEntry] = await runtime.store.campaign_entries(campaign.id, 10)
@@ -674,7 +675,8 @@ async def test_a_campaign_session_picks_the_best_draft_and_a_draft_with_a_link_i
     refused: ToolResult = await _run(ctx, CHECK_DRAFT_TOOL, check)
     assert refused.is_error
     assert refused.text.splitlines() == [
-        "Do not post the draft as it is: 1 of 4 checks reached 0.50. Change it and check again, or answer another post.",
+        "Do not post the draft as it is: 1 of 4 checks reached 0.50. Change it and check again, or answer another "
+        "post.",
         "- off the topic or beside the point of the post: 0.10",
         "- repeats an earlier post of the account: 0.10",
         "- breaks the rule: no links in replies: 0.90 (fired)",

@@ -91,7 +91,8 @@ def render_found(found: FoundElsewhere) -> list[str]:
         shown: str = ", ".join(names[:_LISTED_NAMES]) + (f" and {more} more" if more > 0 else "")
         lines.append(f"  {agent}, {_counted(len(skills), 'skill')}: {shown}")
     lines.extend(
-        f"  MCP server {server.name}  [{server.agent}]  {server.transport}, {server.reaches}{_mark(server, 'Dot has it')}"
+        f"  MCP server {server.name}  [{server.agent}]  {server.transport}, "
+        f"{server.reaches}{_mark(server, 'Dot has it')}"
         for server in found.servers
     )
     lines.extend(

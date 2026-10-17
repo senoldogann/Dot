@@ -227,8 +227,8 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await page.keyboard.press("Escape")
             await expect(options).to_be_hidden()
 
-            # A chat has no goal mode and no Plan first: chosen for one, the "+" holds no switch for them, and Task brings
-            # them back.
+            # A chat has no goal mode and no Plan first: chosen for one, the "+" holds no switch for them, and Task
+            # brings them back.
             await _pill(page, "mode").click()
             await _menu(page, "Mode").get_by_role("option").filter(has_text="Chat").click()
             await expect(_pill(page, "mode")).to_contain_text("Chat")

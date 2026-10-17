@@ -2,8 +2,8 @@
 phone. A chat hands three helpers a part each; each lists a folder step after step. While they work the page is watched
 for four seconds: no text on it is written again as it was, while the time of the group of helpers and each helper's
 step line still move on. Before, the page wrote every helper's time and the head of their group again at every event of
-the chat and its helpers, the same text nearly every time, and a helper's line lost its tool's name at every step and got
-it back.
+the chat and its helpers, the same text nearly every time, and a helper's line lost its tool's name at every step and
+got it back.
 
 No network and no model service is used: the model is a stand-in that answers in code, every role is it and Ollama's
 address is a closed port.
@@ -69,8 +69,8 @@ def _first_user_text(messages: tuple[Message, ...]) -> str:
 
 class _Steady:
     """The chat hands three helpers a part each at its first step; a helper lists a folder at each step, its depth going
-    round so that no two steps in a row are the same, and answers after ``_STEPS`` of them. A moment slow each time, as a
-    model is; a call without tools (a title, a review) gets a short answer."""
+    round so that no two steps in a row are the same, and answers after ``_STEPS`` of them. A moment slow each time,
+    as a model is; a call without tools (a title, a review) gets a short answer."""
 
     @property
     def name(self) -> str:

@@ -1,6 +1,6 @@
-"""A research run in the real loop keeps its notes file and a memory note (item 34): the scripted model writes the notes,
-adds to them, saves a fact and finishes; the file holds both parts, the fact is in memory, and the run is done. The
-file tools that change the world stay out of the run."""
+"""A research run in the real loop keeps its notes file and a memory note (item 34): the scripted model writes the
+notes, adds to them, saves a fact and finishes; the file holds both parts, the fact is in memory, and the run is
+done. The file tools that change the world stay out of the run."""
 
 import asyncio
 from collections.abc import AsyncIterator

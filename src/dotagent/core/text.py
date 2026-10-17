@@ -81,8 +81,8 @@ _MIN_VALUE_CHARS: int = 4
 # mask words of every text it is in.
 KNOWN_SECRET_MIN_CHARS: int = 8
 
-# The marks of Markdown a plain line leaves out (``plain_line``): a fence's line whole; a heading's, a quote's and a list
-# item's mark at the start of a line; bold, strike and code marks anywhere. A link or an image keeps its words.
+# The marks of Markdown a plain line leaves out (``plain_line``): a fence's line whole; a heading's, a quote's and a
+# list item's mark at the start of a line; bold, strike and code marks anywhere. A link or an image keeps its words.
 _FENCE_LINE: re.Pattern[str] = re.compile(r"^[ \t]*(?:```|~~~).*$", re.MULTILINE)
 _LINE_MARK: re.Pattern[str] = re.compile(
     r"^[ \t]*(?:#{1,6}[ \t]+|>[ \t]?|[-*+][ \t]+(?:\[[ xX]\][ \t]+)?|\d{1,3}[.)][ \t]+)", re.MULTILINE

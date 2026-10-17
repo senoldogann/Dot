@@ -53,7 +53,8 @@ class StepStarted(FrozenModel):
 
 
 class StepEnded(FrozenModel):
-    """A step of the model ended: what it read (``input_tokens``, of which ``cached_tokens`` from the cache) and wrote."""
+    """A step of the model ended: what it read (``input_tokens``, of which ``cached_tokens`` from the cache) and
+    wrote."""
 
     message_id: str
     input_tokens: int

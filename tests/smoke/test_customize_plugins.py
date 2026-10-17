@@ -2,12 +2,12 @@
 wide and light and on a phone and dark. Every service in its section, 25 or more, each with its mark, what Dot does
 with it and how it connects; a search, and Connected next to All. With macOS's answers given by the test (an
 application allowed, one not asked, one refused, one not installed), Mail is connected and offers no step, Outlook is
-not installed, OneDrive syncs a folder, GitHub's cookie in the profile of Dot's browser signs it in and Slack is not, with
-no Sign in in a browser without a window; a service not tried yet says so and offers none. A service's own page says
-how it connects, where it stands and where its data goes: Notes' Open System Settings shows the Automation pane under a
-line that names Dot, the program to open there, and goes under that line on a phone. The "+" of Calendar asks macOS and
-its tile says Allowed, and still does once the application is closed and macOS tells nothing about it (item 288). The
-old address of Connect apps leads to the page.
+not installed, OneDrive syncs a folder, GitHub's cookie in the profile of Dot's browser signs it in and Slack is not,
+with no Sign in in a browser without a window; a service not tried yet says so and offers none. A service's own page
+says how it connects, where it stands and where its data goes: Notes' Open System Settings shows the Automation pane
+under a line that names Dot, the program to open there, and goes under that line on a phone. The "+" of Calendar asks
+macOS and its tile says Allowed, and still does once the application is closed and macOS tells nothing about it (item
+288). The old address of Connect apps leads to the page.
 
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.

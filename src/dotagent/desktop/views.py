@@ -1,4 +1,5 @@
-"""Views of the desktop: which part of an accessibility tree the model is shown, and how much of it changed since last time.
+"""Views of the desktop: which part of an accessibility tree the model is shown, and how much of it changed since last
+time.
 
 A first look at a view is complete. A later look at the same view shows only the lines that are new or different, so a
 follow-up snapshot after a click costs a few lines instead of the whole window again.
@@ -149,7 +150,8 @@ def _search_view(
 
 
 def _delta_for(baseline: Mapping[int, str] | None, lines: tuple[Line, ...]) -> Delta | None:
-    """The delta against the stored baseline when the view is big enough and the delta clearly smaller than the whole."""
+    """The delta against the stored baseline when the view is big enough and the delta clearly smaller than the
+    whole."""
     if baseline is None or len(lines) < _MIN_DELTA_NODES:
         return None
     delta: Delta = diff_lines(baseline, lines)

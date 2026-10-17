@@ -1,7 +1,7 @@
-"""Programs on a terminal of their own, through the terminal tools and the gate as the executor runs them: a REPL answers
-what is typed, a password prompt takes a secret only in a ``yolo`` run and the secret shows nowhere, a server stays up
-until its session is closed, and a chat keeps at most its limit of sessions, each closed once it is idle. No model is
-called.
+"""Programs on a terminal of their own, through the terminal tools and the gate as the executor runs them: a REPL
+answers what is typed, a password prompt takes a secret only in a ``yolo`` run and the secret shows nowhere, a server
+stays up until its session is closed, and a chat keeps at most its limit of sessions, each closed once it is idle. No
+model is called.
 """
 
 import asyncio

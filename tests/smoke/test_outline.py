@@ -1,9 +1,9 @@
 """The marks of a conversation's messages (item 201), after T3 Code's: a column of short marks at the left of the
 conversation, one for each message of the owner. Resting the pointer on it shows the message nearest to it and the start
-of its answer; a click, or Enter after the arrows, goes to that message; the marks of the messages in sight stand out. On a
-phone, or in a conversation of one message, there is no column. Beside the side panel, the conversation leaves the
-column its room (item 228), and neither covers the other. A real server on a scripted model, wide and on a phone,
-light and dark."""
+of its answer; a click, or Enter after the arrows, goes to that message; the marks of the messages in sight stand
+out. On a phone, or in a conversation of one message, there is no column. Beside the side panel, the conversation
+leaves the column its room (item 228), and neither covers the other. A real server on a scripted model, wide and on a
+phone, light and dark."""
 
 import asyncio
 import time
@@ -33,7 +33,8 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "outline-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
-# Each message of the chat and the first words of its answer; every answer is long, so the chat is taller than the window.
+# Each message of the chat and the first words of its answer; every answer is long, so the chat is taller than the
+# window.
 _TURNS: tuple[tuple[str, str], ...] = (
     ("Plan the garden beds.", "The beds face south"),
     ("Which seeds go in first?", "Peas and spinach go in first"),

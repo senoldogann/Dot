@@ -191,8 +191,8 @@ def _entry(home: Path, source: ServerFile, name: str) -> McpServerJson:
 
 
 def add_server(path: Path, home: Path, server: FoundServer) -> None:
-    """Add ``server`` to the record at ``path``, with the fingerprint of its entry as it is now in its agent's file under
-    ``home``. Raises ElsewhereError when Dot has it already or cannot use it."""
+    """Add ``server`` to the record at ``path``, with the fingerprint of its entry as it is now in its agent's file
+    under ``home``. Raises ElsewhereError when Dot has it already or cannot use it."""
     context: dict[str, str] = {"agent": server.agent, "server": server.name}
     if server.added:
         raise ElsewhereError(f"the MCP server {server.name} of {server.agent} is added already", context)

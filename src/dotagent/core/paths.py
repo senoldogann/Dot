@@ -158,7 +158,8 @@ def looks_dir() -> Path:
 
 
 def connected_servers_path() -> Path:
-    """Dot's record of the MCP servers the owner added on Customize › Plugins (items 279 and 316): each with its address or command."""
+    """Dot's record of the MCP servers the owner added on Customize › Plugins (items 279 and 316): each with its
+    address or command."""
     return dot_home() / "connected-servers.json"
 
 

@@ -209,8 +209,8 @@ def _change_of_route(brief: Brief) -> str:
     if tried:
         listed: str = "\n".join(entry_line(entry, brief.now) for entry in tried)
         routes: str = (
-            f" The routes tried since the newest progress, oldest first, brought nothing and are refused (campaign_note "
-            f"does not take them again):\n{listed}\n"
+            " The routes tried since the newest progress, oldest first, brought nothing and are refused "
+            f"(campaign_note does not take them again):\n{listed}\n"
         )
     else:
         routes = " No strategy entry says which route they took.\n"

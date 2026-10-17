@@ -66,11 +66,11 @@ _CONNECT_TIMEOUT_S: float = 10.0
 # ids (opencode.ai/docs/zen, read 2026-10-15: Big Pickle, Exo and MiMo "collected data may be used to improve the
 # model", Muse Spark Contributor for training); docs/models.md names them.
 LEARNING_MODELS: tuple[str, ...] = ("big-pickle", "exo-", "mimo-", "muse-spark-")
-# What OpenCode's agent may do (``OPENCODE_PERMISSION``, which OpenCode applies over every config): each of its tools that
-# acts or reads asks Dot first, and so does a subagent, which Dot refuses (its session would not be the run's). No tool
-# is switched off: the tools its agent sends the model stay OpenCode's own, as Zen's free tier wants them (it has been
-# reported to refuse OpenCode itself with a tool off, anomalyco/opencode#49433 and #51315, read 2026-10-15); questions
-# to the owner stay off as OpenCode has them for its command line.
+# What OpenCode's agent may do (``OPENCODE_PERMISSION``, which OpenCode applies over every config): each of its tools
+# that acts or reads asks Dot first, and so does a subagent, which Dot refuses (its session would not be the run's). No
+# tool is switched off: the tools its agent sends the model stay OpenCode's own, as Zen's free tier wants them (it has
+# been reported to refuse OpenCode itself with a tool off, anomalyco/opencode#49433 and #51315, read 2026-10-15);
+# questions to the owner stay off as OpenCode has them for its command line.
 PERMISSIONS: JsonObject = {
     "read": "ask",
     "glob": "ask",
@@ -204,7 +204,8 @@ def _managed_config() -> JsonObject:
 
 
 async def _prepared_home() -> Path:
-    """The server's home in Dot's (:func:`dotagent.core.paths.opencode_dir`), its folders made and its config written."""
+    """The server's home in Dot's (:func:`dotagent.core.paths.opencode_dir`), its folders made and its config
+    written."""
     home: Path = opencode_dir()
     for name in ("config", "data", "state", "cache", "home"):
         await asyncio.to_thread((home / name).mkdir, mode=0o700, parents=True, exist_ok=True)

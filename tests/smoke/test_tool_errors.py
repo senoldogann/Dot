@@ -1,6 +1,6 @@
-"""A tool that raises fails its call, not its run (item 150): an error that no tool expects reaches the model as a failed
-result, with its kind and words, and the run goes on to its end; ``edit_file`` keeps the line ends of a file that breaks
-its lines with CRLF, and refuses a file that is not UTF-8 text, saying so, where it used to end the run.
+"""A tool that raises fails its call, not its run (item 150): an error that no tool expects reaches the model as a
+failed result, with its kind and words, and the run goes on to its end; ``edit_file`` keeps the line ends of a file that
+breaks its lines with CRLF, and refuses a file that is not UTF-8 text, saying so, where it used to end the run.
 
 No network and no model service is used: a scripted model calls the tool, then finishes.
 """

@@ -82,7 +82,8 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (12
 # over, and what it put on the clipboard.
 _COPY: str = """() => {
   const range = getSelection().getRangeAt(0);
-  const start = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+  const start =
+    range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
   const data = new DataTransfer();
   const event = new ClipboardEvent("copy", { clipboardData: data, bubbles: true, cancelable: true });
   start.dispatchEvent(event);
@@ -287,7 +288,8 @@ async def test_the_owners_messages_read_as_markdown_and_a_copy_of_the_conversati
                 await composer.evaluate("node => node.select()")
                 copied: dict[str, object] = await composer.evaluate(
                     "node => { const event = new ClipboardEvent('copy', { clipboardData: new DataTransfer(),"
-                    " bubbles: true, cancelable: true }); node.dispatchEvent(event); return { taken: event.defaultPrevented }; }"
+                    " bubbles: true, cancelable: true }); node.dispatchEvent(event); return { taken: "
+                    "event.defaultPrevented }; }"
                 )
                 assert copied["taken"] is False
 

@@ -148,7 +148,8 @@ async def test_the_head_and_the_panel_stay_in_sight_while_a_long_run_scrolls(
                 await page.evaluate(f"{_SCROLLER}.scrollTo(0, {_SCROLLER}.scrollHeight / 2)")
                 await page.wait_for_timeout(150)
                 head_top, head_bottom = await page.evaluate(_BOX, ".stage-title")
-                # The run's head is the bar itself (item 78), so it never scrolls away; the panel's switch stays in reach.
+                # The run's head is the bar itself (item 78), so it never scrolls away; the panel's switch stays in
+                # reach.
                 assert head_top >= 0 and head_bottom <= bar_bottom + 1, (head_top, head_bottom, bar_bottom)
                 await expect(page.locator(".stage-title .avatar")).to_be_visible()
                 if width >= 960:

@@ -1,6 +1,6 @@
-"""Render Dot's mark (item 114) into the files that carry it: the favicon of the web UI (``static/favicon.svg``), the web
-app's icons (``static/icons/icon-192.png``, ``icon-512.png``), the app icon of the desktop shell (``app.png``, 1024 px,
-for ``npm run icons``) and its menu bar icons, one per state (``tray-{state}.png``, 44 px, the 22 pt item at 2x).
+"""Render Dot's mark (item 114) into the files that carry it: the favicon of the web UI (``static/favicon.svg``), the
+web app's icons (``static/icons/icon-192.png``, ``icon-512.png``), the app icon of the desktop shell (``app.png``, 1024
+px, for ``npm run icons``) and its menu bar icons, one per state (``tray-{state}.png``, 44 px, the 22 pt item at 2x).
 
 The mark is a yellow dot that looks: a disc with the two capsule eyes of the character's attentive rest pose
 (``static/js/character``), a little larger than the engine draws them so they hold at 16 px. ``static/index.html`` sets

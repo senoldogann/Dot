@@ -63,8 +63,8 @@ def typed_answer(options: Sequence[QuestionOption], several: bool, line: str) ->
 
 
 def answered(options: Sequence[QuestionOption], answer: str) -> str:
-    """What the run reads of the user's answer: one option chosen alone is named as an option, with whether it is the one
-    the run recommended; any other answer is quoted as it was given."""
+    """What the run reads of the user's answer: one option chosen alone is named as an option, with whether it is the
+    one the run recommended; any other answer is quoted as it was given."""
     for option in options:
         if option.label == answer:
             recommended: str = ", the one you recommended" if option.recommended else ""

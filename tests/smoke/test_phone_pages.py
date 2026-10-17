@@ -6,11 +6,11 @@ chosen from it opens at the top of its pane. Side by side, the tabs are a column
 and scrolled away with the page. On a phone the settings are a list of their tabs (item 330, test_phone_settings.py).
 
 The bar and the composer (item 273): the bar beside a closed sidebar holds its opener alone, and neither holds the
-emergency stop, which is in Settings › System (item 289); the sidebar's buttons and the side panel's switch and close are one size; the reasoning pill shows its
-level's word, chosen from its menu; on a phone the bar's buttons are a finger's size and the bar holds them all, and the
-box's text keeps the size chosen for it in a window of any width without a touch screen (item 311; the 16 px a touch
-screen needs is in test_phone_fit.py). Before, the stop stood beside the opener, the panel's buttons were smaller and the
-level folded to a brain under 600 px of bar.
+emergency stop, which is in Settings › System (item 289); the sidebar's buttons and the side panel's switch and close
+are one size; the reasoning pill shows its level's word, chosen from its menu; on a phone the bar's buttons are a
+finger's size and the bar holds them all, and the box's text keeps the size chosen for it in a window of any width
+without a touch screen (item 311; the 16 px a touch screen needs is in test_phone_fit.py). Before, the stop stood beside
+the opener, the panel's buttons were smaller and the level folded to a brain under 600 px of bar.
 
 On a phone, light and dark, at a laptop's width and at a wide one. No network and no model service is used: the runs are
 a scripted model's.
@@ -60,7 +60,8 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (390, "dark"),
     (1280, "light"),
 )
-# A laptop's window with the sidebar open: the tabs and the pane do not fit side by side, and a phone's list is not used.
+# A laptop's window with the sidebar open: the tabs and the pane do not fit side by side, and a phone's list is not
+# used.
 _ROW_SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"))
 # Wide enough for the tabs and the pane side by side, the sidebar open.
 _WIDE: int = 1680

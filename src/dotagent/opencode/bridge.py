@@ -3,14 +3,14 @@ Dot starts (:mod:`dotagent.opencode.server`) reaches as a remote MCP server of i
 
 Each chat with a run at work in OpenCode has a door of its own (:class:`Door`): a name OpenCode knows the chat's tools
 by (``dot_`` and eight hex digits of the chat, so a tool reads ``dot_1a2b3c4d_browser_open``), a secret its requests
-carry, the tools of Dot's the run may use, and how a call of one runs, through the run's gate as a call of Dot's own loop
-does (:mod:`dotagent.opencode.run`). OpenCode hands every session the tools of every MCP server it has, so the session of
-a chat keeps to its own door's by its permission rules (:func:`session_rules`): the doors of other chats are hidden from
-its model, and their instructions with them (measured with OpenCode 1.19.1 and a Zen free model, 2026-10-16: the model
-listed only its own door's tool and called it, and Zen's free tier answered as without the server).
+carry, the tools of Dot's the run may use, and how a call of one runs, through the run's gate as a call of Dot's own
+loop does (:mod:`dotagent.opencode.run`). OpenCode hands every session the tools of every MCP server it has, so the
+session of a chat keeps to its own door's by its permission rules (:func:`session_rules`): the doors of other chats are
+hidden from its model, and their instructions with them (measured with OpenCode 1.19.1 and a Zen free model, 2026-10-16:
+the model listed only its own door's tool and called it, and Zen's free tier answered as without the server).
 
-A call waits as long as its tool does, the owner's answer to an approval included: OpenCode waits ``CALL_TIMEOUT_MS`` for
-an answer, and each call sends it progress every ``_PING_S`` meanwhile, which starts that wait again.
+A call waits as long as its tool does, the owner's answer to an approval included: OpenCode waits ``CALL_TIMEOUT_MS``
+for an answer, and each call sends it progress every ``_PING_S`` meanwhile, which starts that wait again.
 """
 
 import asyncio
@@ -62,16 +62,16 @@ _STOP_TIMEOUT_S: float = 5.0
 
 # What OpenCode's agent reads about a door's tools, in its system prompt, while the door's tools are its own.
 INSTRUCTIONS: str = (
-    "You are working inside Dot, the owner's assistant app on their Mac, and this server's tools are Dot's own, given to"
-    " you for this run besides your own: Dot's browser (browser_*: open pages, read them, click, type and fill forms in"
-    " Dot's Chrome, where the sites the owner signed in to there stay signed in), the Mac's applications (desktop_* and"
-    " apple_script) when the owner has allowed them, Dot's memory of earlier conversations (memory_*), schedules"
-    " (schedule_*), a notification to the owner (notify), a page shown in the conversation (show_page), Dot's skills"
-    " (skill), a question to the owner (ask_user) and the apps the owner connected to Dot. When a task needs a web page,"
-    " a site the owner uses or an app on the Mac, use these tools rather than saying that you have no browser or no"
-    " access to the Mac. Each call goes through Dot's rules and, where they say so, the owner's approval; a refused call"
-    " says why, and you go on from there. Other chats of Dot may be at work at the same time: their tabs and apps are"
-    " theirs."
+    "You are working inside Dot, the owner's assistant app on their Mac, and this server's tools are Dot's own, given "
+    "to you for this run besides your own: Dot's browser (browser_*: open pages, read them, click, type and fill "
+    "forms in Dot's Chrome, where the sites the owner signed in to there stay signed in), the Mac's applications "
+    "(desktop_* and apple_script) when the owner has allowed them, Dot's memory of earlier conversations (memory_*), "
+    "schedules (schedule_*), a notification to the owner (notify), a page shown in the conversation (show_page), "
+    "Dot's skills (skill), a question to the owner (ask_user) and the apps the owner connected to Dot. When a task "
+    "needs a web page, a site the owner uses or an app on the Mac, use these tools rather than saying that you have "
+    "no browser or no access to the Mac. Each call goes through Dot's rules and, where they say so, the owner's "
+    "approval; a refused call says why, and you go on from there. Other chats of Dot may be at work at the same time: "
+    "their tabs and apps are theirs."
 )
 
 type CallRunner = Callable[[ToolCall], Awaitable[ToolResult]]

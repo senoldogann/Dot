@@ -243,7 +243,9 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
         ),
         make_tool(
             name="terminal_close",
-            description="End the program of a terminal session and everything it started. Close what you no longer need.",
+            description=(
+                "End the program of a terminal session and everything it started. Close what you no longer need."
+            ),
             args_model=CloseArgs,
             modes=ACTING_MODES,
             parallel_safe=False,

@@ -151,7 +151,8 @@ async def _favicon_state(page: Page) -> str:
     raise AssertionError(f"the favicon names no state: {href[:80]}")
 
 
-# The tab's icon is a data: URL (item 107: the page's Content-Security-Policy allows it); drawn as an image it has a size.
+# The tab's icon is a data: URL (item 107: the page's Content-Security-Policy allows it); drawn as an image it has a
+# size.
 _ICON_LOADS: str = """
 new Promise((done) => {
   const image = new Image();
@@ -303,9 +304,11 @@ async def test_the_face_breathes_at_rest_pulses_at_work_and_holds_still_under_re
                 await manager.wait(run.id)
             await expect(face).to_have_attribute("data-state", "idle", timeout=_STEP_WAIT_S * 1000)
             assert await page.evaluate(_CORE_ANIMATION) == "none"
-            # On a phone the sidebar is a drawer: its slide is a transition of the base length, none under reduced motion.
+            # On a phone the sidebar is a drawer: its slide is a transition of the base length, none under reduced
+            # motion.
             await page.set_viewport_size({"width": 390, "height": 800})
-            # A string predicate polled in the page is refused by its policy (no 'unsafe-eval') once the first check fails.
+            # A string predicate polled in the page is refused by its policy (no 'unsafe-eval') once the first check
+            # fails.
             await expect(page.locator(".shell")).to_have_attribute("data-nav", "drawer")
             assert set((await page.evaluate(_DRAWER_TRANSITION)).split(", ")) == {"0s"}
             await page.emulate_media(reduced_motion="no-preference")

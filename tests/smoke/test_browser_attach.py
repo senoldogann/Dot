@@ -70,7 +70,8 @@ _POLL_S: float = 0.1
 _EVENT_GRACE_S: float = 0.5
 _PAGES: dict[str, str] = {
     "/": """<!doctype html><title>Home</title><h1>Dot attach fixture</h1>
-<button onclick="document.getElementById('n').textContent = String(Number(document.getElementById('n').textContent) + 1)">Increment</button>
+<button onclick="document.getElementById('n').textContent =
+  String(Number(document.getElementById('n').textContent) + 1)">Increment</button>
 <span id="n">0</span>
 <a href="/popup" target="_blank">Open popup</a>""",
     "/mine": "<!doctype html><title>Mine</title><h1>A page of the user</h1>",

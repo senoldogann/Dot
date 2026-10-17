@@ -5,7 +5,8 @@ relative to the viewport of the frame that owns the element, which is why conten
 iframe element's size and not with the page viewport.
 
 The rendered view keeps what the model can act on or read and leaves out scaffolding: anonymous layout wrappers
-(``generic``, ``table``, ``cell`` …), separator text such as ``|`` and link targets, which ``link_lines`` serves on demand.
+(``generic``, ``table``, ``cell`` …), separator text such as ``|`` and link targets, which ``link_lines`` serves on
+demand.
 
 A collapsed native dropdown lists its options under the ``combobox`` line as lines without a ref and without a size,
 which the viewport filter would drop. ``fold_options`` moves them onto the dropdown's own line, as
@@ -32,7 +33,8 @@ _COSMETIC: re.Pattern[str] = re.compile(r" \[cursor=pointer\]")
 _ATTRIBUTE: re.Pattern[str] = re.compile(r"\[([^\]]*)\]")
 _QUOTED_KEY: re.Pattern[str] = re.compile(r"^(?P<lead>\s*- )'(?P<key>(?:[^']|'')*)'(?P<tail>:.*)?$")
 _SHAPE: re.Pattern[str] = re.compile(
-    r'^\s*- (?P<role>/?[\w-]+)(?: "(?P<name>(?:[^"\\]|\\.)*)")?(?P<attrs>(?: \[[^\]]*\])*)(?P<tail>:(?: (?P<inline>.*))?)?$'
+    r'^\s*- (?P<role>/?[\w-]+)(?: "(?P<name>(?:[^"\\]|\\.)*)")?(?P<attrs>(?: \[[^\]]*\])*)(?P<tail>:(?: '
+    r"(?P<inline>.*))?)?$"
 )
 _NAMED: re.Pattern[str] = re.compile(r'^\s*- (?!generic\b)([A-Za-z][\w-]*) "((?:[^"\\]|\\.)*)"')
 _BLANK_RUNS: re.Pattern[str] = re.compile(r"\n{3,}")
@@ -438,7 +440,8 @@ def _label_of(text: str) -> str:
 
 
 def has_option(dropdown: Dropdown, wanted: str) -> bool:
-    """Whether choosing ``wanted`` finds an option: Playwright takes a value as it is and a label ignoring whitespace."""
+    """Whether choosing ``wanted`` finds an option: Playwright takes a value as it is and a label ignoring
+    whitespace."""
     target: str = _label_of(wanted)
     return any(wanted == option.value or target == _label_of(option.label) for option in dropdown.options)
 

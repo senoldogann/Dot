@@ -1,7 +1,7 @@
-"""Skills and plugins end to end, on real folders in a throwaway Dot home: a plugin brings its MCP server and its skills,
-the prompt lists the skills, the ``skill`` tool hands over the instructions and the files of a skill the run is offered
-and of no other (item 168), a run reads and runs them but never changes what Dot loads (item 135), and ``dotx skills
-list`` shows what was found and what was left out. Nothing is mocked."""
+"""Skills and plugins end to end, on real folders in a throwaway Dot home: a plugin brings its MCP server and its
+skills, the prompt lists the skills, the ``skill`` tool hands over the instructions and the files of a skill the run
+is offered and of no other (item 168), a run reads and runs them but never changes what Dot loads (item 135), and
+``dotx skills list`` shows what was found and what was left out. Nothing is mocked."""
 
 import asyncio
 import json
@@ -38,7 +38,8 @@ FIXTURE: Path = Path(__file__).resolve().parent.parent / "fixtures" / "mcp_fixtu
 MODEL: str = "gpt-oss:20b-cloud"
 CLI_TIMEOUT_S: float = 90.0
 FENCE: re.Pattern[str] = re.compile(
-    r'<skill_content nonce="(?P<nonce>[0-9a-f]+)" name="(?P<name>[^"]+)">\n(?P<body>.*)\n</skill_content nonce="(?P=nonce)">',
+    r'<skill_content nonce="(?P<nonce>[0-9a-f]+)" name="(?P<name>[^"]+)">\n(?P<body>.*)\n</skill_content '
+    r'nonce="(?P=nonce)">',
     re.DOTALL,
 )
 RELEASE_NOTES: str = """---

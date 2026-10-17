@@ -1,7 +1,7 @@
 """How a run ends when the end itself is under pressure (item 136): a stop that comes before the run's first step, a
-message sent while the end is being recorded, and a store that fails to record it. a run's end. A database that refuses the event of
-a run's end keeps none of that end, and a delegated run whose end was not kept is an error for the run that delegated
-it (item 179). An end the database refused is stored once it takes it again, a run whose start failed ends with the event
+message sent while the end is being recorded, and a store that fails to record it. A database that refuses the event of
+a run's end keeps none of that end, and a delegated run whose end was not kept is an error for the run that delegated it
+(item 179). An end the database refused is stored once it takes it again, a run whose start failed ends with the event
 the pages wait for, the error of a failed start stays the one raised when its cleanup fails too, the refusal to delete a
 chat names its runs, and the daemon's half-minute check outlives a write the database refuses (item 183). The scripted
 model plays the runs; no network and no model service is used.

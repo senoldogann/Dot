@@ -30,8 +30,9 @@ NO_PACE: PaceConfig = PaceConfig(
     public_per_hour=0, public_per_day=0, social_per_hour=0, social_per_day=0, public_spacing_s=0.0
 )
 
-# What the cautious preset asks about, a payment (a hard stop that is the user's in every mode), a read of a key (refused
-# in every mode) and a schedule (allowed by the aggressive preset until the run has read content from a stranger).
+# What the cautious preset asks about, a payment (a hard stop that is the user's in every mode), a read of a key
+# (refused in every mode) and a schedule (allowed by the aggressive preset until the run has read content from a
+# stranger).
 WRITE: ActionInfo = ActionInfo(
     tool="write_file", kind="write", risk="medium", summary="Write notes.md", target="notes.md", flags=()
 )

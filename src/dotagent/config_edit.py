@@ -232,8 +232,8 @@ def set_judge_provider(path: Path, provider: JudgeProvider) -> None:
 
 
 def set_shell_sandbox(path: Path, on: bool) -> None:
-    """Write ``[shell] sandbox``, whether the processes of a run outside yolo start in the macOS sandbox, into the config
-    file at ``path`` (see :func:`set_setting`)."""
+    """Write ``[shell] sandbox``, whether the processes of a run outside yolo start in the macOS sandbox, into the
+    config file at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "shell", "sandbox", on)
 
 
@@ -267,9 +267,9 @@ def set_context_size(path: Path, model: str, tokens: int | None) -> None:
 def _edit(
     path: Path, keys: tuple[str, ...], value: SettingValue | None, change: Callable[[str], str], by_hand: str
 ) -> None:
-    """Replace the config file at ``path`` with ``change`` of its text, once the result, parsed again, holds ``value`` at
-    ``keys`` (nothing there for ``None``) and every other setting unchanged; else nothing is written and the error says
-    to do ``by_hand`` by hand."""
+    """Replace the config file at ``path`` with ``change`` of its text, once the result, parsed again, holds
+    ``value`` at ``keys`` (nothing there for ``None``) and every other setting unchanged; else nothing is written and
+    the error says to do ``by_hand`` by hand."""
     with _EDITING:
         try:
             before: str = path.read_text(encoding="utf-8") if path.exists() else ""

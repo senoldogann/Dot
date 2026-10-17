@@ -1,11 +1,11 @@
-"""Dot's lists on a phone (item 332), in WebKit as the owner's iPhone and as a small one, on a served daemon with a run at
-work and a run it delegated, at work too.
+"""Dot's lists on a phone (item 332), in WebKit as the owner's iPhone and as a small one, on a served daemon with a run
+at work and a run it delegated, at work too.
 
 On a phone a card's name stands over the card, out of its surface, on Activity's sections and a service's page of
-Customize › Plugins (as in the settings' tabs, item 330); a row of Activity is its title over one line of facts, a delegated run's too; Team's empty
-line says what brings messages there. In a Mac's window the cards keep their names inside. Before, the names were inside
-on a phone too, a delegated run's facts ran to three lines and Team's empty line named a tool. The model is a scripted
-one.
+Customize › Plugins (as in the settings' tabs, item 330); a row of Activity is its title over one line of facts, a
+delegated run's too; Team's empty line says what brings messages there. In a Mac's window the cards keep their names
+inside. Before, the names were inside on a phone too, a delegated run's facts ran to three lines and Team's empty line
+named a tool. The model is a scripted one.
 """
 
 import asyncio

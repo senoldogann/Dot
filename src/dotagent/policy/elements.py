@@ -1,4 +1,5 @@
-"""Name-based risk rules shared by the browser and the desktop: what a control's label says about a click or a keystroke.
+"""Name-based risk rules shared by the browser and the desktop: what a control's label says about a click or a
+keystroke.
 
 A label comes from a web page or an application, so it is untrusted: it can only make a step look riskier than the
 action alone, never safer. The policy engine decides what the resulting risk and flags mean.
@@ -17,7 +18,8 @@ _KEY_LIKE: re.Pattern[str] = re.compile(
 _FINANCIAL_ACTION: re.Pattern[str] = re.compile(
     r"(?i)\b(?:buy now|buy it now|purchase|place (?:your |my )?order|complete (?:your |my )?(?:order|purchase|payment)"
     r"|confirm (?:your |my )?(?:order|purchase|payment)|pay now|pay with|make (?:a )?payment|submit payment|donate"
-    r"|send money|wire transfer|sat[ıi]n al|[öo]demeyi tamamla|sipari[şs]i? (?:ver|onayla|tamamla)|ba[ğg][ıi][şs] yap)\b"
+    r"|send money|wire transfer|sat[ıi]n al|[öo]demeyi tamamla|sipari[şs]i? (?:ver|onayla|tamamla)"
+    r"|ba[ğg][ıi][şs] yap)\b"
     r"|^pay$|^[öo]de$"
 )
 _DESTRUCTIVE_ACTION: re.Pattern[str] = re.compile(

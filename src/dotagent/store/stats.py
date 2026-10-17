@@ -79,7 +79,8 @@ WHERE {scope} AND e.kind = 'tool_result' AND json_extract(e.data, '$.tool') IN (
 # One row per step of the runs: the model of its run, the step's number in its run, the seconds its model call took
 # and the input tokens it sent (NULL for a step recorded before that was measured).
 _STEPS_SQL: str = """
-SELECT r.model, json_extract(e.data, '$.step'), json_extract(e.data, '$.seconds'), json_extract(e.data, '$.input_tokens')
+SELECT r.model, json_extract(e.data, '$.step'), json_extract(e.data, '$.seconds'),
+       json_extract(e.data, '$.input_tokens')
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {scope} AND e.kind = 'assistant'
 """
@@ -162,8 +163,8 @@ FROM events e WHERE e.run_id IN (SELECT id FROM recent)
 # One row per step call of one model that answered and measured its input, in the runs created since a time: the input
 # tokens it sent, the part of them the provider served from its cache, its seconds and its run.
 _CONTEXT_CALLS_SQL: str = """
-SELECT json_extract(e.data, '$.input_tokens'), json_extract(e.data, '$.cached_tokens'), json_extract(e.data, '$.seconds'),
-       e.run_id
+SELECT json_extract(e.data, '$.input_tokens'), json_extract(e.data, '$.cached_tokens'),
+       json_extract(e.data, '$.seconds'), e.run_id
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE r.created_at >= ? AND e.kind = ? AND json_extract(e.data, '$.purpose') = 'step'
   AND json_extract(e.data, '$.model') = ? AND json_extract(e.data, '$.error') IS NULL

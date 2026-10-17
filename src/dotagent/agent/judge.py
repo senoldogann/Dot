@@ -14,11 +14,11 @@ The click questions are asked in ``ask`` and ``auto`` only: in ``yolo`` a flag a
 nothing to the judge.
 
 The judge never decides a step and never grants anything: it adds flags that make the policy ask, stops a claim the
-goal checker would have examined, or puts numbers above a page the model reads anyway. What it sends has its secrets masked, and a page's address goes without its query and
-fragment. It asks through the :class:`TypeSafeService` of the runtime, which the judge_items tool shares: a missing
-key or an outage makes the service unavailable for ``[models] helper_cooldown_s``, with a ``judge_unavailable`` event,
-and meanwhile the patterns and the goal checker decide alone; a request TypeSafe rejects is a ``judge_error`` of this
-code, logged with the request, and does not pause the service.
+goal checker would have examined, or puts numbers above a page the model reads anyway. What it sends has its secrets
+masked, and a page's address goes without its query and fragment. It asks through the :class:`TypeSafeService` of the
+runtime, which the judge_items tool shares: a missing key or an outage makes the service unavailable for ``[models]
+helper_cooldown_s``, with a ``judge_unavailable`` event, and meanwhile the patterns and the goal checker decide alone; a
+request TypeSafe rejects is a ``judge_error`` of this code, logged with the request, and does not pause the service.
 
 With ``[judge] second_opinion`` each question is asked a second time, in a separate request with an independent
 phrasing (:data:`SECOND_CLICK_QUESTIONS`, :data:`SECOND_CLAIM_QUESTION`), and the judge acts on the two answers
@@ -270,7 +270,8 @@ def _page(url: str) -> str:
 
 
 def click_judgment(probabilities: dict[str, float], threshold: float) -> ClickJudgment:
-    """The reasons of the click questions whose probability of yes is at least ``threshold``, and the note naming them."""
+    """The reasons of the click questions whose probability of yes is at least ``threshold``, and the note naming
+    them."""
     found: list[tuple[NoulQuestion, str]] = [
         (question, reason) for question, reason in CLICK_QUESTIONS if probabilities[question.id] >= threshold
     ]

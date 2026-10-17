@@ -1,7 +1,7 @@
-"""The doctor rows that look at this Mac for real: the commands and secrets of MCP servers, and whether macOS can capture
-the screen. Nothing is started and nothing is mocked: the login shell, PATH, ``.env`` file, Keychain and ScreenCaptureKit
-are all asked. The model rows ask a stand-in model service on this Mac through the real connectors, or an address of this
-Mac where nothing listens."""
+"""The doctor rows that look at this Mac for real: the commands and secrets of MCP servers, and whether macOS can
+capture the screen. Nothing is started and nothing is mocked: the login shell, PATH, ``.env`` file, Keychain and
+ScreenCaptureKit are all asked. The model rows ask a stand-in model service on this Mac through the real connectors,
+or an address of this Mac where nothing listens."""
 
 import asyncio
 import json

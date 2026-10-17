@@ -73,6 +73,7 @@ def test_an_oversized_request_is_cut_to_its_limit_and_the_result_says_so() -> No
     steps: list[Step] = [Step(action="press", key=str(number)) for number in range(7)]
     assert first_steps(steps, 5) == steps[:5]
     assert batch_cut_note(7, 5) == (
-        "The batch had 7 steps; the first 5 ran (the most a batch holds). Look at the result, then send the remaining 2."
+        "The batch had 7 steps; the first 5 ran (the most a batch holds). Look at the result, then send the remaining "
+        "2."
     )
     assert batch_cut_note(5, 5) == ""

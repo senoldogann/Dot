@@ -29,7 +29,8 @@ def test_the_hue_of_an_id_is_its_hash_on_the_ring_of_eight() -> None:
         pytest.skip("node is not installed: the browser's hash cannot be run here")
     script: str = (
         f"import {{ hueOf, hashId, HUES }} from '{(STATIC_DIR / 'js' / 'hues.js').as_uri()}';"
-        f"console.log(JSON.stringify({{ hues: {json.dumps(_IDS)}.map(hueOf), hashes: {json.dumps(_IDS)}.map(hashId), ring: HUES }}));"
+        f"console.log(JSON.stringify({{ hues: {json.dumps(_IDS)}.map(hueOf), hashes: {json.dumps(_IDS)}.map(hashId), "
+        f"ring: HUES }}));"
     )
     result = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
     seen: dict[str, object] = json.loads(result.stdout)
@@ -69,7 +70,8 @@ def test_a_chat_with_dot_wears_a_shape_and_a_colour_its_hash_picks_apart() -> No
     script: str = (
         f"import {{ chatLook, HUE_COLOURS }} from '{(STATIC_DIR / 'js' / 'hues.js').as_uri()}';"
         f"import {{ SHAPE_IDS }} from '{(STATIC_DIR / 'js' / 'character' / 'skins.js').as_uri()}';"
-        f"console.log(JSON.stringify({{ looks: {json.dumps(ids)}.map(chatLook), shapes: SHAPE_IDS, colours: HUE_COLOURS }}));"
+        f"console.log(JSON.stringify({{ looks: {json.dumps(ids)}.map(chatLook), shapes: SHAPE_IDS, colours: "
+        f"HUE_COLOURS }}));"
     )
     result = subprocess.run([node, "--input-type=module", "-e", script], capture_output=True, text=True, check=True)
     payload = json.loads(result.stdout)

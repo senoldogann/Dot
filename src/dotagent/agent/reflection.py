@@ -14,8 +14,8 @@ judges each older note against a newer one close to it, and one it calls outdate
 replaced it, so the Memory page still lists it and the owner can wake it); and it writes one journal note of the days
 it read (:func:`journal_span`), tagged ``journal``, when anything happened. A lesson the owner saved from a run's page
 is never folded away, retired nor put aside, and neither is a note the owner wrote. Whether a run read
-content third parties can author is read from all its results, not only the ones its digest shows. The last reflection is kept in the store's key/value table, so the next
-one knows where to start and the Activity list can show it.
+content third parties can author is read from all its results, not only the ones its digest shows. The last reflection
+is kept in the store's key/value table, so the next one knows where to start and the Activity list can show it.
 
 The scheduler fires it at ``[agent] reflection_time`` (:func:`reflection_due`), ``dotx reflect`` runs it by hand. Every
 function here is pure except the ones that take the store or the runtime.

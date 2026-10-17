@@ -25,7 +25,8 @@ def _clip(text: str, limit: int) -> str:
 
 
 def origin(meta: PlaybookMeta) -> str | None:
-    """What the listing says of where a playbook's steps come from, or ``None`` for steps runs are offered as written."""
+    """What the listing says of where a playbook's steps come from, or ``None`` for steps runs are offered as
+    written."""
     if meta.tainted is None:
         return "origin unknown"
     return "learned from third-party content" if meta.tainted else None

@@ -1,6 +1,6 @@
-"""The choices for one message (item 251): Ultrathink asks the model for its Max level, Ultracode for its Extra high level
-and has the run told to split its work across delegated runs; the instructions say so only to a run that can delegate,
-and the store keeps the choice with a run, a queued message and a campaign."""
+"""The choices for one message (item 251): Ultrathink asks the model for its Max level, Ultracode for its Extra high
+level and has the run told to split its work across delegated runs; the instructions say so only to a run that can
+delegate, and the store keeps the choice with a run, a queued message and a campaign."""
 
 from pathlib import Path
 

@@ -131,8 +131,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     resume = commands.add_parser(
         "resume",
-        help="go on with a run that a restart or a shutdown of the daemon, or a closed terminal, cut off, and print the "
-        "result",
+        help=(
+            "go on with a run that a restart or a shutdown of the daemon, or a closed terminal, cut off, and print "
+            "the result"
+        ),
     )
     resume.add_argument(
         "run_id",
@@ -184,8 +186,10 @@ def build_parser() -> argparse.ArgumentParser:
     setup.add_argument("--no-service", action="store_true", help="leave the launchd service as it is")
     commands.add_parser(
         "reflect",
-        help="reflect now on the runs that ended since the last reflection: lessons, merged and rested lesson notes, "
-        "the day's journal note (the daemon does it at [agent] reflection_time)",
+        help=(
+            "reflect now on the runs that ended since the last reflection: lessons, merged and rested lesson notes, "
+            "the day's journal note (the daemon does it at [agent] reflection_time)"
+        ),
     )
 
     browser = commands.add_parser("browser", help="manage the browser Dot uses")
@@ -196,7 +200,10 @@ def build_parser() -> argparse.ArgumentParser:
     browser_login.add_argument("url", nargs="?", default=None, help="page to open first, e.g. accounts.google.com")
     browser_import = browser_commands.add_parser(
         "import-chrome",
-        help="copy the sign-ins (cookies, local storage) of a personal Chrome profile into Dot's profile; quit Chrome first",
+        help=(
+            "copy the sign-ins (cookies, local storage) of a personal Chrome profile into Dot's profile; quit Chrome "
+            "first"
+        ),
     )
     browser_import.add_argument(
         "--profile", default="Default", help="Chrome profile directory, e.g. Default or 'Profile 1'"

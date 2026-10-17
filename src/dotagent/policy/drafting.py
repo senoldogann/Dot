@@ -153,7 +153,8 @@ def rule_from_draft(draft: RuleDraft, tools: frozenset[str]) -> DraftedRule:
         for command in draft.commands:
             if not _UNPLAIN.isdisjoint(command):
                 raise InvalidValueError(
-                    "a command that a rule lets Dot run is one plain command, without ; & | ` $ < > ( ) or a line break",
+                    "a command that a rule lets Dot run is one plain command, without ; & | ` $ < > ( ) or a line "
+                    "break",
                     {"command": command},
                 )
     pattern: str

@@ -57,7 +57,8 @@ def _transform(node: JsonValue, defs: JsonObject, depth: int) -> JsonValue:
 
 
 def _definitions(raw: JsonObject) -> JsonObject:
-    """The reusable sub-schemas of a document, whether it calls them ``$defs`` (current) or ``definitions`` (draft 7)."""
+    """The reusable sub-schemas of a document, whether it calls them ``$defs`` (current) or ``definitions`` (draft
+    7)."""
     collected: JsonObject = {}
     for key in ("definitions", "$defs"):
         found: JsonValue = raw.get(key)

@@ -327,8 +327,8 @@ def _added_servers(config: AppConfig, plugins: PluginCatalog) -> tuple[McpServer
 
 
 def _connected_servers(taken: frozenset[str]) -> tuple[McpServerConfig, ...]:
-    """The MCP servers that the owner added on Customize › Plugins (items 279 and 316). One whose name another server has (``taken``)
-    is logged and left out, and so are all of them when the record cannot be read."""
+    """The MCP servers that the owner added on Customize › Plugins (items 279 and 316). One whose name another server
+    has (``taken``) is logged and left out, and so are all of them when the record cannot be read."""
     path: Path = connected_servers_path()
     try:
         record: ConnectedServers = read_connected(path)

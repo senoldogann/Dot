@@ -41,7 +41,8 @@ _LONE: re.Pattern[str] = re.compile(r"(?<![\d.,:/-])(\d{6})(?![\d.,:/-])")
 
 
 class FoundMessage(FrozenModel):
-    """The newest message that matched: who sent it, its subject (empty in Messages), its age in seconds and its text."""
+    """The newest message that matched: who sent it, its subject (empty in Messages), its age in seconds and its
+    text."""
 
     sender: str
     subject: str

@@ -219,7 +219,8 @@ async def cmd_setup(command: SetupCommand) -> int:
     if command.no_service:
         sys.stdout.write(
             "\nThe service is left as it is. Start Dot with 'dotx daemon' (in this terminal) or 'dotx service install' "
-            f"(in the background, from every login); its web UI is at {base_url(config.server.host, config.server.port)}"
+            "(in the background, from every login); its web UI is at "
+            f"{base_url(config.server.host, config.server.port)}"
             ", and 'dotx open' opens it signed in. A daemon that already runs keeps its models until it starts again.\n"
         )
         return 0

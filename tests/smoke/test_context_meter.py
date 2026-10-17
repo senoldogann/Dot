@@ -46,8 +46,8 @@ _UNSIZED: JsonObject = {
 
 
 def _sized(chosen: int, window: int) -> JsonObject:
-    """The scaffold event of a run whose model has a context size of ``chosen`` tokens of its own (item 250), which three
-    quarters of its ``window`` cut when they are less."""
+    """The scaffold event of a run whose model has a context size of ``chosen`` tokens of its own (item 250), which
+    three quarters of its ``window`` cut when they are less."""
     budget: int = min(chosen, round(window * 0.75))
     return {
         **_UNSIZED,

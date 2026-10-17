@@ -85,7 +85,8 @@ class Unreachable:
 
 
 class Played:
-    """A run that is over: its record, its events, the deltas it streamed (the store keeps none) and how long it took."""
+    """A run that is over: its record, its events, the deltas it streamed (the store keeps none) and how long it
+    took."""
 
     def __init__(
         self, record: RunRecord, events: Sequence[EventRecord], streamed: Sequence[EventRecord], seconds: float

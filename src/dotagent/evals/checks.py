@@ -163,5 +163,6 @@ async def evaluate_check(check: Check, workspace: Path, answer: str, env: Mappin
 async def evaluate_checks(
     checks: Sequence[Check], workspace: Path, answer: str, env: Mapping[str, str]
 ) -> tuple[CheckOutcome, ...]:
-    """Every check of a task, in order. None is skipped when an earlier one fails, so a report shows all that is wrong."""
+    """Every check of a task, in order. None is skipped when an earlier one fails, so a report shows all that is
+    wrong."""
     return tuple([await evaluate_check(check, workspace, answer, env) for check in checks])

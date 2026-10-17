@@ -65,5 +65,6 @@ def history_digest(runs: Sequence[RunRecord], zone: ZoneInfo, budget: int) -> Di
 
 
 def firing_opening(goal: str, digest: Digest) -> str:
-    """The opening message of a firing's run: the digest of the earlier runs, then the goal; the goal alone without one."""
+    """The opening message of a firing's run: the digest of the earlier runs, then the goal; the goal alone without
+    one."""
     return goal if digest.text == "" else f"{digest.text}\n\n{goal}"

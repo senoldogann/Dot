@@ -1,5 +1,5 @@
-"""The three switches of a run: who answers the questions of the policy, what a verdict of the goal check makes of the end
-of a run, what a database from before the switches gets, and what the model is told about them."""
+"""The three switches of a run: who answers the questions of the policy, what a verdict of the goal check makes of
+the end of a run, what a database from before the switches gets, and what the model is told about them."""
 
 import asyncio
 import re

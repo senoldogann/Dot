@@ -1,7 +1,7 @@
-"""The line of an action a yolo run did without asking (item 253), on a run's page in Chrome: the action and the policy's
-reason read once each, for a record the gate keeps now and for one kept before, whose summary ended with its note. Wide
-and on a phone, light and dark. Before, the line said the reason twice. Settings › General keeps such lines out of the
-chat and brings them back (item 346).
+"""The line of an action a yolo run did without asking (item 253), on a run's page in Chrome: the action and the
+policy's reason read once each, for a record the gate keeps now and for one kept before, whose summary ended with its
+note. Wide and on a phone, light and dark. Before, the line said the reason twice. Settings › General keeps such lines
+out of the chat and brings them back (item 346).
 
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server.
 """

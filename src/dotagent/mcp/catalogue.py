@@ -1,6 +1,6 @@
-"""The services whose own MCP servers Customize › Plugins adds in one step (items 279 and 316), each reached at its address over
-streamable HTTP. Those that sign in do so in the owner's browser, as MCP's authorization asks: OAuth with PKCE, Dot
-registering itself with the service's authorization server as a client without a secret.
+"""The services whose own MCP servers Customize › Plugins adds in one step (items 279 and 316), each reached at its
+address over streamable HTTP. Those that sign in do so in the owner's browser, as MCP's authorization asks: OAuth with
+PKCE, Dot registering itself with the service's authorization server as a client without a secret.
 
 Checked on 2026-10-15 in each authorization server's own metadata: every service here that signs in offers dynamic
 client registration and a client without a secret (``none``). Left out, as Dot cannot register with them: GitHub (a

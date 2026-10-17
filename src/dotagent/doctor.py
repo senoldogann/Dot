@@ -243,8 +243,9 @@ def _check_key(provider: str, variable: str, present: bool, needed: bool) -> Che
 
 
 def _search_row(config: AppConfig, ollama_key_present: bool, anthropic_key_present: bool) -> CheckResult:
-    """The engines web_search climbs: what [web] search_backend says, and what auto resolves to on this Mac (the Anthropic
-    rung joins when its key is set, the browser rung when the run's browser is Dot's own Chrome with a visible window)."""
+    """The engines web_search climbs: what [web] search_backend says, and what auto resolves to on this Mac (the
+    Anthropic rung joins when its key is set, the browser rung when the run's browser is Dot's own Chrome with a visible
+    window)."""
     choice: SearchChoice = config.web.search_backend
     visible_own: bool = config.browser.mode == "own" and not config.browser.headless
     anthropic: AnthropicRung | None = config.web.anthropic_search if anthropic_key_present else None

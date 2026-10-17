@@ -124,7 +124,8 @@ async def _json_attempt(
     try:
         return parse_json_object(response.text, label)
     except JsonParseError as exc:
-        # A success whose body is not JSON (a proxy's page, a cut body) breaks the wire format like any other (item 116).
+        # A success whose body is not JSON (a proxy's page, a cut body) breaks the wire format like any other (item
+        # 116).
         raise ProviderProtocolError(
             "the provider answered with a body that is not a JSON object", {**context, "error": exc.message}
         ) from exc

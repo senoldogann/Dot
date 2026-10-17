@@ -84,7 +84,8 @@ def render_model(stats: ModelStats) -> list[str]:
         f"  how they ended: {endings}",
         f"  steps {stats.steps} ({_per(stats.steps, stats.runs)} a run), input tokens {_count(stats.input_tokens)} "
         f"({_per(stats.input_tokens, stats.steps)} a step), output tokens {_count(stats.output_tokens)}",
-        f"  tools: {stats.tool_calls} calls, {stats.tool_errors} failed ({_percent(stats.tool_errors, stats.tool_calls)}), "
+        f"  tools: {stats.tool_calls} calls, {stats.tool_errors} failed "
+        f"({_percent(stats.tool_errors, stats.tool_calls)}), "
         f"{stats.invalid_arguments} with arguments that were not valid JSON, {stats.rejected_arguments} refused for "
         "arguments that did not fit (a turn lost each)",
         f"  stalls {stats.stalls}, compactions {_compaction(stats.compaction)}",

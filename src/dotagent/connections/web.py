@@ -61,5 +61,6 @@ def _under(host: str, domains: Iterable[str]) -> bool:
 
 
 def signed_in(app: WebApp, cookies: frozenset[CookieKey]) -> bool:
-    """Whether ``cookies`` hold one that ``app`` sets only on a signed-in browser, for its domains or a host under one."""
+    """Whether ``cookies`` hold one that ``app`` sets only on a signed-in browser, for its domains or a host under
+    one."""
     return any(name in app.cookies and _under(host, app.domains) for host, name in cookies)

@@ -181,8 +181,8 @@ class SnapshotView(FrozenModel):
     """What the model is shown about an application: a view of its accessibility tree.
 
     ``heading`` (what the view covers, with the window title), ``body`` and ``notes`` come from the application.
-    ``nodes`` counts the elements of the view, ``shown`` the lines of ``body``, ``omitted`` the lines left out to fit the
-    budget and ``removed`` the elements of the previous view that are gone (delta views only).
+    ``nodes`` counts the elements of the view, ``shown`` the lines of ``body``, ``omitted`` the lines left out to fit
+    the budget and ``removed`` the elements of the previous view that are gone (delta views only).
     """
 
     app: AppView
@@ -283,11 +283,11 @@ class Step(BaseModel):
     action: StepAction = Field(
         description=(
             "click | double_click | right_click | hover | press (activate a button or menu item through accessibility, "
-            "without moving the pointer) | focus (give a field the keyboard focus) | set_value (replace a field's whole "
-            "value at once) | type (key by key into the focused field; a long text without a line break or a tab is "
-            "pasted) | paste (via the clipboard, for long text) | key "
-            "(a key or chord such as cmd+s or return) | scroll | drag | menu (choose a menu bar item by its path) | "
-            "wait | activate (bring an application to the front)."
+            "without moving the pointer) | focus (give a field the keyboard focus) | set_value (replace a field's "
+            "whole value at once) | type (key by key into the focused field; a long text without a line break or a "
+            "tab is pasted) | paste (via the clipboard, for long text) | key (a key or chord such as cmd+s or return) "
+            "| scroll | drag | menu (choose a menu bar item by its path) | wait | activate (bring an application to "
+            "the front)."
         )
     )
     ref: str | None = Field(default=None, description="Element ref from the latest snapshot, for example a12.")
@@ -299,7 +299,10 @@ class Step(BaseModel):
     )
     key: str | None = Field(
         default=None,
-        description="Key or chord for key: cmd+c, cmd+shift+4, return, escape, tab, left, f5, ... (modifiers: cmd, shift, alt, ctrl, fn).",
+        description=(
+            "Key or chord for key: cmd+c, cmd+shift+4, return, escape, tab, left, f5, ... (modifiers: cmd, shift, "
+            "alt, ctrl, fn)."
+        ),
     )
     modifiers: list[Literal["cmd", "shift", "alt", "ctrl", "fn"]] | None = Field(
         default=None, description='Keys held during a click, for example ["cmd"] to open a link in a new tab.'

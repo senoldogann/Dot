@@ -263,8 +263,8 @@ async def climb(
     now: Callable[[], float],
 ) -> SearchOutcome:
     """Ask the engines of ``rungs`` in turn until one answers. A benched engine is skipped with the time it has left;
-    one that limits this machine is benched for its ``BENCH_S`` and skipped; one that fails otherwise is skipped with its
-    error. When every rung is skipped the error names each engine and its reason."""
+    one that limits this machine is benched for its ``BENCH_S`` and skipped; one that fails otherwise is skipped with
+    its error. When every rung is skipped the error names each engine and its reason."""
     skipped: list[Skipped] = []
     for engine in rungs:
         remaining: float | None = bench.remaining(engine, now())

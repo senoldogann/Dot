@@ -5209,7 +5209,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 268 | Office files show in the side panel as Quick Look draws them                          | done        | 53b8333 |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
-| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | in progress |         |
+| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | done        | 5fcee1b |
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
@@ -5287,6 +5287,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| done        | 3dedca5 |
 | 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | done        | 3dedca5 |
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
+| 357 | Lines of at most 120 characters, held by `ruff check`                                  | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12004,7 +12005,7 @@ a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; b
 
 ### 271. Settings › Phone sets up Tailscale and keeps the Mac awake
 
-**Status: in progress.** The owner chose it on 2026-10-17 for this round, with 268, 280 and 281. **As built
+**Status: done (`5fcee1b`).** The owner chose it on 2026-10-17 for this round, with 268, 280 and 281. **As built
 (2026-10-17).** `tailnet.py` reads Tailscale's command line, the app's own before one on the PATH (`tailscale status
 --json`, `tailscale serve status --json`, its JSON validated), and `awake.py` holds macOS's `/usr/bin/caffeinate -s -w
 <daemon pid>`. Settings › Phone › Reach Dot from anywhere says whether Tailscale runs signed in and the Mac's name,
@@ -14187,6 +14188,19 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 `test_previews.py`, `test_push.py`, `tests/smoke/test_wire_codecs.py`; each new case fails on the code before. Docs:
 `docs/safety.md`, `docs/phone.md`.
 
+### 357. Lines of at most 120 characters, held by `ruff check`
+
+**Status: in progress.** The owner's word of 2026-10-17: "Tüm bu açık problemleri düzelt" (fix all these open problems).
+Lines over 120 characters came back in the review of nearly every pull request, so the rule that finds them is on: a
+finding that recurs is fixed at its source. **As built (2026-10-17).** The 391 lines over 120 characters in `src` and
+`tests` are wrapped: comments and docstrings reflowed, a string's pieces regrouped up to the end of a line of its text
+and a value over several lines put in parentheses, the prompt's backslash-continued lines reflowed, and JavaScript, HTML
+and SQL inside strings broken where their language ignores the break. Every changed file but 15 parses to the same tree
+as before, docstrings compared by their words; the 15 are two SQL queries, the pages' script, two local names in
+`evals/scoring.py`, the pages and scripts of tests, and the words of one test's docstring, a stray fragment taken out.
+`pyproject.toml` no longer ignores E501, so `ruff check` holds every line of Python to 120 characters. Docs:
+`CONTRIBUTING.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -14957,3 +14971,4 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 - 2026-10-17 (Opus 5.5): item 281 on the owner's choice of the same day, on `item-281-loop`: `/loop 30m <message>` makes a schedule of the chat that asks it again until a run deletes it or the owner stops it, with a line over the composer.
 - 2026-10-17 (Opus 5.5): item 268 on the owner's choice of the same day, carried from the uncommitted work of 2026-10-16 onto `item-268-quick-look`: Office files drawn by Quick Look in a sandboxed frame, a workbook's sheets framed one at a time under the panel's own tabs.
 - 2026-10-17 (Opus 5.5): item 271 on the owner's choice of the same day, on `item-271-phone-setup`: Settings › Phone says what a phone needs to reach Dot through Tailscale, sets it up with one button, and keeps the Mac awake while it charges.
+- 2026-10-17 (Opus 5.5): item 357 on the owner's word of the same day ("Tüm bu açık problemleri düzelt", fix all these open problems), on `item-357-long-lines`: the 391 long lines wrapped with every value kept, and `ruff check` holds every line of Python to 120 characters.

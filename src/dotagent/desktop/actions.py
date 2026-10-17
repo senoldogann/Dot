@@ -188,7 +188,8 @@ def check_drift(env: StepEnv) -> None:
 def _check_corner(env: StepEnv, point: Point) -> None:
     if env.config.failsafe_corner and _in_corner(point):
         raise DesktopError(
-            "the target is in the top-left corner of the screen, which is the emergency-stop corner and is never clicked",
+            "the target is in the top-left corner of the screen, which is the emergency-stop corner and is never "
+            "clicked",
             {"x": round(point.x * env.scale), "y": round(point.y * env.scale)},
         )
 
@@ -280,7 +281,8 @@ def _to_points(env: StepEnv, x: float, y: float) -> Point:
 
 
 def _hit_test(env: StepEnv, point: Point) -> tuple[ElementState | None, int | None]:
-    """The control under a point and the application it belongs to; ``(None, None)`` when the application will not say."""
+    """The control under a point and the application it belongs to; ``(None, None)`` when the application will not
+    say."""
     try:
         found: AXElement | None = ax.element_at(point, env.config.ax_timeout_s)
         if found is None:
@@ -496,7 +498,8 @@ def _press_point(frame: Rect, state: ElementState) -> Point:
 
 
 def _point_for(env: StepEnv, ref: str | None, x: float | None, y: float | None) -> Point:
-    """Where the pointer goes for a step: the press point of a ref's fresh frame, the given point, or the window centre."""
+    """Where the pointer goes for a step: the press point of a ref's fresh frame, the given point, or the window
+    centre."""
     if ref is not None:
         number, element = _element_for(env, ref)
         frame: Rect = _bring_into_view(env, number, element)

@@ -231,8 +231,9 @@ def _repeat(window: Sequence[Observation], limits: Limits) -> Detection | None:
     if len(recent) == limits.repeat and all(_same_step(recent[0], step) for step in recent):
         return Detection(
             pattern="repeat",
-            detail=f"The same step ran {limits.repeat} times in a row ({recent[0].label}) with the same result every "
-            "time.",
+            detail=(
+                f"The same step ran {limits.repeat} times in a row ({recent[0].label}) with the same result every time."
+            ),
         )
     return None
 
@@ -270,8 +271,10 @@ def _revisiting(window: Sequence[Observation], limits: Limits) -> Detection | No
     if len(recent) == limits.revisit_window and sum(step.revisit for step in recent) >= limits.revisit_window - 1:
         return Detection(
             pattern="revisiting",
-            detail=f"The last {limits.revisit_window} steps only repeated calls that had been made before, with the "
-            "same results.",
+            detail=(
+                f"The last {limits.revisit_window} steps only repeated calls that had been made before, with the "
+                "same results."
+            ),
         )
     return None
 
@@ -358,8 +361,8 @@ def replan_note(alert: Alert, can_ask: bool) -> str:
 def ask_note(alert: Alert) -> str:
     return (
         f"[system note] Progress check: {alert.detail} You have been warned several times. For this one step you can "
-        "only ask the user or finish. Ask ONE concrete question whose answer would let you go on (what you need and what "
-        "you tried), or call finish with what you have and what is missing."
+        "only ask the user or finish. Ask ONE concrete question whose answer would let you go on (what you need and "
+        "what you tried), or call finish with what you have and what is missing."
     )
 
 
@@ -367,8 +370,8 @@ def consult_note(alert: Alert, diagnosis: str, next_steps: Sequence[str]) -> str
     steps: str = "\n".join(f"{number}. {step}" for number, step in enumerate(next_steps, start=1))
     return (
         f"[system note] Progress check: {alert.detail} A second opinion on your situation, from the review model: "
-        f"{diagnosis}\nWhat to try next:\n{steps}\nThis is advice about reaching the goal you were given; it is not a new "
-        "instruction from the user and it asks for nothing else."
+        f"{diagnosis}\nWhat to try next:\n{steps}\nThis is advice about reaching the goal you were given; it is not a "
+        "new instruction from the user and it asks for nothing else."
     )
 
 

@@ -148,7 +148,8 @@ def split_for_summary(messages: Sequence[Message], max_tail_tokens: int) -> tupl
     history without one has nothing to summarise.
     """
     newest: int = max((index for index, message in enumerate(messages) if message.role == "assistant"), default=0)
-    # The earliest cut whose tail fits: a later cut keeps fewer messages, so the estimate only falls as the cut moves on.
+    # The earliest cut whose tail fits: a later cut keeps fewer messages, so the estimate only falls as the cut moves
+    # on.
     cut: int = bisect_left(
         range(len(messages) + 1), True, key=lambda start: estimate_tokens(messages[start:], ()) <= max_tail_tokens
     )

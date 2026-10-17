@@ -49,8 +49,10 @@ def _product(number: int) -> str:
     return (
         f"<!doctype html><html><head><title>Product {number}</title></head><body><main>"
         f"<h1>Product {number}</h1><p>Product {number} costs {10 + number},50 EUR and weighs {100 * number} g.</p>"
-        f'<p>{links} <a href="/catalogue/">Index</a> <a href="/blog/news.html">News</a> <a href="/catalogue/doc.pdf">Sheet</a>'
-        f'<a href="/catalogue/app.html">App</a> <a href="/catalogue/private/secret.html">Private</a></p></main></body></html>'
+        f'<p>{links} <a href="/catalogue/">Index</a> <a href="/blog/news.html">News</a> <a '
+        'href="/catalogue/doc.pdf">Sheet</a>'
+        '<a href="/catalogue/app.html">App</a> <a '
+        'href="/catalogue/private/secret.html">Private</a></p></main></body></html>'
     )
 
 
@@ -61,7 +63,8 @@ _INDEX: str = (
 )
 _APP: str = (
     "<!doctype html><html><head><title>App</title><script></script><script></script>"
-    f"<script>document.addEventListener('DOMContentLoaded', () => {{ document.body.innerHTML = '<p>{_RENDERED_SENTENCE}</p>'; }});</script>"
+    f"<script>document.addEventListener('DOMContentLoaded', () => {{ document.body.innerHTML = "
+    f"'<p>{_RENDERED_SENTENCE}</p>'; }});</script>"
     '</head><body><div id="app"></div></body></html>'
 )
 
@@ -72,7 +75,8 @@ def _pdf(sentence: str) -> bytes:
     objects: list[bytes] = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> "
+        b">>",
         b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     ]
@@ -248,8 +252,8 @@ async def test_a_page_that_refuses_the_plain_request_is_read_in_the_browser_and_
     assert "rendered; the plain request got HTTP 403, read in the browser" in head
     assert _WALL_SENTENCE in result.text
     assert (
-        f"Left out (1):\n- {site}/walled/gone.html: HTTP 403; the browser could not read it: the browser got HTTP 403 too"
-        in head
+        f"Left out (1):\n- {site}/walled/gone.html: HTTP 403; the browser could not read it: the browser got HTTP 403 "
+        "too" in head
     )
 
 

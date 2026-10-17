@@ -1,5 +1,5 @@
-"""The delegate tool: its run takes the parent's mode, which the model cannot choose (item 117), and in its result a step
-the plan does not have is a note, not a refusal, and closes nothing."""
+"""The delegate tool: its run takes the parent's mode, which the model cannot choose (item 117), and in its result a
+step the plan does not have is a note, not a refusal, and closes nothing."""
 
 import pytest
 from pydantic import ValidationError

@@ -5,9 +5,9 @@ the pages of other sites from using the API through the browser, the Fetch Metad
 browser to the UI (:func:`navigation_is_foreign`), and the token keeps other programs of this Mac out.
 The clients send the token only to a server that first proves it holds it (:func:`daemon_proof`), so a program that took
 the port while the daemon was down is sent nothing. A phone's app trades a pairing code for the token without it
-(``/api/phone/pair``, item 267; :mod:`dotagent.server.pairing`). A page that a run showed (``/pages/<id>``) is served without the
-token, to whoever names its id, which cannot be guessed; it runs the run's scripts, so it is sandboxed wherever it
-opens (:data:`PAGE_HEADERS`).
+(``/api/phone/pair``, item 267; :mod:`dotagent.server.pairing`). A page that a run showed (``/pages/<id>``) is served
+without the token, to whoever names its id, which cannot be guessed; it runs the run's scripts, so it is sandboxed
+wherever it opens (:data:`PAGE_HEADERS`).
 """
 
 import hashlib
@@ -53,8 +53,8 @@ _PROOF_LABEL: bytes = b"dot daemon proof\n"
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
-        "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; manifest-src 'self'; "
-        "frame-src 'self'; "
+        "default-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' blob: data:; "
+        "manifest-src 'self'; frame-src 'self'; "
         # The desktop shell's bridge (Tauri IPC) is a connection the page makes; a browser never sees these sources.
         "connect-src 'self' ipc: http://ipc.localhost; "
         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'",

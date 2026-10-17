@@ -1,7 +1,8 @@
 """``dotx models`` ends with 1 when no provider answers, so a script that runs it can tell; one provider that answers is
 enough for 0, as a provider without a key is the usual state. The real command runs in a child process with a throw-away
 home whose providers all point at a closed port, and OpenCode's at a program that does not exist (``conftest.py``); the
-keys are not real ones, set in the environment so that the Keychain is never read, and no service is asked (item 177)."""
+keys are not real ones, set in the environment so that the Keychain is never read, and no service is asked (item
+177)."""
 
 import os
 import subprocess

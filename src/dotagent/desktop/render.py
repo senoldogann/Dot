@@ -376,7 +376,8 @@ def render_clipboard(text: str | None, nonce: str) -> str:
 
 
 def render_screenshot_caption(view: ScreenshotView, nonce: str) -> str:
-    """The text that goes with a screenshot: how its pixels map to coordinates, where the pointer is, who is in front."""
+    """The text that goes with a screenshot: how its pixels map to coordinates, where the pointer is, who is in
+    front."""
     if view.zoom == 1 and view.left == 0 and view.top == 0:
         mapping: str = "1 pixel = 1 coordinate unit"
     else:

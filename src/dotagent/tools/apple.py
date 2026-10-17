@@ -1,4 +1,5 @@
-"""AppleScript and JavaScript for Automation: drive the applications that can be scripted, far faster than their windows."""
+"""AppleScript and JavaScript for Automation: drive the applications that can be scripted, far faster than their
+windows."""
 
 import asyncio
 import functools

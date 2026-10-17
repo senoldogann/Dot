@@ -54,6 +54,8 @@ headless against a local server. A few drive WebKit, the engine of Safari on the
 - An error says what failed, with what was asked and what came back, and is raised where it happens. A fallback that
   hides a failure is not added.
 - A comment or a docstring says what the code does now, not how it came to be.
+- A line of Python is at most 120 characters, and `ruff check` holds it to that; new Markdown prose is wrapped the same
+  way.
 - The web UI is plain JavaScript modules and CSS under `src/dotagent/server/static/`, with no build step.
 
 ## Pull requests

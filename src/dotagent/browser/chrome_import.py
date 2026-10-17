@@ -1,11 +1,11 @@
 """Bringing the sign-ins of a personal Chrome profile over to Dot's browser profile.
 
-Chrome refuses remote debugging on its default data directory (since version 136) and locks a profile while it runs, so Dot
-cannot drive the personal profile itself. It copies the two things a signed-in site needs, the cookies and the local
-storage, into its own profile instead, while Chrome is quit. Nothing is decrypted or read: the cookie values stay encrypted
-with the Keychain key they were written with, so the profile switches to the system keychain (see ``keychain``). The
-personal profile is only read, never changed. The copy is made in a staging directory first and moved into place at the
-end, so a failure leaves the profile as it was.
+Chrome refuses remote debugging on its default data directory (since version 136) and locks a profile while it runs, so
+Dot cannot drive the personal profile itself. It copies the two things a signed-in site needs, the cookies and the local
+storage, into its own profile instead, while Chrome is quit. Nothing is decrypted or read: the cookie values stay
+encrypted with the Keychain key they were written with, so the profile switches to the system keychain (see
+``keychain``). The personal profile is only read, never changed. The copy is made in a staging directory first and moved
+into place at the end, so a failure leaves the profile as it was.
 """
 
 import contextlib

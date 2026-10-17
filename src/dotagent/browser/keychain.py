@@ -3,9 +3,9 @@
 Chrome encrypts every cookie it saves. An ordinary Chrome window takes the key from the macOS Keychain ("Chrome Safe
 Storage"); Playwright starts Chrome with a mock keychain, a fixed key that never touches the Keychain. A profile written
 with one key cannot be read with the other, so the window in which a person signs in and the automated sessions that use
-that sign-in have to agree. The profile says which keychain it was written with in a marker file. A profile without one is
-a profile Dot made itself and uses the mock keychain; ``dotx browser import-chrome`` marks the profile it fills with the
-cookies of a personal Chrome profile as ``system``, because those cookies were written with the real key.
+that sign-in have to agree. The profile says which keychain it was written with in a marker file. A profile without one
+is a profile Dot made itself and uses the mock keychain; ``dotx browser import-chrome`` marks the profile it fills with
+the cookies of a personal Chrome profile as ``system``, because those cookies were written with the real key.
 """
 
 from pathlib import Path

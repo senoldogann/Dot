@@ -1,5 +1,5 @@
-"""A request of the web tools that failed in transit (the code review's Y14): a GET is tried again, a POST the server may
-have got is not, since what it asked may have been done (a search the API bills); a POST that was never sent is."""
+"""A request of the web tools that failed in transit (the code review's Y14): a GET is tried again, a POST the server
+may have got is not, since what it asked may have been done (a search the API bills); a POST that was never sent is."""
 
 import httpx
 import pytest

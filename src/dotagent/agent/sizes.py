@@ -22,7 +22,8 @@ class ContextSizes:
         return dict(self._sizes)
 
     def of(self, model: str) -> int | None:
-        """The size chosen for ``model`` (``provider:model``), ``None`` when its runs have ``[agent] context_tokens``."""
+        """The size chosen for ``model`` (``provider:model``), ``None`` when its runs have ``[agent]
+        context_tokens``."""
         return self._sizes.get(model)
 
     def choose(self, model: str, tokens: int | None) -> None:

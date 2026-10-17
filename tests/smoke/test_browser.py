@@ -46,15 +46,20 @@ _LATER_TAB_S: float = 1.6
 _ITEMS: str = "".join(f"<li><button>Item {n}</button></li>" for n in range(300))
 _NUMBERS: str = "".join(f"<option{' selected' if n == 250 else ''}>Number {n}</option>" for n in range(300))
 # The states arrive 600 ms after the click, the way a script fills a dropdown from a request.
-_LOAD_STATES: str = "setTimeout(() => ['Ohio', 'Texas'].forEach((name) => document.querySelector('[name=state]').add(new Option(name))), 600)"
+_LOAD_STATES: str = (
+    "setTimeout(() => ['Ohio', 'Texas'].forEach((name) => "
+    "document.querySelector('[name=state]').add(new Option(name))), 600)"
+)
 _PAGES: dict[str, str] = {
     "/": f"""<!doctype html><title>Home</title>
 <h1>Dot fixture</h1>
-<button onclick="document.getElementById('n').textContent = String(Number(document.getElementById('n').textContent) + 1)">Increment</button>
+<button onclick="document.getElementById('n').textContent =
+  String(Number(document.getElementById('n').textContent) + 1)">Increment</button>
 <span id="n">0</span>
 <a href="/popup" target="_blank">Open popup</a>
 <button onclick="alert('saved!')">Say alert</button>
-<button onclick="document.getElementById('c').textContent = confirm('Proceed?') ? 'accepted' : 'declined'">Ask confirm</button>
+<button onclick="document.getElementById('c').textContent =
+  confirm('Proceed?') ? 'accepted' : 'declined'">Ask confirm</button>
 <span id="c">unanswered</span>
 <a href="/file.txt">Download report</a>
 <iframe src="/frame" title="inner" width="400" height="120"></iframe>
@@ -85,7 +90,9 @@ _PAGES: dict[str, str] = {
     "/late-tab": "<!doctype html><title>Late tab</title><h1>Late tab</h1>",
     "/later-tab": "<!doctype html><title>Later tab</title><h1>Later tab</h1>",
     # A popup that does its job and closes at once, the way a sign-in callback does (item 57).
-    "/opener": '<!doctype html><title>Opener</title><a href="/selfclose" target="_blank">Sign in</a><button>Stay</button>',
+    "/opener": (
+        '<!doctype html><title>Opener</title><a href="/selfclose" target="_blank">Sign in</a><button>Stay</button>'
+    ),
     "/selfclose": "<!doctype html><title>Callback</title><script>window.close()</script>",
     "/frame": """<!doctype html><title>Frame</title>
 <button onclick="document.getElementById('o').textContent = 'clicked inside frame'">Frame button</button>
@@ -95,20 +102,23 @@ _PAGES: dict[str, str] = {
 '<h1>Loaded late</h1><button>Late button</button><a href="/">one</a><a href="/">two</a>' }, 350)</script>""",
     # A hidden copy of the awaited text comes first, the way a template or a closed menu would.
     "/later": """<!doctype html><title>Later</title><p hidden>Order placed</p>
-<button onclick="setTimeout(() => { document.getElementById('s').textContent = 'Order placed' }, 800)">Place order</button>
+<button onclick="setTimeout(() => {
+  document.getElementById('s').textContent = 'Order placed' }, 800)">Place order</button>
 <p id="s">Working</p>""",
     # The page leaves half a second after the click, for one whose end comes only after _SLOW_REST_S.
     "/leaving": """<!doctype html><title>Leaving</title>
 <button onclick="setTimeout(() => { location.href = '/half-page' }, 500)">Leave</button>""",
     # The page leaves half a second after the click for another host, whose answer comes after _LATE_HEADERS_S.
     "/to-blocked": """<!doctype html><title>Leaving</title>
-<button onclick="setTimeout(() => { location.href = `http://localhost:${location.port}/late-headers` }, 500)">Leave</button>""",
+<button onclick="setTimeout(() => {
+  location.href = `http://localhost:${location.port}/late-headers` }, 500)">Leave</button>""",
     "/late-headers": "<!doctype html><title>Blocked</title><h1>Blocked page</h1>",
     # An editor that takes text only through beforeinput, as Draft.js and Lexical do, and drops what comes before it is
     # ready, ?ready= milliseconds after it takes the focus (30 by default); it shows a change ?apply= milliseconds after
     # the input (at once by default).
     "/editor": """<!doctype html><title>Editor</title>
-<div id="ed" contenteditable="true" role="textbox" aria-label="Post text" style="min-height:40px;border:1px solid"></div>
+<div id="ed" contenteditable="true" role="textbox" aria-label="Post text"
+  style="min-height:40px;border:1px solid"></div>
 <p id="holds">Editor holds: </p>
 <input aria-label="Plain field">
 <div contenteditable="true"><p>First note</p><p>Second note</p><input aria-label="Inner field"></div>

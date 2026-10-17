@@ -1,5 +1,5 @@
-"""Tool groups: the group of each tool, what the prompt says about the groups, the groups a thread used, how a run offers
-its tools, the groups a step turns on and the tools a run can call."""
+"""Tool groups: the group of each tool, what the prompt says about the groups, the groups a thread used, how a run
+offers its tools, the groups a step turns on and the tools a run can call."""
 
 from pathlib import Path
 

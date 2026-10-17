@@ -1,6 +1,6 @@
-"""Connect apps (item 278): the catalogue, what macOS's answers about Automation mean and the step each state offers, and
-the sign-ins read from a Chrome profile's cookie file by host and name. macOS is asked for real only without a question
-(about Finder, and about an application that does not exist)."""
+"""Connect apps (item 278): the catalogue, what macOS's answers about Automation mean and the step each state offers,
+and the sign-ins read from a Chrome profile's cookie file by host and name. macOS is asked for real only without a
+question (about Finder, and about an application that does not exist)."""
 
 import sqlite3
 from pathlib import Path

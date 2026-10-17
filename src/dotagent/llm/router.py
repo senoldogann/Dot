@@ -245,7 +245,8 @@ class ModelRouter:
         return reply
 
     def _pause(self, ref: ModelRef, error: Exception) -> None:
-        """Pause the model of ``ref`` after ``error``; the newest error decides how long, as the provider's latest word."""
+        """Pause the model of ``ref`` after ``error``; the newest error decides how long, as the provider's latest
+        word."""
         pause: Pause | None = pause_for(error, self._config.models.helper_cooldown_s, time.time())
         if pause is None:
             return

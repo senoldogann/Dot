@@ -94,7 +94,8 @@ def _kind(events: Sequence[EventRecord], kind: str) -> tuple[JsonObject, ...]:
 async def _play(
     config: AppConfig, login_env: dict[str, str], runs: Sequence[Sequence[ScriptedTurn]]
 ) -> tuple[Played, ...]:
-    """Each of ``runs`` as an unattended run of ``GOAL`` in one thread, one run after the other, in a throw-away home."""
+    """Each of ``runs`` as an unattended run of ``GOAL`` in one thread, one run after the other, in a throw-away
+    home."""
     model: RecordingProvider = RecordingProvider(
         ScriptedProvider(_PROVIDER, [turn for turns in runs for turn in turns])
     )

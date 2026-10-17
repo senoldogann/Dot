@@ -1,4 +1,5 @@
-"""Privacy permissions the desktop needs, checked without ever showing a prompt, plus the Settings panes that grant them."""
+"""Privacy permissions the desktop needs, checked without ever showing a prompt, plus the Settings panes that grant
+them."""
 
 import ctypes
 import os

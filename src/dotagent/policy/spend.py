@@ -123,8 +123,8 @@ def spend_allowance(state: SpendState) -> Decision | None:
         verdict="ask",
         source="spend",
         reason=(
-            f"{render_amount(state.amount)} on {state.host} is within its pre-approved caps ({state.cap.per_purchase:g} "
-            f"per purchase, {state.cap.per_day:g} per day; {left:.2f} left today after it)"
+            f"{render_amount(state.amount)} on {state.host} is within its pre-approved caps "
+            f"({state.cap.per_purchase:g} per purchase, {state.cap.per_day:g} per day; {left:.2f} left today after it)"
         ),
         rule_id=None,
     )

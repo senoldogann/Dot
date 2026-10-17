@@ -110,8 +110,8 @@ def test_a_model_that_names_no_provider_dot_knows_is_refused(
 
 @pytest.mark.parametrize("site", ["www.example.com", "https://example.com", "Example.com", "example.com/shop"])
 def test_a_spending_cap_for_a_site_no_address_matches_is_refused(site: str) -> None:
-    """Item 177: a payment step's site is its host in lower case without ``www.``; a cap under another name never applied,
-    so its purchases asked although the cap was meant to approve them."""
+    """Item 177: a payment step's site is its host in lower case without ``www.``; a cap under another name never
+    applied, so its purchases asked although the cap was meant to approve them."""
     caps: JsonValue = {site: {"per_purchase": 50, "per_day": 100}, "example.org": {"per_purchase": 50, "per_day": 100}}
     with pytest.raises(ValidationError) as refused:
         AppConfig.model_validate(_with(("policy", "spend"), caps))

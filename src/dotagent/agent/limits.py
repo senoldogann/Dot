@@ -71,11 +71,11 @@ def limit_spent(reached: LimitReached) -> str:
 def limit_note(reached: LimitReached) -> str:
     """What the model is told at the first step past a limit."""
     return (
-        f"[system note] The limit of this run is reached: it has used {limit_spent(reached)}. Finish now, in this reply: "
-        "call finish with what was reached (the numbers), what is missing and how to go on; success is true only if the "
-        "goal or its targets are met and verified. To close the steps of your plan, call the plan tools in this reply "
-        "before finish: a call after finish does not run. No other tool runs any more, and the run ends after this "
-        "reply."
+        f"[system note] The limit of this run is reached: it has used {limit_spent(reached)}. Finish now, in this "
+        "reply: call finish with what was reached (the numbers), what is missing and how to go on; success is true "
+        "only if the goal or its targets are met and verified. To close the steps of your plan, call the plan tools "
+        "in this reply before finish: a call after finish does not run. No other tool runs any more, and the run "
+        "ends after this reply."
     )
 
 

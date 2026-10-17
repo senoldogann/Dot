@@ -1,8 +1,8 @@
-"""Import from other apps (item 219): a button at the head of Customize › Skills opens a checklist of what the Mac's other
-agents set up and Dot can add, the skills chosen at first and the MCP servers not; one request adds what the owner
-chose, each as the one scan before them found it, and says what it could not add and why. A home folder of the test's
-own with skills of Claude Code and Codex and a server of Claude Desktop, served by a real server, wide and on a phone,
-light and dark."""
+"""Import from other apps (item 219): a button at the head of Customize › Skills opens a checklist of what the Mac's
+other agents set up and Dot can add, the skills chosen at first and the MCP servers not; one request adds what the
+owner chose, each as the one scan before them found it, and says what it could not add and why. A home folder of the
+test's own with skills of Claude Code and Codex and a server of Claude Desktop, served by a real server, wide and on
+a phone, light and dark."""
 
 import asyncio
 import json

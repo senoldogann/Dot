@@ -120,7 +120,8 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, Run
 
 async def _in_window(locator: Locator) -> bool:
     return await locator.evaluate(
-        "(node) => { const box = node.getBoundingClientRect(); return box.top >= 0 && box.bottom <= window.innerHeight; }"
+        "(node) => { const box = node.getBoundingClientRect(); return box.top >= 0 && box.bottom <= "
+        "window.innerHeight; }"
     )
 
 

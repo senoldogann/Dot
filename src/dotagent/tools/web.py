@@ -228,9 +228,9 @@ def render_http_failure(
     browser_problem: str,
 ) -> str:
     """The result of a fetch the web answered with an error status. A page that is not there says so and lists
-    ``likely``, the front page's links that may be the page meant (``front_problem`` says why the front page could not be
-    read, when it could not). ``browser_problem`` says why the run's browser could not read a refused page instead,
-    when it was asked and could not (item 98)."""
+    ``likely``, the front page's links that may be the page meant (``front_problem`` says why the front page could
+    not be read, when it could not). ``browser_problem`` says why the run's browser could not read a refused page
+    instead, when it was asked and could not (item 98)."""
     lines: list[str] = [f"web_fetch got HTTP {document.status} from {shown_url}."]
     if browser_problem:
         lines.append(browser_problem)
@@ -583,7 +583,8 @@ def render_index(result: CrawlResult, files: tuple[Path, ...]) -> str:
         note: str = f"; {page.problem}" if page.problem else ""
         file: str = f"  -> {files[number - 1]}" if files else ""
         lines.append(
-            f"{number}. [{page.depth}] {page.url}  {page.title or '(no title)'}  {len(page.text)} chars, {how}{note}{file}"
+            f"{number}. [{page.depth}] {page.url}  {page.title or '(no title)'}  {len(page.text)} chars, "
+            f"{how}{note}{file}"
         )
     if result.skipped:
         lines.append(f"Left out ({len(result.skipped)}):")

@@ -108,7 +108,8 @@ def _first_line(text: str) -> str:
 
 
 def _ends(text: str) -> str:
-    """The first and the last line of a result: for a shell command its exit status and, for most checkers, the tally."""
+    """The first and the last line of a result: for a shell command its exit status and, for most checkers, the
+    tally."""
     lines: list[str] = [line for line in text.splitlines() if line.strip()]
     if len(lines) < 2:
         return _first_line(text)

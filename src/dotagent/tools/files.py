@@ -46,8 +46,8 @@ _SEARCH_LINE_LIMIT: int = 300
 # ripgrep ends with 2 when it met an error, also after the matches it found.
 _RG_ERROR: int = 2
 # Its line for a path it did not read: "rg: <path>: [IO error for operation on <path>: ]<reason> (os error <n>)", with
-# EPERM (1, the sandbox), EACCES (13, the permissions of the file) or EINTR (4: macOS breaks off now and then the reading
-# of a folder of a large tree, such as those under ~/Library/Containers, which reads a moment later).
+# EPERM (1, the sandbox), EACCES (13, the permissions of the file) or EINTR (4: macOS breaks off now and then the
+# reading of a folder of a large tree, such as those under ~/Library/Containers, which reads a moment later).
 _UNREAD_PATH: re.Pattern[str] = re.compile(r"rg: (.+ \(os error (?:1|4|13)\))")
 _UNREAD_SHOWN: int = 10
 

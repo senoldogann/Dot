@@ -99,7 +99,8 @@ async def served(runtime: Runtime) -> AsyncIterator[tuple[RunManager, str]]:
 
 
 async def _ended(manager: RunManager, goal: str, thread_id: str | None) -> RunRecord:
-    """``goal`` as a task on ``thread_id`` (a new chat for ``None``) that the scripted model finishes, once it is over."""
+    """``goal`` as a task on ``thread_id`` (a new chat for ``None``) that the scripted model finishes, once it is
+    over."""
     run: RunRecord = await manager.start(
         goal, "task", SCRIPTED_MODEL, thread_id, "test", None, None, "standard", None, "ask", False, ()
     )
@@ -110,7 +111,8 @@ async def _ended(manager: RunManager, goal: str, thread_id: str | None) -> RunRe
 
 
 async def _until_unread(runtime: Runtime, thread_id: str, unread: bool) -> None:
-    """Wait until the daemon holds the chat as ``unread`` or not: the page marks a chat without waiting for the answer."""
+    """Wait until the daemon holds the chat as ``unread`` or not: the page marks a chat without waiting for the
+    answer."""
     deadline: float = time.monotonic() + _MARK_WAIT_S
     while time.monotonic() < deadline:
         chats: list[ThreadSummary] = await runtime.store.list_thread_summaries(50)

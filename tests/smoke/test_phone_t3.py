@@ -1,12 +1,13 @@
 """A phone's run page and list of chats after T3 Code's phone app (items 294 to 298), on a served daemon, in WebKit as
-the owner's iPhone, light and dark. The bar names the chat over the agent and the model, and holds its tools in one pill:
-Dot's computer once the run has had a page, the helpers with their count, and the details. A line over the composer says
-how long the run has worked, how its helpers stand and how many messages are queued (item 352), and its parts open
-where they tell of. The details rise from the foot as a sheet with a grabber, and a drag of its head closes it; the
-Agents tab's rows say each helper's state, model and what it does. Dot's computer opens over the whole page with the
-page's address and the pill of who has control, and goes back to the panel when it closes. The sidebar is the list of
-chats over the whole screen, Dot's name at its head and Settings, the search and a new chat at its foot. A wide window
-keeps its bar as it was: the face, the name and the panel's switch alone; the line over the composer is there too.
+the owner's iPhone, light and dark. The bar names the chat over the agent and the model, and holds its tools in one
+pill: Dot's computer once the run has had a page, the helpers with their count, and the details. A line over the
+composer says how long the run has worked, how its helpers stand and how many messages are queued (item 352), and its
+parts open where they tell of. The details rise from the foot as a sheet with a grabber, and a drag of its head closes
+it; the Agents tab's rows say each helper's state, model and what it does. Dot's computer opens over the whole page with
+the page's address and the pill of who has control, and goes back to the panel when it closes. The sidebar is the list
+of chats over the whole screen, Dot's name at its head and Settings, the search and a new chat at its foot. A wide
+window keeps its bar as it was: the face, the name and the panel's switch alone; the line over the composer is there
+too.
 
 The model is a scripted one; the run's page is a local one in Dot's own headless Chrome.
 """
@@ -243,7 +244,8 @@ async def test_a_phones_run_page_and_list_of_chats_follow_t3_codes_phone_app(own
                     await expect(full).to_have_count(0)
                     await expect(page.locator("#inspector-panel-screen .computer")).to_have_count(1)
 
-                    # The sidebar is the list of chats over the whole screen, with the search and a new chat at its foot.
+                    # The sidebar is the list of chats over the whole screen, with the search and a new chat at its
+                    # foot.
                     await bar.get_by_role("button", name="Show sidebar").click()
                     sidebar: Locator = page.get_by_role("complementary", name="Sidebar")
                     await expect(sidebar.locator(".side-title")).to_have_text("Dot")

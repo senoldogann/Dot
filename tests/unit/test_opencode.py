@@ -1,8 +1,8 @@
-"""Item 283's data: OpenCode's event stream as a run reads it (recorded from OpenCode 1.19.0 on one of Zen's free models,
-for a command whose permission the agent asked for, with an event of another session put in), Zen's free models as
-``opencode models opencode --verbose`` prints them, a permission as Dot's policy weighs it, and the environment of the
-server Dot starts. Item 284's: the tools of Dot's the agent gets, each chat's door and the rules that keep a session to
-its own, and a result of Dot's tool as an MCP result."""
+"""Item 283's data: OpenCode's event stream as a run reads it (recorded from OpenCode 1.19.0 on one of Zen's free
+models, for a command whose permission the agent asked for, with an event of another session put in), Zen's free
+models as ``opencode models opencode --verbose`` prints them, a permission as Dot's policy weighs it, and the
+environment of the server Dot starts. Item 284's: the tools of Dot's the agent gets, each chat's door and the rules
+that keep a session to its own, and a result of Dot's tool as an MCP result."""
 
 import json
 import re

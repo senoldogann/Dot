@@ -83,7 +83,9 @@ class Post(FrozenModel):
 
     id: str = Field(pattern=_ID_PATTERN, description="Letters, digits, - and _ only; the ranking names the post by it.")
     author: Annotated[str, StringConstraints(strip_whitespace=True, max_length=200)] = Field(
-        description="The account that wrote it, with what the page shows about it (name, handle, a bio line); may be ''."
+        description=(
+            "The account that wrote it, with what the page shows about it (name, handle, a bio line); may be ''."
+        )
     )
     text: Text = Field(description="The post's text.")
 
@@ -125,7 +127,9 @@ class CheckDraftArgs(ToolArgs):
     )
     rules: list[Text] = Field(
         max_length=_MAX_RULES,
-        description="The rules the campaign's goal names for what the account posts ('no links', 'never discuss prices').",
+        description=(
+            "The rules the campaign's goal names for what the account posts ('no links', 'never discuss prices')."
+        ),
     )
 
 

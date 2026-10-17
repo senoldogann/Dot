@@ -1,5 +1,5 @@
-"""Every chat wears a creature (item 277): in the sidebar, wide and on a phone, light and dark, each chat shows a face, a
-chat with Dot the look its id gives and a chat with an agent the agent's; its name over its last line (the answer in
+"""Every chat wears a creature (item 277): in the sidebar, wide and on a phone, light and dark, each chat shows a face,
+a chat with Dot the look its id gives and a chat with an agent the agent's; its name over its last line (the answer in
 plain words, or the owner's message after "You:" while the run works); its age at its right, over the accent dot of a
 chat that is unread; the creature of a chat at work wears the working state, that of a failed run the failed one.
 
