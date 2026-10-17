@@ -5284,8 +5284,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | done        | 2f94b84 |
 | 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | done        | b2e8090 |
 | 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | done        | 9c1352e |
-| 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| in progress |         |
-| 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | in progress |         |
+| 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| done        | 3dedca5 |
+| 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | done        | 3dedca5 |
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -14101,7 +14101,7 @@ Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
 
 ### 354. Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view
 
-**Status: in progress.** The owner's word of 2026-10-17, with a screenshot of T3 Code's Settings › Browser: "Amacımız
+**Status: done (`3dedca5`).** The owner's word of 2026-10-17, with a screenshot of T3 Code's Settings › Browser: "Amacımız
 t3code daki browser sistemini temizce ve daha iyisini kendi sistemimize entegre etmekti. T3Code zaten opensource
 istersen bakabilirsin." (our aim was to bring T3 Code's browser system into ours, cleanly and better; T3 Code is open
 source). **As built (2026-10-17).** Four of T3 Code's rows in Settings › Browser, on what Dot's browser already does
@@ -14122,7 +14122,7 @@ run that waits on its question, not once turned off, and a phone's drawer left c
 
 ### 355. Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added
 
-**Status: in progress.** The owner's word of 2026-10-17 (T3 Code's browser system in Dot, cleanly and better; its
+**Status: done (`3dedca5`).** The owner's word of 2026-10-17 (T3 Code's browser system in Dot, cleanly and better; its
 Settings › Browser lists Browser profiles: Default, Set as default, Clear cookies and cache, Add profile, and Incognito,
 whose data is cleared when the app closes). **As built (2026-10-17).** `browser/profiles.py`: Dot's own Chrome works on
 one profile at a time (`[browser] profile`): Default (`browser-profile`), Incognito (`browser-incognito`, emptied before
