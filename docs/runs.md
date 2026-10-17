@@ -90,6 +90,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   its result asks the model to call the tool again. A group stays on for the rest of the run. `auto` is `grouped` for a
   model of the weak tier and for a model whose window cut the context budget, and `full` for every other model. The
   timeline shows the groups a grouped run starts with and each group it turns on.
+- `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
+  each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
+  and safety and how a run ends as `full` has them, word for word where they are the same rule, and says how to work and
+  each kind of tool in a line or two; the rest is in the tools' own descriptions. With `tool_surface = "grouped"` a run
+  starts lean, with the shortest prompt and the core tools. Eval reports keep the style, and `dotx eval report` shows it
+  beside the tool surface. `full` stays the default: on 2026-10-18 the evals' 41 tasks, twice each on DeepSeek V4.1
+  Flash, passed 81 of 82 attempts the full way, 80 with the full prompt and grouped tools, and 78 the lean way, which
+  took 44 % fewer tokens a pass and claimed three times to be done when it was not, where the full way did once.
 - `verify_answer_paths` in `[agent]` checks the paths a final answer names: `~` paths and absolute paths under
   `/Users`, `/tmp`, `/private`, `/var`, `/opt`, `/Applications` and `/Library`. When a task or research run ends with
   success and its answer names such paths that do not exist and that no successful call of the run named (a file the
