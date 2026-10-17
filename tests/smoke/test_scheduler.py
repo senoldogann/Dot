@@ -593,10 +593,11 @@ async def test_a_one_time_schedule_whose_run_does_not_start_stays_due_and_fires_
             due,
             "failed to fire: RuntimeError",
         )
-        # The second failure in a row waits two minutes.
+        # The second failure in a row waits two minutes, unless the owner gives the schedule a new time meanwhile.
         await scheduler.tick(due + 180)
         assert (await runtime.store.get_schedule(once.id)).last_status == "failed to fire: RuntimeError"
-        await scheduler.tick(due + 200)
+        await runtime.store.set_schedule_enabled(once.id, True, due + 150)
+        await scheduler.tick(due + 182)
         manager.ends.set()
         fired: ScheduleRecord = await _until_over(runtime, once.id)
     finally:

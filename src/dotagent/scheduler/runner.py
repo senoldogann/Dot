@@ -285,8 +285,9 @@ class Scheduler:
             await store.record_schedule_skip(record.id, following, "skipped: the emergency stop is engaged")
             return
         if one_time:
+            # The wait is that of a try of this time again: a time given since the last failure fires when it comes.
             failure: FiringFailure | None = await firing_failure(store, record.id)
-            if failure is not None and now < retry_after(failure):
+            if failure is not None and failure.last_failure_at >= record.next_run_at and now < retry_after(failure):
                 return
         if record.id in self._in_flight:
             log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight[record.id])
