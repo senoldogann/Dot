@@ -48,7 +48,7 @@ const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
 // "/loop", a rhythm (30m, 2h) and the message that the chat asks again on it (item 281); "/loop" alone or with a
 // word that is not a rhythm is said how to write it.
 const LOOP_PATTERN = /^\/loop\s+(\d+\s*[mh])\s+([\s\S]+)$/i;
-const LOOP_WORD = /^\/loop\b/i;
+const LOOP_WORD = /^\/loop(?:\s|$)/i;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
 // What cut a run off (agent/resume.py `CutOff`), as the line that offers to resume it says it (item 299).

@@ -280,16 +280,22 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.post("/runs/{run_id}/loop", status_code=201)
     async def start_loop(run_id: str, request: LoopRequest) -> ScheduleRecord:
         """Make the chat of the run ask ``text`` again on the rhythm ``every`` (item 281): one of the chat's schedules,
-        whose runs go on in it as its follow-ups do and start as they do (item 291). The page sends the message itself
-        as a follow-up at once."""
+        whose runs go on in it as its follow-ups do and start as they do (item 291). The same loop asked for again is
+        the one there is, so a page that sends it once more makes no second one. The page sends the message itself as a
+        follow-up at once."""
         run: RunRecord = await store.get_run(run_id)
         owner: RunRecord = run if run.parent_run_id is None else await store.get_run(run.parent_run_id)
         choices: ChatChoices | None = await store.chat_choices(owner.thread_id)
         rhythm: LoopRhythm = loop_rhythm(request.every)
         name: str = loop_name(request.text)
+        goal: str = loop_goal(request.text, rhythm, name)
+        # The same loop asked for again (a page that sends it once more after a failure) is the one there is.
+        for kept in await store.list_schedules():
+            if (kept.thread_id, kept.enabled, kept.cron, kept.goal) == (owner.thread_id, True, rhythm.cron, goal):
+                return kept
         plan: ScheduleRequest = ScheduleRequest(
             name=name,
-            goal=loop_goal(request.text, rhythm, name),
+            goal=goal,
             cron=rhythm.cron,
             at=None,
             mode=schedule_mode(None, owner.mode if choices is None else choices.mode),

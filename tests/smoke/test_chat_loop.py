@@ -110,6 +110,11 @@ async def test_a_loop_is_a_schedule_of_the_chat_that_starts_as_its_follow_ups_do
             options = record["options"]
             assert isinstance(options, dict)
             assert (options["model"], options["approvals"]) == (run.model, run.approvals)
+            # Asked for again, the loop is the one there is.
+            again = await client.post(f"/runs/{run.id}/loop", json={"every": "30m", "text": "check the build"})
+            assert again.status_code == 201 and again.json()["id"] == record["id"], again.text
+            schedules = await client.get("/schedules")
+            assert [view["record"]["id"] for view in schedules.json()] == [record["id"]]
             refused = await client.post(f"/runs/{run.id}/loop", json={"every": "7m", "text": "check the build"})
             assert refused.status_code == 422 and "a loop asks again every" in refused.text
 
