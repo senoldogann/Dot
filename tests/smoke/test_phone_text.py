@@ -2,8 +2,8 @@
 a finished task.
 
 - Text: one "Text size", the size of the body on this device, under a line of an answer: a phone's own is 16 px and the
-  choice runs from 14 to 20. Moved to 18, the answer, a row of the sidebar and a label of the settings grow by 18/16
-  together; after a reload it is still 18, and boot.js alone (main.js held back) puts it on the page before the first
+  choice runs from 12 to 20 (item 347; it ran from 14). Moved to 18, the answer, a row of the sidebar and a label of the
+  settings grow by 18/16 together, and at 12 they shrink by 12/16 together; after a reload it is still 18, and boot.js alone (main.js held back) puts it on the page before the first
   paint.
 - The colour scheme's cards draw a phone, upright, and the themes stand two a row, 320 px wide too, nothing wider than
   the screen. A Mac's window draws a window, wider than high.
@@ -45,7 +45,7 @@ _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
 _ANSWER: str = "The report is ready: three files changed, and the tests pass."
 # A phone's own size of the body, the choice's ends and the size chosen.
 _OWN_PX: int = 16
-_LEAST_PX: int = 14
+_LEAST_PX: int = 12
 _MOST_PX: int = 20
 _CHOSEN_PX: int = 18
 # How far a size may be from what the scale makes of it: the rounding of a fraction of a pixel.
@@ -160,6 +160,12 @@ async def test_a_phones_text_size_is_its_bodys_and_grows_every_text_together(own
                 own,
                 chosen,
             )
+            # The least size shrinks every text together as well (item 347).
+            await slider.fill(str(_LEAST_PX))
+            least: list[float] = await _sizes(page, address, task.id)
+            shrunk: list[float] = [size * _LEAST_PX / _OWN_PX for size in own]
+            assert all(abs(seen - want) <= _ROUNDING_PX for seen, want in zip(least, shrunk, strict=True)), (own, least)
+            await slider.fill(str(_CHOSEN_PX))
 
             # Kept: after a reload, and on the page before main.js runs.
             await page.reload()

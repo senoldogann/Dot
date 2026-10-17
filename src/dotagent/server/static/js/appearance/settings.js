@@ -136,6 +136,16 @@ export const BUSY_SEND = {
   paint: () => undefined,
 };
 
+/** Whether a chat shows the line of each action that ran without asking you (item 346): one YOLO let through, or one the
+ * reviewer approved. A refusal shows either way, as what it held back did not happen. Settings › General chooses it;
+ * it puts nothing on the page. */
+export const AUTO_LINES = {
+  key: "dot.autoLines",
+  initial: "shown",
+  parse: oneOf(["shown", "hidden"]),
+  paint: () => undefined,
+};
+
 /** How long the sidebar and the details panel slide, 0 to 400 ms on steps of 25. */
 export const PANEL_MOTION = {
   key: "dot.panelMotion",
@@ -148,8 +158,9 @@ export const INTERFACE_FONT = family("dot.fontInterface", "--font", ["system"], 
 
 // A phone, as app.css draws one (item 329): a touch screen 720 px wide or less, or under 500 px high on its side.
 const PHONE_TYPE = window.matchMedia("(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)");
-// The body's own size on this device and the sizes it may be given: iOS's 16 px on a phone, Dot's 14 elsewhere.
-const BODY = PHONE_TYPE.matches ? { own: 16, least: 14, most: 20 } : { own: 14, least: 13, most: 17 };
+// The body's own size on this device and the sizes it may be given: iOS's 16 px on a phone, down to 12 (item 347: the
+// owner asked for smaller text there), Dot's 14 elsewhere.
+const BODY = PHONE_TYPE.matches ? { own: 16, least: 12, most: 20 } : { own: 14, least: 13, most: 17 };
 
 /** The size of the body's text on this device (item 331), which the seven sizes of the type are scaled by over the
  * device's own; kept in this browser, so that each device has its own. */
