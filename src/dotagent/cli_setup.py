@@ -10,6 +10,7 @@ from dotagent.cli_commands import AuthSetCommand, Command, ServiceInstallCommand
 from dotagent.cli_daemon import cmd_service_install
 from dotagent.cli_doctor import check_line
 from dotagent.cli_models import cmd_auth_set
+from dotagent.cli_ui import read_line
 from dotagent.config import AppConfig, load_user_config
 from dotagent.config_edit import set_default_model, set_role_model
 from dotagent.core.errors import ConfigError, DotError, InvalidValueError, MissingSecretError
@@ -76,11 +77,20 @@ def _unlisted_fix(ref: ModelRef) -> str:
     return f"'dotx models {ref.provider}' lists the models it serves"
 
 
+def _toolless_fix(provider: str) -> str:
+    """What to do when the model chosen, or every model ``provider`` lists, cannot call tools."""
+    marked: str = f"'dotx models {provider}' shows [tools] beside each model that calls them"
+    if provider == "ollama":
+        return f"pull one that does: ollama pull MODEL (a cloud model needs 'ollama signin' once); {marked}"
+    return marked
+
+
 async def _ask(prompt: str) -> str:
-    try:
-        return (await asyncio.to_thread(input, prompt)).strip()
-    except EOFError as exc:
-        raise ConfigError("the terminal closed before an answer", {"prompt": prompt}) from exc
+    """The line typed at ``prompt``; Ctrl-C stops the wait at once (:func:`dotagent.cli_ui.read_line`)."""
+    answer: str | None = await read_line(prompt)
+    if answer is None:
+        raise ConfigError("the terminal closed before an answer", {"prompt": prompt})
+    return answer.strip()
 
 
 async def _pick(question: str, options: Sequence[str], suggested: int) -> int:
@@ -120,7 +130,9 @@ def _served(ref: ModelRef, listed: Sequence[ModelInfo]) -> ModelInfo:
             {"model": ref.label, "listed": len(listed), "fix": _unlisted_fix(ref)},
         )
     if not found.tools:
-        raise ConfigError("a run needs a model that can call tools", {"model": ref.label})
+        raise ConfigError(
+            "a run needs a model that can call tools", {"model": ref.label, "fix": _toolless_fix(ref.provider)}
+        )
     return found
 
 
@@ -158,13 +170,15 @@ async def _keep_key(name: str) -> None:
 
 async def _choose_model(config: AppConfig, provider: str, asked: ModelRef | None) -> ModelInfo:
     """The model asked for, which ``provider`` must list and which must call tools, or the one the person picks among
-    those it lists that do, the configured main model first when it is one of them."""
+    those it lists that do; Enter takes the configured main model when it is one of them."""
     listed: tuple[ModelInfo, ...] = await _listed(config, provider)
     if asked is not None:
         return _served(asked, listed)
     usable: list[ModelInfo] = [info for info in listed if info.tools]
     if not usable:
-        raise ConfigError(f"{provider} lists no model that can call tools", {"listed": len(listed)})
+        raise ConfigError(
+            f"{provider} lists no model that can call tools", {"listed": len(listed), "fix": _toolless_fix(provider)}
+        )
     refs: list[str] = [f"{provider}:{info.id}" for info in usable]
     suggested: int = refs.index(config.models.main) if config.models.main in refs else 0
     return usable[await _pick("Which model should new chats start on?", [info.id for info in usable], suggested)]
