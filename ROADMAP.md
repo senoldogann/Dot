@@ -5278,7 +5278,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 345 | A chat that goes on at another of its runs keeps its way back                          | done        | aa6093b |
 | 346 | A chat may leave out the lines of what ran without asking                              | done        | a2f619b |
 | 347 | On a phone the text can be as small as 12 px                                           | done        | a2f619b |
-| 349 | OpenRouter: the models of many labs on one key                                         | in progress |         |
+| 349 | OpenRouter: the models of many labs on one key                                         | done        | 196ff64 |
+| 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13954,7 +13955,7 @@ and at 12 px the answer, a row of the sidebar and a label of the settings shrink
 
 ### 349. OpenRouter: the models of many labs on one key
 
-**Status: in progress.** The owner's word of 2026-10-17: "Ayrıca OpenRouter provider desteği istiyorum, bunu da kur."
+**Status: done (`196ff64`).** The owner's word of 2026-10-17: "Ayrıca OpenRouter provider desteği istiyorum, bunu da kur."
 (and I want OpenRouter provider support, set it up too). **As built (2026-10-17).** `llm/openrouter.py`: a provider
 `openrouter` (`openrouter:<lab>/<model>`) over OpenRouter's Chat Completions, its key `OPENROUTER_API_KEY` in Settings ›
 API keys, `dotx auth`, `dotx setup` and `dotx doctor` (`GET /key`: what the key has spent and may spend, a free call).
@@ -13977,6 +13978,36 @@ to the model that gave them, the status of a numeric code, answers of the wrong 
 call, the details of the first step back on the second; the listing, the key's page, credits that ran out inside a
 stream and a refused key) and `tests/smoke/test_doctor.py` (a model whose list could not be read warns). Docs:
 `docs/models.md`, `docs/safety.md`, `docs/command-line.md`, `docs/development.md`, `.env.example`, the README.
+
+### 351. The audit of 2026-10-17: what held, fixed outside the human-only paths
+
+**Status: in progress.** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler gerçekten var ise lütfen
+düzelt. NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum. Özgür bir ajan olmalı." (verify this report, fix the
+problems that are real; YOLO's freedom must not break, the agent must stay free), and "Güvenli bir şekilde" (safely).
+Every claim of the report was checked against the code and, where it could be, a real run; what held is fixed here,
+each with a test that fails on the code before it, and none adds a refusal a yolo run would meet. **As built
+(2026-10-17).** A one-time schedule whose run could not start stays due (`store.keep_schedule_due`), where the firing
+recorded before the start had switched it off for good. A learned skill's kind and When are one line each, only the
+last Evidence heading ends what a tainted skill withholds, and a path in the Mac's own folders (`/tmp`, `/private`,
+`/var` and the like) is withheld too. The calls of a step cut by a stop are told as started from every call event after
+the step. A line of OpenCode's event stream that is not JSON ends the stream as a broken one, which the run reports; it
+ended the reader without a word. A terminal's close that is cancelled while it waits still kills its group and closes
+its descriptor. `compact` waits for the write under way, and `add_memory_once` returns what its last try stored. A goal
+whose images the compaction dropped still starts its run's part of the conversation. A start makes its confinement
+once (the sandbox built and checked once, not again for the services). Leaving Settings › Models stops the scroll cues
+of its tables; a face shown past a quarter of an hour still blinks. In Dot.app, New chat leaves the down page as it is.
+A path or a page under a known one is not known to the continuity check by that, and a folder that is there says
+nothing to the answer check of a path that goes on from it past a space. A run of reasoning items before a call or a
+message goes back to the Responses API whole. One helper (`core.text.unclosing`) breaks a closing tag inside fenced
+text whatever its case, and a teammate's reply and the files attached to a message close only with their nonce. Docs:
+`runs.md` (the tool table), `limits.md`, `autonomy.md`, `extending.md` (`dotx playbooks trust`), `command-line.md`
+(`dotx setup`), `daemon.md`, `memory-and-schedules.md`, `safety.md`. **Left to the owner.** The classification of shell
+lines, git, `open`, awk and tar writes and the ancestors of protected paths (`policy/`, which REVIEW.md leaves to a
+human, and whose tests would carry the inputs that slip through), the drop target of a desktop drag (a new refusal a
+yolo run would meet), Messages' recent rows in its write-ahead log (reading them needs a copy of the database),
+standby's dropped images not being stored, and the reads that see an open unit's rows. The confirmed problems in the
+human-only paths (spend amounts, the key file's values, the review prompts, the pairing of verdicts, undo through a
+linked folder) are item 350, in a pull request for the owner.
 
 ## Log
 
