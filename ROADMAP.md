@@ -5209,7 +5209,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 268 | Office files show in the side panel as Quick Look draws them                          | done        | 53b8333 |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
-| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | in progress |         |
+| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | done        | 5fcee1b |
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
@@ -12005,7 +12005,7 @@ a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; b
 
 ### 271. Settings › Phone sets up Tailscale and keeps the Mac awake
 
-**Status: in progress.** The owner chose it on 2026-10-17 for this round, with 268, 280 and 281. **As built
+**Status: done (`5fcee1b`).** The owner chose it on 2026-10-17 for this round, with 268, 280 and 281. **As built
 (2026-10-17).** `tailnet.py` reads Tailscale's command line, the app's own before one on the PATH (`tailscale status
 --json`, `tailscale serve status --json`, its JSON validated), and `awake.py` holds macOS's `/usr/bin/caffeinate -s -w
 <daemon pid>`. Settings › Phone › Reach Dot from anywhere says whether Tailscale runs signed in and the Mac's name,
