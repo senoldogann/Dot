@@ -366,7 +366,7 @@ function beginSession() {
     root.prepend(shell.element);
   }
 
-  // Each entry of the tab's history says whether its page was opened by a link of the page before it
+  // An entry of the tab's history whose page was opened by a link of the page before it says so
   // (`history.state.dotLinked`, item 338), so the browser's own Back and Forward and a reload keep a phone's Back as
   // it was: such a page goes back to the page before it; another goes to the page above it, or opens the chats. The
   // link is told by the click that leads to it, wherever on the page it is (a dialog, a helper's row that stops its
@@ -389,16 +389,17 @@ function beginSession() {
   // has a page above it on a phone alone).
   let current = null;
 
-  /** Whether the page on screen at `path` was opened by a link of the page before it, kept in its history entry. */
+  /** Whether the page on screen at `path` was opened by a link of the page before it, kept in its history entry. Only
+   * such an entry is written: writing the history as any page opens would cut short a move to another address begun
+   * meanwhile (Chromium drops it), as one typed or asked for while Dot starts. */
   function linkedHere(path) {
     const state = history.state;
-    if (state !== null && typeof state === "object" && state.dotPath === path && typeof state.dotLinked === "boolean") {
-      linkedTo = null;
-      return state.dotLinked;
-    }
-    const linked = linkedTo === path;
+    const kept = state !== null && typeof state === "object" && state.dotPath === path && state.dotLinked === true;
+    const linked = kept || linkedTo === path;
     linkedTo = null;
-    history.replaceState({ ...(state !== null && typeof state === "object" ? state : {}), dotPath: path, dotLinked: linked }, "");
+    if (linked && !kept) {
+      history.replaceState({ ...(state !== null && typeof state === "object" ? state : {}), dotPath: path, dotLinked: true }, "");
+    }
     return linked;
   }
 
