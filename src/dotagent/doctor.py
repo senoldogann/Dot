@@ -44,7 +44,7 @@ from dotagent.help.apps import APP_ROOTS
 from dotagent.llm.calls import log_model_call
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode_go import GoUsage, OpenCodeGoProvider
-from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider
+from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider, listed_id
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ChatProvider, ModelInfo
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
@@ -134,6 +134,14 @@ async def _served(router: ModelRouter, provider: str) -> Served:
     return Served(names=frozenset(model.id for model in models), problem="")
 
 
+def _served_by(ref: ModelRef, listing: Served) -> bool:
+    """Whether the list a provider serves holds the model ``ref`` names: OpenRouter's holds a variant of a model it
+    lists (``:nitro``, ``:floor``, ``:online``), which its connector knows by the listed model (item 349)."""
+    if ref.provider == "openrouter":
+        return listed_id(listing.names, ref.model) is not None
+    return ref.model in listing.names
+
+
 async def _check_model(
     router: ModelRouter, role: str, reference: str, served: Mapping[str, Served], down: Mapping[str, str]
 ) -> CheckResult:
@@ -158,7 +166,7 @@ async def _check_model(
             f"{reference}: not checked, as the list of the models {ref.provider} serves could not be read "
             f"({listing.problem})",
         )
-    if listing is not None and ref.model not in listing.names:
+    if listing is not None and not _served_by(ref, listing):
         return _result(
             f"model {role}",
             False,

@@ -12,7 +12,7 @@ OpenRouter documents it is a :class:`ProviderProtocolError`, not an empty list o
 
 import asyncio
 import time
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 
 import httpx
 from pydantic import JsonValue
@@ -132,13 +132,19 @@ def catalog_of(listing: JsonObject) -> dict[str, ListedModel]:
     }
 
 
-def listed_for(catalog: Mapping[str, ListedModel], model: str) -> ListedModel | None:
-    """What the list says of ``model``, or of the listed model a variant id (``model:nitro``) routes to."""
-    found: ListedModel | None = catalog.get(model)
-    if found is not None:
-        return found
+def listed_id(listed: Collection[str], model: str) -> str | None:
+    """The id of the list ``listed`` that stands for ``model``: the model's own, or the listed model's a variant id
+    (``model:nitro``) routes to; ``None`` when neither is listed."""
+    if model in listed:
+        return model
     base, colon, _ = model.rpartition(":")
-    return catalog.get(base) if colon else None
+    return base if colon and base in listed else None
+
+
+def listed_for(catalog: Mapping[str, ListedModel], model: str) -> ListedModel | None:
+    """What the list says of ``model``, or of the listed model a variant id routes to (:func:`listed_id`)."""
+    found: str | None = listed_id(catalog.keys(), model)
+    return None if found is None else catalog[found]
 
 
 def model_info_of(model: str, listed: ListedModel) -> ModelInfo:

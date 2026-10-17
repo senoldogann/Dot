@@ -183,6 +183,48 @@ async def test_a_model_its_provider_does_not_serve_fails_and_one_whose_list_was_
     assert (rows["standby"].ok, rows["standby"].required, rows["standby"].detail) == (False, False, review.detail)
 
 
+class _OpenRouterHandler(BaseHTTPRequestHandler):
+    """OpenRouter's list of its models, which lists one, and the page of the key; any other path answers 404."""
+
+    def do_GET(self) -> None:
+        answers: dict[str, object] = {
+            "/openrouter/models": {
+                "data": [
+                    {
+                        "id": "lab/agent-model",
+                        "context_length": 128_000,
+                        "architecture": {"input_modalities": ["text"], "output_modalities": ["text"]},
+                        "supported_parameters": ["tools"],
+                    }
+                ]
+            },
+            "/openrouter/key": {"data": {"usage": 0.5, "limit": None, "is_free_tier": False}},
+        }
+        found: object | None = answers.get(self.path)
+        payload: bytes = json.dumps(found if found is not None else {"error": {"message": "no such route"}}).encode()
+        self.send_response(200 if found is not None else 404)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return None
+
+
+@contextmanager
+def _openrouter_service() -> Iterator[str]:
+    """The stand-in for OpenRouter, on a free port of this Mac, for as long as the block runs."""
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _OpenRouterHandler)
+    thread: threading.Thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
 def _openrouter_config(root: str, model: str) -> str:
     """Every role on one OpenRouter model, whose service is the stand-in at ``root``: it has no OpenRouter routes, so
     the list of OpenRouter's models and its key both answer 404. Every other key is one no source has."""
@@ -221,6 +263,23 @@ async def test_an_openrouter_model_whose_list_was_not_read_warns_and_is_not_aske
         f"{model}: not checked, as the list of the models openrouter serves could not be read (provider answered "
         "HTTP 404"
     )
+
+
+async def test_a_variant_of_a_model_openrouter_lists_is_served(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Item 349: OpenRouter routes a variant id (``:nitro``) to the model it lists, so the doctor takes it as served, as
+    the connector does; it was not among the models OpenRouter serves."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    monkeypatch.setenv(OPENROUTER_KEY_ENV, "sk-or-test-doctor")
+    monkeypatch.delenv(UNSET_SECRET, raising=False)
+    model: str = "openrouter:lab/agent-model:nitro"
+    with _openrouter_service() as root:
+        (tmp_path / "config.toml").write_text(_openrouter_config(root, model), encoding="utf-8")
+        rows: dict[str, CheckResult] = {
+            row.name: row for row in await _service_checks(load_config(tmp_path / "config.toml"))
+        }
+    assert rows["openrouter api"].ok, rows["openrouter api"].detail
+    main: CheckResult = rows["model main"]
+    assert (main.ok, main.detail) == (True, f"{model} (tools)")
 
 
 def _closed_port() -> int:

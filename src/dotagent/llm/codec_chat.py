@@ -47,9 +47,9 @@ _DETAIL_WORDS: dict[str, str] = {"reasoning.text": "text", "reasoning.summary": 
 class ChatOptions(FrozenModel):
     """How a server differs in filling in the Chat Completions format. ``reasoning_object``: the reasoning level goes as
     a ``reasoning`` object (OpenRouter's: ``{"effort": label}``, or ``{"enabled": ...}`` for a model whose reasoning is
-    a switch) instead of ``reasoning_effort``. ``replay_details``: a reply keeps the ``reasoning_details`` the server sent
-    (and takes the words of its thinking from them when no string carries them), and an assistant turn of the same
-    model carries them back, unchanged, as OpenRouter asks beside tool calls; without it they are not read."""
+    a switch) instead of ``reasoning_effort``. ``replay_details``: a reply keeps the ``reasoning_details`` the server
+    sent (and takes the words of its thinking from them when no string carries them), and an assistant turn of the
+    same model carries them back, unchanged, as OpenRouter asks beside tool calls; without it they are not read."""
 
     max_tokens_field: str
     request_usage: bool
