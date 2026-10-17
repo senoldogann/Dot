@@ -5254,8 +5254,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 313 | A note a run saves, corrects or forgets is a quiet line in the chat                    | done        | 5655e6f |
 | 314 | A run drafts an email or a message; the owner sends, edits or discards it              | done        | 5655e6f |
 | 315 | An agent starts from one of eight templates and goes to another home as a file         | done        | 5655e6f |
-| 316 | Customize › Plugins: every service Dot works with, its way to connect and its own page | in progress |         |
-| 317 | Customize › Skills: the skills Dot reads as cards, personal and system                 | in progress |         |
+| 316 | Customize › Plugins: every service Dot works with, its way to connect and its own page | done        | 9e04983 |
+| 317 | Customize › Skills: the skills Dot reads as cards, personal and system                 | done        | 9e04983 |
 | 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | done        | 1334b9f |
 | 327 | A run that hesitates over what it was asked says so at once                            | done        | 5655e6f |
 | 328 | A phone that comes back to Dot finds it calm                                           | done        | 34ad323 |
@@ -13297,8 +13297,7 @@ agent holding one is exported.
 
 ### 316. Customize › Plugins: every service Dot works with, its way to connect and its own page
 
-**Status: in progress.** On the branch `items-316-317-customize`, after `items-328-phone`; not merged. The plan is
-`reports/grok-bot-ve-codex-plani-2026-10-16.md` (B group), with the owner's answers of 2026-10-17.
+**Status: done.** Merged as `9e04983` (PR #329; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word of 2026-10-16, with screenshots of Codex's desktop app: a Plugins page and a Skills
 page as Codex has them, more settled and with more variety. Connect apps listed the Mac's applications, the web's and
@@ -13335,7 +13334,7 @@ such ("Not tried yet"), which is how the page reaches the plan's 25 and more.
 
 ### 317. Customize › Skills: the skills Dot reads as cards, personal and system
 
-**Status: in progress.** On the branch `items-316-317-customize`, with item 316; not merged.
+**Status: done.** Merged as `9e04983` (PR #329; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The same word of the owner's. The skills were a tab of the settings that listed the learned ones
 and what the Mac's other agents set up, but neither the owner's own skills, nor those that come with Dot or its
@@ -14520,3 +14519,4 @@ Back the button names no panel (no `aria-controls` or `aria-expanded`). The test
 - 2026-10-17 (Opus 5.5): items 316 and 317 on the owner's word ("Bunların hepsini onaylıyorum yap"): Customize, with Plugins (34 services in six sections, 26 tried, the marks of Simple Icons, a page for each service, the steps of Connect apps) and Skills (cards two a row, Personal and System, Save from a chat); on `items-316-317-customize`.
 - 2026-10-17 (Opus 5.5): on the owner's word ("Bunların hepsini onaylıyorum yap"): PR #326 merged as `5655e6f`, after its one failing test was made to hold on any Mac (`cp $(echo case x)` now writes over /etc/hosts, which every machine has, instead of a ~/.zshrc the CI runner lacks); PR #327 (item 318) merged as `1334b9f`, with the event loop's heartbeat tests given limits between the runner's own pauses and the faults they guard against (0.25 s and 0.5 s) and a check that the notes are compared off the loop's thread; PR #328 (items 328 to 334) merged as `34ad323`. Main's checkout moved to it (its 181 uncommitted entries were the copy of PR #326 and were kept in a backup first) and the daemon restarted at 06:21:27 while no run worked.
 - 2026-10-17 (Opus 5.5): items 335 to 338 on the owner's word of the same day (the recalled line, the foot of a message, a phone's switches and its one way back), on `items-335-338-phone-fixes`.
+- 2026-10-17 (Opus 5.5): PR #329 (items 316 and 317) merged as `9e04983`, after a deep review (`/code-review`, an independent reviewer and a security pass) whose findings A1 to A9 and S1 it fixes (PLAN.md); items 335 to 338 rebased on it, with the review's B1 to B10 and the history race the full gate found (test_controls).
