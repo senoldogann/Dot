@@ -2,13 +2,14 @@
 tell it, which lesson notes say the same or rest, and what it writes."""
 
 from datetime import datetime
+from pathlib import Path
 from zoneinfo import ZoneInfo
 
 import pytest
 from pydantic import ValidationError
 
 from dotagent.agent.reflection import (
-    Reflection,
+    _MERGE_RECENT,
     _Result,
     call_facts,
     digest_of,
@@ -16,17 +17,22 @@ from dotagent.agent.reflection import (
     ending_signal,
     journal_span,
     journal_text,
+    outdated_pairs,
     read_outside,
+    record_reflection_failure,
     reflection_cron,
     reflection_due,
-    summary_line,
+    reflection_failure,
     to_retire,
     to_retire_by_score,
     wants_reflection,
 )
+from dotagent.agent.reflection_record import REFLECTION_KEY, Reflection, ReflectionFailure, summary_line
 from dotagent.agent.verify import CallFact
+from dotagent.cli_stats import render_reflection
 from dotagent.config import AppConfig, load_default_config
 from dotagent.memory.service import OwnerSection, owner_lines_within, owner_prompt_lines
+from dotagent.store.db import Store
 from dotagent.store.models import MemoryRecord, MemoryScore, RunRecord, RunStatus
 
 ZONE: ZoneInfo = ZoneInfo("Europe/Helsinki")
@@ -77,6 +83,8 @@ def _note(
         agent_id=None,
         used_count=0 if last_used_at is None else 1,
         last_used_at=last_used_at,
+        expires_at=None,
+        replaced_by=None,
     )
 
 
@@ -153,10 +161,22 @@ def test_two_lesson_notes_that_say_the_same_make_a_pair_older_first_each_note_on
     d: MemoryRecord = _note(
         "d", "Create notes.txt with write_file before read_file reads it again.", 40.0, None, ("lesson",)
     )
-    assert duplicate_pairs([c, d, b, a], {}) == [(a, b)]
+    assert duplicate_pairs([c, d, b, a], {}, set()) == [(a, b)]
     # With embeddings the cosine decides: close vectors pair, far ones with the same words do not.
     close: dict[str, tuple[float, ...]] = {"a": (1.0, 0.0), "b": (0.0, 1.0), "c": (0.6, 0.8), "d": (0.8, 0.6)}
-    assert duplicate_pairs([a, b, c, d], close) == [(c, d)]
+    assert duplicate_pairs([a, b, c, d], close, set()) == [(c, d)]
+
+
+def test_a_lesson_the_owner_saved_is_the_one_kept_and_two_of_theirs_make_no_pair() -> None:
+    """Audit defect 4: the reflection folded the older of two notes into the newer, a lesson the owner saved too."""
+    saved: MemoryRecord = _note(
+        "a", "Create notes.txt with write_file before read_file reads it.", 10.0, None, ("lesson",)
+    )
+    learnt: MemoryRecord = _note(
+        "b", "Create notes.txt with write_file before read_file reads it back.", 20.0, None, ("lesson",)
+    )
+    assert duplicate_pairs([saved, learnt], {}, {"a"}) == [(learnt, saved)]
+    assert duplicate_pairs([saved, learnt], {}, {"a", "b"}) == []
 
 
 def test_a_resting_note_and_a_note_of_another_agent_make_no_pair() -> None:
@@ -171,8 +191,8 @@ def test_a_resting_note_and_a_note_of_another_agent_make_no_pair() -> None:
         "c", "Create notes.txt with write_file before read_file reads it again.", 30.0, None, ("lesson",)
     ).model_copy(update={"agent_id": "agent_1"})
     same: dict[str, tuple[float, ...]] = {"a": (1.0, 0.0), "b": (1.0, 0.0), "c": (1.0, 0.0)}
-    assert duplicate_pairs([resting, learnt, theirs], {}) == []
-    assert duplicate_pairs([resting, learnt, theirs], same) == []
+    assert duplicate_pairs([resting, learnt, theirs], {}, set()) == []
+    assert duplicate_pairs([resting, learnt, theirs], same, set()) == []
 
 
 def test_a_lesson_and_the_one_that_says_not_to_do_it_make_no_pair() -> None:
@@ -183,8 +203,57 @@ def test_a_lesson_and_the_one_that_says_not_to_do_it_make_no_pair() -> None:
     avoid: MemoryRecord = _note(
         "v", "Do not use --force when git push is refused on the deploy branch.", 20.0, None, ("lesson",)
     )
-    assert duplicate_pairs([use, avoid], {}) == []
-    assert duplicate_pairs([use, avoid], {"u": (1.0, 0.0), "v": (1.0, 0.0)}) == []
+    assert duplicate_pairs([use, avoid], {}, set()) == []
+    assert duplicate_pairs([use, avoid], {"u": (1.0, 0.0), "v": (1.0, 0.0)}, set()) == []
+
+
+def test_only_the_newest_notes_are_looked_for_an_older_twin() -> None:
+    """Review Y19: two older notes were compared by an earlier night's reflection, so a pair's newer note is one of the
+    newest; up to that many notes, every pair is looked for as before."""
+    count: int = _MERGE_RECENT + 10
+    notes: list[MemoryRecord] = [
+        _note(f"n{index}", f"Keep weekly report {index} in the reports folder.", float(index), None, ("lesson",))
+        for index in range(count)
+    ]
+    # Each note has its own direction, and a twin its older note's: 1 of 0 (both older than the newest notes), 205 of
+    # 2 (only the twin among them), 150 of 100 (both among them).
+    twins: dict[int, int] = {1: 0, 205: 2, 150: 100}
+    vectors: dict[str, tuple[float, ...]] = {
+        note.id: tuple(1.0 if place == twins.get(index, index) else 0.0 for place in range(count))
+        for index, note in enumerate(notes)
+    }
+    assert duplicate_pairs(notes, vectors, set()) == [(notes[2], notes[205]), (notes[100], notes[150])]
+    assert duplicate_pairs(notes[:_MERGE_RECENT], vectors, set()) == [(notes[0], notes[1]), (notes[100], notes[150])]
+
+
+def test_a_new_note_is_asked_about_with_the_closest_older_note_of_dot_never_one_the_owner_wrote_or_saved() -> None:
+    """Item 306: the older note of a pair is Dot's own, the same agent's, awake and written before the newer one, which
+    was written since the last reflection; a standing note, a note the owner wrote, a lesson the owner saved, a note of
+    another agent, a resting note and a note whose time ran out are never the older one."""
+    new: MemoryRecord = _note("new", "The invoices are in ~/Dropbox/Invoices now.", 200.0, None, ())
+    old: MemoryRecord = _note("old", "The invoices are in ~/Documents/Invoices.", 10.0, None, ())
+    kept_out: list[MemoryRecord] = [
+        _note("core", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ("core",)),
+        _note("owners", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ()).model_copy(
+            update={"source_run": None}
+        ),
+        _note("theirs", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ()).model_copy(
+            update={"agent_id": "agent_1"}
+        ),
+        _note("ran_out", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ()).model_copy(
+            update={"expires_at": 500.0}
+        ),
+        _note("resting", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ("rest",)),
+    ]
+    saved: MemoryRecord = _note("saved", "The invoices are in ~/Desktop/Invoices.", 20.0, None, ("lesson",))
+    # The notes kept out and the lesson the owner saved are the closest to the new note, Dot's older note less close.
+    vectors: dict[str, tuple[float, ...]] = {note.id: (1.0, 0.0) for note in (new, *kept_out, saved)}
+    vectors["old"] = (0.96, 0.28)
+    notes: list[MemoryRecord] = [new, old, *kept_out, saved]
+    assert outdated_pairs(notes, vectors, 100.0, 1000.0, 0.9, {"saved"}) == [(old, new)]
+    assert outdated_pairs(notes, vectors, 100.0, 1000.0, 0.9, set()) == [(saved, new)]
+    # A note written before the last reflection was asked about then.
+    assert outdated_pairs(notes, vectors, 300.0, 1000.0, 0.9, {"saved"}) == []
 
 
 def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None:
@@ -194,7 +263,11 @@ def test_a_lesson_rests_after_sixty_days_without_a_run_being_handed_it() -> None
     stale: MemoryRecord = _note("stale", "z" * 30, now - 90 * DAY_S, now - 61 * DAY_S, ("lesson",))
     never: MemoryRecord = _note("never", "w" * 30, now - 61 * DAY_S, None, ("lesson",))
     resting: MemoryRecord = _note("resting", "v" * 30, now - 90 * DAY_S, None, ("lesson", "rest"))
-    assert to_retire([fresh, used, stale, never, resting], now, 60) == [stale, never]
+    assert to_retire([fresh, used, stale, never, resting], now, 60, set()) == [stale, never]
+    # A lesson the owner saved never rests for its age, and one learnt again rests from then on (audit defects 4, 5).
+    assert to_retire([stale, never], now, 60, {"never"}) == [stale]
+    again: MemoryRecord = stale.model_copy(update={"updated_at": now - 5 * DAY_S})
+    assert to_retire([again], now, 60, set()) == []
 
 
 def test_the_summary_and_the_journal_say_what_happened() -> None:
@@ -207,16 +280,25 @@ def test_the_summary_and_the_journal_say_what_happened() -> None:
         _run("failed", "task", None, "ui"),
         _run("failed", "task", None, "ui"),
     ]
-    text: str = journal_text("On 2026-10-11", runs, ["Use -layout with pdftotext."], 1, 2, 600)
+    text: str = journal_text("On 2026-10-11", runs, ["Use -layout with pdftotext."], 1, 2, 0, 600)
     assert text == (
         "On 2026-10-11 I worked on 3 runs (1 done, 2 failed). Learned: Use -layout with pdftotext. "
         "Tidied the lessons: 1 merged, 2 retired."
     )
     assert (
-        journal_text("On 2026-10-11", [], [], 0, 1, 600)
+        journal_text("On 2026-10-11", [], [], 0, 1, 0, 600)
         == "On 2026-10-11 I worked on 0 runs (no run ended). Tidied the lessons: 0 merged, 1 retired."
     )
-    assert len(journal_text("On 2026-10-11", runs, ["x" * 700], 0, 0, 100)) == 100
+    assert len(journal_text("On 2026-10-11", runs, ["x" * 700], 0, 0, 0, 100)) == 100
+    # Item 306: the notes put aside for newer ones are said, in the record and in the journal.
+    aside: Reflection = reflection.model_copy(update={"outdated": 2})
+    assert summary_line(aside) == "Reflected on 3 runs: 1 lesson, 1 merged, 2 retired, 2 outdated."
+    assert journal_text("On 2026-10-11", [], [], 0, 0, 1, 600) == (
+        "On 2026-10-11 I worked on 0 runs (no run ended). Put aside 1 note that newer ones made outdated."
+    )
+    # A reflection recorded before item 306 still reads.
+    older: str = reflection.model_dump_json().replace(',"outdated":0', "")
+    assert "outdated" not in older and Reflection.model_validate_json(older).outdated == 0
 
 
 def test_the_journal_names_the_days_it_tells() -> None:
@@ -263,3 +345,30 @@ def test_the_owner_lines_are_flattened_capped_in_count_and_cut_at_the_budget() -
     assert len(owner_lines_within([f"line {n}" for n in range(20)], 1500)) == 12
     section: OwnerSection = OwnerSection(dot_lines=("Works late.",), owner_lines=("I read Turkish.",), updated_at=1.0)
     assert owner_prompt_lines(section) == ("(you said) I read Turkish.", "Works late.")
+
+
+async def test_a_failed_reflection_is_shown_until_one_after_it_is_done(tmp_path: Path) -> None:
+    """O25/O3 of the code review: a reflection that failed was only logged, so learning could stop unseen."""
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        assert await reflection_failure(store) is None
+        await record_reflection_failure(store, 100.0, "the embedder is down for key sk-" + "a" * 24)
+        failed: ReflectionFailure | None = await reflection_failure(store)
+        assert failed is not None and failed.at == 100.0 and failed.error == "the embedder is down for key ***"
+        done: Reflection = Reflection(
+            at=200.0,
+            since=100.0,
+            runs_read=1,
+            lessons_written=0,
+            merged=0,
+            retired=0,
+            journal=None,
+            owner_updated=False,
+        )
+        assert render_reflection(None, failed).endswith(": the embedder is down for key ***")
+        await store.kv_set(REFLECTION_KEY, done.model_dump_json())
+        assert await reflection_failure(store) is None
+        assert render_reflection(done, failed).startswith("  reflection: last done ")
+        assert "failed" not in render_reflection(done, failed)
+    finally:
+        await store.close()

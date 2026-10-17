@@ -15,6 +15,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
+from dotagent.agent.learning_health import failed_with, record_learning
 from dotagent.agent.manager import RunManager
 from dotagent.agent.playbooks import Playbook, playbook_name, write_playbook
 from dotagent.agent.review import PlaybookDraft
@@ -306,10 +307,18 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
     _, address = served
     for number in range(1, _NOTES + 1):
         await runtime.store.add_memory(f"Note {number:02d} about the garden.", ("garden",), None, None, None)
+    # How learning fares (review O25): a lesson work that failed is shown with its error.
+    await record_learning(runtime.store, runtime.bus, "lessons", time.time(), failed_with("the embedder is down"), None)
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
             page: Page = await _page(browser, address, 1280, "light", "/settings/memory")
+            learning: Locator = page.locator("[data-learning]")
+            await expect(learning).to_contain_text("How learning fares")
+            await expect(learning).to_contain_text(
+                "Lessons from runs: has not gone well yet; failed 1 time in a row since: the embedder is down"
+            )
+            await expect(learning).to_contain_text("The nightly reflection: has not gone well yet")
             notes: Locator = page.locator("[data-memory]")
             await expect(notes).to_have_count(30)
             # The notes keep a size (item 218): their box scrolls inside, and Load more under it adds the next page.
@@ -366,6 +375,7 @@ def _learned(number: int) -> Playbook:
         goal=f"When is library {number:02d} open?",
         written_at=1_700_000_000.0 + number,
         acting_steps=2,
+        tainted=False,
     )
 
 

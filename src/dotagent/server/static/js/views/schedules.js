@@ -4,7 +4,7 @@
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
 import { clip, debounce, el, modelName } from "../dom.js";
-import { allModels, levelLabel } from "../efforts.js";
+import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
@@ -384,7 +384,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       at: recurring ? null : at.value,
       mode: mode.value,
       model: model.value === "" ? null : model.value,
-      effort: effort.value === "" ? null : effort.value,
+      effort: chosenLevel(models, model.value, effort.value, options.model ?? "", options.effort),
       approvals: approvals.value === "" ? null : approvals.value,
       goal_mode: goalMode.value === "" ? null : goalMode.value === "on",
       timezone: zone.value.trim() === "" ? null : zone.value.trim(),

@@ -132,6 +132,18 @@
   if (typeof window.__TAURI__ === "object" && window.__TAURI__ !== null) {
     document.documentElement.dataset.shell = "desktop";
   }
+  // iOS zooms the page into a text field whose text is under 16 px as the field gets the focus (item 273), but not past
+  // the largest scale the viewport allows. So on an iPhone and an iPad the viewport allows no scale past the first and
+  // the fields keep the size they have on the Mac (item 311); app.css gives a field at least 16 px on the other touch
+  // screens. An iPad that asks for the desktop's pages says it is a Mac with a touch screen.
+  var ios =
+    /\b(iPhone|iPad|iPod)\b/.test(navigator.userAgent) ||
+    (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  var viewport = document.querySelector('meta[name="viewport"]');
+  if (ios && viewport !== null) {
+    viewport.setAttribute("content", viewport.getAttribute("content") + ", maximum-scale=1");
+    root.dataset.focusZoom = "off";
+  }
   // The opening (item 114, app.css): once per window session, so at every launch of the desktop shell and once per
   // tab, never when the system reduces motion, and not at all when the storage is blocked, since a page that cannot
   // remember it played would play it at every reload. The overlay's own last frame ends it; a click or a key first

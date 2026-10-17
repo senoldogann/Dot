@@ -94,6 +94,16 @@ def _plain_key(text: str) -> str:
     return f"{quoted.group('lead')}{quoted.group('key').replace(chr(39) * 2, chr(39))}{quoted.group('tail') or ''}"
 
 
+def _ref_of(text: str, shape: re.Match[str] | None) -> str | None:
+    """The ref of a line: one of the properties after its name, as a page can write ``[ref=…]`` into a name to pass one
+    control for another (the code review's Y9); in a line of no known shape, its last one."""
+    if shape is not None:
+        refs: list[str] = _REF.findall(shape.group("attrs"))
+    else:
+        refs = _REF.findall(text)
+    return refs[-1] if refs else None
+
+
 def _make_line(raw: str, depth: int) -> SnapshotLine:
     box_match: re.Match[str] | None = _BOX.search(raw)
     box: Box | None = None
@@ -101,12 +111,11 @@ def _make_line(raw: str, depth: int) -> SnapshotLine:
         x, y, width, height = (float(group) for group in box_match.groups())
         box = Box(x=x, y=y, width=width, height=height)
     text: str = _COSMETIC.sub("", _BOX.sub("", raw))
-    ref_match: re.Match[str] | None = _REF.search(text)
     shape: re.Match[str] | None = _SHAPE.match(_plain_key(text))
     return SnapshotLine(
         depth=depth,
         text=text,
-        ref=ref_match.group(1) if ref_match is not None else None,
+        ref=_ref_of(text, shape),
         box=box,
         role=shape.group("role") if shape is not None else "",
         name=(shape.group("name") or "") if shape is not None else "",
@@ -307,7 +316,8 @@ def diff_views(previous: str, current: str) -> ViewDiff:
 
 
 def _refs_in(line: str) -> list[str]:
-    return _REF.findall(line)
+    ref: str | None = _ref_of(line, _SHAPE.match(_plain_key(line.strip())))
+    return [] if ref is None else [ref]
 
 
 def render_diff(diff: ViewDiff) -> str:

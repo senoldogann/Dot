@@ -2,6 +2,7 @@
 
 import re
 import unicodedata
+from collections.abc import Sequence
 from datetime import datetime
 
 from pydantic import JsonValue
@@ -13,32 +14,71 @@ _SECRET_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z0-9 ]*PRIVATE KEY-----|\Z)"),
     # The password of a URL: scheme://user:password@host.
     re.compile(r"(?i)\b([a-z][a-z0-9+.\-]{0,30}://[^\s/@:]+)(:)[^\s/]+(?=@[^\s/@]+)"),
-    # Keys and tokens by the forms their services give them: OpenAI's and Anthropic's; GitHub's, an AWS access key id,
-    # a Google API key, Slack's and a JSON web token (tried only where a run of its letters starts); Stripe's secret and
-    # restricted keys and its webhook secrets, GitLab's tokens, npm's, Hugging Face's, a Twilio API key and SendGrid's.
-    re.compile(r"sk-[A-Za-z0-9_\-]{16,}"),
+    # Keys and tokens by the forms their services give them, each where a word starts and not after a hyphen (so the
+    # end of "task-management" or "risk-free-returns" is no key, review Y4): OpenAI's and Anthropic's; GitHub's, an AWS
+    # access key id, a Google API key, Slack's and a JSON web token; Stripe's secret and restricted keys and its webhook
+    # secrets, GitLab's tokens, npm's, Hugging Face's, a Twilio API key and SendGrid's.
+    re.compile(r"(?<![\w-])sk-[A-Za-z0-9_\-]{16,}"),
     re.compile(
-        r"\b(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}|(?:AKIA|ASIA)[0-9A-Z]{16}\b"
+        r"(?<![\w-])(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{22,}|(?:AKIA|ASIA)[0-9A-Z]{16}\b"
         r"|AIza[0-9A-Za-z_\-]{35}|xox[abprs]-[0-9A-Za-z\-]{10,}"
-        r"|(?<![A-Za-z0-9_\-])eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,})"
+        r"|eyJ[A-Za-z0-9_\-]{8,}\.eyJ[A-Za-z0-9_\-]{8,}\.[A-Za-z0-9_\-]{8,})"
     ),
     re.compile(
-        r"\b(?:[rs]k_(?:live|test)_[0-9A-Za-z]{10,}|whsec_[0-9A-Za-z+/=]{20,}|gl(?:pat|dt|rt)-[0-9A-Za-z_\-]{20,}"
+        r"(?<![\w-])(?:[rs]k_(?:live|test)_[0-9A-Za-z]{10,}|whsec_[0-9A-Za-z+/=]{20,}|gl(?:pat|dt|rt)-[0-9A-Za-z_\-]{20,}"
         r"|npm_[0-9A-Za-z]{36}\b|hf_[0-9A-Za-z]{30,}|SK[0-9a-fA-F]{32}\b|SG\.[0-9A-Za-z_\-]{16,}\.[0-9A-Za-z_\-]{16,})"
     ),
     # The credentials of an Authorization header: Basic ones, a bearer token, and those of any other scheme or of none.
-    re.compile(r"(?i)(authorization\"?\s*[:=]\s*\"?basic)(\s+)[A-Za-z0-9+/=]{4,}"),
+    re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?basic)(\s+)[A-Za-z0-9+/=]{4,}"),
     re.compile(r"(?i)bearer\s+[A-Za-z0-9._\-]{16,}"),
-    re.compile(r"(?i)(authorization\"?\s*[:=]\s*\"?)((?:[a-z][a-z0-9\-]*\s+)?)[A-Za-z0-9._~+/=\-]{16,}"),
+    re.compile(r"(?i)(authorization[\"']?\s*[:=]\s*[\"']?)((?:[a-z][a-z0-9\-]*\s+)?)[A-Za-z0-9._~+/=\-]{16,}"),
     # The cookies of a Cookie or Set-Cookie header, with the attributes among them.
-    re.compile(r"(?i)\b((?:set-)?cookie)(\"?\s*:\s*\"?)[^\s=;\"]+=[^\s;\"]*(?:;\s*[^\s=;\"]+(?:=[^\s;\"]*)?)*"),
-    # The value of key=value or "key": "value" whose key names a secret, and a password's however short it is.
     re.compile(
-        r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:api[_-]?key|access[_-]?key|account[_-]?key|private[_-]?key(?:[_-]?id)?"
-        r"|secret|token|password|passwd|credentials?))(\"?\s*[:=]\s*\"?)[^\s\"',}]{8,}"
+        r"(?i)\b((?:set-)?cookie)([\"']?\s*:\s*[\"']?)[^\s=;\"']+=[^\s;\"']*(?:;\s*[^\s=;\"']+(?:=[^\s;\"']*)?)*"
     ),
-    re.compile(r"(?i)(?<![\w.\-])([\w.\-]{0,40}?(?:password|passwd))(\"?\s*[:=]\s*\"?)[^\s\"',}]+"),
 )
+# A key that names a secret (review Y3): one of these words after any prefix (``DB_PASSWORD``, ``apiKey``,
+# ``x-auth-token``, ``client_secret``), then at most two words that say what of the secret the value is
+# (``SECRET_KEY``, ``token_value``, ``private_key_id``, ``secret_key_base``); ``max_tokens``, ``token_count`` and
+# ``token_type`` name none.
+_SECRET_NAME: str = (
+    r"[\w.\-]{0,40}?(?:password|passwd|secret|token|api[_-]?key|access[_-]?key|account[_-]?key|private[_-]?key"
+    r"|credentials?|authorization|bearer|cookie)"
+    r"(?:[_\-.]?(?:key|value|id|hash|base|string|str|data|hex|b64|header|plain|raw|enc)){0,2}"
+)
+# The value given to such a key: quoted (spaces and all), or a run of characters, after an authentication scheme that
+# is kept (``Authorization: Token x``).
+_SECRET_VALUE: str = (
+    r"(?P<value>\"(?:[^\"\\\n]|\\.)*\"|'[^'\n]*'"
+    r"|(?P<scheme>(?:basic|bearer|token|digest|apikey|api-key|negotiate|ntlm|oauth|key|sso-key|dpop)\s+)?"
+    r"(?P<bare>[^\s\"',}]+))"
+)
+# A secret given by its key's name: ``key=value``, ``KEY='value'``, ``key: value``, ``"key": "value"`` and
+# ``--key=value``; and ``--key value``, an option and its value (one that is not another option).
+_SECRET_FIELDS: tuple[re.Pattern[str], ...] = (
+    re.compile(rf"(?i)(?<![\w.\-])(?P<name>{_SECRET_NAME})(?P<between>[\"']?\s*[:=]\s*){_SECRET_VALUE}"),
+    re.compile(rf"(?i)(?<![\w.\-])(?P<name>--?{_SECRET_NAME})(?P<between>\s+)(?!-){_SECRET_VALUE}"),
+)
+# The name of a field whose value is a secret whatever it looks like (a JSON object's key).
+_SECRET_FIELD: re.Pattern[str] = re.compile(rf"(?i)-*{_SECRET_NAME}")
+# What a key that names a secret may be given that is no secret: nothing more than a mask, a placeholder (``<token>``,
+# ``${TOKEN}``, ``$TOKEN``, ``{{ token }}``, ``${{ secrets.TOKEN }}``, ``%TOKEN%``, ``...``; an unquoted value stops
+# at a space or a brace, so the start of one is enough) or a word for none.
+_PLACEHOLDER: re.Pattern[str] = re.compile(
+    r"\**|<[^<>]*>?|\$\{[^{}]*\}?|\$\w+|\$?\{\{.*|%\w+%|\.{3}|…"
+    r"|(?i:none|null|nil|true|false|undefined|redacted|hidden|x+)"
+)
+_PASSWORD_NAME: re.Pattern[str] = re.compile(r"(?i)passw(?:or)?d")
+# A value after ``key: `` stands where prose stands too (``Authorization: required for every request``): it is a secret
+# when it is long, or has a digit, a capital beside small letters or a sign in it.
+_LONG_VALUE_CHARS: int = 12
+_SHORT_VALUE_CHARS: int = 8
+_SECRET_SIGNS: re.Pattern[str] = re.compile(r"\d|[_\-./+=~]|[a-z].*[A-Z]|[A-Z].*[a-z]")
+# A value is masked from this many characters on (a password's from one).
+_MIN_VALUE_CHARS: int = 4
+# The values known to be secrets (:func:`redact_known`) are masked from this many characters on: a shorter one would
+# mask words of every text it is in.
+KNOWN_SECRET_MIN_CHARS: int = 8
 
 # The marks of Markdown a plain line leaves out (``plain_line``): a fence's line whole; a heading's, a quote's and a list
 # item's mark at the start of a line; bold, strike and code marks anywhere. A link or an image keeps its words.
@@ -108,13 +148,42 @@ def plain_line(text: str, max_chars: int) -> str:
 
 
 def redact_secrets(text: str) -> str:
-    """Mask secrets (items 214 and 241): keys and tokens by their known forms, private keys, the credentials of an
-    Authorization header of any scheme, the cookies of a Cookie or Set-Cookie header, the password of a URL, and the
-    value of a ``key=value`` whose key names a secret."""
+    """Mask secrets (items 214 and 241, review Y3): keys and tokens by their known forms, private keys, the credentials
+    of an Authorization header of any scheme, the cookies of a Cookie or Set-Cookie header, the password of a URL, and
+    the value given to a key that names a secret (:func:`secret_value`), whose key is kept."""
     masked: str = text
     for pattern in _SECRET_PATTERNS:
         masked = pattern.sub(_mask_match, masked)
+    for fields in _SECRET_FIELDS:
+        masked = fields.sub(_mask_field, masked)
     return masked
+
+
+def redact_known(text: str, known: Sequence[str]) -> str:
+    """``text`` with every value of ``known`` (secrets Dot holds, :func:`dotagent.secrets.known_secrets`) masked where
+    it stands, word for word and the longest first, then :func:`redact_secrets`. A value shorter than
+    :data:`KNOWN_SECRET_MIN_CHARS` is left alone."""
+    masked: str = text
+    for value in sorted(set(known), key=len, reverse=True):
+        if len(value) >= KNOWN_SECRET_MIN_CHARS:
+            masked = masked.replace(value, "***")
+    return redact_secrets(masked)
+
+
+def secret_value(name: str, value: str, prose: bool) -> bool:
+    """Whether ``value``, given to the key ``name`` that names a secret, is one to mask: not a placeholder nor a mask
+    already; a password's whatever it is, another's from :data:`_MIN_VALUE_CHARS` characters on. ``prose``: the value
+    stands where prose does (``key: value``, unquoted), so it is a secret only when it is long or has a digit, a
+    capital beside small letters or a sign in it."""
+    if "***" in value or _PLACEHOLDER.fullmatch(value) is not None:
+        return False
+    if _PASSWORD_NAME.search(name) is not None:
+        return True
+    if prose:
+        return len(value) >= _LONG_VALUE_CHARS or (
+            len(value) >= _SHORT_VALUE_CHARS and _SECRET_SIGNS.search(value) is not None
+        )
+    return len(value) >= _MIN_VALUE_CHARS
 
 
 def _mask_match(match: re.Match[str]) -> str:
@@ -122,6 +191,22 @@ def _mask_match(match: re.Match[str]) -> str:
     if len(groups) >= 2 and groups[0] is not None and groups[1] is not None:
         return f"{groups[0]}{groups[1]}***"
     return "***"
+
+
+def _mask_field(match: re.Match[str]) -> str:
+    """A key that names a secret and its value (:data:`_SECRET_FIELDS`), the value masked when it is a secret."""
+    name: str = match.group("name")
+    between: str = match.group("between")
+    value: str = match.group("value")
+    if value[:1] in ("'", '"'):
+        quoted: bool = secret_value(name, value[1:-1], False)
+        return f"{name}{between}{value[0]}***{value[0]}" if quoted else match.group(0)
+    scheme: str | None = match.group("scheme")
+    bare: str = match.group("bare")
+    prose: bool = scheme is None and ":" in between and between[-1:].isspace()
+    if not secret_value(name, bare, prose):
+        return match.group(0)
+    return f"{name}{between}{scheme or ''}***"
 
 
 def duration_text(seconds: float) -> str:
@@ -156,13 +241,17 @@ def strip_blobs(value: JsonValue) -> JsonValue:
 
 
 def redact_json(value: JsonValue) -> JsonValue:
-    """Mask secrets inside every string of a JSON value."""
+    """Mask secrets inside every string of a JSON value, and the whole string of a field whose name names a secret
+    (``{"password": "hunter2"}``), however it looks."""
     if isinstance(value, str):
         return redact_secrets(value)
     if isinstance(value, list):
         return [redact_json(item) for item in value]
     if isinstance(value, dict):
-        return {key: redact_json(item) for key, item in value.items()}
+        return {
+            key: "***" if isinstance(item, str) and item and _SECRET_FIELD.fullmatch(key) else redact_json(item)
+            for key, item in value.items()
+        }
     return value
 
 

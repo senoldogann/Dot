@@ -40,6 +40,8 @@ export function createCostCard() {
   const card = panelSection({ id: "run-cost", title: "Cost", actions: null, body });
   card.element.classList.add("cost-card");
   card.element.setAttribute("aria-label", "Cost of this run");
+  // The figures the grid was drawn from.
+  let drawn = null;
 
   function paint(costs) {
     const stats = costs.stats;
@@ -50,18 +52,25 @@ export function createCostCard() {
     const compactions = stats.compaction.compactions === 0 ? "None" : `${stats.compaction.compactions}${perHundred}`;
     const delegated = stats.delegation.runs === 0 ? "None" : `${stats.delegation.runs} · ${duration(stats.delegation.seconds)} waited`;
     const searches = stats.searches.length === 0 ? "None" : stats.searches.map((entry) => `${entry.searches} ${entry.engine}`).join(" · ");
-    grid.replaceChildren(...[
-      cell("Model", spent(time.model_seconds, total), HINTS.model),
-      cell("Summaries", spent(time.compaction_seconds, total), HINTS.summaries),
-      cell("Tools", spent(costs.tool_seconds, total), HINTS.tools),
-      cell("Waiting for you", spent(costs.waited_s, total), HINTS.gate),
-      cell("Steps", String(stats.steps), HINTS.steps),
-      cell("Input tokens", `${compact(stats.input_tokens)}${cached}`, HINTS.input),
-      cell("Output tokens", compact(stats.output_tokens), HINTS.output),
-      cell("Compactions", compactions, HINTS.compactions),
-      cell("Delegated runs", delegated, HINTS.delegated),
-      cell("Searches", searches, HINTS.searches),
-    ].flat());
+    const facts = [
+      ["Model", spent(time.model_seconds, total), HINTS.model],
+      ["Summaries", spent(time.compaction_seconds, total), HINTS.summaries],
+      ["Tools", spent(costs.tool_seconds, total), HINTS.tools],
+      ["Waiting for you", spent(costs.waited_s, total), HINTS.gate],
+      ["Steps", String(stats.steps), HINTS.steps],
+      ["Input tokens", `${compact(stats.input_tokens)}${cached}`, HINTS.input],
+      ["Output tokens", compact(stats.output_tokens), HINTS.output],
+      ["Compactions", compactions, HINTS.compactions],
+      ["Delegated runs", delegated, HINTS.delegated],
+      ["Searches", searches, HINTS.searches],
+    ];
+    // Read every ten seconds while the run works; drawn again only when a figure changed (item 310).
+    const from = JSON.stringify(facts);
+    if (from === drawn) {
+      return;
+    }
+    drawn = from;
+    grid.replaceChildren(...facts.flatMap(([label, value, hint]) => cell(label, value, hint)));
     body.replaceChildren(grid);
   }
 

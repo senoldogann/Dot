@@ -18,10 +18,15 @@ RunMode = Literal["task", "chat", "research"]
 # Whose words a chat's last line in the sidebar is: the owner's message, or the answer to it (item 277).
 ChatLineRole = Literal["user", "assistant"]
 # How a run was handed a note: at its start, by a memory_search call, or as a note changed while it ran.
-MemoryUseHow = Literal["start", "search", "live"]
+MemoryUseHow = Literal["start", "search", "live", "site"]
 # ``pending``: a run waits for the answer; ``left``: a question a run left for the user and went on without (it is never
 # expired; answering it carries the work on in its thread).
 ApprovalStatus = Literal["pending", "left", "approved", "denied", "expired"]
+# The application a draft goes out with (item 314): ``mail`` an email by Mail, ``message`` an iMessage by Messages.
+DraftChannel = Literal["mail", "message"]
+# ``waiting``: for the owner to send or discard it; ``sending``: handed to the application; ``failed``: the application
+# refused it, and the owner may send it again or discard it; ``sent`` and ``discarded`` are final.
+DraftStatus = Literal["waiting", "sending", "sent", "discarded", "failed"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
 # ``active``: its sessions go on; ``achieved``: the goal checker accepted its evidence, or the owner said so;
 # ``stopped``: the owner stopped it (also with the emergency stop of desktop control, which ends its session), or it ran
@@ -245,6 +250,23 @@ class ApprovalRecord(FrozenModel):
     note: str
 
 
+class DraftRecord(FrozenModel):
+    """An email or a message a run wrote for the owner (item 314). Nothing goes out until the owner presses Send, and
+    then with the recipients and words as they stand on the card; ``error`` says why the last send failed."""
+
+    id: str
+    run_id: str
+    channel: DraftChannel
+    to: tuple[str, ...]
+    cc: tuple[str, ...]
+    subject: str
+    body: str
+    status: DraftStatus
+    created_at: float
+    decided_at: float | None
+    error: str | None
+
+
 class ShownPage(FrozenModel):
     """A page of HTML that a run wrote and showed in the conversation (``show_page``). Its id is all it takes to read
     it: the daemon serves the page to whoever names it (``GET /pages/<id>``), so the id is made to be unguessable."""
@@ -293,7 +315,9 @@ class QueuedMessage(FrozenModel):
 class MemoryRecord(FrozenModel):
     """One note. ``source_run`` is the run that saved it, ``None`` for a note the user wrote; ``agent_id`` is the
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
-    ``last_used_at`` say how often and when a run was handed it."""
+    ``last_used_at`` say how often and when a run was handed it. ``expires_at`` is when a note saved for a while stops
+    holding (item 306), ``None`` for one that holds until it is changed; ``replaced_by`` is the newer note that made it
+    outdated, when the reflection put it aside for that (item 306)."""
 
     id: str
     content: str
@@ -304,6 +328,8 @@ class MemoryRecord(FrozenModel):
     agent_id: str | None
     used_count: int
     last_used_at: float | None
+    expires_at: float | None
+    replaced_by: str | None
 
 
 class MemoryScore(FrozenModel):

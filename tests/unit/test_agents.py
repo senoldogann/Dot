@@ -8,6 +8,8 @@ from pydantic import ValidationError
 
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
+from dotagent.core.errors import InvalidValueError
+from dotagent.server.routes_agents import changed_agent_tools, new_agent_tools
 from dotagent.server.views import AgentRequest
 from dotagent.store.db import Store
 from dotagent.store.models import AgentLook, AgentRecord, RunRecord, ThreadRecord
@@ -41,12 +43,19 @@ def _prompt(agent: AgentBrief | None) -> str:
 
 def test_the_prompt_opens_in_the_agents_voice_and_carries_the_owners_instructions() -> None:
     agent: AgentBrief = AgentBrief(
-        name="Scout", role="Finds and checks sources", instructions="Prefer primary sources."
+        name="Scout", role="Finds and checks sources", instructions="Prefer primary sources.", made_by_dot=False
     )
     prompt: str = _prompt(agent)
     assert prompt.startswith("You are Scout, an agent the owner made: Finds and checks sources.")
-    assert "Prefer primary sources." in prompt
+    assert (
+        "The owner's instructions to you, which you follow within the rules below:\nPrefer primary sources." in prompt
+    )
     assert "You are Scout" not in _prompt(None)
+    # Item 307: an agent a run made carries Dot's instructions, which a model wrote, not the owner's.
+    made: str = _prompt(agent.model_copy(update={"made_by_dot": True}))
+    assert made.startswith("You are Scout, an agent Dot made: Finds and checks sources.")
+    assert "Dot's instructions to you, which you follow within the rules below:\nPrefer primary sources." in made
+    assert "The owner's instructions" not in made
 
 
 def test_the_tools_an_agent_always_keeps_are_the_ones_that_end_ask_and_turn_groups_on() -> None:
@@ -139,7 +148,7 @@ def test_a_request_with_a_look_outside_the_catalogue_is_refused() -> None:
         "model": "",
         "effort": None,
         "approvals": None,
-        "tools": [],
+        "tools": None,
     }
     assert AgentRequest.model_validate({**body, "look": None}).look is None
     chosen: AgentRequest = AgentRequest.model_validate(
@@ -150,3 +159,29 @@ def test_a_request_with_a_look_outside_the_catalogue_is_refused() -> None:
         AgentRequest.model_validate({**body, "look": {"shape": "blob", "expression": "proud", "colour": "pink"}})
     with pytest.raises(ValidationError):
         AgentRequest.model_validate({**body, "look": {"shape": "pebble", "expression": "proud"}})
+
+
+def test_tools_left_out_or_null_are_every_tool_and_an_empty_list_keeps_an_agents_own() -> None:
+    """The code review's Y5: an editor whose tool list had not loaded sent none, which the server took for every tool,
+    so a Save at that moment let a bounded agent use every tool."""
+    body: dict[str, object] = {
+        "name": "Scout",
+        "role": "",
+        "instructions": "",
+        "model": "",
+        "effort": None,
+        "approvals": None,
+    }
+    assert AgentRequest.model_validate(body).tools is None
+    assert AgentRequest.model_validate({**body, "tools": None}).tools is None
+    assert AgentRequest.model_validate({**body, "tools": []}).tools == []
+    with pytest.raises(ValidationError):
+        AgentRequest.model_validate({**body, "tools": [], "every_tool": True})
+    assert new_agent_tools(None) == ()
+    assert new_agent_tools(["shell"]) == ("shell",)
+    with pytest.raises(InvalidValueError, match="no tools to keep"):
+        new_agent_tools([])
+    bounded: tuple[str, ...] = ("shell", "skill")
+    assert changed_agent_tools([], bounded) == bounded
+    assert changed_agent_tools(["shell"], bounded) == ("shell",)
+    assert changed_agent_tools(None, bounded) == ()

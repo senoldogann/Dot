@@ -246,6 +246,12 @@ const SHAPES = {
     ["line", { x1: 21, x2: 14, y1: 3, y2: 10 }],
     ["line", { x1: 3, x2: 10, y1: 21, y2: 14 }],
   ],
+  minimize: [
+    ["polyline", { points: "4 14 10 14 10 20" }],
+    ["polyline", { points: "20 10 14 10 14 4" }],
+    ["line", { x1: 14, x2: 21, y1: 10, y2: 3 }],
+    ["line", { x1: 3, x2: 10, y1: 21, y2: 14 }],
+  ],
   key: [
     ["path", { d: "m15.5 7.5 2.3 2.3a1 1 0 0 0 1.4 0l2.1-2.1a1 1 0 0 0 0-1.4L19 4" }],
     ["path", { d: "m21 2-9.6 9.6" }],
@@ -274,6 +280,12 @@ const SHAPES = {
     ["path", { d: "M19.967 17.484A4 4 0 0 1 18 18" }],
   ],
   message: [["path", { d: "M7.9 20A9 9 0 1 0 4 16.1L2 22Z" }]],
+  // A draft of an email and the press that sends it (item 314).
+  mail: [["rect", { width: 20, height: 16, x: 2, y: 4, rx: 2 }], ["path", { d: "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" }]],
+  send: [
+    ["path", { d: "M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" }],
+    ["path", { d: "m21.854 2.147-10.94 10.939" }],
+  ],
   lock: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 10 0v4" }]],
   lockOpen: [["rect", { width: 18, height: 11, x: 3, y: 11, rx: 2 }], ["path", { d: "M7 11V7a5 5 0 0 1 9.9-1" }]],
   sun: [

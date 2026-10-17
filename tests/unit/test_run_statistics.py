@@ -3,6 +3,7 @@
 import sqlite3
 import time
 from collections.abc import AsyncIterator
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -18,19 +19,23 @@ from dotagent.store.endings import RESULT_STALLED, RESULT_STOPPED
 from dotagent.store.models import MemoryScore, RunRecord, RunStatus
 from dotagent.store.stats import (
     ActStats,
+    DayOutcomes,
     LearningStats,
     ModelStats,
     NoteScore,
     PlaybookComparison,
     RunCosts,
     RunStatistics,
+    SiteOutcomes,
     TimeStats,
     ToolStats,
     WebFailures,
     collect_run_costs,
     collect_statistics,
+    day_outcomes,
     failure_cause,
     nearest_rank,
+    site_outcomes,
 )
 
 DAY_S: float = 86400.0
@@ -38,10 +43,12 @@ NO_LEARNING: LearningStats = LearningStats(
     lessons_proposed=0,
     lessons_saved=0,
     lessons_dismissed=0,
+    lessons_failed=0,
     runs_handed_notes=0,
     notes=(),
     playbooks_written=0,
     playbooks_retired=0,
+    playbooks_failed=0,
     runs_reading_playbooks=0,
     comparisons=(),
 )
@@ -378,12 +385,46 @@ def test_the_statistics_are_rendered_per_model_in_plain_words(database: Path) ->
     tool_row: str = next(line for line in lines if line.strip().startswith("browser_act"))
     assert tool_row.split() == ["browser_act", "5", "1", "14.0", "2.0", "1.5"]
     site_row: str = next(line for line in lines if line.strip().startswith("x.com"))
-    assert site_row.split() == ["x.com", "2", "50", "%", "0", "%", "2.5"]
+    # The one finished run that acted on x.com ended done (item 308).
+    assert site_row.split() == ["x.com", "2", "50", "%", "0", "%", "2.5", "1", "100", "%"]
+    today: str = datetime.now().date().isoformat()
+    assert f"  {today}     1 runs  100 % done" in lines
     assert render_stats(stats, 30, "site")[2].startswith("Sites, from the browser and desktop act calls")
     assert not any(line.startswith("Sites") for line in render_stats(stats, 30, "model"))
-    assert render_stats(RunStatistics(models=(), tools=(), sites=(), channels=(), learning=NO_LEARNING), 7, "all") == [
-        "No runs in the last 7 days."
+    empty: RunStatistics = RunStatistics(models=(), tools=(), sites=(), days=(), channels=(), learning=NO_LEARNING)
+    assert render_stats(empty, 7, "all") == ["No runs in the last 7 days."]
+
+
+def test_each_site_counts_the_finished_runs_that_acted_there_and_the_days_show_the_trend() -> None:
+    """Item 308: per site, the finished runs that made an act call there and how many ended done; per day, the same for
+    every site, the oldest day first. A run at work counts once it ends; a call that named no site counts nowhere."""
+    noon: float = datetime(2026, 10, 14, 12, 0).timestamp()
+    # Rows of the runs query: model, status, result, steps, input and output tokens, id, started, finished.
+    runs: list[tuple[object, ...]] = [
+        ("m", "done", "", 1, 0, 0, "run_1", noon, noon + 60),
+        ("m", "failed", "", 1, 0, 0, "run_2", noon, noon + 60),
+        ("m", "done", "", 1, 0, 0, "run_3", noon + DAY_S, noon + DAY_S + 60),
+        ("m", "running", "", 1, 0, 0, "run_4", noon + DAY_S, None),
+        ("m", "done", "", 1, 0, 0, "run_5", noon + DAY_S, noon + DAY_S + 60),
+        ("m", "done", "", 1, 0, 0, "run_6", noon + DAY_S, noon + DAY_S + 60),
     ]
+    acted: list[tuple[object, ...]] = [
+        ("run_1", "x.com", 2),
+        ("run_1", "Notes", 1),
+        ("run_2", "x.com", 3),
+        ("run_3", "x.com", 1),
+        ("run_4", "x.com", 1),
+        ("run_5", None, 1),
+        ("run_6", "", 1),
+    ]
+    assert site_outcomes(runs, acted) == {
+        "x.com": SiteOutcomes(runs=3, done=2),
+        "Notes": SiteOutcomes(runs=1, done=1),
+    }
+    assert day_outcomes(runs, acted) == (
+        DayOutcomes(day="2026-10-14", runs=2, done=1),
+        DayOutcomes(day="2026-10-15", runs=1, done=1),
+    )
 
 
 def _act(site: str) -> tuple[str, JsonObject]:
@@ -438,9 +479,9 @@ async def test_the_learning_section_scores_the_notes_handed_to_runs_and_compares
     assert comparison.unread.runs == 1 and comparison.unread.acts_per_run == 4.0
     lines: list[str] = render_learning(learning)
     assert lines[0] == "Learning"
-    assert lines[1] == "  lessons: 2 proposed, 1 saved, 0 dismissed"
+    assert lines[1] == "  lessons: 2 proposed, 1 saved, 0 dismissed, failed on 0 runs"
     assert lines[2] == f"  notes handed to 2 runs; {note.id} to 2 (1 done)"
-    assert lines[3] == "  playbooks: 1 written, 0 retired, read by 1 runs"
+    assert lines[3] == "  playbooks: 1 written, 0 retired, 0 failed, read by 1 runs"
     assert lines[4].startswith("  x.com: with its playbook 1 runs, 2.0 acts and ")
 
 

@@ -65,6 +65,7 @@ AUTO: AgentConfig = DEFAULTS.model_copy(update={"tool_surface": "auto"})
         ("show_page", "pages"),
         ("memory_update", "memory_admin"),
         ("memory_forget", "memory_admin"),
+        ("draft_message", "drafts"),
         ("mcp__github__create_issue", "mcp__github"),
         ("mcp__team-wiki__search__all", "mcp__team-wiki"),
     ],
@@ -74,11 +75,20 @@ def test_each_tool_is_in_the_group_of_what_it_reaches(tool: str, group: str) -> 
 
 
 def test_the_core_group_holds_what_most_runs_need_and_is_about_a_third_of_the_tool_definitions() -> None:
-    assert groups_of(TASK_TOOLS) == ("browser", "memory_admin", "schedule", "team", "pages", "terminal", "desktop")
+    assert groups_of(TASK_TOOLS) == (
+        "browser",
+        "memory_admin",
+        "drafts",
+        "schedule",
+        "team",
+        "pages",
+        "terminal",
+        "desktop",
+    )
+    # A research run makes no agent (item 307), so it has no team group; message_agent is core.
     assert groups_of([spec.name for spec in specs_for_mode(REGISTRY, "research")]) == (
         "browser",
         "schedule",
-        "team",
         "pages",
         "desktop",
     )
@@ -124,7 +134,7 @@ def test_the_tools_of_the_groups_that_are_off_are_hidden_with_their_group() -> N
     assert {spec.name for spec in offered} | set(hidden) == set(TASK_TOOLS)
     assert {spec.name for spec in offered} & set(hidden) == set()
     assert {"schedule_create", "schedule_list", "schedule_delete"} <= {spec.name for spec in offered}
-    assert set(hidden.values()) == {"browser", "desktop", "memory_admin", "pages", "team", "terminal"}
+    assert set(hidden.values()) == {"browser", "desktop", "drafts", "memory_admin", "pages", "team", "terminal"}
     assert (hidden["apple_script"], hidden["memory_forget"]) == ("desktop", "memory_admin")
 
 
@@ -169,9 +179,10 @@ def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
         "browser_snapshot, browser_find, browser_links, browser_act, browser_eval, browser_scroll, browser_read_text, "
         "browser_screenshot, browser_wait_text, browser_back, browser_switch_tab, browser_close_tab, browser_upload)",
         "- memory_admin: correcting or forgetting saved notes (memory_update, memory_forget)",
+        "- drafts: an email or a message you write for the owner, who sends it from the conversation (draft_message)",
         "- schedule: goals that run later, once or on a cron expression (schedule_create, schedule_list, "
         "schedule_delete)",
-        "- team: making a lasting teammate agent for a kind of work that recurs (create_agent)",
+        "- team: making a lasting teammate agent for a role the work needs again or in parallel (create_agent)",
         "- pages: showing a page you write in HTML in the conversation: charts, tables, diagrams, 3D views (show_page)",
         "- terminal: programs that ask questions, REPLs and servers that stay up, on a terminal of their own "
         "(terminal_open, terminal_send, terminal_read, terminal_close)",

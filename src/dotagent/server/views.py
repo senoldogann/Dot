@@ -5,6 +5,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile
+from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
 from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
@@ -16,6 +17,7 @@ from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.roles import ModelRole
 from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
 from dotagent.mcp.types import McpFailure
+from dotagent.notify.keys import keys_problem
 from dotagent.policy.types import ApprovalMode
 from dotagent.secrets import SecretSource
 from dotagent.store.models import (
@@ -422,8 +424,9 @@ class KeyRequest(FrozenModel):
 
 class AgentRequest(FrozenModel):
     """Make or change an agent (item 86). ``model`` empty and ``effort``/``approvals`` ``None`` take the configured
-    ones; ``tools`` empty lets the agent use every tool; ``look`` ``None`` leaves the face its id's hue gives it (item
-    102)."""
+    ones; ``tools`` names the tools the agent may use, is ``None`` (or left out) for every tool, and is empty for the
+    ones an agent has, which a new agent has none of, so a list that did not load never lifts the bounds of an agent
+    (the code review's Y5); ``look`` ``None`` leaves the face its id's hue gives it (item 102)."""
 
     name: str = Field(min_length=1, max_length=60)
     role: str = Field(max_length=120)
@@ -431,7 +434,7 @@ class AgentRequest(FrozenModel):
     model: str
     effort: Effort | None
     approvals: ApprovalMode | None
-    tools: list[str]
+    tools: list[str] | None = None
     look: AgentLook | None = None
 
 
@@ -484,6 +487,14 @@ class LearnedSkillView(FrozenModel):
     updated_at: float
     agent_id: str | None
     shared: bool
+
+
+class LearningHealthView(FrozenModel):
+    """``GET /api/memories/learning``: how Dot's learning fares (:mod:`dotagent.agent.learning_health`, review O25):
+    the record, ``None`` before the first outcome, and why learning has stopped (``None`` while it works)."""
+
+    health: LearningHealth | None
+    stalled: str | None
 
 
 class LearnedSkillsView(FrozenModel):
@@ -1046,8 +1057,17 @@ class PushKeyView(FrozenModel):
 
 
 class PushKeysPart(FrozenModel):
+    """The keys a push to the subscription is encrypted with; keys that cannot encrypt anything are refused here."""
+
     p256dh: str = Field(min_length=1, max_length=200)
     auth: str = Field(min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def _usable(self) -> Self:
+        problem: str | None = keys_problem(self.p256dh, self.auth)
+        if problem is not None:
+            raise ValueError(problem)
+        return self
 
 
 class PushSubscribeRequest(FrozenModel):

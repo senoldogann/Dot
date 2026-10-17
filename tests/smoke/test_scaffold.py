@@ -9,11 +9,13 @@ the summaries of a compaction, and reports as the size of each prompt the size t
 
 import asyncio
 import re
+import secrets
 from collections.abc import Sequence
 from itertools import pairwise
 
 import pytest
 import pytest_asyncio
+from structlog.testing import capture_logs
 
 from dotagent.agent.compact import estimate_tokens
 from dotagent.agent.manager import RunManager
@@ -28,6 +30,7 @@ from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, Usage
 from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.secrets import resolve_secret
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
@@ -95,6 +98,21 @@ class WindowedProvider:
 
     async def aclose(self) -> None:
         await self._script.aclose()
+
+
+class TellingFastProvider(WindowedProvider):
+    """The scripted model next to a fast model whose summaries repeat a password and a key Dot holds (``held``)."""
+
+    def __init__(self, script: ScriptedProvider, window: int | None, held: str) -> None:
+        super().__init__(script, window)
+        self._held: str = held
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        reply: ModelReply = await super().complete(request, sink)
+        if not request.session_key.endswith(_SUMMARY_KEY):
+            return reply
+        told: str = f"PROBLEMS: the vault took password: hunter2 and the key {self._held}."
+        return reply.model_copy(update={"text": _SUMMARY.replace("PROBLEMS: none.", told)})
 
 
 class Played(FrozenModel):
@@ -172,6 +190,16 @@ class ForgetfulFastProvider(WindowedProvider):
             reply: ModelReply = await super().complete(request, sink)
             return reply.model_copy(update={"text": _SUMMARY.replace("PROBLEMS: none.\n", "")})
         return await super().complete(request, sink)
+
+
+class StubbornFastProvider(WindowedProvider):
+    """The scripted model next to a fast model that leaves PROBLEMS out of every summary, asked for it or not."""
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        reply: ModelReply = await super().complete(request, sink)
+        if not request.session_key.endswith(_SUMMARY_KEY):
+            return reply
+        return reply.model_copy(update={"text": _SUMMARY.replace("PROBLEMS: none.\n", "")})
 
 
 async def _play(
@@ -288,14 +316,15 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     login_env: dict[str, str],
 ) -> None:
     # Forty pages fill the small budget even when the system prompt is all of the fixed part of the prompt. The window
-    # leaves the fixed part of the prompt (the core tools of items 41 and 34, the page tool of item 193, and the skill
-    # tool with the skills that come with Dot of item 196 included) room for two pages after every compaction; what a
-    # compaction keeps grows a little each time, so a smaller window would end up compacting at every step.
+    # leaves the fixed part of the prompt (the core tools of items 41 and 34, the page tool of item 193, the skill tool
+    # with the skills that come with Dot of item 196 and the draft tool of item 314 included) room for two pages after
+    # every compaction; what a compaction keeps grows a little each time, so a smaller window would end up compacting
+    # at every step.
     turns: list[ScriptedTurn] = _reading(40)
-    small: Played = await _play(_config({}, 6), login_env, 28_000, turns)
+    small: Played = await _play(_config({}, 6), login_env, 29_000, turns)
     roomy: Played = await _play(_config({}, 6), login_env, None, turns)
 
-    assert small.scaffolds == (_scaffold(28_000, None, 21_000, 21_000, 2625, True),)
+    assert small.scaffolds == (_scaffold(29_000, None, 21_750, 21_750, 2719, True),)
     assert roomy.scaffolds == (_scaffold(None, None, 96_000, 81_600, 12_000, False),)
     assert (small.record.status, roomy.record.status) == ("done", "done")
 
@@ -306,7 +335,7 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     for page in [*small_pages, *roomy_pages]:
         assert "chars omitted" not in page
         assert page.endswith("to continue]")
-    assert max(len(page) for page in small_pages) <= 2625 < min(len(page) for page in roomy_pages)
+    assert max(len(page) for page in small_pages) <= 2719 < min(len(page) for page in roomy_pages)
 
     # The small budget is kept by compacting with summaries of the fast model; the large one is never reached.
     assert len(small.compactions) > 1
@@ -314,7 +343,12 @@ async def test_a_small_window_cuts_the_budget_and_the_tool_output_and_the_run_co
     fast: str = parse_model_ref(_config({}, 6).models.fast).label
     assert all((compaction["model"], compaction["fast_problem"]) == (fast, None) for compaction in small.compactions)
     assert len(small.summaries) == len(small.compactions) == len(small.compacted_at)
-    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 21_000
+    # Each compaction tells the size of the prompt before it and after it (item 312): smaller after, inside the budget.
+    for compaction in small.compactions:
+        before, after = compaction["tokens_before"], compaction["tokens_after"]
+        assert isinstance(before, int) and isinstance(after, int), compaction
+        assert after < before and after <= 21_750, compaction
+    assert max(estimate_tokens(step.messages, step.tools) for step in small.steps) <= 21_750
     # Each compaction keeps only what fits the budget and leaves room for the steps after it, instead of folding the
     # history again at the very next step.
     gaps: list[int] = [
@@ -392,6 +426,28 @@ async def test_a_summary_that_lacks_a_section_is_asked_for_again_with_the_sectio
     assert "lacked the sections PROBLEMS" in second and "DECISIONS: read on to the end." in second
 
 
+async def test_a_summary_that_still_lacks_a_section_keeps_its_heading_empty_and_says_so(
+    login_env: dict[str, str],
+) -> None:
+    """Review O9: asked for once more and still without PROBLEMS, the summary goes into the note with an empty PROBLEMS
+    heading; the check and the note name the section, and the log says it was left empty."""
+    with capture_logs() as logs:
+        played: Played = await _play_with(
+            _config({}, 6), login_env, StubbornFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+        )
+    assert played.record.status == "done"
+    assert played.compactions
+    for compaction in played.compactions:
+        assert (compaction["method"], compaction["attempts"]) == ("model", 2)
+        check = compaction["check"]
+        assert isinstance(check, dict) and not check["ok"] and check["missing_sections"] == ["PROBLEMS"]
+    after: str = _said(played.steps[-1])
+    assert "NEXT: read the next page.\nPROBLEMS:\n" in after
+    assert "The summary lacks the sections PROBLEMS" in after
+    left_empty: list[object] = [entry["sections"] for entry in logs if entry["event"] == "summary_sections_left_empty"]
+    assert left_empty == [["PROBLEMS"]] * len(played.compactions)
+
+
 async def test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_totals_hold_them_all(
     login_env: dict[str, str],
 ) -> None:
@@ -452,3 +508,21 @@ async def test_a_window_too_small_for_the_fixed_part_of_the_prompt_refuses_the_r
     assert played.record.status == "failed"
     assert "the model's window is too small for the system prompt and the tool definitions" in played.record.result
     assert played.steps == ()
+
+
+async def test_a_summary_keeps_no_secret_dot_holds_nor_one_of_a_known_form(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Review Y3: the continuity note carries the summary into every later step and the run's record, so a secret Dot
+    holds (one looked up in this process) and one of a known form are masked in it."""
+    held: str = f"MARKER-{secrets.token_hex(8)}"
+    monkeypatch.setenv("DOT_TEST_SUMMARY_KEY", held)
+    assert resolve_secret("DOT_TEST_SUMMARY_KEY") == held
+    played: Played = await _play_with(
+        _config({}, 6), login_env, TellingFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000, held)
+    )
+    assert played.record.status == "done"
+    assert played.compactions and all(compaction["method"] == "model" for compaction in played.compactions)
+    told: list[str] = [_said(step) for step in played.steps]
+    assert any("the vault took password: *** and the key ***." in said for said in told)
+    assert not any(held in said or "hunter2" in said for said in told)

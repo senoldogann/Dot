@@ -73,6 +73,14 @@ export function svg(tag, props, ...children) {
   return node;
 }
 
+/** Put `text` in `node` when it reads otherwise (item 310): the same text written again is a new text node, which the
+ * browser lays out and paints anew for nothing, and a page that follows a run with helpers would do so on every event. */
+export function setText(node, text) {
+  if (node.textContent !== text) {
+    node.textContent = text;
+  }
+}
+
 /** A function that runs `fn` once `ms` after the last call. */
 /** Show `node` once what it tells has held for `ms`, and hide it as soon as it no longer holds: returns `set(shown)`.
  * A break of the connection that mends within `ms` (a phone back from the background) shows nothing (item 286). */

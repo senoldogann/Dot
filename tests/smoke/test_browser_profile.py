@@ -22,7 +22,7 @@ from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, imp
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import chrome_arguments
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.cli_browser import _readable_cookies
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 
@@ -108,7 +108,7 @@ async def test_a_cookie_saved_in_the_sign_in_window_is_read_by_the_automated_bro
     profile: Path, headless_config: BrowserConfig, tmp_path: Path
 ) -> None:
     await save_cookie_in_ordinary_chrome(profile, "http://127.0.0.1:9")
-    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads", no_runs_at_work)
     try:
         assert await session.stored_cookie_count() == 1
     finally:
@@ -144,7 +144,7 @@ async def test_a_launch_given_up_while_chrome_starts_leaves_the_profile_free(
 ) -> None:
     """Item 144: a call given up while Dot's own Chrome starts (its run stopped) leaves no Chrome holding the profile:
     the one the launch started is closed once it is up, and the next call starts Chrome again."""
-    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads", no_runs_at_work)
     try:
         opening: asyncio.Task[int] = asyncio.create_task(session.stored_cookie_count())
         async with asyncio.timeout(_READY_TIMEOUT_S):
@@ -165,7 +165,7 @@ async def test_a_close_of_chrome_that_fails_still_stops_the_driver_and_frees_the
     """Item 176: when closing Dot's own Chrome fails with an error that is not Playwright's, the error is raised and the
     Playwright driver is stopped all the same, which ends the Chrome it started, so nothing is left holding the
     profile."""
-    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads", no_runs_at_work)
     try:
         assert await session.stored_cookie_count() == 0
         assert profile_holder_pid(profile) is not None
@@ -194,7 +194,7 @@ async def test_dots_own_chrome_starts_without_the_switch_that_turns_extensions_o
 ) -> None:
     """Item 264: Playwright starts Chrome with --disable-extensions, which keeps the extensions installed in Dot's
     profile from loading; Dot's own Chrome is started without it, and still without the bar of automated software."""
-    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads")
+    session: BrowserSession = BrowserSession(headless_config, SERVER, profile, tmp_path / "downloads", no_runs_at_work)
     try:
         assert await session.stored_cookie_count() == 0
         holder: int | None = profile_holder_pid(profile)

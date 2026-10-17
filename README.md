@@ -205,18 +205,26 @@ answer keeps its words, Ollama's too.
   OpenCode's own tools (commands, reading and editing files, searching, fetching and searching the web, its to-do list),
   and each of them asks Dot first: Dot weighs it as the same action of its own tools, by your rules, the preset and the
   run's approval mode, and asks you, the review model or nobody as for any run; a refusal tells the agent why, and it
-  goes on. A subagent it asks for is refused, as its session would not be the run's, and it has no question for you. Its
-  commands run outside Dot's sandbox (Settings › Sandbox), each after Dot's policy. The run's timeline shows the agent's
-  text and thinking as they come, each tool call (`opencode_bash`, `opencode_edit`, ...) with its result and each step
-  with its tokens; your messages reach the agent while it works, and Stop stops it. A chat keeps its OpenCode session
-  from run to run, so the agent remembers it, and a session that missed what the chat said on another model hears it
-  with the next message. What Dot's own runs have besides (Dot's tools, memory notes and skills, the checks of a finish,
-  lessons and playbooks) a run here does not have, and a free model cannot be the fast, review or vision model, whose
-  calls are Dot's own. Zen's terms of the free models apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may
-  use what is sent to them to improve their models (opencode.ai/docs/zen, read 2026-10-15), so keep private work on
-  other models. The free tier is Zen's to give: it turned requests down for a few minutes after many in a short time,
-  OpenCode's own command line's too (measured 2026-10-15), and it is reported to refuse OpenCode with one of its tools
-  switched off, so Dot switches none off and has them ask instead; a run it turns down fails with words that say so.
+  goes on. A subagent it asks for is refused, as its session would not be the run's. Its commands run outside Dot's
+  sandbox (Settings › Sandbox), each after Dot's policy, and its web fetches reach no address of this Mac or its network
+  unless `[web] allow_private_hosts` says so. Besides its own, the agent has Dot's tools for what OpenCode has none for
+  (item 284): Dot's browser with your sign-ins, the Mac's applications, memory, schedules, notify, a page in the
+  conversation, skills, a question to you (`ask_user`) and the apps you connected, as the run's mode and agent allow
+  them. Dot serves them to the OpenCode server it started as an MCP server of its own on a loopback port, one door per
+  chat (`dot_` and eight hex digits, with a secret of its own), and a chat's session sees its own door's tools only;
+  each call goes through the run's approvals and time limit as a call of Dot's own loop does, and shows on the timeline
+  under the tool's own name. A call that waits for your answer tells OpenCode so every 20 s, so a slow approval does not
+  time it out. The run's timeline shows the agent's text and thinking as they come, each tool call (`opencode_bash`,
+  `opencode_edit`, `browser_open`, ...) with its result and each step with its tokens; your messages reach the agent
+  while it works, and Stop stops it. A chat keeps its OpenCode session from run to run, so the agent remembers it, and a
+  session that missed what the chat said on another model hears it with the next message. What Dot's own runs bring
+  besides (the memory recalled at the start, the checks of a finish, lessons and playbooks) a run here does not have,
+  and a free model cannot be the fast, review or vision model, whose calls are Dot's own. Zen's terms of the free models
+  apply: the providers of Big Pickle, Exo, MiMo and Muse Spark may use what is sent to them to improve their models
+  (opencode.ai/docs/zen, read 2026-10-15), so keep private work on other models. The free tier is Zen's to give: it
+  turned requests down for a few minutes after many in a short time, OpenCode's own command line's too (measured
+  2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
+  has them ask instead; a run it turns down fails with words that say so.
 
 `dotx models [ollama|openai|opencode_go|anthropic|opencode]` lists what a provider offers, including the reasoning
 levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server on this
@@ -307,19 +315,22 @@ is the answer (a small model that is offered both writes the call out as text).
   which it starts (`context_summarise_share` of `context_tokens` or of the model's own size, or the whole budget when
   the window leaves less), and
   never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
-  a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section is
-  asked again once with the missing sections named and the first draft carried along; when the fast model gives no text,
+  a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section (a
+  section is there as a heading, not as a word of a sentence) is asked again once with the missing sections named and
+  the first draft carried along; when the fast model gives no text,
   a summary far too long, an error or a timeout, the run's own model writes it, and while the fast model is paused after
   a quota, rate-limit or key error (see `standby`) the run's own model writes it without asking the fast one (item 240);
   the `compacted` event names the fast model's problem; when neither writes one, a mechanical summary takes its place
-  and the event says so with the reason. The conversation shows no note of a compaction (item 260): the Details panel
-  counts them and says how many checks flagged something, and the Cost panel keeps the summaries' share. Next to the
-  summary a continuity note keeps the
+  and the event says so with the reason. In the conversation a compaction is a quiet line across the column where it
+  happened, with the size of the context before and after it ("Context compacted 401k → 17k tokens", item 312); the
+  Details panel counts them and says how many checks flagged something (item 260), and the Cost panel keeps the
+  summaries' share. Next to the summary a continuity note keeps the
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
   ellipsis of a cut value, or one lengthened by a fragment counts as known). The `compacted` event names the model,
-  how the summary came about, the attempts it took and what the check found.
+  how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
+  and after it (`tokens_before`, `tokens_after`).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
 `mark_plan_step` changes one step, so the plan in the web UI moves as the work does. A step is marked `done` only with
 evidence (`evidence`, cut at 400 characters): what the run observed that shows it, such as the path and what it read
@@ -400,6 +411,23 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   did in most trial runs). Dot does not reinterpret such text: it is nudged first when tools were used, otherwise it
   becomes the result as written. Use a larger model as `main` for task and research runs.
 - At most `max_concurrent_runs` runs go at once; the others wait. Delegated runs do not count.
+- Runs at work at the same time know each other (item 301). Each chat has its own tabs, which no other chat's run
+  reaches, and the browser keeps the tabs of a chat with a run at work however long they idle. Each run's model is told
+  which other runs are at work, with their goals, the sites of their pages, the applications they drive and the files
+  they changed, whenever that changes. A call that would type or click in an application another run acted in within
+  the last 120 s, or change a file another run changed since this run last read it (or that it never read), does
+  nothing and tells the model why, so that it works elsewhere or reads the file again first. Item 305 closes the other
+  paths to the same app and file: a batch of desktop steps stops at the step that moves to an application another run
+  holds (the steps before it stay done); the applications an AppleScript names count as driven, so a script into one is
+  refused the same way; app names match whatever their case; the check and the footprint are one step taken right before
+  the call runs, again after a wait for your approval; the files a shell or terminal command, or a shell line of an
+  AppleScript (also one that drives a free application), writes or deletes (a redirect, `cp`, `mv`, `rm`, `tee`,
+  `sed -i`, ... and a whole folder for `rm -r`) count as changed by it, as far as the line names them; the files a run
+  changed stay its own for the other chats' runs at work after it ends, until they read them again; and the browser's
+  mode and its debugging port do not change while another chat's run is at work. The prompt tells each run to leave the
+  other runs' apps and files to them and to stop, kill or quit no process or app it did not start. Only the runs of one
+  daemon know each other (`dotx run` in a terminal has its own), a path only the running line knows (`$(...)`,
+  `find -delete`, git) leaves no footprint, and a process killed by name (`pkill`) is kept to only by the prompt.
 - Runs, their events and their conversations are stored in a SQLite database (WAL mode; the daemon writes through one
   connection, one writer at a time, and waits out a lock held by another process with logged retries before it gives an
   error; a token count that cannot be written is logged, not fatal to the run), so the web UI can replay them. The end
@@ -485,6 +513,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 | Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
 | Orchestration   | `delegate`, `consult`, `update_plan`, `ask_user`, `finish`, `use_tools`                                            |
 | Pages           | `show_page`                                                                                                        |
+| Drafts          | `draft_message`                                                                                                    |
 | Skills          | `skill`, `find_help`                                                                                               |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
@@ -594,6 +623,33 @@ end will wake Dot. A command stopped there, closed by the run or ended by the da
 run or a campaign's session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends
 with its run: a command in the background lives as long as the daemon.
 
+### Drafts
+
+`draft_message` writes an email (Mail) or an iMessage (Messages) for you to send (item 314, after Grok's drafts): a
+card in the conversation, where it was written, with the recipients, the subject and the words. **Send email** or
+**Send message** hands it over as it stands; **Edit** turns the card into a form first, and **Discard** drops it, after
+asking, with nothing sent. Nothing goes out before Send, whatever the run's approvals, a `yolo` run's too: a draft is
+how a run has you look first, and the run goes on at once without waiting for your answer. Writing a draft changes
+nothing outside Dot, so the policy allows it (a `notes_write` action, `safe`); a key in it, in an address too, is
+refused as it is anywhere else. The tool is in the `drafts` group, and its tool result tells the model not to send the same message
+another way. While two or more drafts wait, each card has a tick, and a bar after the last of them sends the ticked
+ones together, one after the other, each with its own words. A draft can be answered long after its run ended, and on
+another screen: an open page shows the answer as it comes (the lifecycle stream carries `draft_decided`), and the
+phone hears of every new draft ("Dot drafted an email", with the recipients and the subject), as the web UI's
+notification says it.
+
+Send gives the draft to `osascript` with a fixed script for Mail or Messages; the recipients and the words reach the
+script as its arguments, never as words of the script (`drafts/scripts.py`), and after `--`, so that a subject or a
+message that starts with a dash is not read as an option of `osascript` (`-e` would add a line of script). A send the application refuses leaves the
+draft "Not sent" with what the application said, and **Send again** retries it; a second press, here or on another
+screen, finds it taken (409). A draft the daemon was handing over when it stopped is marked "Not sent" at its next
+start, as whether it went out is not known: look in Mail's Sent mailbox or the conversation in Messages before you send
+it again. Drafts are kept in the `drafts` table and go with their chat, or with the events of their run when those age
+out. The API: `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc", "subject", "body"}`: the words that
+go; a message has no cc and no subject) and `POST /api/drafts/{id}/discard`. The scripts were not run against Mail or
+Messages themselves, which would send for real: the tests give them to a stand-in of `osascript` that writes down what
+it was handed.
+
 ## What leaves this Mac
 
 Dot sends nothing to the people who make it: there is no telemetry, no crash report and no check for updates. What
@@ -622,9 +678,9 @@ leaves the Mac is what a run needs, sent where the configuration points:
   the texts they judge; with `[judge] provider = "typesafe"` the judge of clicks and checks sends what it judges (a
   button's words, the page's address without its query, its title and visible text). `[judge] provider` is `"none"` by
   default.
-- **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question or the
-  result and the page to open, encrypted for that phone's browser and carried by its maker's push service (see
-  [Dot on the phone](#dot-on-the-phone)).
+- **To a phone, once you turn its notifications on: a line.** A title, up to 140 characters of the question, of a
+  draft's recipients and subject (a message's words, item 314) or of the result, and the page to open, encrypted for
+  that phone's browser and carried by its maker's push service (see [Dot on the phone](#dot-on-the-phone)).
 - **To MCP servers and plugins: what their tools are given.** A server's own process reaches what it reaches; none is
   set up by default (see [MCP servers](#mcp-servers)).
 
@@ -873,13 +929,15 @@ or your own words. The run reads which option you chose, and whether it was the 
 
 > **The shell guardrail is best-effort; the sandbox holds only Dot's own files.** Dot reads a shell command before it
 > runs it and judges what it would touch: it reads the line as the shell does (quotes, comments, here-documents, the
-> commands substituted into it, a `cd`, a variable, a link it makes, a wrapper such as `bash -c`, `env` or `xargs`),
-> compares paths without case, and treats what it cannot read (a command named by a substitution, `eval` of one, a line
-> it cannot parse) as a destructive step outside the workspace, which every preset asks about. It does not follow what a
-> recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps those out of
-> Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of your
-> account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
-> `cautious` on a machine where a mistake would be expensive.
+> commands substituted into it, a `case` inside one, a `cd` however it is spelt, a variable, a link it makes, a wrapper
+> such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings and variables that make git or another
+> program run a command line), compares paths without case, and treats what it cannot read (a command named by a
+> substitution or a pattern, `eval` of one, a setting of git it does not know, a line it cannot parse) as a destructive
+> step outside the workspace, which every preset asks about. It does not follow what a recursive command does inside the
+> folders it walks, nor the code of a script it runs; the sandbox keeps those out of Dot's own files, not out of yours,
+> and a shell can do more than any analysis can foresee. Treat Dot as a user of your account with the rights of your
+> account: keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a machine where a
+> mistake would be expensive.
 
 ## Autonomy: approvals, goal mode and the end of a run
 
@@ -964,7 +1022,10 @@ progress is `continue`. A delegated run and a campaign's session keep their own 
 answer starts and a follow-up on the run's page keep the run's. Whatever the model, every task and research run outside
 a campaign is told to keep acting while the goal leaves work it can do, not to stop to report progress or to offer what
 the goal asks for, and to take an ask to keep going at its word. This is not **Keep going** in the composer's Options,
-which makes the goal a campaign worked on in sessions (see [Campaigns](#campaigns)).
+which makes the goal a campaign worked on in sessions (see [Campaigns](#campaigns)). Every run, a chat's too, is told
+that when it hesitates to do what it was asked, or a part of it, it says so at once, with what holds it back and what
+it can do instead, and asks you or goes on with the part it can do, instead of looking into the matter on its own
+first (item 327).
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
@@ -1049,39 +1110,56 @@ after T3 Code's (item 299): "Dot restarted and resumed this turn" when the daemo
 ended, and links to it. A run that waits for you wears the same bolt over its composer, with what cut it off ("Dot
 restarted while this run worked.") and Continue.
 
-**Lessons.** With `lessons = "propose"` or `"auto"` in `[agent]`, a task or research run of its own that reached its
-goal after something went wrong on the way (a call failed, whether the run found its way around it or not; the progress
-watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist) is followed, once it
-has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what went wrong, the
+**Lessons.** With `lessons = "auto"` (the default) or `"propose"` in `[agent]`, a task or research run of its own that
+reached its goal after something went wrong on the way (a call failed, whether the run found its way around it or not;
+the progress watchdog raised an alert; the goal check sent it back; its answer named paths that did not exist) is
+followed, once it has ended, by one call of the review model (`[models] review`). It reads a digest of the run, what
+went wrong, the
 answer and the saved notes that fit the goal, and writes at most three lessons of one sentence: know-how that a later
 run could use from the start, such as that `pdftotext` keeps the columns of a table only with `-layout`. A lesson of
 more than one line, of fewer than 20 or more than 300 characters (or `[memory] max_chars`), with a secret, an e-mail
 address or a path in a home folder, or that says what the goal, another lesson or a saved note already says, is dropped;
 one that says not to do what a saved note says to do (or the other way round) is no repeat of it, however alike their
 words and meaning are (`not`, `never`, `n't`, the Turkish `değil`, `yok`, `asla`; the suffix `-ma`/`-me` is not
-recognised). With `propose` the lessons wait under "Lessons from this run" on the run's page: Save to memory keeps one
-as a note tagged `lesson` whose source is the run, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save` and
-`/dismiss`). A lesson is decided once: a second save or dismissal of it, from another page or after `auto` saved it, is
-refused. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the wait, and the exit status
-stays the run's. With `auto` they are saved at once, except after a run that read content others can write (web pages,
-mail, downloads), which could plant a lesson: those are only proposed, and the page says why. A saved lesson is a note
-of the agent like the others: a later run gets it when it fits its goal, and the Memory page edits or forgets it; a
-lesson of an agent's run is that agent's own (see Agents). Delegated runs, chats, runs that failed or were stopped, and
-evals (which always run without lessons) are not asked at their end; the nightly reflection asks about the failed and
-the stopped ones. `lessons` is `"propose"` by default; `"off"` learns nothing. Every note a run is handed (at its start,
-by `memory_search`, or changed while it ran) is recorded with how the run ended, so the Memory page says "Handed to 5
-runs, 4 done" under a note and `dotx stats` scores the notes.
+recognised). With `auto` nobody is asked: each lesson gets a second look first, one more call of the review model that
+is shown the goal and the lessons and nothing the run read, so that a page the run read cannot speak to it. It keeps
+only know-how about how a tool, a command, a site, an application or a file format behaves, and leaves out a lesson
+that tells the agent to send, post, buy, sign in, contact someone, change a setting or go to an address, to trust some
+content or to skip a check, or that holds private data; when in doubt it leaves it out. After a run that read content
+others can write (web pages, mail, downloads), a lesson with a link or an account name in it, which such content may
+have planted, is left out before it is asked. The kept lessons are saved as notes tagged `lesson` whose source is the
+run, and "Lessons from this run" on the run's page says "Saved on its own" with Undo, which forgets the note (a note
+that was there before, or that was rewritten since, stays); a lesson left out says why, with Save anyway. With `propose`
+the lessons wait on that card: Save to memory keeps one, Dismiss drops it (`POST /api/runs/{id}/lessons/{index}/save`,
+`/dismiss` and `/undo`). A lesson is what its last decision made it, and
+every decision waits for the one before it: a second save or dismissal of a lesson decided already is refused, save the
+Save anyway of one `auto` left out. `dotx run` and `dotx resume` show the lessons after the answer; Ctrl-C skips the
+wait, and the exit status stays the run's. A saved lesson is a note of the agent like the others: a later run gets it
+when it fits its goal, and the Memory page edits or forgets it; a lesson of an agent's run is that agent's own (see
+Agents), and the notes it is checked against are the ones that agent's runs are handed. The same text saved again is
+the same note, also one that rested, which is awake again. Delegated runs, chats, runs that failed or were stopped,
+and evals (which always run without lessons) are not asked at their end; the nightly reflection asks about the failed
+and the stopped ones, once each (a run whose lessons were drawn and none kept says so). `"off"` learns nothing. Every
+note a run is handed (at its start, by `memory_search`, or changed while it ran) is recorded with how the run ended, so
+the Memory page says "Handed to 5 runs, 4 done" under a note and `dotx stats` scores the notes.
 
 **Reflection.** Once a day at `[agent] reflection_time` (`"03:30"` in `[scheduler] timezone`; `"off"` never), the
 daemon reflects on the runs that ended since the last reflection (the last day, the first time): it asks the review
 model for the lessons of the task and research runs the loop did not ask at their end, the failed and the stopped ones
 included, with how the run ended as one more signal and in words that say it did not reach its goal, under the
-`lessons` setting above (`propose` leaves them on the run's page, `auto` saves them, `off` draws none); it folds the
-lesson notes of one agent that say the same, the same way round, into the newer one (by the embeddings when both have
-one, by the words otherwise; a resting lesson is left alone, so one learnt again does not take its rest); it rests a
-lesson that no run was handed for
-`lesson_rest_days` (60), or whose score says it did not help (handed to `[memory] score_min_uses` runs in the last
-`score_days`, more of which failed than ended done; a lesson you saved yourself is never retired this way), by tagging
+`lessons` setting above (`propose` leaves them on the run's page, `auto` saves the ones its second look keeps, `off`
+draws none), and it reads whether such a run read content others can write from all its results; it folds the lesson
+notes of one agent that say the same, the same way round, into the newer one, or into the older one when you saved
+that one yourself (by the embeddings when both have one, by the words otherwise, compared off the daemon's event loop;
+a resting lesson is left alone, so one learnt again does not take its rest, and two you saved stay two; the one
+folded away rests and names the one it was folded into, so nothing the reflection does deletes a note); it rests a
+lesson that no run was handed, and that was not written again, for `lesson_rest_days` (60), or whose score says it did
+not help (handed to `[memory] score_min_uses` runs in the last `score_days`, more of which failed than ended done); a
+lesson you saved yourself is never folded away nor retired. It also puts aside a note of Dot's that a newer note,
+written or changed since the last reflection, made outdated (item 306): the review model reads each such pair of notes
+close in meaning (at most 12 a night; your notes, the lessons you saved and the `core` notes are never the older one)
+and keeps the older one when in doubt; the one it calls outdated rests, names the note that replaced it (the Memory page
+says "Replaced by another note") and the log line `note_outdated` says which. It rests a lesson by tagging
 it `rest`, after which searches skip it while `dotx memory list` and the Memory page still show it, and the log line
 `lesson_retired` says which reason with the numbers; and when anything happened it writes a journal note, tagged
 `journal`, of the day it read: the day of the middle of that time, so the reflection at 03:30 names the day before ("On
@@ -1093,7 +1171,10 @@ the section as it stands, your own lines, your notes and the day's goals, at mos
 characters. A night the Mac slept through is caught up once when it wakes. A daemon that was off at that time, or whose
 stop cut the reflection (a stop does not wait for one, and it records nothing until its end), reflects at the next
 `reflection_time` on everything since the last reflection. Activity lists the reflection among what ended today;
-`dotx reflect` runs one now.
+`dotx reflect` runs one now. A reflection that fails is kept: Activity shows "The nightly review failed" with why until
+one after it is done, and `dotx stats` says when the reflection was last done and the failure since. Learning does not
+stop unseen at a run's end either: lessons that could not be drawn leave `lessons_failed` with why on the run's page,
+skill work that failed `playbook_failed`, and `dotx stats` counts the runs of each.
 
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
@@ -1141,8 +1222,10 @@ the median call; a **step model call by step number** line gives the median seco
 steps 1 to 5, 6 to 10, 11 to 20, 21 to 40 and from 41 on of their runs, which shows how much a run slows down as its
 context grows. The Time table ends with the share of the input tokens the provider served from its cache. A **Sites**
 table follows, per site (the host of the page for a browser act, the application for a desktop one, both recorded in
-the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed and the
-median call. `--by site` prints the sites table only, `--by model` everything but it. Acts and steps recorded before
+the `tool_result` event with the steps of the batch): acts, the share with one step, the share that failed, the
+median call, and the finished runs that acted there with the share of them that ended done (item 308). **By day**
+follows: per day, the finished runs that acted on a site and the share done, which shows whether the browser and the
+desktop work gets better from day to day. `--by site` prints these two only, `--by model` everything but them. Acts and steps recorded before
 these were counted (before item 22 of the roadmap) are left out of the acts lines and the sites table.
 
 The numbers of a long run follow under each model: the **compactions** per 100 steps, their seconds and their share of
@@ -1290,11 +1373,13 @@ has stopped without closing (a network that changed, a Mac that slept): the page
 Between tries the page waits half a second, then longer, up to 8 seconds, and from half a second again once a stream is
 made; a page that comes back into view, or a browser back on the network, tries at once. The rules page reads its rules
 again when one is added, switched or deleted on another page. A page loaded before Dot was updated says so in a banner,
-with **Load again**: the daemon's status tells what the pages it serves are (`pages`, a digest of their files at its
-start), and the page compares it with what it was loaded from. A run delegated by another run sits under the run that
-delegated it, in both the sidebar and the Activity page, with its steps so far and its channel; the parent's row says
-how many runs it delegated. In the chat, the delegated run's card carries a chip with its progress ("step 3 ·
-web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
+with **Load again**: the daemon's status tells what the pages it serves are (`pages`, a digest of their files), and the
+page compares it with what it was loaded from. The daemon serves the pages as it read them when it started, hidden files
+left out (item 309): files changed on disk while it runs (a merge, a batch of work ported in) wait for its next start,
+so that a page never asks the daemon's API for a field or a route only a newer daemon has. A run delegated by another
+run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps so far and its
+channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries a chip with its
+progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
@@ -1319,8 +1404,9 @@ shows, the Goal mode switch and Keep going, see [Autonomy](#autonomy-approvals-g
 the warn ink, on no fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no
 ground until the pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the
 agent's name go and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273),
-so on a phone the bar is still one line. On a phone, and on any touch screen, the box's text is at least 16 px, as iOS
-zooms the page into a box whose text is smaller, and the bar's buttons are 36 px. While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a
+so on a phone the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen
+for it, at least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller
+one (item 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a
 pick or Escape or a click outside closes it. The model's menu (item 208, after T3 Code's) has a rail on its left, a star
 for the favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the
 models of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model
@@ -1699,7 +1785,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
-| `GET /memories`, `GET /memories/search`, `POST /memories`, `PATCH\|DELETE /memories/{id}` | notes                                             |
+| `GET /memories`, `GET /memories/search`, `POST /memories`, `GET\|PATCH\|DELETE /memories/{id}` | notes                                         |
+| `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
@@ -1791,11 +1878,15 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
    it happens before a page is back: the daemon started again after it did not stop cleanly (it was killed, crashed or
    ended with an error; it leaves `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon
    signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store
-   and go when their push service says they are gone. Settings › General › Notifications off drops the subscription.
+   and go when their push service says they are gone. A subscription whose keys cannot encrypt a message is refused
+   (422), and one stored before that check is dropped with a warning while the others still get theirs. Settings ›
+   General › Notifications off drops the subscription.
 
 On a phone the page holds still (item 275). Every page fits the screen's width: a long link, path or word breaks, and
-code and tables scroll in their own frame. No text field is under 16 px, so iOS never zooms into one; a double tap does
-not zoom, and the page does not stretch past its ends. The app added to the home screen runs to the screen's edges, and
+code and tables scroll in their own frame. No page lets the phone zoom into the field that gets the focus: on an iPhone
+and an iPad the viewport allows no scale past the first, so a field has the size it has on the Mac (item 311), and on
+another touch screen no text field is under 16 px. A double tap does not zoom, and the page does not stretch past its
+ends. The app added to the home screen runs to the screen's edges, and
 the bar, the sidebar, the composer and the side panel keep out of the rounded corners, the notch and the home
 indicator. The bar stays at the top of what is seen, also while the keyboard is up, and the composer, the drawers and
 the dialogs stand on what is seen too: iOS 26 can leave the page panned once the keyboard has gone, which left a band
@@ -1969,7 +2060,9 @@ Both modes share what follows.
   Dot holds none of its requests, so as not to slow or stall your own tabs; a tab of Dot's that lands on a refused
   address is reset. Whatever the browser, the daemon itself refuses a navigation to its interface that a page of
   another site started (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs
-  showed.
+  showed. A host is read the way Chrome reads it (international names, the numeric spellings of an IPv4 address, a
+  trailing dot), and an address with a backslash before its query is refused. A new tab's first page waits until
+  Dot checks each hop of its redirects.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
@@ -2026,7 +2119,13 @@ Dot keeps short notes between runs: facts about you, your machine and how you li
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
 UI, where Settings › Memory lists the notes changed last first, 30 at a time with **Load more** for the next, in a
 box that keeps its size and scrolls inside past its first notes (item 218); forgetting, correcting or adding a note
-keeps the notes read and the list where it was, and a correction open on another note stays open (item 204).
+keeps the notes read and the list where it was, and a correction open on another note stays open (item 204). In a
+run's conversation, a note the run saves, corrects (`memory_update`) or forgets leaves a quiet line where it happened,
+what changed and the first words of the note: "Saved to memory", "Updated memory" or "Removed from memory" (item 313,
+after Grok's "Updated memory"). The line of a saved or corrected note opens Settings › Memory with that note first,
+to read, correct or forget (`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note forgotten since is said to
+be gone. A note saved again, or a call that failed, changed nothing and leaves no line. The line names no agent: a
+note a run saves is Dot's, for every run (item 94).
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -2042,13 +2141,21 @@ dotx memory reindex      # embed every note again, for example after changing [m
   context window, at most `inject_tokens` (1500; the cap alone when the provider does not say the window). Each of
   these groups first gets its own share, a quarter of the budget, and what is left then goes to them in the same order,
   so many notes of yours do not crowd out the agent's lessons. A note that does not fit is passed over, a shorter one
-  after it may still fit, and `memory_search` finds the rest. The run's
+  after it may still fit, and `memory_search` finds the rest. A lesson is also tagged with the sites and applications
+  of its run that it names (`site-amazon-com`, `site-notes`; item 308), and when a run first reaches a site or drives
+  an application, its next step is handed the lessons tagged with it that it was not handed yet (at most five) and the
+  learned skills written there that its instructions did not list (at most three), counted as handed like the notes
+  it started with; the timeline says "Recalled 2 memories learned on www.amazon.com". The run's
   timeline says how many notes it recalled and the tokens they took.
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
-  (90) rests: the Memory page lists it under "Resting", a search still finds it, but runs no longer start with it on
-  its own. Your notes and the `core` ones never rest. Under each note the page says how the runs it was handed to
+  (90), counted from when it was last handed or written, rests: the Memory page lists it under "Resting", a search
+  still finds it, but runs no longer start with it on its own. Your notes and the `core` ones never rest that way.
+- A note can hold for a while (item 306): `memory_save` takes `valid_days` for a fact that is true only so long (a
+  trip, a deadline, an offer). The model is told until when it holds ("holds until 2026-10-20"); once that day passes
+  the note rests, whoever wrote it, and neither a run nor a search is handed it; the Memory page says "Holds until …",
+  then "Ran out …". Saving the same note again wakes it with the new time. Under each note the page says how the runs it was handed to
   ended ("Handed to 5 runs, 4 done"); every use is recorded with the run's end, which `dotx stats` reads.
 - What Dot knows about you opens the memory part of every prompt: a short section the nightly reflection keeps (your
   language, hours, tools and sites, the ways you ask, the limits you set), rewritten each night from its previous
@@ -2165,6 +2272,25 @@ rules, which still hold; its tools are the ones the agent names plus finishing, 
 The run's page wears the agent's face and name in the bar with a chip to its page; its rows on the Activity page and
 in the sidebar wear the face too. Deleting an agent leaves its chats, its lessons and its learned skills to Dot.
 
+An agent can start from a template (item 315). Under the list, **Start from a template** shows eight: Sales
+Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health and Chief
+of Staff, each with its face, its role, what it needs of the Mac and the schedule it suggests. **Use template** makes
+the agent in one click and opens its page; it is then an agent like any other, to change in the editor. Every
+template's instructions say that what leaves the Mac for a person is a draft for you to send (`draft_message`, see
+[Drafts](#drafts)). Sales Outbound, Talent Scout, Paid Media and Product Performance work on the web and in files
+and name their tools: the web, Dot's Chrome, files, memory, plans, pages and `draft_message`, none of which drives
+Mail, Messages or a terminal; a Send pressed on a web page is an external send, under your approvals. Expense Manager,
+Bug Reproduction, Account Health and Chief of Staff read your mail, calendar or code and have every tool. A suggested
+schedule is only words on the card; Schedules makes one. An agent's page has **Export** in its bar: a file
+`<name>.dot-agent.json` with the agent's name, role, instructions, model, reasoning level, approvals, tools and look
+(`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An agent whose name, role
+or instructions hold a secret is not exported, and the page says to take it out first: a value Dot holds (any value
+of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a password by its form,
+as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such a file, in this home or another, and
+opens it; a file that names a tool this home lacks is refused with the tool's name. The API: `GET
+/api/agent-templates`, `POST /api/agent-templates/{id}/use`, `GET /api/agents/{id}/export` and `POST
+/api/agents/import` (422 for Dot, for a secret, and for a file that is not an agent's or names tools not here).
+
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
 agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
@@ -2180,9 +2306,13 @@ A run can make a teammate itself (item 99). The `create_agent` tool (a name, a r
 use, a model if one is wanted) makes an agent as the Agents page does, under your approvals (the `persistence` flag,
 like saving a note: `ask` asks once the run has read untrusted content, `yolo` makes it); the agent lasts after the
 run, its record keeps the run that made it, and the Agents page marks it "Made by Dot". The prompt's Team section
-tells a run with no teammate that it may make one for a kind of work that recurs and deserves a role of its own,
-never for a single step; `message_agent` is offered whenever `create_agent` is, so a teammate made mid-run can be
-messaged at once. Every step, a run that may message the team learns of the agents that joined since it started
+tells a run with no team that when the work splits into roles (finding sources, writing, checking) or into parts
+that recur, it makes the teammates it needs, each with only the tools its role needs, and sends them the parts with
+`message_agent` (several at once work in parallel); with a team, it reuses a member before it makes one, never for a
+single step. An agent a run makes can do no more than the run (item 307): only tools the run has (with none named, an
+agent's run gives its own bound and Dot's run every tool), a helper model or the run's own, at most three a run, and a
+research run makes none; its runs open with "an agent Dot made" and "Dot's instructions to you", not yours.
+`message_agent` is offered whenever `create_agent` is, so a teammate made mid-run can be messaged at once. Every step, a run that may message the team learns of the agents that joined since it started
 (made by it, by you or by another run) through a note with their names and roles. Delegated runs and the runs that
 answer a message make no agents.
 
@@ -2201,7 +2331,10 @@ only 20 blocks back from a mark, so the step after a shortening still reads the 
 cache), `context_summarise_share` (0.85 of the configured budget, past which the older part of the run is summarised)
 and `plan_each_turn` (on: the open plan is appended to the system message of every step). The API: `GET /api/agents`
 (Dot first, each agent with its newest run), `POST /api/agents`, `GET`/`PUT`/`DELETE /api/agents/{id}` (Dot is neither
-changed nor deleted), `GET /api/tools` (the names an agent may be given), and `POST /api/runs` with `agent_id` (not with
+changed nor deleted; `tools` names the tools the agent may use, or is empty with `every_tool: true` for all of them, and
+a request with neither is refused, so a tool list that did not load never lifts an agent's bounds; the editor's Save
+waits for the list, and a level the form cannot show is kept as saved), `GET /api/tools` (the names an agent may be
+given), and `POST /api/runs` with `agent_id` (not with
 `standing`: a campaign is Dot's own, and the two together are refused with a 422).
 
 ## Campaigns
@@ -2478,22 +2611,29 @@ arguments and the start of its result; failed calls marked) the model names the 
 steps that worked, one sentence each, with the values that change from goal to goal as parameters in angle brackets, and
 a one-sentence description. The skill is a folder `learned-<kind>/SKILL.md` under `<home>/playbooks` with "Kind of
 work", "When", "Steps", "Parameters" and "Evidence" (the goal, every run it was learned from with its acting steps, the
-date), plus a `playbook.json` that keeps the kind and counts its use. A later run of the same kind (matched by the
-meaning of the kind when embeddings are on, by its name otherwise) updates the skill rather than writing another: the
-steps are the newer run's, the evidence keeps every run. Later runs see it under Skills like any skill (its source is
-`learned`) with a note that it is advice from Dot's own work, to follow with their own parameters and judgement, and
-read it with the `skill` tool. Every run that ended done or failed counts the learned skills it read; one read by two
-runs that then failed is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that
+date), plus a `playbook.json` that keeps the kind and counts its use; the folder is written whole under a hidden name
+and then takes its own. The model is shown the kinds of the skills the run's owner keeps (those of the run's site first)
+and names the run's work by one of them, word for word, when it is that work, so a later run of the same kind (the same
+kind, or one close in meaning when embeddings are on) updates the skill rather than writing another: the steps are the
+newer run's, the evidence keeps every run. A run updates its owner's skills alone (Dot's runs Dot's, an agent's runs
+the agent's); another owner's skill of the same name keeps its folder, and the new one takes the next free name
+(`learned-<kind>-2`). Later runs see it under Skills like any skill (its source is `learned`) with a note that it is
+advice from Dot's own work, to follow with their own parameters and judgement, and read it with the `skill` tool. Every
+run that ended done or failed counts the learned skills it read; one read by two runs in a row that then failed (none
+ended done between them) is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that
 fails, or a folder that cannot be written, leaves a `playbook_failed` event on the run; a written or updated one a
-`playbook_written` event and a retired one a `playbook_retired` event. The distillation reads pages third parties wrote,
-so the skill never takes an instruction from them as a step, and never holds a secret, a one-time code, an e-mail
-address or a home path. Settings › Skills lists the learned skills (kind, where, the runs, how they fared, the retired
-ones apart, an agent's with its name and Share) with Drop, each list in a box that keeps its size and scrolls inside
-past its first rows (item 218); `dotx playbooks list` shows them with their use,
-`dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. Delegated runs,
-chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills written, retired
-and read, and compares, per host, the runs that read a skill with the runs on that host that did not (act calls and
-seconds a run).
+`playbook_written` event and a retired one a `playbook_retired` event. A run that read content third parties can author
+(a web page, a message, a result of an MCP server) is distilled from its own steps alone: the model sees each call and
+whether it worked, never what it returned nor the run's answer; a skill that names a web address, an account or an
+e-mail address the run's own goal and calls never did is not kept (`playbook_failed` says why), and the skill says
+where it comes from (`read_outside` in its record). The skill never takes an instruction from a page as a step, and
+never holds a secret, a one-time code, an e-mail address or a home path. Settings › Skills lists the learned skills
+(kind, where, the runs, how they fared, the retired ones apart, an agent's with its name and Share) with Drop, each list
+in a box that keeps its size and scrolls inside past its first rows (item 218); `dotx playbooks list` shows them with
+their use, `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired.
+Delegated runs, chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills
+written, retired and read, and compares, per host, the runs that read a skill with the runs on that host that did not
+(act calls and seconds a run).
 
 ## Delegation
 

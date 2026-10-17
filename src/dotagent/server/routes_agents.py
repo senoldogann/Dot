@@ -7,9 +7,11 @@ import time
 from fastapi import APIRouter
 
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
+from dotagent.agent.templates import TEMPLATES, AgentFile, AgentTemplate, agent_file, find_template
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
+from dotagent.secrets import known_secrets
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
@@ -31,10 +33,33 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
     """A request whose model parses and whose tools are among the ``known`` ones."""
     if request.model != "":
         parse_model_ref(request.model)
-    unknown: list[str] = sorted(set(request.tools) - known)
+    unknown: list[str] = sorted(set(request.tools or ()) - known)
     if unknown:
-        raise InvalidValueError("an agent names tools that do not exist", {"tools": ", ".join(unknown)})
+        raise InvalidValueError(
+            f"an agent names tools that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
+        )
     return request
+
+
+def new_agent_tools(said: list[str] | None) -> tuple[str, ...]:
+    """The tools a new agent may use, as an :class:`AgentRequest` said them (``said``): every tool (empty) for
+    ``None``, the named ones otherwise. An empty list keeps the tools an agent has, and a new one has none to keep."""
+    if said is None:
+        return ()
+    if not said:
+        raise InvalidValueError(
+            "a new agent has no tools to keep: name the tools it may use, or leave tools out for every tool",
+            {"tools": "[]"},
+        )
+    return tuple(said)
+
+
+def changed_agent_tools(said: list[str] | None, saved: tuple[str, ...]) -> tuple[str, ...]:
+    """The tools an agent may use after a change that said ``said`` (:class:`AgentRequest`): every tool (empty) for
+    ``None``, the ones it has (``saved``) for an empty list, the named ones otherwise (the code review's Y5)."""
+    if said is None:
+        return ()
+    return tuple(said) if said else saved
 
 
 async def dot_record(store: Store) -> AgentRecord:
@@ -93,8 +118,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         dot: AgentSummary = AgentSummary(record=await dot_record(store), latest=None)
         return [dot] + [AgentSummary(record=agent, latest=latest.get(agent.id)) for agent in await store.list_agents()]
 
-    @router.post("/agents", status_code=201)
-    async def create_agent(request: AgentRequest) -> AgentRecord:
+    async def created(request: AgentRequest) -> AgentRecord:
         checked: AgentRequest = _checked(request, known)
         return await store.create_agent(
             checked.name,
@@ -103,10 +127,60 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.model,
             checked.effort,
             checked.approvals,
-            checked.tools,
+            new_agent_tools(checked.tools),
             None,
             checked.look,
         )
+
+    @router.post("/agents", status_code=201)
+    async def create_agent(request: AgentRequest) -> AgentRecord:
+        return await created(request)
+
+    @router.get("/agent-templates")
+    async def agent_templates() -> list[AgentTemplate]:
+        """The agents to start from (item 315), in the gallery's order."""
+        return list(TEMPLATES)
+
+    @router.post("/agent-templates/{template_id}/use", status_code=201)
+    async def use_template(template_id: str) -> AgentRecord:
+        """An agent made from a template: a copy, which the owner then changes as any agent."""
+        chosen: AgentTemplate = find_template(template_id)
+        return await created(
+            AgentRequest(
+                name=chosen.name,
+                role=chosen.role,
+                instructions=chosen.instructions,
+                model="",
+                effort=None,
+                approvals=None,
+                tools=list(chosen.tools) or None,
+                look=chosen.look,
+            )
+        )
+
+    @router.post("/agents/import", status_code=201)
+    async def import_agent(file: AgentFile) -> AgentRecord:
+        """An agent from its file (item 315): the same agent, whose model and tools must be at hand in this home."""
+        return await created(
+            AgentRequest(
+                name=file.name,
+                role=file.role,
+                instructions=file.instructions,
+                model=file.model,
+                effort=file.effort,
+                approvals=file.approvals,
+                tools=list(file.tools) or None,
+                look=file.look,
+            )
+        )
+
+    @router.get("/agents/{agent_id}/export")
+    async def export_agent(agent_id: str) -> AgentFile:
+        """An agent as a file (item 315): its name, role, instructions, model, bounds and face; not its memory, its
+        chats or a secret."""
+        if agent_id == DOT_AGENT_ID:
+            raise InvalidValueError("Dot is not an agent to export", {"agent_id": agent_id})
+        return agent_file(await store.get_agent(agent_id), await asyncio.to_thread(known_secrets))
 
     @router.get("/agents/{agent_id}")
     async def get_agent(agent_id: str) -> AgentDetail:
@@ -124,6 +198,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         if agent_id == DOT_AGENT_ID:
             raise InvalidValueError("Dot is not an agent to change", {"agent_id": agent_id})
         checked: AgentRequest = _checked(request, known)
+        saved: AgentRecord = await store.get_agent(agent_id)
         return await store.update_agent(
             agent_id,
             checked.name,
@@ -132,7 +207,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             checked.model,
             checked.effort,
             checked.approvals,
-            checked.tools,
+            changed_agent_tools(checked.tools, saved.tools),
             checked.look,
         )
 

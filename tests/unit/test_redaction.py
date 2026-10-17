@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from dotagent.core.text import redact_secrets
+from dotagent.core.text import redact_json, redact_known, redact_secrets
 
 _MOMENT_S: float = 1.0
 _LETTERS: str = "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789aBcDeFgHiJ"
@@ -54,6 +54,24 @@ _MASKED: list[tuple[str, str]] = [
     (f"Authorization: {_LETTERS[:40]}", "Authorization: ***"),
     (f"Cookie: sessionid={_LETTERS[:32]}; theme=dark\nnext", "Cookie: ***\nnext"),
     (f"Set-Cookie: sid={_LETTERS[:24]}; Path=/; HttpOnly", "Set-Cookie: ***"),
+    # The code review of 2026-10-15 (Y3): a value in single quotes, a key with a word after its secret, a header of a
+    # Python dict.
+    (f"export API_KEY='{_LETTERS[:19]}'", "export API_KEY='***'"),
+    ("DB_PASSWORD='hunter2hunter2' ./migrate.sh", "DB_PASSWORD='***' ./migrate.sh"),
+    (f"SECRET_KEY={_LETTERS[:20]}", "SECRET_KEY=***"),
+    (f"{{'Authorization': 'Token {_LETTERS[:19]}'}}", "{'Authorization': 'Token ***'}"),
+    # A value given to a key that names a secret, in every form (Y3): an option and its value, a quoted value with
+    # spaces, a short one in quotes, after a scheme, and the keys bearer, cookie and secret_key_base.
+    ("mysql --password hunter2 --verbose", "mysql --password *** --verbose"),
+    ("mysql --password=hunter2", "mysql --password=***"),
+    (f"--api-key {_LETTERS[:12]}", "--api-key ***"),
+    ("--token 'abc def ghi'", "--token '***'"),
+    ('PASSWORD="correct horse battery staple"', 'PASSWORD="***"'),
+    ('{"api_key": "abc123"}', '{"api_key": "***"}'),
+    ("Authorization: Token short1", "Authorization: Token ***"),
+    ("bearer=abcd1234", "bearer=***"),
+    ("cookie=abcd1234", "cookie=***"),
+    (f"secret_key_base: {_LETTERS[:24]}", "secret_key_base: ***"),
 ]
 _KEPT: list[str] = [
     '"max_tokens": 4096',
@@ -70,6 +88,21 @@ _KEPT: list[str] = [
     "npm_config_registry=https://registry.npmjs.org/",
     "Cookie: the browser keeps it until it expires",
     "Authorization: required for every request",
+    # Words that end in "sk" before a dash are no key (Y4).
+    "https://example.com/blog/task-management-best-practices",
+    "feature/ask-for-confirmation-before-delete",
+    "token_count=12345",
+    "Plan the week on the task-management-2024 board.",
+    "risk-free-returns-for-thirty-days",
+    "mask-image-set-for-the-header-logo",
+    # A key that names a secret given a placeholder, prose or nothing secret (Y3).
+    "token: expires daily",
+    '"token_type": "Bearer"',
+    "password_policy=strict",
+    "docker login --password-stdin < password.txt",
+    "token=${GITHUB_TOKEN} and api_key=<your key>",
+    "GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}",
+    "token=none",
 ]
 
 
@@ -90,3 +123,38 @@ def test_a_long_text_of_short_words_is_masked_in_a_moment() -> None:
     started: float = time.monotonic()
     assert redact_secrets(text).endswith("password: ***")
     assert time.monotonic() - started < _MOMENT_S
+
+
+def test_a_field_named_for_a_secret_is_masked_whatever_its_value_looks_like() -> None:
+    assert redact_json(
+        {
+            "password": "hunter2hunter2",
+            "db": {"api_key": "x"},
+            "max_tokens": "4096",
+            "note": "token",
+            "token_type": "Bearer",
+            "secret_key_base": "x",
+        }
+    ) == {
+        "password": "***",
+        "db": {"api_key": "***"},
+        "max_tokens": "4096",
+        "note": "token",
+        "token_type": "Bearer",
+        "secret_key_base": "***",
+    }
+
+
+def test_a_value_dot_holds_is_masked_wherever_it_stands_the_longest_first() -> None:
+    """Review Y3: a secret Dot holds is masked word for word in any text, whatever stands around it; the longest of two
+    that start alike is masked whole; one too short to tell from a word is left alone."""
+    held: str = "MARKER-a1b2c3d4e5"
+    longer: str = f"{held}f6g7"
+    text: str = (
+        f'use {held} in https://x.test/?k={held}&q=1, as \'{held}\' and {{"note": "{held}"}}, then {longer}; '
+        "a MARKER alone; password: hunter2"
+    )
+    assert redact_known(text, (held, longer, "MARKER")) == (
+        'use *** in https://x.test/?k=***&q=1, as \'***\' and {"note": "***"}, then ***; a MARKER alone; password: ***'
+    )
+    assert redact_known(text, ()) == redact_secrets(text)

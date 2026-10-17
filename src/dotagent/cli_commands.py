@@ -228,6 +228,11 @@ class PlaybooksDropCommand(FrozenModel):
     playbook: str
 
 
+class PlaybooksTrustCommand(FrozenModel):
+    name: Literal["playbooks-trust"]
+    playbook: str
+
+
 class ModelsProfileCommand(FrozenModel):
     name: Literal["models-profile"]
     model: str | None
@@ -323,6 +328,7 @@ type Command = Annotated[
     | PlaybooksListCommand
     | PlaybooksShowCommand
     | PlaybooksDropCommand
+    | PlaybooksTrustCommand
     | PruneCommand
     | UndoCommand
     | EvalListCommand

@@ -32,7 +32,7 @@ async def test_a_cancelled_script_does_not_leave_osascript_running() -> None:
     try:
         with pytest.raises(TimeoutError):
             async with asyncio.timeout(1.0):
-                await run_osascript("AppleScript", f"delay 30 -- {marker}", (), SCRIPT_TIMEOUT_S)
+                await run_osascript("AppleScript", f"delay 30 -- {marker}", (), (), SCRIPT_TIMEOUT_S)
         deadline: float = time.monotonic() + GONE_TIMEOUT_S
         while await _count_processes(marker) > 0:
             assert time.monotonic() < deadline, "osascript is still running after its wait was cancelled"

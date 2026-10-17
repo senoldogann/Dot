@@ -83,8 +83,9 @@ def _command_action(
     if classify_path(cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths) == "protected":
         flags = (*flags, "secret_access")
     preview: str = truncate_middle(" ".join(command.split()), _PREVIEW_CHARS)
-    return _action(
-        tool, "shell", assessment.risk, f"{verb}: {preview} ({'; '.join(assessment.reasons)})", command, flags
+    summary: str = f"{verb}: {preview} ({'; '.join(assessment.reasons)})"
+    return _action(tool, "shell", assessment.risk, summary, command, flags).model_copy(
+        update={"changes": assessment.changes}
     )
 
 

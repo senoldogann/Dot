@@ -17,7 +17,16 @@ from dotagent.memory.ranking import (
     unit_vector,
     use_lift,
 )
-from dotagent.memory.service import fit_notes, memory_budget, normalize_tags, normalize_text, note_tokens, resting
+from dotagent.memory.render import render_note
+from dotagent.memory.service import (
+    expired,
+    fit_notes,
+    memory_budget,
+    normalize_tags,
+    normalize_text,
+    note_tokens,
+    resting,
+)
 from dotagent.store.models import MemoryRecord, MemoryScore
 
 DAY_S: float = 86400.0
@@ -42,6 +51,8 @@ def _note(
         agent_id=None,
         used_count=used,
         last_used_at=last_used_at,
+        expires_at=None,
+        replaced_by=None,
     )
 
 
@@ -121,10 +132,25 @@ def test_a_used_agent_note_overtakes_an_unused_one_of_the_same_score_but_not_two
 def test_an_agent_note_no_run_was_handed_for_rest_days_rests_and_the_users_and_core_notes_never_do() -> None:
     assert resting(_note("old", "run_1", NOW - 91 * DAY_S, 0, None, ()), NOW, 90, None, 3)
     assert not resting(_note("young", "run_1", NOW - 89 * DAY_S, 0, None, ()), NOW, 90, None, 3)
-    assert not resting(_note("used", "run_1", NOW - 400 * DAY_S, 1, NOW - 200 * DAY_S, ()), NOW, 90, None, 3)
+    # Item 306: a note handed long ago goes stale like one never handed; one handed lately does not.
+    assert resting(_note("used long ago", "run_1", NOW - 400 * DAY_S, 1, NOW - 200 * DAY_S, ()), NOW, 90, None, 3)
+    assert not resting(_note("used", "run_1", NOW - 400 * DAY_S, 1, NOW - 10 * DAY_S, ()), NOW, 90, None, 3)
     assert resting(_note("retired", "run_1", NOW - DAY_S, 7, NOW, ("lesson", "rest")), NOW, 90, None, 3)
     assert not resting(_note("yours", None, NOW - 400 * DAY_S, 0, None, ()), NOW, 90, None, 3)
     assert not resting(_note("standing", "run_1", NOW - 400 * DAY_S, 0, None, ("core",)), NOW, 90, None, 3)
+
+
+def test_a_note_whose_time_ran_out_rests_whoever_wrote_it_and_says_until_when_it_holds() -> None:
+    lasting: MemoryRecord = _note("trip", "run_1", NOW - DAY_S, 0, None, ())
+    for_a_while: MemoryRecord = lasting.model_copy(update={"expires_at": NOW + 2 * DAY_S})
+    ran_out: MemoryRecord = lasting.model_copy(update={"expires_at": NOW - 1.0})
+    assert not expired(lasting, NOW) and not expired(for_a_while, NOW) and expired(ran_out, NOW)
+    assert not resting(for_a_while, NOW, 90, None, 3)
+    assert resting(ran_out, NOW, 90, None, 3)
+    # The user's note and a standing one rest too once their time ran out.
+    assert resting(ran_out.model_copy(update={"source_run": None}), NOW, 90, None, 3)
+    assert resting(ran_out.model_copy(update={"tags": ("core",)}), NOW, 90, None, 3)
+    assert ", holds until " in render_note(for_a_while) and ", holds until " not in render_note(lasting)
 
 
 def test_text_is_one_line() -> None:

@@ -15,7 +15,7 @@ import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
-import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, showAfter } from "../dom.js";
+import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -60,7 +60,8 @@ const REWIND_CHOICES = [
 ];
 // The events that change what became of the lessons of a run; they come on the lifecycle stream, after the run's end.
 const LESSON_KINDS = new Set(["lessons_proposed", "lesson_saved", "lesson_dismissed", "lessons_failed"]);
-const LESSON_STATES = { saved: { mark: "check", text: "Saved to memory" }, dismissed: { mark: "x", text: "Dismissed" } };
+// What a decision on a lesson says once it is made.
+const LESSON_DONE = { save: "Saved to memory: later runs find it like any note.", dismiss: "The lesson is dismissed.", undo: "Undone: the lesson is no longer in memory." };
 // A replayed run brings its question events in a burst: one refresh after it is enough.
 const QUESTIONS_SETTLE_MS = 120;
 // The conversation changes with every event of a run: the list of its files is drawn again once it settles.
@@ -365,7 +366,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     try {
       await attempt(async () => {
         await api.post(`/runs/${runId}/lessons/${index}/${action}`, null);
-        toast("ok", action === "save" ? "Saved to memory: later runs find it like any note." : "The lesson is dismissed.");
+        toast("ok", LESSON_DONE[action]);
       });
       // Decided now, or decided elsewhere meanwhile (another page, `auto`): show what became of every lesson.
       await reconcile();
@@ -374,11 +375,24 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
   }
 
+  function lessonButton(lesson, action, words) {
+    return el("button", { class: "btn sm", type: "button", onclick: () => decideLesson(lesson.index, action) }, words);
+  }
+
   function lessonRow(lesson) {
     const text = el("span", { class: "lesson-text" }, lesson.text);
-    const settled = LESSON_STATES[lesson.state];
-    if (settled !== undefined) {
-      return el("div", { class: `lesson ${lesson.state}` }, text, el("span", { class: "chip" }, icon(settled.mark), settled.text));
+    if (lesson.state === "saved") {
+      // Saved on its own or by you, a lesson can be taken back: Undo forgets the note it wrote.
+      const said = el("span", { class: "chip" }, icon("check"), lesson.by === "auto" ? "Saved on its own" : "Saved to memory");
+      return el("div", { class: "lesson saved" }, text, el("div", { class: "cluster" }, said, lessonButton(lesson, "undo", "Undo")));
+    }
+    if (lesson.state === "dismissed" && lesson.by === "auto") {
+      // Left out by the second look, with why; it is still yours to keep.
+      const why = el("span", { class: "lesson-why" }, `Left out: ${lesson.reason}`);
+      return el("div", { class: "lesson dismissed" }, text, why, el("div", { class: "cluster" }, lessonButton(lesson, "save", "Save anyway")));
+    }
+    if (lesson.state === "dismissed") {
+      return el("div", { class: "lesson dismissed" }, text, el("span", { class: "chip" }, icon("x"), "Dismissed"));
     }
     // The words sit in the buttons themselves, as on an approval card, so that a phone keeps them.
     const save = el("button", { class: "btn primary sm", type: "button", onclick: () => decideLesson(lesson.index, "save") }, icon("check"), "Save to memory");
@@ -401,7 +415,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
               "div",
               { class: "note warn" },
               icon("alert"),
-              el("span", null, "This run read content that others can write (web pages, mail, downloads), so its lessons are never saved on their own. Read each one before you save it."),
+              el("span", null, "This run read content that others can write (web pages, mail, downloads): read each lesson before you save it."),
             )
           : null,
         lessons.error === null ? null : el("div", { class: "note bad" }, icon("alert"), el("span", null, lessons.error)),
@@ -1166,7 +1180,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       if (!signal.aborted) {
         inspector.setCount("agents", count === 0 ? "" : String(count));
         helpersButton.hidden = count === 0;
-        helpersCount.textContent = String(count);
+        setText(helpersCount, String(count));
       }
     } catch (error) {
       if (!signal.aborted) {
@@ -1285,11 +1299,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   loadActions();
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
-  // Lessons change after the run, and a question may be answered or skipped in another tab. A helper that starts or
-  // ends is read from the store too.
+  // Lessons change after the run, and a question may be answered or skipped in another tab, as a draft may be sent or
+  // discarded on another screen (item 314). A helper that starts or ends is read from the store too.
   const helpersChanged = debounce(() => reconcile(), HELPERS_SETTLE_MS);
   const stopLifecycle = onLifecycle((event) => {
-    if ((LESSON_KINDS.has(event.kind) || event.kind === "approval_decided") && event.run_id === runId) {
+    if (event.kind === "draft_decided") {
+      timeline.draft(event.data);
+    } else if ((LESSON_KINDS.has(event.kind) || event.kind === "approval_decided") && event.run_id === runId) {
       reconcile();
     } else if (HELPER_MOMENTS.has(event.kind) && event.run_id !== runId && (event.data.parent_run_id === runId || timeline.knows(event.run_id))) {
       helpersChanged();

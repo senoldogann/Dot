@@ -30,6 +30,7 @@ type CallPurpose = Literal[
     "attachment",
     "aside",
     "consult",
+    "memory",
 ]
 
 CALL_EVENT: str = "model_call"

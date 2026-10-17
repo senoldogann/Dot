@@ -18,7 +18,7 @@ import pytest
 import pytest_asyncio
 
 from dotagent.browser.safety import refuse_secret_field
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import PageView, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.desktop.perms import check_permissions
@@ -120,7 +120,7 @@ async def browser(
     config: BrowserConfig, tmp_path_factory: pytest.TempPathFactory, site: str
 ) -> AsyncIterator[BrowserSession]:
     session: BrowserSession = BrowserSession(
-        config, SERVER, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads")
+        config, SERVER, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads"), no_runs_at_work
     )
     # The start takes the front once (macOS starts an application in front) and gives it back; it is item 97's.
     await session.open_url("first", site)

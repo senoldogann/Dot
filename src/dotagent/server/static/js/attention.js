@@ -17,6 +17,7 @@ const PUSH_KEY = "dot.push";
 const BODY_CHARS = 140;
 const FINISHED_TITLE = { done: "A run is done", failed: "A run failed", cancelled: "A run was stopped" };
 const ASKING_TITLE = { question: "Dot has a question", handoff: "Dot needs your help" };
+const DRAFT_TITLE = { mail: "Dot drafted an email", message: "Dot drafted a message" };
 
 const FINISHED_FACE = { done: "done", failed: "failed" };
 // The line breaks of Python's str.splitlines, so that the first line of a result is the one the push shows.
@@ -177,6 +178,18 @@ async function tellAboutEnd(event) {
   });
 }
 
+/** A draft a run wrote for the owner to send (item 314), in the words the phone hears (`notify/push.py`). */
+function tellAboutDraft(event) {
+  const { id, channel, to, subject, body } = event.data;
+  tell({
+    title: DRAFT_TITLE[channel] ?? "Dot drafted a message",
+    body: shorten(`To ${to.join(", ")}: ${channel === "mail" ? subject : body}`),
+    tag: `draft-${id}`,
+    route: `#/runs/${event.run_id}`,
+    state: "waiting",
+  });
+}
+
 function tellAboutCampaign(event) {
   const { campaign_id: id, title, status, note } = event.data;
   const achieved = status === "achieved";
@@ -194,6 +207,10 @@ function tellAboutMissedFiring(event) {
   tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed" });
 }
 
+function tellAboutLearningStalled(event) {
+  tell({ title: "Dot's learning has stopped", body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed" });
+}
+
 /** What a failure to notify costs: nothing but a line in the console, so it never stops the page from updating. */
 function onLifecycleEvent(event) {
   try {
@@ -204,10 +221,14 @@ function onLifecycleEvent(event) {
       tellAboutApproval(event);
     } else if (event.kind === "run_finished") {
       tellAboutEnd(event).catch((error) => console.warn("could not tell about a finished run", error));
+    } else if (event.kind === "draft_created") {
+      tellAboutDraft(event);
     } else if (event.kind === "campaign_ended") {
       tellAboutCampaign(event);
     } else if (event.kind === "schedule_missed") {
       tellAboutMissedFiring(event);
+    } else if (event.kind === "learning_stalled") {
+      tellAboutLearningStalled(event);
     }
   } catch (error) {
     console.warn("could not notify", error);

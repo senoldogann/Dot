@@ -12,7 +12,7 @@ import pytest
 from dotagent.core.errors import RunConflict
 from dotagent.llm.types import user_message
 from dotagent.store.db import Store, _writing
-from dotagent.store.models import RunRecord, ThreadRecord
+from dotagent.store.models import MemoryRecord, RunRecord, ThreadRecord
 
 
 class _CutShort(Store):
@@ -95,6 +95,29 @@ async def test_a_write_stopped_part_way_leaves_nothing_for_the_next_commit(tmp_p
         await store.add_run_tokens(run_id, 10, 1)
         run: RunRecord = await store.get_run(run_id)
         assert (run.steps, run.input_tokens) == (0, 10)
+    finally:
+        await store.close()
+
+
+async def test_a_note_handed_while_a_write_is_part_way_waits_for_it_and_commits_nothing_of_it(tmp_path: Path) -> None:
+    store: Store = await _CutShort.open(tmp_path / "dot.db", tmp_path / "images")
+    assert isinstance(store, _CutShort)
+    try:
+        _, run_id = await _runs_and_thread(store)
+        note: MemoryRecord = await store.add_memory("The invoices are in the shared folder.", (), None, None, None)
+        changed: asyncio.Event = asyncio.Event()
+        write: asyncio.Task[None] = asyncio.create_task(store.change_then_wait(run_id, changed))
+        await changed.wait()
+        handing: asyncio.Task[None] = asyncio.create_task(store.mark_memories_used(run_id, [note.id], 1.0, "site"))
+        # It waits for the write part way instead of committing that write with its own.
+        done, _ = await asyncio.wait({handing}, timeout=0.5)
+        assert done == set()
+        write.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await write
+        await handing
+        run: RunRecord = await store.get_run(run_id)
+        assert (run.steps, (await store.get_memory(note.id)).used_count) == (0, 1)
     finally:
         await store.close()
 

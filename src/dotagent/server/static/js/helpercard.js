@@ -5,7 +5,7 @@
 // stays by its row as the conversation scrolls, and goes with the pointer, the focus, a click on the row or Escape. It
 // needs a pointer that rests: on a touch screen a tap opens the row, as before.
 
-import { clip, duration, el, modelName } from "./dom.js";
+import { clip, duration, el, modelName, setText } from "./dom.js";
 import { levelLabel } from "./efforts.js";
 import { providerMark, providerOf } from "./providers.js";
 
@@ -91,6 +91,9 @@ export function helperCard(container) {
   let listening = false;
   // The state the card's face was drawn in: a face drawn again starts its motion again.
   let faceDrawn = null;
+  // The model line as it was drawn: the card is painted on every event of the run (item 310), its mark only when it
+  // changed.
+  let modelDrawn = null;
 
   /** Put the card under the row, or over it where the window has no room below, inside the window. */
   function place() {
@@ -114,20 +117,22 @@ export function helperCard(container) {
       face.replaceChildren(shown.face());
       faceDrawn = helper.status;
     }
-    goal.textContent = clip(helper.goal, GOAL_CHARS);
+    setText(goal, clip(helper.goal, GOAL_CHARS));
     // A helper whose first event the page did not read has no model to name.
     model.hidden = helper.model === null;
-    if (helper.model !== null) {
-      model.replaceChildren(providerMark(providerOf(helper.model)), el("span", null, modelLine(helper)));
+    const modelText = helper.model === null ? null : modelLine(helper);
+    if (helper.model !== null && modelDrawn !== `${helper.model} ${modelText}`) {
+      modelDrawn = `${helper.model} ${modelText}`;
+      model.replaceChildren(providerMark(providerOf(helper.model)), el("span", null, modelText));
     }
     ring.className = `status-ring s-${helper.status}`;
     const until = helper.ended ?? now;
-    state.textContent = `${stateWord(helper.status)} · ${duration(Math.max(until - helper.began, 0))}`;
+    setText(state, `${stateWord(helper.status)} · ${duration(Math.max(until - helper.began, 0))}`);
     const line = actionLine(helper);
     doing.hidden = line === null;
     if (line !== null) {
-      label.textContent = line[0];
-      action.textContent = line[1];
+      setText(label, line[0]);
+      setText(action, line[1]);
     }
   }
 
@@ -151,6 +156,7 @@ export function helperCard(container) {
     }
     shown = { row, helper, face: faceOf };
     faceDrawn = null;
+    modelDrawn = null;
     paint(Date.now() / 1000);
     card.hidden = false;
     place();

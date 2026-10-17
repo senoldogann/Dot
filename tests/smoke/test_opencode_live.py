@@ -4,16 +4,20 @@ A task run asks Dot for the command it runs, waits for the owner's answer and do
 calls and tokens in the run's timeline and its words in the chat; the next run of the chat goes on in the same session
 and remembers; a command the owner refuses is not run, and the run still ends with an answer. A message the owner sends
 reaches the agent at work, and Stop stops it while it waits for the owner, its question decided with it. The free
-models listed are those of OpenCode's refreshed catalog (item 292).
+models listed are those of OpenCode's refreshed catalog (item 292). The agent has Dot's own tools (item 284): it opens a
+page whose words a script writes in Dot's browser and reads them, each call in the run's timeline as Dot's own.
 
 Needs the ``opencode`` program and the internet, and is skipped without the program.
 """
 
 import asyncio
+import base64
 import json
 import os
 import secrets
+import threading
 from collections.abc import AsyncIterator, Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
@@ -59,7 +63,9 @@ def real_opencode() -> Iterator[None]:
 @pytest.fixture(scope="module")
 def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("home")
-    (path / "config.toml").write_text('[policy]\npreset = "cautious"\napproval_timeout_s = 240.0\n', encoding="utf-8")
+    (path / "config.toml").write_text(
+        '[policy]\npreset = "cautious"\napproval_timeout_s = 240.0\n\n[browser]\nheadless = true\n', encoding="utf-8"
+    )
     return path
 
 
@@ -325,3 +331,62 @@ async def test_a_message_reaches_the_agent_at_work_and_stop_stops_it(
     )
     assert after.status == "done", after.result
     assert "DONE" in after.result.upper()
+
+
+def _page_with_a_written_word(word: str) -> bytes:
+    """A page whose word a script writes, so that it is read in a browser: the page's text has it in base64 only."""
+    hidden: str = base64.b64encode(f"The word of the day is {word}.".encode()).decode()
+    return (
+        "<!doctype html><html><head><title>Word of the day</title></head><body><p id='word'>Loading…</p>"
+        f"<script>document.getElementById('word').textContent = atob('{hidden}');</script></body></html>"
+    ).encode()
+
+
+@pytest.fixture
+def word_page() -> Iterator[tuple[str, str]]:
+    word: str = f"plum{secrets.token_hex(3)}"
+    body: bytes = _page_with_a_written_word(word)
+
+    class Page(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *args: object) -> None:
+            return
+
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), Page)
+    thread: threading.Thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}/", word
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+@requires_opencode
+async def test_a_run_on_a_free_model_reads_a_page_in_dots_browser(
+    runtime: Runtime, manager: RunManager, model: str, word_page: tuple[str, str]
+) -> None:
+    """Item 284: the agent opens the page with Dot's browser tool, which a script of the page needs, and reads it."""
+    url, word = word_page
+    run, _, events = await _run(
+        runtime,
+        manager,
+        f"Open {url} in Dot's browser and tell me the word of the day that the page shows.",
+        model,
+        None,
+        True,
+    )
+    assert run.status == "done", run.result
+    calls: list[str] = [event.data["tool"] for event in events if event.kind == "tool_call"]
+    assert "browser_open" in calls, calls
+    assert any(
+        event.kind == "tool_result" and event.data["tool"] == "browser_open" and event.data["ok"] is True
+        for event in events
+    )
+    assert word in run.result, run.result

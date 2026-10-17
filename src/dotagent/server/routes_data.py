@@ -8,6 +8,7 @@ from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, Query
 
+from dotagent.agent.learning_health import LearningHealth, quiet_limit, read_learning_health, stall_reason
 from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import InvalidValueError, NotFoundError
@@ -41,6 +42,7 @@ from dotagent.scheduler.plans import (
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
 from dotagent.server.views import (
+    LearningHealthView,
     MemoriesQuery,
     MemoryPage,
     MemoryRequest,
@@ -186,13 +188,27 @@ def memories_router(ctx: ServerContext) -> APIRouter:
         await set_owner_section(index.store, section)
         return section
 
+    @router.get("/memories/learning")
+    async def learning_health() -> LearningHealthView:
+        """How Dot's learning fares: when the reflection, the lessons and the skills last went well, their failures in
+        a row with the last error, and why learning has stopped, if it has."""
+        health: LearningHealth | None = await read_learning_health(ctx.runtime.store)
+        quiet_s: float | None = quiet_limit(ctx.runtime.config.agent.reflection_time)
+        stalled: str | None = None if health is None else stall_reason(health, time.time(), quiet_s)
+        return LearningHealthView(health=health, stalled=stalled)
+
     @router.get("/memories/search")
     async def search_memories(query: Annotated[SearchQuery, Query()]) -> list[MemoryHit]:
         return await recall(index, query.q, query.limit)
 
+    # After the routes above: "owner", "learning" and "search" are not ids.
+    @router.get("/memories/{memory_id}")
+    async def get_memory(memory_id: str) -> MemoryRecord:
+        return await index.store.get_memory(memory_id)
+
     @router.post("/memories", status_code=201)
     async def add_memory(request: MemoryRequest) -> SavedMemory:
-        return await save_memory(index, request.content, request.tags, None, None)
+        return await save_memory(index, request.content, request.tags, None, None, None)
 
     @router.patch("/memories/{memory_id}")
     async def edit_memory(memory_id: str, request: MemoryRequest) -> MemoryRecord:

@@ -1803,20 +1803,22 @@ a.pill:hover {
   user-select: none;
 }
 
-/* On a phone, and on any touch screen, no text field's text is under --touch-text (item 275), and the composer's box,
-   whose size the owner chooses, never under it either, its copy keeping the same size and leading (item 273). */
-@media (max-width: 720px), (pointer: coarse) {
-  :root :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select, textarea) {
+/* On a touch screen no text field's text is under --touch-text (item 275), and the composer's box, whose size the owner
+   chooses, never under it either, its copy keeping the same size and leading (item 273): below it a phone zooms the page
+   into the field that gets the focus. Not on an iPhone or an iPad, whose viewport boot.js keeps from zooming into a field
+   (`data-focus-zoom="off"`, item 311): there a field has the size it has in a window on the Mac. */
+@media (pointer: coarse) {
+  :root:not([data-focus-zoom="off"]) :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="color"], [type="file"]), select, textarea) {
     font-size: max(var(--touch-text), 1em);
   }
 
-  .composer {
+  :root:not([data-focus-zoom="off"]) .composer {
     --composer-touch-size: max(var(--touch-text), var(--composer-size));
     --composer-touch-leading: calc(var(--composer-touch-size) * var(--composer-leading-ratio));
   }
 
-  :root .composer .textarea,
-  :root .composer .composer-mirror {
+  :root:not([data-focus-zoom="off"]) .composer .textarea,
+  :root:not([data-focus-zoom="off"]) .composer .composer-mirror {
     font-size: var(--composer-touch-size);
     line-height: var(--composer-touch-leading);
   }
@@ -3265,6 +3267,57 @@ details[open] > summary .chev {
   color: var(--warn);
 }
 
+/* A compaction in the conversation (item 312, after Codex's): a quiet rule across the column, its words and the sizes
+   in the middle. */
+.compaction-line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-block: var(--space-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+
+.compaction-line::before,
+.compaction-line::after {
+  content: "";
+  flex: 1;
+  min-width: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+/* A change of the memory in the conversation (item 313, after Grok's "Updated memory"): a quiet note on one line, what
+   changed and then the first words of the note, cut where the line ends. The line of a saved or changed note leads to
+   it; under the pointer, its words of the change are underlined. */
+.memory-line {
+  align-items: center;
+}
+
+.memory-line .icon {
+  margin-top: 0;
+}
+
+.memory-change {
+  flex-shrink: 0;
+}
+
+.memory-words {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+a.memory-line:hover {
+  color: var(--text);
+  text-decoration: none;
+}
+
+a.memory-line:hover .memory-change {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .note.bad {
   color: var(--bad);
 }
@@ -3456,6 +3509,113 @@ details[open] > summary .chev {
   flex: 1;
   min-width: 180px;
   background: var(--surface);
+}
+
+/* A draft a run wrote for the owner (item 314, after Grok's): a card of the surface's colour, the recipients and the
+   subject in two columns over the words, which keep their lines, and Send at the end of the row. Edit turns the fields
+   and the words into a form in place; an answered draft keeps what went out, a discarded one in the quiet colour. */
+.draft-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+.draft-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: var(--weight-title);
+}
+
+.draft-time {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.draft-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+/* A field's label and value are the grid's two cells; in the form, the label element still focuses its input. */
+.draft-field {
+  display: contents;
+}
+
+.draft-label {
+  color: var(--muted);
+}
+
+.draft-value {
+  overflow-wrap: anywhere;
+}
+
+.draft-body {
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.draft-card[data-status="discarded"] .draft-fields,
+.draft-card[data-status="discarded"] .draft-body {
+  color: var(--muted);
+}
+
+.draft-error {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--bad);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+
+.draft-error .icon {
+  flex-shrink: 0;
+  margin-top: var(--space-half);
+}
+
+.draft-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Send keeps to the right end, of the row or, on a phone where the row wraps, of a row of its own. */
+.draft-send {
+  margin-left: auto;
+}
+
+/* While two or more drafts wait, each has a tick, and a bar after the last of them sends the ticked ones together
+   (item 314, after Grok's "send the top 10"). */
+.draft-pick {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.draft-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius);
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 /* A question's options (item 192): a row each, its label over what choosing it leads to, the one Dot recommends marked.
@@ -5434,6 +5594,67 @@ button.attach-chip:hover {
 .tool-pick input {
   margin: 0;
   accent-color: var(--accent);
+}
+
+/* The templates (item 315): a card each, as many abreast as fit and one on a phone; the face, name and role on top,
+   what it needs and its schedule under them, and Use template at the foot, level across a row. */
+.template-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+
+.template-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.template-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.template-name {
+  font-weight: var(--weight-label);
+}
+
+.template-role {
+  color: var(--muted);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.template-facts {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.template-facts > div {
+  display: flex;
+  gap: 8px;
+}
+
+.template-facts dt {
+  flex: none;
+  width: 72px;
+  color: var(--muted);
+}
+
+.template-facts dd {
+  margin: 0;
+  min-width: 0;
+}
+
+.template-card > .btn {
+  margin-top: auto;
+  align-self: flex-start;
 }
 
 .cluster.end {

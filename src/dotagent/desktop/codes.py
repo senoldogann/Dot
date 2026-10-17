@@ -111,7 +111,7 @@ def parse_mail_result(result: str) -> FoundMessage | None:
 
 async def read_mail(sender: str, subject: str, within_minutes: int, timeout_s: float) -> FoundMessage | None:
     return parse_mail_result(
-        await run_osascript("AppleScript", mail_script(sender, subject, within_minutes), (), timeout_s)
+        await run_osascript("AppleScript", mail_script(sender, subject, within_minutes), (), (), timeout_s)
     )
 
 

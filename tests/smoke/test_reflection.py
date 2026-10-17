@@ -1,7 +1,8 @@
 """The nightly reflection in the real loop (item 70): four scripted runs end (done, failed, stopped, and done after a
 stumble, which the loop asks about at its end), two lesson notes that say the same and one stale lesson are in the
 memory, and the scheduler's tick at the reflection's time fires it. The reflection asks the review model about the
-failed and the stopped run only, saves their lessons (``auto``), folds the duplicates into one, rests the stale lesson
+failed and the stopped run only, saves their lessons once the second look keeps them (``auto``), folds the duplicates
+into one, rests the stale lesson
 (a search no longer finds it), writes the day's journal note and stands in the Activity list; the next tick does not
 fire it again.
 
@@ -21,10 +22,10 @@ import pytest_asyncio
 
 from dotagent.agent.lessons import LESSON_TAG, LESSONS_PROPOSED
 from dotagent.agent.manager import RunManager
-from dotagent.agent.reflection import REFLECTION_KEY, Reflection, last_reflection, reflection_cron, summary_line
-from dotagent.agent.review import LESSONS_TOOL, OWNER_TOOL
+from dotagent.agent.reflection import last_reflection, reflection_cron
+from dotagent.agent.reflection_record import REFLECTION_KEY, Reflection, summary_line
+from dotagent.agent.review import LESSONS_TOOL, OWNER_TOOL, VET_TOOL
 from dotagent.config import AppConfig, load_default_config
-from dotagent.core.errors import NotFoundError
 from dotagent.core.paths import db_path
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -184,6 +185,11 @@ def _lessons(*lessons: str) -> ScriptedTurn:
     return _turn(ScriptedCall(tool=LESSONS_TOOL, arguments={"lessons": list(lessons)}))
 
 
+def _kept() -> ScriptedTurn:
+    """The second look's answer that keeps the one lesson it is asked about."""
+    return _turn(ScriptedCall(tool=VET_TOOL, arguments={"verdicts": [{"keep": True, "reason": "know-how"}]}))
+
+
 async def _start(home: Home, goal: str, approvals: str) -> RunRecord:
     return await home.manager.start(
         goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, approvals, False, ()
@@ -252,9 +258,12 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         _turn(_read(NOTES)),
         _finish("The file holds hello.", True),
         _lessons(LESSON_STUMBLE),
-        # The reflection's questions, about B and then C.
+        _kept(),
+        # The reflection's questions, about B and then C, each with its second look.
         _lessons(LESSON_FAILED),
+        _kept(),
         _lessons(LESSON_STOPPED),
+        _kept(),
         # The owner writer's answer: what Dot knows about the owner after the day.
         _owner(OWNER_LINE_LANGUAGE, OWNER_LINE_FILES),
     ]
@@ -330,10 +339,10 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
             LESSON_STOPPED: stopped.id,
         }
 
-        # The older twin was folded into the newer, which kept both notes' tags; the stale lesson rests and a search no
-        # longer finds it, while the Memory page still lists it.
-        with pytest.raises(NotFoundError):
-            await store.get_memory(older.id)
+        # The older twin was folded into the newer, which kept both notes' tags, and rests naming it (item 306); the stale
+        # lesson rests and a search no longer finds it, while the Memory page still lists it.
+        twin: MemoryRecord = await store.get_memory(older.id)
+        assert REST_TAG in twin.tags and twin.replaced_by == newer.id
         assert (await store.get_memory(newer.id)).tags == ("lesson", "pdf")
         rested: MemoryRecord = await store.get_memory(stale.id)
         assert rested.tags == (LESSON_TAG, REST_TAG)

@@ -26,12 +26,20 @@ from dotagent.agent.campaign import (
 )
 from dotagent.agent.gate import HANDBACK_EVENT, TAINT_EVENTS, TAKEOVER_EVENT, RunGate, tainted_after
 from dotagent.agent.keep_going import keep_going_ask
-from dotagent.agent.lessons import LessonCase, dismiss_lesson, learn, save_lesson
+from dotagent.agent.learning_health import (
+    LearningOutcome,
+    LearningWork,
+    failed_with,
+    quiet_limit,
+    record_learning,
+)
+from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
-from dotagent.agent.playbooks import learn_playbook, playbook_case
-from dotagent.agent.reflection import Reflection, reflect
+from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, playbook_case
+from dotagent.agent.reflection import reflect
+from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
     RESUME_SOURCE,
     CutOff,
@@ -43,7 +51,7 @@ from dotagent.agent.resume import (
     resume_note,
     resumes_on_start,
 )
-from dotagent.agent.review import reviewer_for
+from dotagent.agent.review import reviewer_for, shorten_reason
 from dotagent.browser.attach import read_debug_endpoint
 from dotagent.browser.session import BrowserSession
 from dotagent.config import ResumeMode
@@ -61,6 +69,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
 from dotagent.core.text import redact_json, redact_secrets, truncate_tail
 from dotagent.core.types import JsonObject
+from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage, Speed, user_message
@@ -194,6 +203,11 @@ def goal_mode_asked(goal: str, mode: RunMode, goal_mode: bool | None) -> bool | 
     return True if mode != "chat" and keep_going_ask(goal) is not None else goal_mode
 
 
+def _crash(exc: Exception) -> str:
+    """An unexpected error as the owner reads it on a run's page: its kind and its words, secrets masked."""
+    return shorten_reason(redact_secrets(f"{type(exc).__name__}: {exc}"))
+
+
 async def _uncancelled[T](work: Coroutine[object, object, T]) -> T:
     """Run ``work`` to its end even when the caller is cancelled meanwhile (a second stop of a run while its end is
     being recorded), then raise the cancellation (item 116); returns what ``work`` returns."""
@@ -207,6 +221,19 @@ async def _uncancelled[T](work: Coroutine[object, object, T]) -> T:
     if cancelled:
         raise asyncio.CancelledError
     return task.result()
+
+
+async def _to_its_end[T](work: Coroutine[object, object, T]) -> T:
+    """Run ``work`` to its end even when the caller is cancelled meanwhile, and return what it returns or raise what it
+    raises: a cancellation that comes meanwhile is dropped, as what it came to stop is over once ``work`` is (a stop of
+    a run while its end is being recorded, the code review's O5)."""
+    task: asyncio.Task[T] = asyncio.ensure_future(work)
+    while True:
+        try:
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            if task.cancelled():
+                raise
 
 
 class RunManager:
@@ -267,8 +294,8 @@ class RunManager:
 
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
-        longer active, and their lock files; and hold the queue of each chat (:meth:`queue`) whose run the daemon's stop
-        did not cut. The runs of a process that lives (``dotx run`` in a terminal) go on, with the approvals they wait
+        longer active, the drafts the daemon was sending (item 314), and their lock files; and hold the queue of each
+        chat (:meth:`queue`) whose run the daemon's stop did not cut. The runs of a process that lives (``dotx run`` in a terminal) go on, with the approvals they wait
         on. Returns the number of runs closed."""
         store: Store = self._runtime.store
         directory: Path = run_owners_dir()
@@ -278,6 +305,7 @@ class RunManager:
                 gone.append(owner)
         interrupted: int = await store.mark_interrupted_runs(gone)
         await store.expire_pending_approvals(_EXPIRED_ON_START)
+        await fail_unsettled_drafts(store, self._runtime.bus)
         await store.forget_stops_of_ended_runs()
         await self._hold_claims_of_gone(directory)
         # A stop of the daemon is not the owner's stop of the chat: a queue whose run the stop cut goes on once that
@@ -385,13 +413,18 @@ class RunManager:
     async def watch_commands(self) -> None:
         """Every ``COMMAND_CHECK_S`` until cancelled, store the ends the store refused (:meth:`store_left_ends`) and
         close the runs of dead ``dotx`` commands (:meth:`close_runs_of_dead_commands`); a check that fails, on the store
-        or on the files of the owners, is logged and the next one goes on."""
+        or on the files of the owners (a read of the store fails with sqlite3's own error), is logged and the next one
+        goes on."""
         while True:
             await asyncio.sleep(COMMAND_CHECK_S)
             try:
                 stored: int = await self.store_left_ends()
             except DotError as exc:
                 log.warning("left_ends_not_stored", runs=len(self._left_ends), error=exc.message, context=exc.context)
+            except (sqlite3.Error, OSError) as exc:
+                log.warning(
+                    "left_ends_not_stored", runs=len(self._left_ends), error=str(exc), error_type=type(exc).__name__
+                )
             else:
                 if stored:
                     log.info("left_ends_stored", runs=stored)
@@ -400,7 +433,7 @@ class RunManager:
             except DotError as exc:
                 log.warning("dead_commands_not_checked", error=exc.message, context=exc.context)
                 continue
-            except OSError as exc:
+            except (sqlite3.Error, OSError) as exc:
                 log.warning("dead_commands_not_checked", error=str(exc), error_type=type(exc).__name__)
                 continue
             if closed:
@@ -749,10 +782,12 @@ class RunManager:
             None if campaign.cron is None else next_firing(campaign.cron, now, runtime.schedule_zone)
         )
         await runtime.store.set_next_session(campaign.id, following)
-        thread: ThreadRecord = await runtime.store.create_thread(
-            f"{campaign.title} · session {number}", SCHEDULE_SOURCE
-        )
+        made_thread_id: str | None = None
         try:
+            thread: ThreadRecord = await runtime.store.create_thread(
+                f"{campaign.title} · session {number}", SCHEDULE_SOURCE
+            )
+            made_thread_id = thread.id
             run, _ = await self._launch(
                 campaign.goal,
                 "task",
@@ -768,12 +803,13 @@ class RunManager:
                 campaign.id,
                 None,
             )
-        except DotError:
-            # The session is tried again; what cannot be undone is logged, not raised: the error of the start is the one
-            # to raise.
+        except Exception:
+            # Whatever failed, the session is tried again (its next one was cleared above); what cannot be undone is
+            # logged, not raised: the error of the start is the one to raise.
             try:
                 await runtime.store.set_next_session(campaign.id, now + runtime.config.agent.campaign_gap_minutes * 60)
-                await runtime.store.delete_threads([thread.id])
+                if made_thread_id is not None:
+                    await runtime.store.delete_threads([made_thread_id])
             except DotError as exc:
                 log.error("session_start_not_undone", campaign_id=campaign.id, error=exc.message, context=exc.context)
             raise
@@ -1211,6 +1247,10 @@ class RunManager:
     async def dismiss_lesson(self, run_id: str, index: int) -> None:
         """Dismiss a lesson proposed for a run that ended (see :func:`dotagent.agent.lessons.dismiss_lesson`)."""
         await dismiss_lesson(self._runtime, self._deciding, run_id, index)
+
+    async def undo_lesson(self, run_id: str, index: int) -> bool:
+        """Take back the save of a lesson of a run (see :func:`dotagent.agent.lessons.undo_lesson`)."""
+        return await undo_lesson(self._runtime, self._deciding, run_id, index)
 
     async def shutdown(self) -> None:
         """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can tell
@@ -1786,7 +1826,8 @@ class RunManager:
         the lessons and playbooks of a run whose end was not recorded are not drawn. What follows a session of a
         campaign is planned once its end is recorded and before ``finished`` is set, so a waiter finds it planned. The
         lessons of a run that may hold some are drawn after that, in a task of its own, so that they hold up nothing.
-        Last, the run's chat moves its queue on (:meth:`_follow_queue`), once the run no longer holds the chat.
+        Last, the run's chat moves its queue on (:meth:`_follow_queue`), once the run no longer holds the chat; a stop
+        that came while the end was recorded holds the queue, as any stop does.
         """
         runtime: Runtime = self._runtime
         status: RunStatus = "failed"
@@ -1801,6 +1842,8 @@ class RunManager:
                     run.id, "run_started", {"model": run.model, "parent_run_id": run.parent_run_id}, True
                 )
                 agent: AgentRun = AgentRun(runtime, run, gate, cancel, inbox, self, opening)
+                # The other runs know it from now on, and what it holds (item 301).
+                runtime.peers.begin(run.id, run.thread_id, run.goal)
                 # A run on one of Zen's free models goes whole to OpenCode's own agent (item 283).
                 in_opencode: bool = parse_model_ref(run.model).provider == OPENCODE_PROVIDER
                 ended: RunEnd = await (run_in_opencode(agent) if in_opencode else run_agent(agent))
@@ -1821,6 +1864,7 @@ class RunManager:
             status, result = "failed", f"{PREFIX_INTERNAL_ERROR}{type(exc).__name__}: {exc}"
             log.exception("run crashed", run_id=run.id)
         finally:
+            runtime.peers.end(run.id)
             inbox.shutdown()
             recorded: bool = await self._close(run, status, result, needs, error, inbox, finished)
         # Registered before anything awaits, so that a waiter that ``finished`` wakes finds it.
@@ -1831,7 +1875,7 @@ class RunManager:
         if recorded and not self._stopping:
             # Nothing awaits a run's task: a queue that cannot be moved on is logged here and stays as it was.
             try:
-                await self._follow_queue(run, status)
+                await self._follow_queue(run, "cancelled" if cancel.is_set() else status)
             except Exception:
                 log.exception("queue_not_followed", run_id=run.id, thread_id=run.thread_id)
 
@@ -1857,11 +1901,12 @@ class RunManager:
         finished: asyncio.Event,
     ) -> bool:
         """Record the end of the run (:meth:`_record_end`), then release its handle and set ``finished`` whatever
-        happens; returns whether the end was recorded. Nothing awaits a run's task, so a failure to record it is
-        logged here with its traceback; an end the store refused is stored later (:meth:`store_left_ends`), and the
-        run stays as the store has it until then."""
+        happens; returns whether the end was recorded. A stop that comes meanwhile waits for the record and stops
+        nothing more, so what follows the end still happens (:func:`_to_its_end`). Nothing awaits a run's task, so a
+        failure to record it is logged here with its traceback; an end the store refused is stored later
+        (:meth:`store_left_ends`), and the run stays as the store has it until then."""
         try:
-            await _uncancelled(self._record_end(run, status, result, needs, error, inbox))
+            await _to_its_end(self._record_end(run, status, result, needs, error, inbox))
             return True
         except Exception:
             log.exception("run_end_not_recorded", run_id=run.id, status=status)
@@ -2149,22 +2194,44 @@ class RunManager:
         if task is not None:
             await task
 
-    async def _distil(self, run: RunRecord, status: RunStatus) -> None:
-        """Task body of the playbook work of a run that ended (:func:`dotagent.agent.playbooks.learn_playbook`).
-        Unexpected exceptions are logged with their traceback; the run keeps its end either way."""
+    async def _record_learning(self, work: LearningWork, outcome: LearningOutcome) -> None:
+        """Keep how a piece of learning work ended in the record of how learning fares
+        (:func:`dotagent.agent.learning_health.record_learning`), which tells the owner when learning has stopped. A
+        store that cannot keep it is logged: the work has ended either way."""
+        quiet_s: float | None = quiet_limit(self._runtime.config.agent.reflection_time)
         try:
-            await learn_playbook(self._runtime, run, status)
-        except Exception:
-            log.exception("playbook crashed", run_id=run.id)
+            await record_learning(self._runtime.store, self._runtime.bus, work, time.time(), outcome, quiet_s)
+        except StoreError as error:
+            log.error("learning_not_recorded", work=work, state=outcome.state, error=error.message)
+
+    async def _distil(self, run: RunRecord, status: RunStatus) -> None:
+        """Task body of the playbook work of a run that ended (:func:`dotagent.agent.playbooks.learn_playbook`), and
+        the one place its errors end (review O25): the work says on the run what it expected to fail; anything else is
+        logged with its traceback and left on the run as a ``playbook_failed`` event, which its page and ``dotx stats``
+        show. Every outcome goes to the record of how learning fares; the run keeps its end either way."""
+        try:
+            try:
+                outcome: LearningOutcome = await learn_playbook(self._runtime, run, status)
+            except Exception as exc:
+                log.exception("playbook crashed", run_id=run.id)
+                outcome = failed_with(f"The skill work failed: {_crash(exc)}")
+                await self._runtime.bus.emit(run.id, PLAYBOOK_FAILED, {"host": "", "error": outcome.error}, True)
+            await self._record_learning("playbooks", outcome)
         finally:
             self._distilling.pop(run.id, None)
 
     async def _learn(self, case: LessonCase) -> None:
-        """Task body of drawing the lessons of a run that ended. Unexpected exceptions are logged with their traceback;
-        the run keeps its end either way."""
+        """Task body of drawing the lessons of a run that ended (:func:`dotagent.agent.lessons.learn`), and the one
+        place its errors end (review O25): the work says on the run what it expected to fail; anything else is logged
+        with its traceback and left on the run as a ``lessons_failed`` event, which its page and ``dotx stats`` show.
+        Every outcome goes to the record of how learning fares; the run keeps its end either way."""
         try:
-            await learn(self._runtime, self._deciding, case)
-        except Exception:
-            log.exception("lessons crashed", run_id=case.run_id)
+            try:
+                outcome: LearningOutcome = await learn(self._runtime, self._deciding, case)
+            except Exception as exc:
+                log.exception("lessons crashed", run_id=case.run_id)
+                outcome = failed_with(f"The lessons of this run failed: {_crash(exc)}")
+                await self._runtime.bus.emit(case.run_id, LESSONS_FAILED, {"error": outcome.error}, True)
+            await self._record_learning("lessons", outcome)
         finally:
             self._learning.pop(case.run_id, None)

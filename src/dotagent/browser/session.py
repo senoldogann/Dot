@@ -14,7 +14,7 @@ import contextlib
 import re
 import secrets
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -277,6 +277,27 @@ def main_page_of(request: Request) -> Page | None:
     return page if frame == page.main_frame else None
 
 
+def threads_in_use(threads: Mapping[str, ThreadTabs], kept: frozenset[str]) -> list[str]:
+    """The chats whose tabs a switch of the browser would close under them: one in the middle of a step, and one whose
+    run is at work between two of its calls (``kept``, item 305), which would find its pages gone."""
+    return [thread_id for thread_id, thread in threads.items() if thread.lock.locked() or thread_id in kept]
+
+
+def threads_to_release(threads: Mapping[str, ThreadTabs], cutoff: float, kept: frozenset[str]) -> list[str]:
+    """The chats whose tabs the idle reaper releases: unused since ``cutoff`` and not in use now, unless a run of the
+    chat is at work (``kept``): a run that waits for an answer or for a long command finds its pages as it left them."""
+    return [
+        thread_id
+        for thread_id, thread in threads.items()
+        if thread.last_used < cutoff and not thread.lock.locked() and thread_id not in kept
+    ]
+
+
+def no_runs_at_work() -> frozenset[str]:
+    """The chats a session works for when no run does (``dotx browser``): none, so every idle chat is released."""
+    return frozenset()
+
+
 def blocked_by_rules(error: BrowserError) -> bool:
     """Whether a navigation failed because a request of it was refused by the URL rules: Chrome reports an aborted or
     failed request as ``net::ERR_BLOCKED_BY_CLIENT``."""
@@ -363,8 +384,17 @@ class BrowserSession:
     fails with a ``BrowserError`` and the next call starts or connects again; nothing is retried behind the model's
     back, because a click must not repeat."""
 
-    def __init__(self, config: BrowserConfig, server: ServerConfig, profile_dir: Path, downloads_dir: Path) -> None:
+    def __init__(
+        self,
+        config: BrowserConfig,
+        server: ServerConfig,
+        profile_dir: Path,
+        downloads_dir: Path,
+        kept: Callable[[], frozenset[str]],
+    ) -> None:
         self._config: BrowserConfig = config
+        # The chats whose tabs the idle reaper keeps: those of the runs at work (:func:`threads_to_release`).
+        self._kept: Callable[[], frozenset[str]] = kept
         # Whose interface the browser never opens (:func:`check_browser_url`).
         self._server: ServerConfig = server
         self._profile: Path = profile_dir
@@ -381,8 +411,9 @@ class BrowserSession:
         # frame that the rules refused last, which the error page the page then shows is about.
         self._answering: set[asyncio.Task[None]] = set()
         self._refusals: dict[Page, _Refusal] = {}
-        # The pages of Dot's own Chrome whose requests a Fetch session of their own judges (:meth:`_guard_hops`).
-        self._guarded: set[Page] = set()
+        # The pages of Dot's own Chrome whose requests a Fetch session of their own judges (:meth:`_guard_hops`), each
+        # with the setting up of its session, which a navigation of the page waits for.
+        self._guarded: dict[Page, asyncio.Task[None]] = {}
         self._reaper: asyncio.Task[None] | None = None
         self._closed: bool = False
         # The front of the Mac around Dot's own Chrome (item 118): Chrome's process, the application that had the front
@@ -632,7 +663,7 @@ class BrowserSession:
 
     async def check_debug_port(self, port: int) -> None:
         """Raise the error :meth:`set_debug_port` would refuse ``port`` with, changing nothing: the session was closed,
-        a thread is in the middle of a step (as for a switch), or another program holds the port."""
+        a chat's run is at work in the browser (as for a switch), or another program holds the port."""
         async with self._launch_lock:
             await self._refuse_debug_port(port)
 
@@ -643,18 +674,19 @@ class BrowserSession:
             return
         if port and await asyncio.to_thread(port_is_taken, port):
             raise port_taken(port)
-        busy: list[JsonValue] = [thread_id for thread_id, thread in self._threads.items() if thread.lock.locked()]
+        busy: list[JsonValue] = [*threads_in_use(self._threads, self._kept())]
         if busy:
             raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
 
     async def switch(self, config: BrowserConfig, profile_dir: Path) -> None:
         """Work in the Chrome that ``config`` and ``profile_dir`` name from the next call on: the current one is let go
         of first (Dot's own Chrome is closed; in the Chrome of the user the tabs Dot opened are closed and the connection
-        is dropped). Refused while a thread is in the middle of a step, so no run loses the page it works on."""
+        is dropped). Refused while a chat's run is at work in it (:func:`threads_in_use`), so no run loses the page it works
+        on."""
         async with self._launch_lock:
             if self._closed:
                 raise BrowserError("the browser session was closed", {})
-            busy: list[JsonValue] = [thread_id for thread_id, thread in self._threads.items() if thread.lock.locked()]
+            busy: list[JsonValue] = [*threads_in_use(self._threads, self._kept())]
             if busy:
                 raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
             await self._let_go()
@@ -718,13 +750,12 @@ class BrowserSession:
         while True:
             await asyncio.sleep(_REAP_INTERVAL_S)
             cutoff: float = time.monotonic() - self._config.tab_idle_s
-            for thread_id, thread in list(self._threads.items()):
-                if thread.last_used < cutoff and not thread.lock.locked():
-                    _log.info("browser_idle_thread_released", thread_id=thread_id)
-                    try:
-                        await self.release_thread(thread_id)
-                    except Exception:
-                        _log.exception("browser_idle_release_failed", thread_id=thread_id)
+            for thread_id in threads_to_release(self._threads, cutoff, self._kept()):
+                _log.info("browser_idle_thread_released", thread_id=thread_id)
+                try:
+                    await self.release_thread(thread_id)
+                except Exception:
+                    _log.exception("browser_idle_release_failed", thread_id=thread_id)
 
     async def attachment(self) -> Attachment:
         """The Chrome of the user that this session works in; connects first when it is not connected yet."""
@@ -1102,18 +1133,30 @@ class BrowserSession:
         """Ask Chrome about every request of ``page`` through a Fetch session of the tab's own, redirect hops included:
         the route of the context is asked about the first address of a navigation only (measured 2026-10-15: of
         localhost → 302 → Dot's port, the route saw localhost and Chrome fetched Dot's port). A frame of another site,
-        which Chrome runs as a target of its own, is not reached from here; the route sees its first requests."""
-        if page in self._guarded:
-            return
-        self._guarded.add(page)
-        page.on("close", self._forget_page)
+        which Chrome runs as a target of its own, is not reached from here; the route sees its first requests.
+
+        The session is set up once per page, and every call returns only once Chrome has it: a navigation that starts
+        before then is not asked about at all (measured 2026-10-16: the guard begun when Chrome announced a new tab was
+        still under way when the tab's first navigation started, and a redirect hop of one such navigation in five
+        reached Dot's port)."""
+        guarding: asyncio.Task[None] | None = self._guarded.get(page)
+        if guarding is None:
+            guarding = asyncio.create_task(self._set_up_guard(page))
+            self._guarded[page] = guarding
+            page.on("close", self._forget_page)
+        await asyncio.shield(guarding)
+
+    async def _set_up_guard(self, page: Page) -> None:
+        """The Fetch session of :meth:`_guard_hops`. One that could not be set up is forgotten, so that the next call
+        tries again. Closing the browser does not cancel it: it fails as the browser goes, and its callers get that
+        failure rather than a cancellation of their own."""
         try:
             cdp: CDPSession = await page.context.new_cdp_session(page)
             main: str | None = main_frame_id(await cdp.send("Page.getFrameTree"))
             cdp.on("Fetch.requestPaused", partial(self._on_paused, cdp, page, main))
             await cdp.send("Fetch.enable", {"patterns": _FETCH_PATTERNS})
         except PlaywrightError:
-            self._guarded.discard(page)
+            self._guarded.pop(page, None)
             raise
 
     async def _guard_quietly(self, page: Page) -> None:
@@ -1131,7 +1174,7 @@ class BrowserSession:
             )
 
     def _forget_page(self, page: Page) -> None:
-        self._guarded.discard(page)
+        self._guarded.pop(page, None)
         self._refusals.pop(page, None)
 
     def _on_paused(self, cdp: CDPSession, page: Page, main: str | None, event: Mapping[str, object]) -> None:
@@ -1193,6 +1236,18 @@ class BrowserSession:
                 raise
             raise refused from error
 
+    async def _blank(self, page: Page) -> None:
+        """Reset ``page`` to a blank page after a refusal. Chrome's error page for the refused request can commit after
+        the refusal is reported and interrupt the reset, which is then tried again as any interrupted navigation is."""
+        config: BrowserConfig = self._config
+        await navigate(
+            page,
+            "about:blank",
+            _ms(config.navigation_timeout_s),
+            config.navigation_attempts,
+            config.navigation_backoff_ms,
+        )
+
     async def _enforce_landing(self, tab: Tab) -> None:
         """A redirect or click may have ended on a URL the rules forbid; leave it before anything is read from it. One
         the rules refused on the way shows Chrome's error page, which is left the same way."""
@@ -1203,7 +1258,7 @@ class BrowserSession:
             if refused is None:
                 add_note(tab, "the page failed to load (Chrome error page)")
                 return
-            await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+            await self._blank(tab.page)
             raise ForbiddenUrlError(
                 "the page was sent to a URL that may not be opened; the request was refused and the tab was reset to "
                 "a blank page",
@@ -1216,7 +1271,7 @@ class BrowserSession:
             # The page is where it may be: a refusal on the way there, which it then left, is over.
             self._refusals.pop(tab.page, None)
             return
-        await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+        await self._blank(tab.page)
         raise ForbiddenUrlError(
             "the page ended up on a URL that may not be opened; the tab was reset to a blank page",
             landed,
@@ -1232,7 +1287,7 @@ class BrowserSession:
             status: int | None = await self._navigate_checked(tab.page, url, config.navigation_attempts)
         except ForbiddenUrlError as refused:
             # The tab shows Chrome's error page for the refused request; it is left as a page the rules forbid is.
-            await navigate(tab.page, "about:blank", _ms(config.navigation_timeout_s), 1, config.navigation_backoff_ms)
+            await self._blank(tab.page)
             raise ForbiddenUrlError(
                 f"{refused.message}; the tab was reset to a blank page",
                 refused.url,

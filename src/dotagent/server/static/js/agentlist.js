@@ -6,7 +6,7 @@
 
 import { actorFace } from "./actors.js";
 import { api } from "./api.js";
-import { clip, duration, el, modelName } from "./dom.js";
+import { clip, duration, el, modelName, setText } from "./dom.js";
 import { faceState } from "./face.js";
 import { actionLine, stateWord } from "./helpercard.js";
 import { icon } from "./icons.js";
@@ -85,7 +85,7 @@ export function agentList({ threadId, helper }) {
     empty.hidden = runs.length > 0;
     const left = runs.length - shown.length;
     more.hidden = left === 0;
-    more.textContent = `Show ${left} more`;
+    setText(more, `Show ${left} more`);
   }
 
   function expand() {
@@ -109,10 +109,11 @@ export function agentList({ threadId, helper }) {
     more.hidden = true;
   }
 
+  // Every second while the run works; what reads the same is not written again (item 310).
   function tick(now) {
     for (const { run, time, doing } of working) {
-      time.textContent = took(run, now);
-      doing.textContent = doingWords(helper(run.id));
+      setText(time, took(run, now));
+      setText(doing, doingWords(helper(run.id)));
     }
   }
 

@@ -2,7 +2,7 @@
 // The notes keep a size and scroll inside past their first rows (item 218).
 
 import { api, query } from "../api.js";
-import { ago, clip, dateTimeFull, debounce, el, plural } from "../dom.js";
+import { ago, clip, dateTime, dateTimeFull, debounce, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -76,6 +76,24 @@ function provenance(record) {
   return [whose, author, used];
 }
 
+/**
+ * How long the note holds (item 306): until when a note saved for a while holds or since when it ran out, and that another
+ * note replaced one the nightly reflection put aside as outdated or folded into a note that says the same.
+ */
+function lifespan(record) {
+  const until =
+    record.expires_at === null
+      ? null
+      : el(
+          "span",
+          { title: dateTimeFull(record.expires_at) },
+          record.expires_at * 1000 > Date.now() ? `Holds until ${dateTime(record.expires_at)}` : `Ran out ${dateTime(record.expires_at)}`,
+        );
+  const replaced =
+    record.replaced_by !== null && record.tags.includes("rest") ? el("span", { title: record.replaced_by }, "Replaced by another note") : null;
+  return [until, replaced];
+}
+
 /** The note in place as a small form: its words and tags, saved with `onSave(content, tags)` or left with `onCancel`. */
 function editForm(record, onSave, onCancel) {
   const words = el("textarea", { class: "textarea", rows: "3", maxlength: "20000", "aria-label": "Note" });
@@ -132,6 +150,7 @@ function memoryRow({ record, similarity, score }, actions) {
           match,
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
           el("span", { title: dateTimeFull(record.created_at) }, `Saved ${ago(record.created_at)}`),
+          lifespan(record),
           provenance(record),
           scoreLine(score),
         ),
@@ -218,13 +237,22 @@ export function mount(root, ctx) {
   const holder = el("div", null, loadingPanel());
   const more = el("button", { class: "btn", type: "button", hidden: true }, "Load more");
   const awakeCard = el("div", { class: "card list-box" });
+  // The hint under the name, on a line of its own: beside it, a hint longer than the row left the name no room.
   const restingHead = el(
     "div",
-    { class: "row section-head", dataset: { resting: "" } },
-    el("div", { class: "section-label grow" }, "Resting"),
-    el("span", { class: "hint" }, "No run was handed these lately; a search still finds them, runs no longer start with them."),
+    { class: "section-head", dataset: { resting: "" } },
+    el("div", { class: "section-label" }, "Resting"),
+    el(
+      "div",
+      { class: "hint" },
+      "Runs no longer start with these: no run was handed them lately, they did not help, their time ran out, or another note replaced them. A search still finds the ones with no rest tag that have not run out.",
+    ),
   );
   const restingCard = el("div", { class: "card list-box" });
+  // The note a line of a conversation leads to (item 313), named in the address after the tab's name: shown first, to be
+  // read, changed or forgotten there; a note forgotten since is said to be gone.
+  const askedId = new URLSearchParams(location.hash.split("?")[1] ?? "").get("note") ?? "";
+  const asked = el("div", { class: "stack tight", hidden: true, dataset: { asked: "" } });
   // The rows painted, by note id, with the hit each shows: a paint keeps the row of a note that did not change, so that
   // the page keeps its place and a note being corrected its form (item 204).
   let rowsShown = new Map();
@@ -313,6 +341,27 @@ export function mount(root, ctx) {
     await reload();
   }
 
+  async function loadAsked() {
+    if (askedId === "") {
+      return;
+    }
+    let shown;
+    try {
+      const record = await api.get(`/memories/${encodeURIComponent(askedId)}`);
+      shown = el("div", { class: "card list-box" }, memoryRow({ record, similarity: null, score: undefined }, rowActions));
+    } catch (error) {
+      if (error.status !== 404) {
+        throw error;
+      }
+      shown = el("div", { class: "note" }, icon("info"), el("span", null, "This note is no longer in memory: it was forgotten since."));
+    }
+    if (disposed) {
+      return;
+    }
+    asked.replaceChildren(el("div", { class: "section-label" }, "The note from the conversation"), shown);
+    asked.hidden = false;
+  }
+
   async function loadMore() {
     const mine = ticket;
     more.disabled = true;
@@ -355,12 +404,14 @@ export function mount(root, ctx) {
       }
     }
     await reload();
+    await loadAsked();
   }
 
   async function editNote(record, text, tagList) {
     await api.patch(`/memories/${record.id}`, { content: text, tags: tagList });
     toast("ok", "Note updated.");
     await reload();
+    await loadAsked();
   }
 
   const rowActions = {
@@ -452,8 +503,34 @@ export function mount(root, ctx) {
     }),
   );
 
+  // How Dot's learning fares (review O25): when the reflection, the lessons and the skills last went well, their
+  // failures in a row with the last error, and why learning has stopped, if it has.
+  const learningLines = el("ul", { class: "owner-lines" });
+  const learningHint = el("span", { class: "hint" });
+  function learningLine(name, work) {
+    const went = work.last_success === null ? "has not gone well yet" : `last went well ${ago(work.last_success)}`;
+    const failing = work.failures_in_row > 0 ? `; failed ${plural(work.failures_in_row, "time", "times")} in a row since: ${work.last_error}` : "";
+    return el("li", null, `${name}: ${went}${failing}`);
+  }
+  function paintLearning(view) {
+    learningLines.replaceChildren(
+      ...(view.health === null
+        ? [el("li", { class: "muted" }, "Nothing yet. The first reflection, or the lessons or skill of a run, start the record.")]
+        : [
+            learningLine("The nightly reflection", view.health.reflection),
+            learningLine("Lessons from runs", view.health.lessons),
+            learningLine("Skills from runs", view.health.playbooks),
+          ]),
+    );
+    learningHint.textContent = view.stalled === null ? "" : `Learning has stopped: ${view.stalled}`;
+  }
+  async function loadLearning() {
+    paintLearning(await api.get("/memories/learning"));
+  }
+
   root.append(
     paneHead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.", null),
+    asked,
     el(
       "section",
       { class: "card card-pad stack" },
@@ -461,6 +538,12 @@ export function mount(root, ctx) {
       dotLines,
       field("Your lines", ownLines, "Corrections and facts in your own words; Dot's lines above never contradict them."),
       el("div", { class: "row" }, el("span", { class: "spacer" }), saveOwn),
+    ),
+    el(
+      "section",
+      { class: "card card-pad stack", "data-learning": "" },
+      el("div", { class: "row" }, el("div", { class: "section-label grow" }, "How learning fares"), learningHint),
+      learningLines,
     ),
     el(
       "section",
@@ -476,7 +559,9 @@ export function mount(root, ctx) {
     el("div", { class: "cluster" }, more),
   );
   attempt(reload);
+  attempt(loadAsked);
   attempt(loadOwner);
+  attempt(loadLearning);
   return () => {
     disposed = true;
   };

@@ -10,6 +10,7 @@ from zoneinfo import ZoneInfo
 from dotagent.agent.approvals import ApprovalBroker
 from dotagent.agent.gate import SiteLocks
 from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
+from dotagent.agent.peers import Peers
 from dotagent.agent.sizes import ContextSizes
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import BrowserSession
@@ -66,6 +67,7 @@ from dotagent.tools.codes import build_code_tools
 from dotagent.tools.consult import build_consult_tools
 from dotagent.tools.delegate import build_delegate_tools
 from dotagent.tools.desktop import build_desktop_tools
+from dotagent.tools.drafts import build_draft_tool
 from dotagent.tools.files import build_file_tools
 from dotagent.tools.help import build_find_help_tool
 from dotagent.tools.judge_items import build_judge_items_tool
@@ -133,6 +135,8 @@ class Runtime:
     schedule_zone: ZoneInfo
     undo_dir: Path
     notify: Notifier
+    # The runs at work in this process and what each holds (item 301), so that they leave each other's alone.
+    peers: Peers
 
 
 def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[RegisteredTool, ...], ...]:
@@ -146,6 +150,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_web_tools(),
         build_notes_tools(),
         build_memory_tools(),
+        (build_draft_tool(),),
         build_schedule_tools(),
         build_campaign_tools(),
         build_delegate_tools(),
@@ -337,7 +342,8 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             if typesafe_key is not None or config.judge.provider == "typesafe"
             else None
         )
-        browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir())
+        peers: Peers = Peers()
+        browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir(), peers.threads)
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -372,6 +378,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             schedule_zone=schedule_zone,
             undo_dir=undo_dir(),
             notify=show_notification,
+            peers=peers,
         )
         cleanup.pop_all()
     return runtime

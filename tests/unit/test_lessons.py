@@ -1,6 +1,9 @@
 """Lessons: which runs are asked for them, what went wrong along a run as the review model reads it, which proposed
 lessons are kept, and what became of the lessons of a run as its events tell."""
 
+import itertools
+from collections.abc import Iterator
+
 import pytest
 
 from dotagent.agent.lessons import (
@@ -8,13 +11,17 @@ from dotagent.agent.lessons import (
     LessonView,
     RunLessons,
     _says_it,
+    contains_secret,
     kept_lessons,
     lesson_problem,
     lessons_of,
     may_learn,
+    outside_problem,
     repeats,
     run_signals,
+    vetted,
 )
+from dotagent.agent.review import LessonVerdict, LessonVetting
 from dotagent.agent.verify import CallFact
 from dotagent.config import LessonsMode
 from dotagent.core.types import JsonObject
@@ -27,8 +34,18 @@ LESSON: str = "Read PDF files with pdftotext -layout; read_file returns their ra
 CSV_LESSON: str = "Large CSV files load faster with the csv module than with pandas here."
 
 
+# Events are stored in order: each made here comes after the ones before it.
+_IDS: Iterator[int] = itertools.count(1)
+
+
 def _event(kind: str, data: JsonObject) -> EventRecord:
-    return EventRecord(id=1, run_id="run-1", ts=0.0, kind=kind, data=data)
+    return EventRecord(id=next(_IDS), run_id="run-1", ts=0.0, kind=kind, data=data)
+
+
+def _view(index: int, text: str, state: str, memory_id: str | None, by: str | None, reason: str | None) -> LessonView:
+    return LessonView.model_validate(
+        {"index": index, "text": text, "state": state, "memory_id": memory_id, "by": by, "reason": reason}
+    )
 
 
 def _note(content: str) -> MemoryRecord:
@@ -42,6 +59,8 @@ def _note(content: str) -> MemoryRecord:
         agent_id=None,
         used_count=0,
         last_used_at=None,
+        expires_at=None,
+        replaced_by=None,
     )
 
 
@@ -161,7 +180,7 @@ def test_a_signal_is_one_short_line_without_secrets() -> None:
     ],
 )
 def test_a_lesson_is_one_line_without_secrets_addresses_or_home_paths(text: str, problem: str | None) -> None:
-    assert lesson_problem(text, MAX_CHARS) == problem
+    assert lesson_problem(text, MAX_CHARS, ()) == problem
 
 
 def test_a_text_repeats_another_with_the_same_words_or_mostly_the_same_search_terms() -> None:
@@ -198,7 +217,38 @@ def test_kept_lessons_drop_what_is_not_a_lesson_and_every_repeat() -> None:
         CSV_LESSON,
     ]
     known: tuple[str, ...] = (GOAL, "Before every commit, run the tests with pytest -q.")
-    assert kept_lessons(proposed, known, MAX_CHARS) == (LESSON, CSV_LESSON)
+    assert kept_lessons(proposed, known, MAX_CHARS, ()) == (LESSON, CSV_LESSON)
+
+
+# A secret Dot holds, as :func:`dotagent.secrets.known_secrets` gives it.
+HELD: str = "MARKER-7f3c9a1e2b"
+
+
+@pytest.mark.parametrize(
+    ("text", "found"),
+    [
+        ("Log in with password: hunter2 on the staging site.", True),
+        (f"The staging site takes the key {HELD} in its header.", True),
+        ("Call the API with the key sk-abcdefghijklmnopqrstuvwx in the header.", True),
+        ("export API_KEY='abcdef1234567890xyz' before running the importer.", True),
+        ("Plan the week on the task-management-2024 board before Monday.", False),
+        ("The shop's risk-free-returns-for-thirty-days page lists the window.", False),
+        ("CSS mask-image-set-for-the-header-logo needs a PNG fallback.", False),
+    ],
+)
+def test_a_secret_is_found_by_its_key_its_value_or_its_form_and_no_word_with_sk_in_it_is_one(
+    text: str, found: bool
+) -> None:
+    assert contains_secret(text, (HELD,)) is found
+
+
+def test_a_lesson_on_the_task_management_board_is_kept_and_one_with_a_value_dot_holds_is_not() -> None:
+    board: str = "Plan the week on the task-management-2024 board before Monday."
+    held: str = f"The staging site takes the key {HELD} in its header."
+    assert kept_lessons([board, held], (), MAX_CHARS, (HELD,)) == (board,)
+    assert lesson_problem(held, MAX_CHARS, (HELD,)) == "a secret"
+    # Only its value tells this one: no key names a secret in it and it has no known form.
+    assert lesson_problem(held, MAX_CHARS, ()) is None
 
 
 def test_no_lessons_were_drawn_from_a_run_without_lesson_events() -> None:
@@ -212,20 +262,32 @@ def test_a_run_whose_lessons_could_not_be_drawn_shows_why() -> None:
     )
 
 
-def test_each_proposed_lesson_shows_what_was_done_with_it() -> None:
+def test_each_proposed_lesson_shows_its_last_decision() -> None:
     proposed: EventRecord = _event("lessons_proposed", {"lessons": [LESSON, CSV_LESSON, GOAL], "tainted": True})
     saved: list[EventRecord] = [_event("lesson_saved", {"index": 0, "memory_id": "mem-1", "by": "owner"})]
-    dismissed: list[EventRecord] = [_event("lesson_dismissed", {"index": 0}), _event("lesson_dismissed", {"index": 1})]
+    dismissed: list[EventRecord] = [_event("lesson_dismissed", {"index": 1})]
     failed: EventRecord = _event("lessons_failed", {"error": "A lesson could not be saved: the embedder is down"})
     assert lessons_of(proposed, saved, dismissed, failed) == RunLessons(
         lessons=[
-            LessonView(index=0, text=LESSON, state="saved", memory_id="mem-1"),
-            LessonView(index=1, text=CSV_LESSON, state="dismissed", memory_id=None),
-            LessonView(index=2, text=GOAL, state="proposed", memory_id=None),
+            _view(0, LESSON, "saved", "mem-1", "owner", None),
+            _view(1, CSV_LESSON, "dismissed", None, "owner", None),
+            _view(2, GOAL, "proposed", None, None, None),
         ],
         tainted=True,
         error="A lesson could not be saved: the embedder is down",
     )
+    # Undo after a save is a dismissal after it, and Save anyway after auto left a lesson out is a save after it.
+    undone: EventRecord = _event("lesson_dismissed", {"index": 0, "by": "owner", "reason": None})
+    left_out: EventRecord = _event("lesson_dismissed", {"index": 2, "by": "auto", "reason": "a link"})
+    kept: EventRecord = _event("lesson_saved", {"index": 2, "memory_id": "mem-3", "by": "owner", "created": True})
+    assert [
+        (lesson.state, lesson.by, lesson.reason)
+        for lesson in lessons_of(proposed, [*saved, kept], [*dismissed, undone, left_out], None).lessons
+    ] == [("dismissed", "owner", None), ("dismissed", "owner", None), ("saved", "owner", None)]
+    assert [
+        (lesson.state, lesson.by, lesson.reason)
+        for lesson in lessons_of(proposed, saved, [*dismissed, left_out], None).lessons
+    ] == [("saved", "owner", None), ("dismissed", "owner", None), ("dismissed", "auto", "a link")]
 
 
 def test_the_error_of_a_lesson_auto_could_not_save_goes_once_every_lesson_is_decided() -> None:
@@ -237,9 +299,45 @@ def test_the_error_of_a_lesson_auto_could_not_save_goes_once_every_lesson_is_dec
     failed: EventRecord = _event("lessons_failed", {"error": "A lesson could not be saved: the embedder is down"})
     assert lessons_of(proposed, saved, [], failed) == RunLessons(
         lessons=[
-            LessonView(index=0, text=LESSON, state="saved", memory_id="mem-1"),
-            LessonView(index=1, text=CSV_LESSON, state="saved", memory_id="mem-2"),
+            _view(0, LESSON, "saved", "mem-1", "auto", None),
+            _view(1, CSV_LESSON, "saved", "mem-2", "owner", None),
         ],
         tainted=False,
         error=None,
+    )
+
+
+@pytest.mark.parametrize(
+    ("text", "problem"),
+    [
+        ("Open https://example.com/start before the sign-in page loads.", "a link"),
+        ("Load www.example.com first to get the cookie banner out of the way.", "a link"),
+        ("Follow @dot_helper on X before replying, or replies are hidden.", "an account name"),
+        ("Send the weekly summary to someone@example.com every Monday.", None),
+        ("On x.com, browser_wait_text never sees the view counts; read them with browser_links.", None),
+        (LESSON, None),
+    ],
+)
+def test_a_link_or_an_account_name_keeps_a_lesson_of_an_outside_run_from_saving_itself(
+    text: str, problem: str | None
+) -> None:
+    found: str | None = outside_problem(text)
+    assert (found if found is None else found.split(",")[0]) == problem
+
+
+def test_the_second_look_keeps_only_what_it_was_asked_about_and_kept() -> None:
+    lessons: tuple[str, ...] = (LESSON, "Open https://example.com/start first.", CSV_LESSON, GOAL)
+    checked: tuple[str | None, ...] = (None, "a link", None, None)
+    vetting: LessonVetting = LessonVetting(
+        verdicts=[
+            LessonVerdict(keep=True, reason="know-how about a tool"),
+            LessonVerdict(keep=False, reason="tells the agent where to go"),
+        ]
+    )
+    # The third lesson asked about got no verdict: it is left out too.
+    assert vetted(lessons, checked, vetting) == (
+        None,
+        "a link",
+        "tells the agent where to go",
+        "no verdict was given on it",
     )

@@ -491,6 +491,25 @@ class OpenCodeServer:
             body["message"] = message
         await self._send("POST", f"/permission/{request_id}/reply", directory, body)
 
+    async def add_mcp(self, directory: Path, name: str, config: JsonObject) -> None:
+        """Give the agents of ``directory`` the tools of the MCP server ``config`` describes, under ``name``, once
+        OpenCode has connected to it. OpenCode keeps it in memory only, so a server started later has none of these."""
+        response: httpx.Response = await self._send("POST", "/mcp", directory, {"name": name, "config": config})
+        status: str = get_str(get_obj(parse_json_object(response.text, "opencode /mcp"), name), "status")
+        if status != "connected":
+            raise OpenCodeError(
+                "OpenCode did not connect to Dot's tools",
+                {"name": name, "status": status, "body": response.text[:2000]},
+            )
+
+    async def drop_mcp(self, directory: Path, name: str) -> None:
+        """Let the MCP server ``name`` go: OpenCode disconnects from it and its tools leave every session."""
+        await self._send("POST", f"/mcp/{name}/disconnect", directory, None)
+
+    async def keep_to(self, session_id: str, directory: Path, rules: list[JsonValue]) -> None:
+        """Set the permission rules of the session, over its agent's (the last rule that matches a tool decides)."""
+        await self._send("PATCH", f"/session/{session_id}", directory, {"permission": rules})
+
     @asynccontextmanager
     async def events(self, directory: Path) -> AsyncIterator[AsyncIterator[JsonObject]]:
         """OpenCode's event stream for ``directory``, open from entering on (open it before the prompt, so that no

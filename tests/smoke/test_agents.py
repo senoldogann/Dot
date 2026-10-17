@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.playbooks import Playbook, playbook_name, read_meta, write_playbook
@@ -154,6 +154,7 @@ def _skill(agent_id: str) -> Playbook:
         goal="Check the claim",
         written_at=time.time(),
         acting_steps=4,
+        tainted=False,
     )
 
 
@@ -171,7 +172,7 @@ async def _finished(client: httpx.AsyncClient, manager: RunManager, body: dict[s
     return run_id
 
 
-def _agent(tools: list[str]) -> dict[str, object]:
+def _agent(tools: list[str] | None) -> dict[str, object]:
     return {
         "name": "Scout",
         "role": "Finds and checks sources",
@@ -293,7 +294,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
 
     # The agent learns for itself (item 94): a lesson of its run and a skill of its own reach its next run, in the
     # prompt's notes and under Skills, and not Dot's run; its page lists them, scored by its own runs.
-    await save_memory(runtime.memory, LESSON, ("lesson",), run_id, agent_id)
+    await save_memory(runtime.memory, LESSON, ("lesson",), run_id, agent_id, None)
     await asyncio.to_thread(write_playbook, playbooks_dir(), _skill(agent_id))
     MODEL.script = ScriptedProvider(_PROVIDER, [FINISH, FINISH])
     second_id: str = await _finished(client, manager, {"goal": "Find two sources on the matter", "agent_id": agent_id})
@@ -414,3 +415,63 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
     # Its lesson and its skill stay, as Dot's.
     assert (await runtime.store.get_memory(lesson_id)).agent_id is None
     assert read_meta(playbooks_dir() / SKILL_NAME).agent_id is None
+
+
+@pytest.mark.browser
+async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_level(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """The code review's Y5: the editor sent the tools it had listed, none while the list loaded or when it failed,
+    and the server took none for every tool; the level of a model the page could not list was dropped too. Save waits
+    for the tools, a level the page cannot show is kept, and the server takes every tool only for tools null: an empty
+    list keeps the tools an agent has, and a new agent has none to keep."""
+    unsaid = await client.post("/api/agents", json=_agent([]))
+    assert unsaid.status_code == 422, unsaid.text
+    bounded: dict[str, object] = {**_agent(["shell"]), "model": "ollama:gone-model", "effort": "high"}
+    made = await client.post("/api/agents", json=bounded)
+    assert made.status_code == 201, made.text
+    agent_id: str = made.json()["id"]
+    unlisted = await client.put(f"/api/agents/{agent_id}", json={**bounded, "tools": []})
+    assert unlisted.status_code == 200, unlisted.text
+    assert unlisted.json()["tools"] == ["shell"]
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    listed: asyncio.Event = asyncio.Event()
+
+    async def held(route: Route) -> None:
+        await listed.wait()
+        await route.continue_()
+
+    async def failed(route: Route) -> None:
+        await route.fulfill(status=500, content_type="application/json", body='{"detail": "the tools broke"}')
+
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            context: BrowserContext = await browser.new_context(viewport={"width": 1280, "height": 860})
+            page: Page = await context.new_page()
+            await page.route("**/api/tools", held)
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"http://{host}:{port}/#/agents/{agent_id}")
+            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            save = page.get_by_role("button", name="Save changes")
+            await expect(save).to_be_disabled()
+            listed.set()
+            await expect(save).to_be_enabled()
+            await expect(page.locator(".tool-pick input[value='shell']")).to_be_checked()
+            await save.click()
+            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            # A list that failed keeps Save off: the form cannot say which tools the agent keeps.
+            await page.unroute("**/api/tools")
+            await page.route("**/api/tools", failed)
+            await page.reload()
+            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await expect(page.get_by_text("The tools could not be listed")).to_be_visible()
+            await expect(page.get_by_role("button", name="Save changes")).to_be_disabled()
+            await context.close()
+        finally:
+            await browser.close()
+    kept = (await client.get(f"/api/agents/{agent_id}")).json()["record"]
+    assert (kept["tools"], kept["model"], kept["effort"]) == (["shell"], "ollama:gone-model", "high")
+    assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204

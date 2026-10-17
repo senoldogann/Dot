@@ -14,7 +14,7 @@ import re
 import shlex
 import tempfile
 import unicodedata
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from pathlib import Path
 
@@ -56,6 +56,15 @@ _LITERAL_OPERATORS: str = ""
 _HIDE_OPERATORS: dict[int, int] = str.maketrans(_OPERATOR_CHARS, _LITERAL_OPERATORS)
 _SHOW_OPERATORS: dict[int, int] = str.maketrans(_LITERAL_OPERATORS, _OPERATOR_CHARS)
 _WORD_BREAKS: str = " \t\n;&|()<>"
+# What stands before a reserved word where a command begins, and after ``case`` (its word follows) and ``esac``.
+_COMMAND_START: tuple[str, ...] = ("", " ", "\t", "\n", ";", "&", "|", "(")
+_CASE_ENDS: tuple[str, ...] = (" ", "\t", "\n")
+_ESAC_ENDS: tuple[str, ...] = ("", " ", "\t", "\n", ";", "&", "|", ")")
+# What a command begins after, blanks between: an operator or a newline, and the reserved words a command follows.
+_OPENS_COMMAND: str = "\n;&|("
+_BEFORE_COMMAND: frozenset[str] = frozenset({"if", "then", "else", "elif", "do", "while", "until", "!", "{", "time"})
+# What ends an arm of a ``case``, so that a pattern follows (``;|`` is zsh's).
+_ARM_ENDS: frozenset[str] = frozenset({";;", ";&", ";;&", ";|"})
 # A word only the running line knows (what a substitution prints, what an unknown pipe passes on), and the temp path a
 # plain ``mktemp`` prints, which a later ``rm -rf "$dir"`` may remove.
 _SUBSTITUTED: str = "$__dot_substituted__"
@@ -87,15 +96,24 @@ _EXPANDS_AS_CODE: re.Pattern[str] = re.compile(r"\$\{\([^)]*e[^)]*\)|@P\}")
 _VARIABLE: re.Pattern[str] = re.compile(r"\$(?:\{([A-Za-z_][A-Za-z0-9_]*)\}|([A-Za-z_][A-Za-z0-9_]*)|([$!?#]))")
 # Variables the shell sets as the line runs: numbers, or values the line does not show.
 _NUMERIC_VARIABLES: frozenset[str] = frozenset({"RANDOM", "SECONDS", "LINENO", "EPOCHSECONDS", "PPID", "UID", "EUID"})
+# Any expansion of a word, for one :func:`_expansions` cannot spell out (``${HOME%/}``, a substitution's stand-in).
+_UNKNOWN_EXPANSION: re.Pattern[str] = re.compile(r"\$(?:\{[^}]*\}|[A-Za-z_][A-Za-z0-9_]*|[0-9$!?#@*-])")
 _RUNTIME_VARIABLES: frozenset[str] = frozenset({"_", "OLDPWD", "REPLY"})
 _BRACES: re.Pattern[str] = re.compile(r"\{([^{},]*(?:,[^{},]*)+)\}")
 _NAME: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-_ENV_ASSIGNMENT: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*=.*", re.DOTALL)
+# An assignment: a variable's name, an element's subscript (``arr[0]=x``) or ``+=``, then the value; and the start of
+# one that gives an array its values (``files=(*.txt)``).
+_ENV_ASSIGNMENT: re.Pattern[str] = re.compile(r"([A-Za-z_][A-Za-z0-9_]*)(?:\[[^\]]*\])?\+?=(.*)", re.DOTALL)
+_ARRAY_ASSIGNMENT: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*\+?=")
 _GLOB_CHARS: str = "*?["
 _MOST_VALUES: int = 64
 _MOST_PLACES: int = 16
 _DEEPEST: int = 12
 _QUIET_TARGETS: frozenset[str] = frozenset({"/dev/null", "/dev/stdout", "/dev/stderr", "/dev/tty"})
+# The reason of a part that only carries the files it changes (:func:`_changing`).
+_CHANGES: str = "changes files"
+# Writers that change no file's content: a folder made, a file touched, a mode or an owner changed.
+_MODE_WRITERS: frozenset[str] = frozenset({"touch", "mkdir", "chmod", "chown", "chgrp"})
 
 # Reserved words in front of a command, and the heads of compound commands that run nothing themselves.
 _KEYWORDS: frozenset[str] = frozenset(
@@ -103,6 +121,47 @@ _KEYWORDS: frozenset[str] = frozenset(
 )
 _HEADERS: frozenset[str] = frozenset({"for", "select", "case", "foreach"})
 _DECLARERS: frozenset[str] = frozenset({"export", "local", "declare", "typeset", "readonly", "integer", "float"})
+# The commands whose name holds a glob character and is not a pattern.
+_TEST_COMMANDS: frozenset[str] = frozenset({"[", "[["})
+# Variables whose value a program runs as a command line (git's ssh, pager and editor, ``less``'s preprocessor), and
+# ones that make a program load code from where they point or take settings that run commands.
+_COMMAND_VARIABLES: frozenset[str] = frozenset(
+    {
+        "GIT_SSH_COMMAND",
+        "GIT_SSH",
+        "GIT_PAGER",
+        "PAGER",
+        "MANPAGER",
+        "GIT_EDITOR",
+        "GIT_SEQUENCE_EDITOR",
+        "EDITOR",
+        "VISUAL",
+        "FCEDIT",
+        "GIT_EXTERNAL_DIFF",
+        "GIT_ASKPASS",
+        "SSH_ASKPASS",
+        "SUDO_ASKPASS",
+        "LESSOPEN",
+        "LESSCLOSE",
+        "PROMPT_COMMAND",
+        "BROWSER",
+        "RSYNC_RSH",
+    }
+)
+# ``ENV`` is not one: a POSIX shell reads it only when it is interactive, which a line's shells are not.
+_LOADING_VARIABLES: frozenset[str] = frozenset(
+    {
+        "BASH_ENV",
+        "ZDOTDIR",
+        "DYLD_INSERT_LIBRARIES",
+        "LD_PRELOAD",
+        "GIT_CONFIG_PARAMETERS",
+        "GIT_CONFIG_COUNT",
+        "GIT_CONFIG_GLOBAL",
+        "GIT_CONFIG_SYSTEM",
+        "GIT_EXEC_PATH",
+    }
+)
 
 _WRAPPERS: frozenset[str] = frozenset(
     {
@@ -120,7 +179,50 @@ _WRAPPERS: frozenset[str] = frozenset(
         "noglob",
         "nocorrect",
         "watch",
+        "xcrun",
+        "script",
+        "unbuffer",
+        "taskpolicy",
+        "gtimeout",
+        "gnice",
+        "gstdbuf",
     }
+)
+# What a wrapper is past its options: the command it runs, after its duration (``timeout 5 rm``) or the file it logs to
+# (``script -q log rm``).
+_WRAPPER_SKIPS: dict[str, int] = {"timeout": 1, "gtimeout": 1, "script": 1}
+# The precommand modifiers that run a builtin of the shell itself, so ``builtin cd ~`` moves the line as ``cd ~`` does.
+_BUILTIN_MODIFIERS: frozenset[str] = frozenset({"builtin", "command", "noglob", "nocorrect"})
+# Tools that run the command their operands name, after a word of their own (``uv run pytest``, ``bundle exec rake``)
+# or at once (``npx``, ``bunx``). Their options that take a value are many and not all known here, so an operand right
+# after an option may begin the command (:func:`_runner_starts`), and each such reading is judged.
+_RUNNERS: dict[str, frozenset[str]] = {
+    "uv": frozenset({"run"}),
+    "poetry": frozenset({"run"}),
+    "pipenv": frozenset({"run"}),
+    "pdm": frozenset({"run"}),
+    "hatch": frozenset({"run"}),
+    "rye": frozenset({"run"}),
+    "conda": frozenset({"run"}),
+    "bundle": frozenset({"exec"}),
+    "rbenv": frozenset({"exec"}),
+    "pyenv": frozenset({"exec"}),
+    "asdf": frozenset({"exec"}),
+    "mise": frozenset({"exec", "x"}),
+    "direnv": frozenset({"exec"}),
+    "npm": frozenset({"exec"}),
+    "pnpm": frozenset({"exec", "dlx"}),
+    "yarn": frozenset({"exec", "dlx"}),
+    "npx": frozenset(),
+    "bunx": frozenset(),
+    "uvx": frozenset(),
+}
+# Runners whose own operands come before the command: direnv's folder (``direnv exec DIR cmd``), and mise's tools
+# (``mise x node@20 -- node``), as many as are given, which None stands for: each may be the command too.
+_RUNNER_OPERANDS: dict[str, int | None] = {"direnv": 1, "mise": None}
+# Options of these runners that take no value, so the word after one is the command.
+_RUNNER_SWITCHES: frozenset[str] = frozenset(
+    {"-y", "--yes", "--no", "-q", "--quiet", "--frozen", "--locked", "--no-sync", "--isolated", "--offline"}
 )
 _PRIVILEGE_WRAPPERS: frozenset[str] = frozenset({"sudo", "doas", "su", "pkexec"})
 # The options of a wrapper that take a value, so that the value is not taken for the command it runs.
@@ -132,6 +234,12 @@ _WRAPPER_VALUES: dict[str, frozenset[str]] = {
     "stdbuf": frozenset({"-i", "-o", "-e", "--input", "--output", "--error"}),
     "caffeinate": frozenset({"-t", "-w"}),
     "exec": frozenset({"-a"}),
+    "xcrun": frozenset({"-sdk", "--sdk", "-toolchain", "--toolchain"}),
+    "script": frozenset({"-t", "-T"}),
+    "taskpolicy": frozenset({"-c", "-d", "-g", "-t", "-l", "-p"}),
+    "gtimeout": frozenset({"-s", "-k", "--signal", "--kill-after"}),
+    "gnice": frozenset({"-n", "--adjustment"}),
+    "gstdbuf": frozenset({"-i", "-o", "-e", "--input", "--output", "--error"}),
     "arch": frozenset({"-arch", "-e", "-d"}),
     "watch": frozenset({"-n", "--interval"}),
     "sudo": frozenset(
@@ -165,6 +273,8 @@ _WRAPPER_VALUES: dict[str, frozenset[str]] = {
     "pkexec": frozenset({"--user"}),
 }
 _SHELLS: frozenset[str] = frozenset({"bash", "sh", "zsh", "dash", "ksh", "fish"})
+# A shell's own standard input, named as the file it reads commands from (``source /dev/stdin``).
+_STDIN_FILES: frozenset[str] = frozenset({"/dev/stdin", "/dev/fd/0"})
 _SHELL_VALUES: frozenset[str] = frozenset({"-o", "+o", "-O", "+O", "--rcfile", "--init-file"})
 _INTERPRETERS: frozenset[str] = frozenset(
     {"python", "python3", "node", "ruby", "perl", "php", "swift", "deno", "bun", "lua", "Rscript", "julia"}
@@ -475,19 +585,25 @@ _AS_CONTINUATIONS: tuple[str, ...] = ("¬", "&", "+", "(", ",")
 
 class Finding(FrozenModel):
     """What one part of a line does. ``fetches``: it may bring in what other people wrote (it reads from the network,
-    talks to a remote machine, or is code the guard cannot read), so its output is untrusted."""
+    talks to a remote machine, or is code the guard cannot read), so its output is untrusted. ``changes``: the files it
+    changes or removes, as far as the line shows them (item 305, :func:`_changing`)."""
 
     risk: Risk
     flags: tuple[Flag, ...]
     reason: str
     fetches: bool
+    changes: tuple[str, ...]
 
 
 class ShellAssessment(FrozenModel):
+    """How a line is judged, and the files it changes or removes as far as it shows them (``changes``, absolute paths
+    from each directory the line may be in), which the runs at work at the same time keep to (item 305)."""
+
     risk: Risk
     flags: tuple[Flag, ...]
     reasons: tuple[str, ...]
     fetches: bool
+    changes: tuple[str, ...]
 
 
 @dataclass(frozen=True)
@@ -511,13 +627,15 @@ class ShellScope:
 @dataclass(frozen=True)
 class _Reading:
     """A line as the tokenizer is to read it (``text``), the commands substituted into it, the bodies of its
-    here-documents (``text`` names each by a ``_DOCUMENT`` word after its ``<<``), and the code it runs that cannot be
-    read (zsh glob qualifiers that run code)."""
+    here-documents (``text`` names each by a ``_DOCUMENT`` word after its ``<<``), the code it runs that cannot be
+    read (zsh glob qualifiers that run code), and whether a substitution in it never closes, so that where it ends
+    cannot be told."""
 
     text: str
     substituted: tuple[str, ...]
     documents: tuple[str, ...]
     hidden: tuple[str, ...]
+    unclosed: bool
 
 
 @dataclass(frozen=True)
@@ -573,11 +691,17 @@ class _InterpreterLine:
 
 
 def _finding(risk: Risk, flags: tuple[Flag, ...], reason: str) -> Finding:
-    return Finding(risk=risk, flags=flags, reason=reason, fetches=False)
+    return Finding(risk=risk, flags=flags, reason=reason, fetches=False, changes=())
 
 
 def _fetching(risk: Risk, flags: tuple[Flag, ...], reason: str) -> Finding:
-    return Finding(risk=risk, flags=flags, reason=reason, fetches=True)
+    return Finding(risk=risk, flags=flags, reason=reason, fetches=True, changes=())
+
+
+def _changing(paths: list[str]) -> list[Finding]:
+    """A part that changes or removes the files ``paths``: it only carries them (item 305) and takes no part in the
+    judgement (:func:`_merge` leaves it out)."""
+    return [Finding(risk="safe", flags=(), reason=_CHANGES, fetches=False, changes=tuple(paths))] if paths else []
 
 
 def _unknown(reason: str) -> Finding:
@@ -593,10 +717,33 @@ def _given_text(text: str) -> _Input:
 # ---------- reading the line ----------
 
 
+def _reserved_word(text: str, index: int, word: str, ends: tuple[str, ...]) -> bool:
+    """Whether the word ``word`` starts at ``index`` of ``text``, after a blank or an operator and followed by one of
+    ``ends``; :func:`_command_starts` tells whether it is a reserved word there."""
+    before: str = text[index - 1 : index]
+    after: str = text[index + len(word) : index + len(word) + 1]
+    return text.startswith(word, index) and before in _COMMAND_START and after in ends
+
+
+def _command_starts(text: str, start: int, index: int, patterns: Set[int]) -> bool:
+    """Whether a command begins at ``index`` of ``text``, a substitution's body from ``start``, so that a reserved word
+    there is one (in ``$(echo case x)`` it is a word ``echo`` prints): at the body's start, after an operator, a
+    newline, a ``(`` or the ``)`` that ends a case pattern (``patterns``), or after a reserved word a command follows,
+    blanks between."""
+    before: str = text[start:index].rstrip(" \t")
+    if not before or before[-1] in _OPENS_COMMAND or start + len(before) - 1 in patterns:
+        return True
+    return before.split()[-1] in _BEFORE_COMMAND
+
+
 def _closing_paren(text: str, start: int) -> int:
-    """The index of the ``)`` that closes a ``(`` opened just before ``start``, past quotes and nested parentheses;
-    the end of ``text`` when it never closes."""
+    """The index of the ``)`` that closes a ``(`` opened just before ``start``, past quotes, nested parentheses and the
+    patterns of a ``case`` (in ``$(case x in x) rm ;; esac)`` the first ``)`` ends a pattern, and the substitution
+    goes on to its ``esac``); the end of ``text`` when it never closes."""
     depth: int = 1
+    # The depth each ``case`` not yet ended by its ``esac`` stands at: a ``)`` there ends one of its patterns.
+    cases: list[int] = []
+    patterns: set[int] = set()
     quote: str | None = None
     index: int = start
     while index < len(text):
@@ -611,10 +758,18 @@ def _closing_paren(text: str, start: int) -> int:
             quote = char
         elif char == "(":
             depth += 1
+        elif char == ")" and cases and cases[-1] == depth:
+            patterns.add(index)
         elif char == ")":
             depth -= 1
             if depth == 0:
                 return index
+        elif _reserved_word(text, index, "case", _CASE_ENDS) and _command_starts(text, start, index, patterns):
+            cases.append(depth)
+        elif (
+            _reserved_word(text, index, "esac", _ESAC_ENDS) and cases and _command_starts(text, start, index, patterns)
+        ):
+            cases.pop()
         index += 1
     return len(text)
 
@@ -714,6 +869,12 @@ def _document(command: str, start: int, delimiter: str, strip: bool) -> tuple[li
     return lines, index
 
 
+def _last_word(out: list[str]) -> str:
+    """The word :func:`_read` is writing: its text since the last blank or operator."""
+    text: str = "".join(out)
+    return text[max(text.rfind(char) for char in _WORD_BREAKS) + 1 :]
+
+
 def _read(command: str) -> _Reading:
     """``command`` read the way the shell reads it before it splits it into words (item 116).
 
@@ -731,6 +892,7 @@ def _read(command: str) -> _Reading:
     pending: list[tuple[str, bool, bool]] = []
     quote: str | None = None
     arithmetic_until: int = -1
+    unclosed: bool = False
     index: int = 0
     while index < len(command):
         char: str = command[index]
@@ -763,12 +925,14 @@ def _read(command: str) -> _Reading:
             else:
                 substituted.append(body)
                 out.append(_TEMP_STAND_IN if char == "$" and _MKTEMP.fullmatch(body) else _SUBSTITUTED)
+            unclosed = unclosed or end == len(command)
             index = end + 1
         elif char == "`":
             end = _closing_backtick(command, index + 1)
             body = command[index + 1 : end]
             substituted.append(body)
             out.append(_TEMP_STAND_IN if _MKTEMP.fullmatch(body) else _SUBSTITUTED)
+            unclosed = unclosed or end == len(command)
             index = end + 1
         elif quote == '"':
             out.append(char if char == '"' else char.translate(_HIDE_OPERATORS))
@@ -794,6 +958,16 @@ def _read(command: str) -> _Reading:
             arithmetic_until = _closing_paren(command, index + 1)
             out.append("((")
             index += 2
+        elif char == "(" and attached and _ARRAY_ASSIGNMENT.fullmatch(_last_word(out)):
+            # An array's values (``files=(*.txt)``) name no command, and an operator among them runs nothing (bash
+            # refuses the line, zsh passes over a ";"); what they substitute and zsh's glob qualifiers still run.
+            end = _closing_paren(command, index + 1)
+            values: _Reading = _read(command[index + 1 : end])
+            substituted.extend(values.substituted)
+            hidden.extend(values.hidden)
+            out.append(_SUBSTITUTED)
+            unclosed = unclosed or values.unclosed or end == len(command)
+            index = end + 1
         elif char == "(" and attached and out[-1][-1:] not in "$=" and _CODE_QUALIFIER.match(command, index):
             end = _closing_paren(command, index + 1)
             hidden.append(command[index + 1 : end])
@@ -818,7 +992,13 @@ def _read(command: str) -> _Reading:
             out.append(char)
             index += 1
     documents.extend("" for _ in pending)
-    return _Reading(text="".join(out), substituted=tuple(substituted), documents=tuple(documents), hidden=tuple(hidden))
+    return _Reading(
+        text="".join(out),
+        substituted=tuple(substituted),
+        documents=tuple(documents),
+        hidden=tuple(hidden),
+        unclosed=unclosed,
+    )
 
 
 def _tokenize(text: str) -> list[str] | None:
@@ -838,6 +1018,36 @@ def _tokenize(text: str) -> list[str] | None:
             _SHELL_OPERATOR.findall(token) if token and all(char in _OPERATOR_CHARS for char in token) else [token]
         )
     ]
+
+
+def _without_patterns(tokens: list[str]) -> list[str]:
+    """``tokens`` without the patterns of the arms of a ``case``, which name no command (``*)`` is no command named by
+    a pattern): the words after its ``in`` and after each ``;;`` (``;&``, ``;;&``, ``;|``) up to the ``)`` that ends
+    them, with the ``|`` between them. A ``case`` or ``esac`` is a reserved word only where a command begins."""
+    kept: list[str] = []
+    cases: int = 0
+    header: bool = False
+    pattern: bool = False
+    starts: bool = True
+    for token in tokens:
+        if pattern and token == "esac":
+            cases, pattern = cases - 1, False
+        elif pattern:
+            pattern = token != ")"
+            starts = not pattern
+            kept.extend([token] if not pattern else [])
+            continue
+        elif header and token == "in":
+            header, pattern = False, True
+        elif starts and token == "case":
+            cases, header = cases + 1, True
+        elif starts and token == "esac" and cases:
+            cases -= 1
+        elif cases and token in _ARM_ENDS:
+            pattern = True
+        kept.append(token)
+        starts = token in _OPERATORS or (starts and token in _BEFORE_COMMAND)
+    return kept
 
 
 def _split_words(text: str) -> list[str] | None:
@@ -1087,8 +1297,44 @@ def _path_class(raw: str, scope: ShellScope) -> PathClass:
 
 
 def _reaches_protected(raw: str, scope: ShellScope) -> bool:
+    """Whether ``raw`` can name a protected location. A part only the running line knows stands for the home folder,
+    where the protected locations are (``${HOME%/}/.ssh``, ``$(echo ~)/.ssh``)."""
     classes: list[PathClass] | None = _path_classes(raw, scope)
+    if classes is None:
+        home: str = str(Path.home())
+        classes = _path_classes(_UNKNOWN_EXPANSION.sub(lambda _: home, raw), scope)
     return classes is not None and "protected" in classes
+
+
+def _known_paths(raws: list[str], scope: ShellScope) -> list[str]:
+    """The paths ``raws`` name from each directory the line may be in, as far as the line shows them: a word only the
+    running line knows names none, and neither does a terminal or ``/dev/null``."""
+    return [
+        str(_located(value, cwd, scope))
+        for raw in raws
+        if raw not in _QUIET_TARGETS
+        for value in _expansions(raw, scope) or []
+        for cwd in scope.cwds
+    ]
+
+
+def _written_paths(command: str, args: list[str], scope: ShellScope) -> list[str]:
+    """The files a command of ``_WRITERS`` changes or removes: what a copy or a move puts in place (in a folder it
+    lands in, the file of each source's name), what a move takes away, every file ``tee`` and ``truncate`` name. A
+    folder made, a file touched and a mode changed change no file's content."""
+    if command in _MODE_WRITERS:
+        return []
+    words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
+    operands: list[str] = _positional(words)
+    if command not in _COPIES and command != "mv":
+        return _known_paths(operands, scope)
+    sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
+    landing: list[str] = [
+        str(Path(place) / Path(source).name) if Path(place).is_dir() else place
+        for place in _known_paths(destinations, scope)
+        for source in sources
+    ]
+    return [*(_known_paths(sources, scope) if command == "mv" else []), *landing]
 
 
 def _places(raw: str, scope: ShellScope) -> list[Path]:
@@ -1133,9 +1379,9 @@ def _assigned(scope: ShellScope, name: str, raws: list[str]) -> ShellScope:
 def _assign_words(scope: ShellScope, words: list[str]) -> ShellScope:
     current: ShellScope = scope
     for word in words:
-        if _ENV_ASSIGNMENT.fullmatch(word):
-            name, _, value = word.partition("=")
-            current = _assigned(current, name, [value])
+        assignment: re.Match[str] | None = _ENV_ASSIGNMENT.fullmatch(word)
+        if assignment is not None:
+            current = _assigned(current, assignment.group(1), [assignment.group(2)])
     return current
 
 
@@ -1163,6 +1409,29 @@ def _linked(scope: ShellScope, args: list[str]) -> ShellScope:
     return replace(scope, links=(*scope.links, *made))
 
 
+def _past_modifiers(words: list[str]) -> list[str]:
+    """``words`` past the precommand modifiers in front of a builtin (``builtin cd``, ``command -p cd``)."""
+    rest: list[str] = words
+    while rest and rest[0] in _BUILTIN_MODIFIERS:
+        rest = rest[1:]
+        while rest and rest[0].startswith("-") and rest[0] != "-":
+            rest = rest[1:]
+    return rest
+
+
+def _line_scope(line: str, scope: ShellScope) -> ShellScope:
+    """The scope ``line`` leaves when the shell runs it in place (``eval``): its simple commands in turn. A line that
+    cannot be parsed may have moved anywhere, which the home folder stands for."""
+    tokens: list[str] | None = _tokenize(_read(line).text)
+    if tokens is None:
+        return _with_places(scope, [*scope.cwds, Path.home()])
+    state: ShellScope = scope
+    for _, segment in _commands(tokens):
+        words, _, _, _ = _split_redirects(segment, ())
+        state = _next_scope(words, state)
+    return state
+
+
 def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     """The scope after one simple command: the directories a ``cd`` or ``pushd`` may have moved the line to, the
     values an assignment, ``export`` or ``for`` gave a variable, the links an ``ln -s`` made."""
@@ -1179,8 +1448,10 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     while count < len(plain) and _ENV_ASSIGNMENT.fullmatch(plain[count]):
         count += 1
     assigned: ShellScope = _assign_words(scope, plain[:count])
-    rest: list[str] = plain[count:]
+    rest: list[str] = _past_modifiers(plain[count:])
     command: str = Path(rest[0]).name if rest else ""
+    if command == "eval":
+        return _line_scope(" ".join(rest[1:]), assigned)
     if command in ("cd", "pushd"):
         operands: list[str] = _positional(rest[1:])
         wanted: bool = len(operands) == 1 and operands[0] != "-"
@@ -1362,7 +1633,53 @@ def _protected_words(words: list[str], scope: ShellScope) -> list[Finding]:
     return []
 
 
-_GIT_GLOBAL_WITH_VALUE: frozenset[str] = frozenset({"-C", "-c", "--git-dir", "--work-tree", "--namespace"})
+_GIT_GLOBAL_WITH_VALUE: frozenset[str] = frozenset(
+    {"-C", "-c", "--git-dir", "--work-tree", "--namespace", "--config-env"}
+)
+# The settings a git line may give (``git -c``, ``git config``) without asking: none of them runs a command, loads a
+# file or sends to another address, as ``core.fsmonitor``, ``core.sshCommand``, ``core.pager``, ``alias.*``,
+# ``include.path`` and ``url.*.insteadOf`` do. Matched without letter case, as git reads a key.
+_GIT_SAFE_KEYS: frozenset[str] = frozenset(
+    {
+        "user.name",
+        "user.email",
+        "core.quotepath",
+        "core.autocrlf",
+        "core.safecrlf",
+        "core.eol",
+        "core.filemode",
+        "core.ignorecase",
+        "core.precomposeunicode",
+        "core.abbrev",
+        "core.whitespace",
+        "init.defaultbranch",
+        "pull.rebase",
+        "pull.ff",
+        "push.default",
+        "push.autosetupremote",
+        "fetch.prune",
+        "rebase.autosquash",
+        "rebase.autostash",
+        "merge.conflictstyle",
+        "diff.noprefix",
+        "diff.renames",
+        "diff.algorithm",
+        "diff.colormoved",
+        "commit.verbose",
+        "gc.auto",
+        "maintenance.auto",
+        "safe.directory",
+        "protocol.version",
+    }
+)
+_GIT_SAFE_KEY_PREFIXES: tuple[str, ...] = ("color.", "advice.", "log.", "status.", "column.", "i18n.", "blame.")
+# What ``git config`` is given besides a key and a value: the options that only read, and the ones that take a value.
+_GIT_CONFIG_READS: frozenset[str] = frozenset(
+    {"--get", "--get-all", "--get-regexp", "--get-urlmatch", "--get-color", "--get-colorbool", "-l", "--list"}
+)
+_GIT_CONFIG_REMOVES: frozenset[str] = frozenset({"--unset", "--unset-all", "--remove-section"})
+_GIT_CONFIG_VALUES: frozenset[str] = frozenset({"-f", "--file", "--blob", "--type", "--default", "--comment"})
+_GIT_CONFIG_VERBS: frozenset[str] = frozenset({"get", "list", "set", "unset", "rename-section", "remove-section"})
 _GIT_READ_ONLY: frozenset[str] = frozenset(
     {
         "status",
@@ -1408,8 +1725,54 @@ def _git_scope(args: list[str], rest: list[str], scope: ShellScope) -> ShellScop
     return where
 
 
+def _git_safe_key(key: str) -> bool:
+    folded: str = key.casefold()
+    return folded in _GIT_SAFE_KEYS or folded.startswith(_GIT_SAFE_KEY_PREFIXES)
+
+
+def _git_settings(globals_: list[str]) -> list[str]:
+    """The keys the global options of a git line (``globals_``, before its subcommand) set for it: ``-c key=value``,
+    ``--config-env key=VAR``; an ``--exec-path`` that moves where git finds its commands counts as an unknown key."""
+    keys: list[str] = []
+    for index, arg in enumerate(globals_):
+        if arg in ("-c", "--config-env") and index + 1 < len(globals_):
+            keys.append(globals_[index + 1].partition("=")[0])
+        elif arg.startswith("--config-env="):
+            keys.append(arg.removeprefix("--config-env=").partition("=")[0])
+        elif arg.startswith("--exec-path="):
+            keys.append("--exec-path")
+    return keys
+
+
+def _git_config_key(rest: list[str]) -> str | None:
+    """The key a ``git config`` line (``rest`` follows ``config``) sets; None when it only reads or removes."""
+    if any(arg in _GIT_CONFIG_READS or arg in _GIT_CONFIG_REMOVES for arg in rest):
+        return None
+    operands: list[str] = []
+    index: int = 0
+    while index < len(rest):
+        if rest[index] in _GIT_CONFIG_VALUES:
+            index += 2
+            continue
+        if not rest[index].startswith("-"):
+            operands.append(rest[index])
+        index += 1
+    if "--rename-section" in rest or operands[:1] == ["rename-section"]:
+        # The section's new name is what the settings under it become.
+        return operands[-1] if operands else None
+    if operands[:1] and operands[0] in _GIT_CONFIG_VERBS:
+        return operands[1] if operands[0] == "set" and len(operands) > 1 else None
+    return operands[0] if operands else None
+
+
 def _assess_git(args: list[str], scope: ShellScope) -> Finding:
     sub, rest = _git_subcommand(args)
+    settings: list[str] = _git_settings(args[: len(args) - len(rest)])
+    if sub == "config":
+        settings.extend(key for key in [_git_config_key(rest)] if key is not None)
+    unsafe: list[str] = [key for key in settings if not _git_safe_key(key)]
+    if unsafe:
+        return _unknown(f"git is given {', '.join(unsafe)}, a setting that can make it run a command or load a file")
     where: ShellScope = _git_scope(args, rest, scope)
     outside: tuple[Flag, ...] = () if _cwd_class(where) in ("workspace", "temp") else ("outside_workspace",)
     destructive_args: set[str] = {"--hard", "--force", "-f", "-fd", "-fdx", "-df", "-D", "--delete", "drop", "clear"}
@@ -1696,14 +2059,32 @@ def _shell_arguments(args: list[str]) -> tuple[bool, list[str], bool]:
 
 
 def _assess_shell_call(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
-    """A shell given ``-c`` is judged by its command string; one given no script, by the text it reads when the line
-    shows it (a here-document, ``echo ... |``)."""
+    """A shell given ``-c`` is judged by its command string; one given no script, or its standard input by name
+    (``bash /dev/stdin``), by the text it reads when the line shows it (a here-document, ``echo ... |``)."""
     inline, operands, reads_input = _shell_arguments(args)
     if inline:
         return _assess_all(operands[0], scope) if operands else []
-    if (reads_input or not operands) and given.text is not None:
+    if (reads_input or not operands or operands[0] in _STDIN_FILES) and given.text is not None:
         return _assess_all(given.text, scope)
     return [_finding("low", (), f"runs {command}")]
+
+
+def _assess_source(args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
+    """``source`` and ``.`` run a file's commands in the line's own shell. Its standard input by name (``/dev/stdin``)
+    holds the text a here-string, a here-document or a pipe gives it, judged as a line, or code the line does not
+    show; a command's output (``source <(...)``) is code only the running line knows. A file on disk is a script the
+    guard does not read, as when ``bash`` runs one; without a file nothing runs."""
+    operands: list[str] = args[1:] if args[:1] == ["--"] else args
+    if not operands:
+        return [_finding("low", (), "source names no file")]
+    files: list[str] = _expansions(operands[0], scope) or [operands[0]]
+    if any(name in _STDIN_FILES for name in files):
+        if given.text is None:
+            return [_unknown("sources what its standard input brings, which the line does not show")]
+        return _assess_all(given.text, scope)
+    if _SUBSTITUTED in files:
+        return [_unknown("sources the output of a command, which only the running line knows")]
+    return [_finding("low", (), "source runs a script file")]
 
 
 def _assess_xargs(args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
@@ -1862,6 +2243,10 @@ def _assess_sed(args: list[str], scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = []
     if any(arg.startswith(("-i", "--in-place")) for arg in args):
         findings.append(_assess_writes("sed", [arg for arg in args if arg != ""], scope))
+        # The files it edits in place: every operand after the script, or every one when -e or -f gives it.
+        operands: list[str] = _positional([arg for arg in args if arg != ""])
+        given: bool = any(arg.startswith(("-e", "-f", "--expression", "--file")) for arg in args)
+        findings.extend(_changing(_known_paths(operands if given else operands[1:], scope)))
     for word in args:
         for match in _SED_FILES.finditer(word):
             target: str = match.group(2).strip()
@@ -1997,10 +2382,18 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         return _assess_shell_call(command, args, scope, given)
     if command == "eval":
         return _assess_all(" ".join(args), scope)
+    if command in ("source", "."):
+        return _assess_source(args, scope, given)
+    if command == "trap":
+        return _assess_trap(args, scope)
+    if command in _RUNNERS:
+        ran: list[Finding] | None = _assess_runner(command, args, scope, given)
+        if ran is not None:
+            return ran
     if command == "xargs":
         return _assess_xargs(args, scope, given)
     if command in ("rm", "rmdir", "unlink", "shred", "srm"):
-        return [_assess_delete(args, scope)]
+        return [_assess_delete(args, scope), *_changing(_known_paths(_positional(args), scope))]
     if command == "find":
         return _assess_find(args, scope)
     if command == "fd":
@@ -2065,7 +2458,11 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
     if command in _INTERPRETERS:
         return _assess_interpreter(command, args, scope, given)
     if command in _WRITERS:
-        return [_assess_writes(command, args, scope), *_replaced_by(command, args, scope)]
+        return [
+            _assess_writes(command, args, scope),
+            *_replaced_by(command, args, scope),
+            *_changing(_written_paths(command, args, scope)),
+        ]
     if command in _TARS or command == "unzip":
         return [_finding("low", (), f"runs {command}"), *_writes_to(command, _unpacked_into(command, args), scope)]
     if command in _SAFE_COMMANDS:
@@ -2097,13 +2494,77 @@ def _assess_wrapped(command: str, args: list[str], scope: ShellScope, given: _In
         if parts is None:
             return [_unknown("env -S is given a string that cannot be parsed")]
         return _assess_simple([*parts, *words], here, given)
-    if command == "timeout":
-        return _assess_simple(rest[1:], scope, given)
+    if command in _WRAPPER_SKIPS:
+        return _assess_simple(rest[_WRAPPER_SKIPS[command] :], scope, given)
     if command == "watch":
         return _assess_all(" ".join(rest), scope)
     if command == "command" and any(name in ("-v", "-V") for name, _ in options):
         return [_finding("safe", (), "command -v")]
+    if command == "xcrun" and any(name in ("-f", "--find") for name, _ in options):
+        return [_finding("safe", (), "xcrun --find")]
     return _assess_simple(rest, scope, given)
+
+
+def _assignment_findings(word: str, scope: ShellScope) -> list[Finding]:
+    """What the assignment ``word`` (``NAME=value``) sets up for the programs it reaches: a command line one of them
+    runs, judged now, or code one of them loads, which cannot be read; an empty value loads nothing."""
+    assignment: re.Match[str] | None = _ENV_ASSIGNMENT.fullmatch(word)
+    if assignment is None:
+        return []
+    name, value = assignment.group(1), assignment.group(2)
+    if name in _COMMAND_VARIABLES:
+        return _assess_all(value, scope)
+    if name in _LOADING_VARIABLES and value:
+        return [_unknown(f"sets {name}, which makes programs load or run what it names")]
+    return []
+
+
+def _assess_trap(args: list[str], scope: ShellScope) -> list[Finding]:
+    """``trap`` keeps its first operand as a command line that runs later (on a signal, or when the shell exits), which
+    is judged now; ``-l`` and ``-p`` only print, and ``-`` resets."""
+    operands: list[str] = args[1:] if args[:1] == ["--"] else args
+    if not operands or operands[0] in ("-l", "-p", "-", ""):
+        return [_finding("safe", (), "trap")]
+    return _assess_all(operands[0], scope)
+
+
+def _runner_starts(args: list[str], own: int | None) -> list[int]:
+    """Where in ``args``, the words a runner is given, the command it runs may begin. An operand right after an option
+    may be that option's value (one not in :data:`_RUNNER_SWITCHES`, without ``=``), so the command may begin there
+    or at a later operand; one after another operand, or first, is where it begins, and the words after it are its
+    own, as is the word after ``--``. ``own`` operands of the runner come first; None stands for any number, each of
+    which may be the command too."""
+    starts: list[int] = []
+    left: int = own or 0
+    for index, word in enumerate(args):
+        if word == "--":
+            return [*starts, index + 1] if index + 1 < len(args) else starts
+        if word.startswith("-"):
+            continue
+        if left:
+            left -= 1
+            continue
+        starts.append(index)
+        before: str = args[index - 1] if index else ""
+        valued: bool = before.startswith("-") and "=" not in before and before not in _RUNNER_SWITCHES
+        if own is not None and not valued:
+            return starts
+    return starts
+
+
+def _assess_runner(command: str, args: list[str], scope: ShellScope, given: _Input) -> list[Finding] | None:
+    """A tool of :data:`_RUNNERS` judged by the command it runs (:func:`_runner_starts`), after its own word where a
+    command would stand (``uv --directory x run``); None when it is not running one (``uv sync``, ``npm test``)."""
+    words: frozenset[str] = _RUNNERS[command]
+    rest: list[str] = args
+    if words:
+        at: int | None = next((index for index in _runner_starts(args, 0) if args[index] in words), None)
+        if at is None:
+            return None
+        rest = args[at + 1 :]
+    starts: list[int] = _runner_starts(rest, _RUNNER_OPERANDS.get(command, 0))
+    readings: list[Finding] = [found for index in starts for found in _assess_simple(rest[index:], scope, given)]
+    return [_finding("low", (), f"runs {command}"), *readings]
 
 
 def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
@@ -2115,13 +2576,21 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
         return []
     head: str = plain[0]
     if _ENV_ASSIGNMENT.fullmatch(head):
-        return _assess_simple(plain[1:], scope, given)
+        return [*_assignment_findings(head, scope), *_assess_simple(plain[1:], scope, given)]
+    if len(head) > 1 and head.startswith("="):
+        # zsh puts the path of the command in place of ``=rm``.
+        return _assess_simple([head[1:], *plain[1:]], scope, given)
     names: list[str] | None = _expansions(head, scope)
     if names is None:
         return [_unknown("runs a command whose name is only known when the line runs")]
     if names != [head]:
         return [found for name in names for found in _assess_simple([*name.split(), *plain[1:]], scope, given)]
-    command: str = Path(head).name
+    if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
+        return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
+    command: str = head if head == "." else Path(head).name
+    if command in _DECLARERS:
+        declared: list[Finding] = [found for word in plain[1:] for found in _assignment_findings(word, scope)]
+        return [*declared, *_assess_command(command, plain[1:], scope, given)]
     if command in _PRIVILEGE_WRAPPERS:
         return _assess_privileged(command, plain[1:], scope, given)
     if command in _WRAPPERS:
@@ -2140,6 +2609,7 @@ def _assess_segment(
         *_assess_simple(words, scope, given),
         *_assess_redirects(targets, scope),
         *_replacing(emptied, [], scope),
+        *_changing(_known_paths(targets, scope)),
     ]
     return findings, _next_scope(words, scope)
 
@@ -2169,12 +2639,14 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
     findings: list[Finding] = _universal_findings(command, scope)
     if reading.hidden:
         findings.append(_unknown("runs code from a zsh glob qualifier"))
+    if reading.unclosed:
+        findings.append(_unknown("a command substitution never closes, so where it ends cannot be told"))
     tokens: list[str] | None = _tokenize(reading.text)
     if tokens is None:
         return [*findings, _unknown("the line cannot be parsed, so what it runs cannot be judged")]
     state: ShellScope = replace(scope, depth=scope.depth + 1)
     stages: list[list[str]] = []
-    for operator, segment in _commands(tokens):
+    for operator, segment in _commands(_without_patterns(tokens)):
         stages = [*stages, segment] if operator in ("|", "|&") else [segment]
         found, state = _assess_segment(segment, state, _piped(stages[:-1], reading.documents), reading.documents)
         findings.extend(found)
@@ -2184,18 +2656,21 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
 
 
 def _merge(findings: list[Finding]) -> ShellAssessment:
-    if not findings:
-        return ShellAssessment(risk="low", flags=(), reasons=("empty command",), fetches=False)
-    risk: Risk = max((finding.risk for finding in findings), key=lambda value: _RISK_ORDER[value])
+    changes: tuple[str, ...] = tuple(dict.fromkeys(path for finding in findings for path in finding.changes))
+    judged: list[Finding] = [finding for finding in findings if finding.reason != _CHANGES]
+    if not judged:
+        return ShellAssessment(risk="low", flags=(), reasons=("empty command",), fetches=False, changes=changes)
+    risk: Risk = max((finding.risk for finding in judged), key=lambda value: _RISK_ORDER[value])
     flags: list[Flag] = []
-    for finding in findings:
+    for finding in judged:
         flags.extend(finding.flags)
-    reasons: list[str] = [finding.reason for finding in findings if finding.risk != "safe"]
+    reasons: list[str] = [finding.reason for finding in judged if finding.risk != "safe"]
     return ShellAssessment(
         risk=risk,
         flags=tuple(dict.fromkeys(flags)),
         reasons=tuple(dict.fromkeys(reasons)) or ("read-only command",),
-        fetches=any(finding.fetches for finding in findings),
+        fetches=any(finding.fetches for finding in judged),
+        changes=changes,
     )
 
 

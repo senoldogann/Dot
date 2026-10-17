@@ -166,7 +166,7 @@ def build_find_help_tool() -> RegisteredTool:
         catalog: SkillCatalog = await asyncio.to_thread(
             load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
-        skills: tuple[Skill, ...] = await offered_to_run(config, catalog, ctx.run_id, ctx.agent_id)
+        skills: tuple[Skill, ...] = await offered_to_run(config, catalog, ctx.agent_id)
         tools: list[HelpItem] = [
             _mcp_help(name, tool.spec.description)
             for name, tool in ctx.runtime.registry.tools.items()

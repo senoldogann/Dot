@@ -9,7 +9,7 @@
 // delegated runs under it.
 
 import { ApiError, api, request } from "./api.js";
-import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, workingFor } from "./dom.js";
+import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, plural, setText, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
 import { actorFace, lookOf } from "./actors.js";
 import { dotName, faceState } from "./face.js";
@@ -313,7 +313,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const list = el("div", { class: "side-runs" });
   const ageTicker = setInterval(() => {
     for (const node of list.querySelectorAll(".side-age")) {
-      node.textContent = age(Number(node.dataset.ts));
+      setText(node, age(Number(node.dataset.ts)));
     }
   }, AGE_REFRESH_MS);
   const search = el("input", {
@@ -427,8 +427,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function paintBar() {
     const shown = shownChats();
     const allChosen = shown.length > 0 && shown.every((chat) => selected.has(chat.id));
-    count.textContent = selected.size === 0 ? "Choose chats to delete" : `${plural(selected.size, "chat", "chats")} selected`;
-    allButton.textContent = allChosen ? "Clear" : "Select all";
+    setText(count, selected.size === 0 ? "Choose chats to delete" : `${plural(selected.size, "chat", "chats")} selected`);
+    setText(allButton, allChosen ? "Clear" : "Select all");
     allButton.disabled = shown.length === 0;
     deleteButton.disabled = selected.size === 0;
   }
@@ -1117,7 +1117,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   const workTicker = setInterval(() => {
     for (const node of element.querySelectorAll(".side-working-time")) {
-      node.textContent = workingFor(Number(node.dataset.since));
+      setText(node, workingFor(Number(node.dataset.since)));
     }
   }, WORKING_REFRESH_MS);
 

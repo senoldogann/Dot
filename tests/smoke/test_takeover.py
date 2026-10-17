@@ -24,7 +24,7 @@ from playwright.async_api import Browser, Locator, Page, Route, async_playwright
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.browser.attach import DebugEndpoint
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import Frame
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError
@@ -147,7 +147,11 @@ async def cast_browser(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterato
         update={"headless": True}
     )
     session: BrowserSession = BrowserSession(
-        config, SERVER, tmp_path_factory.mktemp("cast-profile"), tmp_path_factory.mktemp("cast-downloads")
+        config,
+        SERVER,
+        tmp_path_factory.mktemp("cast-profile"),
+        tmp_path_factory.mktemp("cast-downloads"),
+        no_runs_at_work,
     )
     try:
         yield session

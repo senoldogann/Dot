@@ -310,6 +310,13 @@
   color: var(--muted);
 }
 
+/* Why the second look left a lesson out, on a line of its own under the lesson. */
+.lesson-why {
+  flex: 1 0 100%;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
 /* ---------- groups of tool steps ---------- */
 
 .steps {

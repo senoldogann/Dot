@@ -6,7 +6,7 @@
 // conversation carries or names takes the panel while it is open (item 195, filepanel.js).
 
 import { imageUrl } from "./api.js";
-import { el, motionMs } from "./dom.js";
+import { el, motionMs, setText } from "./dom.js";
 import { fileView } from "./filepanel.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
@@ -142,7 +142,7 @@ export function createInspector({ layout, tabs, screensIn }) {
   function setCount(id, text) {
     const tab = tabNodes.find((node) => node.id === id);
     if (tab !== undefined) {
-      tab.count.textContent = text;
+      setText(tab.count, text);
       tab.count.hidden = text === "";
     }
   }

@@ -9,19 +9,31 @@ reads a digest of those steps (:func:`acting_digest`) and writes the skill
 (:func:`dotagent.agent.review.playbook_writer_for`): the kind of work in a few words, the steps that worked, the
 parameters a later run fills in, and a one-sentence description. The kind names the folder, ``learned-<kind>/SKILL.md``
 under ``<home>/playbooks`` (:func:`render_playbook`), with the evidence (the runs, the goal, the date, the acting steps)
-and a ``playbook.json`` that keeps the kind and counts the use; a kind that matches an existing skill by meaning (or,
-without embeddings, by name) updates that skill instead of writing another, its runs appended to the evidence. The
-skills catalog reads the folder like any skills directory, so later runs see the description under Skills, told it is
-advice from Dot's own work, and read the rest with the ``skill`` tool.
+and a ``playbook.json`` that keeps the kind and counts the use. The writer is shown the kinds of the skills the run's
+owner keeps (:func:`kinds_shown`) and names the run's work by one of them, word for word, when it is that work; a kind
+written the same as one of them, or close to one by meaning, updates that skill instead of writing another, its runs
+appended to the evidence. A run updates its owner's skills alone (:func:`owned`): another owner's skill of the same name
+keeps its folder, and the new one takes the next free name (:func:`free_name`). The skills catalog reads the folder like
+any skills directory, so later runs see the description under Skills, told it is advice from Dot's own work, and read
+the rest with the ``skill`` tool.
+
+A run that read content third parties can author (as the lessons' reflection reads it, from the store) is distilled
+from its own steps alone (:func:`own_steps_digest`, the answer left out), and its skill's record says so (``tainted``,
+review Y7). A run is offered such a skill, or one whose record is older than the mark, with every line the review model
+wrote that names a web address, an e-mail address or an account, runs a command or reaches a path in the home folder
+withheld, and a warning first (:func:`presented`): a page cannot turn its text into a step of a later run. The file
+keeps the steps: a later run of the kind that read no such content rewrites them and clears the mark, and so does the
+owner (``dotx playbooks trust``, :func:`trust_playbook`).
 
 Every run that ended done or failed records its use of learned skills (the ``skill`` calls that named one): a skill
-read by :data:`MAX_FAILURES` runs that then failed is retired, moved under ``.retired`` where the catalog does not
-look, and no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store, the
+read by :data:`MAX_FAILURES` runs in a row that then failed (none ended done between them) is retired, moved under
+``.retired`` where the catalog does not look, and no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store, the
 embedder and the review model and writes the folder, and the small file helpers it calls.
 
-The files are written whole, and every change of the playbooks holds their lock (``.lock`` in the folder), so runs
-that end at once, the API and another process (``dotx run`` beside the daemon) lose none of each other's changes, and
-a listing never meets a record half written.
+The files are written whole, a new skill's folder under a hidden name before it takes its own, and every change of the
+playbooks holds their lock (``.lock`` in the folder), so runs that end at once, the API and another process (``dotx
+run`` beside the daemon) lose none of each other's changes, and a listing never meets a record or a folder half
+written.
 """
 
 import asyncio
@@ -30,16 +42,19 @@ import json
 import os
 import re
 import shutil
+import tempfile
 import time
 from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from itertools import count
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 import yaml
 from pydantic import JsonValue, ValidationError
 
+from dotagent.agent.learning_health import LEARNED, SKIPPED, LearningOutcome, failed_with
 from dotagent.agent.review import PlaybookDraft, PlaybookRequest, PlaybookWriter, playbook_writer_for, shorten_reason
 from dotagent.config import AppConfig
 from dotagent.core.errors import DotError, InvalidValueError, NotFoundError, SkillError
@@ -47,13 +62,15 @@ from dotagent.core.files import write_whole
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import playbooks_dir
-from dotagent.core.text import redact_secrets, truncate_tail
+from dotagent.core.text import redact_known, redact_secrets, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import parse_model_ref
 from dotagent.memory.ranking import Similar, Vector, most_similar
-from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root
+from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
+from dotagent.secrets import known_secrets
+from dotagent.skills.catalog import PLAYBOOK_SOURCE, playbook_root, read_skill
 from dotagent.skills.parse import parse_skill
 from dotagent.skills.types import SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.models import EventRecord, RunRecord, RunStatus
@@ -71,6 +88,8 @@ _FOLDER_NAME: re.Pattern[str] = re.compile(r"(?:learned|playbook)-[a-z0-9-]*")
 META_FILE: str = "playbook.json"
 RETIRED_DIR: str = ".retired"
 _LOCK_FILE: str = ".lock"
+# The hidden folder a new skill is written in before it takes its name (the skills catalog leaves hidden folders alone).
+_STAGING_PREFIX: str = ".writing-"
 _PRIVATE_FILE_MODE: int = 0o600
 PLAYBOOK_WRITTEN: str = "playbook_written"
 PLAYBOOK_FAILED: str = "playbook_failed"
@@ -109,6 +128,45 @@ _NOT_ACTING: frozenset[str] = frozenset(
 )
 # Two kinds this close in meaning are one kind: the new run updates the skill instead of writing another.
 _SAME_KIND: float = 0.85
+# The kinds of the skills kept that the writer is shown, so that it names a run's work by one of them when it is that
+# work: the skills of the run's site first, then the newest.
+_KINDS_SHOWN: int = 30
+# What the writer reads for the answer of a run that read content third parties can author.
+_ANSWER_LEFT_OUT: str = "(Left out: the run read content other people wrote.)"
+# What withholds a line of a skill that may come from content third parties can author, when a run is offered it: a web
+# address, an e-mail address or an account, a command (code, a tool that runs one, the syntax of a shell, an option, a
+# command with its argument) and a path in the home folder.
+_WITHHELD: tuple[re.Pattern[str], ...] = (
+    re.compile(r"\b[a-z][a-z0-9+.-]*://|\bwww\.\w|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.[a-z]{2,}/", re.IGNORECASE),
+    re.compile(r"\b(?:javascript|vbscript|mailto):\S|\bdata:[\w.+-]+/[\w.+-]+[;,]", re.IGNORECASE),
+    re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+|(?<![\w.@])@[A-Za-z0-9_]{2,}"),
+    re.compile(r"`|\b(?:shell|terminal|apple_?script|osascript|browser_eval|command[ -]line)", re.IGNORECASE),
+    re.compile(r"\$\(|\$\{|\$[A-Z_]{2,}\b|\|\s*\S|&&|(?:^|\s)--?[A-Za-z]"),
+    re.compile(
+        r"\b(?:sudo|curl|wget|bash|zsh|sh|rm|rmdir|mv|cp|chmod|chown|ssh|scp|rsync|nc|dd|eval|exec|launchctl|pkill"
+        r"|killall|xattr|crontab|cat|ls|echo|grep|python3?|pip3?|npm|npx|uvx?|brew|git|docker)\s+\S"
+    ),
+    re.compile(r"(?<![\w/.~])~(?:[A-Za-z_][\w.-]*)?(?=/|\s|$|[)\"'.,;:])|/Users/"),
+)
+# The sections of a learned skill's instructions that the review model wrote (the others are Dot's own words).
+_HEADING: re.Pattern[str] = re.compile(r"##\s+(.*?)\s*")
+_STEPS: str = "Steps"
+_EVIDENCE: str = "Evidence"
+_LIST_ITEM: re.Pattern[str] = re.compile(r"\s*(?:\d+\.|[-*])\s+")
+_FENCE: str = "```"
+# Why a line is withheld, by what the skill's record says of its runs (``tainted``), and the warning the skill starts
+# with.
+_THIRD_PARTY: str = "learned from third-party content"
+_UNKNOWN_ORIGIN: str = "its origin is unknown"
+_WITHHELD_LINES: str = (
+    "Its lines that name a web address, an e-mail address or an account, run a command or reach a path in the home "
+    "folder are withheld; work those steps out from the task in front of you."
+)
+_THIRD_PARTY_WARNING: str = f"Warning: learned from a run that read third-party content. {_WITHHELD_LINES}"
+_UNKNOWN_WARNING: str = (
+    "Warning: learned before Dot recorded whether a run read third-party content, so it is offered as if one did. "
+    f"{_WITHHELD_LINES}"
+)
 # The name a skill is written under when the run acted on no web site or application.
 NO_SITE: str = "this Mac"
 
@@ -124,7 +182,8 @@ class ActingStep(FrozenModel):
 
 class Playbook(FrozenModel):
     """A learned skill as one run writes it: its skill name, the kind of work, the host or application it acted on
-    most (:data:`NO_SITE` for none), what the review model wrote and the evidence of the run it comes from."""
+    most (:data:`NO_SITE` for none), what the review model wrote and the evidence of the run it comes from, which
+    read content third parties can author when ``tainted``."""
 
     name: str
     kind: str
@@ -135,14 +194,19 @@ class Playbook(FrozenModel):
     goal: str
     written_at: float
     acting_steps: int
+    tainted: bool
 
 
 class PlaybookMeta(FrozenModel):
     """``playbook.json``: the kind the skill is matched by, where it comes from (``runs``, the first one first, with
     the acting steps each took) and how it fared since. ``uses`` counts the runs that read it and ended done,
-    ``failures`` the runs that read it and failed. ``agent_id`` is the agent whose skill it is (item 94), ``None``
-    for Dot's, offered to every run; an agent's is offered to its runs alone until the owner marks it ``shared``.
-    Both are absent from the record of a skill written before item 94, which is Dot's."""
+    ``failures`` the runs that read it and failed, ``failing`` those of them since the last that ended done.
+    ``agent_id`` is the agent whose skill it is (item 94), ``None`` for Dot's, offered to every run; an agent's is
+    offered to its runs alone until the owner marks it ``shared``. ``tainted``: the run whose steps the skill holds (the
+    last of ``runs``) read content third parties can author, and the owner has not trusted it since; ``None`` in a
+    record older than the mark, which is offered as one that did (:func:`presented`). ``tainted_runs`` are the runs
+    among ``runs`` that read such content. The fields with a default are absent from the records written before
+    them."""
 
     name: str
     kind: str
@@ -155,6 +219,9 @@ class PlaybookMeta(FrozenModel):
     failures: int
     agent_id: str | None = None
     shared: bool = False
+    failing: int = 0
+    tainted: bool | None = None
+    tainted_runs: tuple[str, ...] = ()
 
 
 class PlaybookEntry(FrozenModel):
@@ -238,6 +305,36 @@ def acting_digest(steps: Sequence[ActingStep]) -> str:
     return redact_secrets(header + "\n".join(lines))
 
 
+def own_steps_digest(steps: Sequence[ActingStep]) -> str:
+    """The acting steps without what they returned, as the writer reads them for a run that read content third parties
+    can author: what the agent did, never what a page or a message said, secrets masked, the newest when there are
+    many."""
+    kept: Sequence[ActingStep] = steps[-_DIGEST_STEPS:]
+    omitted: int = len(steps) - len(kept)
+    lines: list[str] = [
+        f"{number}. {step.tool} {step.arguments} -> {'ok' if step.ok else 'FAILED'}"
+        for number, step in enumerate(kept, start=omitted + 1)
+    ]
+    header: str = "(What the calls returned is left out: the run read content other people wrote.)\n" + (
+        f"({omitted} earlier steps are left out.)\n" if omitted else ""
+    )
+    return redact_secrets(header + "\n".join(lines))
+
+
+def redacted_draft(draft: PlaybookDraft, secrets: Sequence[str]) -> PlaybookDraft:
+    """``draft`` with every secret masked before it is written (review Y3): the values Dot holds (``secrets``), the
+    value of a key that names a secret, and keys and tokens of known forms (:func:`dotagent.core.text.redact_known`)."""
+    return draft.model_copy(
+        update={
+            "kind": redact_known(draft.kind, secrets),
+            "description": redact_known(draft.description, secrets),
+            "when": redact_known(draft.when, secrets),
+            "steps": tuple(redact_known(step, secrets) for step in draft.steps),
+            "parameters": tuple(redact_known(parameter, secrets) for parameter in draft.parameters),
+        }
+    )
+
+
 def used_playbooks(events: Sequence[EventRecord]) -> tuple[str, ...]:
     """The names of the playbooks the run read with the ``skill`` tool, each once, in order."""
     names: dict[str, None] = {}
@@ -266,11 +363,12 @@ def _frontmatter(name: str, description: str) -> str:
 
 def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
     """The SKILL.md of a learned skill: the frontmatter the skills loader reads, then the kind, when it fits, the
-    steps, the parameters and the evidence (the runs of ``earlier``, when the skill is updated, before this one)."""
+    steps and the parameters a line each, and the evidence (the runs of ``earlier``, when the skill is updated, before
+    this one)."""
     draft: PlaybookDraft = playbook.draft
-    description: str = " ".join(draft.description.split()).replace('"', "'")
-    steps: str = "\n".join(f"{number}. {step}" for number, step in enumerate(draft.steps, start=1))
-    parameters: str = "\n".join(f"- {parameter}" for parameter in draft.parameters) or "- none"
+    description: str = " ".join(draft.description.split())
+    steps: str = "\n".join(f"{number}. {' '.join(step.split())}" for number, step in enumerate(draft.steps, start=1))
+    parameters: str = "\n".join(f"- {' '.join(parameter.split())}" for parameter in draft.parameters) or "- none"
     runs: list[str] = [*(earlier.runs if earlier is not None else ()), playbook.run_id]
     counts: list[int] = [*(earlier.acting_steps if earlier is not None else ()), playbook.acting_steps]
     evidence: str = "\n".join(f"- Run {run}: {count} acting steps" for run, count in zip(runs, counts, strict=True))
@@ -292,7 +390,9 @@ def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
 
 def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
     """The record of a skill just written from ``playbook``, or updated from ``earlier`` by it (the runs appended,
-    the kind and the counts kept)."""
+    the kind and the counts kept). The steps are the run's alone either way, and so is the mark of content third
+    parties can author (``tainted``): a run of the kind that read none clears it."""
+    tainted_runs: tuple[str, ...] = (playbook.run_id,) if playbook.tainted else ()
     if earlier is None:
         return PlaybookMeta(
             name=playbook.name,
@@ -306,23 +406,32 @@ def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
             failures=0,
             agent_id=playbook.agent_id,
             shared=False,
+            failing=0,
+            tainted=playbook.tainted,
+            tainted_runs=tainted_runs,
         )
     return earlier.model_copy(
         update={
             "runs": (*earlier.runs, playbook.run_id),
             "acting_steps": (*earlier.acting_steps, playbook.acting_steps),
             "updated_at": playbook.written_at,
+            "tainted": playbook.tainted,
+            "tainted_runs": (*earlier.tainted_runs, *tainted_runs),
         }
     )
 
 
 def recorded(meta: PlaybookMeta, succeeded: bool) -> PlaybookMeta:
-    """The record after a run that read the playbook ended."""
-    return meta.model_copy(update={"uses": meta.uses + 1} if succeeded else {"failures": meta.failures + 1})
+    """The record after a run that read the playbook ended: one that ended done clears the failures in a row."""
+    if succeeded:
+        return meta.model_copy(update={"uses": meta.uses + 1, "failing": 0})
+    return meta.model_copy(update={"failures": meta.failures + 1, "failing": meta.failing + 1})
 
 
 def retires(meta: PlaybookMeta) -> bool:
-    return meta.failures >= MAX_FAILURES
+    """Whether the playbook is retired: :data:`MAX_FAILURES` runs in a row read it and failed, none since ending done
+    (a skill that served forty runs is not retired for two failures among them)."""
+    return meta.failing >= MAX_FAILURES
 
 
 def offered_to(meta: PlaybookMeta, agent_id: str | None) -> bool:
@@ -331,13 +440,67 @@ def offered_to(meta: PlaybookMeta, agent_id: str | None) -> bool:
     return meta.shared or meta.agent_id is None or meta.agent_id == agent_id
 
 
+def withholds(text: str) -> bool:
+    """Whether a line of a skill that may come from content third parties can author is withheld when a run is offered
+    it: it names a web address, an e-mail address or an account, runs a command or reaches a path in the home folder
+    (:data:`_WITHHELD`)."""
+    return any(pattern.search(text) is not None for pattern in _WITHHELD)
+
+
+def withheld_body(body: str, why: str, warning: str) -> str:
+    """``body``, the instructions of a learned skill (:func:`render_playbook`), with ``warning`` after its title and,
+    in place of every line the review model wrote (its sections but the evidence) that :func:`withholds` or that a code
+    block holds, ``[step withheld: <why>]`` (``[withheld: <why>]`` outside the steps); a numbered or bulleted line keeps
+    its number or bullet."""
+    lines: list[str] = []
+    section: str | None = None
+    fenced: bool = False
+    for line in body.splitlines():
+        heading: re.Match[str] | None = None if fenced else _HEADING.fullmatch(line)
+        fence: bool = line.lstrip().startswith(_FENCE)
+        if heading is not None:
+            section = heading.group(1)
+            lines.append(line)
+        elif section is not None and section != _EVIDENCE and (fenced or fence or withholds(line)):
+            item: re.Match[str] | None = _LIST_ITEM.match(line)
+            what: str = "step withheld" if section == _STEPS else "withheld"
+            lines.append(f"{item.group(0) if item is not None else ''}[{what}: {why}]")
+        else:
+            lines.append(line)
+        fenced = fenced != fence
+    title: int = next((index for index, line in enumerate(lines) if line.startswith("# ")), -1)
+    return "\n".join((*lines[: title + 1], *([""] if title >= 0 else []), warning, *lines[title + 1 :]))
+
+
+def presented(skill: Skill, meta: PlaybookMeta) -> Skill:
+    """The learned skill ``skill`` as a run is offered it, by its record ``meta``: as written when the run whose steps
+    it holds read no content third parties can author, or the owner trusts it; else, its record saying so or older
+    than the mark (``tainted`` ``None``), with the lines that could carry that content's instructions withheld
+    (:func:`withheld_body`) and its description marked, withheld too when it names what a line is withheld for."""
+    if meta.tainted is False:
+        return skill
+    why: str = _THIRD_PARTY if meta.tainted else _UNKNOWN_ORIGIN
+    warning: str = _THIRD_PARTY_WARNING if meta.tainted else _UNKNOWN_WARNING
+    description: str = f"[withheld: {why}]" if withholds(skill.description) else skill.description
+    return skill.model_copy(
+        update={"description": f"({why}) {description}", "body": withheld_body(skill.body, why, warning)}
+    )
+
+
 def offered_skills(
     skills: Sequence[Skill], entries: Sequence[PlaybookEntry], agent_id: str | None
 ) -> tuple[Skill, ...]:
-    """``skills`` without the learned ones a run of ``agent_id`` is not offered (:func:`offered_to`); a learned skill
-    without a readable record among ``entries`` is not offered either."""
-    offered: set[str] = {entry.meta.name for entry in entries if offered_to(entry.meta, agent_id)}
-    return tuple(skill for skill in skills if skill.source != PLAYBOOK_SOURCE or skill.name in offered)
+    """``skills`` without the learned ones a run of ``agent_id`` is not offered (:func:`offered_to`), each learned one
+    as its record has it offered (:func:`presented`); a learned skill without a readable record among the active
+    ``entries`` is not offered."""
+    offered: dict[str, PlaybookMeta] = {
+        entry.meta.name: entry.meta for entry in entries if not entry.retired and offered_to(entry.meta, agent_id)
+    }
+    return tuple(
+        skill if skill.source != PLAYBOOK_SOURCE else presented(skill, offered[skill.name])
+        for skill in skills
+        if skill.source != PLAYBOOK_SOURCE or skill.name in offered
+    )
 
 
 def playbook_folder(root: Path, name: str) -> Path:
@@ -371,15 +534,26 @@ def rendered_skill(file: Path, playbook: Playbook, earlier: PlaybookMeta | None)
 
 
 def write_playbook(root: Path, playbook: Playbook) -> Path:
-    """Write the skill's folder under ``root`` and return its SKILL.md. The folder must not exist. The record is
-    written before the skill, so a listing never meets the skill without it."""
+    """Write the skill's folder under ``root`` and return its SKILL.md. The folder is made whole under a hidden name,
+    its record and its skill in it, and then takes its own name in one rename, so a write that stops part way leaves no
+    folder of the skill behind; one such folder an older Dot left (no skill in it) is replaced. A folder of the name
+    with a skill in it is there already: :class:`FileExistsError`."""
     folder: Path = playbook_folder(root, playbook.name)
     file: Path = folder / SKILL_FILE
     text: str = rendered_skill(file, playbook, None)
     with _changing(root):
-        folder.mkdir(exist_ok=False)
-        _save_meta(folder, meta_of(playbook, None))
-        write_whole(file, text)
+        if file.is_file():
+            raise FileExistsError(f"the learned skill {playbook.name} is there already")
+        staging: Path = Path(tempfile.mkdtemp(prefix=_STAGING_PREFIX, dir=root))
+        try:
+            _save_meta(staging, meta_of(playbook, None))
+            write_whole(staging / SKILL_FILE, text)
+            if folder.is_dir():
+                shutil.rmtree(folder)
+            staging.rename(folder)
+        finally:
+            if staging.is_dir():
+                shutil.rmtree(staging)
     return file
 
 
@@ -407,7 +581,7 @@ def read_meta(folder: Path) -> PlaybookMeta:
 
 def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta | None:
     """Count a run that read the playbook ``name`` and ended; a playbook that :func:`retires` is moved under
-    ``.retired``. Returns the record after the count, or None for a playbook that is no longer active (another run
+    ``.retired``, where an earlier one of its name keeps its folder. Returns the record after the count, or None for a playbook that is no longer active (another run
     retired it or the owner deleted it since this run read it), which is not counted."""
     folder: Path = playbook_folder(root, name)
     with _changing(root):
@@ -417,11 +591,17 @@ def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta | None:
         _save_meta(folder, meta)
         if retires(meta):
             retired: Path = root / RETIRED_DIR / name
-            if retired.exists():
-                shutil.rmtree(retired)
             retired.parent.mkdir(parents=True, exist_ok=True)
+            if retired.exists():
+                # A skill of the name retired before keeps its folder, under the next free name (item 306).
+                shutil.move(str(retired), str(_unused(root / RETIRED_DIR, name)))
             shutil.move(str(folder), str(retired))
     return meta
+
+
+def _unused(parent: Path, name: str) -> Path:
+    """The first of ``name-2``, ``name-3``, ... that ``parent`` holds nothing of."""
+    return next(candidate for number in count(2) if not (candidate := parent / f"{name}-{number}").exists())
 
 
 def _folder_of(root: Path, name: str) -> Path:
@@ -454,6 +634,18 @@ def share_playbook(root: Path, name: str, shared: bool) -> PlaybookMeta:
     return meta
 
 
+def trust_playbook(root: Path, name: str) -> PlaybookMeta:
+    """The owner's word that the playbook ``name`` (active or retired) may be offered as written although a run it
+    comes from read content third parties can author, or its record is older than the mark: ``tainted`` is ``False``
+    until a run that read such content rewrites its steps. Returns the record after it."""
+    with _changing(root):
+        folder: Path = _folder_of(root, name)
+        meta: PlaybookMeta = read_meta(folder).model_copy(update={"tainted": False})
+        _save_meta(folder, meta)
+    log.info("playbook_trusted", name=name, tainted_runs=list(meta.tainted_runs))
+    return meta
+
+
 def release_playbooks(root: Path, agent_id: str) -> int:
     """Make the playbooks of the agent ``agent_id`` Dot's (an agent that was deleted); how many there were."""
     released: int = 0
@@ -475,35 +667,32 @@ def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
         if not child.name.startswith((PLAYBOOK_PREFIX, _OLD_PREFIX)) or not file.is_file():
             continue
         try:
-            skill: Skill = parse_skill(file, file.read_text(encoding="utf-8"), PLAYBOOK_SOURCE)
-        except SkillError as error:
-            # One skill the loader cannot read (edited by hand, written by an older Dot) is left out, as the catalog
-            # leaves it out; the others, and the runs that are offered them, go on.
+            skill: Skill = read_skill(file, PLAYBOOK_SOURCE)
+            meta: PlaybookMeta = read_meta(child)
+        except (SkillError, NotFoundError) as error:
+            # One skill the loader cannot read (edited by hand, written by an older Dot, no UTF-8 text) or whose record
+            # cannot be read is left out, as the catalog leaves it out; the others, and the runs that are offered them,
+            # go on. A learned skill with no entry is not offered (:func:`offered_skills`).
             log.warning("playbook_unreadable", path=str(file), error=error.message, context=error.context)
             continue
-        entries.append(PlaybookEntry(skill=skill, meta=read_meta(child), retired=retired))
+        entries.append(PlaybookEntry(skill=skill, meta=meta, retired=retired))
     return entries
 
 
 def list_playbooks(root: Path) -> tuple[PlaybookEntry, ...]:
-    """Every playbook under ``root``: the active ones, then the retired ones."""
+    """Every playbook under ``root``: the active ones, then the retired ones; one whose files cannot be read is left
+    out and logged."""
     return (*_entries(root, False), *_entries(root / RETIRED_DIR, True))
 
 
-async def offered_to_run(
-    config: AppConfig, skills: SkillCatalog, run_id: str, agent_id: str | None
-) -> tuple[Skill, ...]:
-    """The skills of ``skills`` that the run ``run_id`` of the agent ``agent_id`` is offered: every one but the learned
-    skills of other agents (item 94, :func:`offered_skills`); with the learned skills' records unreadable, none of
-    them."""
+async def offered_to_run(config: AppConfig, skills: SkillCatalog, agent_id: str | None) -> tuple[Skill, ...]:
+    """The skills of ``skills`` that a run of the agent ``agent_id`` is offered: every one but the learned skills of
+    other agents (item 94, :func:`offered_skills`); a learned skill whose files cannot be read is not offered
+    (:func:`list_playbooks`)."""
     root: Path | None = playbook_root(config)
     if root is None:
         return skills.skills
-    try:
-        entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
-    except NotFoundError as error:
-        log.warning("playbooks_unreadable", run_id=run_id, error=error.message, context=error.context)
-        entries = ()
+    entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
     return offered_skills(skills.skills, entries, agent_id)
 
 
@@ -532,23 +721,53 @@ def same_kind(kind: str, entries: Sequence[PlaybookEntry], vectors: Sequence[Vec
     return next((entry for entry in active if close and entry.meta.name == close[0].id), None)
 
 
-async def _matching(
-    runtime: "Runtime", kind: str, entries: Sequence[PlaybookEntry], agent_id: str | None
-) -> PlaybookEntry | None:
-    """The active skill of ``kind`` among the ones a run of ``agent_id`` is offered (:func:`offered_to`), if any."""
-    offered: list[PlaybookEntry] = [entry for entry in entries if offered_to(entry.meta, agent_id)]
-    active: list[PlaybookEntry] = [entry for entry in offered if not entry.retired]
-    if runtime.memory.embedder is None or not active:
-        return same_kind(kind, offered, None)
-    vectors: list[Vector] = await runtime.memory.embedder.embed([kind, *(entry.meta.kind for entry in active)])
-    return same_kind(kind, offered, vectors)
+def owned(entries: Sequence[PlaybookEntry], agent_id: str | None) -> list[PlaybookEntry]:
+    """The active skills a run of ``agent_id`` may update: its owner's own (Dot's for Dot's runs, an agent's for its
+    runs). A skill of another owner, shared or not, is never rewritten by a run that is not its owner's."""
+    return [entry for entry in entries if not entry.retired and entry.meta.agent_id == agent_id]
+
+
+def kinds_shown(entries: Sequence[PlaybookEntry], host: str) -> tuple[str, ...]:
+    """The kinds the writer is shown (:data:`_KINDS_SHOWN` at most): those of the skills on ``host`` first, then the
+    newest, each once."""
+    ordered: list[PlaybookEntry] = sorted(entries, key=lambda entry: (entry.meta.host != host, -entry.meta.updated_at))
+    return tuple(dict.fromkeys(entry.meta.kind for entry in ordered))[:_KINDS_SHOWN]
+
+
+def _has_skill(root: Path, name: str) -> bool:
+    return (playbook_folder(root, name) / SKILL_FILE).is_file() or (root / RETIRED_DIR / name / SKILL_FILE).is_file()
+
+
+def free_name(root: Path, name: str) -> str:
+    """``name``, or the first of ``name-2``, ``name-3``, ... with no skill under ``root``, active or retired: a skill of
+    another owner keeps its folder, and so does one that retired (item 306), which a skill of its name retiring later
+    would take the place of."""
+    if not _has_skill(root, name):
+        return name
+    return next(candidate for number in count(2) if not _has_skill(root, candidate := f"{name}-{number}"))
+
+
+async def _matching(runtime: "Runtime", kind: str, own: Sequence[PlaybookEntry]) -> PlaybookEntry | None:
+    """The skill of ``kind`` among ``own`` (:func:`owned`): the one whose kind is written the same (the writer reuses
+    a kind it is shown word for word), else the closest by meaning, if any."""
+    exact: PlaybookEntry | None = same_kind(kind, own, None)
+    if exact is not None or runtime.memory.embedder is None or not own:
+        return exact
+    vectors: list[Vector] = await runtime.memory.embedder.embed([kind, *(entry.meta.kind for entry in own)])
+    return same_kind(kind, own, vectors)
 
 
 async def _write_from(
-    runtime: "Runtime", run: RunRecord, steps: Sequence[ActingStep], host: str
+    runtime: "Runtime", run: RunRecord, steps: Sequence[ActingStep], host: str, tainted: bool
 ) -> tuple[Path, str, bool]:
-    """Ask the review model for the skill of ``run`` and write it: a new folder, or the folder of the skill of the
-    same kind. Returns the SKILL.md, the skill's name and whether it was updated rather than written."""
+    """Ask the review model for the skill of ``run`` and write it, its secrets masked (:func:`redacted_draft`): a new
+    folder, or the folder of the run's owner's skill of the same kind. Returns the SKILL.md, the skill's name and
+    whether it was updated rather than written.
+    ``tainted``: the run read content third parties can author, so the writer sees what the agent did and not what the
+    calls returned, and the skill's record says so (:func:`presented`)."""
+    root: Path = playbooks_dir()
+    entries: tuple[PlaybookEntry, ...] = await asyncio.to_thread(list_playbooks, root)
+    own: list[PlaybookEntry] = owned(entries, run.agent_id)
     writer: PlaybookWriter = playbook_writer_for(
         runtime.router,
         runtime.roles.review(),
@@ -557,9 +776,17 @@ async def _write_from(
         f"{run.thread_id}:playbook",
         run.id,
     )
-    draft: PlaybookDraft = await writer(
-        PlaybookRequest(goal=run.goal, host=host, digest=acting_digest(steps), answer=run.result)
+    secrets: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+    written: PlaybookDraft = await writer(
+        PlaybookRequest(
+            goal=run.goal,
+            host=host,
+            digest=own_steps_digest(steps) if tainted else acting_digest(steps),
+            answer=_ANSWER_LEFT_OUT if tainted else run.result,
+            kinds=kinds_shown(own, host),
+        )
     )
+    draft: PlaybookDraft = redacted_draft(written, secrets)
     playbook: Playbook = Playbook(
         name=playbook_name(draft.kind),
         kind=draft.kind,
@@ -567,27 +794,25 @@ async def _write_from(
         draft=draft,
         run_id=run.id,
         agent_id=run.agent_id,
-        goal=redact_secrets(run.goal),
+        goal=redact_known(run.goal, secrets),
         written_at=time.time(),
         acting_steps=len(steps),
+        tainted=tainted,
     )
-    root: Path = playbooks_dir()
-    match: PlaybookEntry | None = await _matching(
-        runtime, draft.kind, await asyncio.to_thread(list_playbooks, root), run.agent_id
-    )
+    match: PlaybookEntry | None = await _matching(runtime, draft.kind, own)
     if match is not None:
         return await asyncio.to_thread(update_playbook, root, match.meta.name, playbook), match.meta.name, True
     if not slug(draft.kind):
         raise InvalidValueError("the kind of work has no letters or digits to name a skill by", {"kind": draft.kind})
-    if playbook_folder(root, playbook.name).is_dir():
-        return await asyncio.to_thread(update_playbook, root, playbook.name, playbook), playbook.name, True
-    return await asyncio.to_thread(write_playbook, root, playbook), playbook.name, False
+    named: Playbook = playbook.model_copy(update={"name": await asyncio.to_thread(free_name, root, playbook.name)})
+    return await asyncio.to_thread(write_playbook, root, named), named.name, False
 
 
-async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) -> None:
+async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) -> LearningOutcome:
     """The skill work of a run that ended: record its use of learned skills, then, when it may be distilled, write
-    the skill of its kind or update the one that exists. A review model that fails, or a folder that cannot be
-    written, ends it with a ``playbook_failed`` event; the run keeps its end either way."""
+    the skill of its kind or update the one that exists (``skipped`` when it may not). A review model that fails, or a
+    folder that cannot be written, ends it with a ``playbook_failed`` event and fails it; the run keeps its end either
+    way."""
     events: list[EventRecord] = await runtime.store.list_events(run.id, 0, _EVENTS_READ)
     await _record_uses(runtime, run, status, events)
     steps: tuple[ActingStep, ...] = acting_steps(events)
@@ -596,21 +821,19 @@ async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) 
             log.info(
                 "playbook_skipped", run_id=run.id, reason="fewer acting steps than skill_min_steps", steps=len(steps)
             )
-        return
+        return SKIPPED
     host: str = main_site(events) or NO_SITE
+    tainted: bool = await runtime.store.read_outside(run.id, tuple(TAINTING_KINDS), tuple(OUTSIDE_CHANNELS))
     try:
-        file, name, updated = await _write_from(runtime, run, steps, host)
+        file, name, updated = await _write_from(runtime, run, steps, host, tainted)
     except (DotError, OSError) as error:
         message: str = error.message if isinstance(error, DotError) else str(error)
         log.warning("playbook_failed", run_id=run.id, host=host, error=message)
-        await runtime.bus.emit(
-            run.id,
-            PLAYBOOK_FAILED,
-            {"host": host, "error": f"The skill could not be written: {shorten_reason(message)}"},
-            True,
-        )
-        return
-    log.info("playbook_written", run_id=run.id, name=name, host=host, path=str(file), updated=updated)
+        said: str = f"The skill could not be written: {shorten_reason(message)}"
+        await runtime.bus.emit(run.id, PLAYBOOK_FAILED, {"host": host, "error": said}, True)
+        return failed_with(said)
+    log.info("playbook_written", run_id=run.id, name=name, host=host, path=str(file), updated=updated, tainted=tainted)
     await runtime.bus.emit(
         run.id, PLAYBOOK_WRITTEN, {"name": name, "host": host, "path": str(file), "updated": updated}, True
     )
+    return LEARNED

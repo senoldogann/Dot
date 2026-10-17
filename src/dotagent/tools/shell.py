@@ -187,6 +187,7 @@ def _classify_shell(
         summary=f"Run: {preview} ({'; '.join(assessment.reasons)})",
         target=args.command,
         flags=flags,
+        changes=assessment.changes,
     )
 
 

@@ -298,6 +298,38 @@ async def test_a_question_a_yolo_run_leaves_reaches_the_phone_and_the_run_goes_o
     assert len(posts) == sent + 2, "the question the run left and the end of the run reached the push service"
 
 
+async def test_keys_that_cannot_encrypt_are_refused_and_a_stored_one_goes_while_the_others_get_theirs(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, push_service: _PushService
+) -> None:
+    """The code review's Y15: a subscription whose keys could not encrypt a message stopped the watcher, and with it
+    every push, until the daemon started again."""
+    push_service.status = 201
+    for stored in await runtime.store.list_push_subscriptions():
+        await runtime.store.delete_push_subscription(stored.endpoint)
+    good: dict[str, str] = _browser_keys()
+    for keys in ({"p256dh": "!!!", "auth": good["auth"]}, {"p256dh": good["p256dh"], "auth": "c2hvcnQ"}):
+        refused: httpx.Response = await client.post(
+            "/api/push/subscriptions", json={"endpoint": push_service.endpoint, "keys": keys}
+        )
+        assert refused.status_code == 422, refused.text
+    # One stored before the door checked keys, next to a good one.
+    await runtime.store.add_push_subscription("https://push.invalid/unusable", "!!!", "!!!")
+    await runtime.store.add_push_subscription(push_service.plain_endpoint, good["p256dh"], good["auth"])
+    sent: int = len(push_service.posts)
+    for goal in ("Say done", "Say done again"):
+        MODEL.script = ScriptedProvider(_PROVIDER, [_turn(FINISH_TOOL, {"answer": "Done.", "success": True})])
+        run: RunRecord = await manager.start(
+            goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
+        )
+        async with asyncio.timeout(_RUN_WAIT_S):
+            await manager.wait(run.id)
+    posts = await asyncio.to_thread(push_service.wait_posts, sent + 2)
+    assert len(posts) == sent + 2, "the good subscription got the end of both runs"
+    assert [stored.endpoint for stored in await runtime.store.list_push_subscriptions()] == [
+        push_service.plain_endpoint
+    ]
+
+
 def _free_port() -> int:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
         probe.bind(("127.0.0.1", 0))

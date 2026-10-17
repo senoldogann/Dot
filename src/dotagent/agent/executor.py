@@ -21,6 +21,7 @@ from dotagent.core.text import redact_json, strip_blobs, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, invalid_arguments_text
 from dotagent.policy.types import ActionInfo
+from dotagent.tools.apple import APPLE_SCRIPT_TOOL, script_apps
 from dotagent.tools.base import PreparedCall, RegisteredTool, ToolResult, fail, ok
 from dotagent.tools.channels import channel_of
 from dotagent.tools.context import Gate, ToolContext
@@ -46,14 +47,22 @@ def _safe_json(value: JsonObject) -> JsonObject:
     return sanitized if isinstance(sanitized, dict) else {}
 
 
-def _site(call: ToolCall, action: ActionInfo | None) -> str:
-    """Where a call acted, for the statistics: the host of the page for a browser action, the application for a
-    desktop one, and nothing for every other tool (a file path or a command is not a site)."""
+def reached_sites(call: ToolCall, action: ActionInfo | None) -> tuple[str, ...]:
+    """The sites a call reached: the host of the page for a browser action, the application for a desktop one and the
+    applications a script names (item 308), and none for every other tool (a file path or a command is not a site)."""
     if action is None:
-        return ""
+        return ()
     if action.kind.startswith("browser_"):
-        return urlsplit(action.target).hostname or ""
-    return action.target if call.name.startswith("desktop_") else ""
+        host: str = urlsplit(action.target).hostname or ""
+        return (host,) if host else ()
+    if call.name == APPLE_SCRIPT_TOOL:
+        return script_apps(action.target)
+    return (action.target,) if call.name.startswith("desktop_") and action.target.strip() else ()
+
+
+def _site(call: ToolCall, action: ActionInfo | None) -> str:
+    """Where a call acted, for the statistics and the site of a learned skill: the first site it reached."""
+    return next(iter(reached_sites(call, action)), "")
 
 
 def batch_steps(arguments: JsonObject) -> int:
@@ -139,6 +148,10 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
+        # A call that would step on another run at work does not run, and is not asked about (item 301).
+        held: str | None = ctx.runtime.peers.conflict(ctx.run_id, call.name, action)
+        if held is not None:
+            return _Checked(result=fail(held), action=action, waited_s=0.0)
         asked_at: float = time.monotonic()
         try:
             note = await gate.authorize(action)
@@ -146,6 +159,11 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
             held_s: float = await gate.wait_free()
         finally:
             at_gate.seconds += time.monotonic() - asked_at
+        # The wait may have been long, and another run may have taken the app or changed the file since: checked again,
+        # and from here the check and the footprint are one step, before the call runs (item 305).
+        taken: str | None = ctx.runtime.peers.take(ctx.run_id, call.name, action)
+        if taken is not None:
+            return _Checked(result=_with_approval_note(fail(taken), note), action=action, waited_s=at_gate.seconds)
         async with asyncio.timeout(tool.timeout_s) as scope:
             result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
     except (RunCancelled, FailSafeTriggered):
@@ -161,6 +179,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         return _Checked(result=failed, action=action, waited_s=at_gate.seconds)
     if action is not None and not result.is_error:
         gate.observe(action)
+        ctx.runtime.peers.saw(ctx.run_id, call.name, action)
     if result.untrusted:
         gate.taint()
     noted: ToolResult = _with_approval_note(result, note)

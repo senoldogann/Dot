@@ -89,3 +89,13 @@ export function forgetLevel(model) {
 export function allModels(providers) {
   return providers.flatMap((provider) => provider.models);
 }
+
+/**
+ * The level a form sends for the model `ref`: what its select says (`picked`, "" for the default) once `models` lists
+ * that model's levels; until then (the list is loading or failed, or the model is not offered now) the level `kept`
+ * saved with the model `keptRef`, which the form could not show, so a save does not drop it.
+ */
+export function chosenLevel(models, ref, picked, keptRef, kept) {
+  if (models.some((candidate) => candidate.ref === ref)) return picked === "" ? null : picked;
+  return ref === keptRef ? kept : null;
+}

@@ -6,6 +6,7 @@ A session in a mode starts or connects with the first call that needs it; the po
 pool closes every session.
 """
 
+from collections.abc import Callable
 from contextlib import AsyncExitStack
 from pathlib import Path
 
@@ -16,10 +17,14 @@ from dotagent.store.models import BrowserMode
 
 
 class BrowserPool:
-    def __init__(self, config: BrowserConfig, server: ServerConfig, downloads_dir: Path) -> None:
+    def __init__(
+        self, config: BrowserConfig, server: ServerConfig, downloads_dir: Path, kept: Callable[[], frozenset[str]]
+    ) -> None:
         self._server: ServerConfig = server
         self._downloads: Path = downloads_dir
-        self.main: BrowserSession = BrowserSession(config, server, browser_data_dir(config.mode), downloads_dir)
+        # The chats of the runs at work, whose tabs no session's idle reaper closes.
+        self._kept: Callable[[], frozenset[str]] = kept
+        self.main: BrowserSession = BrowserSession(config, server, browser_data_dir(config.mode), downloads_dir, kept)
         self._others: dict[BrowserMode, BrowserSession] = {}
 
     def session_for(self, mode: BrowserMode | None) -> BrowserSession:
@@ -35,6 +40,7 @@ class BrowserPool:
                 self._server,
                 browser_data_dir(mode),
                 self._downloads,
+                self._kept,
             )
             self._others[mode] = found
         return found

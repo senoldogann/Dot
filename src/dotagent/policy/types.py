@@ -85,6 +85,9 @@ RESEARCH_KINDS: frozenset[ActionKind] = READ_ONLY_KINDS | {"notes_write", "memor
 TAINTING_KINDS: frozenset[ActionKind] = frozenset(
     {"network", "browser_read", "browser_navigate", "desktop_observe", "mcp", "mcp_read"}
 )
+# A stored run read content third parties can author when a tool result of it was of one of the kinds above or came
+# over one of these channels (the loop knows it for sure; the store keeps the kind and the channel of every result).
+OUTSIDE_CHANNELS: frozenset[str] = frozenset({"web", "browser"})
 
 # Flags whose consequences reach beyond the machine, or beyond the run (persistence: what is remembered or scheduled
 # shapes every later run; upload: what a command sends to a server, a push, a form, a remote copy); untrusted input must
@@ -115,7 +118,9 @@ class Amount(FrozenModel):
 class ActionInfo(FrozenModel):
     """A concrete action about to happen, as the policy sees it. ``amount`` is the money a payment step moves, when
     the page says it; every other action has none (the default stands for that, since only the browser's payment
-    steps know an amount)."""
+    steps know an amount). ``changes`` are the files a command line changes or removes as far as it shows them (item
+    305), which the runs at work at the same time keep to; only the lines of a shell, a terminal and a script name
+    such files, so the default is none."""
 
     tool: str
     kind: ActionKind
@@ -124,6 +129,7 @@ class ActionInfo(FrozenModel):
     target: str
     flags: tuple[Flag, ...]
     amount: Amount | None = None
+    changes: tuple[str, ...] = ()
 
 
 class Decision(FrozenModel):

@@ -13,7 +13,7 @@ from typing import Literal
 from pydantic import Field
 
 from dotagent.config import AppConfig
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import DesktopError, ToolInputError
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
 from dotagent.desktop.render import (
     describe_step,
@@ -332,6 +332,11 @@ def _act_tool() -> RegisteredTool:
 
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         async def review(step_review: StepReview) -> None:
+            # A step that moves into an application another run drives stops the batch there (item 305).
+            app: str = step_review.context.app
+            held: str | None = ctx.runtime.peers.take_app(ctx.run_id, app) if app else None
+            if held is not None:
+                raise DesktopError(held, {"app": app, "step": step_review.index})
             live: StepAssessment = assess_step(
                 step_review.step, step_review.context, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
             )

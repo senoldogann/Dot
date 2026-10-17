@@ -12,7 +12,8 @@ import pytest
 import pytest_asyncio
 
 from dotagent.agent.manager import RunManager
-from dotagent.agent.reflection import Reflection, last_reflection, reflection_cron
+from dotagent.agent.reflection import last_reflection, reflection_cron
+from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import InterruptedCall, interrupted_calls
 from dotagent.config import AppConfig, load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home

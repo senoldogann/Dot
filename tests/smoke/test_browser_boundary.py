@@ -3,7 +3,7 @@ stands in for Dot's interface and counts what reaches it.
 
 Covers the ways a page can send the browser to the interface: a popup, a resource it loads, a fetch, a service worker,
 a link, a script and a redirect on the way; and the daemon's own refusal of navigations that pages of other sites start
-(``Sec-Fetch-Site``), measured with the real guard behind a real server.
+(``Sec-Fetch-Site``), but for the page a sign-in comes back to, measured with the real guard behind a real server.
 """
 
 import asyncio
@@ -19,20 +19,32 @@ from urllib.parse import urlsplit
 import pytest
 import pytest_asyncio
 import uvicorn
-from playwright.async_api import Browser, Page, Playwright, Response, async_playwright
+from playwright.async_api import (
+    Browser,
+    BrowserContext,
+    CDPSession,
+    Frame,
+    Page,
+    Playwright,
+    Response,
+    async_playwright,
+)
 from starlette.types import Message, Receive, Scope, Send
 from test_browser import act, ref_of
 
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import PageView, ScriptRun, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import ForbiddenUrlError
+from dotagent.mcp.signin import CALLBACK_PATH
 from dotagent.server.guard import LocalGuard
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 _TOKEN: str = "boundary-test-token"
 _STARTUP_S: float = 10.0
+_READS: int = 10
+_SLOW_CDP_S: float = 0.3
 
 
 @dataclass(frozen=True, slots=True)
@@ -84,6 +96,7 @@ def _site_pages(inside: str, guarded: str) -> dict[str, str]:
 <a href="/hop">Hop to inside</a>
 <a href="{guarded}/">Guarded link</a>
 <a href="/hop-guarded">Hop to guarded</a>
+<a href="/allow">Allow sign-in</a>
 <img src="{inside}/pixel.png" alt="pixel">
 <img src="/own.png" alt="own">
 <p id="out">quiet</p>""",
@@ -105,6 +118,10 @@ def _site_handler(inside: str, guarded: str) -> type[BaseHTTPRequestHandler]:
                 return
             if path == "/hop-guarded":
                 self._redirect(f"{guarded}/")
+                return
+            if path == "/allow":
+                # An authorization server that the owner allowed a sign-in on sends the browser back to the daemon.
+                self._redirect(f"{guarded}{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
                 return
             if path == "/sw.js":
                 body: bytes = (
@@ -255,7 +272,11 @@ async def browser(
     browser_config: BrowserConfig, server_config: ServerConfig, tmp_path_factory: pytest.TempPathFactory
 ) -> AsyncIterator[BrowserSession]:
     session: BrowserSession = BrowserSession(
-        browser_config, server_config, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads")
+        browser_config,
+        server_config,
+        tmp_path_factory.mktemp("profile"),
+        tmp_path_factory.mktemp("downloads"),
+        no_runs_at_work,
     )
     yield session
     await session.aclose()
@@ -338,10 +359,23 @@ async def test_a_link_that_redirects_to_the_interface_is_stopped(
     assert _InsideHandler.arrivals.items == []
 
 
-async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(browser: BrowserSession, site: str) -> None:
+async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(
+    browser: BrowserSession, site: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Each read navigates a new tab, whose guard is also begun when Chrome announces the tab. With Chrome slow to open
+    the guard's session, reads in a row show that none navigates before its tab's guard is up (measured 2026-10-16:
+    a read could navigate while the guard begun for its tab was still under way, and its redirect reached Dot's port)."""
+    open_session = BrowserContext.new_cdp_session
+
+    async def slow_session(context: BrowserContext, page: Page | Frame) -> CDPSession:
+        await asyncio.sleep(_SLOW_CDP_S)
+        return await open_session(context, page)
+
+    monkeypatch.setattr(BrowserContext, "new_cdp_session", slow_session)
     port: int | None = urlsplit(site).port
-    with pytest.raises(ForbiddenUrlError):
-        await browser.read_page(f"http://localhost:{port}/hop")
+    for read in range(_READS):
+        with pytest.raises(ForbiddenUrlError):
+            await browser.read_page(f"http://localhost:{port}/hop?read={read}")
     assert _InsideHandler.arrivals.items == []
 
 
@@ -399,6 +433,21 @@ async def test_the_daemon_refuses_navigations_that_pages_of_other_sites_start(
     async with plain_page.expect_navigation():
         await plain_page.click('text="Hop to guarded"')
     assert _last_page(recorder) == Served(path="/", fetch_site="cross-site", status=403), recorder.served
+
+
+async def test_the_page_a_sign_in_comes_back_to_is_served_after_a_redirect_from_another_site(
+    plain_page: Page, site: str, recorder: _Recorder
+) -> None:
+    """An authorization server sends the browser back to ``/oauth/callback`` through a redirect once the owner allowed
+    the sign-in on its page (item 279): Chrome sends that navigation as ``cross-site``, and the daemon serves this path
+    to it while it refuses the UI to the same navigation."""
+    recorder.served.clear()
+    port: int | None = urlsplit(site).port
+    await plain_page.goto(f"http://localhost:{port}/")
+    async with plain_page.expect_navigation():
+        await plain_page.click('text="Allow sign-in"')
+    callbacks: list[Served] = [served for served in recorder.served if served.path == CALLBACK_PATH]
+    assert callbacks == [Served(path=CALLBACK_PATH, fetch_site="cross-site", status=200)], recorder.served
 
 
 async def test_what_chrome_sends_when_the_browser_itself_is_redirected(

@@ -8,7 +8,8 @@
 
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
-import { clip, clock, compact, dateTime, duration, el, plural } from "./dom.js";
+import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
+import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
 import { faceState } from "./face.js";
 import { helperCard } from "./helpercard.js";
@@ -33,6 +34,11 @@ const RING_LABELS = { blocked: "waiting" };
 // keeps for its last line.
 const FLOCK_FACES = 3;
 const PREVIEW_CHARS = 240;
+// The memory tools' results that changed the memory, "Saved: [mem_x] …", and what their line in the conversation says
+// (item 313); a note saved again ("Already saved: …") changed nothing. The line shows this much of the note.
+const MEMORY_RESULT = /^(Saved|Updated|Forgot): \[([^\]\s]+)\]/;
+const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
+const MEMORY_WORDS_CHARS = 120;
 // How the helpers of a group stand, in the order a reader scans them, after T3 Code's: those under way first, then how
 // the others ended.
 const FLOCK_WORDS = [
@@ -160,6 +166,36 @@ function describeCall(tool, args) {
   return clip(detail === "" ? tool : `${tool} · ${detail}`, LATEST_CHARS);
 }
 
+/** The line a compaction leaves in the conversation (item 312): "Context compacted", and the size of the context
+ * before and after it where the event says them (an event of before item 312 does not). */
+function compactionLine(data) {
+  const sized = typeof data.tokens_before === "number" && typeof data.tokens_after === "number";
+  const text = sized ? `Context compacted ${compact(data.tokens_before)} → ${compact(data.tokens_after)} tokens` : "Context compacted";
+  return el("div", { class: "compaction-line" }, icon("minimize"), el("span", null, text));
+}
+
+/**
+ * The line a change of the memory leaves in the conversation (item 313, after Grok's "Updated memory"): what changed and
+ * the first words of the note, for a save and a change from the call's arguments, for a removal from the action's
+ * summary, which holds the words the note had. The line of a saved or changed note opens it in Settings › Memory; a
+ * removed note is gone. Null for a result that changed nothing: a failed call, a note saved again.
+ */
+function memoryLine(data, args) {
+  const found = data.kind === "memory_write" && data.ok ? MEMORY_RESULT.exec(data.text) : null;
+  if (found === null) {
+    return null;
+  }
+  const [, change, id] = found;
+  const words = change === "Forgot" ? data.summary.replace(/^Forget: /, "") : typeof args.content === "string" ? args.content : "";
+  const parts = [icon("database"), el("span", { class: "memory-change" }, MEMORY_CHANGES[change])];
+  if (words.trim() !== "") {
+    parts.push(el("span", { class: "memory-words" }, `“${clip(words, MEMORY_WORDS_CHARS)}”`));
+  }
+  return change === "Forgot"
+    ? el("div", { class: "note memory-line" }, ...parts)
+    : el("a", { class: "note memory-line", href: `#/settings/memory?note=${encodeURIComponent(id)}` }, ...parts);
+}
+
 /** An empty group of tool steps that starts at `ts` (seconds); it is "working" until something ends it. */
 function buildGroup(ts) {
   const state = el("span", { class: "steps-state" });
@@ -181,13 +217,13 @@ function paintGroup(group) {
     group.state.replaceChildren(live ? el("span", { class: "spinner" }) : icon("check"));
   }
   const model = group.modelSeconds > 0 ? ` (model ${duration(group.modelSeconds)})` : "";
-  group.title.textContent = live ? "Working…" : `Worked for ${duration(Math.max(group.end - group.start, group.longest))}${model}`;
-  group.count.textContent = plural(group.calls, "tool call", "tool calls");
+  setText(group.title, live ? "Working…" : `Worked for ${duration(Math.max(group.end - group.start, group.longest))}${model}`);
+  setText(group.count, plural(group.calls, "tool call", "tool calls"));
   const troubles = [group.failedCalls > 0 ? `${group.failedCalls} failed` : "", group.cutCalls > 0 ? `${group.cutCalls} cut off` : ""];
   group.failed.hidden = group.failedCalls === 0 && group.cutCalls === 0;
-  group.failed.textContent = troubles.filter((text) => text !== "").join(" · ");
+  setText(group.failed, troubles.filter((text) => text !== "").join(" · "));
   group.latest.hidden = !live;
-  group.latest.textContent = live ? group.last : "";
+  setText(group.latest, live ? group.last : "");
 }
 
 /**
@@ -209,16 +245,17 @@ function buildFlock() {
 
 /**
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
- * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it and
- * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row) and
- * `helperStatuses()` the statuses of the delegated runs; the
+ * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it,
+ * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
+ * `helperStatuses()` the statuses of the delegated runs and `draft(record)` paints a draft's card as the draft now
+ * stands (item 314: one answered after the run's stream ended); the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
  * event (its context budget, its model's window, the size chosen for the model and the prompt past which the run
  * summarizes), `onCalls({ calls, failed })` after every tool call of the run, `onCompacted({ count, flagged })` after
- * every compaction of the run (item 260: the conversation shows no note of one; `flagged` counts the checks that found
- * a section missing or a name the conversation never had),
+ * every compaction of the run (item 260; the conversation shows a quiet line where it happened, item 312; `flagged`
+ * counts the checks that found a section missing or a name the conversation never had),
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `onGoalFiles(files)` takes the files that came
@@ -234,6 +271,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   const liveChildren = new Set();
   let browserSeen = false;
   const totals = { calls: 0, failed: 0 };
+  // The cards of the drafts the runs wrote, by draft id, in the order they came (item 314): a decision repaints its card
+  // wherever it is; while two or more wait, a bar after the last of them sends the ticked ones together.
+  const drafts = new Map();
+  const draftBar = draftsBar(() => [...drafts.values()]);
 
   // `began` is when the run started; `boundary` is when the work since the last message started.
   function makeScope({ runId, actorId: actor, container, panel, parent, began }) {
@@ -330,10 +371,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     const live = helpers.some((helper) => helper.ended === null);
     const began = Math.min(...helpers.map((helper) => helper.began));
     const ended = live ? now : Math.max(...helpers.map((helper) => helper.ended));
-    flock.group.title.textContent = plural(helpers.length, "helper", "helpers");
-    flock.group.state.textContent = flockState(helpers.map((helper) => helper.status));
+    setText(flock.group.title, plural(helpers.length, "helper", "helpers"));
+    setText(flock.group.state, flockState(helpers.map((helper) => helper.status)));
     flock.group.state.classList.toggle("bad", !live && helpers.some((helper) => helper.status === "failed"));
-    flock.group.time.textContent = duration(Math.max(ended - began, 0));
+    setText(flock.group.time, duration(Math.max(ended - began, 0)));
   }
 
   /**
@@ -473,7 +514,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       calls: 0,
     };
     card.attach(summary, helper, () => actorFace(data.agent_id ?? runId, faceState(helper.status), null));
-    const panel = { node, face, status, meta, progress, time, steps: 0, helper, flock: null };
+    // `line`: the facts its last line shows (see paintChild).
+    const panel = { node, face, status, meta, progress, line: "starting", time, steps: 0, helper, flock: null };
     const scope = makeScope({ runId, actorId: data.agent_id ?? runId, container: inner, panel, parent, began: ts });
     scopes.set(runId, scope);
     liveChildren.add(scope);
@@ -481,10 +523,15 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     return scope;
   }
 
-  /** The row of a delegated run as it stands at `ts`: its last line as facts and the time it has taken. */
+  /** The row of a delegated run as it stands at `ts`: its last line as facts, drawn again only when they changed (item
+   * 310), and the time it has taken. */
   function paintChild(scope, ts, facts) {
-    scope.panel.progress.replaceChildren(...facts.map((fact) => el("span", null, fact)));
-    scope.panel.time.textContent = duration(Math.max(ts - scope.began, 0));
+    const line = facts.join("\n");
+    if (scope.panel.line !== line) {
+      scope.panel.line = line;
+      scope.panel.progress.replaceChildren(...facts.map((fact) => el("span", null, fact)));
+    }
+    setText(scope.panel.time, duration(Math.max(ts - scope.began, 0)));
   }
 
   /** The row of the delegated run of `scope` shows that the run ended with `status` at `ts` after `steps` steps, its
@@ -540,11 +587,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   /** The row of every delegated run that has not ended says how long it has worked at `now` (seconds): the page calls
    * this every second while the run works, so a folded row's time counts on between the events of its run, as T3 Code
    * counts a working subagent's (item 123), and as an event comes. The card a row shows follows (item 226), and so does
-   * the head of the group the row is in (item 245). */
+   * the head of the group the row is in (item 245). What reads the same as before is not written again (item 310): the
+   * page calls this on every event of the run and its helpers. */
   function tick(now) {
     const flocks = new Set();
     for (const scope of liveChildren) {
-      scope.panel.time.textContent = duration(Math.max(now - scope.began, 0));
+      setText(scope.panel.time, duration(Math.max(now - scope.began, 0)));
       flocks.add(scope.panel.flock);
     }
     for (const flock of flocks) {
@@ -696,7 +744,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     group.calls += 1;
     group.pending += 1;
     group.last = describeCall(call.tool, call.args);
-    const entry = { row, group };
+    const entry = { row, group, args: call.args };
     scope.calls.set(call.id, entry);
     if (scope.runId === rootRunId) {
       totals.calls += 1;
@@ -754,7 +802,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       settleThought(scope, data);
       if (scope.panel !== null) {
         scope.panel.steps = Math.max(scope.panel.steps, data.step);
-        scope.panel.progress.textContent = `step ${scope.panel.steps}`;
+        // A turn that calls a tool has its line painted by its first call, so the tool's name does not go and come back
+        // at every step (item 310).
+        if (!data.tool_calls.some((name) => name !== FINISH_TOOL)) {
+          paintChild(scope, record.ts, [`step ${scope.panel.steps}`]);
+        }
       }
       const bubble = scope.live !== null && scope.live.step === data.step ? scope.live : null;
       scope.live = null;
@@ -854,7 +906,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         showCall(scope, { id: data.call_id, tool: data.tool, args: finishArgs });
       }
       const entry = scope.calls.get(data.call_id) ?? showCall(scope, { id: data.call_id, tool: data.tool, args: {} });
-      const { row, group } = entry;
+      const { row, group, args } = entry;
       row.finish(data);
       if (scope.panel !== null) {
         scope.panel.helper.calls = Math.max(0, scope.panel.helper.calls - 1);
@@ -872,6 +924,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       paintGroup(group);
       for (const name of data.images) {
         onImage(name);
+      }
+      const remembered = memoryLine(data, args);
+      if (remembered !== null) {
+        place(scope, remembered, record.ts);
       }
     },
 
@@ -1078,7 +1134,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     memories(scope, record) {
       const count = plural(record.data.ids.length, "memory", "memories");
       const tokens = typeof record.data.tokens === "number" ? `, ${plural(record.data.tokens, "token", "tokens")}` : "";
-      const text = record.data.live === true ? `Picked up ${count} saved while the run worked` : `Recalled ${count}${tokens}`;
+      // Item 308: the lessons of a site the run just reached say where they were learned.
+      const text =
+        record.data.live === true
+          ? `Picked up ${count} saved while the run worked`
+          : typeof record.data.site === "string"
+            ? `Recalled ${count} learned on ${record.data.site}`
+            : `Recalled ${count}${tokens}`;
       note(scope, record.ts, "database", text, "");
     },
 
@@ -1088,8 +1150,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "database", `${what} by their words alone: the embedding service failed — ${clip(record.data.error, 240)}`, "warn");
     },
 
-    // A compaction is counted for the Details panel, not told in the conversation (item 260); the Cost panel has the
-    // summaries' share, and the event keeps the model, the method and the check.
+    // A compaction is a quiet line across the conversation where it happened, with the size of the context before and
+    // after it (item 312, after Codex's); the Details panel counts the compactions and the checks that flagged
+    // something (item 260), the Cost panel has the summaries' share, and the event keeps the model, the method and the
+    // check.
     compacted(scope, record) {
       if (scope.runId !== rootRunId) {
         return;
@@ -1100,6 +1164,22 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         compactions.flagged += 1;
       }
       onCompacted({ ...compactions });
+      place(scope, compactionLine(record.data), record.ts);
+    },
+
+    // A draft a run wrote for the owner (item 314): a card where it was written, and the owner's Send or Discard on it,
+    // or a send that failed, which may come long after the run ended.
+    draft_created(scope, record) {
+      const made = draftCard(record.data, () => draftBar.paint());
+      drafts.set(record.data.id, made);
+      place(scope, made.node, record.ts);
+      draftBar.paint();
+      // An answer that came after the run's last event is not in the run's stream: the card reads the draft once.
+      made.refresh();
+    },
+
+    draft_decided(scope, record) {
+      drafts.get(record.data.id)?.update(record.data);
     },
 
     // A side question (/btw) and its answer: shown in the conversation, never part of the run's own context.
@@ -1254,5 +1334,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   const helper = (runId) => scopes.get(runId)?.panel?.helper ?? null;
   // The statuses of the run's delegated runs, in the order they started.
   const helperStatuses = () => [...scopes.values()].filter((scope) => scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
-  return { element, push, tick, settle, knows: (runId) => scopes.has(runId), helper, helperStatuses };
+  return {
+    element,
+    push,
+    tick,
+    settle,
+    knows: (runId) => scopes.has(runId),
+    helper,
+    helperStatuses,
+    draft: (record) => drafts.get(record.id)?.update(record),
+  };
 }

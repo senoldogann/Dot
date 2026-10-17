@@ -1,14 +1,16 @@
 // Agents (item 86): the profiles the owner makes, each with a face in its own hue, a name, a role in one line,
 // instructions that open the prompt of its runs, and bounds for them (a model, a reasoning level, approvals, tools).
-// The list (#/agents) shows Dot first and then the agents, each with its newest chat; an agent's page (#/agents/<id>)
-// greets with its face and role, takes a message for it and lists its chats; the editor makes or changes an agent.
+// The list (#/agents) shows Dot first and then the agents, each with its newest chat, and under them the templates an
+// agent starts from in one click (item 315); an agent's page (#/agents/<id>) greets with its face and role, takes a
+// message for it and lists its chats; the editor makes or changes an agent. An agent goes out as a file from its page
+// and comes back, in this home or another, from the list's Import.
 
 import { actorFace, dotFace, fallbackLook, rememberLook } from "../actors.js";
 import { api } from "../api.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
-import { allModels, levelLabel } from "../efforts.js";
+import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
 import { lookPicker } from "../lookpicker.js";
@@ -27,6 +29,8 @@ const GOAL_CHARS = 90;
 const MAX_GOAL_PX = 320;
 // The face an agent wears in its row: working while its newest run works, at rest otherwise.
 const WORKING = new Set(["queued", "running", "blocked"]);
+// The largest agent file Import reads: its instructions take at most 50,000 characters, of up to four bytes each.
+const MOST_AGENT_FILE_BYTES = 256 * 1024;
 
 function faceOf(record, latest) {
   if (record.id === DOT_ID) {
@@ -56,6 +60,84 @@ function agentRow({ record, latest }) {
     record.made_by === null ? null : el("span", { class: "agent-made" }, "Made by Dot"),
     latest === null ? null : el("span", { class: "agent-when" }, ago(latest.created_at)),
   );
+}
+
+// ------------------------------------------------------------------------------------------------- templates and files
+
+function templateFact(label, text) {
+  return el("div", null, el("dt", null, label), el("dd", null, text));
+}
+
+/** A template's card (item 315): its face, name and role, what it needs of the Mac and the schedule it suggests. */
+function templateCard(template, onUse) {
+  const use = el("button", { class: "btn sm", type: "button", "aria-label": `Use the template ${template.name}` }, icon("plus"), "Use template");
+  use.addEventListener("click", async () => {
+    use.disabled = true;
+    try {
+      await attempt(() => onUse(template));
+    } finally {
+      use.disabled = false;
+    }
+  });
+  return el(
+    "article",
+    { class: "card template-card", dataset: { template: template.id } },
+    el(
+      "div",
+      { class: "template-head" },
+      actorFace(`template-${template.id}`, "idle", template.look),
+      el("div", { class: "row-main" }, el("div", { class: "template-name" }, template.name), el("div", { class: "template-role" }, template.role)),
+    ),
+    el(
+      "dl",
+      { class: "template-facts" },
+      templateFact("Needs", template.needs),
+      templateFact("Schedule", template.schedule === "" ? "When you ask" : template.schedule),
+    ),
+    use,
+  );
+}
+
+/** The name of an agent's file: its name in lower case with dashes, or its id when the name has no letter or digit. */
+function agentFileName(record) {
+  const slug = record.name
+    .normalize("NFKD")
+    .replace(/\p{M}/gu, "")
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${slug === "" ? record.id : slug}.dot-agent.json`;
+}
+
+/** The agent as a file to keep or to import in another home (item 315); the daemon refuses one that holds a key. */
+async function exportAgent(record) {
+  const file = await api.get(`/agents/${record.id}/export`);
+  const name = agentFileName(record);
+  const url = URL.createObjectURL(new Blob([`${JSON.stringify(file, null, 2)}\n`], { type: "application/json" }));
+  const link = el("a", { href: url, download: name, hidden: true });
+  document.body.append(link);
+  link.click();
+  link.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  toast("ok", `${record.name} is saved as ${name}.`);
+}
+
+/** An agent made from its file (item 315); the daemon refuses a file that is not one, or that names tools not here. */
+async function importAgent(file) {
+  if (file.size > MOST_AGENT_FILE_BYTES) {
+    throw new Error(`${file.name} is larger than an agent file can be.`);
+  }
+  const text = await file.text();
+  let parsed;
+  try {
+    parsed = JSON.parse(text);
+  } catch (error) {
+    throw new Error(`${file.name} is not an agent file: ${error.message}`);
+  }
+  const saved = await api.post("/agents/import", parsed);
+  rememberLook(saved.id, saved.look);
+  toast("ok", `${saved.name} is imported.`);
+  return saved;
 }
 
 // ------------------------------------------------------------------------------------------------- the editor
@@ -143,7 +225,7 @@ function agentForm({ record, onSaved, onCancel }) {
   }
 
   model.addEventListener("change", paintEffort);
-  loadModels()
+  const modelsListed = loadModels()
     .then((providers) => {
       models = allModels(providers).filter((candidate) => candidate.tools);
       const chosen = model.value;
@@ -159,10 +241,13 @@ function agentForm({ record, onSaved, onCancel }) {
     .catch((error) => {
       console.warn("the models could not be listed", error);
     });
-  api
+  // Saved only once the tools are listed: without them the form cannot say which tools the agent may use.
+  let toolsListed = false;
+  const toolsLoaded = api
     .get("/tools")
     .then((names) => {
       tools.replaceChildren(toolPicks(names, record === null ? [] : record.tools));
+      toolsListed = true;
     })
     .catch((error) => {
       tools.replaceChildren(el("span", { class: "muted" }, `The tools could not be listed: ${error.message}`));
@@ -172,7 +257,10 @@ function agentForm({ record, onSaved, onCancel }) {
     role.value = record.role;
     instructions.value = record.instructions;
   }
-  const save = el("button", { class: "btn primary", type: "button" }, icon(record === null ? "plus" : "check"), record === null ? "Create agent" : "Save changes");
+  const save = el("button", { class: "btn primary", type: "button", disabled: true }, icon(record === null ? "plus" : "check"), record === null ? "Create agent" : "Save changes");
+  Promise.allSettled([modelsListed, toolsLoaded]).then(() => {
+    save.disabled = !toolsListed;
+  });
   const cancel = el("button", { class: "btn ghost", type: "button", onclick: onCancel }, "Cancel");
 
   async function submit() {
@@ -181,14 +269,16 @@ function agentForm({ record, onSaved, onCancel }) {
       name.focus();
       return;
     }
+    const picked = [...tools.querySelectorAll("input:checked")].map((input) => input.value);
     const body = {
       name: nameText,
       role: role.value.trim(),
       instructions: instructions.value.trim(),
       model: model.value,
-      effort: effort.value === "" ? null : effort.value,
+      effort: chosenLevel(models, model.value, effort.value, record === null ? "" : record.model, record === null ? null : record.effort),
       approvals: approvals.value === "" ? null : approvals.value,
-      tools: [...tools.querySelectorAll("input:checked")].map((input) => input.value),
+      // None picked is every tool, said as null: an empty list keeps the tools an agent has (the code review's Y5).
+      tools: picked.length === 0 ? null : picked,
       look: look.value(),
     };
     save.disabled = true;
@@ -235,6 +325,31 @@ function mountList(root, ctx) {
   let ticket = 0;
   const holder = el("div", null, loadingPanel());
   const editorSlot = el("div", null);
+  const templates = el("section", { class: "stack", "aria-label": "Templates" }, loadingPanel());
+
+  async function loadTemplates() {
+    try {
+      const listed = await api.get("/agent-templates");
+      if (!disposed) {
+        templates.replaceChildren(
+          el("div", { class: "section-label" }, "Start from a template"),
+          el("p", { class: "hint" }, "Each becomes an agent of yours, to change as you like. What one writes to a person is a draft that you send."),
+          el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate))),
+        );
+      }
+    } catch (error) {
+      if (!disposed) {
+        templates.replaceChildren(errorPanel(error, () => attempt(loadTemplates)));
+      }
+    }
+  }
+
+  async function useTemplate(template) {
+    const saved = await api.post(`/agent-templates/${template.id}/use`, null);
+    rememberLook(saved.id, saved.look);
+    toast("ok", `${saved.name} is ready.`);
+    ctx.navigate(`/agents/${saved.id}`);
+  }
 
   async function reload() {
     const mine = ++ticket;
@@ -277,10 +392,28 @@ function mountList(root, ctx) {
 
   const newButton = el("button", { class: "btn primary", type: "button", onclick: openEditor }, icon("plus"), el("span", { class: "label" }, "New agent"));
   const teamLink = el("a", { class: "btn ghost", href: "#/team", title: "Today's messages between agents" }, icon("branch"), el("span", { class: "label" }, "Team"));
+  const chooser = el("input", { type: "file", accept: ".json,application/json", hidden: true, "aria-label": "Agent file" });
+  const importButton = el(
+    "button",
+    { class: "btn ghost", type: "button", title: "Make an agent from a file exported from Dot", onclick: () => chooser.click() },
+    icon("upload"),
+    el("span", { class: "label" }, "Import"),
+  );
+  chooser.addEventListener("change", () => {
+    const [file] = chooser.files;
+    chooser.value = "";
+    if (file !== undefined) {
+      attempt(async () => {
+        const saved = await importAgent(file);
+        ctx.navigate(`/agents/${saved.id}`);
+      });
+    }
+  });
   root.append(
-    pageHead("Agents", "Dot, and the agents you made: each with a face, a role and its own chats.", el("div", { class: "cluster" }, teamLink, newButton)),
+    pageHead("Agents", "Dot, and the agents you or Dot made: each with a face, a role and its own chats.", el("div", { class: "cluster" }, teamLink, importButton, chooser, newButton)),
     editorSlot,
     holder,
+    templates,
   );
   const stopLifecycle = onLifecycle((event) => {
     if (event.kind === "run_started" || event.kind === "run_finished") {
@@ -289,6 +422,7 @@ function mountList(root, ctx) {
   });
   const stopBack = onStreamBack(() => attempt(reload));
   attempt(reload);
+  attempt(loadTemplates);
   return () => {
     disposed = true;
     stopLifecycle();
@@ -445,6 +579,7 @@ function mountPage(root, ctx, agentId) {
     setStageTitle(actorFace(record.id, "idle", record.look), el("span", { class: "stage-name" }, record.name));
     setStageTools(
       el("button", { class: "btn ghost sm", type: "button", title: "Edit the agent", onclick: () => edit(record) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
+      el("button", { class: "btn ghost sm", type: "button", title: "Save the agent as a file, to import in another home", onclick: () => attempt(() => exportAgent(record)) }, icon("download"), el("span", { class: "label" }, "Export")),
       el("button", { class: "btn ghost sm", type: "button", title: "Delete the agent", onclick: () => attempt(() => remove(record)) }, icon("trash"), el("span", { class: "label" }, "Delete")),
     );
   }

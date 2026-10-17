@@ -1,7 +1,9 @@
-"""The compaction notes leave the conversation (item 260): a run that compacted its context twice shows no note of it
-in its conversation; the Details panel says how many times it compacted and how many checks flagged something. A real
-server over a stand-in of Anthropic's provider in Chrome, wide and on a phone, light and dark. Before, each compaction
-was a note in the timeline ("Context compacted: …")."""
+"""A compaction is a quiet line in the conversation (item 312, after Codex's): a run that compacted its context twice
+shows two lines where it compacted, the first with the size of the context before and after it, the second, of an event
+from before item 312, without them; no note tells the summary or its check (item 260), and the Details panel says how
+many times it compacted and how many checks flagged something. A real server over a stand-in of Anthropic's provider in
+Chrome, wide and on a phone, light and dark. Before item 260 each compaction was a note in the timeline ("Context
+compacted: …"); from item 260 to item 312 the conversation showed nothing of it."""
 
 import asyncio
 import time
@@ -39,6 +41,8 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
 _FLAGGED: JsonObject = {
     "summarised_messages": 6,
     "compaction": 1,
+    "tokens_before": 401_234,
+    "tokens_after": 17_100,
     "method": "model",
     "model": OPUS,
     "attempts": 2,
@@ -46,6 +50,7 @@ _FLAGGED: JsonObject = {
     "fast_problem": None,
     "check": {"ok": False, "missing_sections": ["PLAN"], "unverified": ["/tmp/nowhere.txt"], "summary_chars": 900},
 }
+# An event of before item 312: it does not say the sizes.
 _CLEAN: JsonObject = {
     "summarised_messages": 5,
     "compaction": 2,
@@ -164,7 +169,7 @@ async def _seed(runtime: Runtime) -> RunRecord:
 
 
 @pytest.mark.browser
-async def test_a_compaction_is_counted_in_the_details_and_not_told_in_the_conversation(
+async def test_a_compaction_is_a_quiet_line_in_the_conversation_and_is_counted_in_the_details(
     runtime: Runtime, served: str, tmp_path: Path
 ) -> None:
     run: RunRecord = await _seed(runtime)
@@ -181,6 +186,9 @@ async def test_a_compaction_is_counted_in_the_details_and_not_told_in_the_conver
                 details = page.locator("#panel-run-details")
                 await expect(details).to_contain_text("Compacted 2 times")
                 await expect(details).to_contain_text("1 check flagged")
+                lines = page.locator(".timeline .compaction-line")
+                await expect(lines).to_have_text(["Context compacted 401k → 17k tokens", "Context compacted"])
+                await expect(lines.first).to_be_visible()
                 await expect(page.locator(".timeline .note", has_text="compacted")).to_have_count(0)
                 await expect(page.locator(".timeline .note", has_text="summarised")).to_have_count(0)
                 await page.screenshot(path=str(tmp_path / f"quiet-{width}-{scheme}.png"), animations="disabled")

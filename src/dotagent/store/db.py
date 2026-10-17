@@ -45,6 +45,9 @@ from dotagent.store.models import (
     CampaignEntryKind,
     CampaignRecord,
     ChatChoices,
+    DraftChannel,
+    DraftRecord,
+    DraftStatus,
     EventRecord,
     MemoryRecord,
     MemoryScore,
@@ -106,6 +109,12 @@ CREATE TABLE IF NOT EXISTS approvals (
     args TEXT NOT NULL, decided_by TEXT, note TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS approvals_run ON approvals(run_id, status);
+CREATE TABLE IF NOT EXISTS drafts (
+    id TEXT PRIMARY KEY, run_id TEXT NOT NULL, channel TEXT NOT NULL, recipients TEXT NOT NULL, cc TEXT NOT NULL,
+    subject TEXT NOT NULL, body TEXT NOT NULL, status TEXT NOT NULL, created_at REAL NOT NULL, decided_at REAL,
+    error TEXT
+);
+CREATE INDEX IF NOT EXISTS drafts_status ON drafts(status, created_at);
 CREATE TABLE IF NOT EXISTS shown_pages (
     id TEXT PRIMARY KEY, run_id TEXT NOT NULL, title TEXT NOT NULL, html TEXT NOT NULL, created_at REAL NOT NULL
 );
@@ -498,6 +507,29 @@ def _approval(row: aiosqlite.Row) -> ApprovalRecord:
     )
 
 
+def _addresses(value: object) -> tuple[str, ...]:
+    """The stored recipients of a draft: a JSON array of addresses."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise StoreError("a stored draft has recipients that are not a list of addresses", {"recipients": repr(value)})
+    return tuple(value)
+
+
+def _draft(row: aiosqlite.Row) -> DraftRecord:
+    return DraftRecord(
+        id=row["id"],
+        run_id=row["run_id"],
+        channel=row["channel"],
+        to=_addresses(parse_json_value(row["recipients"], "draft recipients")),
+        cc=_addresses(parse_json_value(row["cc"], "draft cc")),
+        subject=row["subject"],
+        body=row["body"],
+        status=row["status"],
+        created_at=row["created_at"],
+        decided_at=row["decided_at"],
+        error=row["error"],
+    )
+
+
 def _rule(row: aiosqlite.Row) -> RuleRecord:
     return RuleRecord(
         id=row["id"],
@@ -533,6 +565,12 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
     )
 
 
+# The note with a text that a run of an agent (the second value; NULL for Dot) is handed: its own first, else Dot's.
+_SAME_TEXT: str = (
+    "SELECT * FROM memories WHERE content = ? AND (agent_id IS ? OR agent_id IS NULL) ORDER BY agent_id IS NULL LIMIT 1"
+)
+
+
 def _memory(row: aiosqlite.Row) -> MemoryRecord:
     tags: str = row["tags"]
     return MemoryRecord(
@@ -545,6 +583,8 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         agent_id=row["agent_id"],
         used_count=row["used_count"],
         last_used_at=row["last_used_at"],
+        expires_at=row["expires_at"],
+        replaced_by=row["replaced_by"],
     )
 
 
@@ -622,6 +662,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     ("used_count", "INTEGER NOT NULL DEFAULT 0"),
     ("last_used_at", "REAL"),
     ("agent_id", "TEXT"),
+    # Item 306: notes held until they were changed, and none was put aside for a newer one.
+    ("expires_at", "REAL"),
+    ("replaced_by", "TEXT"),
 )
 # Columns of ``schedules`` added later: NULL means "what the configuration says when the schedule fires", which is how
 # the schedules of an older database ran.
@@ -855,6 +898,19 @@ class Store:
         )
         await self._db.commit()
 
+    @_writing
+    async def kv_update(self, key: str, update: Callable[[str | None], str]) -> str:
+        """Set ``key`` to what ``update`` makes of its value (``None`` while it has none), read and written in one write
+        that no other one interleaves; returns the value set."""
+        row: aiosqlite.Row | None = await self._one("SELECT value FROM kv WHERE key = ?", (key,))
+        value: str = update(None if row is None else str(row["value"]))
+        await self._db.execute(
+            "INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+        await self._db.commit()
+        return value
+
     # ----- threads and messages ------------------------------------------------------------
 
     @_writing
@@ -994,6 +1050,7 @@ class Store:
         await self._db.execute(f"{doomed} DELETE FROM events WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM approvals WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM shown_pages WHERE run_id IN (SELECT id FROM doomed)", named)
+        await self._db.execute(f"{doomed} DELETE FROM drafts WHERE run_id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"{doomed} DELETE FROM runs WHERE id IN (SELECT id FROM doomed)", named)
         await self._db.execute(f"DELETE FROM messages WHERE thread_id IN ({marks})", named)
         await self._db.execute(f"DELETE FROM message_archive WHERE thread_id IN ({marks})", named)
@@ -1094,11 +1151,13 @@ class Store:
 
     @_writing
     async def delete_events_of_runs_ended_before(self, before: float) -> int:
-        """Delete the events of the runs that ended before ``before``, and the pages they showed; the runs stay.
-        Returns how many events went. The screenshots those events named become orphans for :meth:`orphan_images`."""
+        """Delete the events of the runs that ended before ``before``, and the pages they showed and the drafts they
+        wrote, which the conversation showed; the runs stay. Returns how many events went. The screenshots those events
+        named become orphans for :meth:`orphan_images`."""
         ended: str = "SELECT id FROM runs WHERE finished_at IS NOT NULL AND finished_at < ?"
         cursor = await self._db.execute(f"DELETE FROM events WHERE run_id IN ({ended})", (before,))
         await self._db.execute(f"DELETE FROM shown_pages WHERE run_id IN ({ended})", (before,))
+        await self._db.execute(f"DELETE FROM drafts WHERE run_id IN ({ended})", (before,))
         await self._db.commit()
         return cursor.rowcount
 
@@ -1746,6 +1805,30 @@ class Store:
         )
         return [_event(row) for row in rows]
 
+    async def run_sites(self, run_id: str) -> list[str]:
+        """The sites a run's calls reached (the ``site`` of its ``tool_result`` events: page hosts and applications),
+        the one it reached most often first (item 308)."""
+        rows = await self._all(
+            "SELECT json_extract(data, '$.site') AS site FROM events WHERE run_id = ? AND kind = 'tool_result'"
+            " AND coalesce(json_extract(data, '$.site'), '') != '' GROUP BY site ORDER BY COUNT(*) DESC, site",
+            (run_id,),
+        )
+        return [str(row["site"]) for row in rows]
+
+    async def read_outside(self, run_id: str, kinds: Sequence[str], channels: Sequence[str]) -> bool:
+        """Whether a run read content third parties can author, from every one of its ``tool_result`` events: one of
+        ``kinds`` or over one of ``channels``, or one the run made while it was tainted."""
+        kind_marks: str = ",".join("?" for _ in kinds)
+        channel_marks: str = ",".join("?" for _ in channels)
+        row: aiosqlite.Row | None = await self._one(
+            "SELECT EXISTS(SELECT 1 FROM events WHERE run_id = ? AND kind = 'tool_result' AND ("
+            "json_extract(data, '$.tainted') = 1"
+            f" OR json_extract(data, '$.kind') IN ({kind_marks})"
+            f" OR json_extract(data, '$.channel') IN ({channel_marks})))",
+            (run_id, *kinds, *channels),
+        )
+        return row is not None and bool(row[0])
+
     async def model_profile(self, model: str, runs: int) -> ModelProfile:
         """How reliably ``model`` worked in its newest ``runs`` finished runs, read on a read-only connection."""
         return await asyncio.to_thread(read_model_profile, self._database, model, runs)
@@ -1878,6 +1961,108 @@ class Store:
                 "SELECT * FROM approvals WHERE status = ? ORDER BY created_at DESC LIMIT ?", (status, limit)
             )
         return [_approval(row) for row in rows]
+
+    @_writing
+    async def add_draft(
+        self, run_id: str, channel: DraftChannel, to: Sequence[str], cc: Sequence[str], subject: str, body: str
+    ) -> DraftRecord:
+        """Keep a draft a run wrote (item 314): it waits for the owner."""
+        record: DraftRecord = DraftRecord(
+            id=new_id("drf"),
+            run_id=run_id,
+            channel=channel,
+            to=tuple(to),
+            cc=tuple(cc),
+            subject=subject,
+            body=body,
+            status="waiting",
+            created_at=time.time(),
+            decided_at=None,
+            error=None,
+        )
+        await self._db.execute(
+            "INSERT INTO drafts(id, run_id, channel, recipients, cc, subject, body, status, created_at, decided_at, error)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
+            (
+                record.id,
+                run_id,
+                channel,
+                dumps_compact(list(record.to)),
+                dumps_compact(list(record.cc)),
+                subject,
+                body,
+                record.status,
+                record.created_at,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def get_draft(self, draft_id: str) -> DraftRecord:
+        row = await self._one("SELECT * FROM drafts WHERE id = ?", (draft_id,))
+        if row is None:
+            raise NotFoundError("draft not found", {"draft_id": draft_id})
+        return _draft(row)
+
+    async def list_drafts(self, status: DraftStatus, limit: int) -> list[DraftRecord]:
+        """The drafts in ``status``, newest first."""
+        rows = await self._all(
+            "SELECT * FROM drafts WHERE status = ? ORDER BY created_at DESC LIMIT ?", (status, limit)
+        )
+        return [_draft(row) for row in rows]
+
+    @_writing
+    async def claim_draft(
+        self, draft_id: str, to: Sequence[str], cc: Sequence[str], subject: str, body: str
+    ) -> DraftRecord:
+        """Take a draft that waits, or whose last send failed, for sending, with the recipients and words the owner
+        sends: it is ``sending`` from now on, so that a second press, here or on another screen, finds it taken."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE drafts SET status = 'sending', recipients = ?, cc = ?, subject = ?, body = ?, error = NULL"
+            " WHERE id = ? AND status IN ('waiting', 'failed')",
+            (dumps_compact(list(to)), dumps_compact(list(cc)), subject, body, draft_id),
+        )
+        await self._db.commit()
+        record: DraftRecord = await self.get_draft(draft_id)
+        if cursor.rowcount == 0:
+            raise RunConflict(f"the draft is {record.status}, not waiting", {"draft_id": draft_id})
+        return record
+
+    @_writing
+    async def settle_draft(self, draft_id: str, error: str | None) -> DraftRecord:
+        """End the send of a draft: ``sent``, or ``failed`` with the application's ``error``."""
+        await self._db.execute(
+            "UPDATE drafts SET status = ?, decided_at = ?, error = ? WHERE id = ? AND status = 'sending'",
+            ("sent" if error is None else "failed", time.time(), error, draft_id),
+        )
+        await self._db.commit()
+        return await self.get_draft(draft_id)
+
+    @_writing
+    async def discard_draft(self, draft_id: str) -> DraftRecord:
+        """Drop a draft that waits, or whose last send failed: nothing goes out."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE drafts SET status = 'discarded', decided_at = ? WHERE id = ? AND status IN ('waiting', 'failed')",
+            (time.time(), draft_id),
+        )
+        await self._db.commit()
+        record: DraftRecord = await self.get_draft(draft_id)
+        if cursor.rowcount == 0:
+            raise RunConflict(f"the draft is {record.status}, not waiting", {"draft_id": draft_id})
+        return record
+
+    @_writing
+    async def fail_sending_drafts(self, error: str) -> list[DraftRecord]:
+        """Mark ``failed`` with ``error`` the drafts a stopped daemon was sending, and return them: whether they went
+        out is not known, so none is sent again by itself."""
+        rows = await self._all("SELECT id FROM drafts WHERE status = 'sending'", ())
+        ids: list[str] = [str(row["id"]) for row in rows]
+        await self._db.execute(
+            "UPDATE drafts SET status = 'failed', decided_at = ?, error = ? WHERE status = 'sending'",
+            (time.time(), error),
+        )
+        await self._db.commit()
+        return [await self.get_draft(draft_id) for draft_id in ids]
 
     async def list_left_questions(self, run_id: str) -> list[ApprovalRecord]:
         """The questions ``run_id`` left for the user that are not answered or skipped yet, oldest first."""
@@ -2261,7 +2446,8 @@ class Store:
         agent_id: str | None,
         vector: Sequence[float] | None,
     ) -> MemoryRecord:
-        record: MemoryRecord = await self._insert_memory(content, tags, source_run, agent_id, vector)
+        """Add a note that holds until it is changed."""
+        record: MemoryRecord = await self._insert_memory(content, tags, source_run, agent_id, vector, None)
         await self._db.commit()
         return record
 
@@ -2272,17 +2458,21 @@ class Store:
         source_run: str | None,
         agent_id: str | None,
         vector: Sequence[float] | None,
+        expires_at: float | None,
     ) -> tuple[MemoryRecord, bool]:
-        """Add a note unless one has this text already (saved meanwhile, in this process or another): the look and the
-        add are one transaction. Returns the note with the text and whether it was added."""
+        """Add a note unless one that a run of ``agent_id`` is handed has this text already (saved meanwhile, in this
+        process or another; :meth:`find_memory_by_content`): the look and the add are one transaction. Returns the note
+        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never."""
         outcome: list[tuple[MemoryRecord, bool]] = []
 
         async def statements() -> None:
-            row: aiosqlite.Row | None = await self._one("SELECT * FROM memories WHERE content = ? LIMIT 1", (content,))
+            row: aiosqlite.Row | None = await self._one(_SAME_TEXT, (content, agent_id))
             if row is not None:
                 outcome.append((_memory(row), False))
             else:
-                outcome.append((await self._insert_memory(content, tags, source_run, agent_id, vector), True))
+                outcome.append(
+                    (await self._insert_memory(content, tags, source_run, agent_id, vector, expires_at), True)
+                )
 
         await self._unit(statements)
         return outcome[0]
@@ -2294,6 +2484,7 @@ class Store:
         source_run: str | None,
         agent_id: str | None,
         vector: Sequence[float] | None,
+        expires_at: float | None,
     ) -> MemoryRecord:
         """The statements that add a note, in the caller's transaction."""
         now: float = time.time()
@@ -2307,12 +2498,14 @@ class Store:
             agent_id=agent_id,
             used_count=0,
             last_used_at=None,
+            expires_at=expires_at,
+            replaced_by=None,
         )
         tag_text: str = ",".join(record.tags)
         await self._db.execute(
-            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?)",
-            (record.id, content, tag_text, now, now, source_run, agent_id),
+            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at),
         )
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -2420,9 +2613,39 @@ class Store:
         rows = await self._all("SELECT id, vec FROM memory_vectors", ())
         return [(str(row["id"]), unpack_vector(bytes(row["vec"]))) for row in rows]
 
-    async def find_memory_by_content(self, content: str) -> MemoryRecord | None:
-        row = await self._one("SELECT * FROM memories WHERE content = ? LIMIT 1", (content,))
+    async def find_memory_by_content(self, content: str, agent_id: str | None) -> MemoryRecord | None:
+        """The note with this text that a run of ``agent_id`` (``None`` for Dot) is handed: the agent's own first, else
+        Dot's; another agent's note with the same text is not the saver's to merge into."""
+        row = await self._one(_SAME_TEXT, (content, agent_id))
         return None if row is None else _memory(row)
+
+    @_writing
+    async def wake_memory(
+        self, memory_id: str, tags: Sequence[str], when: float, expires_at: float | None
+    ) -> MemoryRecord:
+        """Give a note ``tags`` and write it anew at ``when`` (its ``updated_at``), holding until ``expires_at``: a
+        resting lesson learnt again is awake, its rest is counted from now, and no newer note replaces it. Its text and
+        vector stay."""
+        tag_text: str = ",".join(tags)
+        await self._db.execute(
+            "UPDATE memories SET tags = ?, updated_at = ?, expires_at = ?, replaced_by = NULL WHERE id = ?",
+            (tag_text, when, expires_at, memory_id),
+        )
+        await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
+
+    @_writing
+    async def retire_memory(self, memory_id: str, tags: Sequence[str], replaced_by: str) -> MemoryRecord:
+        """Put a note aside for the newer note ``replaced_by`` (item 306): it rests with ``tags`` (which hold ``rest``)
+        and says what replaced it; its text, its vector and ``updated_at`` stay, as with :meth:`set_memory_tags`."""
+        tag_text: str = ",".join(tags)
+        await self._db.execute(
+            "UPDATE memories SET tags = ?, replaced_by = ? WHERE id = ?", (tag_text, replaced_by, memory_id)
+        )
+        await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
+        await self._db.commit()
+        return await self.get_memory(memory_id)
 
     async def memories_with_tag(self, tag: str, limit: int) -> list[MemoryRecord]:
         """The most recently changed memories carrying ``tag`` (tags never contain commas)."""
@@ -2455,11 +2678,16 @@ class Store:
         )
         return [_memory(row) for row in rows]
 
+    async def handed_memory_ids(self, run_id: str) -> set[str]:
+        """The notes run ``run_id`` was handed so far, however it was handed them (item 308)."""
+        rows = await self._all("SELECT DISTINCT memory_id FROM memory_uses WHERE run_id = ?", (run_id,))
+        return {str(row["memory_id"]) for row in rows}
+
     @_writing
     async def mark_memories_used(self, run_id: str, memory_ids: Sequence[str], when: float, how: MemoryUseHow) -> None:
         """Count one more use of each note, at ``when``, and record that run ``run_id`` was handed it (``how``: at its
-        start, by a search, or as a changed note); the note's ``updated_at`` stays. The use is scored once the run
-        ends (:meth:`close_memory_uses`)."""
+        start, by a search, as a changed note, or as a lesson of a site it reached); the note's ``updated_at`` stays.
+        The use is scored once the run ends (:meth:`close_memory_uses`)."""
         if not memory_ids:
             return
         marks: str = ",".join("?" for _ in memory_ids)
@@ -2477,7 +2705,8 @@ class Store:
         """The notes the owner saved as lessons from a run's page (a ``lesson_saved`` event by the owner)."""
         rows = await self._all(
             "SELECT json_extract(data, '$.memory_id') AS memory_id FROM events"
-            " WHERE kind = 'lesson_saved' AND json_extract(data, '$.by') = 'owner'",
+            # An event stored before ``by`` was written is the owner's (``_SavedData``).
+            " WHERE kind = 'lesson_saved' AND coalesce(json_extract(data, '$.by'), 'owner') = 'owner'",
             (),
         )
         return {str(row["memory_id"]) for row in rows if row["memory_id"] is not None}
