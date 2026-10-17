@@ -29,6 +29,9 @@ from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+# What scrolls the conversation: on a phone the conversation itself, between the top bar and the composer (item 352);
+# on a wider window the window.
+_SCROLLER: str = "(window.innerWidth <= 720 ? document.querySelector('.run-thread') : document.scrollingElement)"
 
 TOKEN: str = "chrome-test-token"
 GOAL: str = "Count to sixty, one line at a time."
@@ -135,14 +138,14 @@ async def test_the_head_and_the_panel_stay_in_sight_while_a_long_run_scrolls(
                 await expect(page.locator(".stage-title")).to_be_visible()
                 await expect(page.locator("details.steps").first).to_be_visible()
                 await expect(page.locator("details.steps .steps-body").first).to_be_visible()
-                assert await page.evaluate("document.documentElement.scrollHeight") > 2 * 800
+                assert await page.evaluate(f"{_SCROLLER}.scrollHeight") > 2 * 800
                 bar_bottom: float = (await page.evaluate(_BOX, ".stagebar"))[1]
                 assert bar_bottom > 30
                 measured: str = await page.evaluate(
                     "getComputedStyle(document.documentElement).getPropertyValue('--stagebar-h')"
                 )
                 assert measured.strip() == f"{round(bar_bottom)}px", (measured, bar_bottom)
-                await page.evaluate("window.scrollTo(0, document.documentElement.scrollHeight / 2)")
+                await page.evaluate(f"{_SCROLLER}.scrollTo(0, {_SCROLLER}.scrollHeight / 2)")
                 await page.wait_for_timeout(150)
                 head_top, head_bottom = await page.evaluate(_BOX, ".stage-title")
                 # The run's head is the bar itself (item 78), so it never scrolls away; the panel's switch stays in reach.

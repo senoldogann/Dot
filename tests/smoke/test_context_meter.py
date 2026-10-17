@@ -238,7 +238,10 @@ async def test_a_model_with_a_context_size_of_its_own_has_the_meter_and_the_time
         try:
             for width, scheme in _SHOTS:
                 page: Page = await _run_page(browser, served, sized.id, width, scheme)
-                # The timeline says where the budget comes from.
+                # The timeline says where the budget comes from, in the line of how the run was set up (item 352).
+                context: Locator = page.locator(".context-line").first
+                await expect(context.locator(".context-summary")).to_contain_text("budget 192k")
+                await context.locator("summary").click()
                 await expect(
                     page.get_by_text(
                         "Context budget 192k tokens, the size chosen for the model in Settings, tool output up to 12k "
@@ -265,6 +268,7 @@ async def test_a_model_with_a_context_size_of_its_own_has_the_meter_and_the_time
                 await page.close()
             # A size the window cut: the note names both.
             page = await _run_page(browser, served, cut.id, 1280, "light")
+            await page.locator(".context-line").first.locator("summary").click()
             await expect(
                 page.get_by_text(
                     "Context budget 154k tokens, the 192k chosen for the model in Settings cut to fit its window of "

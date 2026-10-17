@@ -190,8 +190,12 @@ how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent s
 "Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single "Worked
 for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns took
 (open it for every call, result and screenshot: each call one quiet line with its icon, its result on a hairline under
-it once opened), while approvals, questions and policy notes stay in the open. What the model thought in a step is a
-line of its own there, before the step's calls (item 246, after T3 Code), or out of the fold before the message the
+it once opened), while approvals, questions and policy notes stay in the open. The lines of how a run was set up (the
+notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
+model) are one quiet line that names them in short, amber when one of them warns (the embedding service failed, so the
+notes were found by their words alone), and opens on a click to the lines themselves (item 352). What the model thought
+in a step is a line of its own there, before the step's calls (item 246, after T3 Code), or out of the fold before the
+message the
 step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the model thinks
 and "Thought" once it is done, the start of the thought beside it; opened, the whole thought: up to 12,000 characters
 of it, of a longer one its start and its end, its secrets masked; it is there when the page is loaded again. A step
@@ -227,7 +231,10 @@ draft back), **Steer**, which sends it to the run now, and × to take it out. �
 holds, past the queue, or with the queue's next message when the box is empty. Settings › General › Composer can have a
 message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the
 queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why, with **Read
-again**. When the run ends done, the next message starts and the page follows it; every open page shows the queue as it
+again**. A line over the box (item 352, after T3 Code's) says how long the run has worked and what it does now, or that
+it waits for you, how its helpers stand, how many messages are queued and how many commands run in the chat; each part
+opens what it tells of, and the line comes while one of them has something to say and goes when none has. When the run
+ends done, the next message starts and the page follows it; every open page shows the queue as it
 changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3 Code's
 composer: the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up
 or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199):

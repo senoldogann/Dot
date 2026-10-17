@@ -1,12 +1,12 @@
 """A phone's run page and list of chats after T3 Code's phone app (items 294 to 298), on a served daemon, in WebKit as
 the owner's iPhone, light and dark. The bar names the chat over the agent and the model, and holds its tools in one pill:
 Dot's computer once the run has had a page, the helpers with their count, and the details. A line over the composer says
-how long the run has worked and how its helpers stand, and its parts open where they tell of; what is queued is the
-queue's banner's to say, under it, so the line does not say it again. The details rise from the foot as a sheet with a grabber, and a drag of its head closes it; the Agents tab's rows say each
-helper's state, model and what it does. Dot's computer opens over the whole page with the page's address and the pill of
-who has control, and goes back to the panel when it closes. The sidebar is the list of chats over the whole screen, Dot's
-name at its head and Settings, the search and a new chat at its foot. A wide window keeps its bar as it was: the face,
-the name and the panel's switch alone, and no line over the composer.
+how long the run has worked, how its helpers stand and how many messages are queued (item 352), and its parts open
+where they tell of. The details rise from the foot as a sheet with a grabber, and a drag of its head closes it; the
+Agents tab's rows say each helper's state, model and what it does. Dot's computer opens over the whole page with the
+page's address and the pill of who has control, and goes back to the panel when it closes. The sidebar is the list of
+chats over the whole screen, Dot's name at its head and Settings, the search and a new chat at its foot. A wide window
+keeps its bar as it was: the face, the name and the panel's switch alone; the line over the composer is there too.
 
 The model is a scripted one; the run's page is a local one in Dot's own headless Chrome.
 """
@@ -192,12 +192,12 @@ async def test_a_phones_run_page_and_list_of_chats_follow_t3_codes_phone_app(own
                     screen_button: Locator = bar.get_by_role("button", name="Show Dot's computer")
                     await expect(screen_button).to_be_visible()
                     await expect(bar.get_by_role("button", name="Run details")).to_be_visible()
-                    # The line over the composer: the run's time and its helpers; the queue's banner says what waits.
+                    # The line over the composer: the run's time, its helpers and what is queued (item 352).
                     capsule: Locator = page.locator(".capsule")
                     await expect(capsule).to_contain_text("Working")
                     await expect(capsule).to_contain_text(f"{len(_HELPERS)} working")
                     await expect(page.locator(".queue")).to_contain_text(_QUEUED)
-                    await expect(capsule).not_to_contain_text("queued")
+                    await expect(capsule.get_by_role("button", name="1 queued")).to_be_visible()
                     await page.screenshot(path=str(tmp_path / f"run-{scheme}.png"))
 
                     # The helpers' part opens the details as a sheet from the foot, on the Agents tab.
@@ -256,15 +256,19 @@ async def test_a_phones_run_page_and_list_of_chats_follow_t3_codes_phone_app(own
                     await page.screenshot(path=str(tmp_path / f"chats-{scheme}.png"))
                     await context.close()
 
-                # A wide window keeps its bar: the face, the name and the panel's switch alone, and no line.
+                # A wide window keeps its bar: the face, the name and the panel's switch alone; the line over the
+                # composer is there too while the run works (item 352).
                 wide: Page = await browser.new_page(viewport={"width": 1280, "height": 800})
                 await wide.goto(ui_url("127.0.0.1", port, TOKEN))
                 await wide.goto(f"{address}/#/runs/{run.id}")
                 await expect(wide.locator(".stage-title .stage-name")).to_be_visible()
                 await expect(wide.locator(".stage-heading")).to_be_hidden()
                 await expect(wide.locator(".stage-tools button:visible")).to_have_count(1)
-                await expect(wide.locator(".capsule")).to_be_hidden()
-                await wide.screenshot(path=str(tmp_path / "wide.png"))
+                await expect(wide.locator(".capsule")).to_contain_text("Working")
+                await expect(wide.locator(".capsule").get_by_role("button", name="1 queued")).to_be_visible()
+                # The curtain of a page opened on a chat (item 328) lifts once the chat shows.
+                await expect(wide.locator(".waiting")).to_have_count(0)
+                await wide.screenshot(path=str(tmp_path / "wide.png"), animations="disabled")
                 await wide.close()
             finally:
                 await browser.close()

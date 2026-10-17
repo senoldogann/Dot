@@ -20,9 +20,10 @@ function took(session, now) {
 
 /**
  * The line of the commands at work in the chat `threadId`, which goes right above the composer. Returns `{ element,
- * dispose() }`.
+ * count(), dispose() }`: `count()` is how many commands run; `onCount(count)` is called on every change of them (item
+ * 352: the line over the composer counts them).
  */
-export function backgroundWork({ threadId }) {
+export function backgroundWork({ threadId, onCount }) {
   const list = el("ul", { class: "background-list" });
   const problem = el("span", null);
   const unread = el(
@@ -78,6 +79,7 @@ export function backgroundWork({ threadId }) {
     shown = [];
     list.replaceChildren(...sessions.map((session) => row(session, now)));
     element.hidden = sessions.length === 0 && unread.hidden;
+    onCount(sessions.length);
     if (shown.length > 0 && ticker === null) {
       ticker = setInterval(tick, TICK_MS);
     } else if (shown.length === 0 && ticker !== null) {
@@ -125,6 +127,7 @@ export function backgroundWork({ threadId }) {
   load();
   return {
     element,
+    count: () => shown.length,
     dispose: () => {
       stopLifecycle();
       stopBack();

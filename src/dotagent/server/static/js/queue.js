@@ -24,11 +24,13 @@ function oneLine(text) {
  * after `afterRunId`, and `onEdit()` of the start and the end of an edit, which the composer's send names Save while
  * it lasts.
  *
- * Returns `{ element, add(body), steerFirst(), setActive(on), editing(), saveEdit(text), cancelEdit(), dispose() }`:
- * `add` queues a message (the body of `POST /threads/{id}/queue`), `editing()` is the id of the message the composer
- * edits or null, and `saveEdit` keeps the composer's text as that message's.
+ * Returns `{ element, add(body), steerFirst(), setActive(on), editing(), saveEdit(text), cancelEdit(), count(),
+ * expand(), dispose() }`: `add` queues a message (the body of `POST /threads/{id}/queue`), `editing()` is the id of the
+ * message the composer edits or null, `saveEdit` keeps the composer's text as that message's, `count()` is how many
+ * messages wait and `expand()` opens their list. `onCount(count)` is called on every change of the queue (item 352: the
+ * line over the composer counts them).
  */
-export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
+export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onCount }) {
   const listId = `queue-${threadId}`;
   let messages = [];
   let held = false;
@@ -315,6 +317,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
       const like = list.querySelector(`[data-id="${focused.dataset.id}"][data-part="${focused.dataset.part}"]`);
       (like !== null && !like.disabled ? like : frame.textarea).focus();
     }
+    onCount(messages.length);
   }
 
   const stopLifecycle = onLifecycle((event) => {
@@ -352,6 +355,11 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit }) {
     },
     cancelEdit: () => {
       endEdit();
+      paint();
+    },
+    count: () => messages.length,
+    expand: () => {
+      expanded = true;
       paint();
     },
     dispose: () => {

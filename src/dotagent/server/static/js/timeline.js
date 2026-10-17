@@ -229,6 +229,42 @@ function paintGroup(group) {
 }
 
 /**
+ * The line of how a run was set up (item 352): the notes and the skills it was handed and how they were found, its
+ * budget, its tools, the model a step went to. Those lines come one after another, mostly at the run's start; together
+ * they are one quiet line that names them in short and opens on a tap to the lines themselves. A line that warns (the
+ * embedding service failed, so notes were found by their words alone) gives the whole line its tone.
+ */
+function buildContext() {
+  const mark = el("span", { class: "tool-kind context-mark" }, icon("layers"));
+  const summary = el("span", { class: "context-summary" });
+  const head = el("summary", { class: "tool-head" }, mark, summary, el("span", { class: "chev" }, icon("chevron")));
+  const body = el("div", { class: "tool-body context-body" });
+  const node = el("details", { class: "context-line" }, head, body);
+  return { node, body, summary, items: [], tone: "" };
+}
+
+// The parts of the context line's summary that say the same thing of the notes and of the skills are said once.
+const WORDS_ALONE = { notes: "notes", skills: "skills" };
+
+/** Show the context line's summary: its parts in the order they came, the notes and skills found by words alone once. */
+function paintContext(context) {
+  const alone = context.items.filter((item) => item.kind === "words").map((item) => item.text);
+  const parts = [];
+  let saidAlone = false;
+  for (const item of context.items) {
+    if (item.kind !== "words") {
+      parts.push(item.text);
+    } else if (!saidAlone) {
+      saidAlone = true;
+      parts.push(`${alone.join(" and ")} found by their words alone`);
+    }
+  }
+  setText(context.summary, parts.join(" · "));
+  context.node.classList.toggle("warn", context.tone === "warn");
+  context.node.classList.toggle("bad", context.tone === "bad");
+}
+
+/**
  * The group of helpers that follow one another (item 245), after T3 Code's group of subagents: a head with their faces,
  * how many they are and how they stand, the time from the first one's start to the last one's end and a chevron that
  * folds their rows away. It is open from the start.
@@ -249,7 +285,8 @@ function buildFlock() {
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
  * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it,
  * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
- * `helperStatuses()` the statuses of the delegated runs and `draft(record)` paints a draft's card as the draft now
+ * `helperStatuses()` the statuses of the delegated runs, `activity()` what the run does now (the latest step's head,
+ * "" between steps), and `draft(record)` paints a draft's card as the draft now
  * stands (item 314: one answered after the run's stream ended); the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
@@ -298,6 +335,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       live: null,
       // The block of the latest step's thinking (item 246; see startThought).
       thought: null,
+      // The context line at the end of the scope, which the next line of how the run was set up joins (item 352).
+      context: null,
       reply: null,
       touched: false,
       // The cards that wait for the reader's answer in this scope and the delegated runs inside it.
@@ -467,6 +506,26 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
 
   function note(scope, ts, iconName, text, tone) {
     place(scope, el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text)), ts);
+  }
+
+  /**
+   * A line of how the run was set up (see buildContext): it joins the context line at the end of the scope, made there
+   * when the scope ends with something else. `kind` and `short` are what it adds to the line's summary ("words" for a
+   * notes' or skills' search by words alone, whose parts are said once).
+   */
+  function contextNote(scope, ts, kind, short, iconName, text, tone) {
+    let context = scope.context;
+    if (context === null || scope.container.lastElementChild !== context.node) {
+      context = buildContext();
+      scope.context = context;
+      place(scope, context.node, ts);
+    }
+    context.body.append(el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text)));
+    context.items.push({ kind, text: short });
+    if (tone === "bad" || (tone === "warn" && context.tone === "")) {
+      context.tone = tone;
+    }
+    paintContext(context);
   }
 
   function childScope(runId, data, ts) {
@@ -1118,20 +1177,21 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         onScaffold({ contextTokens: data.context_tokens, window: data.window, chosen, summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null });
       }
       const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
+      const budget = `budget ${compact(data.context_tokens)}`;
       if (data.cut_to_window && chosen !== null) {
-        note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the ${compact(chosen)} chosen for the model in Settings cut to fit its window of ${compact(data.window)}, ${output}`, "");
+        contextNote(scope, record.ts, "budget", budget, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the ${compact(chosen)} chosen for the model in Settings cut to fit its window of ${compact(data.window)}, ${output}`, "");
       } else if (data.cut_to_window) {
-        note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens to fit the model's window of ${compact(data.window)}, ${output}`, "");
+        contextNote(scope, record.ts, "budget", budget, "sliders", `Context budget ${compact(data.context_tokens)} tokens to fit the model's window of ${compact(data.window)}, ${output}`, "");
       } else if (chosen !== null) {
-        note(scope, record.ts, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the size chosen for the model in Settings, ${output}`, "");
+        contextNote(scope, record.ts, "budget", budget, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the size chosen for the model in Settings, ${output}`, "");
       }
       if (data.reminder_every !== null) {
-        note(scope, record.ts, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");
+        contextNote(scope, record.ts, "reminder", `goal every ${data.reminder_every} steps`, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");
       }
     },
 
     reminder(scope, record) {
-      note(scope, record.ts, "target", `Reminded of the goal at step ${record.data.step}`, "");
+      contextNote(scope, record.ts, "reminder", `goal at step ${record.data.step}`, "target", `Reminded of the goal at step ${record.data.step}`, "");
     },
 
     // The tool groups of a run whose tools come in groups ([agent] tool_surface): the ones it starts with, then each
@@ -1140,10 +1200,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const data = record.data;
       if (data.step === 0) {
         const off = data.off.length === 0 ? "" : `; ${data.off.join(", ")} off until the run needs them`;
-        note(scope, record.ts, "layers", `Tools offered by group: ${data.on.join(", ")} on${off} (${data.reason})`, "");
+        contextNote(scope, record.ts, "tools", "tools by group", "layers", `Tools offered by group: ${data.on.join(", ")} on${off} (${data.reason})`, "");
       } else {
         const noun = data.turned_on.length === 1 ? "group" : "groups";
-        note(scope, record.ts, "layers", `Turned on the tool ${noun} ${data.turned_on.join(", ")} at step ${data.step}`, "");
+        contextNote(scope, record.ts, "tools", `${data.turned_on.join(", ")} on`, "layers", `Turned on the tool ${noun} ${data.turned_on.join(", ")} at step ${data.step}`, "");
       }
     },
 
@@ -1165,13 +1225,15 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
           : typeof data.site === "string"
             ? `Recalled ${count} learned on ${data.site}`
             : `Recalled ${count}${newer}${tokens}`;
-      note(scope, record.ts, "database", text, "");
+      const short = data.live === true ? `${count} picked up` : typeof data.site === "string" ? `${count} of ${data.site}` : `${count}${newer}`;
+      contextNote(scope, record.ts, "memories", short, "database", text, "");
     },
 
     // The run's start found its notes or its skills by their words alone: the embedding service failed (item 256).
     embedding_failed(scope, record) {
-      const what = record.data.purpose === "skills" ? "Skills listed" : "Notes recalled";
-      note(scope, record.ts, "database", `${what} by their words alone: the embedding service failed — ${clip(record.data.error, 240)}`, "warn");
+      const skills = record.data.purpose === "skills";
+      const what = skills ? "Skills listed" : "Notes recalled";
+      contextNote(scope, record.ts, "words", skills ? WORDS_ALONE.skills : WORDS_ALONE.notes, "database", `${what} by their words alone: the embedding service failed — ${clip(record.data.error, 240)}`, "warn");
     },
 
     // A compaction is a quiet line across the conversation where it happened, with the size of the context before and
@@ -1295,11 +1357,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     step_routed(scope, record) {
       const data = record.data;
       const odds = Object.entries(data.probabilities).map(([option, p]) => `${option} ${p.toFixed(2)}`).join(", ");
-      note(scope, record.ts, "refresh", `Step ${data.step} goes to ${data.model} (${odds})`, "");
+      contextNote(scope, record.ts, "route", `step ${data.step} on ${data.model}`, "refresh", `Step ${data.step} goes to ${data.model} (${odds})`, "");
     },
     step_route_failed(scope, record) {
       const data = record.data;
-      note(scope, record.ts, "refresh", `${data.model} could not answer step ${data.step}; asked again on the run's model: ${data.error}`, "warn");
+      contextNote(scope, record.ts, "route", `step ${data.step} back on the run's model`, "refresh", `${data.model} could not answer step ${data.step}; asked again on the run's model: ${data.error}`, "warn");
     },
 
     // A session of a campaign ranked the posts it could answer (`topic`, `weights`, `posts` with their scores, the
@@ -1358,6 +1420,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   const helper = (runId) => scopes.get(runId)?.panel?.helper ?? null;
   // The statuses of the run's delegated runs, in the order they started.
   const helperStatuses = () => [...scopes.values()].filter((scope) => scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
+  // What the run does now, as the head of its latest group of steps still at work says it ("Thinking…", the latest
+  // call: a call to its helpers stays at work while their rows follow it), "" when none is (item 352: the line over the
+  // composer says it).
+  function activity() {
+    const live = scopes.get(rootRunId).groups.findLast((group) => group.tail || group.pending > 0);
+    return live === undefined ? "" : live.last;
+  }
   return {
     element,
     push,
@@ -1366,6 +1435,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     knows: (runId) => scopes.has(runId),
     helper,
     helperStatuses,
+    activity,
     draft: (record) => drafts.get(record.id)?.update(record),
   };
 }

@@ -3969,6 +3969,42 @@ a.memory-line:hover .memory-change {
   line-height: var(--leading-sm);
 }
 
+/* How a run was set up (item 352): one quiet line that names the notes and skills it was handed, its budget and its
+   tools in short, its mark amber or red when one of its lines warns; opened, those lines hang under it on a hairline. */
+.context-line {
+  min-width: 0;
+}
+
+.context-mark {
+  color: var(--muted);
+}
+
+.context-summary {
+  flex: 1;
+  min-width: 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-line.warn .context-mark {
+  color: var(--warn);
+}
+
+.context-line.bad .context-mark {
+  color: var(--bad);
+}
+
+.context-body {
+  gap: var(--space-1);
+}
+
+.context-body > .note {
+  padding: 0;
+}
+
 .restart-body p,
 .restart-calls {
   margin: 0;
@@ -6381,12 +6417,119 @@ button.attach-chip:hover {
 
 /* ---------- a phone's run page, after T3 Code's phone app (items 295 and 297) ---------- */
 
-/* The chat's title over the agent and the model, the bar's quick ways and the line over the composer are a phone's;
-   a wider page keeps the face and the name, the panel's switch alone, and no line. */
+/* The chat's title over the agent and the model and the bar's quick ways are a phone's; a wider page keeps the face and
+   the name and the panel's switch alone. The line over the composer is every width's (item 352). */
 .stage-heading,
-.stage-pill > .stage-quick,
-.capsule {
+.stage-pill > .stage-quick {
   display: none;
+}
+
+/* The line over the composer (items 297 and 352): a pill in the middle, its parts on short hairlines, each a button. It
+   rises into place when it comes, and what the run does now gives way to the time and the other parts. */
+.capsule:not([hidden]) {
+  display: flex;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  margin: 0 auto var(--space-2);
+  padding: var(--space-half);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  box-shadow: var(--shadow-raised);
+  overflow-x: auto;
+  scrollbar-width: none;
+  animation: capsule-in var(--motion-base) var(--ease) both;
+}
+
+.capsule-part {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--text-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.capsule-part[hidden] {
+  display: none;
+}
+
+.capsule-part:not([hidden]) ~ .capsule-part:not([hidden])::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 16px;
+  border-left: 1px solid var(--border-strong);
+  translate: 0 -50%;
+}
+
+.capsule-part .icon {
+  width: 15px;
+  height: 15px;
+  color: var(--muted);
+}
+
+.capsule-mark {
+  display: inline-grid;
+}
+
+.capsule-work {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.capsule-activity {
+  min-width: 8ch;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--muted);
+}
+
+.capsule-activity[hidden] {
+  display: none;
+}
+
+/* A phone's line has room for what the run does now only while no other part stands beside the time. */
+@media (max-width: 720px) {
+  .capsule:has(> .capsule-part:not(.capsule-work):not([hidden])) .capsule-activity {
+    display: none;
+  }
+}
+
+.capsule-work[data-state="working"] .capsule-mark .icon {
+  animation: spin var(--motion-spin) linear infinite;
+}
+
+.capsule-work[data-state="waiting"],
+.capsule-work[data-state="waiting"] .icon {
+  color: var(--warn);
+}
+
+@keyframes capsule-in {
+  from {
+    opacity: 0;
+    translate: 0 6px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .capsule:not([hidden]),
+  .capsule-work[data-state="working"] .capsule-mark .icon {
+    animation: none;
+  }
 }
 
 .stage-pill {
@@ -6473,79 +6616,6 @@ button.attach-chip:hover {
     font-size: var(--text-sm);
     font-weight: var(--weight-label);
     font-variant-numeric: tabular-nums;
-  }
-
-  /* The line over the composer (item 297): a pill in the middle, its parts on short hairlines, each a button. */
-  .capsule:not([hidden]) {
-    display: flex;
-    align-items: center;
-    width: fit-content;
-    max-width: 100%;
-    margin: 0 auto var(--space-2);
-    padding: var(--space-half);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-pill);
-    background: var(--surface);
-    box-shadow: var(--shadow-raised);
-    overflow-x: auto;
-    scrollbar-width: none;
-  }
-
-  .capsule-part {
-    position: relative;
-    display: inline-flex;
-    flex: none;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border: 0;
-    border-radius: var(--radius-pill);
-    background: transparent;
-    color: var(--text-2);
-    font: inherit;
-    font-size: var(--text-sm);
-    font-variant-numeric: tabular-nums;
-    white-space: nowrap;
-    cursor: pointer;
-  }
-
-  .capsule-part[hidden] {
-    display: none;
-  }
-
-  .capsule-part:not([hidden]) ~ .capsule-part:not([hidden])::before {
-    content: "";
-    position: absolute;
-    left: 0;
-    top: 50%;
-    height: 16px;
-    border-left: 1px solid var(--border-strong);
-    translate: 0 -50%;
-  }
-
-  .capsule-part .icon {
-    width: 15px;
-    height: 15px;
-    color: var(--muted);
-  }
-
-  .capsule-mark {
-    display: inline-grid;
-  }
-
-  .capsule-work[data-state="working"] .capsule-mark .icon {
-    animation: spin var(--motion-spin) linear infinite;
-  }
-
-  .capsule-work[data-state="waiting"],
-  .capsule-work[data-state="waiting"] .icon {
-    color: var(--warn);
-  }
-}
-
-@media (max-width: 720px) and (prefers-reduced-motion: reduce) {
-  .capsule-work[data-state="working"] .capsule-mark .icon {
-    animation: none;
   }
 }
 
