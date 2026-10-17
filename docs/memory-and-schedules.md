@@ -119,12 +119,13 @@ dated final answers of the schedule's last ended runs (`[scheduler] history_runs
 so the run builds on them instead of doing the same work again (item 257). The chat shows the goal alone, and the run's
 reviewer takes only the goal as your words; a one-time schedule that fires late says when it was due in that first
 message too. With `same_chat` a firing goes on in the chat of the one before (a new one when you deleted it), where the
-run reads their conversation instead of the digest. Either way it reads earlier runs' words without a message of
-yours, so it starts tainted (asking before outward-facing actions) when one of the runs it reads ended so. The digest
-counts the firings since item 257: a firing from before names no schedule. The agent can create schedules too
+run reads their conversation instead of the digest. Either way it reads earlier runs' words without a message of yours,
+so it starts tainted (asking before outward-facing actions) when one of the runs it reads ended so. The digest counts
+the firings since item 257: a firing from before names no schedule. The agent can create schedules too
 (`schedule_create`): such a schedule goes on in the chat it was made in, with that chat's choices as its composer shows
 them (the ones its first run started with until you picked others: its mode, model, reasoning level, speed, approval
-mode and goal mode; item 291). The scheduler also fires the nightly reflection at `[agent] reflection_time` (see Reflection
+mode and goal mode; item 291). `/loop 30m <message>` in the box of a run makes such a schedule from the composer (item
+281; see [Runs](runs.md)). The scheduler also fires the nightly reflection at `[agent] reflection_time` (see Reflection
 above); it is not a schedule and does not count against `max_schedules`.
 
 On Settings › Schedules a schedule is created and edited whole: its name, goal, repetition (cron or one moment), time

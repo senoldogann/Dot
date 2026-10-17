@@ -21,6 +21,7 @@ import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHisto
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
+import { chatLoops } from "../loops.js";
 import { createQueue } from "../queue.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
@@ -44,6 +45,10 @@ const APPROVAL_WORDS = { auto: "Auto-approve", yolo: "YOLO" };
 const NEAR_BOTTOM_PX = 140;
 // "/btw" followed by the side question; the question may span lines.
 const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
+// "/loop", a rhythm (30m, 2h) and the message that the chat asks again on it (item 281); "/loop" alone or with a
+// word that is not a rhythm is said how to write it.
+const LOOP_PATTERN = /^\/loop\s+(\d+\s*[mh])\s+([\s\S]+)$/i;
+const LOOP_WORD = /^\/loop(?:\s|$)/i;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
 // What cut a run off (agent/resume.py `CutOff`), as the line that offers to resume it says it (item 299).
@@ -477,7 +482,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     boxLabel: `Message for ${agent !== null ? agent.name : dotName()}`,
     placeholder: "",
     maxPx: CHAT_BOX_PX,
-    commands: [{ label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " }],
+    commands: [
+      { label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " },
+      { label: "/loop", hint: "Ask again on a rhythm until it is done: /loop 30m <message>", insert: "/loop " },
+    ],
     send: () => submit(false),
     sendLabel: "Steer",
     draftKey: runId,
@@ -612,6 +620,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const stopStatus = onChange(choices.sync);
   // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
   const background = backgroundWork({ threadId: run.thread_id, onCount: () => paintCapsule() });
+  // The chat's loops (item 281), beside its commands at work.
+  const loops = chatLoops({ threadId: run.thread_id });
   // The line over the composer (items 297 and 352): the run's time and what it does now, its helpers, the messages
   // queued and the commands at work; the first three are the way to where they are told of.
   const capsule = createCapsule({
@@ -622,7 +632,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       queue.element.scrollIntoView({ block: "nearest" });
     },
   });
-  const dock = el("div", { class: "dock" }, capsule.element, resumeLine, queue.element, background.element, frame.element, foot);
+  const dock = el("div", { class: "dock" }, capsule.element, resumeLine, queue.element, loops.element, background.element, frame.element, foot);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -722,6 +732,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       askAside(question);
       return;
     }
+    if (LOOP_WORD.test(text)) {
+      await startLoop(text, other);
+      return;
+    }
     if (!readyToSend(attachments)) {
       return;
     }
@@ -731,6 +745,38 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     try {
       await attempt(async () => {
         const next = await deliver(text, files, other);
+        frame.clear();
+        if (next !== null) {
+          ctx.goOnAt(`/runs/${next}`);
+        }
+      });
+    } finally {
+      sending = false;
+      send.disabled = false;
+    }
+  }
+
+  // "/loop 30m <message>" (item 281): the chat asks the message again on that rhythm, from a schedule of its own, until
+  // it is stopped or a run of it ends it; the message itself goes now, as any message does.
+  async function startLoop(text, other) {
+    const loop = LOOP_PATTERN.exec(text);
+    if (loop === null) {
+      toast("error", "Write /loop, how often and the message: /loop 30m check the build");
+      input.focus();
+      return;
+    }
+    if (!readyToSend(attachments)) {
+      return;
+    }
+    const message = loop[2].trim();
+    const files = attachments.ids();
+    sending = true;
+    send.disabled = true;
+    try {
+      await attempt(async () => {
+        await api.post(`/runs/${runId}/loop`, { every: loop[1].replace(/\s+/g, ""), text: message });
+        loops.refresh();
+        const next = await deliver(message, files, other);
         frame.clear();
         if (next !== null) {
           ctx.goOnAt(`/runs/${next}`);
@@ -1475,6 +1521,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     choices.dispose();
     queue.dispose();
     background.dispose();
+    loops.dispose();
     meter.dispose();
     frame.dispose();
     if (ticker !== null) {
