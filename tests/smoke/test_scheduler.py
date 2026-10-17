@@ -572,7 +572,8 @@ class _FailsThenStarts(_StartsAndEnds):
 
 async def test_a_one_time_schedule_whose_run_does_not_start_stays_due_and_fires_later(runtime: Runtime) -> None:
     """Item 351: a one-time schedule's firing switched it off before its run started, so one whose start failed (Dot's
-    error, or a crash) never fired. It stays due now, and fires once its run can start."""
+    error, or a crash) never fired. It stays due now, and fires once its run can start; it is tried again a minute after
+    the first failure and twice as long after each next one, not at every tick."""
     once: ScheduleRecord = await _schedule(runtime, _once(runtime, "Flaky once", 60.0))
     manager: _FailsThenStarts = _FailsThenStarts(runtime)
     scheduler: Scheduler = Scheduler(runtime, manager)
@@ -582,14 +583,20 @@ async def test_a_one_time_schedule_whose_run_does_not_start_stays_due_and_fires_
         refused: ScheduleRecord = await runtime.store.get_schedule(once.id)
         assert (refused.enabled, refused.next_run_at) == (True, due), refused
         assert refused.last_status == "failed to start: the model is gone"
-        await scheduler.tick(due + 10)
+        # Within the minute after the failure, a tick leaves it due and does not try it.
+        await scheduler.tick(due + 30)
+        assert len(manager.failures) == 1
+        await scheduler.tick(due + 70)
         crashed: ScheduleRecord = await runtime.store.get_schedule(once.id)
         assert (crashed.enabled, crashed.next_run_at, crashed.last_status) == (
             True,
             due,
             "failed to fire: RuntimeError",
         )
-        await scheduler.tick(due + 15)
+        # The second failure in a row waits two minutes.
+        await scheduler.tick(due + 180)
+        assert (await runtime.store.get_schedule(once.id)).last_status == "failed to fire: RuntimeError"
+        await scheduler.tick(due + 200)
         manager.ends.set()
         fired: ScheduleRecord = await _until_over(runtime, once.id)
     finally:

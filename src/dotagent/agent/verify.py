@@ -202,9 +202,11 @@ def answer_paths(answer: str) -> tuple[NamedPath, ...]:
 
 
 def _goes_on(reading: str, readings: Sequence[str]) -> bool:
-    """Whether a longer reading goes on from ``reading`` into folders past a space ("Projects Final/plan.md" after
-    "Projects"), so that ``reading`` is only the start of the path the answer names."""
-    return any(other.startswith(reading) and "/" in other[len(reading) :] for other in readings if other != reading)
+    """Whether a longer reading goes on from ``reading`` into folders past a space, its very next word holding a slash
+    ("Projects Final/plan.md" after "Projects"), so that ``reading`` is only the start of the path the answer names. A
+    slash further on ("~/Projects with src/main.py") is a word of the sentence, not of the path."""
+    start: str = f"{reading} "
+    return any(other.startswith(start) and "/" in other[len(start) :].split(" ", 1)[0] for other in readings)
 
 
 def _found(reading: str, readings: Sequence[str], touched: set[Path], workspace: Path) -> bool:

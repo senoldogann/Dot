@@ -154,11 +154,13 @@ def test_a_path_is_missing_when_no_reading_exists_and_no_successful_call_named_i
     (tmp_path / "Application Support" / "notes.md").write_text("notes")
     (tmp_path / "real.txt").write_text("real")
     (tmp_path / "Projects").mkdir()
+    (tmp_path / "Code").mkdir()
     answer: str = (
         f"See {tmp_path}/Application Support/notes.md and {tmp_path}/real.txt; {tmp_path}/gone.txt is new, "
         f"{tmp_path}/moved.txt was moved away and {tmp_path}/made.txt was made. "
-        # A folder that is there says nothing of the path that goes on from it past a space.
-        f"The plan is in {tmp_path}/Projects Final/plan.md."
+        # A folder that is there says nothing of the path that goes on from it past a space, and is there when the
+        # sentence goes on with a word of its own.
+        f"The plan is in {tmp_path}/Projects Final/plan.md. The code is in {tmp_path}/Code with src/main.py."
     )
     # A relative value is a path in the workspace.
     named: tuple[str, ...] = ("moved.txt", f"{tmp_path}/made.txt", "https://example.org")

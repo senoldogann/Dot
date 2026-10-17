@@ -45,8 +45,8 @@ _IDENTIFIER: re.Pattern[str] = re.compile(
 # The ellipsis is the mark Dot's own renderings leave on a value they cut (the pinned actions, a page's text), which
 # a summary copies as it is.
 _TRAILING_PUNCTUATION: str = ".,;:!?…"
-# An identifier that starts with a known identifier this long is that address with a fragment or a query the
-# history did not have; a shorter known identifier says little about what follows it.
+# A known identifier this long, lengthened by a fragment, a query or a closing slash the history did not have, is that
+# address (``_lengthens``); a shorter known identifier says little about what follows it.
 _LONG_IDENTIFIER_CHARS: int = 24
 # Where a Mac's paths have a second spelling: ``/tmp`` and ``/var`` are ``/private/tmp`` and ``/private/var``.
 _PRIVATE_PREFIXES: tuple[tuple[str, str], ...] = (("/tmp/", "/private/tmp/"), ("/var/", "/private/var/"))
@@ -205,13 +205,18 @@ def spellings(name: str, home: str) -> tuple[str, ...]:
     return tuple(forms)
 
 
+def _lengthens(form: str, other: str) -> bool:
+    """Whether ``form`` is the known identifier ``other`` with what an address adds without being another one: a
+    fragment, a query or a closing slash. A path or a page under it is another one."""
+    return form.startswith((f"{other}#", f"{other}?")) or form == f"{other}/"
+
+
 def _is_known(name: str, known: str, known_names: Collection[str], home: str) -> bool:
     """Whether the history holds ``name``, as it is written or as the Mac also writes it (:func:`spellings`): whole,
-    cut short (a cut identifier is a part of its whole), or as a long identifier with a fragment after it. A path or a
-    page under a known one is not known by that."""
+    cut short (a cut identifier is a part of its whole), or as a long identifier it lengthens (:func:`_lengthens`). A
+    path or a page under a known one is not known by that."""
     return any(
-        form in known
-        or any(len(other) >= _LONG_IDENTIFIER_CHARS and form.startswith(f"{other}#") for other in known_names)
+        form in known or any(len(other) >= _LONG_IDENTIFIER_CHARS and _lengthens(form, other) for other in known_names)
         for form in spellings(name, home)
     )
 
@@ -220,8 +225,8 @@ def check_continuity(summary: str, reference: str, ledger: RunLedger, home: str)
     """Validate a model's summary against ``reference`` (the full text of the history it replaces) and the ledger.
 
     An identifier counts as known when the history holds it, whole or cut short (a trailing ellipsis, the mark of a
-    value Dot cut, is not part of it), or when it is a known identifier of at least 24 characters with a fragment
-    after it (``#step-3``) the history did not have; a path or a page under a known one does not count by that. A
+    value Dot cut, is not part of it), or when it is a known identifier of at least 24 characters with a fragment, a
+    query or a closing slash the history did not have; a path or a page under a known one does not count by that. A
     path counts in any of its spellings: ``~`` for ``home``, the home folder, and ``/tmp`` or ``/var`` with or without
     ``/private``.
     """

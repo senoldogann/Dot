@@ -1186,8 +1186,8 @@ class Store:
     async def compact(self) -> None:
         """Give the free pages of the database file back to the disk, and let later deletes do so by themselves. Needs
         the connection to have no transaction open, so it waits for the write under way (item 351), and a lock held by
-        another process is waited out as for any write. The rewritten file reaches the disk through the write-ahead log, so
-        the log is emptied too; a connection that is reading at that moment leaves the rest of it for a later
+        another process is waited out as for any write. The rewritten file reaches the disk through the write-ahead
+        log, so the log is emptied too; a connection that is reading at that moment leaves the rest of it for a later
         checkpoint."""
         await self._db.execute("PRAGMA auto_vacuum=INCREMENTAL")
         await self._db.execute("VACUUM")
@@ -2480,8 +2480,9 @@ class Store:
     ) -> tuple[MemoryRecord, bool]:
         """Add a note unless one that a run of ``agent_id`` is handed has this text already (saved meanwhile, in this
         process or another; :meth:`find_memory_by_content`): the look and the add are one transaction. Returns the note
-        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never. A unit tried
-        again after a lock returns what its last try stored (item 351: the first try's note, rolled back, came back)."""
+        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never. A unit
+        tried again after a lock returns what its last try stored (item 351: the first try's note, rolled back, came
+        back)."""
 
         async def statements() -> tuple[MemoryRecord, bool]:
             row: aiosqlite.Row | None = await self._one(_SAME_TEXT, (content, agent_id))
@@ -2928,11 +2929,14 @@ class Store:
         return [_run(row) for row in rows]
 
     @_writing
-    async def keep_schedule_due(self, schedule_id: str, next_run_at: float) -> None:
-        """A one-time firing whose run did not start: due again at ``next_run_at`` and switched on, as it was before
-        :meth:`record_schedule_fire` gave it no next time (item 351)."""
+    async def keep_schedule_due(self, schedule_id: str, next_run_at: float, fired_at: float) -> None:
+        """A one-time firing at ``fired_at`` whose run did not start: due again at ``next_run_at`` and switched on, as
+        it was before :meth:`record_schedule_fire` gave it no next time (item 351). A schedule changed since that
+        firing (given a time, switched on, fired again) is left as it is."""
         await self._db.execute(
-            "UPDATE schedules SET next_run_at = ?, enabled = 1 WHERE id = ?", (next_run_at, schedule_id)
+            "UPDATE schedules SET next_run_at = ?, enabled = 1"
+            " WHERE id = ? AND last_run_at = ? AND next_run_at IS NULL AND enabled = 0",
+            (next_run_at, schedule_id, fired_at),
         )
         await self._db.commit()
 

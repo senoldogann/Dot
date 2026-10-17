@@ -93,7 +93,7 @@ def test_the_check_takes_an_address_cut_short_or_lengthened_as_known_and_another
     # The model copied the address as a rendering cut it, ellipsis and all, or added a fragment the history lacks.
     cut = check_continuity(SUMMARY + f"\nSee {page[:40]}…", reference, ledger, HOME)
     assert cut.ok, cut.unverified
-    lengthened = check_continuity(SUMMARY + f"\nSee {page}#step-3", reference, ledger, HOME)
+    lengthened = check_continuity(SUMMARY + f"\nSee {page}#step-3, {page}?print=1 and {page}/", reference, ledger, HOME)
     assert lengthened.ok, lengthened.unverified
     # Another page under the same prefix is not this one, nor is a page under this one, and a short known path says
     # nothing about a longer one.

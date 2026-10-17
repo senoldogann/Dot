@@ -23,7 +23,13 @@ from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE, ScheduleMissed
-from dotagent.scheduler.failures import record_firing_failure, record_firing_started
+from dotagent.scheduler.failures import (
+    FiringFailure,
+    firing_failure,
+    record_firing_failure,
+    record_firing_started,
+    retry_after,
+)
 from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
@@ -278,6 +284,10 @@ class Scheduler:
             log.warning("schedule_skipped_emergency_stop", schedule_id=record.id)
             await store.record_schedule_skip(record.id, following, "skipped: the emergency stop is engaged")
             return
+        if one_time:
+            failure: FiringFailure | None = await firing_failure(store, record.id)
+            if failure is not None and now < retry_after(failure):
+                return
         if record.id in self._in_flight:
             log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight[record.id])
             await store.record_schedule_skip(record.id, following, "skipped: the previous run was still going")
@@ -333,9 +343,10 @@ class Scheduler:
             if started is None and made:
                 await self._drop_chat(record.id, thread_id)
             # A one-time schedule is never dropped: one whose run did not start, with Dot's error or with a crash, is
-            # due again, and the next tick tries again (item 351; the firing above had switched it off for good).
+            # due again, and is tried again after a wait (``retry_after``; item 351: the firing above had switched it
+            # off for good).
             if started is None and one_time:
-                await store.keep_schedule_due(record.id, record.next_run_at)
+                await store.keep_schedule_due(record.id, record.next_run_at, now)
         run: RunRecord = started
         if await _emergency_stop_engaged():
             log.warning("schedule_run_stopped_emergency_stop", schedule_id=record.id, run_id=run.id)

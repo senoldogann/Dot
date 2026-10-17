@@ -35,7 +35,8 @@ is the answer (a small model that is offered both writes the call out as text).
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
-  ellipsis of a cut value, or one lengthened by a fragment counts as known). The `compacted` event names the model,
+  ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
+  it). The `compacted` event names the model,
   how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
   and after it (`tokens_before`, `tokens_after`).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and

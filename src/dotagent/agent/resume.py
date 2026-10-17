@@ -239,8 +239,8 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
     when a stop cut the step, every call of the step after a crash (:func:`~dotagent.agent.compact.pending_calls`). Its
     events tell which of them started and which finished: every event after the step's ``assistant`` event, since a
     call's id is unique only within its step, the events of its calls that ended among them (item 351: read as many as
-    the calls left, the newest were those of a call that ended after a cut one started, which then read as not started). When that event is missing, the step's message was stored and nothing of
-    the step ran. Reads the store."""
+    the calls left, the newest were those of a call that ended after a cut one started, which then read as not
+    started). When that event is missing, the step's message was stored and nothing of the step ran. Reads the store."""
     if run.steps == 0:
         return ()
     calls: tuple[ToolCall, ...] = pending_calls(await runtime.store.load_messages(run.thread_id, 0))
