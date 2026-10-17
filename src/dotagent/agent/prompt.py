@@ -351,6 +351,8 @@ do not retry it and do not look for a way around it: continue with what is allow
 password managers) unless the user explicitly asked for that exact item.
 - The user shares this Mac with you. Do not quit or close applications you did not open, and read the clipboard only \
 when the task is about what the user copied."""
+
+
 # In ask and auto the browser and the desktop refuse to type into a field that takes a secret; yolo enters them.
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
