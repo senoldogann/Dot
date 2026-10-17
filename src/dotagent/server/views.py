@@ -91,7 +91,8 @@ class AwakeRequest(FrozenModel):
 
 
 class PairingView(FrozenModel):
-    """A pairing code (item 267), as Settings › Phone shows it, and when it stops being good (seconds since the epoch)."""
+    """A pairing code (item 267), as Settings › Phone shows it, and when it stops being good (seconds since the
+    epoch)."""
 
     code: str
     expires_at: float
@@ -690,8 +691,8 @@ class ActionStep(FrozenModel):
 class FileEdit(FrozenModel):
     """One file the run or a run it delegated to changed, with what taking the change back would do (see
     ``undo.restore.UndoStep``): ``state`` is ``ready`` for a file as the runs left it, which one button takes back,
-    ``conflict``, ``cannot`` or ``as_before`` otherwise, with ``reason``. ``tool`` and ``run_id`` are the first change's,
-    ``changes`` how many the runs made."""
+    ``conflict``, ``cannot`` or ``as_before`` otherwise, with ``reason``. ``tool`` and ``run_id`` are the first
+    change's, ``changes`` how many the runs made."""
 
     path: str
     state: UndoState
@@ -938,10 +939,10 @@ class BrowserView(FrozenModel):
 
 
 class ConnectionView(FrozenModel):
-    """One application of Customize › Plugins (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it drives it with
-    AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it keeps in sync.
-    ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None`` when there is none
-    to take; ``waiting`` is true while macOS asks the owner about it on the Mac."""
+    """One application of Customize › Plugins (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it
+    drives it with AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it
+    keeps in sync. ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None``
+    when there is none to take; ``waiting`` is true while macOS asks the owner about it on the Mac."""
 
     id: str
     kind: ConnectionKind
@@ -975,12 +976,12 @@ type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signin
 
 
 class McpServerView(FrozenModel):
-    """One MCP server Dot has, as Customize › Plugins shows it (item 279). ``origin`` is where it is set up: Dot's config, a
-    plugin, another agent of the Mac (Customize › Skills › Found on this Mac), or the Plugins page itself, the only place that removes
-    one. ``address`` is its URL or its command. ``state``: its tools are offered to runs (``ready``, with ``tools``,
-    their names on the server), it was left out (``error`` says why), it is switched off in the config, or Dot tries it
-    now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the
-    owner's account, and Sign in again renews that."""
+    """One MCP server Dot has, as Customize › Plugins shows it (item 279). ``origin`` is where it is set up: Dot's
+    config, a plugin, another agent of the Mac (Customize › Skills › Found on this Mac), or the Plugins page itself,
+    the only place that removes one. ``address`` is its URL or its command. ``state``: its tools are offered to runs
+    (``ready``, with ``tools``, their names on the server), it was left out (``error`` says why), it is switched off
+    in the config, or Dot tries it now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``:
+    Dot signs in to it with the owner's account, and Sign in again renews that."""
 
     name: str
     origin: McpOrigin

@@ -8,10 +8,11 @@ this Mac.
 - (b) one browser_act of three actions (type into a field, choose an option, click a button);
 - a snapshot and a screenshot of the page as it is;
 - a page that draws its content in a frame of its own, as an app does: browser_open and the wait for its text;
-- (d) a task of ten steps through the real loop, on the scripted model: the time Dot itself takes, as the model's is nil.
+- (d) a task of ten steps through the real loop, on the scripted model: the time Dot itself takes, as the model's is
+  nil.
 
-Each is done five times; the medians (milliseconds) are printed as JSON, and written to the file DOT_SPEED_OUT names when
-it is set. The test checks that each call did its work, never how fast: the numbers are for the record of a change.
+Each is done five times; the medians (milliseconds) are printed as JSON, and written to the file DOT_SPEED_OUT names
+when it is set. The test checks that each call did its work, never how fast: the numbers are for the record of a change.
 With DOT_SPEED_VISIBLE=1 the scratch Chrome is on screen, as the owner's is: a tab made behind the active one is then
 hidden and throttled, which no tab of a hidden Chrome is; the app in front gets the front back once Chrome started.
 """
@@ -55,7 +56,8 @@ _FORM: str = """<!doctype html><html><head><title>Form</title></head><body>
 <h1>Weekly report</h1>
 <label>Name <input id="name" name="name"></label>
 <label>Week <select id="week"><option>1</option><option>2</option><option>3</option></select></label>
-<button id="save" onclick="document.getElementById('said').textContent = 'Saved ' + document.getElementById('name').value">Save</button>
+<button id="save" onclick="document.getElementById('said').textContent =
+  'Saved ' + document.getElementById('name').value">Save</button>
 <p id="said"></p>
 <a href="/second">Second page</a>
 <ul>{items}</ul>

@@ -1,11 +1,11 @@
-"""Zen's free models in Dot (item 283), for real: the OpenCode program Dot starts, on one of the free models, with no key.
-The server keeps the owner's own OpenCode setup out: a tool in the home's ``.opencode`` folder does not reach its agent.
-A task run asks Dot for the command it runs, waits for the owner's answer and does what it was told, its steps, tool
-calls and tokens in the run's timeline and its words in the chat; the next run of the chat goes on in the same session
-and remembers; a command the owner refuses is not run, and the run still ends with an answer. A message the owner sends
-reaches the agent at work, and Stop stops it while it waits for the owner, its question decided with it. The free
-models listed are those of OpenCode's refreshed catalog (item 292). The agent has Dot's own tools (item 284): it opens a
-page whose words a script writes in Dot's browser and reads them, each call in the run's timeline as Dot's own.
+"""Zen's free models in Dot (item 283), for real: the OpenCode program Dot starts, on one of the free models, with no
+key. The server keeps the owner's own OpenCode setup out: a tool in the home's ``.opencode`` folder does not reach its
+agent. A task run asks Dot for the command it runs, waits for the owner's answer and does what it was told, its steps,
+tool calls and tokens in the run's timeline and its words in the chat; the next run of the chat goes on in the same
+session and remembers; a command the owner refuses is not run, and the run still ends with an answer. A message the
+owner sends reaches the agent at work, and Stop stops it while it waits for the owner, its question decided with it. The
+free models listed are those of OpenCode's refreshed catalog (item 292). The agent has Dot's own tools (item 284): it
+opens a page whose words a script writes in Dot's browser and reads them, each call in the run's timeline as Dot's own.
 
 Needs the ``opencode`` program and the internet, and is skipped without the program.
 """

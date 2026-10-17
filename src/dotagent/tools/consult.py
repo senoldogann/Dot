@@ -90,7 +90,9 @@ class ConsultArgs(ToolArgs):
     )
     model: str | None = Field(
         default=None,
-        description="One of the helper models named in your instructions; leave it out to ask the first that can answer.",
+        description=(
+            "One of the helper models named in your instructions; leave it out to ask the first that can answer."
+        ),
     )
 
 

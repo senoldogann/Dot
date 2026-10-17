@@ -41,7 +41,8 @@ GOAL: str = "Find the line of server.log that says why the backup failed."
 LOG: FileSeed = FileSeed(
     path="server.log",
     content="".join(
-        f"03:{index // 60 % 60:02d}:{index % 60:02d} backup: chunk {index:05d} of 03000 copied to the archive, checksum ok\n"
+        f"03:{index // 60 % 60:02d}:{index % 60:02d} backup: chunk {index:05d} of 03000 copied to the archive, "
+        "checksum ok\n"
         for index in range(1, 3001)
     ),
     encoding="text",

@@ -377,7 +377,8 @@ _MEETINGS: tuple[tuple[str, str], ...] = (
         _lines(
             "# Kickoff",
             "",
-            "Present: Ayşe Demir <ayse.demir@example.org>, Can Öztürk: can@ozturk.example.net, Zeynep (no address given).",
+            "Present: Ayşe Demir <ayse.demir@example.org>, Can Öztürk: can@ozturk.example.net, Zeynep (no address "
+            "given).",
         ),
     ),
     (
@@ -782,8 +783,10 @@ def _catalog() -> tuple[EvalTask, ...]:
                             {"text": "Write contacts.csv", "status": "pending"},
                             {"text": "Count its rows against the addresses found", "status": "pending"},
                         ],
-                        targets="contacts.csv has one row for every person in notes/ with an e-mail address, counted "
-                        "with grep against the addresses grep finds in the notes",
+                        targets=(
+                            "contacts.csv has one row for every person in notes/ with an e-mail address, counted with "
+                            "grep against the addresses grep finds in the notes"
+                        ),
                     )
                 ),
                 _shell("grep -rn @ notes"),
@@ -1079,7 +1082,8 @@ _FORM_PAGE: str = _lines(
     "<!doctype html><title>Newsletter form</title><h1>Newsletter</h1>",
     '<form action="/done" method="get">',
     '<label>Name <input name="name"></label>',
-    '<label>Color <select name="color"><option value="red">Red</option><option value="blue">Blue</option></select></label>',
+    '<label>Color <select name="color"><option value="red">Red</option><option '
+    'value="blue">Blue</option></select></label>',
     '<label><input type="checkbox" name="agree"> I agree</label>',
     '<button type="submit">Submit form</button>',
     "</form>",
@@ -1226,7 +1230,8 @@ def _long_tasks() -> tuple[EvalTask, ...]:
         _task(
             "pipeline-with-flaky-stage",
             "recovery",
-            f"Run the {_STAGES} stages of the build pipeline in order: sh pipeline/stage.sh 1, then 2, up to {_STAGES}. "
+            f"Run the {_STAGES} stages of the build pipeline in order: sh pipeline/stage.sh 1, then 2, up to "
+            f"{_STAGES}. "
             "Each stage writes build/stageN.txt. A stage that fails with a message that says 'transient' is run "
             f"again. Finish when build/stage1.txt to build/stage{_STAGES}.txt all exist.",
             "task",

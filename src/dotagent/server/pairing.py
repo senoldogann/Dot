@@ -1,5 +1,5 @@
-"""Pairing a phone (item 267): a short code, shown in Settings › Phone, that an app added to a phone's home screen trades
-once for the access token. iOS gives such an app storage of its own, apart from Safari's, so the token that the
+"""Pairing a phone (item 267): a short code, shown in Settings › Phone, that an app added to a phone's home screen
+trades once for the access token. iOS gives such an app storage of its own, apart from Safari's, so the token that the
 address of the QR code carried into Safari is not there, and nobody types a 43-character token on a phone.
 
 A code is eight characters of Crockford's base32 (40 bits), good for ten minutes and for one use. A new code takes the

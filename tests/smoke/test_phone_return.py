@@ -358,8 +358,8 @@ async def _chat_page(context: BrowserContext, proxy: Proxy, run: RunRecord) -> P
 
 
 async def _keep_pages_copy(page: Page) -> None:
-    """Let the service worker take the page; loaded again, the page leaves it a copy of the pages, as a phone that opened
-    Dot before has one."""
+    """Let the service worker take the page; loaded again, the page leaves it a copy of the pages, as a phone that
+    opened Dot before has one."""
     await page.wait_for_function("() => navigator.serviceWorker.controller !== null")
     await page.reload()
     await page.wait_for_function("async () => (await caches.match('/js/main.js')) !== undefined")

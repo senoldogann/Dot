@@ -6,9 +6,9 @@ that only a newer daemon has, and break on every screen until it starts again. K
 version until the next start, and the digest a page compares (:func:`pages_build`) is that of the pages it is served.
 Hidden files (``.DS_Store``, a tool's cache) are no pages: they are neither served nor counted.
 
-Every file served names that digest, the build it is of, in a header (:data:`BUILD_HEADER`), by which the phone's service
-worker keeps its copies; Dot's own page names it in its ``dot-pages`` meta too, so that a page the service worker answered
-from its copy, while the network woke, knows whether it is of the daemon's build (item 328).
+Every file served names that digest, the build it is of, in a header (:data:`BUILD_HEADER`), by which the phone's
+service worker keeps its copies; Dot's own page names it in its ``dot-pages`` meta too, so that a page the service
+worker answered from its copy, while the network woke, knows whether it is of the daemon's build (item 328).
 """
 
 import hashlib
@@ -33,8 +33,8 @@ _INDEX: str = "index.html"
 BUILD_HEADER: str = "x-dot-pages"
 # The mark in a page that the daemon fills with the build as it serves the page (item 328).
 _BUILD_MARK: bytes = b'<meta name="dot-pages" content="">'
-# The headers a 304 answer keeps, as Starlette's StaticFiles keeps them, and the build: the browser writes it over the one
-# its copy was stored with, since a file the same in two builds is answered 304.
+# The headers a 304 answer keeps, as Starlette's StaticFiles keeps them, and the build: the browser writes it over the
+# one its copy was stored with, since a file the same in two builds is answered 304.
 _NOT_MODIFIED_HEADERS: frozenset[str] = frozenset(
     {"cache-control", "content-location", "date", "etag", "expires", "vary", BUILD_HEADER}
 )

@@ -7,8 +7,8 @@ it knows what they mean (a review model that fails, a folder that cannot be writ
 its outcome (:class:`LearningOutcome`); the task catches anything else, once, and records every outcome
 (:func:`record_learning`). ``dotx stats`` and the Memory page show the record. Learning that has stopped
 (:func:`stall_reason`: a work failed :data:`FAILURES_TO_TELL` times in a row, or, while the reflection is on, none
-went well for :data:`REFLECTION_SILENCE_S`) is told to the owner once, a ``learning_stalled`` event of Dot itself that the web UI and
-the phones show, and not again until it works again.
+went well for :data:`REFLECTION_SILENCE_S`) is told to the owner once, a ``learning_stalled`` event of Dot itself that
+the web UI and the phones show, and not again until it works again.
 """
 
 from typing import Literal

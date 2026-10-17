@@ -1,8 +1,8 @@
 """Stop in the send button's place (item 120): while a run works and the box is empty, the run page's send is a Stop in
 the danger colour; a typed word brings the send back, as Queue (item 148), and pressed, the Stop cancels the run, after
 which the send follows up. The top bar keeps the face, the name (on a phone the chat's title) and the panel's switch;
-there is no emergency stop in the bar. A scripted run waits in a shell command, served by a real server, wide and on a phone, light and
-dark."""
+there is no emergency stop in the bar. A scripted run waits in a shell command, served by a real server, wide and on
+a phone, light and dark."""
 
 import asyncio
 import time

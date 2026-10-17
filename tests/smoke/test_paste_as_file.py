@@ -133,7 +133,8 @@ async def _paste(box: Locator, text: str) -> bool:
     """Paste ``text`` into ``box`` as the clipboard does; whether the page took the paste, keeping it out of the box."""
     return await box.evaluate(
         "(box, text) => { const data = new DataTransfer(); data.setData('text/plain', text);"
-        " return !box.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })); }",
+        " return !box.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: "
+        "true })); }",
         text,
     )
 

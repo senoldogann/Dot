@@ -1,10 +1,10 @@
-"""Settings › Appearance on a phone (item 331), in WebKit as the owner's iPhone and as a small one, on a served daemon with
-a finished task.
+"""Settings › Appearance on a phone (item 331), in WebKit as the owner's iPhone and as a small one, on a served daemon
+with a finished task.
 
 - Text: one "Text size", the size of the body on this device, under a line of an answer: a phone's own is 16 px and the
   choice runs from 12 to 20 (item 347; it ran from 14). Moved to 18, the answer, a row of the sidebar and a label of the
-  settings grow by 18/16 together, and at 12 they shrink by 12/16 together; after a reload it is still 18, and boot.js alone (main.js held back) puts it on the page before the first
-  paint.
+  settings grow by 18/16 together, and at 12 they shrink by 12/16 together; after a reload it is still 18, and boot.js
+  alone (main.js held back) puts it on the page before the first paint.
 - The colour scheme's cards draw a phone, upright, and the themes stand two a row, 320 px wide too, nothing wider than
   the screen. A Mac's window draws a window, wider than high.
 
@@ -66,8 +66,8 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 
 @asynccontextmanager
 async def _served(home: Path) -> AsyncIterator[tuple[RunManager, str]]:
-    """A daemon on the Dot home ``home`` whose model is the scripted one, answering a task at once: its run manager and the
-    address it is at."""
+    """A daemon on the Dot home ``home`` whose model is the scripted one, answering a task at once: its run manager
+    and the address it is at."""
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
     )

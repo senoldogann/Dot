@@ -1,5 +1,5 @@
-"""``dotx browser``: let Dot work in the Chrome that is open, or bring the sign-ins of a personal Chrome profile into Dot's
-own browser profile."""
+"""``dotx browser``: let Dot work in the Chrome that is open, or bring the sign-ins of a personal Chrome profile into
+Dot's own browser profile."""
 
 import asyncio
 import sys
@@ -98,7 +98,8 @@ async def cmd_browser_attach(command: BrowserAttachCommand) -> int:
         await session.aclose()
     await asyncio.to_thread(set_browser_mode, config_path(), "attach")
     sys.stdout.write(
-        f"Worked in a test tab of Chrome {attachment.browser_version} ({attachment.open_tabs} tabs open) and closed it.\n"
+        f"Worked in a test tab of Chrome {attachment.browser_version} ({attachment.open_tabs} tabs open) and closed "
+        "it.\n"
         f'Saved mode = "attach" under [browser] in {config_path()}.\n'
         "Restart the Dot service so it uses your Chrome: dotx service install\n"
         "Chrome asks you to click Allow once when the service first opens a page. "

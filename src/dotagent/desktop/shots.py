@@ -1,8 +1,8 @@
 """Screenshots of the main display, in the coordinates the model clicks in.
 
-A screenshot shows the whole screen at one pixel per model unit, or a zoomed region of it at the display's own sharpness.
-Windows of password managers are painted black before the picture leaves this module. Everything here blocks and runs on
-the session's worker thread.
+A screenshot shows the whole screen at one pixel per model unit, or a zoomed region of it at the display's own
+sharpness. Windows of password managers are painted black before the picture leaves this module. Everything here blocks
+and runs on the session's worker thread.
 """
 
 from collections.abc import Sequence

@@ -57,8 +57,8 @@ def _windows(config: PaceConfig, pace: PaceClass) -> tuple[tuple[str, float, int
 
 
 def pace_is_set(config: PaceConfig, pace: PaceClass) -> bool:
-    """Whether ``[policy.pace]`` limits the actions of class ``pace`` at all: a number in an hour or a day, or for public
-    ones a spacing."""
+    """Whether ``[policy.pace]`` limits the actions of class ``pace`` at all: a number in an hour or a day, or for
+    public ones a spacing."""
     spacing_s: float = config.public_spacing_s if pace == "public" else 0.0
     return spacing_s > 0 or any(limit > 0 for _, _, limit in _windows(config, pace))
 

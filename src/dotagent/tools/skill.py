@@ -55,8 +55,8 @@ def files_of_skill(root: Path) -> list[str]:
 
 
 def with_python(skill: Skill, python: str) -> Skill:
-    """``skill`` with :data:`PYTHON_MARK` in its instructions replaced by ``python``, the path of Dot's own Python as the
-    shell takes it."""
+    """``skill`` with :data:`PYTHON_MARK` in its instructions replaced by ``python``, the path of Dot's own Python as
+    the shell takes it."""
     return skill.model_copy(update={"body": skill.body.replace(PYTHON_MARK, python)})
 
 

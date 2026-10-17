@@ -156,7 +156,9 @@ def _from_keychain(name: str) -> str | None:
             {
                 "name": name,
                 "timeout_s": _KEYCHAIN_TIMEOUT_S,
-                "hint": "unlock the login keychain or answer its prompt, or keep the key in the env file (dotx auth set)",
+                "hint": (
+                    "unlock the login keychain or answer its prompt, or keep the key in the env file (dotx auth set)"
+                ),
             },
         ) from exc
     if completed.returncode != 0:

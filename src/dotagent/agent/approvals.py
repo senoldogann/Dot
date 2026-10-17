@@ -70,8 +70,9 @@ class ApprovalBroker:
         finally:
             self._waiting.pop(record.id, None)
             self._run_of.pop(record.id, None)
-            # A decision made through ``resolve`` is stored already and stays as it is; the other endings are stored here.
-            # The run acts on what is stored, also when the deadline passed while a person's decision was being stored.
+            # A decision made through ``resolve`` is stored already and stays as it is; the other endings are stored
+            # here. The run acts on what is stored, also when the deadline passed while a person's decision was being
+            # stored.
             stored: ApprovalRecord = await self._store.decide_approval(
                 record.id, outcome.status, outcome.decided_by, outcome.note
             )

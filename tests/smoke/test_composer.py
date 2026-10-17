@@ -215,7 +215,8 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 goal = page.locator(GOAL)
                 popover = page.locator(".composer .composer-popover[aria-label='Model']")
                 await expect(popover).to_be_hidden()
-                # The Model pill (item 108) wears the mark of its provider, an SVG of the page's own, and the model's name.
+                # The Model pill (item 108) wears the mark of its provider, an SVG of the page's own, and the model's
+                # name.
                 model_pill = page.locator(".composer-pill[data-pill='model']")
                 await expect(model_pill).to_contain_text("scripted")
                 mark = model_pill.locator(".provider-mark")
@@ -228,7 +229,8 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 # The scripted model offers no reasoning levels, so the Reasoning pill is away.
                 reasoning_pill = page.locator(".composer-pill[data-pill='reasoning']")
                 await expect(reasoning_pill).to_be_hidden()
-                # The menu: the daemon's default ticked, every model with its mark; a pick closes it and names the model.
+                # The menu: the daemon's default ticked, every model with its mark; a pick closes it and names the
+                # model.
                 await model_pill.click()
                 await expect(popover).to_be_visible()
                 await expect(popover.locator("[role=option][aria-selected=true]")).to_contain_text("Default (scripted)")
@@ -239,7 +241,8 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await popover.get_by_role("option", name="thinker").click()
                 await expect(popover).to_be_hidden()
                 await expect(model_pill).to_contain_text("thinker")
-                # A model with levels brings the Reasoning pill: the daemon's level until one is picked, then the one picked.
+                # A model with levels brings the Reasoning pill: the daemon's level until one is picked, then the one
+                # picked.
                 await expect(reasoning_pill).to_contain_text("Medium")
                 await expect(reasoning_pill.locator("[data-icon='brain']")).to_have_count(1)
                 await reasoning_pill.click()
@@ -346,8 +349,8 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
     runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
     """Item 115: with every pill out (an agent, a model with reasoning levels, YOLO), the bar is one line at 1280, 800,
-    560 and 390 px, as tall as its pills (32 px, and 36 px on a phone, item 273), nothing past its right edge; the mode's
-    name folds to its icon on a short bar, and YOLO wears no fill."""
+    560 and 390 px, as tall as its pills (32 px, and 36 px on a phone, item 273), nothing past its right edge; the
+    mode's name folds to its icon on a short bar, and YOLO wears no fill."""
     made: httpx.Response = await client.post(
         "/api/agents",
         json={

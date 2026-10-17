@@ -129,9 +129,10 @@ class BrowserError(DotError):
 
 
 class ForbiddenUrlError(BrowserError):
-    """The browser rules refuse an address: Dot's own interface, a blocked host, a host outside ``browser.allowed_hosts``
-    or a scheme that is not the web's. ``url`` is the address as Chrome read it, ``reason`` why it is refused and
-    ``resource_type`` what the request was for (``document`` for a page, else Chrome's name for the resource)."""
+    """The browser rules refuse an address: Dot's own interface, a blocked host, a host outside
+    ``browser.allowed_hosts`` or a scheme that is not the web's. ``url`` is the address as Chrome read it, ``reason``
+    why it is refused and ``resource_type`` what the request was for (``document`` for a page, else Chrome's name for
+    the resource)."""
 
     def __init__(self, message: str, url: str, reason: str, resource_type: str) -> None:
         super().__init__(message, {"url": url, "reason": reason, "resource_type": resource_type})

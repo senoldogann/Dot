@@ -156,8 +156,8 @@ def test_a_signal_is_one_short_line_without_secrets() -> None:
     long: CallFact = CallFact(tool="shell", target="x" * 400, ok=False, result="[exit 1]")
     signals: tuple[str, ...] = run_signals(_case((leaked, long), ()), [], [], [])
     assert signals[0] == (
-        "web_fetch https://api.example.com/v1 failed (401 Unauthorized for key ***); no later call of the same tool and "
-        "target worked."
+        "web_fetch https://api.example.com/v1 failed (401 Unauthorized for key ***); no later call of the same tool "
+        "and target worked."
     )
     assert len(signals[1]) == 300
     assert signals[1].endswith("…")

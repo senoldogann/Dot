@@ -1,12 +1,12 @@
 """Rewinding a chat to before one of the owner's messages (item 282), as T3 Code's Edit from here does: the message and
 all that came after it leave the chat, the history the model reads ends where it ended before the message, and the
 message's words and attachments go back to the owner's composer. When the owner asks for it, the file changes of the
-runs taken out, and of the runs they delegated to, are taken back as ``dotx undo`` takes them back: the changes made with
-Dot's file tools, from their journals, each file only while it is as the runs left it; the others are named. What a
-command changed stays, as no journal holds it. The plan is made before the chat is rewound, so that a journal that
-cannot be read stops the rewind; once the chat is rewound, a file that cannot be put back is named with why, as one
-changed since is. The chat's OpenCode session saw what was taken out, so the chat's next run on OpenCode starts a new
-one, which reads the chat's history (``opencode.run``)."""
+runs taken out, and of the runs they delegated to, are taken back as ``dotx undo`` takes them back: the changes made
+with Dot's file tools, from their journals, each file only while it is as the runs left it; the others are named.
+What a command changed stays, as no journal holds it. The plan is made before the chat is rewound, so that a journal
+that cannot be read stops the rewind; once the chat is rewound, a file that cannot be put back is named with why, as
+one changed since is. The chat's OpenCode session saw what was taken out, so the chat's next run on OpenCode starts a
+new one, which reads the chat's history (``opencode.run``)."""
 
 import asyncio
 from collections.abc import Sequence

@@ -180,7 +180,8 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             )
         if session.config.headless:
             raise RunConflict(
-                "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the config",
+                "Dot's browser runs without a window, so there is none to sign in in: switch headless off in the "
+                "config",
                 {"app_id": app_id},
             )
         await session.open_url(_SIGN_IN_THREAD, found_web.sign_in)

@@ -52,17 +52,24 @@ def test_headings_links_lists_tables_and_code_keep_their_structure() -> None:
 _RESULTS: str = """<html><body><div id="links" class="results">
 <div class="result results_links results_links_deep web-result">
 <div class="links_main links_deep result__body"><h2 class="result__title">
-<a rel="nofollow" class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.python.org%2F&amp;rut=1">Welcome to <b>Python</b>.org</a></h2>
-<a class="result__snippet" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.python.org%2F&amp;rut=1">The official home of the
+<a rel="nofollow" class="result__a"
+href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.python.org%2F&amp;rut=1">Welcome to <b>Python</b>.org</a></h2>
+<a class="result__snippet"
+href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.python.org%2F&amp;rut=1">The official home of the
 <b>Python</b>  Programming Language.</a></div></div>
 <div class="result results_links results_links_deep result--ad">
-<h2 class="result__title"><a class="result__a" href="https://duckduckgo.com/y.js?ad_domain=shop.test&amp;u=1">Buy Python now</a></h2>
-<a class="result__snippet" href="https://duckduckgo.com/y.js?ad_domain=shop.test&amp;u=1">Sponsored</a></div>
+<h2 class="result__title"><a class="result__a"
+href="https://duckduckgo.com/y.js?ad_domain=shop.test&amp;u=1">Buy Python now</a></h2>
+<a class="result__snippet"
+href="https://duckduckgo.com/y.js?ad_domain=shop.test&amp;u=1">Sponsored</a></div>
 <div class="result results_links results_links_deep web-result">
-<h2 class="result__title"><a class="result__a" href="https://en.wikipedia.org/wiki/Python_(programming_language)">Python - Wikipedia</a></h2>
-<a class="result__snippet" href="https://en.wikipedia.org/wiki/Python_(programming_language)">General-purpose language.</a></div>
+<h2 class="result__title"><a class="result__a"
+href="https://en.wikipedia.org/wiki/Python_(programming_language)">Python - Wikipedia</a></h2>
+<a class="result__snippet"
+href="https://en.wikipedia.org/wiki/Python_(programming_language)">General-purpose language.</a></div>
 <div class="result results_links results_links_deep web-result">
-<h2 class="result__title"><a class="result__a" href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.python.org%2F&amp;rut=2">Python.org again</a></h2></div>
+<h2 class="result__title"><a class="result__a"
+href="//duckduckgo.com/l/?uddg=https%3A%2F%2Fwww.python.org%2F&amp;rut=2">Python.org again</a></h2></div>
 </div></body></html>"""
 
 

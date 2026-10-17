@@ -88,7 +88,8 @@ def expand_variables(value: str, variables: PluginVariables, path: Path) -> str:
 
 
 def expand_fully(value: str, variables: PluginVariables, path: Path, field: str) -> str:
-    """Like :func:`expand_variables`, for a value that must be complete: Dot fills ``${NAME}`` only in env and headers."""
+    """Like :func:`expand_variables`, for a value that must be complete: Dot fills ``${NAME}`` only in env and
+    headers."""
     expanded: str = expand_variables(value, variables, path)
     leftover: re.Match[str] | None = _VARIABLE.search(expanded)
     if leftover is not None:

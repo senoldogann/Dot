@@ -66,7 +66,8 @@ def _stdout(arguments: Sequence[str]) -> str:
 
 
 def parse_lsappinfo(text: str) -> tuple[AppInfo, ...]:
-    """The applications in the output of ``lsappinfo list``; one that has no pid yet is still launching and is left out."""
+    """The applications in the output of ``lsappinfo list``; one that has no pid yet is still launching and is left
+    out."""
     headers: list[re.Match[str]] = list(_HEADER.finditer(text))
     apps: list[AppInfo] = []
     for index, header in enumerate(headers):

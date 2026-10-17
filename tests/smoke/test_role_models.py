@@ -1,8 +1,8 @@
-"""The models of Dot's own work (item 232): Settings › Models chooses the fast, review and vision models under the default
-one, offering those that can do that work; the config file keeps each choice with the rest of it as it was, the status
-says it, and the next call of that work goes to it, with no restart. A model that cannot do the work is refused, and
-nothing changes. A real server whose providers list the test's models and answer nothing; wide and on a phone, light
-and dark."""
+"""The models of Dot's own work (item 232): Settings › Models chooses the fast, review and vision models under the
+default one, offering those that can do that work; the config file keeps each choice with the rest of it as it was,
+the status says it, and the next call of that work goes to it, with no restart. A model that cannot do the work is
+refused, and nothing changes. A real server whose providers list the test's models and answer nothing; wide and on a
+phone, light and dark."""
 
 import asyncio
 import os

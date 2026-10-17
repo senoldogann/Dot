@@ -1,7 +1,7 @@
-"""The MCP servers the owner added on Customize › Plugins (items 279 and 316), kept in Dot's home (:func:`connected_servers_path`): each
-as Dot connects to it, by its address or its command, and whether it signs in. Dot connects them at its start after the
-servers of its config, its plugins and the other agents, and while it runs as soon as one is added; a name one of
-those has leaves this one out."""
+"""The MCP servers the owner added on Customize › Plugins (items 279 and 316), kept in Dot's home
+(:func:`connected_servers_path`): each as Dot connects to it, by its address or its command, and whether it signs in.
+Dot connects them at its start after the servers of its config, its plugins and the other agents, and while it runs
+as soon as one is added; a name one of those has leaves this one out."""
 
 import json
 import threading

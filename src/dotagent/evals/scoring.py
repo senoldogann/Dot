@@ -127,7 +127,8 @@ def _measured_mean(values: Sequence[float | None]) -> float | None:
 
 
 def _share(parts: Sequence[int | None], wholes: Sequence[int | None]) -> float | None:
-    """``parts`` over ``wholes``, summed over the attempts that counted both; ``None`` when none did or the whole is 0."""
+    """``parts`` over ``wholes``, summed over the attempts that counted both; ``None`` when none did or the whole is
+    0."""
     counted: list[tuple[int, int]] = [
         (part, whole) for part, whole in zip(parts, wholes, strict=True) if part is not None and whole is not None
     ]
@@ -334,15 +335,19 @@ def _easy_share(card: Scorecard) -> float | None:
 def render_difference(first: Scorecard, second: Scorecard) -> list[str]:
     """One line with the second scorecard against the first: the same model before and after a change, or two
     models. Shares are given in percentage points; a number either side lacks shows ``-``."""
+    first_k: float | None = None if first.tokens_per_pass is None else first.tokens_per_pass / 1000
+    second_k: float | None = None if second.tokens_per_pass is None else second.tokens_per_pass / 1000
     return [
         f"Difference, {second.model} against {first.model}: "
-        f"passed {second.passed - first.passed:+d} ({_delta_pp(_rate(first.passed, first.attempts), _rate(second.passed, second.attempts))}), "
+        f"passed {second.passed - first.passed:+d} "
+        f"({_delta_pp(_rate(first.passed, first.attempts), _rate(second.passed, second.attempts))}), "
         f"steps/pass {_delta(first.steps_per_pass, second.steps_per_pass, '')}, "
-        f"tokens/pass {_delta(None if first.tokens_per_pass is None else first.tokens_per_pass / 1000, None if second.tokens_per_pass is None else second.tokens_per_pass / 1000, ' k')}, "
+        f"tokens/pass {_delta(first_k, second_k, ' k')}, "
         f"seconds/pass {_delta(first.seconds_per_pass, second.seconds_per_pass, ' s')}, "
         f"one-step acts {_delta_pp(first.single_act_share, second.single_act_share)}, "
         f"cached {_delta_pp(first.cached_share, second.cached_share)}, "
-        f"tool errors {_delta_pp(_rate(first.tool_errors, first.tool_calls), _rate(second.tool_errors, second.tool_calls))}, "
+        "tool errors "
+        f"{_delta_pp(_rate(first.tool_errors, first.tool_calls), _rate(second.tool_errors, second.tool_calls))}, "
         f"compactions/100 steps {_delta(first.compactions_per_100_steps, second.compactions_per_100_steps, '')}, "
         f"not found {_delta_count(first.not_found, second.not_found)}, "
         f"stalls {second.stalls - first.stalls:+d}, false claims {second.false_successes - first.false_successes:+d}, "

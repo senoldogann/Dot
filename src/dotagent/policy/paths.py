@@ -7,8 +7,8 @@ import tempfile
 from pathlib import Path
 from typing import Literal
 
-# ``dot`` is what Dot loads and runs, and its emergency stop (``Runtime.dot_paths``): a run reads it as it reads the home
-# folder, and changes it as it would a protected location.
+# ``dot`` is what Dot loads and runs, and its emergency stop (``Runtime.dot_paths``): a run reads it as it reads the
+# home folder, and changes it as it would a protected location.
 PathClass = Literal["workspace", "temp", "home", "system", "dot", "protected"]
 # The reason the policy gives when a run would change a ``dot`` path.
 CHANGES_DOT: str = "changes what Dot loads and runs (its plugins, skills and playbooks) or its emergency stop"

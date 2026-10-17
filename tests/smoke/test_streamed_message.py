@@ -1,5 +1,5 @@
-"""A message that streams is drawn as it will stay (item 274), on a served daemon in Chrome, with a model that thinks and
-then writes a message of ten parts in small pieces, faster than the page paints. While it streams the message is
+"""A message that streams is drawn as it will stay (item 274), on a served daemon in Chrome, with a model that thinks
+and then writes a message of ten parts in small pieces, faster than the page paints. While it streams the message is
 formatted (its bold is bold), drawn at most once a frame, the parts written before the one being written left as they
 were drawn, with the caret in its text, not in the column of the face; when it ends its height does not change; and the
 arrow down never shows while the page follows the run to its answer, also when a long message comes whole, with the
@@ -60,7 +60,8 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),
 )
 # What the page does while the message streams, seen once a frame. A draw is a change to the live message's text, as one
-# call of a mutation observer sees it; a part is written once another follows it, and redrawn if its node leaves the page.
+# call of a mutation observer sees it; a part is written once another follows it, and redrawn if its node leaves the
+# page.
 _WATCH: str = """() => {
   const seen = {
     frames: 0, draws: 0, formatted: false, carets: 0, caretsInText: 0, liveHeight: 0, written: 0, redrawn: 0,
@@ -213,7 +214,8 @@ async def _served(home: Path, model: Streamer) -> AsyncIterator[tuple[RunManager
 
 
 async def _opened(page: Page) -> None:
-    """Wait out the opening, which plays over the page once a tab, so that the pictures taken while it streams show it."""
+    """Wait out the opening, which plays over the page once a tab, so that the pictures taken while it streams show
+    it."""
     await page.wait_for_function("() => document.documentElement.dataset.opening === undefined")
 
 

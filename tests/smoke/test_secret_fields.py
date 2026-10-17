@@ -1,5 +1,5 @@
-"""A field that takes a secret, through the browser tools and the gate: in ask mode the step is refused, a yolo run types
-the code it read and the gate keeps a credential record of it.
+"""A field that takes a secret, through the browser tools and the gate: in ask mode the step is refused, a yolo run
+types the code it read and the gate keeps a credential record of it.
 
 The fixture page asks for a code from an e-mail in a field marked ``autocomplete="one-time-code"`` whose label names
 nothing secret, so only the field's own marking, read when the step runs, tells what it takes. The check is what reached

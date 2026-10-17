@@ -1,5 +1,5 @@
-"""Browser tools: open pages, read them as compact snapshots, act on them in batches, run scripts in them, and move between
-tabs.
+"""Browser tools: open pages, read them as compact snapshots, act on them in batches, run scripts in them, and move
+between tabs.
 
 Every result carries page-derived text only inside a ``<web_content>`` fence with a fresh random nonce; the line above
 the fence is produced by Dot. Navigation is checked against the URL rules before anything is classified, and a batch of
@@ -279,16 +279,18 @@ class ActArgs(ToolArgs):
         description=(
             "Steps run in order against the latest snapshot: every step you can predict without a new look at the "
             "page (a call with one step costs a model round trip for one click); a batch holds a few steps (5 by "
-            "default), and more are cut to the first ones with the result saying so. The batch stops at the first failure "
-            "or when the page surprises you (new tab, dialog, download, navigation); the remaining steps are then "
-            "skipped. Example: "
+            "default), and more are cut to the first ones with the result saying so. The batch stops at the first "
+            "failure or when the page surprises you (new tab, dialog, download, navigation); the remaining steps are "
+            "then skipped. Example: "
             '[{"action": "fill", "ref": "e5", "text": "Ada"}, {"action": "select", "ref": "e7", "text": "blue"}, '
             '{"action": "click", "ref": "e9"}].'
         ),
     )
     accept_dialogs: bool = Field(
         default=False,
-        description="Accept confirm() dialogs this batch triggers (purchase or payment confirmations are never accepted).",
+        description=(
+            "Accept confirm() dialogs this batch triggers (purchase or payment confirmations are never accepted)."
+        ),
     )
     expect: str | None = Field(
         default=None,
@@ -400,8 +402,9 @@ def _act_tool() -> RegisteredTool:
         if limited:
             raise ToolInputError(
                 "A batch takes one public or social action at most (a post, a reply, a repost, a message, a follow, a "
-                "like) while the owner sets a pace for them: each one counts toward the pace of the site. Send them one "
-                "call at a time; doing them with a script in the page (browser_eval) would go around the owner's pace.",
+                "like) while the owner sets a pace for them: each one counts toward the pace of the site. Send them "
+                "one call at a time; doing them with a script in the page (browser_eval) would go around the owner's "
+                "pace.",
                 {"public_or_social_steps": len(paced), "paced_classes": list(limited)},
             )
         notes: list[str] = [judgment.note for judgment in judgments if judgment.note]

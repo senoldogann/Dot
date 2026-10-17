@@ -143,7 +143,11 @@ _SIZES: str = """() => {
   });
   probe.remove();
   const toggle = document.querySelector(".switch").getBoundingClientRect();
-  return { sizes, body: getComputedStyle(document.body).fontSize, toggle: [toggle.width, toggle.height].map(Math.round) };
+  return {
+    sizes,
+    body: getComputedStyle(document.body).fontSize,
+    toggle: [toggle.width, toggle.height].map(Math.round),
+  };
 }"""
 
 

@@ -5,12 +5,12 @@ fit."""
 
 import re
 
-# Whole words only, the typed apostrophe or the curly one: "durmadan" (without stopping) asks, "durmak istiyorum" (I want
-# to stop) and "durması" (its stopping) do not. "durma" (don't stop) asks after "hiç" or "sakın" or at the end of a
+# Whole words only, the typed apostrophe or the curly one: "durmadan" (without stopping) asks, "durmak istiyorum" (I
+# want to stop) and "durması" (its stopping) do not. "durma" (don't stop) asks after "hiç" or "sakın" or at the end of a
 # clause, since it is also the noun of "durma noktası" (the stopping point). The lookalikes that ask nothing of the kind
-# are left out: a stop with an object ("don't stop the server"), a wait ("wait until it is done", "bitene kadar
-# bekle"), "durmadan önce" (before stopping), and "non-stop", which is mostly said of flights. "devam et" (go on) is left
-# out too: it is how a follow-up says "continue", not "until it is done".
+# are left out: a stop with an object ("don't stop the server"), a wait ("wait until it is done", "bitene kadar bekle"),
+# "durmadan önce" (before stopping), and "non-stop", which is mostly said of flights. "devam et" (go on) is left out
+# too: it is how a follow-up says "continue", not "until it is done".
 _KEEP_GOING: re.Pattern[str] = re.compile(
     r"\b(?:"
     r"(?:don['’]?t|do not|never) stop(?!\s+(?:the|a|an|this|that|these|those|my|your|our|their|its|any)\b)"

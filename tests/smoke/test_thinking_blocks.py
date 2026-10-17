@@ -167,7 +167,8 @@ async def _folded(block: Locator) -> bool:
     """Whether the details ``block`` is as tall as its summary: what it holds takes no room. Its box is read, as
     WebKit's Playwright counts the content of a closed details as visible."""
     return await block.evaluate(
-        "(node) => node.getBoundingClientRect().height <= node.querySelector('summary').getBoundingClientRect().height + 1"
+        "(node) => node.getBoundingClientRect().height <= "
+        "node.querySelector('summary').getBoundingClientRect().height + 1"
     )
 
 

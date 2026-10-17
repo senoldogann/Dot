@@ -1,18 +1,19 @@
 """On a phone the settings are a list of their tabs in groups, after T3 Code's (item 330), in WebKit as the owner's
-iPhone (440 px wide) and as a small one (320 px), on a served daemon with two schedules, three notes and the Ocean theme.
+iPhone (440 px wide) and as a small one (320 px), on a served daemon with two schedules, three notes and the Ocean
+theme.
 
 On a phone:
 
-- `#/settings` is four groups of rows, ten in all (Skills is a tab of Customize, item 317): Appearance tells the theme on screen, Models the main model, Memory
-  how many notes Dot keeps and Schedules how many schedules there are;
+- `#/settings` is four groups of rows, ten in all (Skills is a tab of Customize, item 317): Appearance tells the theme
+  on screen, Models the main model, Memory how many notes Dot keeps and Schedules how many schedules there are;
 - a row opens its tab as a page of its own: the bar names the tab, its Back at the top left (item 338) is the one
   way back and no rail or row of tabs shows; Back leads to the list;
 - a card's name stands over the card, out of its surface;
 - neither the list nor any tab runs wider than the screen.
 
 In a Mac's window `#/settings` leads to General, in the place of the address it was opened at: the rail is there and the
-way back and the list are not, the bar says Settings and a card's name is inside the card. Before, a phone had the row of
-tabs over the pane, and `#/settings` was General. The model is a scripted one.
+way back and the list are not, the bar says Settings and a card's name is inside the card. Before, a phone had the row
+of tabs over the pane, and `#/settings` was General. The model is a scripted one.
 """
 
 import asyncio
@@ -65,7 +66,8 @@ _NOTES: tuple[str, ...] = (
     "The team stand-up is at 09:30 on weekdays.",
     "Writes reports in British English.",
 )
-# What the rows that hold something say: the theme picked (`dot.theme`), the main model's name, the notes, the schedules.
+# What the rows that hold something say: the theme picked (`dot.theme`), the main model's name, the notes, the
+# schedules.
 _VALUES: dict[str, str] = {
     "Appearance": "Ocean",
     "Models": SCRIPTED_MODEL.partition(":")[2],

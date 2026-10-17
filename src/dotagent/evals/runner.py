@@ -1,5 +1,5 @@
-"""Playing eval tasks: each attempt is an unattended run in a home and a workspace of its own, judged by the checks of the
-task, and everything it does is counted.
+"""Playing eval tasks: each attempt is an unattended run in a home and a workspace of its own, judged by the checks of
+the task, and everything it does is counted.
 
 The process points at a throw-away Dot home for the length of an attempt (``DOT_HOME``), so the database, the
 workspace and the screenshots of the user are never touched. The API keys of the models an attempt may call
@@ -59,9 +59,9 @@ _ATTEMPT_ENV: dict[str, str] = {"PYTHONDONTWRITEBYTECODE": "1"}
 def eval_config(config: AppConfig) -> AppConfig:
     """The configuration an eval run uses: the given one, without what must not take part in a measurement (the MCP
     servers, skills and plugins of the user, the Mac desktop, the embeddings of the memory, the lessons and the
-    playbooks, which would carry what one attempt learnt into the next, the user's helper and standby models, which would answer for the
-    model under measure, and the user's limits of a run: a task's own time and token limits cut its runs); the browser
-    is headless, since nobody watches an attempt."""
+    playbooks, which would carry what one attempt learnt into the next, the user's helper and standby models, which
+    would answer for the model under measure, and the user's limits of a run: a task's own time and token limits cut
+    its runs); the browser is headless, since nobody watches an attempt."""
     return config.model_copy(
         update={
             "browser": config.browser.model_copy(update={"headless": True}),

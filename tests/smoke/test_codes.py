@@ -98,7 +98,8 @@ async def test_a_code_mailed_to_the_owner_is_read_back(runtime: Runtime) -> None
         "\n".join(
             (
                 'tell application "Mail"',
-                f'  set m to make new outgoing message with properties {{subject:"{_SUBJECT}", content:"Your Dot test code is {_TEST_CODE}.", visible:false}}',
+                f'  set m to make new outgoing message with properties {{subject:"{_SUBJECT}", content:"Your Dot test '
+                f'code is {_TEST_CODE}.", visible:false}}',
                 f'  tell m to make new to recipient at end of to recipients with properties {{address:"{own}"}}',
                 "  send m",
                 "end tell",

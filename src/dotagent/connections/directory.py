@@ -1,9 +1,10 @@
 """The Plugins page of Customize (item 316): every service Dot works with, one listing each, in the section the page
-shows it in. A listing names the ways Dot reaches its service. Each tried way is an entry of the connections' catalogues:
-an MCP service of ``mcp/catalogue.py``, or an application of the Mac, a synced folder or an application of the web of
-``connections/catalogue.py``; the page reads where it stands from ``GET /connections`` and ``GET /mcp/servers`` and
-takes its step there (items 278 and 279). A way not tried yet has no entry and says what it would take. A listing whose
-ways are all untried is shown as "Not tried yet" and offers no step: "Works" is written only of a way that was tried.
+shows it in. A listing names the ways Dot reaches its service. Each tried way is an entry of the connections'
+catalogues: an MCP service of ``mcp/catalogue.py``, or an application of the Mac, a synced folder or an application of
+the web of ``connections/catalogue.py``; the page reads where it stands from ``GET /connections`` and ``GET
+/mcp/servers`` and takes its step there (items 278 and 279). A way not tried yet has no entry and says what it would
+take. A listing whose ways are all untried is shown as "Not tried yet" and offers no step: "Works" is written only of a
+way that was tried.
 
 The marks of the services Simple Icons draws (version 16.35.0, CC0) are files of ``static/icons/plugins``, drawn in the
 brand's colour (``colour``) where it reads on both grounds; a service without one is drawn with one of the interface's

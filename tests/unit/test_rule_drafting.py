@@ -166,7 +166,8 @@ async def test_a_draft_that_breaks_a_check_is_asked_for_once_more() -> None:
     assert (rule.tool_glob, rule.behavior, rule.description) == (
         "shell",
         "allow",
-        "For “git status” run alone in the shell, with plain arguments (after a cd at most): Dot does it without asking.",
+        "For “git status” run alone in the shell, with plain arguments (after a cd at most): Dot does it without "
+        "asking.",
     )
     assert [call.purpose for call in calls] == ["rule_draft", "rule_draft"]
 

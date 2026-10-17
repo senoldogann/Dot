@@ -72,8 +72,8 @@ requires_typesafe = pytest.mark.skipif(TYPESAFE_KEY is None, reason="needs TYPES
 OPENAI_MODEL: str = "gpt-4.1-mini"
 # The smallest current Claude model; it thinks, so the round trip also replays a signed thinking block.
 ANTHROPIC_MODEL: str = "claude-haiku-5-5"
-# The model the owner's rules are drafted with (`[models] review` on the owner's Mac), which once answered the drafter in
-# Spanish or French and wrote a note about a broad rule where only a refusal belongs.
+# The model the owner's rules are drafted with (`[models] review` on the owner's Mac), which once answered the drafter
+# in Spanish or French and wrote a note about a broad rule where only a refusal belongs.
 RULE_DRAFT_MODEL: str = "anthropic:claude-sonnet-5-5"
 # Typographic punctuation an English sentence may hold; anything else outside ASCII is another language's.
 _TYPOGRAPHIC: dict[int, None] = {ord(mark): None for mark in "\u2018\u2019\u201c\u201d\u2013\u2014\u2026"}
@@ -260,13 +260,18 @@ async def test_typesafe_flags_click_labels_the_patterns_do_not_know() -> None:
 
 def _claim(claim: str) -> JsonObject:
     """A claim of a campaign on X as the campaign tool hands it to the judge: the goal, the targets and how they are
-    verified, the ledger, what the session's calls did (nothing the goal checker would hold against it) and the claim."""
+    verified, the ledger, what the session's calls did (nothing the goal checker would hold against it) and the
+    claim."""
     return {
         "goal": "Grow the X account @dot_example to 500 followers.",
-        "targets": "1. The account @dot_example has at least 500 followers.\nHow they are verified: Open "
-        "https://x.com/dot_example and read the follower count on the profile.",
-        "ledger": "Progress recorded in the campaign's ledger:\n- 3 days ago: 212 followers\n- yesterday: 431 "
-        "followers\n- 2 hours ago: 488 followers",
+        "targets": (
+            "1. The account @dot_example has at least 500 followers.\nHow they are verified: Open "
+            "https://x.com/dot_example and read the follower count on the profile."
+        ),
+        "ledger": (
+            "Progress recorded in the campaign's ledger:\n- 3 days ago: 212 followers\n- yesterday: 431 followers\n- "
+            "2 hours ago: 488 followers"
+        ),
         "session_facts": render_facts(new_facts(), (), ()),
         "claim": claim,
     }
@@ -283,8 +288,8 @@ async def test_typesafe_lets_a_true_campaign_claim_through_and_stops_one_resting
     try:
         read: dict[str, float] = await client.nouls(
             _claim(
-                "I opened https://x.com/dot_example in this session and read '512 Followers' on the profile; the target "
-                "of 500 is reached."
+                "I opened https://x.com/dot_example in this session and read '512 Followers' on the profile; the "
+                "target of 500 is reached."
             ),
             (CLAIM_QUESTION,),
         )

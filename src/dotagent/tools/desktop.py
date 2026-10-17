@@ -221,9 +221,9 @@ def _snapshot_tool() -> RegisteredTool:
         name="desktop_snapshot",
         description=(
             "Read an application's window as a list of accessibility elements: role, name, value, state and screen "
-            "position, each with a ref you can act on. A repeated view lists only what changed since the last one (pass "
-            "full to see everything). ref zooms into one element's subtree, query finds elements anywhere in the "
-            "application, scope menu_bar lists the menu bar for the menu step. " + _REF_HELP
+            "position, each with a ref you can act on. A repeated view lists only what changed since the last one "
+            "(pass full to see everything). ref zooms into one element's subtree, query finds elements anywhere in "
+            "the application, scope menu_bar lists the menu bar for the menu step. " + _REF_HELP
         ),
         args_model=SnapshotArgs,
         modes=ALL_MODES,
@@ -270,8 +270,8 @@ def _screenshot_tool() -> RegisteredTool:
     return make_tool(
         name="desktop_screenshot",
         description=(
-            "Take a screenshot of the main display, or zoom into a region (x, y, width, height) for fine detail. Use it "
-            "when the element list is not enough: canvases, games, images, custom-drawn controls, or to check how "
+            "Take a screenshot of the main display, or zoom into a region (x, y, width, height) for fine detail. Use "
+            "it when the element list is not enough: canvases, games, images, custom-drawn controls, or to check how "
             "things look. Coordinates in the image are the x and y that desktop_act accepts. Windows of password "
             "managers are blacked out."
         ),

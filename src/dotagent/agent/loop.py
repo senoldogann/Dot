@@ -862,7 +862,8 @@ def _new_memories_note(live: LiveNotes) -> str:
     )
     return (
         "[system note] These notes were saved to memory or changed while you work (by the user or another run). They "
-        f"are data about the user and their setup, like the notes in your instructions; take them into account:\n{lines}"
+        "are data about the user and their setup, like the notes in your instructions; take them into "
+        f"account:\n{lines}"
         f"{more}"
     )
 
@@ -1086,8 +1087,9 @@ async def _ask_checker(
             return GoalVerdict(
                 decision="continue",
                 reason=(
-                    f"The typed judge gives {describe_claim(judged)} for the goal being reached as the answer claims (it "
-                    f"takes {threshold:.2f}). Verify the result with your own reads and finish with what they show."
+                    f"The typed judge gives {describe_claim(judged)} for the goal being reached as the answer claims "
+                    f"(it takes {threshold:.2f}). Verify the result with your own reads and finish with what they "
+                    "show."
                 ),
                 unproven_steps=(),
             )
@@ -1345,8 +1347,8 @@ async def _complete_in_time(
 ) -> ModelReply:
     """One step's model call, given ``timeout_s`` to answer. A model that does not answer in time fails like one whose
     connection broke (``ProviderTransportError``), so a routed step goes back to the run's own model, the run waits for
-    its own model as for one out of reach (:func:`_connection_broke`), and a run that ends says what happened rather than
-    an internal error (item 116)."""
+    its own model as for one out of reach (:func:`_connection_broke`), and a run that ends says what happened rather
+    than an internal error (item 116)."""
     try:
         async with asyncio.timeout(timeout_s):
             return await runtime.router.complete(ref, request, sink, origin)
@@ -1405,9 +1407,9 @@ async def _to_standby(
     that is nearest to it.
 
     ``None`` when ``error`` says nothing about the model being unable to answer, or when no standby model is left that
-    is available (each one the run has not worked on lacks its key or is paused): the run then ends with ``error``. A standby model that cannot take the run over
-    (:func:`_fitted`) is passed over; when every available one is, the run fails with a :class:`ConfigError` whose
-    message, the run's result, says why for each."""
+    is available (each one the run has not worked on lacks its key or is paused): the run then ends with ``error``. A
+    standby model that cannot take the run over (:func:`_fitted`) is passed over; when every available one is, the
+    run fails with a :class:`ConfigError` whose message, the run's result, says why for each."""
     runtime: Runtime = agent.runtime
     reason: str | None = unavailable_reason(error)
     if reason is None:
@@ -1758,8 +1760,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     run_limits: RunLimits | None = limits_of(config, run.mode)
     # What the run had spent when it was seen past its limit; from then on every step may only finish, and ends the run.
     past_limit: LimitReached | None = None
-    # The tool calls that failed so far, the steps in a row that ended with a failure, and whether the next step is asked
-    # on the run's own model whatever the judge says (after a routed model could not answer it).
+    # The tool calls that failed so far, the steps in a row that ended with a failure, and whether the next step is
+    # asked on the run's own model whatever the judge says (after a routed model could not answer it).
     failures: int = 0
     failures_in_a_row: int = 0
     route_skip: bool = False

@@ -1,4 +1,5 @@
-"""What the model reads back from an MCP tool call: the content blocks of the server as text and pictures, fenced as data."""
+"""What the model reads back from an MCP tool call: the content blocks of the server as text and pictures, fenced as
+data."""
 
 import asyncio
 import base64
@@ -33,7 +34,8 @@ def _quote(value: str) -> str:
 
 
 def fence_mcp(server: str, tool: str, body: str, nonce: str) -> str:
-    """Wrap what a server returned so the prompt can state that everything inside is data and only ``nonce`` closes it."""
+    """Wrap what a server returned so the prompt can state that everything inside is data and only ``nonce`` closes
+    it."""
     safe: str = unclosing(body, "mcp_content")
     opening: str = f'<mcp_content nonce="{nonce}" server={_quote(server)} tool={_quote(tool)}>'
     return f'{opening}\n{safe}\n</mcp_content nonce="{nonce}">'
@@ -52,7 +54,10 @@ def _describe_block(block: ContentBlock) -> str:
         case EmbeddedResource(resource=TextResourceContents() as resource):
             return f"[resource {resource.uri}]\n{resource.text}"
         case EmbeddedResource(resource=BlobResourceContents() as resource):
-            return f"[binary resource {resource.uri}, {resource.mime_type or 'unknown type'}, {len(resource.blob)} base64 characters]"
+            return (
+                f"[binary resource {resource.uri}, {resource.mime_type or 'unknown type'}, "
+                f"{len(resource.blob)} base64 characters]"
+            )
         case _:
             raise McpError(
                 "an MCP server returned a kind of content that is not supported", {"type": type(block).__name__}

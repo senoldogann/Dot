@@ -27,8 +27,9 @@ owner (``dotx playbooks trust``, :func:`trust_playbook`).
 
 Every run that ended done or failed records its use of learned skills (the ``skill`` calls that named one): a skill
 read by :data:`MAX_FAILURES` runs in a row that then failed (none ended done between them) is retired, moved under
-``.retired`` where the catalog does not look, and no longer offered. Every function here is pure except :func:`learn_playbook`, which reads the store, the
-embedder and the review model and writes the folder, and the small file helpers it calls.
+``.retired`` where the catalog does not look, and no longer offered. Every function here is pure except
+:func:`learn_playbook`, which reads the store, the embedder and the review model and writes the folder, and the small
+file helpers it calls.
 
 The files are written whole, a new skill's folder under a hidden name before it takes its own, and every change of the
 playbooks holds their lock (``.lock`` in the folder), so runs that end at once, the API and another process (``dotx
@@ -589,8 +590,9 @@ def read_meta(folder: Path) -> PlaybookMeta:
 
 def record_use(root: Path, name: str, succeeded: bool) -> PlaybookMeta | None:
     """Count a run that read the playbook ``name`` and ended; a playbook that :func:`retires` is moved under
-    ``.retired``, where an earlier one of its name keeps its folder. Returns the record after the count, or None for a playbook that is no longer active (another run
-    retired it or the owner deleted it since this run read it), which is not counted."""
+    ``.retired``, where an earlier one of its name keeps its folder. Returns the record after the count, or None for
+    a playbook that is no longer active (another run retired it or the owner deleted it since this run read it),
+    which is not counted."""
     folder: Path = playbook_folder(root, name)
     with _changing(root):
         if not folder.is_dir():

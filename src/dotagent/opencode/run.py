@@ -10,10 +10,10 @@ done with the agent's last answer once the agent has nothing left to do, and fai
 The agent has Dot's own tools besides its own (item 284): those of what OpenCode has no tool for (Dot's browser, the
 Mac's applications, memory, schedules, a notification, a page in the conversation, skills, a question to the owner and
 the apps the owner connected), served by Dot's bridge (:mod:`dotagent.opencode.bridge`) at the chat's door while the run
-works. A call of one runs as a call of Dot's own loop (:func:`dotagent.agent.executor.execute_calls`: the run's gate, the
-tool's time limit, the run's timeline under the tool's own name), and the session keeps to its own chat's door. A run here
-has none of the rest of what Dot's own runs bring (the memory recalled at the start, the checks of a finish, the lessons
-and playbooks)."""
+works. A call of one runs as a call of Dot's own loop (:func:`dotagent.agent.executor.execute_calls`: the run's gate,
+the tool's time limit, the run's timeline under the tool's own name), and the session keeps to its own chat's door. A
+run here has none of the rest of what Dot's own runs bring (the memory recalled at the start, the checks of a finish,
+the lessons and playbooks)."""
 
 import asyncio
 import time
@@ -113,8 +113,8 @@ LOCAL_TARGET_NOTE: str = (
 _WEB_TOOLS: frozenset[str] = frozenset({"webfetch", "websearch", "codesearch"})
 # Dot's tools the agent gets besides its own (item 284): the groups of what OpenCode has no tool for, every connected
 # app's (``mcp__<server>``), and a few of the core group's. The agent's own tools read, write and search files, run
-# commands and fetch and search the web, so Dot's for those stay out, and so do those of Dot's own loop (the plan, finish,
-# the tool groups, helpers, teammates and a campaign's).
+# commands and fetch and search the web, so Dot's for those stay out, and so do those of Dot's own loop (the plan,
+# finish, the tool groups, helpers, teammates and a campaign's).
 _BRIDGED_GROUPS: frozenset[str] = frozenset({"browser", "desktop", "schedule", "memory_admin", "pages"})
 _BRIDGED_CORE: frozenset[str] = frozenset({"memory_save", "memory_search", "notify", "ask_user", "skill"})
 # What a run says when Zen's free tier turns a request down. Its own words say that the free tier serves OpenCode alone,
@@ -689,7 +689,8 @@ async def _bridged_call(registry: ToolRegistry, context: ToolContext, gate: RunG
 
 
 async def _tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> ToolContext:
-    """What Dot's tools get while they run for the agent: what a run of Dot's own loop gives them, without delegation."""
+    """What Dot's tools get while they run for the agent: what a run of Dot's own loop gives them, without
+    delegation."""
     runtime: Runtime = agent.runtime
     run = agent.run
     scaffold: Scaffold = scaffold_for(

@@ -265,7 +265,8 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await expect(child_card.locator(".child-progress")).to_contain_text("step")
                     await expect(child_card.locator("a.child-open")).to_have_attribute("href", f"#/runs/{delegated.id}")
                     await page.screenshot(path=str(tmp_path / f"delegated-{width}-{scheme}.png"))
-                    # The delegated run's own page: the parent's goal in the bar as a link, the pill under the conversation.
+                    # The delegated run's own page: the parent's goal in the bar as a link, the pill under the
+                    # conversation.
                     await page.goto(f"http://{host}:{port}/#/runs/{delegated.id}")
                     await expect(page.locator(".stage-crumb")).to_have_attribute("href", f"#/runs/{working.id}")
                     await expect(page.locator(".stage-crumb")).to_contain_text(working.goal[:24])

@@ -113,7 +113,8 @@ async def _open_home(browser: Browser, address: str, width: int, height: int, sc
 
 
 async def _settled(page: Page) -> None:
-    """Wait for the page's fade to end (it stays with the motion reduced), so a screenshot shows the page as it rests."""
+    """Wait for the page's fade to end (it stays with the motion reduced), so a screenshot shows the page as it
+    rests."""
     await expect(page.locator("main.page")).to_have_css("opacity", "1")
 
 

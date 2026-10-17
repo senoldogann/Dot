@@ -106,8 +106,8 @@ def browser_router(ctx: ServerContext) -> APIRouter:
     @router.post("/browser/sign-in")
     async def sign_in() -> BrowserView:
         """Open Dot's own profile in a plain Chrome window, where the owner signs in to the sites Dot should use, as
-        ``dotx browser login`` does (item 344): Dot's own Chrome is closed first, which is refused while runs are active,
-        and the window stays until the owner quits it. While one is open, another is not opened."""
+        ``dotx browser login`` does (item 344): Dot's own Chrome is closed first, which is refused while runs are
+        active, and the window stays until the owner quits it. While one is open, another is not opened."""
         async with opening:
             if not signing:
                 active: list[JsonValue] = list(ctx.manager.active_run_ids())

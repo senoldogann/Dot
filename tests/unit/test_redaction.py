@@ -1,6 +1,6 @@
 """The redactor masks the secrets it knows by their forms and keeps the words around them, and leaves look-alikes alone
-(items 214 and 241). Every sample is made up, and those in the form of a real service's key are put together at run time, so no
-file holds one whole."""
+(items 214 and 241). Every sample is made up, and those in the form of a real service's key are put together at run
+time, so no file holds one whole."""
 
 import base64
 import time

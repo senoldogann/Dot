@@ -140,7 +140,8 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
   const marking = field.getAttribute('autocomplete') || '';
   return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
 }"""
-# Whether the element has the keyboard focus and takes typed text: a text input or a textarea, not disabled or read-only.
+# Whether the element has the keyboard focus and takes typed text: a text input or a textarea, not disabled or
+# read-only.
 _TAKES_TEXT_SCRIPT: str = """(element) => element.getRootNode().activeElement === element
   && ['text', 'search', 'url', 'tel', 'email', 'password', 'number', 'textarea'].includes(element.type)
   && element.matches('input, textarea') && !element.disabled && !element.readOnly"""

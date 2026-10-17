@@ -1,7 +1,7 @@
-"""What the skills that come with Dot for Office files and OneDrive find on this Mac, for ``dotx doctor`` (item 196): the
-applications they drive, each with the version its Info.plist gives, and the folders OneDrive syncs, told by the kind of
-account each belongs to. Nothing is started, and a folder is never named: the folder of a work or school account
-carries the name of the organization."""
+"""What the skills that come with Dot for Office files and OneDrive find on this Mac, for ``dotx doctor`` (item 196):
+the applications they drive, each with the version its Info.plist gives, and the folders OneDrive syncs, told by the
+kind of account each belongs to. Nothing is started, and a folder is never named: the folder of a work or school
+account carries the name of the organization."""
 
 from collections.abc import Sequence
 from pathlib import Path

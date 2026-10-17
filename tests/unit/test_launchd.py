@@ -52,7 +52,10 @@ RUNNING: str = (
     "}\n"
 )
 
-WAITING_AFTER_A_CRASH: str = "gui/501/dev.example.job = {\n\tstate = not running\n\truns = 2\n\tlast exit code = 1\n\n\tprogram = /usr/bin/python3\n}\n"
+WAITING_AFTER_A_CRASH: str = (
+    "gui/501/dev.example.job = {\n\tstate = not running\n\truns = 2\n\tlast exit code = 1\n\n"
+    "\tprogram = /usr/bin/python3\n}\n"
+)
 
 
 def test_a_running_job_is_read_from_the_properties_of_the_job_itself() -> None:
@@ -157,7 +160,8 @@ def launchctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         'case "$1" in\n'
         "print) [ -f loaded ] || exit 113; cat printed ;;\n"
         "bootout) [ -f stuck ] && { echo 'Boot-out failed: 5: Input/output error' >&2; exit 5; }; rm -f loaded ;;\n"
-        "bootstrap) grep -q refused-by-launchd \"$3\" && { echo 'Bootstrap failed: 5: Input/output error' >&2; exit 5; }; "
+        "bootstrap) grep -q refused-by-launchd \"$3\" && { echo 'Bootstrap failed: 5: Input/output error' >&2; exit "
+        "5; }; "
         'cp "$3" loaded ;;\n'
         "*) exit 64 ;;\n"
         "esac\n",

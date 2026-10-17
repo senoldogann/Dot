@@ -102,14 +102,19 @@ _BOOTSTRAP: str = """(() => {
     }
     event.preventDefault();
     requests += 1;
-    window.parent.postMessage({ jsonrpc: "2.0", id: `dot-link-${requests}`, method: OPEN_LINK, params: { url: url.href } }, "*");
+    window.parent.postMessage(
+      { jsonrpc: "2.0", id: `dot-link-${requests}`, method: OPEN_LINK, params: { url: url.href } },
+      "*",
+    );
   });
 
   // The page's height: what overflows the frame, or, when the page is shorter than the frame, the page itself.
   let reported = 0;
   function report() {
     const root = document.documentElement;
-    const height = Math.ceil(root.scrollHeight > root.clientHeight ? root.scrollHeight : root.getBoundingClientRect().height);
+    const height = Math.ceil(
+      root.scrollHeight > root.clientHeight ? root.scrollHeight : root.getBoundingClientRect().height,
+    );
     if (height !== reported) {
       reported = height;
       window.parent.postMessage({ jsonrpc: "2.0", method: SIZE_CHANGED, params: { height } }, "*");

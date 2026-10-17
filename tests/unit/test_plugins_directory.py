@@ -1,8 +1,8 @@
-"""Customize › Plugins (item 316): the directory of the services Dot works with. At least 25, each once, each saying what
-Dot does with it; every application and MCP service of Connect apps' catalogues has a listing, so the page holds all
-of them; a listing is tried exactly when one of its ways is a catalogue's, and an untried way says what it would take;
-each mark is a logo file of Simple Icons' (one path, named in the folder's LICENSE), an icon of the interface or
-letters."""
+"""Customize › Plugins (item 316): the directory of the services Dot works with. At least 25, each once, each saying
+what Dot does with it; every application and MCP service of Connect apps' catalogues has a listing, so the page holds
+all of them; a listing is tried exactly when one of its ways is a catalogue's, and an untried way says what it would
+take; each mark is a logo file of Simple Icons' (one path, named in the folder's LICENSE), an icon of the interface
+or letters."""
 
 import re
 import xml.etree.ElementTree as ET

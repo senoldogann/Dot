@@ -1,10 +1,10 @@
 """The DevTools port of Dot's own Chrome (item 265), end to end on a real headless Chrome: with ``[browser] debug_port``
-set, Dot's Chrome answers the DevTools Protocol on that port of this Mac, and a script connected there sees the tab a run
-opened and works in a tab of its own while the session goes on; a port another program holds stops the start with an
+set, Dot's Chrome answers the DevTools Protocol on that port of this Mac, and a script connected there sees the tab a
+run opened and works in a tab of its own while the session goes on; a port another program holds stops the start with an
 error that names it, and no Chrome is left on the profile. Through the API of a served daemon the port is set, kept in
-the config file, and refused when it is taken or out of range (below 1024 too); Settings › Browser shows and sets it
-in Chrome, wide and on a phone, light and dark. A browser session that refuses the port leaves every session of the
-pool as it was. Before, Dot's Chrome took no connection but Playwright's pipe.
+the config file, and refused when it is taken or out of range (below 1024 too); Settings › Browser shows and sets it in
+Chrome, wide and on a phone, light and dark. A browser session that refuses the port leaves every session of the pool as
+it was. Before, Dot's Chrome took no connection but Playwright's pipe.
 
 No network and no model service is used.
 """

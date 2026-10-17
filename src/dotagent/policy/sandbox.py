@@ -95,7 +95,8 @@ async def check_sandbox(sandbox: Sandbox) -> None:
             )
         except OSError as error:
             raise ConfigError(
-                "the macOS sandbox for the processes of a run cannot start; [shell] sandbox = false runs them without it",
+                "the macOS sandbox for the processes of a run cannot start; [shell] sandbox = false runs them without "
+                "it",
                 {"program": words[0], "error": str(error)},
             ) from error
         _, stderr = await process.communicate()
@@ -111,10 +112,10 @@ async def check_sandbox(sandbox: Sandbox) -> None:
 
 
 class SwitchedSandbox:
-    """Where the processes of a run start outside yolo, as ``[shell] sandbox`` said at the daemon's start or as the owner
-    switched it since in Settings › Rules (item 262). The sandbox is built at start whatever the setting, and checked to
-    start each time it is switched on, so that a Mac without ``sandbox-exec`` refuses the switch rather than every process
-    of a run."""
+    """Where the processes of a run start outside yolo, as ``[shell] sandbox`` said at the daemon's start or as the
+    owner switched it since in Settings › Rules (item 262). The sandbox is built at start whatever the setting, and
+    checked to start each time it is switched on, so that a Mac without ``sandbox-exec`` refuses the switch rather
+    than every process of a run."""
 
     def __init__(self, built: Sandbox, on: bool) -> None:
         self._built: Sandbox = built
@@ -125,7 +126,8 @@ class SwitchedSandbox:
         return self._on
 
     def current(self) -> Sandbox:
-        """The sandbox a process of a run outside yolo starts in now: the built one, or :data:`UNSANDBOXED` while off."""
+        """The sandbox a process of a run outside yolo starts in now: the built one, or :data:`UNSANDBOXED` while
+        off."""
         return self._built if self._on else UNSANDBOXED
 
     async def switch(self, on: bool) -> None:

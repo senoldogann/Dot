@@ -194,7 +194,8 @@ class JudgeUnavailablePayload(Payload):
 
 
 class EmbeddingFailedPayload(Payload):
-    """The start of a run found its notes or its skills by their words alone: the embedding service failed (item 256)."""
+    """The start of a run found its notes or its skills by their words alone: the embedding service failed (item
+    256)."""
 
     purpose: Literal["notes", "skills"]
     error: str

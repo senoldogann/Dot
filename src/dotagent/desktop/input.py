@@ -203,7 +203,8 @@ def right_click_events(source: EventSource, at: Point, modifiers: Sequence[Modif
 
 
 def drag_events(source: EventSource, start: Point, end: Point, moves: int, event_number: int) -> tuple[TimedEvent, ...]:
-    """Press at ``start``, hold, drag in ``moves`` interpolated steps, release at ``end`` (one event number throughout)."""
+    """Press at ``start``, hold, drag in ``moves`` interpolated steps, release at ``end`` (one event number
+    throughout)."""
     events: list[TimedEvent] = list(move_events(source, start, 0.05))
     pressed: CGEvent = Quartz.CGEventCreateMouseEvent(
         source, Quartz.kCGEventLeftMouseDown, (start.x, start.y), Quartz.kCGMouseButtonLeft

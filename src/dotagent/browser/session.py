@@ -199,7 +199,10 @@ def closed_popup_note(url: str) -> str:
 
 def closed_tab_stop(url: str) -> str:
     """Why a batch stopped when the tab it worked in closed: the page did that, and the thread's current tab follows."""
-    return f"the tab was closed by the page (it was at {truncate_middle(url, _LAUNCH_ERROR_CHARS)}); the tab now current is shown below"
+    return (
+        f"the tab was closed by the page (it was at {truncate_middle(url, _LAUNCH_ERROR_CHARS)}); "
+        "the tab now current is shown below"
+    )
 
 
 _CLOSED_STEP_DETAIL: str = "the page closed under this step"
@@ -435,8 +438,8 @@ class BrowserSession:
         self._chrome_pid: int | None = None
         self._front_before: int | None = None
         self._front_returns: set[asyncio.Task[None]] = set()
-        # The Chrome of the user went away (quit, restarted, the connection broke) since Dot was last connected to it, and
-        # Dot waits now for its Allow (item 341): what the browser card and a call that meets the loss say.
+        # The Chrome of the user went away (quit, restarted, the connection broke) since Dot was last connected to it,
+        # and Dot waits now for its Allow (item 341): what the browser card and a call that meets the loss say.
         self._lost: bool = False
         self._waiting_allow: bool = False
         # Told when Dot connects again to a Chrome of the user that went away, before Chrome asks for its Allow, and the
@@ -628,7 +631,8 @@ class BrowserSession:
 
     def _tell(self, notice: Callable[[], Awaitable[None]]) -> None:
         """Have ``notice`` told beside the connection, which does not wait for it (item 341): Chrome asks for its Allow
-        meanwhile, and a notice that fails (a notification macOS did not show) is logged, never in the connection's way."""
+        meanwhile, and a notice that fails (a notification macOS did not show) is logged, never in the connection's
+        way."""
 
         async def telling() -> None:
             await notice()
@@ -794,9 +798,9 @@ class BrowserSession:
 
     async def switch(self, config: BrowserConfig, profile_dir: Path) -> None:
         """Work in the Chrome that ``config`` and ``profile_dir`` name from the next call on: the current one is let go
-        of first (Dot's own Chrome is closed; in the Chrome of the user the tabs Dot opened are closed and the connection
-        is dropped). Refused while a chat's run is at work in it (:func:`threads_in_use`), so no run loses the page it works
-        on."""
+        of first (Dot's own Chrome is closed; in the Chrome of the user the tabs Dot opened are closed and the
+        connection is dropped). Refused while a chat's run is at work in it (:func:`threads_in_use`), so no run loses
+        the page it works on."""
         async with self._launch_lock:
             if self._closed:
                 raise BrowserError("the browser session was closed", {})
@@ -982,8 +986,8 @@ class BrowserSession:
             taken_in(opener_tab, tab)
 
     def _keeps_front(self) -> bool:
-        """Whether Dot gives the front of the Mac back when its own Chrome takes it (item 118): a visible window that may
-        not be raised, whose process is known."""
+        """Whether Dot gives the front of the Mac back when its own Chrome takes it (item 118): a visible window that
+        may not be raised, whose process is known."""
         config: BrowserConfig = self._config
         return config.mode == "own" and not config.headless and not config.raise_window and self._chrome_pid is not None
 
@@ -994,9 +998,9 @@ class BrowserSession:
             self._front_before = await asyncio.to_thread(front_pid)
 
     def _return_front(self) -> None:
-        """A tab a page opens itself brings Chrome to the front by Chrome's own doing: the application that had the front
-        when the thread began to act gets it back, unless that was Dot's Chrome itself. The check runs beside the step,
-        which does not wait for it."""
+        """A tab a page opens itself brings Chrome to the front by Chrome's own doing: the application that had the
+        front when the thread began to act gets it back, unless that was Dot's Chrome itself. The check runs beside
+        the step, which does not wait for it."""
         before: int | None = self._front_before
         chrome: int | None = self._chrome_pid
         if not self._keeps_front() or before is None or chrome is None or before == chrome:
@@ -1570,8 +1574,8 @@ class BrowserSession:
         if browser is None:
             return await context.new_page()
         # Each tab is told apart by an address of its own: tabs made at the same time (a crawl reads pages side by side)
-        # would otherwise all be handed the first new page (measured 2026-10-12: five calls, one page). It goes back to a
-        # plain blank page at once, the address the URL rules and the tab views know.
+        # would otherwise all be handed the first new page (measured 2026-10-12: five calls, one page). It goes back to
+        # a plain blank page at once, the address the URL rules and the tab views know.
         mark: str = f"about:blank#dot-{secrets.token_hex(_TAB_MARK_BYTES)}"
         target: dict[str, object] = {"url": mark, "background": True}
         if self._config.mode == "attach":
@@ -1710,7 +1714,8 @@ class BrowserSession:
                 await run_step(tab.page, step, _ms(config.action_timeout_s), secret_field)
             except BrowserError as error:
                 if tab.page.is_closed():
-                    # The page closed under the step (a callback that did its job, a tab the user closed): not a failure.
+                    # The page closed under the step (a callback that did its job, a tab the user closed): not a
+                    # failure.
                     reports.append(
                         StepReport(index=index, description=description, outcome="skipped", detail=_CLOSED_STEP_DETAIL)
                     )
@@ -1748,10 +1753,10 @@ class BrowserSession:
         """Let what a step on ``tab`` set off land before the batch goes on (item 342), and return whether a tab Chrome
         made for it is still on its way. The page takes one turn of its event loop (:func:`let_page_turn`), and a tab
         Chrome made meanwhile is waited for until its thread has it (:meth:`_let_births_land`). No fixed wait: a step
-        that sets off nothing costs the turn alone, a frame of the page (measured: 13 ms after a click, against the 40 ms
-        grace before), and a tab whose page answers late stops the batch all the same, where the grace let the batch go
-        on: Playwright reports a tab only once its page has answered (411 ms after the click for a page that answers in
-        400 ms), while Chrome tells of it before the click returns."""
+        that sets off nothing costs the turn alone, a frame of the page (measured: 13 ms after a click, against the
+        40 ms grace before), and a tab whose page answers late stops the batch all the same, where the grace let the
+        batch go on: Playwright reports a tab only once its page has answered (411 ms after the click for a page that
+        answers in 400 ms), while Chrome tells of it before the click returns."""
         await let_page_turn(tab.page, _ms(self._config.action_timeout_s))
         return await self._let_births_land(tab)
 
@@ -1816,9 +1821,10 @@ class BrowserSession:
             return await self._changes_view(thread, tab)
 
     async def wait_text(self, thread_id: str, text: str, timeout_s: float) -> TextWait:
-        """Wait until ``text`` is visible on the current tab, at most ``timeout_s``; the page is shown either way. After a
-        wait that timed out the page is shown as it is, without a settle that could outlast the wait. A navigation still
-        pending then holds the reading until it commits, so the URL rules are checked again once the page is read."""
+        """Wait until ``text`` is visible on the current tab, at most ``timeout_s``; the page is shown either way.
+        After a wait that timed out the page is shown as it is, without a settle that could outlast the wait. A
+        navigation still pending then holds the reading until it commits, so the URL rules are checked again once the
+        page is read."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             started: float = time.monotonic()

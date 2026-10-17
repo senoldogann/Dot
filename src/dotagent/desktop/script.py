@@ -1,4 +1,5 @@
-"""AppleScript and JavaScript for Automation, run by ``osascript`` in a child process that can be timed out and killed."""
+"""AppleScript and JavaScript for Automation, run by ``osascript`` in a child process that can be timed out and
+killed."""
 
 import asyncio
 import contextlib

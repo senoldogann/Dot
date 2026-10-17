@@ -140,8 +140,8 @@ def build_launch_agent(launcher: str, python: str, home: Path, logs: Path, envir
 def agent_plist(agent: LaunchAgent) -> AgentPlist:
     """The property list of the job.
 
-    ``Interactive`` keeps the browser and the desktop actions the daemon starts at full speed; ``Aqua`` keeps the job out
-    of sessions that have no screen. ``-P`` keeps the working directory, Dot's home, where a run's commands may make
+    ``Interactive`` keeps the browser and the desktop actions the daemon starts at full speed; ``Aqua`` keeps the job
+    out of sessions that have no screen. ``-P`` keeps the working directory, Dot's home, where a run's commands may make
     files, off the path Python imports from: the job runs the Dot that is installed. launchd runs Dot.app's program,
     which starts the daemon's Python and waits for it, so that macOS names Dot for the daemon (item 288).
     """

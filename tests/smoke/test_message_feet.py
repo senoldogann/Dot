@@ -1,8 +1,8 @@
 """The feet of a conversation's messages (item 205), after T3 Code's: under each of the owner's messages, once its turn
 has its answer, when it was sent and a copy of it as it was written, and under a message that opened a turn Edit from
 here (item 282, which ``test_rewind`` follows through); under each answer, a copy of it and when it came. A turn at work
-keeps the feet of its messages back until its answer is in. A real server on a scripted model, wide and on a phone, light
-and dark."""
+keeps the feet of its messages back until its answer is in. A real server on a scripted model, wide and on a phone,
+light and dark."""
 
 import asyncio
 import re
@@ -254,8 +254,13 @@ async def test_the_messages_have_their_time_a_copy_and_edit_from_here_once_answe
                     const { messageTime } = await import("/js/dom.js");
                     const now = new Date();
                     const day = (back, hours, minutes) =>
-                        new Date(now.getFullYear(), now.getMonth(), now.getDate() - back, hours, minutes).getTime() / 1000;
-                    return [messageTime(day(0, 0, 5)), messageTime(day(1, 14, 3)), messageTime(new Date(2020, 2, 5, 14, 3).getTime() / 1000)];
+                        new Date(now.getFullYear(), now.getMonth(), now.getDate() - back, hours, minutes)
+                            .getTime() / 1000;
+                    return [
+                        messageTime(day(0, 0, 5)),
+                        messageTime(day(1, 14, 3)),
+                        messageTime(new Date(2020, 2, 5, 14, 3).getTime() / 1000),
+                    ];
                 }"""
             )
             assert shown == ["00:05", "Yesterday, 14:03", "5 Mar 2020, 14:03"], shown

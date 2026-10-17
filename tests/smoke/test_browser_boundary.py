@@ -1,5 +1,5 @@
-"""The URL rules on what Dot's own Chrome sends (item 135): a real headless Chrome against two local servers, one of which
-stands in for Dot's interface and counts what reaches it.
+"""The URL rules on what Dot's own Chrome sends (item 135): a real headless Chrome against two local servers, one of
+which stands in for Dot's interface and counts what reaches it.
 
 Covers the ways a page can send the browser to the interface: a popup, a resource it loads, a fetch, a service worker,
 a link, a script and a redirect on the way; and the daemon's own refusal of navigations that pages of other sites start
@@ -126,7 +126,8 @@ def _site_handler(inside: str, guarded: str) -> type[BaseHTTPRequestHandler]:
             if path == "/sw.js":
                 body: bytes = (
                     "self.addEventListener('fetch', (event) => { "
-                    f"if (event.request.url.includes('/through-worker')) event.respondWith(fetch('{inside}/worker')); }});"
+                    f"if (event.request.url.includes('/through-worker')) event.respondWith(fetch('{inside}/worker')); "
+                    f"}});"
                 ).encode()
                 self._answer(body, "text/javascript")
                 return
@@ -364,7 +365,8 @@ async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(
 ) -> None:
     """Each read navigates a new tab, whose guard is also begun when Chrome announces the tab. With Chrome slow to open
     the guard's session, reads in a row show that none navigates before its tab's guard is up (measured 2026-10-16:
-    a read could navigate while the guard begun for its tab was still under way, and its redirect reached Dot's port)."""
+    a read could navigate while the guard begun for its tab was still under way, and its redirect reached Dot's
+    port)."""
     open_session = BrowserContext.new_cdp_session
 
     async def slow_session(context: BrowserContext, page: Page | Frame) -> CDPSession:

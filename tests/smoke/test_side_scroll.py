@@ -2,7 +2,8 @@
 page comes to another chat, and a list painted again after a delete, a pin, a run that starts or a follow-up in the
 open chat stays where the reader scrolled it; the Memory page keeps the notes it has read, and its place, when one of
 them is forgotten. The notes keep a size and scroll inside it (item 218); the learned skills show their first six and
-the rest a click away (item 317). Chats, notes and skills in a home of their own, scripted runs, served by a real server, wide and on a phone, light and dark."""
+the rest a click away (item 317). Chats, notes and skills in a home of their own, scripted runs, served by a real
+server, wide and on a phone, light and dark."""
 
 import asyncio
 import re

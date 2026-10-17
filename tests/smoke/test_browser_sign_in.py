@@ -1,8 +1,8 @@
 """Settings › Browser opens Dot's own profile in a plain Chrome window to sign in to sites (item 344), as
-``dotx browser login`` does: Dot's own Chrome, when it is open, is closed first once the owner says so, and the card says
-the window is open until the owner quits it. A program stands in for Chrome here (it notes how it was opened and waits
-until it is stopped), so no window opens on the Mac; Dot's own Chrome is the real one, hidden. In Chrome wide and on a
-phone, light and dark, and in WebKit as an iPhone.
+``dotx browser login`` does: Dot's own Chrome, when it is open, is closed first once the owner says so, and the card
+says the window is open until the owner quits it. A program stands in for Chrome here (it notes how it was opened and
+waits until it is stopped), so no window opens on the Mac; Dot's own Chrome is the real one, hidden. In Chrome wide and
+on a phone, light and dark, and in WebKit as an iPhone.
 """
 
 import asyncio
@@ -50,7 +50,10 @@ _STARTED_S: float = 10.0
 _POLL_S: float = 0.05
 _OPENED: str = "sessionStorage.setItem('dot.opened', '1')"
 # Whether the fades have ended (a page fades in, item 85, also with reduced motion): the endless ones aside.
-_STILL: str = "() => document.getAnimations().every((a) => a.effect.getTiming().iterations === Infinity || a.playState !== 'running')"
+_STILL: str = (
+    "() => document.getAnimations().every((a) => a.effect.getTiming().iterations === Infinity || "
+    "a.playState !== 'running')"
+)
 
 
 @asynccontextmanager

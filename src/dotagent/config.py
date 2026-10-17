@@ -474,13 +474,13 @@ MCP_NAME_PATTERN: str = r"^[a-z][a-z0-9-]{0,23}$"
 
 class McpServerConfig(FrozenModel):
     """One MCP server Dot talks to (a ``[[mcp]]`` table): a ``command`` it starts and talks to over standard input and
-    output, or a ``url`` it connects to over streamable HTTP (``transport = "http"``, the default for a URL) or the older
-    SSE transport (``transport = "sse"``).
+    output, or a ``url`` it connects to over streamable HTTP (``transport = "http"``, the default for a URL) or the
+    older SSE transport (``transport = "sse"``).
 
     Values of ``env`` and ``headers`` may refer to secrets as ``${NAME}``; they are looked up like API keys
     (environment, ``.env``, Keychain). ``allow`` lists the server's tools to offer to the model (empty: all of them, up
-    to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Customize › Plugins
-    (item 279): Dot then sends the access token it keeps for the server and renews it.
+    to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Customize ›
+    Plugins (item 279): Dot then sends the access token it keeps for the server and renews it.
     """
 
     name: str = Field(pattern=MCP_NAME_PATTERN)

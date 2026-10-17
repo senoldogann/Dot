@@ -1,4 +1,5 @@
-"""The agent drives the browser end to end: a live model opens a form, fills it through the browser tools and submits it.
+"""The agent drives the browser end to end: a live model opens a form, fills it through the browser tools and submits
+it.
 
 The page comes from a local fixture server that keeps what the form sent, so the check is what reached the server and
 not what the model says about it. The test uses the real local Ollama server with a cloud model and a real headless

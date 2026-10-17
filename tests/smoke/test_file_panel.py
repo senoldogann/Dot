@@ -372,7 +372,8 @@ async def _one_size(
     box: Locator = page.get_by_role("textbox", name=re.compile(r"^Message for "))
     assert await box.evaluate(
         "(box, text) => { const data = new DataTransfer(); data.setData('text/plain', text);"
-        " return !box.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: true })); }",
+        " return !box.dispatchEvent(new ClipboardEvent('paste', { clipboardData: data, bubbles: true, cancelable: "
+        "true })); }",
         PASTED,
     )
     pasted: Locator = page.locator(".composer .attach-chip")

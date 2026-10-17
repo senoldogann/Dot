@@ -36,12 +36,11 @@ type Surface = Literal["full", "grouped"]
 
 
 class Scaffold(FrozenModel):
-    """The help one run of a model gets. ``window`` is what one request of the model can hold (``None`` when its provider
-    does not say); ``chosen`` is the context size chosen for the model (item 250), ``None`` when its runs have
-    ``[agent] context_tokens``; ``context_tokens`` and ``tool_output_chars`` are the run's budgets, never above the
-    configured ones;
-    ``reason`` says why the model has its tier; ``reminder_every`` is the number of steps between two reminders of the
-    goal, ``None`` when there are none."""
+    """The help one run of a model gets. ``window`` is what one request of the model can hold (``None`` when its
+    provider does not say); ``chosen`` is the context size chosen for the model (item 250), ``None`` when its runs
+    have ``[agent] context_tokens``; ``context_tokens`` and ``tool_output_chars`` are the run's budgets, never above
+    the configured ones; ``reason`` says why the model has its tier; ``reminder_every`` is the number of steps
+    between two reminders of the goal, ``None`` when there are none."""
 
     model: str
     window: int | None
@@ -191,8 +190,10 @@ def require_room(scaffold: Scaffold, fixed_tokens: int) -> None:
                 "window": scaffold.window,
                 "context_tokens": scaffold.context_tokens,
                 "fixed_tokens": fixed_tokens,
-                "hint": "pick a model with a larger window, raise [providers.ollama] num_ctx for an Ollama model, "
-                "or give the model a larger context size in Settings › Models when its budget is below three quarters "
-                "of the window",
+                "hint": (
+                    "pick a model with a larger window, raise [providers.ollama] num_ctx for an Ollama model, or give "
+                    "the model a larger context size in Settings › Models when its budget is below three quarters of "
+                    "the window"
+                ),
             },
         )

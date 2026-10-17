@@ -165,7 +165,8 @@ def test_a_draft_is_checked_for_topic_repeats_and_each_rule_and_refused_at_the_t
         ("rule_1", True),
     ]
     assert render_checks(checks, 0.5) == (
-        "Do not post the draft as it is: 2 of 4 checks reached 0.50. Change it and check again, or answer another post.\n"
+        "Do not post the draft as it is: 2 of 4 checks reached 0.50. Change it and check again, or answer another "
+        "post.\n"
         "- off the topic or beside the point of the post: 0.20\n"
         "- repeats an earlier post of the account: 0.10\n"
         "- breaks the rule: no links: 0.95 (fired)\n"

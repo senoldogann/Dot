@@ -1,7 +1,7 @@
-"""The models of Dot's own work (item 232): the fast model, which writes the summaries of long runs first and reads pages
-for the facts asked of them, the review model, which checks runs and draws their lessons, and the vision model, which
-reads images for a model that cannot. ``[models]`` names them, and Settings › Models chooses them while the daemon runs,
-which the config file keeps too."""
+"""The models of Dot's own work (item 232): the fast model, which writes the summaries of long runs first and reads
+pages for the facts asked of them, the review model, which checks runs and draws their lessons, and the vision model,
+which reads images for a model that cannot. ``[models]`` names them, and Settings › Models chooses them while the
+daemon runs, which the config file keeps too."""
 
 from typing import Literal
 

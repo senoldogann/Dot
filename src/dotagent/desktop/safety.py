@@ -280,7 +280,8 @@ def lines_after(lines: Mapping[str, str], step: Step, context: StepContext) -> d
 
 
 def exceeds(live: StepAssessment, risk: Risk, flags: Collection[Flag]) -> bool:
-    """Whether a step is riskier than what was authorised: a higher risk, or a flag that was not part of the approval."""
+    """Whether a step is riskier than what was authorised: a higher risk, or a flag that was not part of the
+    approval."""
     return _RISK_ORDER.index(live.risk) > _RISK_ORDER.index(risk) or any(flag not in flags for flag in live.flags)
 
 

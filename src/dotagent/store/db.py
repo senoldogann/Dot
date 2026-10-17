@@ -655,8 +655,8 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
     ("once", "TEXT"),
     # Where the run's first message went in its chat's history (item 282): the version of that history and the place in
-    # it, NULL for a delegated run, which has a chat of its own, and for a run from before; and when a rewind took the run
-    # out of its chat, NULL while it is in it.
+    # it, NULL for a delegated run, which has a chat of its own, and for a run from before; and when a rewind took the
+    # run out of its chat, NULL while it is in it.
     ("history_version", "INTEGER"),
     ("history_seq", "INTEGER"),
     ("rewound_at", "REAL"),
@@ -684,8 +684,8 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
 )
 
 
-# Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions ran;
-# they ran at the standard speed too, and without a choice for one message.
+# Columns of ``campaigns`` added later: NULL means the daemon's browser, which is where an older campaign's sessions
+# ran; they ran at the standard speed too, and without a choice for one message.
 _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("browser", "TEXT"),
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
@@ -1002,8 +1002,8 @@ class Store:
         """The chats, the pinned ones first (the last pinned first, so they are listed however old), then the latest
         activity first: every thread with a run a person started on it, with the latest of those runs. Threads holding
         only delegated runs are left out, and so are the threads of a campaign's sessions after the first, which start
-        in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat. The runs a
-        rewind took out of their chat (item 282) are not counted."""
+        in threads of their own: the campaign's page lists them, and the campaign's conversation stays a chat. The
+        runs a rewind took out of their chat (item 282) are not counted."""
         rows: list[aiosqlite.Row] = await self._all(
             "WITH ranked AS ("
             " SELECT thread_id, id, status, mode, created_at, finished_at,"
@@ -1032,8 +1032,8 @@ class Store:
         the delegated runs, with their messages and any queue, unless a run of their own remains there. Returns the ids
         that named a thread, in the order given; the others are skipped. A schedule keeps the id of the thread it last
         fired into and makes a new one per firing, so it is left alone. Nothing is deleted while a run of any process
-        works on one of the chats, itself or through a run it delegated to: ``RunConflict`` names the chats and the runs.
-        The check is made in the transaction of the deletes, which holds the write lock from its start."""
+        works on one of the chats, itself or through a run it delegated to: ``RunConflict`` names the chats and the
+        runs. The check is made in the transaction of the deletes, which holds the write lock from its start."""
         named: tuple[str, ...] = tuple(thread_ids)
         marks: str = ",".join("?" * len(named))
         doomed: str = (
@@ -1140,7 +1140,8 @@ class Store:
     async def referenced_images(self) -> set[str]:
         """The screenshot files that a stored message (one kept aside too) or event names."""
         rows: list[aiosqlite.Row] = await self._all(
-            "SELECT body AS text FROM messages UNION ALL SELECT body FROM message_archive UNION ALL SELECT data FROM events",
+            "SELECT body AS text FROM messages UNION ALL SELECT body FROM message_archive UNION ALL SELECT data FROM "
+            "events",
             (),
         )
         return await asyncio.to_thread(image_names_in, [str(row["text"]) for row in rows])
@@ -1200,7 +1201,8 @@ class Store:
     @_writing
     async def _unit[R](self, statements: Callable[[], Awaitable[R]]) -> R:
         """Run ``statements`` as one transaction on the connection and return what they return: all of it is stored or
-        none of it. The write lock is held throughout, so no other writer's statement or commit lands inside the unit."""
+        none of it. The write lock is held throughout, so no other writer's statement or commit lands inside the
+        unit."""
         await self._db.execute("BEGIN IMMEDIATE")
         try:
             stored: R = await statements()
@@ -1276,21 +1278,22 @@ class Store:
         return await asyncio.to_thread(decode_all)
 
     async def runs_from(self, run_id: str) -> list[RunRecord]:
-        """The run ``run_id`` and the later runs still in its chat, oldest first: what :meth:`rewind_chat` would take out
-        of the chat now (item 282). None for a helper's run, which has a chat of its own."""
+        """The run ``run_id`` and the later runs still in its chat, oldest first: what :meth:`rewind_chat` would take
+        out of the chat now (item 282). None for a helper's run, which has a chat of its own."""
         return [_run(row) for row in await self._all(_RUNS_FROM, (run_id, run_id))]
 
     async def rewind_chat(self, run_id: str, expected: Sequence[str]) -> RewindCut:
         """Rewind the chat of the run ``run_id`` to before the run's first message (item 282), in one transaction. The
         run and the chat's later runs leave the chat: they stay stored, with what they cost, but no list of the chat's
-        runs holds them. ``expected`` are the ids of those runs as :meth:`runs_from` read them for the caller, who planned
-        for them; a chat that changed since is not rewound (``RunConflict``). The history the model reads ends where it ended before the run: cut back, or, when it was
-        written anew since, made of what was kept aside of the version the run started on, as a new version. What a
-        version kept aside after that place goes, and so do the versions after it; the screenshots only they named are
-        left to :meth:`orphan_images`. The questions those runs, or the runs they delegated to, left for the owner wait
-        no more: they expire. Refused for a delegated run, for a run from before the places of messages were kept
-        (``InvalidValueError``), for one a rewind took out already, while a run works on the chat and while messages
-        wait in its queue (``RunConflict``)."""
+        runs holds them. ``expected`` are the ids of those runs as :meth:`runs_from` read them for the caller, who
+        planned for them; a chat that changed since is not rewound (``RunConflict``). The history the model reads
+        ends where it ended before the run: cut back, or, when it was written anew since, made of what was kept aside
+        of the version the run started on, as a new version. What a version kept aside after that place goes, and so
+        do the versions after it; the screenshots only they named are left to :meth:`orphan_images`. The questions
+        those runs, or the runs they delegated to, left for the owner wait no more: they expire. Refused for a
+        delegated run, for a run from before the places of messages were kept (``InvalidValueError``), for one a
+        rewind took out already, while a run works on the chat and while messages wait in its queue
+        (``RunConflict``)."""
 
         async def statements() -> RewindCut:
             row: aiosqlite.Row | None = await self._one("SELECT * FROM runs WHERE id = ?", (run_id,))
@@ -1551,8 +1554,8 @@ class Store:
         return _run(row)
 
     async def list_runs(self, limit: int, thread_id: str | None) -> list[RunRecord]:
-        """The latest ``limit`` runs, of the chat ``thread_id`` when it is given, newest first; the runs a rewind took out
-        of their chat (item 282) are left out."""
+        """The latest ``limit`` runs, of the chat ``thread_id`` when it is given, newest first; the runs a rewind
+        took out of their chat (item 282) are left out."""
         if thread_id is None:
             rows = await self._all(
                 "SELECT * FROM runs WHERE rewound_at IS NULL ORDER BY created_at DESC LIMIT ?", (limit,)
@@ -1571,8 +1574,8 @@ class Store:
 
     async def list_thread_helpers(self, thread_id: str, limit: int) -> list[RunRecord]:
         """The runs that the runs of the chat ``thread_id`` started on their behalf (item 227), newest first, at most
-        ``limit``, those of the runs a rewind took out of the chat (item 282) left out. A helper's own runs are not among
-        them: a delegated run delegates no further."""
+        ``limit``, those of the runs a rewind took out of the chat (item 282) left out. A helper's own runs are not
+        among them: a delegated run delegates no further."""
         rows = await self._all(
             "SELECT * FROM runs WHERE parent_run_id IN (SELECT id FROM runs WHERE thread_id = ? AND rewound_at IS NULL)"
             " ORDER BY created_at DESC LIMIT ?",
@@ -1853,7 +1856,8 @@ class Store:
         return await asyncio.to_thread(read_context_evidence, self._database, model, days, time.time())
 
     async def run_costs(self, run_id: str) -> RunCosts:
-        """What the run cost and where it went, read on a read-only connection; its minutes run to now while it works."""
+        """What the run cost and where it went, read on a read-only connection; its minutes run to now while it
+        works."""
         return await asyncio.to_thread(collect_run_costs, self._database, run_id, time.time())
 
     # ----- approvals -------------------------------------------------------------------------
@@ -1861,8 +1865,8 @@ class Store:
     @_writing
     async def _insert_approval(self, record: ApprovalRecord) -> None:
         await self._db.execute(
-            "INSERT INTO approvals(id, run_id, created_at, decided_at, status, tool, summary, severity, args, decided_by, note)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO approvals(id, run_id, created_at, decided_at, status, tool, summary, severity, args, "
+            "decided_by, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.run_id,
@@ -1995,8 +1999,8 @@ class Store:
             error=None,
         )
         await self._db.execute(
-            "INSERT INTO drafts(id, run_id, channel, recipients, cc, subject, body, status, created_at, decided_at, error)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
+            "INSERT INTO drafts(id, run_id, channel, recipients, cc, subject, body, status, created_at, decided_at, "
+            "error) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, NULL)",
             (
                 record.id,
                 run_id,
@@ -2564,9 +2568,9 @@ class Store:
 
     @_writing
     async def set_memory_tags(self, memory_id: str, tags: Sequence[str]) -> MemoryRecord:
-        """Replace the tags of a memory; its text, its vector and ``updated_at`` stay: what the note says did not change,
-        so a retag (the nightly ``rest``, merged tags) makes it no newer than its correction, nor a change a running run
-        is handed (item 157)."""
+        """Replace the tags of a memory; its text, its vector and ``updated_at`` stay: what the note says did not
+        change, so a retag (the nightly ``rest``, merged tags) makes it no newer than its correction, nor a change a
+        running run is handed (item 157)."""
         tag_text: str = ",".join(tags)
         await self._db.execute("UPDATE memories SET tags = ? WHERE id = ?", (tag_text, memory_id))
         await self._db.execute("UPDATE memories_fts SET tags = ? WHERE id = ?", (fold_search(tag_text), memory_id))
@@ -2893,7 +2897,8 @@ class Store:
 
     async def due_schedules(self, now: float) -> list[ScheduleRecord]:
         rows = await self._all(
-            "SELECT * FROM schedules WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY next_run_at",
+            "SELECT * FROM schedules WHERE enabled = 1 AND next_run_at IS NOT NULL AND next_run_at <= ? ORDER BY "
+            "next_run_at",
             (now,),
         )
         return [_schedule(row) for row in rows]
@@ -2984,7 +2989,8 @@ class Store:
         files: Sequence[str],
         browser: BrowserMode,
     ) -> CampaignRecord:
-        """Store a new campaign: active, without targets, with no session planned yet, on the Chrome ``browser`` names."""
+        """Store a new campaign: active, without targets, with no session planned yet, on the Chrome ``browser``
+        names."""
         now: float = time.time()
         record: CampaignRecord = CampaignRecord(
             id=new_id("cmp"),
@@ -3277,7 +3283,8 @@ class Store:
         )
         measured: JsonObject = {name: value for name, value in entry.numbers.items()}
         await self._db.execute(
-            "INSERT INTO campaign_entries(id, campaign_id, run_id, ts, kind, text, numbers) VALUES(?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO campaign_entries(id, campaign_id, run_id, ts, kind, text, numbers) VALUES(?, ?, ?, ?, ?, ?, "
+            "?)",
             (entry.id, entry.campaign_id, entry.run_id, entry.ts, entry.kind, entry.text, dumps_compact(measured)),
         )
         await self._db.commit()

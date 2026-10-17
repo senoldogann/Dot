@@ -2,11 +2,11 @@
 ``background`` for a command that runs long and ends by itself, and ends; the command outlives it, and when it ends,
 its chat is told in a message of its queue that starts the chat's next run, with the chat's choices. The message says
 which command ended, with its exit status and how long it ran, and nothing the command printed, which the run reads with
-``terminal_read``, as untrusted. The pages hear of every change of a chat's sessions. ``GET /api/threads/{id}/terminals``
-lists a chat's sessions, and ``DELETE`` stops one, which tells the chat nothing. The chat's page shows its commands at
-work right above the composer, as T3 Code does: a dot that pulses for one whose end wakes Dot, the command, the time it
-has run and a Stop; the run that the end of a command started opens with Dot's note, not with a message of the owner.
-Served by a real server, wide and on a phone, light and dark.
+``terminal_read``, as untrusted. The pages hear of every change of a chat's sessions. ``GET
+/api/threads/{id}/terminals`` lists a chat's sessions, and ``DELETE`` stops one, which tells the chat nothing. The
+chat's page shows its commands at work right above the composer, as T3 Code does: a dot that pulses for one whose end
+wakes Dot, the command, the time it has run and a Stop; the run that the end of a command started opens with Dot's note,
+not with a message of the owner. Served by a real server, wide and on a phone, light and dark.
 
 No network and no model service is used: the scripted model plays each run.
 """

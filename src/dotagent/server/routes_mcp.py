@@ -1,6 +1,7 @@
-"""Routes of the MCP servers on Customize › Plugins (items 279 and 316): every server Dot has with where it stands, the catalogue's
-services, adding one, connecting one again (signing in again) and removing one, and the page an authorization server sends the
-browser back to after a sign-in (``/oauth/callback``, outside ``/api``, so that it needs no token).
+"""Routes of the MCP servers on Customize › Plugins (items 279 and 316): every server Dot has with where it stands, the
+catalogue's services, adding one, connecting one again (signing in again) and removing one, and the page an
+authorization server sends the browser back to after a sign-in (``/oauth/callback``, outside ``/api``, so that it needs
+no token).
 
 Adding a server tries it first: Dot connects to it once with a sign-in the owner can give (only a server that answers
 401 asks for one), keeps it once it answered with its tools, and connects it again as runs do, its tools offered to
@@ -52,7 +53,8 @@ _TAKEN_NAME: str = "another MCP server has its name"
 _PAGE: str = (
     '<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8">'
     '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Dot</title></head>\n'
-    '<body>\n<h1>{title}</h1>\n<p>{text}</p>\n<p><a href="/#/customize/plugins">Back to Plugins</a></p>\n</body>\n</html>\n'
+    '<body>\n<h1>{title}</h1>\n<p>{text}</p>\n<p><a href="/#/customize/plugins">Back to '
+    "Plugins</a></p>\n</body>\n</html>\n"
 )
 
 
@@ -262,8 +264,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/api/mcp/servers/{name}/connect")
     async def connect_again(name: str, body: McpReconnect) -> McpServerView:
-        """Connect the server ``name`` again: tried once more, and signed in to again when it asks. One added on the Plugins page,
-        or one of Dot's config that signs in (``oauth = true``)."""
+        """Connect the server ``name`` again: tried once more, and signed in to again when it asks. One added on the
+        Plugins page, or one of Dot's config that signs in (``oauth = true``)."""
         page: str = page_origin(body.origin)
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
@@ -278,8 +280,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:
-        """Remove a server added on the Plugins page, or let go of a try: its tools leave the runs that start after, and Dot
-        forgets its address and its sign-in."""
+        """Remove a server added on the Plugins page, or let go of a try: its tools leave the runs that start after,
+        and Dot forgets its address and its sign-in."""
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
         if found is None:

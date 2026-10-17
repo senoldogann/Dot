@@ -58,7 +58,8 @@ def _pdf(sentence: str) -> bytes:
     objects: list[bytes] = [
         b"<< /Type /Catalog /Pages 2 0 R >>",
         b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> "
+        b">>",
         b"<< /Length " + str(len(stream)).encode() + b" >>\nstream\n" + stream + b"\nendstream",
         b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
     ]
@@ -79,7 +80,8 @@ _ARTICLE: str = """<!doctype html><html lang="en"><head><title>Fixture article</
 <meta name="description" content="A page for the web tools."></head><body>
 <nav><a href="/">Home</a> <a href="/about">About us</a></nav>
 <main><h1>Fixture article</h1>
-<ul><li><a lang="de" hreflang="de" href="/de">Deutsch</a></li><li><a lang="fr" hreflang="fr" href="/fr">Français</a></li></ul>
+<ul><li><a lang="de" hreflang="de" href="/de">Deutsch</a></li><li><a lang="fr"
+hreflang="fr" href="/fr">Français</a></li></ul>
 <p>First paragraph with a <a href="/more">relative link</a>.</p>
 <h2>Steps</h2><ul><li>Install</li><li>Configure</li></ul>
 <table><tr><th>Name</th><th>Value</th></tr><tr><td>alpha</td><td>1</td></tr></table>

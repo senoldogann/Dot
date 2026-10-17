@@ -1,8 +1,8 @@
-"""Help found elsewhere, added with the owner's yes (item 165), in a home and a Dot home made here: a skill is added as a
-copy in Dot's skills folder, which Dot's catalog then reads and which keeps to what was copied, and removing it deletes
-that copy and nothing else, even once its agent no longer has it; an MCP server is added as a line of Dot's record, by
-its agent, its name and a fingerprint of its entry with no secret of it, and is read from its agent's file when Dot
-starts, as long as its entry is the one the owner said yes to. What Dot cannot take is refused, with why."""
+"""Help found elsewhere, added with the owner's yes (item 165), in a home and a Dot home made here: a skill is added
+as a copy in Dot's skills folder, which Dot's catalog then reads and which keeps to what was copied, and removing it
+deletes that copy and nothing else, even once its agent no longer has it; an MCP server is added as a line of Dot's
+record, by its agent, its name and a fingerprint of its entry with no secret of it, and is read from its agent's file
+when Dot starts, as long as its entry is the one the owner said yes to. What Dot cannot take is refused, with why."""
 
 import json
 import shutil

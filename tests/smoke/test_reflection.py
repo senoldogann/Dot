@@ -341,8 +341,8 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
             LESSON_STOPPED: stopped.id,
         }
 
-        # The older twin was folded into the newer, which kept both notes' tags, and rests naming it (item 306); the stale
-        # lesson rests and a search no longer finds it, while the Memory page still lists it.
+        # The older twin was folded into the newer, which kept both notes' tags, and rests naming it (item 306); the
+        # stale lesson rests and a search no longer finds it, while the Memory page still lists it.
         twin: MemoryRecord = await store.get_memory(older.id)
         assert REST_TAG in twin.tags and twin.replaced_by == newer.id
         assert (await store.get_memory(newer.id)).tags == ("lesson", "pdf")

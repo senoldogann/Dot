@@ -17,7 +17,8 @@ RESULT_PROCESS_ENDED: str = "The dotx command that drove this run was told to en
 # daemon finds while it runs (:meth:`dotagent.agent.manager.RunManager.close_runs_of_dead_commands`).
 RESULT_COMMAND_DIED: str = "The dotx command that drove this run ended without recording the run's end."
 RESULT_RESTARTED: str = "daemon stopped while the run was active"
-# A run whose start failed after it was stored, before its task was registered (:meth:`dotagent.agent.manager.RunManager._end_unstarted`).
+# A run whose start failed after it was stored, before its task was registered
+# (:meth:`dotagent.agent.manager.RunManager._end_unstarted`).
 RESULT_NOT_STARTED: str = "The run could not be started."
 # A stop for lack of progress: the bare text of older runs, and the start of the text that says what was tried.
 RESULT_STALLED: str = "Stopped: the agent kept repeating the same failing actions."

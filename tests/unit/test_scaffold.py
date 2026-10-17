@@ -264,7 +264,8 @@ def test_a_profile_and_the_scaffold_of_the_next_run_are_rendered_in_plain_words(
     profile: ModelProfile = read_model_profile(database, "ollama:a", 30)
     assert render_profile(profile, scaffold_for(MEASURED, _info(32768), profile, None)) == [
         "ollama:a, its newest 2 finished runs: 13 steps",
-        "  tools: 4 calls, 3 failed (75 %), 2 refused before they ran (50 %), 1 with arguments that were not valid JSON",
+        "  tools: 4 calls, 3 failed (75 %), 2 refused before they ran (50 %), 1 with arguments that were not valid "
+        "JSON",
         "  replies with neither text nor a tool call 1, stalls 1, compactions 1",
         "Its next run:",
         "  window 32,768 tokens, context budget 24,576 tokens, tool output up to 3,072 characters",

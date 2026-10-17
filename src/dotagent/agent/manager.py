@@ -303,8 +303,8 @@ class RunManager:
     async def recover(self) -> int:
         """Close out what processes that are gone left behind: the runs they left active, the approvals of runs no
         longer active, the drafts the daemon was sending (item 314), and their lock files; and hold the queue of each
-        chat (:meth:`queue`) whose run the daemon's stop did not cut. The runs of a process that lives (``dotx run`` in a terminal) go on, with the approvals they wait
-        on. Returns the number of runs closed."""
+        chat (:meth:`queue`) whose run the daemon's stop did not cut. The runs of a process that lives (``dotx run``
+        in a terminal) go on, with the approvals they wait on. Returns the number of runs closed."""
         store: Store = self._runtime.store
         directory: Path = run_owners_dir()
         gone: list[str] = []
@@ -874,9 +874,9 @@ class RunManager:
     async def resume_campaigns(self) -> int:
         """Plan a session for every active campaign with no session planned and none working: one whose session the
         daemon stopped, since a session plans the next one only when it ends. For the daemon, when it starts, after
-        :meth:`recover`. The session starts now, or ``[agent] campaign_gap_minutes`` later when the daemon died while the
-        last session worked: a session that brings the daemon down does not start again and again. Returns how many
-        campaigns got a session."""
+        :meth:`recover`. The session starts now, or ``[agent] campaign_gap_minutes`` later when the daemon died while
+        the last session worked: a session that brings the daemon down does not start again and again. Returns how
+        many campaigns got a session."""
         store: Store = self._runtime.store
         now: float = time.time()
         gap_s: float = self._runtime.config.agent.campaign_gap_minutes * 60
@@ -1139,8 +1139,9 @@ class RunManager:
         return can_resume(run, await self._newest_run_id(run.thread_id))
 
     async def resume(self, run_id: str) -> RunRecord:
-        """Resume by hand a run that was cut off (:func:`dotagent.agent.resume.cut_off_by`): a new run on its thread goes
-        on from where it stopped. Refused unless :meth:`resumable` allows it; any source may be resumed this way."""
+        """Resume by hand a run that was cut off (:func:`dotagent.agent.resume.cut_off_by`): a new run on its thread
+        goes on from where it stopped. Refused unless :meth:`resumable` allows it; any source may be resumed this
+        way."""
         old: RunRecord = await self._runtime.store.get_run(run_id)
         newest_run_id: str | None = await self._newest_run_id(old.thread_id)
         if not can_resume(old, newest_run_id):
@@ -1314,9 +1315,9 @@ class RunManager:
         return await undo_lesson(self._runtime, self._deciding, run_id, index)
 
     async def shutdown(self) -> None:
-        """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can tell
-        them from runs stopped by hand; their thread keeps everything up to the step they were in. Lessons still being
-        drawn from runs that ended are dropped. A command in the background that ends from now on is told to no
+        """Stop every live run. They end as cancelled with a result that says the daemon shut down, so the owner can
+        tell them from runs stopped by hand; their thread keeps everything up to the step they were in. Lessons still
+        being drawn from runs that ended are dropped. A command in the background that ends from now on is told to no
         chat: the daemon's stop ends it too."""
         self._stopping = True
         self._runtime.terminals.unwatch(self)
@@ -1694,9 +1695,9 @@ class RunManager:
         """Whether a run starts tainted, as the run it goes on from is (item 243): a delegated run as its parent is now,
         a resumed run as the run it resumes was when it was cut off, and the run that tells its chat of a command in the
         background as the chat's last run ended, since that message is Dot's and only a message of the owner restores
-        trust; a schedule's firing as any earlier run whose words it reads ended (``opening.carried``, item 257), for the
-        same reason. Any other run starts untainted. Asked before the run's record is made: the chat's last run is the
-        one before it."""
+        trust; a schedule's firing as any earlier run whose words it reads ended (``opening.carried``, item 257), for
+        the same reason. Any other run starts untainted. Asked before the run's record is made: the chat's last run
+        is the one before it."""
         if parent is not None:
             return parent.gate.tainted
         if opening.resumed is not None:
@@ -1866,8 +1867,8 @@ class RunManager:
 
     async def _end_unstarted(self, run: RunRecord) -> None:
         """End a run whose start failed after it was stored, before its task was registered: failed, stored as every
-        end is, with its ``run_finished`` event, and told to the pages that showed it queued. An end the store refuses is
-        logged and left to :meth:`store_left_ends`: the error of the start is the one that goes on."""
+        end is, with its ``run_finished`` event, and told to the pages that showed it queued. An end the store
+        refuses is logged and left to :meth:`store_left_ends`: the error of the start is the one that goes on."""
         data: JsonObject = {"status": "failed", "result": RESULT_NOT_STARTED, "needs": ""}
         try:
             ended: EventRecord = await self._runtime.store.end_run(run.id, "failed", RESULT_NOT_STARTED, data)

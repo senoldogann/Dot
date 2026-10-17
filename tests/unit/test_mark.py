@@ -1,5 +1,5 @@
-"""Dot's mark (item 114) is one drawing in three places: ``desktop/icons/render.py`` writes the favicon from its numbers,
-the page's opening (``static/index.html``) and the desktop shell's page for a daemon that is down
+"""Dot's mark (item 114) is one drawing in three places: ``desktop/icons/render.py`` writes the favicon from its
+numbers, the page's opening (``static/index.html``) and the desktop shell's page for a daemon that is down
 (``desktop/ui/down.html``) set the same disc and eyes as the o of the wordmark between the same d and t, and every
 copy wears the ``--brand`` and ``--on-brand`` of the base look."""
 

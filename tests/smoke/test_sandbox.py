@@ -1,10 +1,10 @@
-"""The processes of a run start in the macOS sandbox outside yolo: a shell command, a terminal session and an AppleScript
-neither read nor change Dot's own files, nor change what it loads and runs (its own code among it), nor move the folders
-above them, whatever program does it, while those of a yolo run do as the user's account may; a search of a run reads
-neither Dot's own files nor the user's protected locations, and shows what it found elsewhere with a note of what it did
-not read; the login shell Dot reads at its start runs in the sandbox too, the one sandbox of that start, checked once.
-Each tool runs as it does once the gate has let it through, so the sandbox is what stands in its way. The processes are
-real; no model is called.
+"""The processes of a run start in the macOS sandbox outside yolo: a shell command, a terminal session and an
+AppleScript neither read nor change Dot's own files, nor change what it loads and runs (its own code among it), nor move
+the folders above them, whatever program does it, while those of a yolo run do as the user's account may; a search of a
+run reads neither Dot's own files nor the user's protected locations, and shows what it found elsewhere with a note of
+what it did not read; the login shell Dot reads at its start runs in the sandbox too, the one sandbox of that start,
+checked once. Each tool runs as it does once the gate has let it through, so the sandbox is what stands in its way. The
+processes are real; no model is called.
 """
 
 import asyncio
@@ -213,7 +213,8 @@ async def test_a_search_of_a_run_reads_neither_dots_own_files_nor_the_protected_
     shown: str = await _search(ctx, _matching(TOKEN), dot_home())
     listed: str = await _run(ctx, "find_files", {"glob": beside.name, "path": str(dot_home())})
     kept: str = await _search(ctx, _matching(VAULT_SECRET), vault)
-    # A command still reads the user's protected locations (ssh and git read their keys there): the guard reads its line.
+    # A command still reads the user's protected locations (ssh and git read their keys there): the guard reads its
+    # line.
     read: str = await _run(ctx, "shell", {"command": f"cat {shlex.quote(str(vault / 'note.txt'))}"})
     assert TOKEN not in shown and _refused(shown), shown
     assert f"{beside.name}:1:{TOKEN[:-4]}0000" in shown, shown
