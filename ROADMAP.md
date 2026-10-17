@@ -13803,13 +13803,16 @@ side, alternating with `main`, each the median of five calls, shown as the media
 | (c) screen, click, screen                             | 516.1, 518.6 (two runs)    | 479.4                      |
 | (d) a ten-step task through the loop, scripted model  | 61,275.9                   | 1,470.2                    |
 
-The one slower step is the first browser_open of a chat, which makes its tab in a window of its own (item 340): the
-window takes about 30 ms more to make than a tab in the owner's (44.5 against 14.1 ms with Chrome on screen; 56-73
-against 17-19 ms hidden, where the harness also meets the new window's renderer cold), paid once a chat, as its tabs
-stay until `tab_idle_s`, and for each quiet read (`read_page`, the web tools' way through a page that needs JavaScript)
-and browser_new_tab. In the owner's runs of the last 30 days (`dotx stats`) a step's model call takes 5 to 7 s and the
-median browser_open 1.2 s, most of it the network; the three slowest of Dot's own steps above are the ten-step task, the
-computer-use loop and the three-action act, all faster.
+With the scratch Chrome on screen (`DOT_SPEED_VISIBLE=1`, three runs each side) the picture is the same: a new chat
+121.5 against 195.2, the act of three 233.7 against 169.3, the snapshot 77.5 against 72.2, the app's page 180.8 against
+174.6 (drawn five times in five on both sides), the page's screenshot 44.3 against 46.0 (ranges 34.8-46.7 and 45.5-48.0,
+the same 1280 by 713 viewport). The one slower step is the first browser_open of a chat, which makes its tab in a window
+of its own (item 340), with no gain in speed (see 340): the window takes about 30 ms more to make than a tab in the
+owner's (44.5 against 14.1 ms with Chrome on screen; 56-73 against 17-19 ms hidden, where the harness also meets the new
+window's renderer cold), paid once a chat, as its tabs stay until `tab_idle_s`, and for each quiet read (`read_page`,
+the web tools' way through a page that needs JavaScript) and browser_new_tab. In the owner's runs of the last 30 days
+(`dotx stats`) a step's model call takes 5 to 7 s and the median browser_open 1.2 s, most of it the network; the three
+slowest of Dot's own steps above are the ten-step task, the computer-use loop and the three-action act, all faster.
 
 ### 339. Back in the owner's Chrome takes a navigation, not 30 s
 
@@ -13828,10 +13831,12 @@ reads `document.readyState` in the page. Measured: browser_back in the ten-step 
 app in front stays in front (measured: Finder before and after), and the owner's windows and tabs are not touched. With
 Chrome itself in front, as when the owner works in it, the window opens below the owner's and Chrome stays the app in
 front (measured after the review with the window order Quartz gives). Measured first in a scratch Chrome on screen (one
-second of frames and timer ticks): a background tab in the owner's window is hidden, 0 frames and 8 ticks; a window of
-its own 61 and 208, also when another window covers it whole; a minimized one is hidden again, so Dot never minimizes.
-One window per tab, so that each run's tab is its window's visible tab while runs work side by side; the window goes
-with its tab. Its cost is in the table above. Test:
+second of frames and timer ticks): a tab made in the background of the owner's window is hidden, 0 frames and 8 ticks; a
+window of its own 61 and 208, also when another window covers it whole; a minimized one is hidden again, so Dot never
+minimizes. After the review, an A/B with the scratch Chrome on screen drew an app's page in both, which a probe
+explained: `keep_focused`, the focus emulation Dot puts on every tab of its in the owner's Chrome, has a tab made in the
+background draw at 61 frames and 208 ticks too. So the window buys no speed: it keeps Dot's tabs out of the owner's
+windows, which criterion 3 asks, at the cost in the table above. One window per tab; the window goes with its tab. Test:
 `test_browser_attach.py::test_a_tab_of_dot_opens_in_a_window_of_its_own` (Chrome's own `Browser.getWindowForTarget`).
 
 ### 341. A restarted Chrome is said in one line, and the card follows Chrome

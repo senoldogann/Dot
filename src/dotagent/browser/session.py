@@ -1519,11 +1519,12 @@ class BrowserSession:
         """A new tab created in the background through CDP. Playwright's ``new_page`` opens in the foreground, which
         brings Chrome to the front of the Mac (measured 2026-10-12, item 118) and takes the user's tab in the user's
         Chrome; a tab made this way does neither, and it still takes screenshots. In the Chrome of the user it opens in
-        a window of its own (item 340): a background tab is hidden, so Chrome draws no frame of its page and cuts its
-        timers to 8 a second, while a window of its own, made in the background, runs it at full speed (61 frames and
-        208 timer ticks a second, measured 2026-10-17), stays behind the window the user works in and leaves the app in
-        front as it was, and it keeps Dot's tabs out of the user's windows. ``new_page`` stays for a context without a
-        browser at hand."""
+        a window of its own (item 340), which keeps Dot's tabs out of the user's windows: made in the background, it
+        stays behind the window the user works in, also when Chrome is the app in front, and leaves the app in front as
+        it was. Either way the page runs at full speed once ``keep_focused`` has it (measured 2026-10-17: a tab made in
+        the background draws no frame and ticks its timers 8 times a second until then, 61 frames and 208 ticks after,
+        as in a window of its own); the window costs about 30 ms more to make than a tab. ``new_page`` stays for a
+        context without a browser at hand."""
         browser: Browser | None = context.browser
         if browser is None:
             return await context.new_page()

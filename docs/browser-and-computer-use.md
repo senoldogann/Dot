@@ -51,12 +51,12 @@ Dot works with are the ones of your Chrome, so nothing is copied and nothing goe
   Allow is to be clicked (item 341). Settings › Browser reads how Chrome stands every 3 seconds while it is open:
   connected, waiting for Allow, Chrome closed, remote debugging off, or Chrome restarted, each with what to do. A
   schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails.
-- A tab that Dot opens is opened in a window of its own, made behind the window you work in (item 340): the app in
-  front stays in front, your windows and tabs are not touched, and the page runs at full speed, where a tab in the
-  background of your window would get no frames and its timers cut to 8 a second. Each of Dot's tabs has its window,
-  so that runs working side by side each have a visible tab; the window closes with the tab. Making a window takes
-  about 30 ms more than a tab, once per chat. Dot never minimizes it (a minimized window is throttled); a window
-  covered by others runs at full speed.
+- A tab that Dot opens is opened in a window of its own, made behind the window you work in, also when Chrome is the
+  app in front (item 340): the app in front stays in front and your windows and tabs are not touched. Its page runs
+  at full speed, as any tab of Dot's does: Dot emulates focus for it, without which Chrome draws no frame of a tab in
+  the background. The window closes with the tab. Making a window takes about 30 ms more than a tab, once per chat
+  and for each quiet read. Dot never minimizes it (a minimized window is throttled); a window covered by others runs
+  at full speed.
 - Downloads go to the download folder of Chrome, not to Dot's `downloads/`.
 - Dot closes the tabs it opened when they have been idle for `tab_idle_s`. If Dot itself crashes they stay open.
 - Calls that arrive while Dot waits for the click queue behind it, and each may in turn wait up to `attach_timeout_s` if
