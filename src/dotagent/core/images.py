@@ -53,3 +53,18 @@ def encode_image(data: bytes, max_edge: int, quality: int) -> EncodedImage:
         source_width=source_width,
         source_height=source_height,
     )
+
+
+def jpeg_of_size(data: bytes, width: int, height: int, quality: int) -> bytes:
+    """The JPEG ``data`` at ``width`` by ``height``: as it is when it has that size, else redrawn at it (a page Chrome
+    draws larger or smaller than its CSS pixels, item 358, so that a pixel of the picture is one for ``click_at``)."""
+    try:
+        with Image.open(io.BytesIO(data)) as opened:
+            if opened.size == (width, height):
+                return data
+            picture: Image.Image = _flatten(opened).resize((width, height), Image.Resampling.LANCZOS)
+    except OSError as exc:
+        raise ToolExecutionError("the data is not a readable image", {"bytes": len(data), "error": str(exc)}) from exc
+    buffer: io.BytesIO = io.BytesIO()
+    picture.save(buffer, format="JPEG", quality=quality, optimize=True)
+    return buffer.getvalue()

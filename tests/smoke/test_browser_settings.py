@@ -6,6 +6,7 @@ drives a real headless Chrome on a throw-away profile against a page served on t
 """
 
 import asyncio
+import io
 import json
 import threading
 import time
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
+from PIL import Image
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -187,6 +189,10 @@ async def test_a_page_has_the_size_and_the_colour_scheme_chosen(
         )
         zoomed: dict[str, object] = await _seen(session, site)
         assert (zoomed["width"], zoomed["height"], zoomed["zoom"]) == (1024, 688, 1.25), zoomed
+        # The model is told that size, and a pixel of its screenshot is one of the page's, for click_at.
+        drawn = await session.screenshot("look")
+        with Image.open(io.BytesIO(drawn.data)) as picture:
+            assert (drawn.width, drawn.height, *picture.size) == (1024, 688, 1024, 688)
         # Filling its window, a page has the window's size, and the model is told that size.
         await session.set_look(
             PageLook(fit_window=True, viewport_width=390, viewport_height=844, appearance="light", zoom=100)
@@ -365,8 +371,10 @@ async def test_a_run_that_opens_its_browser_shows_its_page_beside_the_chat(site:
             await browser.close()
 
 
-async def _has_folder(path: Path) -> bool:
-    return await asyncio.to_thread(path.is_dir)
+async def _chrome_worked_in(folder: Path) -> bool:
+    """Whether a Chrome worked on the profile in ``folder``: its Local State, which only Chrome writes (Dot writes the
+    zoom into the profile's preferences before Chrome starts, item 358)."""
+    return await asyncio.to_thread((folder / "Local State").is_file)
 
 
 @pytest.mark.browser
@@ -380,20 +388,20 @@ async def test_dots_chrome_works_on_the_profile_in_use_and_incognito_keeps_nothi
         )
         try:
             await session.open_url("profiles", site)
-            assert await _has_folder(profile_dir(DEFAULT_PROFILE) / "Default")
+            assert await _chrome_worked_in(profile_dir(DEFAULT_PROFILE))
             # An added profile is a folder of its own, which Chrome fills when it works on it.
             await asyncio.to_thread(add_profile, "Work")
             await session.use_profile("Work")
             assert session.profile_dir == profile_dir("Work")
             await session.open_url("profiles", site)
-            assert await _has_folder(profile_dir("Work") / "Default")
+            assert await _chrome_worked_in(profile_dir("Work"))
             await session.use_profile(INCOGNITO_PROFILE)
             await session.open_url("profiles", site)
-            assert await _has_folder(profile_dir(INCOGNITO_PROFILE) / "Default")
+            assert await _chrome_worked_in(profile_dir(INCOGNITO_PROFILE))
             # Its Chrome closed, Incognito keeps nothing; the other profiles keep their folders.
             await session.use_profile(DEFAULT_PROFILE)
             assert not await asyncio.to_thread(profile_dir(INCOGNITO_PROFILE).exists)
-            assert await _has_folder(profile_dir("Work") / "Default")
+            assert await _chrome_worked_in(profile_dir("Work"))
         finally:
             await session.aclose()
 

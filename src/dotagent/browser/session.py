@@ -101,6 +101,7 @@ from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.browser.window import chrome_to_watch, focused_app, front_pid, give_focus_back, return_front
 from dotagent.config import BrowserConfig, ServerConfig
 from dotagent.core.errors import ApprovalRejected, BrowserError, ForbiddenUrlError, HandedOff, PolicyDenied
+from dotagent.core.images import jpeg_of_size
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
@@ -128,6 +129,11 @@ _TAB_OPENING: str = (
 )
 _BLANK_URLS: frozenset[str] = frozenset({"about:blank", "chrome://newtab/", "chrome://new-tab-page/"})
 _TAB_MARK_BYTES: int = 6
+# Dot's own Chrome at this zoom draws a page at the size it was given, which the page need not be asked for (item 358).
+_UNZOOMED: int = 100
+# A scroll with no distance moves by this share of the page area the model sees.
+_SCROLL_SHARE: float = 0.8
+
 _LAUNCH_ARGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
     "--no-first-run",
@@ -1149,10 +1155,11 @@ class BrowserSession:
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
 
     async def _viewport(self, tab: Tab) -> Viewport:
-        """The page area the model sees: the configured size in Dot's own Chrome, the real window where the page fills
-        it (item 354) and in the open Chrome."""
+        """The page area the model sees, in CSS pixels: the configured size in Dot's own Chrome at 100 %, what the page
+        measures where it fills its window (item 354), is drawn larger or smaller (item 358: 1280 by 860 at 125 % is
+        1024 by 688) or is in the open Chrome."""
         config: BrowserConfig = self._config
-        if config.mode == "own" and not config.fit_window:
+        if config.mode == "own" and not config.fit_window and config.zoom == _UNZOOMED:
             return Viewport(width=config.viewport_width, height=config.viewport_height)
         return await measure_viewport(tab.page)
 
@@ -1633,7 +1640,11 @@ class BrowserSession:
             tab: Tab = await self._current_tab(thread)
             config: BrowserConfig = self._config
             viewport: Viewport = await self._viewport(tab)
-            data: bytes = await screenshot_jpeg(tab.page, config.screenshot_quality, _ms(config.action_timeout_s))
+            shot: bytes = await screenshot_jpeg(tab.page, config.screenshot_quality, _ms(config.action_timeout_s))
+            # Chrome's zoom is left out of Playwright's CSS pixels: the picture is redrawn at the page's own size.
+            data: bytes = await asyncio.to_thread(
+                jpeg_of_size, shot, viewport.width, viewport.height, config.screenshot_quality
+            )
             return Screenshot(url=tab.page.url, width=viewport.width, height=viewport.height, data=data)
 
     def _tab_of(self, thread_id: str) -> Tab | None:
@@ -1809,14 +1820,16 @@ class BrowserSession:
         self,
         thread_id: str,
         direction: Literal["down", "up", "top", "bottom"],
-        pixels: int,
+        pixels: int | None,
         ref: str | None,
     ) -> PageView:
+        """Scroll the current tab by ``pixels``, or by most of the page area the model sees when ``pixels`` is None."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             viewport: Viewport = await self._viewport(tab)
+            distance: int = pixels if pixels is not None else round(viewport.height * _SCROLL_SHARE)
             await scroll_page(
-                tab.page, direction, pixels, ref, viewport.width, viewport.height, _ms(self._config.action_timeout_s)
+                tab.page, direction, distance, ref, viewport.width, viewport.height, _ms(self._config.action_timeout_s)
             )
             # The wheel lands a few tens of milliseconds after the call returns, inside the DOM quiet window.
             await self._settle(tab)

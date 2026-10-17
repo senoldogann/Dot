@@ -106,6 +106,11 @@ def test_the_zoom_is_written_into_the_profile_and_its_other_preferences_stay(tmp
     assert json.loads(preferences.read_text(encoding="utf-8"))["partition"]["default_zoom_level"]["x"] == pytest.approx(
         1.2239, abs=1e-4
     )
+    assert preferences.stat().st_mode & 0o777 == 0o600
+    # Asked again for the zoom it holds, the file is left as it is.
+    written: int = preferences.stat().st_mtime_ns
+    write_default_zoom(tmp_path, 125)
+    assert preferences.stat().st_mtime_ns == written
     preferences.write_text(
         json.dumps(
             {"profile": {"name": "Dot"}, "partition": {"default_zoom_level": {"x": 1.0}, "per_host_zoom_levels": {}}}
@@ -118,9 +123,10 @@ def test_the_zoom_is_written_into_the_profile_and_its_other_preferences_stay(tmp
     assert kept["partition"]["default_zoom_level"] == {"x": 0.0}
 
 
-def test_preferences_that_are_not_a_json_object_are_refused_and_left_as_they_were(tmp_path: Path) -> None:
+@pytest.mark.parametrize("held", ["[]", '{"partition": []}', '{"partition": {"default_zoom_level": 1.5}}'])
+def test_preferences_dot_does_not_know_are_refused_and_left_as_they_were(tmp_path: Path, held: str) -> None:
     (tmp_path / "Default").mkdir()
-    (tmp_path / "Default" / "Preferences").write_text("[]", encoding="utf-8")
+    (tmp_path / "Default" / "Preferences").write_text(held, encoding="utf-8")
     with pytest.raises(BrowserError):
         write_default_zoom(tmp_path, 125)
-    assert (tmp_path / "Default" / "Preferences").read_text(encoding="utf-8") == "[]"
+    assert (tmp_path / "Default" / "Preferences").read_text(encoding="utf-8") == held

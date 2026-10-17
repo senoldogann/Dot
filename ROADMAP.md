@@ -14221,8 +14221,10 @@ into the preferences of the profile in use before Chrome starts on it, the other
 **Zoom of pages** offers Chrome's steps from 50 to 200 and sends it with the look (`POST /api/browser/look`); Dot's own
 Chrome starts again with it at the next call that needs it, and your Chrome keeps its own. Measured in Chrome: a page of
 1280 × 860 at 125 has the room of 1024 × 688 and a `devicePixelRatio` of 1.25, with a size of its own and filling its
-window alike. Tests: `tests/unit/test_browser_profiles.py`, `tests/smoke/test_browser_settings.py`. Docs:
-`docs/browser-and-computer-use.md`.
+window alike. The model is told that room, measured on the page whenever the zoom is not 100, its screenshots are
+redrawn at it (Playwright's CSS pixels leave Chrome's zoom out), and a scroll with no distance moves by most of it;
+`click_at` at a button's centre in CSS pixels hits it at 75, 100 and 125. Tests: `tests/unit/test_browser_profiles.py`,
+`tests/smoke/test_browser_settings.py`. Docs: `docs/browser-and-computer-use.md`.
 
 ## Log
 

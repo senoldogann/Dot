@@ -99,14 +99,15 @@ and kept in `config.toml`. A page of Dot's own Chrome fills its window (`fit_win
 the page has) or has the size given (1280 × 860 by default), and pages are told to prefer the Mac's colour scheme
 (`appearance = "system"`, the default), light or dark. Dot's own Chrome draws pages at `zoom` percent of their size (100
 by default): it is Chrome's default zoom, written into the preferences of the profile in use before Chrome starts on it,
-so a page of 1280 × 860 at 125 has the room of 1024 × 688, and ⌘+ and ⌘− still change one site there. Dot's own Chrome
-is let go of and starts with them at the next call that needs it; the tabs Dot opens in your Chrome are told the colour
-scheme one by one, and keep the size and the zoom of its window. Before, Dot's own Chrome told every page Playwright's
-default, light. **Show Dot's computer when a run opens the browser** (kept in the browser you read Dot in, on by
-default) opens the details panel on its Screen tab when a run at work first uses its browser, beside the chat on a wide
-window, without making it the panel or the tab you chose; its switch hides it, and a phone keeps the button of its bar.
-One row of T3 Code's is left out: where links open (a link in Dot's chats opens in the browser you read Dot in, and Sign
-in… covers signing in for Dot).
+so a page of 1280 × 860 at 125 has the room of 1024 × 688; the model is told that room, and its screenshots are drawn at
+it, so a pixel of one is a pixel for `click_at`. A site zoomed by hand with ⌘+ or ⌘− in Dot's own Chrome keeps its own
+zoom. Dot's own Chrome is let go of and starts with them at the next call that needs it; the tabs Dot opens in your
+Chrome are told the colour scheme one by one, and keep the size of its window and the zoom of each site. Before, Dot's
+own Chrome told every page Playwright's default, light. **Show Dot's computer when a run opens the browser** (kept in
+the browser you read Dot in, on by default) opens the details panel on its Screen tab when a run at work first uses its
+browser, beside the chat on a wide window, without making it the panel or the tab you chose; its switch hides it, and a
+phone keeps the button of its bar. One row of T3 Code's is left out: where links open (a link in Dot's chats opens in
+the browser you read Dot in, and Sign in… covers signing in for Dot).
 
 
 **Profiles** (item 355, after T3 Code's): Dot's own Chrome works on one profile at a time, each with its own cookies and

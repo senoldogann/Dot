@@ -61,6 +61,8 @@ def test_a_number_that_would_stop_the_daemon_is_refused(path: tuple[str, ...]) -
         (("browser", "screenshot_quality"), 0),
         (("browser", "screenshot_quality"), 101),
         (("browser", "viewport_margin_px"), -1),
+        (("browser", "zoom"), 24),
+        (("browser", "zoom"), 501),
     ],
 )
 def test_a_page_size_or_a_screenshot_quality_chrome_cannot_take_is_refused(path: tuple[str, ...], value: int) -> None:
