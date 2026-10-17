@@ -183,6 +183,8 @@ class QuickLook:
             await asyncio.to_thread(os.replace, drawn, self.folder / drawing)
             for old in await asyncio.to_thread(_oldest_beyond, self.folder, KEPT_LOOKS):
                 await asyncio.to_thread(shutil.rmtree, old)
+                # Its lock goes with it, so the locks stay as few as the drawings kept.
+                self._drawing.pop(old.name, None)
         finally:
             await asyncio.to_thread(shutil.rmtree, workshop)
         log.info("look_drawn", path=str(path), drawing=drawing)

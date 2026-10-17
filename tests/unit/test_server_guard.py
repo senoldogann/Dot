@@ -79,6 +79,10 @@ def test_only_a_bearer_header_carries_the_token(header: str | None, expected: st
         ("/api/status", LOCAL_HOST, "https://attacker.example", GOOD_AUTH, 403),
         ("/api/status", LOCAL_HOST, f"http://127.0.0.1:{PORT + 1}", GOOD_AUTH, 403),
         ("/", LOCAL_HOST, "null", None, 403),
+        # A drawing's part asked for by the drawing itself, whose origin is opaque (item 268); nothing else is.
+        ("/looks/0123456789abcdef0123456789abcdef/Attachment1.css", LOCAL_HOST, "null", None, None),
+        ("/api/status", LOCAL_HOST, "null", GOOD_AUTH, 403),
+        ("/pages/abc", LOCAL_HOST, "null", None, 403),
         ("/api/health", "attacker.example", None, None, 421),
     ],
 )

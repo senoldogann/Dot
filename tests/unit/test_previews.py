@@ -185,7 +185,8 @@ def test_a_pdf_page_is_drawn_at_the_width_asked_in_its_proportions(tmp_path: Pat
 def test_a_workbooks_drawing_is_its_sheets_and_any_other_drawing_its_page() -> None:
     # Quick Look's page of a workbook (item 268), as qlmanage wrote it on macOS: a tab per sheet that is not hidden.
     workbook: str = (
-        '<div class="TabView" id="tabs"><div class="TabViewItem selected"><div class="TabHeader">Budget &amp; plan</div>'
+        '<div class="TabView" id="tabs"><div class="TabViewItem selected">'
+        '<div class="TabHeader">Budget &amp; plan</div>'
         '<a href="Attachment7.html"></a></div><div class="TabViewItem"><div class="TabHeader">Notes</div>'
         '<a href="Attachment3.html"></a></div><div class="TabViewItem"><div class="TabHeader">Odd</div>'
         '<a href="../../secret.html"></a></div></div>'

@@ -303,6 +303,7 @@ function officeView(file, lookAddress, views, toolbar, body) {
   const failed = (error) => {
     switcher.set("contents");
     chosen = "contents";
+    body.dataset.view = "contents";
     contentsView(file.preview, toolbar, body);
     toolbar.prepend(note("warn", `Quick Look could not draw this file (${error.message}); this is what Dot reads of it.`));
   };
