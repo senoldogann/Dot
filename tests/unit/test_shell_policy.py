@@ -84,7 +84,7 @@ _HIDDEN: list[str] = [
     # command after its own options, operands or "--"; what an array's values run; a later arm of a case.
     "find ~/Documents $(echo case x) -delete",
     "find ~/Documents $(case x in x) echo esac ;; esac) -delete",
-    "cp $(echo case x) ~/.zshrc",
+    "cp $(echo case x) /etc/hosts",
     "echo $(case x in x) echo hi ;; esac",
     "source <(echo 'rm -rf ~/Documents')",
     ". <(echo rm -rf ~/Documents)",
