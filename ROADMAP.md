@@ -13777,30 +13777,31 @@ Back the button names no panel (no `aria-controls` or `aria-expanded`). The test
 The owner's word of 2026-10-17: "Ajan kendi tarayıcısında sıfırdan başlamasın. Alabildiği her şeyi alsın; ben sorunsuz
 Chrome üzerinde hızlı computer use ve browser use istiyorum." (the agent should not start from nothing in a browser of
 its own but take all it can; smooth, fast computer use and browser use in Chrome.) Decided with it: the agent works in
-the owner's live Chrome (`[browser] mode = "attach"`, My Chrome), as it is, copying nothing of what Chrome keeps on disk;
-Chrome's remote-debugging switch and its Allow button stay the owner's, and the card and the errors say how. Done when:
-the setup takes one Allow at most and a run finds the owner signed in; later runs connect with no click, and after a
-restart of Chrome the next call connects again by itself with one clear line, never crashes and says why on a timeout;
+the owner's live Chrome (`[browser] mode = "attach"`, My Chrome), as it is, copying nothing of what Chrome keeps on
+disk; Chrome's remote-debugging switch and its Allow button stay the owner's, and the card and the errors say how. Done
+when: the setup takes one Allow at most and a run finds the owner signed in; later runs connect with no click, and after
+a restart of Chrome the next call connects again by itself with one clear line, never crashes and says why on a timeout;
 Dot's tabs open in a window of their own, the app in front stays in front and the owner's tabs are not touched; (a)
 browser_open to its first view, (b) a browser_act of three actions, (c) a computer-use loop and (d) a ten-step task are
 measured before and after on the same Mac, none slower, the three slowest better or shown to be the model's or the
 network's time; and the checks pass. Tests never touch the owner's Chrome (a scratch Chrome through `DOT_CHROME_DIR`);
 the last real try is the owner's. Built on `items-339-chrome`.
 
-**Measured** (medians; `tests/smoke/test_chrome_speed.py` against a hidden scratch Chrome in attach mode, three runs of
-five each side, alternating with `main`; `tests/smoke/test_desktop_speed.py` against the fixture window, ten loops; ms):
+**Measured** (ms; `tests/smoke/test_chrome_speed.py` against a hidden scratch Chrome in attach mode: five runs each
+side, alternating with `main`, each the median of five calls, shown as the median of the five runs and their range;
+`tests/smoke/test_desktop_speed.py` against the fixture window: the median of ten loops):
 
-| Step                                              | before (`main`)   | after             |
-| ------------------------------------------------- | ----------------- | ----------------- |
-| connect to Chrome                                 | 215.8-1608.1      | 211.1-392.2       |
-| (a) browser_open in a new chat (its tab is made)  | 122.0-131.3       | 212.5-237.7       |
-| (a) browser_open again, in the chat's tab         | 105.0-106.6       | 98.6-103.3        |
-| (b) browser_act of three actions                  | 211.7-258.0       | 165.9-171.2       |
-| snapshot                                          | 77.3-81.2         | 71.7-73.8         |
-| screenshot of the page                            | 20.4-26.6         | 12.3-26.2         |
-| a page an app draws in frames, open and its text  | 189.8-191.2       | 175.8-177.4       |
-| (c) screen, click, screen                         | 516.1             | 479.4             |
-| (d) a ten-step task through the loop              | 61,275.9          | 1,480.9           |
+| Step                                                  | before (`main`)            | after                      |
+| ----------------------------------------------------- | -------------------------- | -------------------------- |
+| connect to Chrome (the driver started)                | 154.2 (152.4-154.9)        | 153.8 (152.5-154.5)        |
+| (a) browser_open in a new chat (its tab is made)      | 125.5 (123.8-129.8)        | 211.1 (208.1-214.0)        |
+| (a) browser_open again, in the chat's tab             | 103.1 (101.8-104.0)        | 100.7 (97.0-102.2)         |
+| (b) browser_act of three actions                      | 229.5 (228.2-242.7)        | 166.5 (164.6-169.5)        |
+| snapshot                                              | 75.7 (75.1-76.7)           | 72.7 (70.6-73.0)           |
+| screenshot of the page                                | 23.6 (23.6-26.0)           | 20.6 (10.9-27.1)           |
+| a page an app draws in frames, open and its text      | 187.8 (186.2-189.5)        | 177.4 (176.3-183.8)        |
+| (c) screen, click, screen                             | 516.1, 518.6 (two runs)    | 479.4                      |
+| (d) a ten-step task through the loop, scripted model  | 61,275.9                   | 1,470.2                    |
 
 The one slower step is the first browser_open of a chat, which makes its tab in a window of its own (item 340): the
 window takes about 30 ms more to make than a tab in the owner's (44.5 against 14.1 ms with Chrome on screen; 56-73
@@ -13811,8 +13812,8 @@ the computer-use loop and the three-action act, all faster.
 
 ### 339. Back in the owner's Chrome takes a navigation, not 30 s
 
-**Status: in progress.** **As built (2026-10-17).** A Chrome that keeps its back-forward cache (the owner's; Playwright's
-own Chrome turns it off) brings the page Back from the cache with no DOMContentLoaded and no load event:
+**Status: in progress.** **As built (2026-10-17).** A Chrome that keeps its back-forward cache (the owner's;
+Playwright's own Chrome turns it off) brings the page Back from the cache with no DOMContentLoaded and no load event:
 `go_back(wait_until="domcontentloaded")` waited the whole navigation timeout, 30 s, and then failed though the tab had
 gone back, and the settle after a click that went back waited the same in `_wait_quiet`. `go_back` now waits for the
 commit and first asks Chrome's history whether a page is before (Dot's blank start does not count), and `_wait_quiet`
@@ -13826,19 +13827,19 @@ reads `document.readyState` in the page. Measured: browser_back in the ten-step 
 app in front stays in front (measured: Finder before and after), and the owner's windows and tabs are not touched.
 Measured first in a scratch Chrome on screen (one second of frames and timer ticks): a background tab in the owner's
 window is hidden, 0 frames and 8 ticks; a window of its own 61 and 208, also when another window covers it whole; a
-minimized one is hidden again, so Dot never minimizes. One window per tab, so that each run's tab is its window's visible
-tab while runs work side by side; the window goes with its tab. Its cost is in the table above. Test:
+minimized one is hidden again, so Dot never minimizes. One window per tab, so that each run's tab is its window's
+visible tab while runs work side by side; the window goes with its tab. Its cost is in the table above. Test:
 `test_browser_attach.py::test_a_tab_of_dot_opens_in_a_window_of_its_own` (Chrome's own `Browser.getWindowForTarget`).
 
 ### 341. A restarted Chrome is said in one line, and the card follows Chrome
 
-**Status: in progress.** **As built (2026-10-17).** The connection stays across runs (only a switch, closing the
-session or a new DevTools port of Dot's own Chrome drops it), so later runs need no click. When Chrome quits or restarts
-the session marks itself lost; the next call connects again by itself, the owner gets a notification ("Chrome asks to
-allow Dot"), the connection's error starts with "Chrome was closed or restarted", and a step under way when Chrome went
-fails with that line and that the next step connects again. Settings › Browser reads the session's `lost` and
-`waiting_allow` every 3 s while the card is open in attach mode: connected, waiting for Allow, Chrome closed, remote
-debugging off, Chrome restarted or not connected, each with one line of what to do. Tests in `test_browser_attach.py`:
+**Status: in progress.** **As built (2026-10-17).** The connection stays across runs (only a switch, closing the session
+or a new DevTools port of Dot's own Chrome drops it), so later runs need no click. When Chrome quits or restarts the
+session marks itself lost; the next call connects again by itself, the owner gets a notification ("Chrome asks to allow
+Dot"), the connection's error starts with "Chrome was closed or restarted", and a step under way when Chrome went fails
+with that line and that the next step connects again. Settings › Browser reads the session's `lost` and `waiting_allow`
+every 3 s while the card is open in attach mode: connected, waiting for Allow, Chrome closed, remote debugging off,
+Chrome restarted or not connected, each with one line of what to do. Tests in `test_browser_attach.py`:
 `test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrome_is_back`,
 `test_a_chrome_that_restarted_and_refuses_says_so_in_one_line` and
 `test_the_settings_card_follows_chrome_as_it_quits_and_comes_back`.
@@ -13846,38 +13847,39 @@ debugging off, Chrome restarted or not connected, each with one line of what to 
 ### 342. A browser step waits for what it set off, not for a fixed 40 ms
 
 **Status: in progress.** **As built (2026-10-17).** After a step that can open a tab or a dialog, `_let_events_land`
-slept `side_effect_grace_ms` (40 ms) and then waited for the popups Playwright had reported. Probes
-(`/tmp/dot-plan21/scripts/probe_popup*.py`) showed that one turn of the page's event loop is enough for Chrome to have
-told of a dialog, a file chooser, a navigation in the document and a tab it made, thirty times in thirty in both modes,
-and that Playwright reports a new tab only once its page has answered: 411 ms after the click for a page that answers in
-400 ms, while Chrome tells of it about 8 ms before the click returns. So the grace let a batch go on past a popup whose
-page answers late. Now the page takes one turn (`let_page_turn`, a `setTimeout(0)` in the page; Playwright holds it
-while a navigation the step started is under way, until it commits), and each tab keeps the tabs Chrome made for it
-(`watch_births`: a CDP session of the tab's own with `Target.setDiscoverTargets`; births whose opener is the tab, gone
-when the thread takes them in or Chrome closes them). The step waits until each is taken in, a second at most; one still
-opening then stops the batch with "a new tab is opening and its page has not answered yet". A popup Chrome blocks (the
-second of one click, in the owner's Chrome) is no birth and holds nothing, where `Page.windowOpen` would have counted it.
-The window's size is read alongside the snapshot instead of before it. `[browser] side_effect_grace_ms` is gone. Tests:
-`test_browser.py::test_a_tab_whose_page_answers_late_still_stops_the_batch` and
-`::test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_later` (both fail on `main`: the batch went on),
-`test_browser_attach.py::test_a_click_that_asks_for_two_tabs_stops_at_the_one_chrome_opened`.
+slept `side_effect_grace_ms` (40 ms) and then waited for the popups Playwright had reported. Probes showed that one turn
+of the page's event loop is enough for Chrome to have told of a dialog, a file chooser, a navigation in the document and
+a tab it made, thirty times in thirty in both modes, and that Playwright reports a new tab only once its page has
+answered: 411 ms after the click for a page that answers in 400 ms, while Chrome tells of it about 8 ms before the click
+returns. So the grace let a batch go on past a popup whose page answers late. Now the page takes one turn
+(`let_page_turn`, a `setTimeout(0)` in the page; Playwright holds it while a navigation the step started is under way,
+until it commits), and each tab keeps the tabs Chrome made for it (`watch_births`: a CDP session of the tab's own with
+`Target.setDiscoverTargets`; births whose opener is the tab, gone when the thread takes them in or Chrome closes them).
+The step waits until each is taken in, a second at most; one still opening then stops the batch with "a new tab is
+opening and its page has not answered yet". A popup Chrome blocks (the second of one click, in the owner's Chrome) is no
+birth and holds nothing, where `Page.windowOpen` would have counted it. The window's size is read alongside the snapshot
+instead of before it: no round trip of its own, and never stale, where a size kept until the window is resized would
+need a listener in the page or a poll of Chrome to tell that the owner resized Dot's window. `[browser]
+side_effect_grace_ms` is gone. Tests: `test_browser.py::test_a_tab_whose_page_answers_late_still_stops_the_batch` and
+`::test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_later` (both fail on `main`: the batch went
+on), `test_browser_attach.py::test_a_click_that_asks_for_two_tabs_stops_at_the_one_chrome_opened`.
 
 ### 343. Computer use checks only what it needs, and "Google Chrome" is the Chrome Dot works in
 
 **Status: in progress.** **As built (2026-10-17).** Measured on the act's path: each preparation read all three
 permissions, 13 ms, where Screen Recording and input events take 6.4 ms each and Accessibility nothing; listing the
-applications (`lsappinfo`) takes 25 ms and ran for the preview and again for the act. Now an act reads Accessibility
-and input events, a screenshot Screen Recording only, and the act uses the preview's listing when it follows within a
-second (an act after a question to the owner lists again). A name that fits several running copies of one application
-means the Chrome Dot's browser works in (`BrowserPool.chrome_pids`: the pid that holds each session's profile), where it
-was refused as ambiguous. Part 46's misses were AppleScript reaching whichever Chrome macOS picked; their answer is
+applications (`lsappinfo`) takes 25 ms and ran for the preview and again for the act. Now an act reads Accessibility and
+input events, a screenshot Screen Recording only, and the act uses the preview's listing when it follows within a second
+(an act after a question to the owner lists again). A name that fits several running copies of one application means the
+Chrome Dot's browser works in (`BrowserPool.chrome_pids`: the pid that holds each session's profile), where it was
+refused as ambiguous. Part 46's misses were AppleScript reaching whichever Chrome macOS picked; their answer is
 browser_eval in the run's own tab (item 263), now proven while three Chromes run. Kept as they were, and why: the
 click's pacing (110 ms; item 13, no acknowledgement exists between posted events), the 120 ms quiet window of the
 accessibility tree, the whole screen as the screenshot (the model's frame of coordinates; `desktop_screenshot` with a
 region zooms) and its LANCZOS resize (a box reduce first saves 17 ms a screenshot but moves text edges by up to 41 of
 255 levels, and the model reads text from it). Tests: `tests/unit/test_desktop_apps.py`,
-`test_browser_attach.py::test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_run`, the desktop
-smoke tests, and `tests/smoke/test_desktop_speed.py` for the loop's numbers.
+`test_browser_attach.py::test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_run`, the desktop smoke
+tests, and `tests/smoke/test_desktop_speed.py` for the loop's numbers.
 
 ### 344. Settings › Browser opens Dot's own Chrome to sign in to sites
 
