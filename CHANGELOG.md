@@ -10,8 +10,8 @@ The first public version of Dot, an always-on autonomous agent for macOS.
 - **Runs** work on a goal until it is done. They use a shell and the file system, the web, a Chrome profile of their
   own (browser use), the screen, mouse and keyboard (computer use), AppleScript and sub-agents. See
   [Runs and tools](docs/runs.md) and [Browser and computer use](docs/browser-and-computer-use.md).
-- **Models** come from Ollama, OpenAI, OpenCode Go, Anthropic or OpenCode Zen's free models. Dot's own work has fast,
-  review and vision models, and a run can ask helper models or move to standby ones. See
+- **Models** come from Ollama, OpenAI, OpenCode Go, Anthropic, OpenRouter or OpenCode Zen's free models. Dot's own
+  work has fast, review and vision models, and a run can ask helper models or move to standby ones. See
   [Models and providers](docs/models.md).
 - **A policy** records everything a run does. In the approval modes `ask` (the default) and `auto` it hands money and
   credentials to you and asks before a risky action; in `yolo` only your hand-off rules stop a run. See
