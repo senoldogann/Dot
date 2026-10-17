@@ -1191,7 +1191,7 @@
 
 .tailnet-lines li > svg {
   flex: none;
-  margin-top: 2px;
+  margin-top: var(--space-half);
 }
 
 .tailnet-missing > svg {
