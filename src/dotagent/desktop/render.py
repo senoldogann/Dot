@@ -8,7 +8,7 @@ from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
-from dotagent.core.text import fold_search
+from dotagent.core.text import fold_search, unclosing
 from dotagent.desktop.ax import INTERACTIVE_ROLES
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
@@ -93,7 +93,7 @@ class Delta:
 
 def fence_screen(source: str, body: str, nonce: str) -> str:
     """Wrap screen-derived text so the prompt can state that everything inside is data and only ``nonce`` closes it."""
-    safe: str = body.replace("</screen_content", "<\\/screen_content")
+    safe: str = unclosing(body, "screen_content")
     quoted: str = '"' + source.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return f'<screen_content nonce="{nonce}" source={quoted}>\n{safe}\n</screen_content nonce="{nonce}">'
 

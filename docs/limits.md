@@ -22,9 +22,9 @@ Chrome on the mock keychain); `attach` mode against your own Chrome. Its logic a
 scratch Chrome with a debugging port, which plays your Chrome but has no Allow dialog, so what only your Chrome shows is
 open: the dialog itself, opening a tab in the window you work in, how long a connection takes with very many tabs open,
 and what Chrome does to a tab in the background. The web UI (chats, their selection and deletion, the settings tabs
-including the Browser one) ran in a headless Chromium against the static files and a mocked API, and the API itself in
-the server smoke tests; the two were not run together against a live daemon. No model worked from a real skill or plugin
-folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
+including the Browser one) runs in a headless Chromium against the daemon's own server and API in the browser smoke
+tests, started in the test's process with a throwaway home, not against the daemon you run. No model worked from a real
+skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
 - The shell guardrail is best-effort, and the sandbox of a run's processes keeps them out of Dot's own files only (see
   [Safety](safety.md#safety)).
 - The token goes only to a server that proves it holds it, but a page that another program served at the daemon's
@@ -40,7 +40,8 @@ folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
   `min_similarity` values.
 - Schedules fire only while the daemon runs and the Mac is awake. `dotx service install` writes, lints and loads the
   launchd job that keeps the daemon running in your login session.
-- MCP: tools only, over stdio or the streamable HTTP and SSE transports (no resources, prompts, sampling or OAuth).
+- MCP: tools only, over stdio or the streamable HTTP and SSE transports (no resources, prompts or sampling); a server
+  at a URL may sign in with OAuth (see [MCP servers](extending.md#mcp-servers)).
 - All conversation threads share one Chrome window.
 - Every model call carries the schemas of over forty tools, several thousand tokens. A model with a small context
   window or a metered key feels it; `allow` lists keep the MCP part short.
@@ -59,7 +60,8 @@ folder (discovery, `dotx skills list` and the `skill` tool ran on real folders).
   says which finished. A run of `dotx run` works in its own process: a daemon that starts while it works leaves it, and
   the approvals it waits on, to that process, and marks it as cut off only once the process has ended (the daemon never
   resumes such a run on its own).
-- Undo: only `write_file` and `edit_file` are in the journal, not shell commands, the browser or the desktop. A run
-  keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and `undo_max_run_bytes`. Runs
-  that change the same file are taken back in the order their changes were noted. The web UI has no undo button: use
-  `dotx undo`, which needs the run in the database (the journals of a deleted chat stay until `dotx prune --apply`).
+- Undo: only `write_file`, `edit_file` and `write_notes` are in the journal, not shell commands, the browser or the
+  desktop. A run keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and
+  `undo_max_run_bytes`. Runs that change the same file are taken back in the order their changes were noted. `dotx undo`
+  and the Actions tab of a run's page (a button for each file) need the run in the database (the journals of a deleted
+  chat stay until `dotx prune --apply`).

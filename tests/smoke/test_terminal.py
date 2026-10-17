@@ -5,6 +5,7 @@ called.
 """
 
 import asyncio
+import contextlib
 import dataclasses
 import re
 from collections.abc import AsyncIterator
@@ -226,6 +227,25 @@ async def test_a_command_in_the_background_runs_unread_and_its_end_alone_is_told
         # Opened three times, closed by hand, closed idle twice, and one end: each was heard.
         assert watcher.changed.count("chat") >= 6, watcher.changed
         assert watcher.ended.empty()
+    finally:
+        await terminals.aclose()
+
+
+async def test_a_close_cancelled_while_it_waits_still_releases_the_terminal(runtime: Runtime) -> None:
+    """Item 351: a close cancelled while it gave the program its grace left the session's terminal open and its
+    program running; both go now."""
+    terminals: Terminals = Terminals(3, 1.0, runtime.shell_env)
+    try:
+        stubborn: TerminalSession = await terminals.open("chat", "trap '' TERM; sleep 30", (), workspace_dir(), False)
+        # Let the shell set its trap first, so that the close waits out its grace.
+        await asyncio.sleep(0.5)
+        closing: asyncio.Task[None] = asyncio.create_task(terminals.close("chat", stubborn.id))
+        await asyncio.sleep(0.3)
+        closing.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await closing
+        assert stubborn.finished.is_set() and stubborn.ended
+        assert await asyncio.wait_for(stubborn.exit_code(), 5.0) != 0
     finally:
         await terminals.aclose()
 

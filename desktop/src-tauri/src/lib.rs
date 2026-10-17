@@ -437,12 +437,28 @@ fn show(app: &AppHandle) {
     }
 }
 
-/// Bring the window up on the new chat page.
+/// Whether `page` is the down page (`down_url`), which reads what it says from its fragment.
+fn is_down_page(page: &url::Url) -> bool {
+    page.scheme() == "tauri" && page.path() == format!("/{DOWN_PAGE}")
+}
+
+/// Bring the window up on the new chat page; on the down page, bring it up as it is, as the address of a new chat would
+/// wipe what the page says (item 351). The UI opens once the daemon answers.
 fn new_chat(app: &AppHandle) {
     if let Some(window) = app.get_webview_window(WINDOW) {
-        let _ = window.eval(
-            "location.hash = '#/runs'; if (window.focusComposer) { window.focusComposer(); }",
-        );
+        match window.url() {
+            Ok(page) if is_down_page(&page) => {}
+            Ok(_) => {
+                let _ = window.eval(
+                    "location.hash = '#/runs'; if (window.focusComposer) { window.focusComposer(); }",
+                );
+            }
+            Err(error) => {
+                eprintln!(
+                    "dot-shell: the window's address could not be read for a new chat: {error}"
+                )
+            }
+        }
     }
     show(app);
 }
@@ -893,6 +909,17 @@ mod tests {
         let restart_polls: u32 = 6;
         assert!((0..=restart_polls).all(|misses| !leaves_ui(misses)));
         assert!(leaves_ui(MISSES_BEFORE_DOWN));
+    }
+
+    #[test]
+    fn a_new_chat_leaves_the_down_page_as_it_is_and_opens_on_the_ui() {
+        let page = |address: &str| url::Url::parse(address).expect("an address");
+        assert!(is_down_page(&page(&down_url(&Seen::Silent))));
+        assert!(is_down_page(&page(
+            "tauri://localhost/down.html#title=Dot+cannot+read&detail=x"
+        )));
+        assert!(!is_down_page(&page("http://127.0.0.1:8765/#/runs")));
+        assert!(!is_down_page(&page("tauri://localhost/index.html")));
     }
 
     #[test]

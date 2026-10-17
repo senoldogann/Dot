@@ -258,21 +258,26 @@ class TerminalSession:
         return await self._process.wait()
 
     async def close(self) -> None:
-        """End the program and everything it started in its process group, and release the terminal."""
+        """End the program and everything it started in its process group, and release the terminal, also when the
+        close is cancelled while it waits for the program (item 351: the terminal's file stayed open then)."""
         self.closing = True
-        if self._process.returncode is None:
-            with contextlib.suppress(ProcessLookupError, PermissionError):
-                os.killpg(self._process.pid, signal.SIGTERM)
-            with contextlib.suppress(TimeoutError):
-                await asyncio.wait_for(self._process.wait(), _CLOSE_GRACE_S)
-        kill_group(self._process.pid)
-        await self._process.wait()
-        self._drop_pending()
-        if not self.ended:
-            asyncio.get_running_loop().remove_reader(self._master)
-            self.ended = True
-        self.finished.set()
-        os.close(self._master)
+        try:
+            if self._process.returncode is None:
+                with contextlib.suppress(ProcessLookupError, PermissionError):
+                    os.killpg(self._process.pid, signal.SIGTERM)
+                with contextlib.suppress(TimeoutError):
+                    await asyncio.wait_for(self._process.wait(), _CLOSE_GRACE_S)
+            kill_group(self._process.pid)
+            await self._process.wait()
+        finally:
+            if self._process.returncode is None:
+                kill_group(self._process.pid)
+            self._drop_pending()
+            if not self.ended:
+                asyncio.get_running_loop().remove_reader(self._master)
+                self.ended = True
+            self.finished.set()
+            os.close(self._master)
 
 
 class TerminalWatcher(Protocol):

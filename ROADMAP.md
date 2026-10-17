@@ -5278,7 +5278,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 345 | A chat that goes on at another of its runs keeps its way back                          | done        | aa6093b |
 | 346 | A chat may leave out the lines of what ran without asking                              | done        | a2f619b |
 | 347 | On a phone the text can be as small as 12 px                                           | done        | a2f619b |
-| 349 | OpenRouter: the models of many labs on one key                                         | in progress |         |
+| 349 | OpenRouter: the models of many labs on one key                                         | done        | 196ff64 |
+| 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13954,11 +13955,11 @@ and at 12 px the answer, a row of the sidebar and a label of the settings shrink
 
 ### 349. OpenRouter: the models of many labs on one key
 
-**Status: in progress.** The owner's word of 2026-10-17: "Ayrıca OpenRouter provider desteği istiyorum, bunu da kur."
-(and I want OpenRouter provider support, set it up too). **As built (2026-10-17).** `llm/openrouter.py`: a provider
-`openrouter` (`openrouter:<lab>/<model>`) over OpenRouter's Chat Completions, its key `OPENROUTER_API_KEY` in Settings ›
-API keys, `dotx auth`, `dotx setup` and `dotx doctor` (`GET /key`: what the key has spent and may spend, a free call).
-What a model can do comes from OpenRouter's own list of its models (`GET /models`, read again after
+**Status: done (`196ff64`).** The owner's word of 2026-10-17: "Ayrıca OpenRouter provider desteği istiyorum, bunu da
+kur." (and I want OpenRouter provider support, set it up too). **As built (2026-10-17).** `llm/openrouter.py`: a
+provider `openrouter` (`openrouter:<lab>/<model>`) over OpenRouter's Chat Completions, its key `OPENROUTER_API_KEY` in
+Settings › API keys, `dotx auth`, `dotx setup` and `dotx doctor` (`GET /key`: what the key has spent and may spend, a
+free call). What a model can do comes from OpenRouter's own list of its models (`GET /models`, read again after
 `[providers.openrouter] models_ttl_s`): whether it reads images and calls tools, its context and output limits, whether
 it takes a temperature, its reasoning levels (`reasoning.supported_efforts`; read on 2026-10-17: 470 models, 399 with
 tools, 341 that reason), or a switch for one whose reasoning is not mandatory and names no levels. The level goes as
@@ -13970,13 +13971,44 @@ for credits that ran out) is that status. A model whose id ends in `:free`, or w
 variant OpenRouter does not list (`:nitro`, `:floor`, `:online`) has its model's traits. A list of models or a key's
 page not shaped as OpenRouter documents it is a `ProviderProtocolError`, and `dotx doctor` checks a configured model
 against the list before asking about it, so a list that could not be read is the warning beside the provider's row. No
-`HTTP-Referer` or title header is sent. Tests: `tests/unit/test_openrouter.py` (the list's traits, a variant, the
-joined details, that only a codec that sends them back keeps them, the `reasoning` object, the details sent back only
-to the model that gave them, the status of a numeric code, answers of the wrong shape), `tests/smoke/test_openrouter.py`
-(a run through the real loop against a stand-in for OpenRouter's API on this Mac: the Bearer key, the level, a tool
-call, the details of the first step back on the second; the listing, the key's page, credits that ran out inside a
-stream and a refused key) and `tests/smoke/test_doctor.py` (a model whose list could not be read warns). Docs:
-`docs/models.md`, `docs/safety.md`, `docs/command-line.md`, `docs/development.md`, `.env.example`, the README.
+`HTTP-Referer` or title header is sent. Tests: `tests/unit/test_openrouter.py` (the list's traits, a variant, the joined
+details, that only a codec that sends them back keeps them, the `reasoning` object, the details sent back only to the
+model that gave them, the status of a numeric code, answers of the wrong shape), `tests/smoke/test_openrouter.py` (a run
+through the real loop against a stand-in for OpenRouter's API on this Mac: the Bearer key, the level, a tool call, the
+details of the first step back on the second; the listing, the key's page, credits that ran out inside a stream and a
+refused key) and `tests/smoke/test_doctor.py` (a model whose list could not be read warns). Docs: `docs/models.md`,
+`docs/safety.md`, `docs/command-line.md`, `docs/development.md`, `.env.example`, the README.
+
+### 351. The audit of 2026-10-17: what held, fixed outside the human-only paths
+
+**Status: in progress.** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler gerçekten var ise lütfen düzelt.
+NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum. Özgür bir ajan olmalı." (verify this report, fix the problems that
+are real; YOLO's freedom must not break, the agent must stay free), and "Güvenli bir şekilde" (safely). Every claim of
+the report was checked against the code and, where it could be, a real run; what held is fixed here, each with a test
+that fails on the code before it, and none adds a refusal a yolo run would meet. **As built (2026-10-17).** A one-time
+schedule whose run could not start stays due (`store.keep_schedule_due`), where the firing recorded before the start had
+switched it off for good; it is tried again after a minute, then twice as long each time up to an hour
+(`failures.retry_after`), and a schedule changed meanwhile is left as it is. A learned skill's kind and When are one
+line each, only the last Evidence heading ends what a tainted skill withholds, and a path in the Mac's own folders
+(`/tmp`, `/private`, `/var` and the like) is withheld too. The calls of a step cut by a stop are told as started from
+every call event after the step. A line of OpenCode's event stream that is not JSON ends the stream as a broken one,
+which the run reports; it ended the reader without a word. A terminal's close that is cancelled while it waits still
+kills its group and closes its descriptor. `compact` waits for the write under way, and `add_memory_once` returns what
+its last try stored. A goal whose images the compaction dropped still starts its run's part of the conversation. A start
+makes its confinement once (the sandbox built and checked once, not again for the services). Leaving Settings › Models
+stops the scroll cues of its tables; a face shown past a quarter of an hour still blinks. In Dot.app, New chat leaves
+the down page as it is. A path or a page under a known one is not known to the continuity check by that, and a folder
+that is there says nothing to the answer check of a path that goes on from it past a space. A run of reasoning items
+before a call or a message goes back to the Responses API whole. One helper (`core.text.unclosing`) breaks a closing tag
+inside fenced text whatever its case, and a teammate's reply and the files attached to a message close only with their
+nonce. Docs: `runs.md` (the tool table), `limits.md`, `autonomy.md`, `extending.md` (`dotx playbooks trust`),
+`command-line.md` (`dotx setup`), `daemon.md`, `memory-and-schedules.md`, `safety.md`. **Left to the owner.** The
+classification of shell lines, git, `open`, awk and tar writes and the ancestors of protected paths (`policy/`, which
+REVIEW.md leaves to a human, and whose tests would carry the inputs that slip through), the drop target of a desktop
+drag (a new refusal a yolo run would meet), Messages' recent rows in its write-ahead log (reading them needs a copy of
+the database), standby's dropped images not being stored, and the reads that see an open unit's rows. The confirmed
+problems in the human-only paths (spend amounts, the key file's values, the review prompts, the pairing of verdicts,
+undo through a linked folder) are item 350, in a pull request for the owner.
 
 ## Log
 
@@ -14738,3 +14770,4 @@ stream and a refused key) and `tests/smoke/test_doctor.py` (a model whose list c
 - 2026-10-17 (Opus 5.5): `test_dot_app`'s intermittent timeout on CI traced to its own shell, not the launcher: bash 3.2's `wait` misses a trapped SIGTERM that comes just before it waits (through the launcher, 1 run in 500 did not end within 2 s); the child now sleeps in short foreground steps (500 in 500, the slowest 135 ms). Item 345 on `items-345-back-follows`.
 - 2026-10-17 (Opus 5.5): PR #332 (item 345 and `test_dot_app`'s shell) merged as `aa6093b`. Items 346 and 347 on the owner's word of the same day, on `items-346-348`; item 348 (PyPI) on a branch of its own, as it touches `.github/workflows/`.
 - 2026-10-17 (Opus 5.5): PR #333 (items 346 and 347) merged as `a2f619b` after CI and the local gate (651 passed; the 6 tests that save a memory note failed while the local Ollama was not running, the same 6 as on `main` then); main's checkout moved to it and the daemon restarted at 16:14:49 while no run worked. Item 349 (OpenRouter) on `item-349-openrouter`, with a fresh-context review's findings fixed: only OpenRouter's codec keeps reasoning details, an answer of the wrong shape is a protocol error, the doctor checks a model against its list first, a variant id has its model's traits.
+- 2026-10-17 (Opus 5.5): PR #334 (item 349, OpenRouter) merged as `196ff64` after CI and a second fresh-context review whose findings it fixes (a variant id the doctor did not know, lines over 120 columns, the lists of providers). Item 351 on `items-351-audit-fixes` as PR #335; its review's findings fixed (a failing one-time schedule waits between tries, the answer check reads only the word after a folder, a known address may gain a query or a closing slash); `test_browser_sign_in`'s stand-in no longer writes its pid before its arguments (300 of 300 probes failed before, none after).

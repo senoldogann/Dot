@@ -1,10 +1,12 @@
 """The store's one door for writes (item 66): concurrent appends and token counts all land, a unit of several
 statements is never split by another writer, and a lock held by another process is waited out, not fatal. A chat that a
-run works on, in any process, is not deleted (item 179)."""
+run works on, in any process, is not deleted (item 179). A note added once after a locked commit comes back as the try
+that was stored, and the database is compacted only when no write is under way on its connection (item 351)."""
 
 import asyncio
 import sqlite3
 import threading
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
 import pytest
@@ -157,5 +159,49 @@ async def test_a_chat_a_run_works_on_is_not_deleted_whichever_process_drives_the
         assert (await store.get_thread(thread.id)).id == (await store.get_run(run_id)).thread_id
         await store.finish_run(child.id, "done", "Found.")
         assert await store.delete_threads([thread.id]) == [thread.id]
+    finally:
+        await store.close()
+
+
+async def test_a_note_added_once_after_a_locked_commit_is_the_one_stored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        commit: Callable[[], Awaitable[None]] = store._db.commit
+        locked: list[bool] = [True]
+
+        async def locked_once() -> None:
+            if locked:
+                locked.clear()
+                raise sqlite3.OperationalError("database is locked")
+            await commit()
+
+        monkeypatch.setattr(store._db, "commit", locked_once)
+        record, created = await store.add_memory_once("The owner prefers short answers.", (), None, None, None, None)
+        monkeypatch.undo()
+        stored: MemoryRecord = await store.get_memory(record.id)
+        assert created and stored.content == "The owner prefers short answers."
+    finally:
+        await store.close()
+
+
+async def test_the_database_is_compacted_after_the_write_under_way(tmp_path: Path) -> None:
+    store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
+    try:
+        holding: asyncio.Event = asyncio.Event()
+        release: asyncio.Event = asyncio.Event()
+
+        async def statements() -> None:
+            holding.set()
+            await release.wait()
+
+        writing: asyncio.Task[None] = asyncio.create_task(store._unit(statements))
+        await holding.wait()
+        compacting: asyncio.Task[None] = asyncio.create_task(store.compact())
+        await asyncio.sleep(0.05)
+        release.set()
+        await writing
+        await compacting
     finally:
         await store.close()

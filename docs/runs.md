@@ -35,7 +35,8 @@ is the answer (a small model that is offered both writes the call out as text).
   goal, the plan with the state of each step and its targets, and your messages, and of the work already done and the
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
-  ellipsis of a cut value, or one lengthened by a fragment counts as known). The `compacted` event names the model,
+  ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
+  it). The `compacted` event names the model,
   how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
   and after it (`tokens_before`, `tokens_after`).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
@@ -217,8 +218,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 | Browser         | `browser_open`, `browser_snapshot`, `browser_find`, `browser_links`, `browser_read_text`, `browser_wait_text`, `browser_act`, `browser_eval`, `browser_scroll`, `browser_screenshot`, `browser_upload`, `browser_back`, `browser_new_tab`, `browser_switch_tab`, `browser_close_tab` |
 | Desktop         | `desktop_apps`, `desktop_open_app`, `desktop_snapshot`, `desktop_read`, `desktop_act`, `desktop_screenshot`, `desktop_clipboard_read`, `desktop_clipboard_write` |
 | macOS           | `apple_script`, `notify`, `code_fetch`                                                                             |
-| Memory, time    | `memory_save`, `memory_search`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete`             |
-| Orchestration   | `delegate`, `consult`, `update_plan`, `ask_user`, `finish`, `use_tools`                                            |
+| Memory, time    | `memory_save`, `memory_search`, `memory_update`, `memory_forget`, `schedule_create`, `schedule_list`, `schedule_delete` |
+| Orchestration   | `delegate`, `consult`, `update_plan`, `mark_plan_step`, `ask_user`, `finish`, `use_tools`                          |
+| Team            | `create_agent`, `message_agent`                                                                                    |
+| Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
 | Skills          | `skill`, `find_help`                                                                                               |
