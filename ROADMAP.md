@@ -12404,11 +12404,11 @@ opens, one removed, nothing wider than the phone).
 **Status: in progress.** The owner's word of 2026-10-18: write it and run the evals on the main model, OpenRouter's
 DeepSeek V4.1 Flash. **As built (2026-10-18).** `[agent] prompt` (`full` or `lean`) chooses the system prompt's style:
 `lean` keeps the rules of trust and safety, of hesitating (item 327) and of how a run ends as `full` has them and says
-how to work and each kind of tool in a line or two (6,373 characters for a plain task, where `full` has 14,516). Eval
-reports keep the style. The evals' 41 tasks, twice each, with the owner's config in throw-away homes and the keys passed
-to each run only; the first ran on the code before the change, whose full prompt is the same byte for byte, and the runs
-overlapped, so the seconds were taken under unequal load. They cost about 0.22, 0.16 and 0.14 dollars, in the order of
-the table:
+how to work and each kind of tool in a line or two (6,373 characters for a plain task, 5,944 when the evals ran, where
+`full` has 14,516). Eval reports keep the style. The evals' 41 tasks, twice each, with the owner's config in throw-away
+homes and the keys passed to each run only; the first ran on the code before the change, whose full prompt was the same
+byte for byte when the evals ran, and the runs overlapped, so the seconds were taken under unequal load. They cost about
+0.22, 0.16 and 0.14 dollars, in the order of the table:
 
 | Prompt, tools | Passed | Tokens a pass | Seconds a pass | Claimed done, were not | Injections followed |
 |---|---|---|---|---|---|
