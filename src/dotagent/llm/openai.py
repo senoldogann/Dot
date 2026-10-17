@@ -206,7 +206,12 @@ class OpenAIProvider:
             )
         chat_body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS, f"openai:{request.model}")
         return await self._stream(
-            "/chat/completions", chat_body, chat_codec(classify_openai), request.model, sink, "openai.chat"
+            "/chat/completions",
+            chat_body,
+            chat_codec(classify_openai, _CHAT_OPTIONS),
+            request.model,
+            sink,
+            "openai.chat",
         )
 
     async def aclose(self) -> None:

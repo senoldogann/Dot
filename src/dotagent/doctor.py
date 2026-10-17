@@ -138,17 +138,17 @@ async def _check_model(
     router: ModelRouter, role: str, reference: str, served: Mapping[str, Served], down: Mapping[str, str]
 ) -> CheckResult:
     """A configured model, which its provider must serve to its key: Ollama and Anthropic answer for the model itself,
-    OpenAI, OpenCode Go and OpenRouter through the list of the models they serve (``served``, by provider). When that list could
-    not be read, the model is a warning: the provider's own row fails for it. So is a model of a provider whose server
-    could not be reached (``down``: what its row says, by provider), which is not asked, as the call would only wait
-    out its retries (item 212)."""
+    OpenAI, OpenCode Go and OpenRouter through the list of the models they serve (``served``, by provider). When that
+    list could not be read, the model is a warning, and is not asked about (OpenRouter's connector would read the same
+    list again): the provider's own row fails for it. So is a model of a provider whose server could not be reached
+    (``down``: what its row says, by provider), which is not asked, as the call would only wait out its retries (item
+    212)."""
     try:
         ref: ModelRef = parse_model_ref(reference)
-        if ref.provider in down:
-            return _result(f"model {role}", False, False, f"{reference}: not checked, as {down[ref.provider]}")
-        info = await router.model_info(ref)
-    except (ConfigError, ProviderError) as exc:
+    except ConfigError as exc:
         return _result(f"model {role}", False, True, f"{reference}: {exc.message}")
+    if ref.provider in down:
+        return _result(f"model {role}", False, False, f"{reference}: not checked, as {down[ref.provider]}")
     listing: Served | None = served.get(ref.provider)
     if listing is not None and listing.problem:
         return _result(
@@ -166,6 +166,10 @@ async def _check_model(
             f"{reference}: not among the {len(listing.names)} models {ref.provider} serves to this key "
             f"(dotx models {ref.provider} lists them)",
         )
+    try:
+        info = await router.model_info(ref)
+    except (ConfigError, ProviderError) as exc:
+        return _result(f"model {role}", False, True, f"{reference}: {exc.message}")
     capabilities: str = ", ".join(
         name
         for name, present in (("tools", info.tools), ("vision", info.vision), ("thinking", info.thinking))
@@ -351,8 +355,8 @@ def _judge_row(config: JudgeConfig, present: bool) -> CheckResult:
 
 async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
     """Ask ``provider`` whether it takes the key in use now, through connectors made for this check alone. The calls
-    for OpenAI, OpenCode Go, Anthropic and OpenRouter cost nothing; Ollama's key is for its hosted web search, so it is checked with
-    one search, and TypeSafe's, the typed judge's, with one small judgment."""
+    for OpenAI, OpenCode Go, Anthropic and OpenRouter cost nothing; Ollama's key is for its hosted web search, so it is
+    checked with one search, and TypeSafe's, the typed judge's, with one small judgment."""
     if provider == "ollama":
         return await _check_ollama_search(config)
     if provider == "typesafe":

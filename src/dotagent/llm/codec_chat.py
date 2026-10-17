@@ -46,9 +46,10 @@ _DETAIL_WORDS: dict[str, str] = {"reasoning.text": "text", "reasoning.summary": 
 
 class ChatOptions(FrozenModel):
     """How a server differs in filling in the Chat Completions format. ``reasoning_object``: the reasoning level goes as
-    a ``reasoning`` object (OpenRouter's: ``{"effort": label}``, or ``{"enabled": ...}`` for a model whose reasoning is a
-    switch) instead of ``reasoning_effort``. ``replay_details``: an assistant turn of the same model carries back the
-    ``reasoning_details`` it came with, unchanged, as OpenRouter asks beside tool calls."""
+    a ``reasoning`` object (OpenRouter's: ``{"effort": label}``, or ``{"enabled": ...}`` for a model whose reasoning is
+    a switch) instead of ``reasoning_effort``. ``replay_details``: a reply keeps the ``reasoning_details`` the server sent
+    (and takes the words of its thinking from them when no string carries them), and an assistant turn of the same
+    model carries them back, unchanged, as OpenRouter asks beside tool calls; without it they are not read."""
 
     max_tokens_field: str
     request_usage: bool
@@ -167,7 +168,8 @@ class PartialCall(FrozenModel):
 
 class ChatState(FrozenModel):
     """Everything accumulated from the event stream so far. ``done`` becomes true at ``[DONE]``; ``details`` are the
-    reasoning details the server sent (OpenRouter's), joined into whole ones (:func:`merge_details`)."""
+    reasoning details the server sent (OpenRouter's), joined into whole ones (:func:`merge_details`), when the codec
+    sends them back (``ChatOptions.replay_details``)."""
 
     model: str
     text: str
@@ -185,14 +187,22 @@ def initial_chat_state(model: str) -> ChatState:
     )
 
 
+def _continues(last: JsonObject, piece: JsonObject) -> bool:
+    """Whether a streamed piece goes on with the last detail: the same type and index, and not another detail's id."""
+    ids: tuple[JsonValue, JsonValue] = (last.get("id"), piece.get("id"))
+    same_id: bool = not (ids[0] and ids[1]) or ids[0] == ids[1]
+    return last.get("type") == piece.get("type") and last.get("index") == piece.get("index") and same_id
+
+
 def merge_details(kept: tuple[JsonObject, ...], pieces: Sequence[JsonObject]) -> tuple[JsonObject, ...]:
-    """Streamed reasoning details joined into whole ones, as a reply that is not streamed holds them: a piece of the same
-    type and index as the last detail adds its text (``text``, ``summary``, ``data``) to that detail, and its other
-    fields that say something (a signature, an id) replace the last one's; any other piece starts a new detail."""
+    """Streamed reasoning details joined into whole ones, as a reply that is not streamed holds them: a piece that goes
+    on with the last detail (the same type and index, no other id) adds its text (``text``, ``summary``, ``data``) to
+    it, and its other fields that say something (a signature, an id) replace the last one's; any other piece starts a
+    new detail."""
     merged: list[JsonObject] = list(kept)
     for piece in pieces:
         last: JsonObject | None = merged[-1] if merged else None
-        if last is None or last.get("type") != piece.get("type") or last.get("index") != piece.get("index"):
+        if last is None or not _continues(last, piece):
             merged.append(dict(piece))
             continue
         joined: JsonObject = dict(last)
@@ -266,7 +276,7 @@ def _fold_call(calls: tuple[PartialCall, ...], entry: JsonObject) -> tuple[Parti
 
 
 def fold_chat_event(
-    state: ChatState, event: SseEvent, context: JsonObject, classify: StatusClassifier
+    state: ChatState, event: SseEvent, context: JsonObject, classify: StatusClassifier, options: ChatOptions
 ) -> tuple[ChatState, tuple[StreamDelta, ...]]:
     """Fold one SSE chunk into the state; zero-choice chunks (usage only) are normal."""
     if event.data.strip() == "[DONE]":
@@ -281,7 +291,7 @@ def fold_chat_event(
     deltas: list[StreamDelta] = []
     text: str = state.text
     thinking: str = state.thinking
-    pieces: list[JsonObject] = get_objects(delta, "reasoning_details")
+    pieces: list[JsonObject] = get_objects(delta, "reasoning_details") if options.replay_details else []
     # The words of the thinking come once: as a string where the server sends one, else from the details.
     reasoning: str = get_str(delta, "reasoning_content") or get_str(delta, "reasoning") or _detail_words(pieces)
     if reasoning:
@@ -347,10 +357,11 @@ def chat_reply(state: ChatState) -> ModelReply:
     )
 
 
-def chat_codec(classify: StatusClassifier) -> StreamCodec[ChatState]:
+def chat_codec(classify: StatusClassifier, options: ChatOptions) -> StreamCodec[ChatState]:
+    """The stream codec of a server that fills in the format as ``options`` say (the body's options)."""
     return StreamCodec(
         initial=initial_chat_state,
-        fold=lambda state, event, context: fold_chat_event(state, event, context, classify),
+        fold=lambda state, event, context: fold_chat_event(state, event, context, classify, options),
         is_final=lambda state: state.done,
         accepts_eof=lambda state: state.finish != "",
         to_reply=chat_reply,

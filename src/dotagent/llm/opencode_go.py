@@ -310,7 +310,7 @@ class OpenCodeGoProvider:
         match route:
             case "chat":
                 chat_body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS, origin)
-                return await self._stream(route, chat_body, chat_codec(classify_opencode), request, sink)
+                return await self._stream(route, chat_body, chat_codec(classify_opencode, _CHAT_OPTIONS), request, sink)
             case "responses":
                 options: ResponsesOptions = _OPENAI_RESPONSES if request.model.startswith("gpt-") else _OTHER_RESPONSES
                 responses_body: JsonObject = build_responses_body(request, traits, origin, options)

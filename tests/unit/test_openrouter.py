@@ -1,11 +1,17 @@
-"""OpenRouter (item 349): what its list of models says each model can do, how streamed reasoning details join into
-whole ones, and what a request asks: the reasoning level as OpenRouter's ``reasoning`` object, and the details of an
-assistant turn sent back only to the model that gave them."""
+"""OpenRouter (item 349): what its list of models says each model can do (a variant of a model too), how streamed
+reasoning details join into whole ones and that only a codec that sends them back keeps them, what a request asks (the
+reasoning level as OpenRouter's ``reasoning`` object, and the details of an assistant turn sent back only to the model
+that gave them), and that an answer not shaped as OpenRouter documents it is a protocol error."""
 
+import pytest
+
+from dotagent.core.errors import ProviderProtocolError
+from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.types import JsonObject
-from dotagent.llm.codec_chat import ChatOptions, build_chat_body, merge_details
-from dotagent.llm.openrouter import listed_model, parse_key, writes_text
-from dotagent.llm.provider_errors import WireError, status_for_stream_error
+from dotagent.llm.codec_chat import ChatOptions, build_chat_body, fold_chat_event, initial_chat_state, merge_details
+from dotagent.llm.http import SseEvent
+from dotagent.llm.openrouter import catalog_of, listed_for, listed_model, model_info_of, parse_key, writes_text
+from dotagent.llm.provider_errors import WireError, classify_generic, status_for_stream_error
 from dotagent.llm.types import (
     ChatRequest,
     Effort,
@@ -125,6 +131,31 @@ def test_streamed_details_join_into_whole_ones() -> None:
         },
         {"type": "reasoning.encrypted", "data": "abcdef", "index": 1},
     )
+    # A piece with another detail's id starts a detail of its own, even at the same index.
+    first: JsonObject = {"type": "reasoning.encrypted", "id": "rs_1", "data": "a", "index": 0}
+    second: JsonObject = {"type": "reasoning.encrypted", "id": "rs_2", "data": "b", "index": 0}
+    assert merge_details((first,), [second]) == (first, second)
+
+
+def test_only_a_codec_that_sends_details_back_keeps_them() -> None:
+    piece: JsonObject = {"type": "reasoning.text", "text": "Plan.", "index": 0}
+    chunk: SseEvent = SseEvent(
+        event=None,
+        data=dumps_compact({"choices": [{"index": 0, "delta": {"reasoning_details": [piece]}, "finish_reason": None}]}),
+    )
+    without: ChatOptions = _OPTIONS.model_copy(update={"replay_details": False})
+    kept, _ = fold_chat_event(initial_chat_state("m"), chunk, {}, classify_generic, _OPTIONS)
+    left, _ = fold_chat_event(initial_chat_state("m"), chunk, {}, classify_generic, without)
+    assert (kept.thinking, kept.details) == ("Plan.", (piece,))
+    assert (left.thinking, left.details) == ("", ())
+
+
+def test_a_variant_of_a_listed_model_can_do_what_the_model_can() -> None:
+    claude = listed_model(_CLAUDE)
+    catalog = {"anthropic/claude-sonnet-5.5": claude}
+    assert listed_for(catalog, "anthropic/claude-sonnet-5.5:nitro") == claude
+    assert listed_for(catalog, "anthropic/claude-opus-5.5") is None
+    assert model_info_of("anthropic/claude-sonnet-5.5:free", claude).free
 
 
 def test_the_details_of_a_turn_go_back_only_to_the_model_that_gave_them() -> None:
@@ -153,6 +184,15 @@ def test_a_status_as_an_error_code_is_that_status_and_the_key_reads_its_limits()
     assert status_for_stream_error(WireError(kind="", code="12", message="odd", limit_name="")) == 500
     status = parse_key({"data": {"usage": 1.25, "limit": None, "is_free_tier": True}})
     assert (status.usage, status.limit, status.free_tier) == (1.25, None, True)
+
+
+def test_an_answer_not_shaped_as_documented_is_a_protocol_error() -> None:
+    for listing in ({"error": {"message": "busy"}}, {"data": []}, {"data": {"id": "x"}}):
+        with pytest.raises(ProviderProtocolError):
+            catalog_of(listing)
+    for payload in ({}, {"data": None}, {"data": {"limit": 5}}, {"data": {"usage": "1.5"}}):
+        with pytest.raises(ProviderProtocolError):
+            parse_key(payload)
 
 
 def _assistant(body: JsonObject) -> JsonObject:

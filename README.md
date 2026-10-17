@@ -7,8 +7,8 @@ and sub-agents.
 
 It runs on models from **Ollama** (local models, and cloud models through the local Ollama server), the **OpenAI** API,
 **OpenCode Go**, the **Anthropic** API (the Claude models), **OpenRouter** (the models of many labs on one key) or
-**OpenCode Zen**'s free models. A daemon on the Mac serves a web UI and a REST API and runs the schedules, and `dotx run`
-and `dotx chat` work in the terminal. Dot runs on macOS only.
+**OpenCode Zen**'s free models. A daemon on the Mac serves a web UI and a REST API and runs the schedules, and
+`dotx run` and `dotx chat` work in the terminal. Dot runs on macOS only.
 
 By default Dot acts without asking. It stops for what it must not decide alone (money, credentials, public posts,
 messages sent for you, privilege, system settings), everything it does is recorded, and it can be stopped at once. Read

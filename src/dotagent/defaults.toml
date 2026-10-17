@@ -37,8 +37,8 @@ reach = []
 retention_days = 90
 
 [models]
-# "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter and opencode (Zen's free models,
-# which run as OpenCode's own agent: [providers.opencode]).
+# "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter and opencode (Zen's free
+# models, which run as OpenCode's own agent: [providers.opencode]).
 # A run uses the model it was started with (main unless one is chosen) for every step, until it moves to a standby
 # model (below); the roles below are only used for what their comments say.
 main = "ollama:minimax-m2.7:cloud"

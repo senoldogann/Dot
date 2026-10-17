@@ -105,6 +105,7 @@ answer keeps its words, Ollama's too.
   from OpenRouter's own list of its models, read when a model is first asked about and kept for `[providers.openrouter]
   models_ttl_s` (an hour): whether it reads images and calls tools (the model picker offers only those that do), its
   context and output limits, whether it takes a temperature, and its reasoning levels, the ones OpenRouter lists for it.
+  A variant OpenRouter does not list (`:nitro`, `:floor` or `:online` after the id) can do what its model can.
   A model whose reasoning is a switch offers On and Off, and one that always reasons and names no levels offers none.
   The level goes as OpenRouter's `reasoning` object; a step's reasoning details go back to the same model on its next
   step, unchanged, as OpenRouter asks beside tool calls, so a model that thinks keeps its thread across a run's tool

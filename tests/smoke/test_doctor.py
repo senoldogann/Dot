@@ -30,6 +30,7 @@ FIRST_MACOS_WITH_RECT_CAPTURE: tuple[int, int] = (15, 2)
 UNSET_SECRET: str = "DOT_TEST_SURELY_UNSET_SECRET"
 OPENAI_KEY_ENV: str = "DOT_TEST_DOCTOR_OPENAI_KEY"
 GO_KEY_ENV: str = "DOT_TEST_DOCTOR_GO_KEY"
+OPENROUTER_KEY_ENV: str = "DOT_TEST_DOCTOR_OPENROUTER_KEY"
 # The models the stand-in service lists as OpenAI's.
 SERVED: tuple[str, ...] = ("gpt-5.5", "gpt-5.5-mini")
 
@@ -180,6 +181,46 @@ async def test_a_model_its_provider_does_not_serve_fails_and_one_whose_list_was_
     assert (rows["helpers"].ok, rows["helpers"].required) == (True, False)
     assert rows["helpers"].detail == f"{main.detail}; openai:gpt-5.5 ready"
     assert (rows["standby"].ok, rows["standby"].required, rows["standby"].detail) == (False, False, review.detail)
+
+
+def _openrouter_config(root: str, model: str) -> str:
+    """Every role on one OpenRouter model, whose service is the stand-in at ``root``: it has no OpenRouter routes, so
+    the list of OpenRouter's models and its key both answer 404. Every other key is one no source has."""
+    roles: str = "".join(f'{role} = "{model}"\n' for role in ("main", "vision", "fast", "review"))
+    return (
+        f"[models]\n{roles}\n"
+        f'[providers.ollama]\nbase_url = "{root}"\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.openai]\napi_key_env = "{UNSET_SECRET}"\norganization_env = "{UNSET_SECRET}"\n'
+        f'project_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.opencode_go]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.anthropic]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        f'[providers.openrouter]\nbase_url = "{root}/openrouter"\napi_key_env = "{OPENROUTER_KEY_ENV}"\n\n'
+        f'[judge]\napi_key_env = "{UNSET_SECRET}"\n\n'
+        "[memory]\nembed_enabled = false\n"
+    )
+
+
+async def test_an_openrouter_model_whose_list_was_not_read_warns_and_is_not_asked_about(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Item 349: OpenRouter's connector knows a model from the list of its models, so a model whose list could not be
+    read is the warning beside the provider's row, not a failure of its own from reading that list again."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    monkeypatch.setenv(OPENROUTER_KEY_ENV, "sk-or-test-doctor")
+    monkeypatch.delenv(UNSET_SECRET, raising=False)
+    model: str = "openrouter:lab/agent-model"
+    with _model_service() as root:
+        (tmp_path / "config.toml").write_text(_openrouter_config(root, model), encoding="utf-8")
+        rows: dict[str, CheckResult] = {
+            row.name: row for row in await _service_checks(load_config(tmp_path / "config.toml"))
+        }
+    assert (rows["openrouter api"].ok, rows["openrouter api"].required) == (False, True)
+    main: CheckResult = rows["model main"]
+    assert (main.ok, main.required) == (False, False)
+    assert main.detail.startswith(
+        f"{model}: not checked, as the list of the models openrouter serves could not be read (provider answered "
+        "HTTP 404"
+    )
 
 
 def _closed_port() -> int:

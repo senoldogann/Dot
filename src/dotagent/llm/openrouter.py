@@ -4,18 +4,22 @@ What a model can do is read from OpenRouter's own list of its models (``GET /mod
 whether it reads images and calls tools, its context and output limits, its reasoning levels or its reasoning switch,
 and whether it takes a temperature. The level goes as OpenRouter's ``reasoning`` object, and an assistant turn carries
 the ``reasoning_details`` it came with back to the same model, unchanged, as OpenRouter asks beside tool calls. A model
-whose id ends in ``:free``, or whose prices are both zero, is free. ``GET /key`` tells what the key has spent and may
-spend, and costs nothing.
+whose id ends in ``:free``, or whose prices are both zero, is free. A variant of a listed model (``:nitro``, ``:floor``,
+``:online``, which choose how OpenRouter routes it and are not listed themselves) can do what the model can.
+``GET /key`` tells what the key has spent and may spend, and costs nothing. An answer of either that is not shaped as
+OpenRouter documents it is a :class:`ProviderProtocolError`, not an empty list or nothing spent.
 """
 
 import asyncio
 import time
+from collections.abc import Mapping
 
 import httpx
 from pydantic import JsonValue
 
 from dotagent import __version__
 from dotagent.config import OpenRouterConfig
+from dotagent.core.errors import ProviderProtocolError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.retry import RetryPolicy
 from dotagent.core.types import FrozenModel, JsonObject
@@ -25,7 +29,7 @@ from dotagent.llm.http import build_client, request_context
 from dotagent.llm.provider_errors import classify_generic
 from dotagent.llm.traits import ModelTraits, info_from_traits, is_known_label
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
-from dotagent.llm.wire import get_float, get_int, get_list, get_obj, get_objects, get_str
+from dotagent.llm.wire import get_float, get_int, get_list, get_obj, get_str
 
 # OpenRouter takes ``max_tokens``, sends the usage with the last chunk unasked, reads the level as its ``reasoning``
 # object and wants the reasoning details of a turn back beside its tool calls.
@@ -112,13 +116,52 @@ def listed_model(entry: JsonObject) -> ListedModel:
     )
 
 
+def catalog_of(listing: JsonObject) -> dict[str, ListedModel]:
+    """``GET /models``'s answer as Dot keeps it: the models that answer in text, by id. An answer without a list of
+    models in ``data`` is not one."""
+    entries: JsonValue = listing.get("data")
+    if not isinstance(entries, list) or not entries:
+        raise ProviderProtocolError(
+            "OpenRouter's list of models came without models",
+            {"keys": ", ".join(sorted(listing)), "data": str(entries)[:200]},
+        )
+    return {
+        get_str(entry, "id"): listed_model(entry)
+        for entry in entries
+        if isinstance(entry, dict) and get_str(entry, "id") and writes_text(entry)
+    }
+
+
+def listed_for(catalog: Mapping[str, ListedModel], model: str) -> ListedModel | None:
+    """What the list says of ``model``, or of the listed model a variant id (``model:nitro``) routes to."""
+    found: ListedModel | None = catalog.get(model)
+    if found is not None:
+        return found
+    base, colon, _ = model.rpartition(":")
+    return catalog.get(base) if colon else None
+
+
 def model_info_of(model: str, listed: ListedModel) -> ModelInfo:
-    return info_from_traits(model, listed.traits, listed.free).model_copy(update={"tools": listed.tools})
+    free: bool = listed.free or model.endswith(_FREE_SUFFIX)
+    return info_from_traits(model, listed.traits, free).model_copy(update={"tools": listed.tools})
+
+
+def _number(value: JsonValue) -> bool:
+    return isinstance(value, int | float) and not isinstance(value, bool)
 
 
 def parse_key(payload: JsonObject) -> KeyStatus:
-    """``GET /key``'s answer: ``data.usage``, ``data.limit`` (``null`` for no limit) and ``data.is_free_tier``."""
-    data: JsonObject = get_obj(payload, "data")
+    """``GET /key``'s answer: ``data.usage``, ``data.limit`` (``null`` for no limit) and ``data.is_free_tier``. One
+    without the credits spent as a number is not that answer."""
+    data: JsonValue = payload.get("data")
+    if not isinstance(data, dict) or not _number(data.get("usage")):
+        raise ProviderProtocolError(
+            "OpenRouter's answer about the key does not say what it has spent",
+            {
+                "keys": ", ".join(sorted(payload)),
+                "data_keys": ", ".join(sorted(data)) if isinstance(data, dict) else "",
+            },
+        )
     limit: JsonValue = data.get("limit")
     return KeyStatus(
         usage=get_float(data, "usage"),
@@ -165,20 +208,16 @@ class OpenRouterProvider:
                     self._policy,
                     "openrouter.models",
                 )
-                self._listed = {
-                    get_str(entry, "id"): listed_model(entry)
-                    for entry in get_objects(listed, "data")
-                    if get_str(entry, "id") and writes_text(entry)
-                }
+                self._listed = catalog_of(listed)
                 self._listed_at = now
             return self._listed
 
     async def _traits(self, model: str) -> ModelTraits:
-        found: ListedModel | None = (await self._catalog()).get(model)
+        found: ListedModel | None = listed_for(await self._catalog(), model)
         return _UNLISTED if found is None else found.traits
 
     async def model_info(self, model: str) -> ModelInfo:
-        found: ListedModel | None = (await self._catalog()).get(model)
+        found: ListedModel | None = listed_for(await self._catalog(), model)
         if found is None:
             return info_from_traits(model, _UNLISTED, model.endswith(_FREE_SUFFIX))
         return model_info_of(model, found)
@@ -200,7 +239,7 @@ class OpenRouterProvider:
         url: str = self._url("/chat/completions")
         payload: str = dumps_compact(body)
         context: JsonObject = request_context(url, body)
-        codec = chat_codec(classify_generic)
+        codec = chat_codec(classify_generic, _CHAT_OPTIONS)
 
         async def attempt() -> ModelReply:
             return await stream_model_reply(

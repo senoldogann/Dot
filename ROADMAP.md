@@ -13963,15 +13963,20 @@ What a model can do comes from OpenRouter's own list of its models (`GET /models
 it takes a temperature, its reasoning levels (`reasoning.supported_efforts`; read on 2026-10-17: 470 models, 399 with
 tools, 341 that reason), or a switch for one whose reasoning is not mandatory and names no levels. The level goes as
 OpenRouter's `reasoning` object; the reasoning details OpenRouter streams in pieces are joined into whole ones
-(`codec_chat.merge_details`, by type and index), shown as the model's thinking when it sends no string, and sent back
-on the same model's next step beside its tool calls (`ChatOptions.replay_details`), as OpenRouter asks. An error code
-inside a stream that is a status (OpenRouter's `402` for credits that ran out) is that status. A model whose id ends in
-`:free`, or whose prices are both zero, is free. No `HTTP-Referer` or title header is sent. Tests:
-`tests/unit/test_openrouter.py` (the list's traits, the joined details, the `reasoning` object, the details sent back
-only to the model that gave them, the status of a numeric code) and `tests/smoke/test_openrouter.py` (a run through the
-real loop against a stand-in for OpenRouter's API on this Mac: the Bearer key, the level, a tool call, the details of
-the first step back on the second; the listing, the key's page, credits that ran out inside a stream and a refused key).
-Docs: `docs/models.md`, the README.
+(`codec_chat.merge_details`, by type, index and id), shown as the model's thinking when it sends no string, and sent
+back on the same model's next step beside its tool calls (`ChatOptions.replay_details`), as OpenRouter asks; the chat
+routes of OpenAI and OpenCode Go do not read them. An error code inside a stream that is a status (OpenRouter's `402`
+for credits that ran out) is that status. A model whose id ends in `:free`, or whose prices are both zero, is free; a
+variant OpenRouter does not list (`:nitro`, `:floor`, `:online`) has its model's traits. A list of models or a key's
+page not shaped as OpenRouter documents it is a `ProviderProtocolError`, and `dotx doctor` checks a configured model
+against the list before asking about it, so a list that could not be read is the warning beside the provider's row. No
+`HTTP-Referer` or title header is sent. Tests: `tests/unit/test_openrouter.py` (the list's traits, a variant, the
+joined details, that only a codec that sends them back keeps them, the `reasoning` object, the details sent back only
+to the model that gave them, the status of a numeric code, answers of the wrong shape), `tests/smoke/test_openrouter.py`
+(a run through the real loop against a stand-in for OpenRouter's API on this Mac: the Bearer key, the level, a tool
+call, the details of the first step back on the second; the listing, the key's page, credits that ran out inside a
+stream and a refused key) and `tests/smoke/test_doctor.py` (a model whose list could not be read warns). Docs:
+`docs/models.md`, `docs/safety.md`, `docs/command-line.md`, `docs/development.md`, `.env.example`, the README.
 
 ## Log
 

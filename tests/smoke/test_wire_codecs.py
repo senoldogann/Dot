@@ -67,6 +67,15 @@ GO_MESSAGES: MessagesOptions = MessagesOptions(
 CLAUDE_MESSAGES: MessagesOptions = MessagesOptions(
     adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None
 )
+# What OpenCode Go's chat route sends: ``max_tokens``, the thinking of a turn carried back as ``reasoning_content``.
+GO_CHAT: ChatOptions = ChatOptions(
+    max_tokens_field="max_tokens",
+    request_usage=False,
+    replay_reasoning=True,
+    cache_key_in_body=False,
+    reasoning_object=False,
+    replay_details=False,
+)
 
 TEMPERATURE_TOOL: ToolSpec = ToolSpec(
     name="get_temperature",
@@ -158,7 +167,7 @@ def test_chat_stream_assembles_tool_call_and_usage_chunk_without_choices() -> No
         ),
         SseEvent(event=None, data="[DONE]"),
     ]
-    reply, deltas = replay(chat_codec(classify_opencode), "m", events)
+    reply, deltas = replay(chat_codec(classify_opencode, GO_CHAT), "m", events)
     assert reply.text == "Checking."
     assert reply.thinking == "weigh "
     assert [(call.id, call.name, call.arguments) for call in reply.tool_calls] == [
@@ -304,7 +313,7 @@ def test_messages_stream_with_thinking_signature_and_tool_use() -> None:
 
 
 def test_stream_error_frame_without_http_error_is_raised() -> None:
-    codec = chat_codec(classify_opencode)
+    codec = chat_codec(classify_opencode, GO_CHAT)
     frame = sse(
         {
             "type": "error",
