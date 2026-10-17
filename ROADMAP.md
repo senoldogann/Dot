@@ -5288,7 +5288,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | done        | 3dedca5 |
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 | 357 | Lines of at most 120 characters, held by `ruff check`                                  | done        | 4ebf951 |
-| 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | in progress |         |
+| 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | done        | 177b005 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14231,8 +14231,8 @@ taken out. `pyproject.toml` no longer ignores E501, so `ruff check` holds every 
 
 ### 358. Settings › Browser: the zoom Dot's own Chrome draws pages at
 
-**Status: in progress.** The owner's choice of 2026-10-18, among the rows of T3 Code's Settings › Browser that item 354
-left out: the default zoom. **As built (2026-10-18).** `[browser] zoom` (percent, 25 to 500, 100 by default) is how
+**Status: done (`177b005`).** The owner's choice of 2026-10-18, among the rows of T3 Code's Settings › Browser that item
+354 left out: the default zoom. **As built (2026-10-18).** `[browser] zoom` (percent, 25 to 500, 100 by default) is how
 large Dot's own Chrome draws pages: `browser/profiles.py` writes it as Chrome's default zoom
 (`partition.default_zoom_level`, the level whose power of 1.2 is the factor, as Chrome's own settings page writes it)
 into the preferences of the profile in use before Chrome starts on it, the other preferences kept. Settings › Browser ›
