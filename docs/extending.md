@@ -85,8 +85,8 @@ headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; header
 `dotx mcp list` starts every configured server and shows its tools, or why it does not start. Only tools are used (no
 resources, prompts or sampling). A server at a URL may sign in as MCP's authorization asks (OAuth): `oauth = true` has
 Dot send the token it keeps for it, which **Sign in again** on [Customize › Plugins](#customize--plugins) gets, and the servers added
-there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on Connect
-apps, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on the Plugins
+page, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
 or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
 nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System names it

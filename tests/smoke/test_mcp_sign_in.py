@@ -458,6 +458,14 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await page.locator(".connect-add").get_by_role("button", name="Add").click()
             signed: Locator = _server_row(page, "signed")
             await expect(signed.locator(".badge")).to_have_text("Waiting for your sign-in")
+            # The page asks every 2 s how the server stands; a field being typed in keeps its focus and its words
+            # (review A3: each asking drew the page anew and took the focus away).
+            typing: Locator = page.get_by_label("Server name")
+            await typing.fill("typing")
+            await page.wait_for_timeout(2600)
+            await expect(typing).to_be_focused()
+            await expect(typing).to_have_value("typing")
+            await typing.fill("")
             async with page.context.expect_page() as opened:
                 await signed.get_by_role("link", name="Open the sign-in page").click()
             sign_in: Page = await opened.value

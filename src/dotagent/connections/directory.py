@@ -505,7 +505,12 @@ _MCP_SIGNS_IN: str = (
 )
 _MCP_OPEN: str = "Its own MCP server, open to all: there is nothing to sign in to."
 _MAC_HOW: str = "Dot drives it with AppleScript once macOS lets it (Privacy & Security › Automation)."
-_MAC_DATA: str = "It stays on this Mac; Dot asks the application through macOS."
+_MAC_DATA: str = (
+    "Dot reads and acts in it through macOS on this Mac; what a run reads there goes to the run's model, as every "
+    "tool's result does."
+)
+# Said of every way's data: a tool's result is part of what the model of the run is sent (docs/safety.md).
+_TO_MODEL: str = "what a run reads there goes to the run's model."
 _WEB_HOW: str = "Dot works in it in its own browser, once you have signed in there."
 _FOLDER_HOW: str = "Dot reads and writes the files it keeps in sync in a folder of this Mac."
 
@@ -522,7 +527,7 @@ def _way_view(way: PluginWay) -> PluginWayView:
         if service is None:
             raise LookupError(f"the MCP catalogue has no service {way.ref}")
         host: str = urlsplit(service.url).hostname or service.url
-        data: str = f"Between Dot and {host}, the service's own server."
+        data: str = f"Between Dot and {host}, the service's own server; {_TO_MODEL}"
         if service.signs_in:
             data += " Dot keeps your sign-in in its home."
         how: str = _MCP_SIGNS_IN if service.signs_in else _MCP_OPEN
@@ -536,12 +541,13 @@ def _way_view(way: PluginWay) -> PluginWayView:
         folder = next((one for one in FOLDER_APPS if one.id == way.ref), None)
         if folder is None:
             raise LookupError(f"the folders' catalogue has no application {way.ref}")
-        data = f"It stays in a folder of this Mac, which {folder.name} syncs with its cloud."
+        data = f"The files stay in a folder of this Mac, which {folder.name} syncs with its cloud; {_TO_MODEL}"
         return PluginWayView(kind="folder", ref=folder.id, how=_FOLDER_HOW, data=data, does=folder.does)
     web = next((one for one in WEB_APPS if one.id == way.ref), None)
     if web is None:
         raise LookupError(f"the web's catalogue has no application {way.ref}")
-    data = f"Between Dot's browser on this Mac and {', '.join(web.domains)}."
+    signs_in_at: str = urlsplit(web.sign_in).hostname or web.sign_in
+    data = f"Between Dot's browser on this Mac and the service's sites (you sign in at {signs_in_at}); {_TO_MODEL}"
     return PluginWayView(kind="web", ref=web.id, how=_WEB_HOW, data=data, does=web.does)
 
 

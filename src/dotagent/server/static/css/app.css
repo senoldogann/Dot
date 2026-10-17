@@ -1573,6 +1573,7 @@ a.pill:hover {
 .plugin-main,
 .skill-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   flex: 1 1 auto;
   gap: var(--space-half);
   min-width: 0;
@@ -1586,20 +1587,34 @@ a.pill:hover {
   text-decoration: none;
 }
 
-.plugin-tile .plugin-name::after {
+.plugin-tile a.plugin-name::after {
   content: "";
   position: absolute;
   inset: 0;
-  border-radius: inherit;
+  border-radius: var(--radius);
 }
 
-.plugin-tile .plugin-name:focus-visible {
+.plugin-tile a.plugin-name:focus-visible {
   outline: 0;
 }
 
-.plugin-tile .plugin-name:focus-visible::after {
+.plugin-tile a.plugin-name:focus-visible::after {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
+}
+
+/* A server that is no service has no page of its own: its tile is no link, its address shows whole, and its buttons
+   go under its words when they do not fit beside them. */
+.plugin-tile.plugin-server {
+  flex-wrap: wrap;
+}
+
+.plugin-server > .plugin-main {
+  flex: 1 1 200px;
+}
+
+.plugin-server > .plugin-actions {
+  margin-left: auto;
 }
 
 .plugin-tile .plugin-add,
@@ -1638,10 +1653,24 @@ a.pill:hover {
 .plugin-guide {
   color: var(--text-2);
   font-size: var(--text-sm);
+  overflow-wrap: anywhere;
 }
 
 .plugin-address {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
   word-break: break-all;
+}
+
+/* A chip of a card keeps to the card's width, cut short with an ellipsis (a learned skill's kind runs to 60
+   characters). */
+.plugin-meta > .chip,
+.skill-chips > .chip {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .plugin-actions,
@@ -1739,6 +1768,8 @@ a.pill:hover {
 }
 
 .plugin-tools li {
+  max-width: 100%;
+  overflow-wrap: anywhere;
   padding: var(--space-half) var(--space-2);
   border-radius: var(--radius-control);
   background: var(--surface-3);
@@ -1790,6 +1821,7 @@ a.pill:hover {
 }
 
 .skill-facts {
+  overflow-wrap: anywhere;
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
@@ -1845,6 +1877,11 @@ a.pill:hover {
 .chat-skill-goal {
   min-width: 0;
   overflow-wrap: anywhere;
+}
+
+.chat-skill-problem {
+  margin: 0;
+  color: var(--bad);
 }
 
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {

@@ -145,6 +145,9 @@ export function mount(root, ctx) {
   let polling = null;
   let shown = "all";
   let words = "";
+  // The steps under way, by what they act on (`app:<id>`, `mcp:<service or name>`, `server:<name>`): their buttons stay
+  // off while the page paints again, and an application's says that macOS asks.
+  const busy = new Set();
   const holder = el("div", { class: "stack" }, loadingPanel());
 
   /** Where `way` stands now: its application of `GET /connections`, or its server and service of `GET /mcp/servers`. */
@@ -184,7 +187,7 @@ export function mount(root, ctx) {
           if (now.service !== null && now.service.added) {
             continue;
           }
-          return { label: "Add", take: (button) => add({ service: way.ref, name: null, address: null }, button) };
+          return { label: "Add", key: `mcp:${way.ref}`, take: () => add({ service: way.ref, name: null, address: null }) };
         }
         if (now.server.state === "signing_in" && now.server.link !== null) {
           return { label: "Sign in", link: now.server.link };
@@ -194,12 +197,13 @@ export function mount(root, ctx) {
         }
         if (now.server.state === "left_out" && now.server.origin === "connected") {
           const server = now.server;
-          return { label: server.signs_in ? "Sign in again" : "Try again", take: (button) => connectAgain(server, button) };
+          return { label: server.signs_in ? "Sign in again" : "Try again", key: `server:${server.name}`, take: () => connectAgain(server) };
         }
         continue;
       }
       if (now.app !== undefined && now.app !== null && now.app.step !== null) {
-        return { label: STEP_LABELS[now.app.step], take: (button) => takeStep(now.app, button) };
+        const app = now.app;
+        return { label: STEP_LABELS[app.step], key: `app:${app.id}`, take: () => takeStep(app) };
       }
     }
     return null;
@@ -251,11 +255,18 @@ export function mount(root, ctx) {
     } else if (step !== null) {
       action = el(
         "button",
-        { class: "btn sm icon-only plugin-add", type: "button", title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` },
+        {
+          class: "btn sm icon-only plugin-add",
+          type: "button",
+          title: `${step.label}: ${plugin.name}`,
+          "aria-label": `${step.label} ${plugin.name}`,
+          disabled: busy.has(step.key),
+        },
         icon("plus"),
       );
-      action.addEventListener("click", () => attempt(() => step.take(action)));
+      action.addEventListener("click", () => attempt(step.take));
     }
+    const asking = plugin.ways.some((way) => way.kind === "mac" && busy.has(`app:${way.ref}`));
     return el(
       "div",
       { class: "plugin-tile", dataset: { plugin: plugin.id, connected: String(isConnected), tried: String(plugin.tried) } },
@@ -265,7 +276,7 @@ export function mount(root, ctx) {
         { class: "plugin-main" },
         el("a", { class: "plugin-name", href: `#/customize/plugins/${plugin.id}` }, plugin.name),
         el("div", { class: "plugin-does" }, plugin.does),
-        el("div", { class: "plugin-meta" }, howChip(plugin), standing(plugin)),
+        el("div", { class: "plugin-meta" }, howChip(plugin), asking ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : standing(plugin)),
       ),
       action,
     );
@@ -281,7 +292,7 @@ export function mount(root, ctx) {
         "div",
         { class: "plugin-main" },
         el("span", { class: "plugin-name" }, server.name),
-        el("div", { class: "plugin-does mono plugin-address" }, server.address),
+        el("div", { class: "mono plugin-address" }, server.address),
         server.tools.length === 0 ? null : el("div", { class: "plugin-does" }, toolLine(server.tools)),
         server.origin in MCP_ORIGIN_WORDS ? el("div", { class: "plugin-does" }, MCP_ORIGIN_WORDS[server.origin]) : null,
         el("div", { class: "plugin-meta" }, el("span", { class: "chip" }, "MCP"), el("span", { class: `badge ${MCP_STATE_TONES[server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[server.state] ?? server.state)),
@@ -294,19 +305,20 @@ export function mount(root, ctx) {
   /** The buttons of an MCP server: its sign-in page while Dot waits for one, Sign in again or Try again, and Remove for
    * one added here; null when it has none. */
   function serverActions(server, service) {
-    const busy = server.state === "trying" || server.state === "signing_in";
+    const working = server.state === "trying" || server.state === "signing_in";
     const actions = [];
     if (server.state === "signing_in" && server.link !== null) {
       actions.push(el("a", { class: "btn sm primary", href: server.link, target: "_blank", rel: "noopener noreferrer" }, icon("external"), "Open the sign-in page"));
     }
     const again = server.origin === "connected" || (server.origin === "config" && server.signs_in);
-    if (again && !busy && (server.signs_in || server.state === "left_out")) {
-      const button = el("button", { class: "btn sm", type: "button" }, server.signs_in ? "Sign in again" : "Try again");
-      button.addEventListener("click", () => attempt(() => connectAgain(server, button)));
+    const acting = busy.has(`server:${server.name}`);
+    if (again && !working && (server.signs_in || server.state === "left_out")) {
+      const button = el("button", { class: "btn sm", type: "button", disabled: acting }, server.signs_in ? "Sign in again" : "Try again");
+      button.addEventListener("click", () => attempt(() => connectAgain(server)));
       actions.push(button);
     }
     if (server.origin === "connected") {
-      actions.push(el("button", { class: "btn sm", type: "button", onclick: () => attempt(() => remove(server, service)) }, "Remove"));
+      actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => remove(server, service)) }, "Remove"));
     }
     return actions.length === 0 ? null : el("div", { class: "plugin-actions" }, ...actions);
   }
@@ -325,7 +337,12 @@ export function mount(root, ctx) {
     const button = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Add");
     button.addEventListener("click", () =>
       attempt(async () => {
-        await add({ service: null, name: name.value.trim(), address: address.value.trim() }, button);
+        button.disabled = true;
+        try {
+          await add({ service: null, name: name.value.trim(), address: address.value.trim() });
+        } finally {
+          button.disabled = false;
+        }
         name.value = "";
         address.value = "";
       }),
@@ -339,37 +356,39 @@ export function mount(root, ctx) {
     );
   }
 
-  async function takeStep(app, button) {
-    button.disabled = true;
+  /** Do `work` with `key` busy: the page paints as it starts and once it is done. */
+  async function busyWith(key, work) {
+    busy.add(key);
+    paint();
     try {
+      await work();
+    } finally {
+      busy.delete(key);
+      paint();
+    }
+  }
+
+  function takeStep(app) {
+    return busyWith(`app:${app.id}`, async () => {
       const changed = await api.post(`/connections/${encodeURIComponent(app.id)}`, {});
       if (!disposed) {
         listing = { ...listing, apps: listing.apps.map((one) => (one.id === changed.id ? changed : one)) };
       }
-    } finally {
-      button.disabled = false;
-    }
-    paint();
+    });
   }
 
-  async function add(body, button) {
-    button.disabled = true;
-    try {
+  function add(body) {
+    return busyWith(`mcp:${body.service ?? body.name}`, async () => {
       await api.post("/mcp/servers", { ...body, origin: location.origin });
-    } finally {
-      button.disabled = false;
-    }
-    await refreshServers();
+      await refreshServers();
+    });
   }
 
-  async function connectAgain(server, button) {
-    button.disabled = true;
-    try {
+  function connectAgain(server) {
+    return busyWith(`server:${server.name}`, async () => {
       await api.post(`/mcp/servers/${encodeURIComponent(server.name)}/connect`, { origin: location.origin });
-    } finally {
-      button.disabled = false;
-    }
-    await refreshServers();
+      await refreshServers();
+    });
   }
 
   async function remove(server, service) {
@@ -382,17 +401,23 @@ export function mount(root, ctx) {
     if (!sure) {
       return;
     }
-    const changed = await api.del(`/mcp/servers/${encodeURIComponent(server.name)}`);
-    if (!disposed) {
-      servers = changed;
-      paint();
-    }
+    await busyWith(`server:${server.name}`, async () => {
+      const changed = await api.del(`/mcp/servers/${encodeURIComponent(server.name)}`);
+      if (!disposed) {
+        servers = changed;
+      }
+    });
   }
 
-  /** Ask again how the MCP servers stand, and keep asking while Dot tries one or waits for a sign-in. */
+  /** Ask again how the MCP servers stand, and keep asking while Dot tries one or waits for a sign-in. The page paints
+   * again only when they changed, so that a field being typed in, a tap and a step under way survive the asking. */
   async function refreshServers() {
     const found = await api.get("/mcp/servers");
     if (disposed) {
+      return;
+    }
+    if (JSON.stringify(found) === JSON.stringify(servers)) {
+      keepPolling();
       return;
     }
     servers = found;
@@ -509,8 +534,8 @@ export function mount(root, ctx) {
         badge = el("span", { class: "badge b-muted" }, "Name taken");
         guideLine = `A server of Dot's config or of a plugin is named ${way.ref} already: Connected lists it.`;
       } else if (now.server === null) {
-        const button = el("button", { class: "btn sm primary", type: "button" }, "Add");
-        button.addEventListener("click", () => attempt(() => add({ service: way.ref, name: null, address: null }, button)));
+        const button = el("button", { class: "btn sm primary", type: "button", disabled: busy.has(`mcp:${way.ref}`) }, "Add");
+        button.addEventListener("click", () => attempt(() => add({ service: way.ref, name: null, address: null })));
         actions = el("div", { class: "plugin-actions" }, button);
         badge = el("span", { class: "badge b-muted" }, now.service !== null && now.service.signs_in ? "Signs in" : "Open to all");
       } else {
@@ -523,8 +548,11 @@ export function mount(root, ctx) {
       badge = el("span", { class: `badge ${CONNECTED_STATES.has(app.state) ? "b-ok" : app.state === "refused" ? "b-bad" : "b-muted"}` }, STATE_WORDS[app.state] ?? app.state);
       guideLine = appGuide(app, listing.runner) ?? (way.kind === "web" && !CONNECTED_STATES.has(app.state) ? webNote(listing) : null);
       if (app.step !== null) {
-        const button = el("button", { class: app.step === "settings" ? "btn sm" : "btn sm primary", type: "button" }, STEP_LABELS[app.step]);
-        button.addEventListener("click", () => attempt(() => takeStep(app, button)));
+        // While macOS asks, the button says so, as Connect apps' did.
+        const asking = busy.has(`app:${app.id}`);
+        const label = asking && app.step === "ask" ? "Waiting for macOS…" : STEP_LABELS[app.step];
+        const button = el("button", { class: app.step === "settings" ? "btn sm" : "btn sm primary", type: "button", disabled: asking }, label);
+        button.addEventListener("click", () => attempt(() => takeStep(app)));
         actions = el("div", { class: "plugin-actions" }, button);
       }
     }

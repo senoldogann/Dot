@@ -189,6 +189,23 @@ class _Waiting(FrozenModel):
     link: str
 
 
+# The hosts of this Mac, where an authorization server of one's own may answer over plain http.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def checked_link(link: str) -> str:
+    """``link``, the authorization server's page the owner is sent to, once it is an https address, or an http one on
+    this Mac. The page opens it as a link, so anything else (``javascript:``, ``data:``, plain http to another host)
+    is refused with :class:`McpError`: the authorization server is the MCP server's, not Dot's."""
+    parts = urlparse(link)
+    if parts.scheme == "https" or (parts.scheme == "http" and parts.hostname in _LOOPBACK_HOSTS):
+        return link
+    raise McpError(
+        "the authorization server's page is not an https address",
+        {"scheme": parts.scheme, "host": parts.hostname or ""},
+    )
+
+
 def _state_of(link: str) -> str:
     states: list[str] = parse_qs(urlparse(link).query).get("state", [])
     if len(states) != 1 or states[0] == "":
@@ -218,7 +235,7 @@ class SignIns:
         pending: dict[str, str] = {}
 
         async def redirect(link: str) -> None:
-            state: str = _state_of(link)
+            state: str = _state_of(checked_link(link))
             self._codes[state] = asyncio.get_running_loop().create_future()
             self._waiting[state] = _Waiting(server=config.name, link=link)
             pending["state"] = state

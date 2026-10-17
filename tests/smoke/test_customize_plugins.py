@@ -52,6 +52,12 @@ _PHONE_PX: int = 860
 _DAY_S: float = 86_400.0
 # The program macOS holds responsible for Dot here: the service's app.
 _DOT_APP: Path = Path("/Users/someone/Library/Application Support/Dot/Dot.app")
+# How long macOS's question waits for the owner here.
+_ASK_S: float = 1.5
+# A server of the config whose command does not start: its long command and the reason it is left out.
+_LONG_COMMAND: str = "/opt/missing/tools/" + "nested-folder/" * 6 + "mcp-server-that-is-not-there"
+# The narrowest phone looked at.
+_SMALLEST_PX: int = 320
 
 
 class _Mac:
@@ -68,6 +74,8 @@ class _Mac:
 
     def ask(self, bundle_id: str) -> AutomationState:
         self.asked.append(bundle_id)
+        # macOS answers once the owner has: the page says meanwhile that it asks (review A6).
+        time.sleep(_ASK_S)
         self.states[bundle_id] = "allowed"
         return "allowed"
 
@@ -83,11 +91,14 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     """A runtime in a throw-away home whose browser has no window."""
     home: Path = tmp_path_factory.mktemp("home")
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n'
+        f'[[mcp]]\nname = "long-command"\ncommand = "{_LONG_COMMAND}"\nargs = ["--a-flag", "{"x" * 60}"]\n',
+        encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
+    patch.setenv("DOT_LOG_DIR", str(tmp_path_factory.mktemp("logs")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
     try:
         yield built
@@ -253,7 +264,9 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 await expect(way.locator(".badge")).to_have_text("Refused")
                 await expect(way.locator(".plugin-guide")).to_contain_text("Privacy & Security › Automation")
                 await expect(way.locator(".plugin-guide")).to_contain_text("open Dot and switch on Notes")
-                await expect(page.locator(".plugin-card[data-kind='data']")).to_contain_text("It stays on this Mac")
+                await expect(page.locator(".plugin-card[data-kind='data']")).to_contain_text(
+                    "through macOS on this Mac; what a run reads there goes to the run's model"
+                )
                 await expect(page.locator(".customize-body")).not_to_contain_text("null")
                 # On a phone the wide button goes under the text instead of squeezing it; on a wide page it sits beside.
                 settings: Locator = way.get_by_role("button", name="Open System Settings")
@@ -279,6 +292,8 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
             calendar: Locator = _tile(calendar_page, "calendar")
             await expect(calendar.locator(".badge")).to_have_text("Not asked yet")
             await calendar.get_by_role("button", name="Allow Calendar").click()
+            await expect(calendar.locator(".badge")).to_have_text("Waiting for macOS…")
+            await expect(calendar.get_by_role("button", name="Allow Calendar")).to_be_disabled()
             await expect(calendar.locator(".badge")).to_have_text("Allowed")
             await expect(calendar.get_by_role("button")).to_have_count(0)
             # Allow asked macOS about Calendar alone, and showed no pane of System Settings.
@@ -290,5 +305,31 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
             await expect(calendar.locator(".badge")).to_have_text("Allowed")
             await expect(calendar.get_by_role("button")).to_have_count(0)
             assert macos.asked == [_CALENDAR]
+            # On the smallest phone, a server of the config left out with a long command: its tile wraps its buttons
+            # under its words, shows its address whole, takes no overlay of a link it does not have, and nothing is
+            # wider than the screen (review A1 and A2).
+            small: Page = await browser.new_page(
+                viewport={"width": _SMALLEST_PX, "height": 700}, color_scheme="dark", reduced_motion="reduce"
+            )
+            await small.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await small.goto(ui_url("127.0.0.1", port, TOKEN))
+            await small.goto(f"{address}/#/customize/plugins")
+            server: Locator = small.locator(".plugin-server[data-server='long-command']")
+            await expect(server.locator(".badge")).to_have_text("Left out")
+            await expect(server.locator(".plugin-address")).to_contain_text(_LONG_COMMAND)
+            tile_box: FloatRect = await _box(server)
+            for part in (".plugin-address", ".plugin-guide", ".plugin-name"):
+                part_box: FloatRect = await _box(server.locator(part))
+                assert part_box["x"] + part_box["width"] <= tile_box["x"] + tile_box["width"] + 0.5, (part, part_box)
+            await server.scroll_into_view_if_needed()
+            # A tile that links nowhere has no overlay of a link over its words: its address is where it shows.
+            covered: bool = await server.locator(".plugin-address").evaluate(
+                "(line) => { const r = line.getBoundingClientRect();"
+                " return !line.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2)); }"
+            )
+            assert not covered
+            wide: int = await small.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
+            assert wide <= 0, wide
+            await small.screenshot(path=str(tmp_path / f"plugins-{_SMALLEST_PX}-dark.png"), full_page=True)
         finally:
             await browser.close()

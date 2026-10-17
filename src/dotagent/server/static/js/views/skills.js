@@ -466,29 +466,54 @@ function learnedCard(skill, onChanged) {
   return skillCard({ name: skill.name, description: skill.description, mark: "brain", facts, actions: [share, drop].filter((one) => one !== null), have: skill.retired ? "Retired" : "Learned" });
 }
 
+// A chat's run that can give a skill at the owner's word, by what the page knows of it: it ended done, it is no
+// delegated run, no eval's, and not OpenCode's agent's, whose tools a skill of Dot's cannot name (agent/playbooks.py
+// `unsavable`, which also wants an acting step: the server says so of a chat without one).
+const EVAL_SOURCE = "eval";
+const OPENCODE_MODEL = "opencode:";
+// The runs the dialog looks among, newest first: the most the API gives in one read.
+const CHAT_RUNS = 200;
+
+function savable(run) {
+  return run.status === "done" && run.parent_run_id === null && run.source !== EVAL_SOURCE && !run.model.startsWith(OPENCODE_MODEL);
+}
+
 /**
- * The owner's choice of a finished chat whose work becomes a skill: its runs that ended done, newest first. Resolves to
- * the run chosen, or null when the owner closed the dialog.
+ * The owner's choice of a finished chat whose work becomes a skill, and its saving: `save(run)` writes it while the
+ * dialog stays open, its rows off and the chosen one saying so; a refusal or a failure is said in the dialog, which
+ * stays open for another choice. Resolves to what `save` gave, or null when the owner closed the dialog.
  */
-function chatDialog(runs) {
+function chatDialog(runs, save) {
   return new Promise((resolve) => {
-    let chosen = null;
+    let saved = null;
     const dialog = el("dialog", { class: "modal chat-skill-dialog", "aria-labelledby": "chat-skill-title" });
-    const rows = runs.map((run) =>
-      el(
-        "button",
-        {
-          class: "chat-skill-row",
-          type: "button",
-          onclick: () => {
-            chosen = run;
-            dialog.close("ok");
-          },
-        },
-        el("span", { class: "chat-skill-goal" }, clip(run.goal, 120)),
-        el("span", { class: "hint" }, ago(run.finished_at ?? run.created_at)),
-      ),
-    );
+    const problem = el("p", { class: "hint chat-skill-problem", role: "alert", hidden: true });
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
+    const rows = runs.map((run) => {
+      const when = el("span", { class: "hint" }, ago(run.finished_at ?? run.created_at));
+      const row = el("button", { class: "chat-skill-row", type: "button" }, el("span", { class: "chat-skill-goal" }, clip(run.goal, 120)), when);
+      row.addEventListener("click", async () => {
+        for (const one of rows) {
+          one.disabled = true;
+        }
+        cancel.disabled = true;
+        problem.hidden = true;
+        when.textContent = "Saving…";
+        try {
+          saved = await save(run);
+          dialog.close("ok");
+        } catch (error) {
+          problem.textContent = `${clip(run.goal, 60)}: ${error.message}`;
+          problem.hidden = false;
+          when.textContent = ago(run.finished_at ?? run.created_at);
+          for (const one of rows) {
+            one.disabled = false;
+          }
+          cancel.disabled = false;
+        }
+      });
+      return row;
+    });
     dialog.append(
       el(
         "div",
@@ -496,12 +521,19 @@ function chatDialog(runs) {
         el("h3", { id: "chat-skill-title" }, "Save a skill from a chat"),
         el("p", { class: "muted" }, "Dot's review model writes how the chat's work was done as a skill, offered to the runs of its kind after it."),
         rows.length === 0 ? el("p", { class: "hint" }, "No chat has ended done yet.") : el("div", { class: "chat-skill-list" }, rows),
+        problem,
       ),
-      el("div", { class: "modal-actions" }, el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel")),
+      el("div", { class: "modal-actions" }, cancel),
     );
+    // While a skill is being written the dialog stays: Escape waits for the answer too.
+    dialog.addEventListener("cancel", (event) => {
+      if (cancel.disabled) {
+        event.preventDefault();
+      }
+    });
     dialog.addEventListener("close", () => {
       dialog.remove();
-      resolve(chosen);
+      resolve(saved);
     });
     document.body.append(dialog);
     dialog.showModal();
@@ -686,27 +718,37 @@ export function mount(root) {
     holder.replaceChildren(...parts.filter((part) => part !== null));
   }
 
+  // After a change the page paints at once, then reads the skills Dot offers again: a skill imported or taken back
+  // changes them. One taken back leaves them at once, so that it does not show as one of yours meanwhile.
   function foundChanged(after) {
-    if (after !== null && !disposed) {
-      found = after;
-      attempt(loadPalette);
+    if (after === null || disposed) {
+      return;
     }
+    if (palette !== null) {
+      const before = [...imported().keys()];
+      const still = new Set([...after.skills.filter((skill) => skill.added), ...after.gone.filter((item) => item.kind === "skill")].map((skill) => skill.name));
+      const removed = new Set(before.filter((name) => !still.has(name)));
+      palette = { ...palette, skills: palette.skills.filter((skill) => !removed.has(skill.name)) };
+    }
+    found = after;
+    paint();
+    attempt(loadPalette);
   }
 
   function changed(list) {
     if (list !== null && !disposed) {
       items = list;
+      paint();
       attempt(loadPalette);
     }
   }
 
   async function saveFromChat() {
-    const runs = await api.get(`/runs${query({ limit: 100 })}`);
-    const run = await chatDialog(runs.filter((one) => one.status === "done" && one.parent_run_id === null));
-    if (run === null) {
+    const runs = await api.get(`/runs${query({ limit: CHAT_RUNS })}`);
+    const saved = await chatDialog(runs.filter(savable), (run) => api.post(`/runs/${encodeURIComponent(run.id)}/skill`, {}));
+    if (saved === null) {
       return;
     }
-    const saved = await api.post(`/runs/${encodeURIComponent(run.id)}/skill`, {});
     toast("ok", saved.updated ? `Updated the skill ${saved.name}.` : `Saved the skill ${saved.name}.`);
     const page = await api.get("/skills/learned");
     changed(page.items);

@@ -6,6 +6,7 @@ Skills address leads here. Save from a chat writes the skill of a chat that ende
 the review model; Share offers an agent's learned skill to every run; Drop removes a learned skill and Remove an
 imported one, which is then found again on this Mac."""
 
+import asyncio
 import json
 import re
 import time
@@ -14,7 +15,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, FloatRect, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, FloatRect, Locator, Page, Route, async_playwright, expect
 from test_composer_picks import DONE, GOAL, KIND, SKILL_WRITTEN, SOURCE, TOKEN, WRITE, _daemon, _served
 
 from dotagent.agent.playbooks import Playbook, playbook_name, write_playbook
@@ -32,9 +33,14 @@ _OWN: tuple[str, ...] = tuple(f"own-skill-{number}" for number in range(1, 8))
 _PLUGIN: str = "acme"
 _PLUGIN_SKILL: str = "acme-brief"
 _FOUND: str = "pdf-tools"
-_SHARED_KIND: str = "write an agent's report"
+# A kind as long as the review model may write one (60 characters at most): its chip keeps to the card (review A2).
+_SHARED_KIND: str = "Prepare the weekly status report from the project tracker"
 _SHARED: str = playbook_name(_SHARED_KIND)
 _WAIT_S: float = 60.0
+_IDLE_GOAL: str = "Say hello in one word."
+# How long the skills Dot offers take to read in one look, and how soon a card shows an action's change.
+_SLOW_PALETTE_S: float = 3.0
+_AT_ONCE_MS: int = 1500
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -115,7 +121,7 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
     _skill(tmp_path / ".claude" / "skills", _FOUND, "Fill and merge PDF forms.")
     with scratch_home() as home, eval_environment(home, {}):
         _home_skills(home)
-        async with _daemon(login_env, _config(), [WRITE, DONE, SKILL_WRITTEN]) as (runtime, manager, _model):
+        async with _daemon(login_env, _config(), [WRITE, DONE, DONE, SKILL_WRITTEN]) as (runtime, manager, _model):
             monkeypatch.setenv("HOME", str(tmp_path))
             run: RunRecord = await manager.start_picked(
                 GOAL, "task", SCRIPTED_MODEL, None, SOURCE, None, None, "standard", None, "ask", False, (), NO_PICKS
@@ -123,6 +129,24 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
             ended: RunRecord = await manager.wait(run.id)
             await manager.distilled(run.id)
             assert ended.status == "done"
+            # A chat that answered without acting: the server gives it no skill, and says why.
+            idle: RunRecord = await manager.start_picked(
+                _IDLE_GOAL,
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                SOURCE,
+                None,
+                None,
+                "standard",
+                None,
+                "ask",
+                False,
+                (),
+                NO_PICKS,
+            )
+            assert (await manager.wait(idle.id)).status == "done"
+            await manager.distilled(idle.id)
             async with _served(runtime, manager) as served:
                 async with httpx.AsyncClient(base_url=served, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
                     imported: httpx.Response = await client.put(
@@ -158,7 +182,9 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await expect(_section(page, "imported").locator(".skill-card")).to_have_count(1)
                         shared: Locator = _card(page, _SHARED)
                         await expect(shared.locator(".skill-have")).to_have_text("Learned")
-                        # Two cards a row on a wide page.
+                        # Two cards a row on a wide page, measured once what the Mac's other agents set up is read
+                        # and drawn (the page paints again then).
+                        await expect(page.get_by_text("Found on this Mac")).to_be_visible()
                         first: FloatRect = await _box(own.locator(".skill-card").nth(0))
                         second: FloatRect = await _box(own.locator(".skill-card").nth(1))
                         assert first["y"] == second["y"] and second["x"] > first["x"], (first, second)
@@ -177,13 +203,30 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await expect(_card(page, _SHARED)).to_have_count(0)
                         await page.screenshot(path=str(tmp_path / "skills-system-1280-light.png"), full_page=True)
                         await page.get_by_role("button", name=re.compile(r"^Personal \d+$")).click()
-                        # Share offers the agent's skill to every run.
+
+                        # Share offers the agent's skill to every run, and the card says so at once, before the
+                        # skills Dot offers are read again (review A5: it waited for them).
+                        async def slow(route: Route) -> None:
+                            await asyncio.sleep(_SLOW_PALETTE_S)
+                            await route.continue_()
+
+                        await page.route("**/api/palette", slow)
                         await shared.get_by_role("button", name="Share").click()
                         await expect(page.locator(".toast.ok", has_text="is offered to every run")).to_be_visible()
-                        await expect(shared.get_by_role("button", name="Keep to the agent")).to_be_visible()
+                        await expect(shared.get_by_role("button", name="Keep to the agent")).to_be_visible(
+                            timeout=_AT_ONCE_MS
+                        )
+                        await page.unroute("**/api/palette")
                         # Save from a chat: the chat that ended done, its skill written by the review model.
                         await page.get_by_role("button", name="Save from a chat").click()
                         dialog: Locator = page.locator("dialog.chat-skill-dialog")
+                        # A chat with no acting step is refused in the dialog, which stays for another choice
+                        # (review A4: it closed first and the refusal came as a toast).
+                        await dialog.locator(".chat-skill-row", has_text=_IDLE_GOAL).click()
+                        await expect(dialog.locator(".chat-skill-problem")).to_contain_text(
+                            "it took no acting step, so it did nothing a skill could repeat"
+                        )
+                        await expect(dialog).to_be_visible()
                         await dialog.locator(".chat-skill-row", has_text=GOAL).click()
                         name: str = playbook_name(KIND)
                         await expect(page.locator(".toast.ok", has_text=f"Saved the skill {name}.")).to_be_visible()
@@ -214,6 +257,7 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         await phone.goto(f"{served}/#/customize/skills")
                         cards: Locator = _section(phone, "own").locator(".skill-card")
                         await expect(cards).to_have_count(6)
+                        await expect(phone.get_by_text("Found on this Mac")).to_be_visible()
                         lefts: set[float] = {(await _box(cards.nth(index)))["x"] for index in range(2)}
                         assert len(lefts) == 1, lefts
                         wide: int = await phone.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
