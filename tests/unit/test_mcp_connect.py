@@ -4,8 +4,9 @@ over streamable HTTP or SSE, a command line), with the names and lines it refuse
 import pytest
 
 from dotagent.config import McpServerConfig
-from dotagent.core.errors import ConfigError, NotFoundError
+from dotagent.core.errors import ConfigError, McpError, NotFoundError
 from dotagent.mcp.catalogue import MCP_SERVICES
+from dotagent.mcp.signin import checked_link
 from dotagent.server.routes_mcp import requested_server
 from dotagent.server.views import McpServerAdd
 
@@ -47,3 +48,22 @@ def test_each_service_of_the_catalogue_is_a_server_dot_can_have() -> None:
     for service in MCP_SERVICES:
         config: McpServerConfig = McpServerConfig(name=service.id, url=service.url, transport="http")
         assert config.url is not None and config.url.startswith("https://")
+
+
+def test_a_sign_in_page_is_opened_only_at_an_https_address_or_one_of_this_mac() -> None:
+    """The authorization server is the MCP server's: the page it sends the owner to is a link on Dot's page, so only an
+    https address, or an http one on this Mac, is taken (review S1)."""
+    for link in (
+        "https://auth.example.com/authorize?state=s",
+        "http://127.0.0.1:8123/authorize?state=s",
+        "http://localhost/authorize?state=s",
+    ):
+        assert checked_link(link) == link
+    for link in (
+        "javascript:alert(document.cookie)//?state=s",
+        "data:text/html,<script>x</script>?state=s",
+        "http://auth.example.com/authorize?state=s",
+        "file:///etc/passwd?state=s",
+    ):
+        with pytest.raises(McpError, match="not an https address"):
+            checked_link(link)

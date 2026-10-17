@@ -1,5 +1,5 @@
 """``dotx skills``: the skills and plugins Dot finds, where each comes from, and the folders it has to leave out; then
-what the Mac's other agents have set up, which Dot does not use until the owner adds it in Settings › Skills (items
+what the Mac's other agents have set up, which Dot does not use until the owner adds it in Customize › Skills (items
 164 and 165)."""
 
 import asyncio
@@ -78,7 +78,7 @@ def render_found(found: FoundElsewhere) -> list[str]:
     what it reaches, what the owner added that its agent no longer has, and the files that could not be read. What Dot
     already uses, and what the owner added from here, is marked; every line is printable."""
     lines: list[str] = [
-        "Found elsewhere on this Mac (Dot does not use these unless you add them in Settings › Skills):"
+        "Found elsewhere on this Mac (Dot does not use these unless you add them in Customize › Skills):"
     ]
     if not found.skills and not found.servers and not found.problems:
         lines.append("  Nothing: no skills or MCP servers of Claude Code, Claude Desktop, Cursor, VS Code or Codex.")

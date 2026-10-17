@@ -2,13 +2,13 @@
 registered with the server's authorization server on the first sign-in (dynamic client registration), the code brought
 back to Dot's own page, ``/oauth/callback``, by the browser that signed in. The flow itself is the MCP library's
 (:class:`mcp.client.auth.oauth2.OAuthClientProvider`); Dot keeps what it gives and answers its two questions: where to
-send the owner (the link the Connect apps page shows) and what came back (the code the callback hands over).
+send the owner (the link the Plugins page shows) and what came back (the code the callback hands over).
 
 What a sign-in gave is kept in Dot's home, one file per server readable by the owner alone (:func:`sign_in_path`): the
 tokens, the client the authorization server registered, the redirect address it was registered with, and when the access
 token runs out. The library renews an access token with the refresh token before it runs out; that time is kept with the
 tokens, so that a token is renewed after a restart of the daemon too. A run never signs in: when a server asks for a new
-sign-in while Dot works, the server is left out with a message that sends the owner to Connect apps
+sign-in while Dot works, the server is left out with a message that sends the owner to Customize › Plugins
 (:func:`kept_sign_in`).
 """
 
@@ -39,8 +39,8 @@ CALLBACK_PATH: str = "/oauth/callback"
 SIGN_IN_WAIT_S: float = 600.0
 _DIR_MODE: int = 0o700
 _CLIENT_NAME: str = "Dot"
-NOT_SIGNED_IN: str = "the MCP server needs you to sign in first: Connect apps › Sign in"
-SIGN_IN_AGAIN: str = "the MCP server asks you to sign in again: Connect apps › Sign in"
+NOT_SIGNED_IN: str = "the MCP server needs you to sign in first: Customize › Plugins › Sign in again"
+SIGN_IN_AGAIN: str = "the MCP server asks you to sign in again: Customize › Plugins › Sign in again"
 # One change of a server's file at a time in this process: each reads it, changes it and replaces it.
 _FILE_LOCK: threading.Lock = threading.Lock()
 
@@ -189,6 +189,23 @@ class _Waiting(FrozenModel):
     link: str
 
 
+# The hosts of this Mac, where an authorization server of one's own may answer over plain http.
+_LOOPBACK_HOSTS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def checked_link(link: str) -> str:
+    """``link``, the authorization server's page the owner is sent to, once it is an https address, or an http one on
+    this Mac. The page opens it as a link, so anything else (``javascript:``, ``data:``, plain http to another host)
+    is refused with :class:`McpError`: the authorization server is the MCP server's, not Dot's."""
+    parts = urlparse(link)
+    if parts.scheme == "https" or (parts.scheme == "http" and parts.hostname in _LOOPBACK_HOSTS):
+        return link
+    raise McpError(
+        "the authorization server's page is not an https address",
+        {"scheme": parts.scheme, "host": parts.hostname or ""},
+    )
+
+
 def _state_of(link: str) -> str:
     states: list[str] = parse_qs(urlparse(link).query).get("state", [])
     if len(states) != 1 or states[0] == "":
@@ -218,7 +235,7 @@ class SignIns:
         pending: dict[str, str] = {}
 
         async def redirect(link: str) -> None:
-            state: str = _state_of(link)
+            state: str = _state_of(checked_link(link))
             self._codes[state] = asyncio.get_running_loop().create_future()
             self._waiting[state] = _Waiting(server=config.name, link=link)
             pending["state"] = state

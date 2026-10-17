@@ -3,7 +3,7 @@ iPhone (440 px wide) and as a small one (320 px), on a served daemon with two sc
 
 On a phone:
 
-- `#/settings` is four groups of rows, eleven in all: Appearance tells the theme on screen, Models the main model, Memory
+- `#/settings` is four groups of rows, ten in all (Skills is a tab of Customize, item 317): Appearance tells the theme on screen, Models the main model, Memory
   how many notes Dot keeps and Schedules how many schedules there are;
 - a row opens its tab as a page of its own: the bar names the tab, the way back to the list is at its top and no rail or
   row of tabs shows; the way back leads to the list;
@@ -51,7 +51,6 @@ _TABS: dict[str, str] = {
     "keys": "API keys",
     "rules": "Rules",
     "memory": "Memory",
-    "skills": "Skills",
     "schedules": "Schedules",
     "browser": "Browser",
     "phone": "Phone",

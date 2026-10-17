@@ -1,1 +1,1 @@
-"""Connect apps (item 278): the applications Dot is set up with from the sidebar, and where each one stands."""
+"""The applications Dot is set up with from Customize › Plugins (items 278 and 316), and where each one stands."""

@@ -1,4 +1,4 @@
-"""The services whose own MCP servers Connect apps adds in one step (item 279), each reached at its address over
+"""The services whose own MCP servers Customize › Plugins adds in one step (items 279 and 316), each reached at its address over
 streamable HTTP. Those that sign in do so in the owner's browser, as MCP's authorization asks: OAuth with PKCE, Dot
 registering itself with the service's authorization server as a client without a secret.
 

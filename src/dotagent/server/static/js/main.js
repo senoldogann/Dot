@@ -22,8 +22,8 @@ import * as activity from "./views/activity.js";
 import * as agents from "./views/agents.js";
 import * as team from "./views/team.js";
 import * as campaigns from "./views/campaigns.js";
-import * as connectApps from "./views/connect.js";
 import * as controls from "./views/controls.js";
+import * as customize from "./views/customize.js";
 import * as run from "./views/run.js";
 import * as runs from "./views/runs.js";
 import * as settings from "./views/settings.js";
@@ -33,12 +33,15 @@ const DEFAULT_ROUTE = "/runs";
 const LAST_CHAT_KEY = "dot.lastChat";
 // Where a home-screen app added before item 286 starts (its manifest's start_url then): it opens the last chat instead.
 const OLD_START = "#/activity";
-// The pages of the earlier sidebar live on as tabs of the settings; their old addresses lead there.
+// The pages of the earlier sidebar live on as tabs of the settings or of Customize; their old addresses lead there.
 const MOVED = new Map([
   ["/memory", "/settings/memory"],
   ["/schedules", "/settings/schedules"],
   ["/rules", "/settings/rules"],
   ["/system", "/settings/system"],
+  // Connect apps and the settings' Skills became Customize's two tabs (items 316 and 317).
+  ["/connect", "/customize/plugins"],
+  ["/settings/skills", "/customize/skills"],
 ]);
 // `layout` is put on the page element as `data-layout`, so the style sheets can give each kind of page its own width.
 const ROUTES = [
@@ -48,7 +51,7 @@ const ROUTES = [
   { tab: "campaigns", layout: "page", title: "Campaigns", pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/, view: campaigns },
   { tab: "agents", layout: "page", title: "Agents", pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/, view: agents },
   { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, view: team },
-  { tab: "connect", layout: "page", title: "Connect apps", pattern: /^\/connect$/, view: connectApps },
+  { tab: "customize", layout: "page", title: "Customize", pattern: /^\/customize(?:\/(plugins|skills))?(?:\/([a-z0-9-]+))?$/, view: customize },
   { tab: "settings", layout: "page", title: "Settings", pattern: /^\/settings(?:\/([a-z]+))?$/, view: settings },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
   { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls },

@@ -5222,7 +5222,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | done        | 427c51e |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
-| 284 | OpenCode's agent uses Dot's own tools over MCP                                        | in progress |         |
+| 284 | OpenCode's agent uses Dot's own tools over MCP                                        | done        | 5655e6f |
 | 285 | A helper that starts late joins its siblings, and stopped ones stand still            | done        | 8aa45dd |
 | 286 | The phone comes back quietly, on the chat it was in                                   | done        | 8aa45dd |
 | 287 | Connect apps' sections give their lines room                                          | done        | 8aa45dd |
@@ -5239,30 +5239,32 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 298 | Dot's computer opens over the whole phone, with its address and Take over             | done        | b4e554f |
 | 299 | A turn that goes on after Dot restarted says so, with a bolt                          | done        | b4e554f |
 | 300 | The code review's first fixes: requests, typing, a skill's YAML                       | done        | 3202bb6 |
-| 301 | Runs at work side by side keep to their own tabs, apps and files                      | in progress |         |
-| 302 | Lessons are saved on their own, after a second look                                   | in progress |         |
-| 303 | Memory, lessons and skills: the audit's fixes                                         | in progress |         |
-| 304 | The code review's second fixes                                                        | in progress |         |
-| 305 | Runs side by side keep to each other's apps, files and browser, by every path          | in progress |         |
-| 306 | Stale knowledge steps aside on its own: notes, lessons and skills                      | in progress |         |
-| 307 | Dot builds its own team within its bounds, listed under Agents                         | in progress |         |
-| 308 | What was learned on a site comes back there; the stats show the trend                  | in progress |         |
-| 309 | The daemon serves the pages it started with, so pages and API never part               | in progress |         |
-| 310 | A chat whose helpers work writes on its page only what changed                         | in progress |         |
-| 311 | On an iPhone and an iPad a field has the size it has on the Mac                        | in progress |         |
-| 312 | A compaction is a quiet line in the chat, with the context's size before and after     | in progress |         |
-| 313 | A note a run saves, corrects or forgets is a quiet line in the chat                    | in progress |         |
-| 314 | A run drafts an email or a message; the owner sends, edits or discards it              | in progress |         |
-| 315 | An agent starts from one of eight templates and goes to another home as a file         | in progress |         |
-| 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | in progress |         |
-| 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
-| 328 | A phone that comes back to Dot finds it calm                                           | in progress |         |
-| 329 | On a phone Dot reads at a phone's size and takes a finger                              | in progress |         |
-| 330 | On a phone the settings are a list of their tabs in groups                             | in progress |         |
-| 331 | On a phone Appearance draws phones, two themes a row and one Text size                 | in progress |         |
-| 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | in progress |         |
-| 333 | `dotx setup` leads to a working model, and the home says when none answers             | in progress |         |
-| 334 | The repository opens with a short README, its details under docs/                      | in progress |         |
+| 301 | Runs at work side by side keep to their own tabs, apps and files                      | done        | 5655e6f |
+| 302 | Lessons are saved on their own, after a second look                                   | done        | 5655e6f |
+| 303 | Memory, lessons and skills: the audit's fixes                                         | done        | 5655e6f |
+| 304 | The code review's second fixes                                                        | done        | 5655e6f |
+| 305 | Runs side by side keep to each other's apps, files and browser, by every path          | done        | 5655e6f |
+| 306 | Stale knowledge steps aside on its own: notes, lessons and skills                      | done        | 5655e6f |
+| 307 | Dot builds its own team within its bounds, listed under Agents                         | done        | 5655e6f |
+| 308 | What was learned on a site comes back there; the stats show the trend                  | done        | 5655e6f |
+| 309 | The daemon serves the pages it started with, so pages and API never part               | done        | 5655e6f |
+| 310 | A chat whose helpers work writes on its page only what changed                         | done        | 5655e6f |
+| 311 | On an iPhone and an iPad a field has the size it has on the Mac                        | done        | 5655e6f |
+| 312 | A compaction is a quiet line in the chat, with the context's size before and after     | done        | 5655e6f |
+| 313 | A note a run saves, corrects or forgets is a quiet line in the chat                    | done        | 5655e6f |
+| 314 | A run drafts an email or a message; the owner sends, edits or discards it              | done        | 5655e6f |
+| 315 | An agent starts from one of eight templates and goes to another home as a file         | done        | 5655e6f |
+| 316 | Customize › Plugins: every service Dot works with, its way to connect and its own page | in progress |         |
+| 317 | Customize › Skills: the skills Dot reads as cards, personal and system                 | in progress |         |
+| 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | done        | 1334b9f |
+| 327 | A run that hesitates over what it was asked says so at once                            | done        | 5655e6f |
+| 328 | A phone that comes back to Dot finds it calm                                           | done        | 34ad323 |
+| 329 | On a phone Dot reads at a phone's size and takes a finger                              | done        | 34ad323 |
+| 330 | On a phone the settings are a list of their tabs in groups                             | done        | 34ad323 |
+| 331 | On a phone Appearance draws phones, two themes a row and one Text size                 | done        | 34ad323 |
+| 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | done        | 34ad323 |
+| 333 | `dotx setup` leads to a working model, and the home says when none answers             | done        | 34ad323 |
+| 334 | The repository opens with a short README, its details under docs/                      | done        | 34ad323 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12506,7 +12508,7 @@ that, which left a stopped run's question pending on its page.
 
 ### 284. OpenCode's agent uses Dot's own tools over MCP
 
-**Status: in progress.** Built on `item-300-tools-and-learning` with part 52.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What.** OpenCode's agent gets Dot's own tools besides its own: Dot serves the tools a run may use (the browser, the
 Mac's desktop, memory, notes, schedules, …) as an MCP server of its own for that run, added to the run's OpenCode
@@ -12873,7 +12875,7 @@ reading is due on or after 2026-10-18.
 
 ### 301. Runs at work side by side keep to their own tabs, apps and files
 
-**Status: in progress.** Built on `item-300-tools-and-learning`.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** Each chat had tabs of its own that no tool of another chat's run reaches (`browser/session.py`),
 but a run knew nothing of the others at work: two runs could type in one application at once, and a run could write
@@ -12896,7 +12898,7 @@ file the first changed until it has read it).
 
 ### 302. Lessons are saved on their own, after a second look
 
-**Status: in progress.** Built on `item-300-tools-and-learning`.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What.** The owner asked that what a session learned be saved at its end without asking, carefully and selectively.
 `[agent] lessons` was `propose` by default (each lesson waited on the run's page), and `auto` saved every lesson the
@@ -12917,7 +12919,7 @@ dark page and on a light phone), `tests/smoke/test_lessons.py`, `tests/unit/test
 
 ### 303. Memory, lessons and skills: the audit's fixes
 
-**Status: in progress.** Built on `item-300-tools-and-learning`.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** An audit of memory, lessons and learned skills for the owner's words ranked eleven defects: (1) a
 run that read pages could become a skill, with no check of where its steps came from (the code review's Y7); (2) one
@@ -12956,7 +12958,7 @@ live: that the review model names a run's work by a kind it is shown (the paths 
 
 ### 304. The code review's second fixes
 
-**Status: in progress.** Built on `item-300-tools-and-learning`.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The rest of the code review's plan of fixes, each read again against the code first, and one leak
 that a flaky test of item 300 turned out to be. Each fix has a test that fails on the code before it.
@@ -13012,7 +13014,7 @@ is `reports/oturum-hafiza-ekip-2026-10-16.md` (kept out of the repository).
 
 ### 305. Runs side by side keep to each other's apps, files and browser, by every path
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** Item 301's footprints had gaps a second run could walk through: a batch of desktop steps was
 checked only for its first application; an AppleScript drove any application without a footprint; app names matched
@@ -13034,7 +13036,7 @@ run did not start. README: How a run works. Tests: `tests/unit/test_peers.py` (e
 
 ### 306. Stale knowledge steps aside on its own: notes, lessons and skills
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** A note that had been handed to a run once never rested again; nothing could say a fact holds only
 for a while; a note a newer one contradicted stayed handed beside it; the nightly fold deleted the lesson it folded
@@ -13054,7 +13056,7 @@ nightly reflection. Tests: `tests/unit/test_memory_ranking.py`, `test_reflection
 
 ### 307. Dot builds its own team within its bounds, listed under Agents
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's data held no agent and no `create_agent` call: the prompt offered a teammate only for
 work that recurs, an agent a run made could get any tool and any model, and its runs read the run's instructions as
@@ -13072,7 +13074,7 @@ of another chat sends a member work by name).
 
 ### 308. What was learned on a site comes back there; the stats show the trend
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** A learned skill knew its site, but a lesson did not, and a run was handed lessons only by its goal's
 words: a run whose goal did not name the site it went to was not handed what was learned there. `dotx stats` counted
@@ -13093,7 +13095,7 @@ second look or saved anyway, carries its tag).
 
 ### 309. The daemon serves the pages it started with, so pages and API never part
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word on 2026-10-16: "mobilde sohbetlere girildiğinde ekteki hatayı alıyorum bunuda
 düzelt lütfen aymı şekil web ve desktopda da ve memory sayfasina girdigimizde not found hatasi geliyor bu problemide bul
@@ -13118,7 +13120,7 @@ start is served as it was or not at all; 304, HEAD, 405 and a folder's redirect)
 
 ### 310. A chat whose helpers work writes on its page only what changed
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word on 2026-10-16: "Sayfa kendini sürekli render ediyor belirli araliklarla acaba
 subagentlerden dolayi mi yoksa baska bir sey mi sürekli. mesela [a screenshot] su an bir sohbet calisiyor." (the page
@@ -13147,7 +13149,7 @@ those four seconds).
 
 ### 311. On an iPhone and an iPad a field has the size it has on the Mac
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word on 2026-10-16: "Ayrica mobil tasarim harika olmus fakat bazi placeholderlar
 text-size olarak cok büyük görünüyor ve drodpown menu icindeki deger [a screenshot] umarim desktop ve web tarafida bunu
@@ -13173,7 +13175,7 @@ both fail on the code before), `test_phone_pages.py` (the composer keeps its cho
 
 ### 312. A compaction is a quiet line in the chat, with the context's size before and after
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word on 2026-10-16: "ve chat icinde compacted olayini ekteki fotgoraftaki gibi
 gösterelim eger mümkünse chat icinde" (show the compaction in the chat as in the attached picture, if possible), with a
@@ -13193,7 +13195,7 @@ on the code before they fail with no line and `KeyError: 'tokens_before'`.
 
 ### 313. A note a run saves, corrects or forgets is a quiet line in the chat
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word on 2026-10-16 asked for the features of xAI's Grok Bot in Dot, with two
 screenshots of its page (one of them a bot's chat with "Updated memory for Account Manager"), and for a plan; the
@@ -13215,7 +13217,7 @@ route in the API table.
 
 ### 314. A run drafts an email or a message; the owner sends, edits or discards it
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The second item of the plan's group A, which the owner chose on 2026-10-16. xAI's Grok Bot writes
 an email as a draft its owner sends or discards, and sends several at once when told ("send the top 10"). Dot sent
@@ -13254,7 +13256,7 @@ Messages themselves.
 
 ### 315. An agent starts from one of eight templates and goes to another home as a file
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The third item of the plan's group A, which the owner chose on 2026-10-16. xAI's Grok Bot offers
 ready-made agents for kinds of work (outbound sales, finding talent, paid media, expenses, product numbers, bug
@@ -13289,9 +13291,67 @@ imported as the same agent, whose page opens with Edit, Export and Delete inside
 before, and with the routes of before alone, the test finds none of the eight cards; without the home's secrets, the
 agent holding one is exported.
 
+### 316. Customize › Plugins: every service Dot works with, its way to connect and its own page
+
+**Status: in progress.** On the branch `items-316-317-customize`, after `items-328-phone`; not merged. The plan is
+`reports/grok-bot-ve-codex-plani-2026-10-16.md` (B group), with the owner's answers of 2026-10-17.
+
+**What was found.** The owner's word of 2026-10-16, with screenshots of Codex's desktop app: a Plugins page and a Skills
+page as Codex has them, more settled and with more variety. Connect apps listed the Mac's applications, the web's and
+the MCP services in three lists of rows, with no search, no marks and no page of a service's own. The marks needed
+files from outside and the services that were not tried needed a word from the owner: on 2026-10-17 the owner allowed
+the download of the marks from Simple Icons and approved the plan as a whole, and the services not tried are shown as
+such ("Not tried yet"), which is how the page reaches the plan's 25 and more.
+
+**As built (2026-10-17).**
+
+- `connections/directory.py`: 34 listings in six sections (Popular, Communication, Development, Business,
+  Productivity, This Mac), each with the ways Dot reaches its service: an entry of the connections' catalogues (an MCP
+  service, an application of the Mac, a synced folder, an application of the web) or a way not tried yet, which says
+  what it would take. 26 are tried; Vercel, Supabase, Hugging Face, Figma, Atlassian, Canva, Asana and Box are not.
+  `plugin_views` adds how each way connects, where its data goes and what it lets Dot do; a way no catalogue holds
+  raises. `GET /api/plugins` returns them.
+- The marks: 18 of Simple Icons 16.35.0 (CC0), each rebuilt from its one path, in `static/icons/plugins` with a LICENSE
+  that names the brands' guidelines; a service without one (Slack, Canva, LinkedIn, Microsoft's and Apple's
+  applications, DeepWiki) has letters or an icon of the interface. A mark takes the brand's colour where it reads on both
+  grounds (WCAG luminance between 0.06 and 0.55), else the ink, on a tile tinted with it.
+- `views/customize.js` (Customize, two tabs) and `views/plugins.js` (Plugins): a search, Connected and All with their
+  counts, tiles two a row (one on a phone) with the mark, what Dot does, how it connects and where it stands, and a "+"
+  that takes the first step of items 278 and 279; a service's page with how it connects (each way, its state, what to
+  do and its step), its tools and where its data goes; Your own MCP server at the foot, and the servers of the config,
+  plugins and other agents under Connected. The sidebar's Connect apps is Customize; `#/connect` leads to Plugins;
+  `views/connect.js` is gone, its steps in `plugins.js`. The words that sent the owner to Connect apps send them here.
+- Docs: `docs/extending.md` (Customize › Plugins), `docs/daemon.md`, `docs/phone.md`, `docs/configuration.md`.
+- Tests: `tests/unit/test_plugins_directory.py` (25 and more, each once with what it does; every catalogue entry
+  listed; tried exactly when a way is a catalogue's; each mark a file of one path named in the LICENSE, an icon or
+  letters); `tests/smoke/test_customize_plugins.py` (was `test_connect_apps.py`: the sidebar, the sections, every
+  tile's mark, words and chip, each state, Not tried yet without a step, the search, Connected, Notes' page and its
+  step, Calendar's "+", the old address, no "null" for an empty section, nothing wider than a phone);
+  `test_mcp_sign_in.py`, `test_phone_lists.py`, `test_phone_type.py` and `test_tour.py` on the new page.
+
+### 317. Customize › Skills: the skills Dot reads as cards, personal and system
+
+**Status: in progress.** On the branch `items-316-317-customize`, with item 316; not merged.
+
+**What was found.** The same word of the owner's. The skills were a tab of the settings that listed the learned ones
+and what the Mac's other agents set up, but neither the owner's own skills, nor those that come with Dot or its
+plugins, nor a way to save a chat's work as a skill there.
+
+**As built (2026-10-17).** `views/skills.js` is Customize's Skills tab: cards two a row (one on a phone), each with its
+mark, name, what it is for and Installed, Learned or Retired. Personal: Yours (Dot's skills folder and the config's),
+Imported (from another agent, with Remove), Learned (kind, agent, where, the runs and the record, with Share and
+Drop); under them Found on this Mac and Import from other apps, as before. System: Comes with Dot and From plugins. A
+search, and a section past its sixth card shows See N more. Save from a chat lists the chats that ended done and writes
+the chosen one's skill with the review model (`POST /api/runs/{id}/skill`, item 318). The settings' Skills tab is gone:
+`#/settings/skills` leads here, and the phone's settings list has ten rows. Docs: `docs/extending.md` (Skills and
+plugins). Tests: `tests/smoke/test_customize_skills.py` (every source in its tab and section, See 1 more, two a row and
+one on a phone, the search, Share, Save from a chat through the scripted review model, Drop and Remove, the old address);
+`test_side_scroll.py` (twenty learned skills show six and See 14 more), `test_phone_settings.py`,
+`test_import_elsewhere.py` and `test_found_elsewhere.py` on the new page.
+
 ### 318. A "+" in the composer picks plugins, skills and Plan first, as chips
 
-**Status: in progress.** On the branch `item-318-composer-picks`, after PR #326; not merged.
+**Status: done.** Merged as `1334b9f` (PR #327; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word of 2026-10-16, with five screenshots of Codex's desktop app: "Codex sistemindkei
 gibi eklentiler ve beceriler sayfasi yapma sansimiz var mi daha otrurakli kurumsal ve hos görünüm ve daha cok cesitlilik
@@ -13348,8 +13408,9 @@ that names it.
 
 ### 327. A run that hesitates over what it was asked says so at once
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed. Numbers 316, 317 and 319
-to 326 are the items of the plan `reports/grok-bot-ve-codex-plani-2026-10-16.md`, not yet taken into this roadmap.
+**Status: done.** Merged as `5655e6f` (PR #326; no Linear issue, the Linear connector was signed out).
+Numbers 319 to 326 are items of the plan `reports/grok-bot-ve-codex-plani-2026-10-16.md`, not yet taken into this
+roadmap.
 
 **What was found.** The owner's word of 2026-10-16: they asked a run on a Claude model to sit and pass a certification
 exam, and the run spent its steps on the exam's rules (a search, the exam guide, its terms of service twice) before it
@@ -13367,8 +13428,7 @@ use shows, since the tests call no model.
 
 ### 328. A phone that comes back to Dot finds it calm
 
-**Status: in progress.** On the branch `items-328-phone`, after `item-318-composer-picks`; not merged. The plan of this
-item and the ones after it (329 to 334) is `reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+**Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word of 2026-10-16, with five screenshots of T3 Code's phone app: "Web tarafinda mobilde
 hala istedigim sabiyeti ve netligi hisswdemiyorum. Uygulamayi arka plana atip baska seylere ugrasip tekrar dondugumde
@@ -13432,8 +13492,7 @@ update left out of date sat in the bar and pushed the page down.
 
 ### 329. On a phone Dot reads at a phone's size and takes a finger
 
-**Status: in progress.** On the branch `items-328-phone`, after item 328; not merged. The plan is
-`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+**Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The same word of the owner (item 328): every page should read and be understood better on the
 phone. Measured in WebKit as the owner's iPhone 17 Pro Max and as an iPhone SE, light and dark, on 21 pages and the open
@@ -13481,8 +13540,7 @@ and some hints named the config file's keys (`[agent] context_tokens in config.t
 
 ### 330. On a phone the settings are a list of their tabs in groups
 
-**Status: in progress.** On the branch `items-328-phone`, after item 329; not merged. The plan is
-`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+**Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The same word of the owner (item 328), with T3 Code's phone app beside it: its settings open on a
 list of groups, each a card of rows with a mark, a name, what the page holds and an arrow, and a row opens its page with
@@ -13518,8 +13576,7 @@ is called" a word a line beside its field.
 
 ### 331. On a phone Appearance draws phones, two themes a row and one Text size
 
-**Status: in progress.** On the branch `items-328-phone`, after item 330; not merged. The plan is
-`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+**Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
 **What was found.** T3 Code's Appearance on the owner's phone: the colour schemes drawn as phones, the themes two a row,
 each with a light and a dark sphere and its name, and one Text card, a sample line over a "Text size" in points that
@@ -13551,8 +13608,7 @@ schemes were drawn as Mac windows, and an iPhone SE had one theme a row.
 
 ### 332. On a phone Activity, Connect apps and an agent's editor name their cards over them
 
-**Status: in progress.** On the branch `items-328-phone`, after item 331; not merged. The plan is
-`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+**Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
 **What was found.** After item 329 the pages of a phone already read at its sizes and take a finger. Against T3 Code's
 grouped lists: Activity's three sections and Connect apps' carried their names inside their cards, a delegated run's row
@@ -13579,8 +13635,7 @@ sidebar, Agents, an agent's page and Campaigns already stood in named groups, wi
 
 ### 333. `dotx setup` leads to a working model, and the home says when none answers
 
-**Status: in progress.** On the branch `items-328-phone`, after item 332; not merged. The plan is
-`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+**Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The README's quick start ended at `uv sync` and `dotx doctor`; nothing set Dot up. Every default
 model is an Ollama cloud model, so a new person without an Ollama account got no answer, and a missing key showed only
@@ -13621,8 +13676,7 @@ requirements.
 
 ### 334. The repository opens with a short README, its details under docs/
 
-**Status: in progress.** On the branch `items-328-phone`, after item 333; not merged. The plan is
-`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+**Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The README had 2,900 lines in 26 sections, most of them details for someone who already runs Dot,
 with no picture, no guide for contributors and no changelog. `pyproject.toml` named three of the five providers and
@@ -14401,3 +14455,5 @@ had no links or classifiers, and nothing said plainly that Dot runs on macOS alo
 - 2026-10-16 (Opus 5.5): the daemon restarted at 20:55:39 on the owner's word ("Kapat yeniden aç, session devam ediyor olması farketmez"), with two runs at work, after the wait for an idle moment was stopped: pid 56472, from main's environment, healthy at 20:55:46; the pages it serves are main's (`drafts.js`, `views/agents.js`, `timeline.js`, `views/memory.js`, `views/run.js`, `attention.js`, `icons.js` and `app.css` alike byte for byte), and both runs went on after it, each with events of its own since.
 - 2026-10-16 (Opus 5.5): PR #326 opened for items 284, 301 to 315 and 327 (the branch `items-301-to-327`, 21 commits over `main`, its tree main's working tree); its gate green, browser tests included (633 passed). The merge waits for the owner.
 - 2026-10-16 (Opus 5.5): item 318, the first of the plan's B group as the owner chose: a "+" in the composer picks plugins (MCP servers), skills and Plan first for a message, as chips; the run starts with the picked servers' tools on and the skills' instructions after the owner's words; Save skill writes a learned skill at the owner's word. Built on `item-318-composer-picks`, after PR #326.
+- 2026-10-17 (Opus 5.5): items 316 and 317 on the owner's word ("Bunların hepsini onaylıyorum yap"): Customize, with Plugins (34 services in six sections, 26 tried, the marks of Simple Icons, a page for each service, the steps of Connect apps) and Skills (cards two a row, Personal and System, Save from a chat); on `items-316-317-customize`.
+- 2026-10-17 (Opus 5.5): on the owner's word ("Bunların hepsini onaylıyorum yap"): PR #326 merged as `5655e6f`, after its one failing test was made to hold on any Mac (`cp $(echo case x)` now writes over /etc/hosts, which every machine has, instead of a ~/.zshrc the CI runner lacks); PR #327 (item 318) merged as `1334b9f`, with the event loop's heartbeat tests given limits between the runner's own pauses and the faults they guard against (0.25 s and 0.5 s) and a check that the notes are compared off the loop's thread; PR #328 (items 328 to 334) merged as `34ad323`. Main's checkout moved to it (its 181 uncommitted entries were the copy of PR #326 and were kept in a backup first) and the daemon restarted at 06:21:27 while no run worked.

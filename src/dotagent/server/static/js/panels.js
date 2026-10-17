@@ -30,7 +30,7 @@ export function inlineLoading() {
   return el("div", { class: "empty", role: "status", "aria-label": "Loading" }, el("div", { class: "spinner" }));
 }
 
-/** A failed load, with the reason and a way to try again, to sit inside a card. */
+/** A failed load, with the reason and, when `retry` is given, a way to try again, to sit inside a card. */
 export function inlineError(error, retry) {
   return el(
     "div",
@@ -38,7 +38,7 @@ export function inlineError(error, retry) {
     icon("alert"),
     el("div", { class: "row-title" }, "This could not be loaded"),
     el("div", null, error.message),
-    el("div", { class: "cluster" }, el("button", { class: "btn", type: "button", onclick: retry }, icon("refresh"), "Try again")),
+    typeof retry === "function" ? el("div", { class: "cluster" }, el("button", { class: "btn", type: "button", onclick: retry }, icon("refresh"), "Try again")) : null,
   );
 }
 

@@ -17,8 +17,8 @@
 #   name = "docs"
 #   url = "https://mcp.example.com/mcp"             # a remote server; transport = "http" (default) or "sse"
 #   headers = { Authorization = "Bearer ${DOCS_TOKEN}" }   # ${NAME} as above; headers are never logged
-#   oauth = false                       # true: sign in with your account (Connect apps › Sign in again)
-# Plugins add their own servers (see [plugins]); their names become <plugin>-<server>. Servers added on Connect apps
+#   oauth = false                       # true: sign in with your account (Customize › Plugins › Sign in again)
+# Plugins add their own servers (see [plugins]); their names become <plugin>-<server>. Servers added on Customize › Plugins
 # are kept in connected-servers.json in Dot's home, not here.
 mcp = []
 
@@ -300,7 +300,7 @@ lesson_rest_days = 60
 # kept; matched by name or meaning) updates its owner's skill instead of writing another; a run that read content
 # other people wrote is distilled from its own steps alone, and its skill names no address or account the run did not
 # use. A skill read by two runs in a row that then failed is retired (moved under .retired) and no longer offered;
-# Settings › Skills lists them with Drop. dotx stats counts the skills written, retired and read, and compares the runs
+# Customize › Skills lists them with Drop. dotx stats counts the skills written, retired and read, and compares the runs
 # that read one on a host with the runs on that host that did not. false distils nothing.
 playbooks = true
 skill_min_steps = 4
@@ -602,7 +602,7 @@ same_chat = false
 # folder of every plugin; list more directories here (each holds skill folders; ~ expands), such as "~/.claude/skills".
 dirs = []
 # find_help also lists the skills and MCP servers that the Mac's other agents (Claude Code, Claude Desktop, Cursor,
-# VS Code, Codex) set up, for a run to ask you to add one in Settings > Skills; false leaves them out.
+# VS Code, Codex) set up, for a run to ask you to add one in Customize > Skills; false leaves them out.
 elsewhere = true
 # The most skills a run's instructions list by name and description. When a run is offered more, they list those that
 # share the most words with its goal and say how many more there are, which find_help searches.

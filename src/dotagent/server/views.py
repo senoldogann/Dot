@@ -11,6 +11,7 @@ from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
 from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
 from dotagent.connections.catalogue import ConnectionKind
+from dotagent.connections.directory import PluginView
 from dotagent.connections.states import ConnectionState, ConnectionStep
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
@@ -893,7 +894,7 @@ class BrowserView(FrozenModel):
 
 
 class ConnectionView(FrozenModel):
-    """One application of Connect apps (item 278). ``kind`` says how Dot reaches it: ``mac``, it drives it with
+    """One application of Customize › Plugins (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it drives it with
     AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it keeps in sync.
     ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None`` when there is none
     to take; ``waiting`` is true while macOS asks the owner about it on the Mac."""
@@ -919,13 +920,19 @@ class ConnectionsView(FrozenModel):
     runner: str
 
 
+class PluginsView(FrozenModel):
+    """``GET /plugins``: the listings of Customize's Plugins page (item 316), in its order."""
+
+    plugins: tuple[PluginView, ...]
+
+
 type McpOrigin = Literal["config", "plugin", "elsewhere", "connected"]
 type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signing_in"]
 
 
 class McpServerView(FrozenModel):
-    """One MCP server Dot has, as Connect apps shows it (item 279). ``origin`` is where it is set up: Dot's config, a
-    plugin, another agent of the Mac (Skills › Found elsewhere), or Connect apps itself, the only place that removes
+    """One MCP server Dot has, as Customize › Plugins shows it (item 279). ``origin`` is where it is set up: Dot's config, a
+    plugin, another agent of the Mac (Customize › Skills › Found on this Mac), or the Plugins page itself, the only place that removes
     one. ``address`` is its URL or its command. ``state``: its tools are offered to runs (``ready``, with ``tools``,
     their names on the server), it was left out (``error`` says why), it is switched off in the config, or Dot tries it
     now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the
@@ -943,7 +950,7 @@ class McpServerView(FrozenModel):
 
 
 class McpServiceView(FrozenModel):
-    """A service of Connect apps' catalogue (``mcp/catalogue.py``), with whether Dot has its server already."""
+    """A service of the MCP catalogue (``mcp/catalogue.py``), with whether Dot has its server already."""
 
     id: str
     name: str

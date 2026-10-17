@@ -52,7 +52,6 @@ _SETTINGS: tuple[str, ...] = (
     "browser",
     "rules",
     "memory",
-    "skills",
     "schedules",
     "phone",
     "system",
@@ -293,7 +292,9 @@ async def test_every_page_on_a_phone_reads_at_a_phones_size_and_takes_a_finger(o
             ("agent", f"#/agents/{agent}"),
             ("team", "#/team"),
             ("campaigns", "#/campaigns"),
-            ("connect", "#/connect"),
+            ("plugins", "#/customize/plugins"),
+            ("plugin", "#/customize/plugins/notion"),
+            ("skills", "#/customize/skills"),
             ("settings", "#/settings"),
             *[(f"settings {tab}", f"#/settings/{tab}") for tab in _SETTINGS],
         ]
