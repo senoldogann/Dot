@@ -62,6 +62,25 @@ src/dotagent/
   core/       errors, logging, retries, paths, shared types
 ```
 
+## Releasing to PyPI
+
+Dot is published on PyPI as `dotagent-macos` (`dotagent` was taken; the package it installs is still `dotagent`, and
+the command `dotx`), by `.github/workflows/release.yml` (item 348) through trusted publishing, so no token is kept
+anywhere. Once, on pypi.org, with two-factor authentication on: Account settings › Publishing › Add a new pending
+publisher › GitHub, with the project name `dotagent-macos`, the owner `senoldogann`, the repository `Dot`, the workflow
+`release.yml` and the environment `pypi`. Then a release is a tag that says the version in `pyproject.toml`:
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The workflow checks that the tag and the version agree, builds the source distribution and the wheel with `uv build`
+and uploads them with `uv publish`. A version can be uploaded once: the next release raises `version` in
+`pyproject.toml` and `__version__` in `src/dotagent/__init__.py` first (a unit test keeps the two the same, and the
+workflow checks the tag against both). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`,
+then `dotx setup`.
+
 ## Measuring the agent
 
 How well Dot finishes work is measured, not guessed, in two ways.
