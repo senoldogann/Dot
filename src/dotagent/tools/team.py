@@ -11,7 +11,7 @@ from collections.abc import Sequence
 from pydantic import Field
 
 from dotagent.core.errors import ToolExecutionError, ToolInputError
-from dotagent.core.text import truncate_tail
+from dotagent.core.text import truncate_tail, unclosing
 from dotagent.llm.router import parse_model_ref
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import AgentRecord, RunMode, RunRecord
@@ -60,7 +60,9 @@ def find_agent(agents: list[AgentRecord], name: str) -> AgentRecord | None:
 
 
 def _fence(text: str, nonce: str, run_id: str) -> str:
-    return f'<agent_reply nonce="{nonce}" run="{run_id}">\n{text}\n</agent_reply>'
+    """Wrap a reply that may carry third-party text so that only ``nonce`` closes it."""
+    safe: str = unclosing(text, "agent_reply")
+    return f'<agent_reply nonce="{nonce}" run="{run_id}">\n{safe}\n</agent_reply nonce="{nonce}">'
 
 
 def render_reply(agent: AgentRecord, outcome: DelegateOutcome, nonce: str) -> ToolResult:

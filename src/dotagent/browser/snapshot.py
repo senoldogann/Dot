@@ -23,6 +23,7 @@ from dataclasses import dataclass, replace
 from urllib.parse import urljoin
 
 from dotagent.browser.types import Dropdown, DropdownOption
+from dotagent.core.text import unclosing
 
 _INDENT: re.Pattern[str] = re.compile(r"^( *)- ")
 _BOX: re.Pattern[str] = re.compile(r" \[box=(-?[\d.]+),(-?[\d.]+),([\d.]+),([\d.]+)\]")
@@ -526,7 +527,7 @@ def fold_options(lines: Sequence[SnapshotLine]) -> tuple[SnapshotLine, ...]:
 
 def fence_untrusted(url: str, body: str, nonce: str) -> str:
     """Wrap page-derived text so the prompt can state that everything inside is data and only ``nonce`` closes it."""
-    safe: str = body.replace("</web_content", "<\\/web_content")
+    safe: str = unclosing(body, "web_content")
     quoted: str = '"' + url.replace("\\", "\\\\").replace('"', '\\"') + '"'
     return f'<web_content nonce="{nonce}" url={quoted}>\n{safe}\n</web_content nonce="{nonce}">'
 

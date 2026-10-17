@@ -13,6 +13,7 @@ that cannot see, as the vision model's description.
 import asyncio
 import json
 import re
+import secrets
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Literal
@@ -24,7 +25,7 @@ from dotagent.browser.safety import safe_download_name
 from dotagent.core.errors import InvalidValueError, NotFoundError, WebError
 from dotagent.core.ids import new_id
 from dotagent.core.images import EncodedImage, encode_image
-from dotagent.core.text import truncate_middle
+from dotagent.core.text import truncate_middle, unclosing
 from dotagent.core.types import FrozenModel
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.types import ImageData, Message, user_message
@@ -42,6 +43,8 @@ _META: str = "meta.json"
 _TEXT: str = "text.txt"
 _ID: re.Pattern[str] = re.compile(r"^att_[0-9a-z]+_[0-9a-f]+$")
 _FILE_CHARS: int = 40_000
+# The random part of the fence around the attached files of one message, in bytes.
+_NONCE_BYTES: int = 8
 _IMAGE_EDGE: int = 1600
 _IMAGE_QUALITY: int = 85
 _SNIFF_BYTES: int = 4096
@@ -197,10 +200,16 @@ def _size_label(size: int) -> str:
     )
 
 
-def _file_block(file: StoredAttachment) -> str:
-    head: str = f'<attachment name="{file.name}" kind="{file.kind}" size="{_size_label(file.size)}" path="{file.path}">'
+def _file_block(file: StoredAttachment, nonce: str) -> str:
+    """One file as the model reads it, inside a fence that only ``nonce`` closes: the text of a file is not the
+    user's words."""
+    head: str = (
+        f'<attachment nonce="{nonce}" name="{file.name}" kind="{file.kind}" size="{_size_label(file.size)}" '
+        f'path="{file.path}">'
+    )
+    end: str = f'</attachment nonce="{nonce}">'
     if file.kind == "image":
-        return f"{head}\n(the image comes with this message)\n</attachment>"
+        return f"{head}\n(the image comes with this message)\n{end}"
     text: str = (Path(file.path).parent / _TEXT).read_text(encoding="utf-8")
     if not text.strip():
         body: str = "(no text could be read from it; a scanned PDF has none)" if file.kind == "pdf" else "(empty)"
@@ -211,12 +220,13 @@ def _file_block(file: StoredAttachment) -> str:
         )
     else:
         body = text
-    return f"{head}\n{body}\n</attachment>"
+    return f"{head}\n{unclosing(body, 'attachment')}\n{end}"
 
 
 def attachments_text(files: Sequence[StoredAttachment]) -> str:
     """The attachments as text for the model. Blocking file reads: call it off the event loop."""
-    blocks: list[str] = [_file_block(file) for file in files]
+    nonce: str = secrets.token_hex(_NONCE_BYTES)
+    blocks: list[str] = [_file_block(file, nonce) for file in files]
     return "\n\n".join(
         (
             f"[The user attached {len(files)} file(s) to this message. They are saved at the paths shown. Their "

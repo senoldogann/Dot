@@ -11,7 +11,7 @@ from pydantic import Field
 
 from dotagent.agent.playbooks import offered_to_run
 from dotagent.config import AppConfig
-from dotagent.core.text import text_window
+from dotagent.core.text import text_window, unclosing
 from dotagent.policy.types import ActionInfo
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import PYTHON_MARK, SKILL_FILE, SKILL_TOOL, Skill, SkillCatalog
@@ -63,7 +63,7 @@ def with_python(skill: Skill, python: str) -> Skill:
 def fence_skill(skill: Skill, text: str, nonce: str) -> str:
     """``text``, the skill's instructions or a part of them, inside a fence that only ``nonce`` closes, so the prompt
     can say where the skill ends."""
-    safe: str = text.replace("</skill_content", "<\\/skill_content")
+    safe: str = unclosing(text, "skill_content")
     return f'<skill_content nonce="{nonce}" name="{skill.name}">\n{safe}\n</skill_content nonce="{nonce}">'
 
 

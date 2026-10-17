@@ -201,17 +201,33 @@ def answer_paths(answer: str) -> tuple[NamedPath, ...]:
     return tuple(NamedPath(name=name, readings=_readings(answer, name)) for name in names)
 
 
+def _goes_on(reading: str, readings: Sequence[str]) -> bool:
+    """Whether a longer reading goes on from ``reading`` into folders past a space ("Projects Final/plan.md" after
+    "Projects"), so that ``reading`` is only the start of the path the answer names."""
+    return any(other.startswith(reading) and "/" in other[len(reading) :] for other in readings if other != reading)
+
+
+def _found(reading: str, readings: Sequence[str], touched: set[Path], workspace: Path) -> bool:
+    """Whether ``reading`` is there: a successful call of the run named it, or it exists, as a file or as a folder that
+    no longer reading goes on from (a folder ``Projects`` says nothing of ``Projects Final/plan.md``)."""
+    path: Path = expand_path(reading, workspace)
+    if path in touched:
+        return True
+    if os.path.isdir(path):
+        return not _goes_on(reading, readings)
+    return os.path.exists(path)
+
+
 def missing_paths(paths: Sequence[NamedPath], named: Collection[str], workspace: Path) -> tuple[str, ...]:
-    """The names of ``paths`` of which no reading exists and that no successful call of the run named: a file the run
-    removed or moved is not missing. A relative ``named`` value is resolved against ``workspace``. Reads the file
-    system."""
+    """The names of ``paths`` of which no reading is there (:func:`_found`): a file the run removed or moved, which a
+    successful call of the run named, is not missing. A relative ``named`` value is resolved against ``workspace``.
+    Reads the file system."""
     touched: set[Path] = {expand_path(value, workspace) for value in named if not value.startswith(_ADDRESS_STARTS)}
-    missing: list[str] = []
-    for path in paths:
-        readings: list[Path] = [expand_path(reading, workspace) for reading in path.readings]
-        if not any(reading in touched or os.path.exists(reading) for reading in readings):
-            missing.append(path.name)
-    return tuple(missing)
+    return tuple(
+        path.name
+        for path in paths
+        if not any(_found(reading, path.readings, touched, workspace) for reading in path.readings)
+    )
 
 
 def unopened_addresses(answer: str, named: Collection[str]) -> tuple[str, ...]:

@@ -10,12 +10,13 @@ from typing import Literal
 
 import pytest
 
+from dotagent.agent.compact import drop_old_images
 from dotagent.agent.loop import RunOutcome, SendBack, _after_verdict, _since_goal
 from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
-from dotagent.llm.types import Message, assistant_message, user_message
+from dotagent.llm.types import ImageData, Message, assistant_message, user_message
 from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, QuestionMode, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -90,6 +91,18 @@ def test_the_conversation_of_a_run_starts_at_its_goal() -> None:
     reply: Message = assistant_message("a reply", None, ())
     assert _since_goal([earlier, reply, goal, reply], goal) == [goal, reply]
     assert _since_goal([goal, reply, goal, reply], goal) == [goal, reply]
+
+
+def test_a_goal_whose_images_were_dropped_still_starts_its_run() -> None:
+    """Item 351: once its picture was dropped into a note, the goal no longer equalled itself and the whole chat, its
+    earlier runs too, went to the goal check."""
+    earlier: Message = user_message("an earlier goal", ())
+    goal: Message = user_message(
+        "what is on this screenshot?", (ImageData(media_type="image/png", data_b64="iVBORw0K"),)
+    )
+    reply: Message = assistant_message("a reply", None, ())
+    kept: list[Message] = drop_old_images([earlier, reply, goal, reply], 0)
+    assert _since_goal(kept, goal) == kept[2:]
 
 
 def test_a_conversation_whose_start_was_summarised_is_taken_whole() -> None:

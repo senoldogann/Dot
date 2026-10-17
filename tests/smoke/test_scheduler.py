@@ -441,33 +441,6 @@ async def test_while_the_emergency_stop_is_engaged_a_due_schedule_is_skipped_to_
     assert len(await runtime.store.list_threads(1000)) == threads_before
 
 
-class _Starts(RunManager):
-    """Keeps the opening and the goal of every run a firing starts; no run starts in these tests, so each firing fails
-    to start."""
-
-    def __init__(self, runtime: Runtime) -> None:
-        super().__init__(runtime)
-        self.started: list[str] = []
-        self.goals: list[str] = []
-
-    async def start_firing(
-        self,
-        goal: str,
-        opening: str,
-        mode: RunMode,
-        model: str | None,
-        thread_id: str,
-        effort: Effort | None,
-        speed: Speed,
-        approvals: ApprovalMode | None,
-        goal_mode: bool | None,
-        carried: tuple[str, ...],
-    ) -> RunRecord:
-        self.started.append(opening)
-        self.goals.append(goal)
-        raise ConfigError("no run starts in this test", {"goal": goal})
-
-
 class _StartsAndEnds(RunManager):
     """Starts every firing's run as a record of the store, which ends done once the test lets it (``ends``); no model
     runs."""
@@ -512,6 +485,33 @@ class _StartsAndEnds(RunManager):
         await self.ends.wait()
         await self._runtime.store.finish_run(run_id, "done", "pong")
         return await self._runtime.store.get_run(run_id)
+
+
+class _Starts(_StartsAndEnds):
+    """Keeps the opening of every run a firing starts, and starts it as :class:`_StartsAndEnds` does, ended at once."""
+
+    def __init__(self, runtime: Runtime) -> None:
+        super().__init__(runtime)
+        self.started: list[str] = []
+        self.ends.set()
+
+    async def start_firing(
+        self,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        carried: tuple[str, ...],
+    ) -> RunRecord:
+        self.started.append(opening)
+        return await super().start_firing(
+            goal, opening, mode, model, thread_id, effort, speed, approvals, goal_mode, carried
+        )
 
 
 async def test_a_schedule_whose_running_status_was_not_written_is_free_once_its_run_ends(
@@ -568,6 +568,33 @@ class _FailsThenStarts(_StartsAndEnds):
         return await super().start_firing(
             goal, opening, mode, model, thread_id, effort, speed, approvals, goal_mode, carried
         )
+
+
+async def test_a_one_time_schedule_whose_run_does_not_start_stays_due_and_fires_later(runtime: Runtime) -> None:
+    """Item 351: a one-time schedule's firing switched it off before its run started, so one whose start failed (Dot's
+    error, or a crash) never fired. It stays due now, and fires once its run can start."""
+    once: ScheduleRecord = await _schedule(runtime, _once(runtime, "Flaky once", 60.0))
+    manager: _FailsThenStarts = _FailsThenStarts(runtime)
+    scheduler: Scheduler = Scheduler(runtime, manager)
+    due: float = _planned(once)
+    try:
+        await scheduler.tick(due + 5)
+        refused: ScheduleRecord = await runtime.store.get_schedule(once.id)
+        assert (refused.enabled, refused.next_run_at) == (True, due), refused
+        assert refused.last_status == "failed to start: the model is gone"
+        await scheduler.tick(due + 10)
+        crashed: ScheduleRecord = await runtime.store.get_schedule(once.id)
+        assert (crashed.enabled, crashed.next_run_at, crashed.last_status) == (
+            True,
+            due,
+            "failed to fire: RuntimeError",
+        )
+        await scheduler.tick(due + 15)
+        manager.ends.set()
+        fired: ScheduleRecord = await _until_over(runtime, once.id)
+    finally:
+        await scheduler.drain()
+    assert (fired.enabled, fired.next_run_at, fired.last_status, manager.goals) == (False, None, "done", [GOAL])
 
 
 async def test_a_firing_that_fails_is_counted_leaves_no_chat_and_the_schedule_fires_again(runtime: Runtime) -> None:

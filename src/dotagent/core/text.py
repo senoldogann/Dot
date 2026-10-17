@@ -1,4 +1,5 @@
-"""Text helpers: truncation, secret redaction and blob stripping for logs and errors, and times of day."""
+"""Text helpers: truncation, secret redaction and blob stripping for logs and errors, the fences around text that is
+data, and times of day."""
 
 import re
 import unicodedata
@@ -145,6 +146,12 @@ def plain_line(text: str, max_chars: int) -> str:
     run together, at most ``max_chars`` characters."""
     unmarked: str = _LINE_MARK.sub("", _LINK.sub(r"\1", _FENCE_LINE.sub("", text)))
     return _SPACES.sub(" ", _INLINE_MARK.sub("", unmarked)).strip()[:max_chars]
+
+
+def unclosing(body: str, tag: str) -> str:
+    """``body`` with every closing tag of ``tag`` in it broken (``<\\/tag``), whatever its case, so that only the end of
+    the fence it goes in closes that fence."""
+    return re.sub(rf"</(?={re.escape(tag)})", r"<\\/", body, flags=re.IGNORECASE)
 
 
 def redact_secrets(text: str) -> str:

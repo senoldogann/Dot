@@ -21,7 +21,17 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.events import Subscription
 from dotagent.llm.router import parse_model_ref
-from dotagent.llm.types import ChatRequest, DeltaSink, Message, ModelInfo, ModelReply
+from dotagent.llm.types import (
+    ChatRequest,
+    DeltaSink,
+    Message,
+    ModelInfo,
+    ModelReply,
+    ToolCall,
+    assistant_message,
+    tool_message,
+    user_message,
+)
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler.runner import Scheduler
 from dotagent.scheduler.timing import next_firing
@@ -132,6 +142,54 @@ async def test_a_step_a_stop_of_the_daemon_cuts_keeps_the_results_of_the_calls_t
     assert results[WRITE.tool].startswith("Wrote 8 bytes (1 lines) to ")
     # Only the command was cut, so only it is left for a resumed run to look at.
     assert [call.tool for call in left] == [SHELL.tool]
+
+
+async def test_a_call_cut_after_another_of_its_step_ended_is_said_to_have_started(
+    login_env: dict[str, str],
+) -> None:
+    """Item 351: the calls of a step that started were read from its newest events, as many as the calls left without a
+    result, so a call cut while a later call of its step (two run side by side) had ended was said not to have started,
+    and its note said nothing of it ran. The store holds the step as such a stop leaves it."""
+    first: ToolCall = ToolCall(id="call_1", name="read_file", arguments={"path": "data.csv"})
+    second: ToolCall = ToolCall(id="call_2", name="list_dir", arguments={"path": "."})
+    with scratch_home() as home, eval_environment(home, {}):
+        runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
+        try:
+            store = runtime.store
+            thread = await store.create_thread(GOAL, UI_SOURCE)
+            run: RunRecord = await store.create_run(
+                thread.id,
+                GOAL,
+                "task",
+                SCRIPTED_MODEL,
+                None,
+                UI_SOURCE,
+                "medium",
+                "standard",
+                None,
+                "yolo",
+                False,
+                None,
+                None,
+                None,
+            )
+            await store.set_run_steps(run.id, 1)
+            await store.add_event(run.id, "assistant", {"step": 1})
+            await store.append_messages(
+                thread.id,
+                [
+                    user_message(GOAL, ()),
+                    assistant_message("", None, (first, second)),
+                    tool_message(second, "data.csv", ()),
+                ],
+            )
+            for call in (first, second):
+                await store.add_event(run.id, "tool_call", {"call_id": call.id, "tool": call.name})
+            await store.add_event(run.id, "tool_result", {"call_id": second.id, "tool": second.name, "ok": True})
+            left: tuple[InterruptedCall, ...] = await interrupted_calls(runtime, await store.get_run(run.id))
+        finally:
+            await close_runtime(runtime)
+    assert [(call.tool, call.end) for call in left] == [(first.name, "cut_off")]
 
 
 def _reflecting_config() -> AppConfig:

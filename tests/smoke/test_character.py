@@ -1,6 +1,6 @@
 """The characters (item 101): the gallery at ``#/controls`` shows every shape, expression and colour as a still frame
 and every animation moving; a state change reaches the engine; reduced motion leaves still frames; a hidden tab stops
-the loop. In a headless Chrome."""
+the loop; a face shown for an hour still blinks (item 351). In a headless Chrome."""
 
 import asyncio
 import time
@@ -40,6 +40,20 @@ _MOUNT: str = """
 import(new URL('js/character/character.js', location.href)).then((m) => {
   window.__character = m.mountCharacter(document.body, { shape: 'droplet', colour: 'violet', size: 120, phase: 0 });
   return window.__character.element.dataset.animation;
+})
+"""
+
+# How long the lids are more than half shut, in samples 20 ms apart, over the first minute and over a minute an hour on.
+_SHUT: str = """
+import(new URL('js/character/face.js', location.href)).then((m) => {
+  const shut = (from) => {
+    let samples = 0;
+    for (let t = from; t < from + 60; t += 0.02) {
+      if (m.liveliness(t).lid < 0.5) samples++;
+    }
+    return samples;
+  };
+  return [shut(0), shut(3600)];
 })
 """
 
@@ -274,4 +288,13 @@ async def test_a_hidden_tab_stops_the_loop_and_a_shown_one_resumes_it(
     )
     assert await page.evaluate(_TICKER) is True
     assert await _path_moves(page, _ORBIT)
+    await page.close()
+
+
+async def test_a_face_shown_for_an_hour_still_blinks(browser: Browser, client: httpx.AsyncClient) -> None:
+    """Item 351: the calendar of blinks covers about a quarter of an hour and starts again; after it, the eyes stayed
+    open for good."""
+    page: Page = await _open(browser, client, False, "light")
+    first, later = await page.evaluate(_SHUT)
+    assert first > 0 and later > 0, (first, later)
     await page.close()

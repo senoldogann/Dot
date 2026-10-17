@@ -39,6 +39,16 @@ def drop_old_images(messages: Sequence[Message], keep_recent: int) -> list[Messa
     ]
 
 
+def kept_as(message: Message, original: Message) -> bool:
+    """Whether ``message`` is ``original`` as :func:`drop_old_images` may have left it: the same, or with its images
+    dropped into a short note."""
+    if message == original:
+        return True
+    return bool(original.images) and message == original.model_copy(
+        update={"images": (), "content": original.content + _OMITTED_IMAGE_NOTE}
+    )
+
+
 def shrink_old_tool_results(messages: Sequence[Message], keep_recent: int) -> list[Message]:
     """Truncate tool output that is older than the newest ``keep_recent`` tool messages."""
     results: list[int] = [index for index, message in enumerate(messages) if message.role == "tool"]

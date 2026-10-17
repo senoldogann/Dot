@@ -30,7 +30,7 @@ from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanPayload, plan_from_e
 from dotagent.agent.review import goal_digest
 from dotagent.core.errors import MissingSecretError, ProviderError
 from dotagent.core.logs import get_logger
-from dotagent.core.text import redact_secrets, truncate_tail
+from dotagent.core.text import redact_secrets, truncate_tail, unclosing
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.router import ModelRef, parse_model_ref
 from dotagent.llm.types import (
@@ -101,7 +101,7 @@ def _fenced(name: str, nonce: str, body: str) -> str:
 def _advice(model: str, answer: str, nonce: str) -> str:
     """Wrap the answer so that only ``nonce`` closes it: the helper read the run's record, which may hold third-party
     text."""
-    safe: str = answer.replace("</helper_advice", "<\\/helper_advice")
+    safe: str = unclosing(answer, "helper_advice")
     return f'<helper_advice nonce="{nonce}" model="{model}">\n{safe}\n</helper_advice nonce="{nonce}">'
 
 

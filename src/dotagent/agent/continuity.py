@@ -207,9 +207,11 @@ def spellings(name: str, home: str) -> tuple[str, ...]:
 
 def _is_known(name: str, known: str, known_names: Collection[str], home: str) -> bool:
     """Whether the history holds ``name``, as it is written or as the Mac also writes it (:func:`spellings`): whole,
-    cut short (a cut identifier is a part of its whole), or as a long identifier it starts with."""
+    cut short (a cut identifier is a part of its whole), or as a long identifier with a fragment after it. A path or a
+    page under a known one is not known by that."""
     return any(
-        form in known or any(len(other) >= _LONG_IDENTIFIER_CHARS and form.startswith(other) for other in known_names)
+        form in known
+        or any(len(other) >= _LONG_IDENTIFIER_CHARS and form.startswith(f"{other}#") for other in known_names)
         for form in spellings(name, home)
     )
 
@@ -218,9 +220,10 @@ def check_continuity(summary: str, reference: str, ledger: RunLedger, home: str)
     """Validate a model's summary against ``reference`` (the full text of the history it replaces) and the ledger.
 
     An identifier counts as known when the history holds it, whole or cut short (a trailing ellipsis, the mark of a
-    value Dot cut, is not part of it), or when it starts with a known identifier of at least 24 characters (an
-    address with a fragment the history did not have). A path counts in any of its spellings: ``~`` for ``home``,
-    the home folder, and ``/tmp`` or ``/var`` with or without ``/private``.
+    value Dot cut, is not part of it), or when it is a known identifier of at least 24 characters with a fragment
+    after it (``#step-3``) the history did not have; a path or a page under a known one does not count by that. A
+    path counts in any of its spellings: ``~`` for ``home``, the home folder, and ``/tmp`` or ``/var`` with or without
+    ``/private``.
     """
     missing: tuple[str, ...] = missing_sections(summary)
     known: str = "\n".join([reference, ledger.goal, *ledger.instructions, *ledger.touched])

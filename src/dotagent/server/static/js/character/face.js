@@ -45,8 +45,9 @@ export function eyePoses(gaze, scale, split = EYE_SPLIT) {
 // Life at rest: a slow drift of the gaze, saccades, blinks. A pure function of time, so pause, resume and a jump to
 // any date give the same picture. The values are offsets added to the current state's pose.
 const BLINK_RNG = createRng(0x5eed);
-// A blink calendar drawn once: deterministic and stateless.
-const BLINKS = (() => {
+// A blink calendar drawn once: deterministic and stateless. It covers about 15 minutes and then starts again, so a
+// face shown for longer goes on blinking; its last blink ends before the time the calendar covers does.
+const { BLINKS, BLINK_CYCLE } = (() => {
   const out = [];
   let t = 1.4;
   while (t < 900) {
@@ -58,13 +59,14 @@ const BLINKS = (() => {
       t += 0.24;
     }
   }
-  return out;
+  return { BLINKS: out, BLINK_CYCLE: t };
 })();
 
 // Measured: 1 to 2 frames at 10 fps.
 const BLINK_DUR = 0.18;
 
-function blinkLid(t) {
+function blinkLid(time) {
+  const t = time % BLINK_CYCLE;
   for (let i = 0; i < BLINKS.length; i++) {
     const start = BLINKS[i];
     if (t < start) break;

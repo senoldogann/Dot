@@ -247,8 +247,9 @@ with 1 when it left a file as it is. A file that changed or was deleted after th
 and is left as it is; `--apply --force` takes it back too, and what changed in it since is lost. A file larger than
 `undo_max_file_bytes` (10 MiB), or whose copy would bring the copies of the run past `undo_max_run_bytes` (100 MiB), is
 changed without a copy and cannot be put back; a file the run created can always be deleted again. A copy that is not
-the one the journal noted is not written back, and a folder that is now where a file was is never replaced. Only the two
-file tools are in the journal: what a shell command (`rm`, `mv`, `sed -i`), the browser or the desktop changed is not. A
+the one the journal noted is not written back, and a folder that is now where a file was is never replaced. Only the
+file tools are in the journal (`write_file`, `edit_file` and `write_notes`): what a shell command (`rm`, `mv`,
+`sed -i`), the browser or the desktop changed is not. A
 run that is still working is refused; a run of `dotx run` that a crash left working ends when the daemon starts again.
 `dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days). The Actions tab of
 the run's page shows the same plan, one file at a time, with a button for each file that is as the run left it.

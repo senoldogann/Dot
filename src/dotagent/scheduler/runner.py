@@ -332,6 +332,10 @@ class Scheduler:
             # went on in stays.
             if started is None and made:
                 await self._drop_chat(record.id, thread_id)
+            # A one-time schedule is never dropped: one whose run did not start, with Dot's error or with a crash, is
+            # due again, and the next tick tries again (item 351; the firing above had switched it off for good).
+            if started is None and one_time:
+                await store.keep_schedule_due(record.id, record.next_run_at)
         run: RunRecord = started
         if await _emergency_stop_engaged():
             log.warning("schedule_run_stopped_emergency_stop", schedule_id=record.id, run_id=run.id)

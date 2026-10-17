@@ -95,11 +95,19 @@ def test_the_check_takes_an_address_cut_short_or_lengthened_as_known_and_another
     assert cut.ok, cut.unverified
     lengthened = check_continuity(SUMMARY + f"\nSee {page}#step-3", reference, ledger, HOME)
     assert lengthened.ok, lengthened.unverified
-    # Another page under the same prefix is not this one, and a short known path says nothing about a longer one.
+    # Another page under the same prefix is not this one, nor is a page under this one, and a short known path says
+    # nothing about a longer one.
     other = check_continuity(
-        SUMMARY + f"\nSee {page.rsplit('/', 1)[0]}/delete-all and ~/Reports/a.md.bak", reference, ledger, HOME
+        SUMMARY + f"\nSee {page.rsplit('/', 1)[0]}/delete-all, {page}/delete-all and ~/Reports/a.md.bak",
+        reference,
+        ledger,
+        HOME,
     )
-    assert other.unverified == ("https://docs.example.com/guides/backups/delete-all", "~/Reports/a.md.bak")
+    assert other.unverified == (
+        "https://docs.example.com/guides/backups/delete-all",
+        f"{page}/delete-all",
+        "~/Reports/a.md.bak",
+    )
 
 
 def test_the_check_knows_a_path_in_the_other_spellings_a_mac_has_for_it() -> None:

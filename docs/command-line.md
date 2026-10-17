@@ -1,5 +1,8 @@
 # The command line
 
+`dotx setup` checks this Mac, asks for the model Dot runs on and stores its key, and installs the service (see
+[Install](../README.md#install)); `dotx --help` lists every command, and `dotx COMMAND --help` its flags.
+
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the Office applications and the OneDrive folders of the skills that come with Dot
 (none is opened), the commands and secrets of the configured MCP servers (none is started), Ollama, the keys of OpenAI,
