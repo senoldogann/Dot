@@ -39,6 +39,8 @@ _PROVIDER: str = "ollama"
 TOKEN: str = "tour-test-token"
 _RUN_WAIT_S: float = 90.0
 _SETTLE_MS: int = 900
+# What scrolls a conversation: on a phone the conversation itself, the window on a wider screen (item 352).
+_SCROLLER: str = "(window.innerWidth <= 720 ? document.querySelector('.run-thread') : document.scrollingElement)"
 # Every page of the interface by its hash; the run page is added once the scripted run exists.
 _PAGES: tuple[tuple[str, str], ...] = (
     ("home", "#/runs"),
@@ -257,7 +259,7 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             )
         if name == "run":
             # From the top of a conversation taller than the window, the way down to the answer (item 96).
-            await page.evaluate("window.scrollTo(0, 0)")
+            await page.evaluate(f"{_SCROLLER}.scrollTo(0, 0)")
             await page.wait_for_timeout(_SETTLE_MS)
             await expect(page.get_by_role("button", name="Jump to the answer")).to_be_visible()
             await page.screenshot(path=str(out / f"{tag}-run-top.png"), full_page=False)

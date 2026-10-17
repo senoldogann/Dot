@@ -13958,19 +13958,19 @@ and at 12 px the answer, a row of the sidebar and a label of the settings shrink
 
 ### 348. Dot can be published to PyPI as dotagent-macos, by a tag
 
-**Status: done (`5e2476f`); the first upload waits for the owner's pending publisher on pypi.org.** The owner's word of 2026-10-17: "PyPI olayı
-ne, kayıt oldum ama ne yapacağız?" (what about PyPI: I signed up, what do we do), after approving publication on
-2026-10-17 ("Paket PyPI'ye yayımlansın mı?", approved). **As built (2026-10-17).** `dotagent` and `dotx` are taken on
-PyPI (its JSON API answered 200; `dotagent-macos` 404); the distribution is `dotagent-macos`, the package it installs
-stays `dotagent` (`[tool.uv.build-backend] module-name`) and the command `dotx`. `.github/workflows/release.yml` builds
-on a tag `v*` whose version is `pyproject.toml`'s and uploads with `uv publish` through trusted publishing (`id-token:
-write`, environment `pypi`), so no token is kept. Checked: `uv build` with uv 0.13 makes the sdist and the wheel (the
-local uv 0.10.9 could not unpack the sdist uv_build 0.13 writes; CI installs a current uv), the wheel holds the web UI,
-Dot.app's source, the defaults, the built-in skills and the evals, and `uv tool run --from <wheel> dotx --help` runs.
-Docs: `docs/development.md` › Releasing to PyPI, with the values of PyPI's pending publisher. The first upload waits for
-the owner: the pending publisher on pypi.org is theirs to add, and the first upload claims the name. The package's
-`__version__` and `pyproject.toml`'s are kept the same by `tests/unit/test_version.py`, and the workflow checks the tag
-against both.
+**Status: done (`5e2476f`); the first upload waits for the owner's pending publisher on pypi.org.** The owner's word of
+2026-10-17: "PyPI olayı ne, kayıt oldum ama ne yapacağız?" (what about PyPI: I signed up, what do we do), after
+approving publication on 2026-10-17 ("Paket PyPI'ye yayımlansın mı?", approved). **As built (2026-10-17).** `dotagent`
+and `dotx` are taken on PyPI (its JSON API answered 200; `dotagent-macos` 404); the distribution is `dotagent-macos`,
+the package it installs stays `dotagent` (`[tool.uv.build-backend] module-name`) and the command `dotx`.
+`.github/workflows/release.yml` builds on a tag `v*` whose version is `pyproject.toml`'s and uploads with `uv publish`
+through trusted publishing (`id-token: write`, environment `pypi`), so no token is kept. Checked: `uv build` with uv
+0.13 makes the sdist and the wheel (the local uv 0.10.9 could not unpack the sdist uv_build 0.13 writes; CI installs a
+current uv), the wheel holds the web UI, Dot.app's source, the defaults, the built-in skills and the evals, and `uv tool
+run --from <wheel> dotx --help` runs. Docs: `docs/development.md` › Releasing to PyPI, with the values of PyPI's pending
+publisher. The first upload waits for the owner: the pending publisher on pypi.org is theirs to add, and the first
+upload claims the name. The package's `__version__` and `pyproject.toml`'s are kept the same by
+`tests/unit/test_version.py`, and the workflow checks the tag against both.
 
 ### 349. OpenRouter: the models of many labs on one key
 
@@ -14031,11 +14031,11 @@ undo through a linked folder) are item 350, in a pull request for the owner.
 
 ### 350. The audit of 2026-10-17: what held in the paths a human merges
 
-**Status: done (`410af27`).** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler
-gerçekten var ise lütfen düzelt. NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum." (verify the report, fix what is
-real; YOLO's freedom must not break). These touch `policy/`, `secrets.py`, `agent/review.py` and `undo/`, which
-REVIEW.md leaves to a human; the owner's word was to merge them once a fresh review is clean and CI is green. None adds anything a yolo run meets. **As built
-(2026-10-17).** The amount of a payment step is read whole (`$1500.00` was 150, `$150000` 150, `$2500` 250, `CHF
+**Status: done (`410af27`).** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler gerçekten var ise lütfen
+düzelt. NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum." (verify the report, fix what is real; YOLO's freedom must
+not break). These touch `policy/`, `secrets.py`, `agent/review.py` and `undo/`, which REVIEW.md leaves to a human; the
+owner's word was to merge them once a fresh review is clean and CI is green. None adds anything a yolo run meets. **As
+built (2026-10-17).** The amount of a payment step is read whole (`$1500.00` was 150, `$150000` 150, `$2500` 250, `CHF
 1'234.50` 1; a point, a comma, an apostrophe or a space groups thousands), and of several in a label or after the total
 cues of a page the largest counts, so a misread errs towards the hand-off; a yolo run waives that hand-off as before,
 while an `auto` run no longer lets its review model approve a $1500 payment read as $150 under a $200 cap. A key whose
