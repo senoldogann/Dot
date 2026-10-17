@@ -368,17 +368,18 @@ function beginSession() {
   // along it. A page opened any other way (the sidebar, an address, a page's own move) starts it anew, and the browser's
   // own Back takes a page off it.
   let trail = [];
-  let byLink = false;
+  // The page the last link of a page leads to: the next page is opened by that link when it is that page.
+  let linkedTo = null;
   shell.main.addEventListener("click", (event) => {
     const link = event.target instanceof Element ? event.target.closest("a[href^='#/']") : null;
     if (link !== null && link.target === "") {
-      byLink = true;
+      linkedTo = link.getAttribute("href").slice(1).split("?")[0];
     }
   });
 
   function followTrail(path) {
-    const linked = byLink;
-    byLink = false;
+    const linked = linkedTo === path;
+    linkedTo = null;
     if (!linked && trail.length >= 2 && trail[trail.length - 2] === path) {
       trail.pop();
     } else if (trail[trail.length - 1] !== path) {
