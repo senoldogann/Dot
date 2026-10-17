@@ -31,11 +31,12 @@ from dotagent.agent.manager import RunManager
 from dotagent.browser.attach import DebugEndpoint, parse_port_file
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import chrome_arguments
+from dotagent.browser.look import PageLook
 from dotagent.browser.modes import adopt_mode, browser_data_dir
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, RenderedDocument, no_runs_at_work
-from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot, Step
+from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot, ScriptRun, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError, ToolExecutionError
 from dotagent.core.paths import ensure_layout
@@ -313,6 +314,27 @@ async def test_a_tab_of_dot_opens_in_a_window_of_its_own(
         await session.aclose()
 
 
+async def test_the_colour_scheme_chosen_reaches_new_tabs_and_the_connection_stays(
+    chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """Item 354: in the Chrome of the user a new colour scheme lets go of nothing; the tabs Dot opens after it are told
+    it, as the tab of another thread, opened before, keeps working."""
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        await session.open_url("before", f"{site}/")
+        await session.set_look(PageLook(fit_window=False, viewport_width=1280, viewport_height=860, appearance="dark"))
+        assert session.connected
+        await session.open_url("after", f"{site}/other")
+        dark: ScriptRun = await session.run_script("after", "matchMedia('(prefers-color-scheme: dark)').matches", 5.0)
+        assert (dark.end, dark.text) == ("value", "true"), dark
+        kept: ScriptRun = await session.run_script("before", "document.title", 5.0)
+        assert kept.end == "value", kept
+    finally:
+        await session.aclose()
+
+
 async def test_back_in_the_chrome_of_the_user_takes_no_longer_than_a_page(
     chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
@@ -573,7 +595,7 @@ async def test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_
     await asyncio.to_thread(third_dir.mkdir, mode=0o700)
     third: ScratchChrome = await start_chrome(third_dir, f"{site}/other")
     own: BrowserSession = BrowserSession(
-        own_config, SERVER, browser_data_dir("own"), own_home / "downloads", no_runs_at_work
+        own_config, SERVER, browser_data_dir("own", own_config.profile), own_home / "downloads", no_runs_at_work
     )
     attached: BrowserSession = BrowserSession(
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
@@ -593,7 +615,7 @@ async def test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_
 async def test_a_session_moves_between_dots_own_chrome_and_the_chrome_of_the_user(
     chrome: ScratchChrome, own_config: BrowserConfig, own_home: Path, site: str
 ) -> None:
-    own_profile: Path = browser_data_dir("own")
+    own_profile: Path = browser_data_dir("own", own_config.profile)
     session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads", no_runs_at_work)
     try:
         assert (session.mode, session.connected) == ("own", False)
@@ -627,7 +649,7 @@ async def test_a_switch_that_chrome_refuses_leaves_the_session_where_it_was(
 ) -> None:
     wrong: str = "00000000-0000-4000-8000-000000000000"
     (chrome.data_dir / _PORT_FILE).write_text(f"{chrome.port}\n/devtools/browser/{wrong}\n", encoding="utf-8")
-    own_profile: Path = browser_data_dir("own")
+    own_profile: Path = browser_data_dir("own", own_config.profile)
     session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads", no_runs_at_work)
     try:
         with pytest.raises(BrowserError, match="did not accept the connection"):
@@ -648,7 +670,7 @@ async def test_a_switch_to_the_chrome_of_the_user_while_it_is_closed_opens_it_fi
         opened.append(await spawn_chrome(directory, f"{site}/mine"))
 
     session: BrowserSession = BrowserSession(
-        own_config, SERVER, browser_data_dir("own"), own_home / "downloads", no_runs_at_work
+        own_config, SERVER, browser_data_dir("own", own_config.profile), own_home / "downloads", no_runs_at_work
     )
     try:
         assert profile_holder_pid(data_dir) is None
@@ -675,7 +697,7 @@ async def test_a_chrome_opened_with_its_remote_debugging_off_is_named_and_the_se
     async def open_as_a_click_does(directory: Path) -> None:
         opened.append(await spawn_chrome_without_debugging(directory, f"{site}/mine"))
 
-    own_profile: Path = browser_data_dir("own")
+    own_profile: Path = browser_data_dir("own", own_config.profile)
     session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads", no_runs_at_work)
     try:
         with pytest.raises(BrowserError, match="does not allow remote debugging"):

@@ -5,9 +5,10 @@
 Dot works in Chrome in one of two ways, set by `[browser] mode`: in a Chrome of its own (`own`, the default) or in new
 tabs of the Chrome you already have open (`attach`, see below).
 
-**`own`** starts a Chrome of Dot's own on its own profile (`<home>/browser-profile`). It cannot drive your daily profile
-that way: since version 136 Chrome refuses remote debugging on its default data directory, and it locks a profile while
-it runs. There are two ways to open the sites Dot should use with your accounts:
+**`own`** starts a Chrome of Dot's own on the profile in use (Default, `<home>/browser-profile`, unless Settings ›
+Browser chose another; see Profiles below). It cannot drive your daily profile that way: since version 136 Chrome
+refuses remote debugging on its default data directory, and it locks a profile while it runs. There are two ways to open
+the sites Dot should use with your accounts:
 
 - `dotx browser login [url]` opens Dot's profile as a normal Chrome window. Sign in, then quit Chrome (Cmd+Q); the
   cookies stay. Settings › Browser does the same with "Sign in…" (`POST /api/browser/sign-in`, item 344): Dot's own

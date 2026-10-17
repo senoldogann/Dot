@@ -737,10 +737,14 @@ class BrowserSession:
         _log.info("browser_enabled", mode=self._config.mode, enabled=enabled)
 
     async def set_look(self, look: PageLook) -> None:
-        """How pages look from the next call on (item 354): Chrome is let go of first, as for a switch, so that Dot's
-        own Chrome starts again with the size and the colour scheme, and the tabs Dot opens in the Chrome of the user
-        are told the colour scheme. Refused while a chat's run is at work in it, as a switch is."""
-        await self.switch(self._config.model_copy(update=look.model_dump()), self._profile)
+        """How pages look from the next call on (item 354). Dot's own Chrome is let go of first, as for a switch, so
+        that it starts again with the size and the colour scheme, which is refused while a chat's run is at work in it;
+        in the Chrome of the user the connection stays, and the tabs Dot opens from now on are told the colour scheme."""
+        if self._config.mode == "own":
+            await self.switch(self._config.model_copy(update=look.model_dump()), self._profile)
+            return
+        self._config = self._config.model_copy(update=look.model_dump())
+        _log.info("browser_look", mode=self._config.mode, appearance=look.appearance)
 
     async def use_profile(self, profile: str) -> None:
         """Work on the profile ``profile`` of Dot's own Chrome from the next call on (item 355), as a switch does: Dot's

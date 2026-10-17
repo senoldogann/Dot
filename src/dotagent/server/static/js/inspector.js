@@ -394,10 +394,11 @@ export function createInspector({ layout, tabs, screensIn }) {
   // switch hides it.
   let peeking = false;
 
-  /** Show the tab `id` beside the conversation for now, the reader's choices kept as they are; on a window too narrow
-   * for the panel nothing changes (a phone has the button of its bar). */
+  /** Show the tab `id` beside the conversation for now, the reader's choices kept as they are. A panel the reader has
+   * open keeps the tab it shows, and on a window too narrow for the panel nothing changes (a phone has the button of
+   * its bar). */
   function peekTab(id) {
-    if (file !== null || measuredWidth < MIN_WIDTH_PX) {
+    if (file !== null || measuredWidth < MIN_WIDTH_PX || showInspector()) {
       return;
     }
     show(id);

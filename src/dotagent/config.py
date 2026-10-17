@@ -61,6 +61,7 @@ def _debug_port(value: int) -> int:
 # A profile of Dot's own Chrome (item 355, after T3 Code's): "default", "incognito", or the name of one the owner added,
 # which names its folder.
 _PROFILE_NAME: re.Pattern[str] = re.compile(r"^[^\W_][\w -]{0,47}$")
+_RESERVED_PROFILES: frozenset[str] = frozenset({"default", "incognito"})
 
 
 def _profile_name(value: str) -> str:
@@ -68,6 +69,9 @@ def _profile_name(value: str) -> str:
     from a letter or a digit, so that it names a folder of its own and nothing else."""
     if _PROFILE_NAME.fullmatch(value) is None or value != value.strip():
         raise ValueError("a profile's name is up to 48 letters, digits, spaces, - and _, from a letter or a digit")
+    # Default and Incognito are named in one way only, so that "Incognito" is never a folder that keeps what it got.
+    if value.casefold() in _RESERVED_PROFILES and value not in _RESERVED_PROFILES:
+        raise ValueError("the two profiles every Dot has are written default and incognito")
     return value
 
 

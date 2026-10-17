@@ -47,7 +47,9 @@ def test_a_name_is_a_folders(name: str) -> None:
     assert _NAMES.validate_python(name) == name
 
 
-@pytest.mark.parametrize("name", ["", " Work", "Work ", "../x", "a/b", ".hidden", "-x", "_x", "a" * 49, "a\nb"])
+@pytest.mark.parametrize(
+    "name", ["", " Work", "Work ", "../x", "a/b", ".hidden", "-x", "_x", "a" * 49, "a\nb", "Incognito", "DEFAULT"]
+)
 def test_a_name_that_is_not_a_folders_alone_is_refused(name: str) -> None:
     with pytest.raises(ValidationError):
         _NAMES.validate_python(name)
