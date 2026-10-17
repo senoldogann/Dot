@@ -18,13 +18,17 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: pypi
+    # A job's permissions replace the workflow's: the checkout still needs to read the code.
     permissions:
+      contents: read
       id-token: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-      - name: The tag says the version
-        run: test "${GITHUB_REF_NAME#v}" = "$(uv version --short)"
+      - name: The tag says the version, as pyproject.toml and the package do
+        run: |
+          test "${GITHUB_REF_NAME#v}" = "$(uv version --short)"
+          grep -qx "__version__ = \"${GITHUB_REF_NAME#v}\"" src/dotagent/__init__.py
       - name: Build
         run: uv build
       - name: Publish

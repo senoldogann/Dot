@@ -76,8 +76,10 @@ git push origin v0.1.0
 ```
 
 The workflow checks that the tag and the version agree, builds the source distribution and the wheel with `uv build`
-and uploads them with `uv publish`. A version can be uploaded once: the next release raises `version` first. Installed
-from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`, then `dotx setup`.
+and uploads them with `uv publish`. A version can be uploaded once: the next release raises `version` in
+`pyproject.toml` and `__version__` in `src/dotagent/__init__.py` first (a unit test keeps the two the same, and the
+workflow checks the tag against both). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`,
+then `dotx setup`.
 
 ## Measuring the agent
 
