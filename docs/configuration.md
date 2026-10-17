@@ -25,6 +25,8 @@ Anthropic one), a site under `[policy.spend]` that is not a bare host in lower c
 | `opencode/`                                      | the OpenCode server Dot starts, the chats' sessions, the free models |
 | `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |
 | `browser-profile/`                               | the Chrome profile of the browser tools                              |
+| `browser-incognito/`                             | the Incognito profile of Dot's Chrome, emptied as Chrome starts and closes |
+| `browser-profiles/`                              | the profiles of Dot's Chrome added in Settings › Browser, one folder each |
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
 | `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |

@@ -10,9 +10,18 @@ from dotagent.browser.devtools import devtools_address
 from dotagent.browser.login import open_sign_in_window
 from dotagent.browser.look import PageLook
 from dotagent.browser.modes import adopt_mode, open_users_chrome
+from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profiles import (
+    add_profile,
+    clear_site_data,
+    delete_profile,
+    known_profile,
+    listed_profiles,
+    profile_dir,
+)
 from dotagent.browser.session import BrowserSession
 from dotagent.config_edit import BrowserSetting, SettingValue, set_browser_mode, set_browser_setting
-from dotagent.core.errors import RunConflict
+from dotagent.core.errors import InvalidValueError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, config_path
 from dotagent.server.context import ServerContext
@@ -20,6 +29,7 @@ from dotagent.server.views import (
     BrowserDebugPortRequest,
     BrowserEnabledRequest,
     BrowserModeRequest,
+    BrowserProfileRequest,
     BrowserRaiseRequest,
     BrowserView,
 )
@@ -63,7 +73,22 @@ def browser_router(ctx: ServerContext) -> APIRouter:
                 viewport_height=session.config.viewport_height,
                 appearance=session.config.appearance,
             ),
+            profile=session.config.profile,
+            profiles=await asyncio.to_thread(listed_profiles),
         )
+
+    def refuse_while_runs(what: str) -> None:
+        active: list[JsonValue] = list(ctx.manager.active_run_ids())
+        if active:
+            raise RunConflict(f"{what} while runs are active", {"active_runs": active})
+
+    async def refuse_while_open(name: str) -> None:
+        """Refuse a change to the profile ``name`` while a Chrome window has it open (Sign in… opens one)."""
+        holder: int | None = await asyncio.to_thread(profile_holder_pid, profile_dir(name))
+        if holder is not None:
+            raise RunConflict(
+                "the profile is open in a Chrome window; quit that Chrome first", {"profile": name, "pid": holder}
+            )
 
     @router.get("/browser")
     async def browser_state() -> BrowserView:
@@ -140,6 +165,45 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         )
         for key, value in settings:
             await asyncio.to_thread(set_browser_setting, config_path(), key, value)
+        return await state()
+
+    @router.post("/browser/profiles")
+    async def add_browser_profile(request: BrowserProfileRequest) -> BrowserView:
+        """Add a profile of Dot's own Chrome (item 355): an empty one, which Chrome fills on its first start on it."""
+        await asyncio.to_thread(add_profile, request.name)
+        return await state()
+
+    @router.post("/browser/profile")
+    async def use_browser_profile(request: BrowserProfileRequest) -> BrowserView:
+        """Have Dot's own Chrome work on the profile ``name`` from its next start (item 355), kept in the config file.
+        Chrome is let go of, so the change is refused while runs are active."""
+        await asyncio.to_thread(known_profile, request.name)
+        refuse_while_runs("the profile cannot be changed")
+        await ctx.runtime.browsers.use_profile(request.name)
+        await asyncio.to_thread(set_browser_setting, config_path(), "profile", request.name)
+        return await state()
+
+    @router.post("/browser/profiles/{name}/clear")
+    async def clear_browser_profile(name: str) -> BrowserView:
+        """Delete the cookies and the caches of the profile ``name`` (item 355). Dot's own Chrome is let go of when it
+        works on it, so the change is refused while runs are active, and while a Chrome window has the profile open."""
+        await asyncio.to_thread(known_profile, name)
+        refuse_while_runs("a profile cannot be cleared")
+        own: BrowserSession = ctx.runtime.browsers.session_for("own")
+        if own.config.profile == name:
+            await own.let_go_of_chrome()
+        await refuse_while_open(name)
+        await asyncio.to_thread(clear_site_data, profile_dir(name))
+        return await state()
+
+    @router.delete("/browser/profiles/{name}")
+    async def delete_browser_profile(name: str) -> BrowserView:
+        """Delete a profile the owner added (item 355), with what it kept; the one in use stays."""
+        await asyncio.to_thread(known_profile, name)
+        if session.config.profile == name:
+            raise InvalidValueError("the profile in use cannot be deleted; use another one first", {"profile": name})
+        await refuse_while_open(name)
+        await asyncio.to_thread(delete_profile, name)
         return await state()
 
     return router

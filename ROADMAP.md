@@ -5285,6 +5285,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | done        | b2e8090 |
 | 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | done        | 9c1352e |
 | 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| in progress |         |
+| 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14107,6 +14108,23 @@ its window; the rows wide and on a phone, light and dark, kept in `config.toml`;
 run that waits on its question, not once turned off, and a phone's drawer left closed). Docs:
 `docs/browser-and-computer-use.md`, `docs/daemon.md`.
 
+### 355. Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added
+
+**Status: in progress.** The owner's word of 2026-10-17 (T3 Code's browser system in Dot, cleanly and better; its
+Settings › Browser lists Browser profiles: Default, Set as default, Clear cookies and cache, Add profile, and Incognito,
+whose data is cleared when the app closes). **As built (2026-10-17).** `browser/profiles.py`: Dot's own Chrome works on
+one profile at a time (`[browser] profile`): Default (`browser-profile`), Incognito (`browser-incognito`, emptied before
+Chrome starts on it and after it closes) and the ones added (`browser-profiles/<name>`, up to 24, a name of up to 48
+letters of any script, digits, spaces, `-` and `_`). Settings › Browser lists them with In use: Use (`POST
+/api/browser/profile`, which lets go of Chrome, refused while runs are active), Clear (its cookies and caches; Chrome
+let go of when it works on it), Delete (an added profile not in use), Add profile; a profile a Chrome window has open is
+not changed. Sign in…, `dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use,
+and the new folders are guarded as Default is. Tests: `tests/unit/test_browser_profiles.py` (the list, the names,
+adding, deleting, clearing, emptying), `tests/smoke/test_browser_settings.py` (a real headless Chrome works on Default,
+then on an added profile, then on Incognito, whose folder is gone once its Chrome closed; Settings › Browser adds, uses
+and deletes a profile, wide and on a phone). Docs: `docs/browser-and-computer-use.md`, `docs/configuration.md`,
+`docs/safety.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -14871,3 +14889,4 @@ run that waits on its question, not once turned off, and a phone's drawer left c
 - 2026-10-17 (Opus 5.5): PR #335 (item 351, the audit's fixes) merged as `2f94b84` after CI; main's checkout moved to it and the daemon restarted at 17:36:46 while no run worked. Item 352 on the owner's word of the same day (fewer info lines, a live line over the composer, a phone's chat as one screen), on `items-352-chat-calm`.
 - 2026-10-17 (Opus 5.5): item 353 on the owner's answer of the same day (Keep going into the "+" beside Goal mode, Plan first kept), on `item-353-keep-going`: the home's Keep going switch is a row of the composer's "+" after Goal mode's, the Options pill holds the approvals alone; `test_composer.py` failed on the code before.
 - 2026-10-17 (Opus 5.5): item 354 on the owner's word of the same day (T3 Code's browser system in Dot, cleanly and better, with a screenshot of its Settings › Browser), on `item-354-browser-settings`: runs may be kept off the browser, a page of Dot's own Chrome fills its window or has a size, pages are told the Mac's colour scheme or one chosen, and a run at work shows its page beside the chat by itself; T3 Code's zoom and link target left out, with the reason.
+- 2026-10-17 (Opus 5.5): item 355 on the same word, on `item-354-browser-settings` after 354: profiles of Dot's own Chrome (Default, Incognito, added ones; Use, Clear, Delete, Add profile). T3 Code's recordings (frame rate, key and mouse presses) are not built: what they would record is too close to what the session's safety check stopped twice that day, and they were the largest, least needed part.

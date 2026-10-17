@@ -144,7 +144,7 @@ Dot's, not yours. A message you send starts a run unmarked.
   tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
   `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
   `~/.password-store`), the shell's history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
-  this one), nor Dot's own key file, token, browser profile, configuration, database and journals of file changes. The
+  this one), nor Dot's own key file, token, browser profiles, configuration, database and journals of file changes. The
   configuration holds the policy and the MCP servers, the database the rules, the journals what `dotx undo` writes back.
   In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
@@ -162,7 +162,7 @@ Dot's, not yours. A message you send starts a run unmarked.
   or a skill in place yourself.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
-  files above (its key file, token, push key, browser profile, configuration, database and journals, and the data
+  files above (its key file, token, push key, browser profiles, configuration, database and journals, and the data
   directory of your Chrome), nor change what Dot loads and runs, nor rename a folder above any of them, whatever program
   does it: a script the run wrote, code that builds the path, a link, another letter case. macOS answers
   `Operation not permitted`. The search tools may not read your protected locations either; a command still may (ssh and

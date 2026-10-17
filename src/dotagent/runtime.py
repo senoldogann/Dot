@@ -21,7 +21,9 @@ from dotagent.core.logs import get_logger
 from dotagent.core.notify import Notifier, show_notification
 from dotagent.core.paths import (
     added_servers_path,
+    browser_incognito_dir,
     browser_profile_dir,
+    browser_profiles_dir,
     chrome_data_dir,
     config_path,
     connected_servers_path,
@@ -181,6 +183,8 @@ def _guarded_files() -> tuple[Path, ...]:
         token_path(),
         vapid_path(),
         browser_profile_dir(),
+        browser_incognito_dir(),
+        browser_profiles_dir(),
         chrome_data_dir(),
         config_path(),
         database,

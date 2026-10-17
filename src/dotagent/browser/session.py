@@ -64,6 +64,7 @@ from dotagent.browser.keychain import KeychainMode, keychain_switches, playwrigh
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
 from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profiles import INCOGNITO_PROFILE, empty_incognito, profile_dir
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
@@ -502,6 +503,9 @@ class BrowserSession:
             )
         if config.debug_port and await asyncio.to_thread(port_is_taken, config.debug_port):
             raise port_taken(config.debug_port)
+        # Incognito starts with nothing, however its last Chrome ended (item 355).
+        if config.profile == INCOGNITO_PROFILE:
+            await asyncio.to_thread(empty_incognito)
         keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, self._profile)
         playwright: Playwright = await self._driver()
         # With the window kept in the background (item 97), whoever has the focus now gets it back after the launch.
@@ -738,6 +742,16 @@ class BrowserSession:
         are told the colour scheme. Refused while a chat's run is at work in it, as a switch is."""
         await self.switch(self._config.model_copy(update=look.model_dump()), self._profile)
 
+    async def use_profile(self, profile: str) -> None:
+        """Work on the profile ``profile`` of Dot's own Chrome from the next call on (item 355), as a switch does: Dot's
+        own Chrome is let go of first, and the change is refused while a chat's run is at work in it. A session in the
+        Chrome of the user goes on there, and takes the profile up when it is moved to Dot's own Chrome."""
+        if self._config.mode == "own":
+            await self.switch(self._config.model_copy(update={"profile": profile}), profile_dir(profile))
+            return
+        self._config = self._config.model_copy(update={"profile": profile})
+        _log.info("browser_profile", mode=self._config.mode, profile=profile)
+
     def set_raise_window(self, raise_window: bool) -> None:
         """Whether the window is raised while a run works, from the next call on; Chrome is not restarted."""
         self._config = self._config.model_copy(update={"raise_window": raise_window})
@@ -842,6 +856,9 @@ class BrowserSession:
             if self._playwright is not None:
                 await self._playwright.stop()
                 self._playwright = None
+            # What Incognito kept goes with its Chrome (item 355).
+            if self._config.mode == "own" and self._config.profile == INCOGNITO_PROFILE and context is not None:
+                await asyncio.to_thread(empty_incognito)
             self._threads.clear()
             self._initial_pages = []
 

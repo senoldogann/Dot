@@ -486,6 +486,9 @@ raise_window = false
 # Dot's Chrome does not start while another program holds the port. The port asks for no token: any program on this
 # Mac can drive Dot's Chrome through it while it runs. Settings › Browser sets it.
 debug_port = 0
+# The profile Dot's own Chrome works on (item 355): "default", "incognito" (it keeps nothing: emptied before Chrome starts
+# on it and after it closes) or the name of one added in Settings › Browser, whose folder is in browser-profiles.
+profile = "default"
 # The size of a page of Dot's own Chrome: the window's (fit_window = true) or the one below. Settings › Browser sets them
 # (item 354); Chrome starts again with the next call that needs it.
 fit_window = false

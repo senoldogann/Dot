@@ -21,6 +21,8 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 
 from dotagent.agent.manager import RunManager
 from dotagent.browser.look import PageLook
+from dotagent.browser.modes import browser_data_dir
+from dotagent.browser.profiles import DEFAULT_PROFILE, INCOGNITO_PROFILE, add_profile, profile_dir
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ScriptRun
 from dotagent.config import AppConfig, BrowserConfig, ServerConfig, load_config, load_default_config
@@ -247,10 +249,10 @@ def _kept() -> str:
 
 
 async def _changed(page: Page, path: str, change: Callable[[], Awaitable[object]]) -> None:
-    """Make ``change`` on the page and wait for the daemon's answer to the request it sends to ``path``, which the
-    daemon gives once the config file holds the change."""
+    """Make ``change`` on the page and wait for the daemon's answer to the change it asks of ``path`` (a POST or a
+    DELETE), which the daemon gives once the change is made and kept."""
     async with page.expect_response(
-        lambda response: response.url.endswith(path) and response.request.method == "POST"
+        lambda response: response.url.endswith(path) and response.request.method != "GET"
     ) as answer:
         await change()
     answered = await answer.value
@@ -341,5 +343,76 @@ async def test_a_run_that_opens_its_browser_shows_its_page_beside_the_chat(site:
             await expect(phone.locator(".inspector[data-open='true']")).to_have_count(0)
             await phone.screenshot(path=tmp_path / "phone-390-dark.png")
             await phone.close()
+        finally:
+            await browser.close()
+
+
+async def _has_folder(path: Path) -> bool:
+    return await asyncio.to_thread(path.is_dir)
+
+
+@pytest.mark.browser
+async def test_dots_chrome_works_on_the_profile_in_use_and_incognito_keeps_nothing(
+    site: str, headless: BrowserConfig
+) -> None:
+    server: ServerConfig = load_default_config().server
+    with scratch_home() as home, eval_environment(home, {}):
+        session: BrowserSession = BrowserSession(
+            headless, server, browser_data_dir("own", DEFAULT_PROFILE), home / "downloads", no_runs_at_work
+        )
+        try:
+            await session.open_url("profiles", site)
+            assert await _has_folder(profile_dir(DEFAULT_PROFILE) / "Default")
+            # An added profile is a folder of its own, which Chrome fills when it works on it.
+            await asyncio.to_thread(add_profile, "Work")
+            await session.use_profile("Work")
+            assert session.profile_dir == profile_dir("Work")
+            await session.open_url("profiles", site)
+            assert await _has_folder(profile_dir("Work") / "Default")
+            await session.use_profile(INCOGNITO_PROFILE)
+            await session.open_url("profiles", site)
+            assert await _has_folder(profile_dir(INCOGNITO_PROFILE) / "Default")
+            # Its Chrome closed, Incognito keeps nothing; the other profiles keep their folders.
+            await session.use_profile(DEFAULT_PROFILE)
+            assert not await asyncio.to_thread(profile_dir(INCOGNITO_PROFILE).exists)
+            assert await _has_folder(profile_dir("Work") / "Default")
+        finally:
+            await session.aclose()
+
+
+@pytest.mark.browser
+async def test_settings_browser_adds_uses_and_deletes_a_profile(tmp_path: Path) -> None:
+    async with _daemon(()) as (_manager, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            for width, scheme in _SHOTS:
+                page: Page = await _page(browser, address, width, scheme)
+                await page.goto(f"{address}/#/settings/browser")
+                profiles: Locator = page.get_by_role("list", name="Profiles")
+                await expect(profiles.get_by_role("listitem")).to_have_count(2)
+                await expect(profiles.locator("[data-profile='default']")).to_contain_text("In use")
+                await page.get_by_role("button", name="Add profile").click()
+                await page.get_by_role("textbox", name="Name of the new profile").fill("Work")
+                await _changed(page, "/api/browser/profiles", page.get_by_role("button", name="Add", exact=True).click)
+                work: Locator = profiles.locator("[data-profile='Work']")
+                await expect(work).to_be_visible()
+                await _changed(page, "/api/browser/profile", page.get_by_role("button", name="Use Work for runs").click)
+                await expect(work).to_contain_text("In use")
+                assert 'profile = "Work"\n' in _kept()
+                # The profile in use can be cleared, not deleted.
+                await expect(page.get_by_role("button", name="Delete Work")).to_have_count(0)
+                await page.screenshot(path=tmp_path / f"profiles-{width}-{scheme}.png", full_page=True)
+                await _changed(
+                    page, "/api/browser/profile", page.get_by_role("button", name="Use Default for runs").click
+                )
+                await page.get_by_role("button", name="Delete Work").click()
+                await _changed(
+                    page,
+                    "/api/browser/profiles/Work",
+                    page.get_by_role("dialog").get_by_role("button", name="Delete").click,
+                )
+                await expect(work).to_have_count(0)
+                assert 'profile = "default"\n' in _kept()
+                await page.close()
         finally:
             await browser.close()

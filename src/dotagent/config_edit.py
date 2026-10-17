@@ -34,7 +34,15 @@ _EDITING: threading.Lock = threading.Lock()
 type ConfigTable = Literal["agent", "browser", "judge", "models", "shell"]
 type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal[
-    "mode", "raise_window", "debug_port", "enabled", "fit_window", "viewport_width", "viewport_height", "appearance"
+    "mode",
+    "raise_window",
+    "debug_port",
+    "enabled",
+    "profile",
+    "fit_window",
+    "viewport_width",
+    "viewport_height",
+    "appearance",
 ]
 type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]

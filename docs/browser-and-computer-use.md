@@ -89,7 +89,7 @@ that needs it, and the value is written to `config.toml`. The port asks for no t
 program on this Mac can connect to it and drive Chrome with the sign-ins of Dot's profile.
 
 
-Settings › Browser has four more rows, after T3 Code's (item 354). **Runs may use the browser** (`[browser] enabled`, on
+Settings › Browser has these rows after T3 Code's (item 354). **Runs may use the browser** (`[browser] enabled`, on
 by default; `POST /api/browser/enabled` with `{"enabled": false}`) keeps the browser tools from every run that starts
 after it, an agent's and OpenCode's agent's too; a run at work keeps the tools it started with, and computer use still
 sees the screen. **Size of a page** and **Appearance of pages** are `POST /api/browser/look` with `fit_window`,
@@ -104,6 +104,18 @@ beside the chat on a wide window, without making it the panel or the tab you cho
 keeps the button of its bar. Two rows of T3 Code's are left out: the zoom of a page (Chrome keeps the zoom of each site
 in its profile, which ⌘+ and ⌘− set in Dot's Chrome) and where links open (a link in Dot's chats opens in the browser
 you read Dot in, and Sign in… covers signing in for Dot).
+
+
+**Profiles** (item 355, after T3 Code's): Dot's own Chrome works on one profile at a time, each with its own cookies and
+sign-ins. **Default** is the profile Dot always had (`browser-profile` in its home); **Incognito** (`browser-incognito`)
+is emptied before Chrome starts on it and after it closes, so it keeps nothing; **Add profile** makes another
+(`browser-profiles/<name>`, up to 24, a name of up to 48 letters, digits, spaces, `-` and `_`). **Use** makes runs work
+on a profile from Chrome's next start (`[browser] profile`, `POST /api/browser/profile`, refused while runs are active);
+**Clear** deletes its cookies and caches and keeps its settings (`POST /api/browser/profiles/<name>/clear`; Dot's own
+Chrome is let go of when it works on it); **Delete** removes an added profile that is not in use (`DELETE
+/api/browser/profiles/<name>`). A profile that a Chrome window has open (Sign in… opens one) is not changed. Sign in…,
+`dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use. Every profile is
+guarded as Default is: a run neither reads nor changes it. In My Chrome mode the profiles are your Chrome's own.
 
 Both modes share what follows.
 

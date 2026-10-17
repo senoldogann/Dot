@@ -22,10 +22,10 @@ from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profiles import profile_dir
 from dotagent.config import AppConfig, JudgeConfig, McpServerConfig, MemoryConfig, ModelsConfig, ProvidersConfig
 from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError, WebError
 from dotagent.core.paths import (
-    browser_profile_dir,
     chrome_data_dir,
     config_path,
     dot_home,
@@ -468,8 +468,8 @@ async def _check_browser_launch(config: AppConfig) -> CheckResult:
     return _result("browser launch", True, False, f"{channel} {version} starts under Playwright")
 
 
-def _check_browser_profile() -> CheckResult:
-    profile: Path = browser_profile_dir()
+def _check_browser_profile(config: AppConfig) -> CheckResult:
+    profile: Path = profile_dir(config.browser.profile)
     holder: int | None = profile_holder_pid(profile)
     keychain: KeychainMode = read_keychain_mode(profile)
     state: str = f"in use by pid {holder}" if holder is not None else "free"
@@ -749,7 +749,7 @@ async def _machine_checks(config: AppConfig) -> list[CheckResult]:
         *_check_desktop(config),
         await asyncio.to_thread(_codes_row, config),
         await asyncio.to_thread(_check_browser_mode, config),
-        await asyncio.to_thread(_check_browser_profile),
+        await asyncio.to_thread(_check_browser_profile, config),
         _plugins_row(plugins),
         _skills_row(skills),
         *await asyncio.to_thread(_office_checks),
