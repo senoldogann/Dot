@@ -1899,7 +1899,7 @@ a.pill:hover {
   /* Your message's foot rises by the band its finger-sized buttons add above their marks, so that it follows the bubble
      as closely as in a Mac's window (item 336). */
   .message-foot {
-    margin-top: -6px;
+    margin-top: -8px;
   }
 
   /* The name's link covers its tile; its own box is a finger's height too, without moving the tile's lines. */
