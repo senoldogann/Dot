@@ -68,7 +68,7 @@ export function mount(root, ctx) {
             el(
               "span",
               null,
-              "No address yet. A phone reaches Dot through Tailscale: serve Dot on your tailnet and write the Mac's name on it in Dot's config file, as the README's “Dot on the phone” says. ",
+              "No address yet. A phone reaches Dot through Tailscale: serve Dot on your tailnet and write the Mac's name on it in Dot's config file, as “Dot on the phone” in Dot's documentation (docs/phone.md) says. ",
               el("span", { class: "faint" }, "In the config file: [server] reach."),
             ),
           );

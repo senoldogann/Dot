@@ -21,8 +21,8 @@ Dot runs with your rights on your Mac, so the boundaries it keeps matter most:
 - the browser and desktop tools, and the MCP servers, skills and plugins that Dot loads.
 
 A prompt injection that the approval modes and the policy stop as they are meant to is not a vulnerability; one that
-gets past them is. The shell guard is best-effort (README, "Status and known limits"), and a way past it is worth a
-report.
+gets past them is. The shell guard is best-effort ([Status and known limits](docs/limits.md)), and a way past it is
+worth a report.
 
 ## Supported versions
 

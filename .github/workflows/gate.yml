@@ -1,4 +1,4 @@
-# The gate every change passes before it is merged: the same commands as README "Development", on macOS because the
+# The gate every change passes before it is merged: the same commands as CONTRIBUTING.md, on macOS because the
 # package depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted
 # model or a stand-in plays the real loop, tools, policy and store. The tests marked live, browser, internet, desktop or
 # hosted stay on the developer's Mac; one that needs the local Ollama server's embedding model skips itself here.

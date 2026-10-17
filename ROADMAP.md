@@ -5262,6 +5262,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 331 | On a phone Appearance draws phones, two themes a row and one Text size                 | in progress |         |
 | 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | in progress |         |
 | 333 | `dotx setup` leads to a working model, and the home says when none answers             | in progress |         |
+| 334 | The repository opens with a short README, its details under docs/                      | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13617,6 +13618,38 @@ requirements.
   - Against the code and pages before this item both fail.
 - Not verified on a device, and not with a real provider: the interactive path ran in a pseudo-terminal against the
   stand-in.
+
+### 334. The repository opens with a short README, its details under docs/
+
+**Status: in progress.** On the branch `items-328-phone`, after item 333; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The README had 2,900 lines in 26 sections, most of them details for someone who already runs Dot,
+with no picture, no guide for contributors and no changelog. `pyproject.toml` named three of the five providers and
+had no links or classifiers, and nothing said plainly that Dot runs on macOS alone.
+
+**As built (2026-10-17).**
+
+- **README** (about 120 lines). It says what Dot is, on macOS only, with two pictures (a finished task on a Mac and on a
+  phone; a run of the scripted model on a throwaway home, as the README says). Then the requirements, five steps to
+  install with `dotx setup`, the first steps, the phone through Tailscale, the safety in short, the documentation and
+  the licences.
+- **docs/.** Fourteen pages take the README's sections word for word: the command line, models, runs and tools,
+  autonomy, safety and privacy, the daemon, the phone, browser and computer use, memory and schedules, agents and
+  campaigns, apps, MCP servers, skills and plugins, configuration, development and the known limits. Only their headings
+  and links changed. A script checked that every relative link of the Markdown files reaches a file and a heading (87
+  links in 23 files), and that every line of the old README is in the new files; the four that are not changed on
+  purpose (the providers of the first lines, the Quick start's heading and commands).
+- **New files.** `CONTRIBUTING.md` covers setting up, the gate's commands, the rules of the tests, the code and pull
+  requests. `CODE_OF_CONDUCT.md` follows the Contributor Covenant 2.1, with reports through GitHub's Report content.
+  `CHANGELOG.md` sums up the first public version under Unreleased. There are issue templates for a bug and a feature
+  (a security problem goes to SECURITY.md's private reporting) and a pull request template.
+- **pyproject.toml.** It names the five providers, and has keywords, classifiers (macOS only, Python 3.13, Alpha) and
+  the project's links. The package's metadata was built with them offline; the lock is unchanged.
+- SECURITY.md, the gate's workflow and a comment of `opencode/server.py` point at the pages under docs/ that now hold
+  what they named in the README.
+- Left as they are, for the owner to decide: ROADMAP.md in the repository, the item numbers in comments and in the
+  pages, and a release on PyPI.
 
 ## Log
 
