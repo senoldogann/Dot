@@ -14128,8 +14128,8 @@ and deletes a profile, wide and on a phone). Docs: `docs/browser-and-computer-us
 
 ### 356. The second audit of 2026-10-17: what held outside the shell guard, fixed
 
-**Status: done (`e82ee9f`).** The owner's word of 2026-10-17, with a second outside report pasted (its claims 1A-1B and 32
-more): "başka bir ajanın review bulgularını da sıraya kat ... problemler var ise düzeltme yap" (queue another agent's
+**Status: done (`e82ee9f`).** The owner's word of 2026-10-17, with a second outside report pasted (its claims 1A-1B and
+32 more): "başka bir ajanın review bulgularını da sıraya kat ... problemler var ise düzeltme yap" (queue another agent's
 review findings, and fix them where they are real). Each claim was checked by reading the code and calling Dot's own
 functions (two read-only verifiers): many names in it do not exist, and most claims were false. **As built
 (2026-10-17).** What held, outside the shell guard: what signing in to an MCP server gave Dot (`mcp-sign-ins/`) is

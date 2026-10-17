@@ -739,7 +739,8 @@ class BrowserSession:
     async def set_look(self, look: PageLook) -> None:
         """How pages look from the next call on (item 354). Dot's own Chrome is let go of first, as for a switch, so
         that it starts again with the size and the colour scheme, which is refused while a chat's run is at work in it;
-        in the Chrome of the user the connection stays, and the tabs Dot opens from now on are told the colour scheme."""
+        in the Chrome of the user the connection stays, and the tabs Dot opens from now on are told the colour
+        scheme."""
         if self._config.mode == "own":
             await self.switch(self._config.model_copy(update=look.model_dump()), self._profile)
             return
