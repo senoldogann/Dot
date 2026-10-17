@@ -32,6 +32,8 @@ from dotagent.core.paths import (
     ensure_layout,
     env_file_path,
     failsafe_path,
+    mcp_sign_ins_dir,
+    opencode_dir,
     playbooks_dir,
     plugins_data_dir,
     run_owners_dir,
@@ -172,16 +174,17 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
 
 
 def _guarded_files() -> tuple[Path, ...]:
-    """What the agent must neither read nor change: secrets and the lock of their file, the browser profiles (Dot's own
-    and the Chrome of the user), the settings that decide what it may do (policy, rules, MCP servers), its own database,
-    the journals of file changes (``dotx undo`` writes back what a journal says) and the locks that tell which process
-    drives a run."""
+    """What the agent must neither read nor change: secrets and the lock of their file, what signing in to an MCP server
+    gave Dot (its tokens), the browser profiles (Dot's own and the Chrome of the user), the settings that decide what it
+    may do (policy, rules, MCP servers), its own database, the journals of file changes (``dotx undo`` writes back what
+    a journal says) and the locks that tell which process drives a run."""
     database: Path = db_path()
     return (
         env_file_path(),
         env_lock_path(env_file_path()),
         token_path(),
         vapid_path(),
+        mcp_sign_ins_dir(),
         browser_profile_dir(),
         browser_incognito_dir(),
         browser_profiles_dir(),
@@ -210,13 +213,16 @@ def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
     """What Dot loads and runs, which the agent may read (a skill's files are read and run by path) but never change:
     its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
     with the daemon and are given keys from the key store, and so does each server of its record of those added from
-    other agents (item 165), its skills (the copies of those added from other agents too) and the playbooks it
-    learned, which shape later runs, and the file of its emergency stop."""
+    other agents (item 165) and of its record of those added on Customize › Plugins, the home of the OpenCode server it
+    starts (its config says what OpenCode's agent may do), its skills (the copies of those added from other agents too)
+    and the playbooks it learned, which shape later runs, and the file of its emergency stop."""
     return (
         *_own_code(),
         *plugin_roots(config.plugins),
         plugins_data_dir(),
         added_servers_path(),
+        connected_servers_path(),
+        opencode_dir(),
         skills_dir(),
         *(Path(entry).expanduser() for entry in config.skills.dirs),
         playbooks_dir(),

@@ -144,7 +144,8 @@ Dot's, not yours. A message you send starts a run unmarked.
   tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
   `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
   `~/.password-store`), the shell's history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
-  this one), nor Dot's own key file, token, browser profiles, configuration, database and journals of file changes. The
+  this one), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles, configuration,
+  database and journals of file changes. The
   configuration holds the policy and the MCP servers, the database the rules, the journals what `dotx undo` writes back.
   In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
@@ -152,8 +153,9 @@ Dot's, not yours. A message you send starts a run unmarked.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
   own code (the folder its package is imported from, the Python environment it runs in and the Python under that, and
   the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
-  `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's record
-  of the MCP servers you added from other agents, the playbooks it learned and the file of its emergency stop. The file
+  `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
+  of the MCP servers you added from other agents and on Customize › Plugins, the home of the OpenCode server it starts,
+  the playbooks it learned and the file of its emergency stop. The file
   tools refuse to write there, and so does the shell guard for a line that writes there by a copy or a move (its target
   folder option too), `dd`, a redirect, a download, a clone, an unpacked archive, git run in one of those folders, a
   file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline code that names the place (in a word of switches such
@@ -162,7 +164,8 @@ Dot's, not yours. A message you send starts a run unmarked.
   or a skill in place yourself.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
-  files above (its key file, token, push key, browser profiles, configuration, database and journals, and the data
+  files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals,
+  and the data
   directory of your Chrome), nor change what Dot loads and runs, nor rename a folder above any of them, whatever program
   does it: a script the run wrote, code that builds the path, a link, another letter case. macOS answers
   `Operation not permitted`. The search tools may not read your protected locations either; a command still may (ssh and

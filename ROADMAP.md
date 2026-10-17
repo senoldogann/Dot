@@ -5286,6 +5286,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | done        | 9c1352e |
 | 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| in progress |         |
 | 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | in progress |         |
+| 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14125,6 +14126,25 @@ then on an added profile, then on Incognito, whose folder is gone once its Chrom
 and deletes a profile, wide and on a phone). Docs: `docs/browser-and-computer-use.md`, `docs/configuration.md`,
 `docs/safety.md`.
 
+### 356. The second audit of 2026-10-17: what held outside the shell guard, fixed
+
+**Status: done (`e82ee9f`).** The owner's word of 2026-10-17, with a second outside report pasted (its claims 1A-1B and 32
+more): "başka bir ajanın review bulgularını da sıraya kat ... problemler var ise düzeltme yap" (queue another agent's
+review findings, and fix them where they are real). Each claim was checked by reading the code and calling Dot's own
+functions (two read-only verifiers): many names in it do not exist, and most claims were false. **As built
+(2026-10-17).** What held, outside the shell guard: what signing in to an MCP server gave Dot (`mcp-sign-ins/`) is
+guarded as the key file is, and Dot's record of the MCP servers added on Customize › Plugins and the OpenCode server's
+home are read, never changed, by a run (`runtime.py`); the answer check keys a failed call by its whole target, so two
+long paths that start alike are two calls (`verify.py`); an `event: error` line of a Responses stream that names no
+error ends the answer with a protocol error (`codec_responses.py`); a path through a file is "no such file" (404) and a
+loop of links "cannot be followed" (422), both a 500 before (`previews/paths.py`); after a move to a standby model the
+step router leaves the models the run worked on (`loop.py`); a push service that is busy or failing is asked once more
+(`notify/push.py`). Not changed: the shell guard's findings (reported for the owner), a token refresh of MCP's OAuth
+(mcp 2.3.0 refreshes under its provider's own lock, and the hub keeps one connection per server), cross-site frames of
+Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit/test_dot_files.py`, `test_verify.py`,
+`test_previews.py`, `test_push.py`, `tests/smoke/test_wire_codecs.py`; each new case fails on the code before. Docs:
+`docs/safety.md`, `docs/phone.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -14890,3 +14910,5 @@ and deletes a profile, wide and on a phone). Docs: `docs/browser-and-computer-us
 - 2026-10-17 (Opus 5.5): item 353 on the owner's answer of the same day (Keep going into the "+" beside Goal mode, Plan first kept), on `item-353-keep-going`: the home's Keep going switch is a row of the composer's "+" after Goal mode's, the Options pill holds the approvals alone; `test_composer.py` failed on the code before.
 - 2026-10-17 (Opus 5.5): item 354 on the owner's word of the same day (T3 Code's browser system in Dot, cleanly and better, with a screenshot of its Settings › Browser), on `item-354-browser-settings`: runs may be kept off the browser, a page of Dot's own Chrome fills its window or has a size, pages are told the Mac's colour scheme or one chosen, and a run at work shows its page beside the chat by itself; T3 Code's zoom and link target left out, with the reason.
 - 2026-10-17 (Opus 5.5): item 355 on the same word, on `item-354-browser-settings` after 354: profiles of Dot's own Chrome (Default, Incognito, added ones; Use, Clear, Delete, Add profile). T3 Code's recordings (frame rate, key and mouse presses) are not built: what they would record is too close to what the session's safety check stopped twice that day, and they were the largest, least needed part.
+
+- 2026-10-17 (Opus 5.5): item 356 on the owner's word of the same day (a second outside report: fix what is real), on `item-356-audit-runtime`: two read-only verifiers checked every claim; the shell guard's findings stay reported for the owner, the six that held elsewhere are fixed, each with a test that fails on the code before.

@@ -1,8 +1,11 @@
 """The pure parts of the step router: the state a step is judged on, the Choice over the models offered, the policy
 over the answer and the event of a routed step."""
 
+from dotagent.agent.loop import _Candidate, still_routable
+from dotagent.agent.scaffold import Scaffold
 from dotagent.agent.stepmodel import (
     StepChoice,
+    StepModel,
     choose,
     last_result,
     route_question,
@@ -10,7 +13,8 @@ from dotagent.agent.stepmodel import (
     routed_event,
     step_state,
 )
-from dotagent.llm.types import Message
+from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import Message, ModelInfo
 from dotagent.llm.typesafe import ChoiceAnswer
 
 
@@ -76,3 +80,37 @@ def test_another_model_takes_the_step_only_at_the_threshold_and_the_likelier_one
         "probabilities": {"fast": 0.81, "main": 0.19},
         "confidence": 0.81,
     }
+
+
+def _candidate(option: StepModel, label: str) -> _Candidate:
+    info: ModelInfo = ModelInfo(
+        id=label,
+        vision=False,
+        tools=True,
+        thinking=False,
+        context_length=None,
+        own_context_length=None,
+        window_source=None,
+        efforts=(),
+        free=False,
+    )
+    scaffold: Scaffold = Scaffold(
+        model=label,
+        window=None,
+        chosen=None,
+        context_tokens=48_000,
+        tool_output_chars=12_000,
+        tier="standard",
+        reason="",
+        reminder_every=None,
+    )
+    return _Candidate(option=option, ref=parse_model_ref(label), info=info, scaffold=scaffold)
+
+
+def test_after_a_move_to_a_standby_model_a_step_goes_to_none_of_the_models_the_run_worked_on() -> None:
+    # The fast model was the standby the run moved to, and the main one stopped answering: neither is a place for a
+    # step any more (the outside audit of 2026-10-17, R3).
+    fast: _Candidate = _candidate("fast", "ollama:fast")
+    helper: _Candidate = _candidate("helper", "openai:helper")
+    assert still_routable((fast, helper), frozenset({"openai:main", "ollama:fast"})) == (helper,)
+    assert still_routable((fast, helper), frozenset({"openai:main"})) == (fast, helper)
