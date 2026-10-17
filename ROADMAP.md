@@ -5284,6 +5284,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | done        | 2f94b84 |
 | 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | done        | b2e8090 |
 | 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | in progress |         |
+| 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14085,6 +14086,25 @@ chat's page has none. Test: `tests/smoke/test_composer.py` (the "+" holds Goal m
 hides goal mode and shows the line under the frame; the Options no longer hold it), which failed on the code before.
 Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
 
+### 356. The second audit of 2026-10-17: what held outside the shell guard, fixed
+
+**Status: in progress.** The owner's word of 2026-10-17, with a second outside report pasted (its claims 1A-1B and 32
+more): "başka bir ajanın review bulgularını da sıraya kat ... problemler var ise düzeltme yap" (queue another agent's
+review findings, and fix them where they are real). Each claim was checked by reading the code and calling Dot's own
+functions (two read-only verifiers): many names in it do not exist, and most claims were false. **As built
+(2026-10-17).** What held, outside the shell guard: what signing in to an MCP server gave Dot (`mcp-sign-ins/`) is
+guarded as the key file is, and Dot's record of the MCP servers added on Customize › Plugins and the OpenCode server's
+home are read, never changed, by a run (`runtime.py`); the answer check keys a failed call by its whole target, so two
+long paths that start alike are two calls (`verify.py`); an `event: error` line of a Responses stream that names no
+error ends the answer with a protocol error (`codec_responses.py`); a path through a file is "no such file" (404) and a
+loop of links "cannot be followed" (422), both a 500 before (`previews/paths.py`); after a move to a standby model the
+step router leaves the models the run worked on (`loop.py`); a push service that is busy or failing is asked once more
+(`notify/push.py`). Not changed: the shell guard's findings (reported for the owner), a token refresh of MCP's OAuth
+(mcp 2.3.0 refreshes under its provider's own lock, and the hub keeps one connection per server), cross-site frames of
+Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit/test_dot_files.py`, `test_verify.py`,
+`test_previews.py`, `test_push.py`, `tests/smoke/test_wire_codecs.py`; each new case fails on the code before. Docs:
+`docs/safety.md`, `docs/phone.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -14848,3 +14868,4 @@ Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
 - 2026-10-17 (Opus 5.5): PR #334 (item 349, OpenRouter) merged as `196ff64` after CI and a second fresh-context review whose findings it fixes (a variant id the doctor did not know, lines over 120 columns, the lists of providers). Item 351 on `items-351-audit-fixes` as PR #335; its review's findings fixed (a failing one-time schedule waits between tries, the answer check reads only the word after a folder, a known address may gain a query or a closing slash); `test_browser_sign_in`'s stand-in no longer writes its pid before its arguments (300 of 300 probes failed before, none after).
 - 2026-10-17 (Opus 5.5): PR #335 (item 351, the audit's fixes) merged as `2f94b84` after CI; main's checkout moved to it and the daemon restarted at 17:36:46 while no run worked. Item 352 on the owner's word of the same day (fewer info lines, a live line over the composer, a phone's chat as one screen), on `items-352-chat-calm`.
 - 2026-10-17 (Opus 5.5): item 353 on the owner's answer of the same day (Keep going into the "+" beside Goal mode, Plan first kept), on `item-353-keep-going`: the home's Keep going switch is a row of the composer's "+" after Goal mode's, the Options pill holds the approvals alone; `test_composer.py` failed on the code before.
+- 2026-10-17 (Opus 5.5): item 356 on the owner's word of the same day (a second outside report: fix what is real), on `item-356-audit-runtime`: two read-only verifiers checked every claim; the shell guard's findings stay reported for the owner, the six that held elsewhere are fixed, each with a test that fails on the code before.

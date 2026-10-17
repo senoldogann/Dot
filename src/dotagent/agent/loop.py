@@ -1442,6 +1442,11 @@ class _Candidate:
     scaffold: Scaffold
 
 
+def still_routable(candidates: tuple[_Candidate, ...], worked_on: frozenset[str]) -> tuple[_Candidate, ...]:
+    """The candidates a step may still be routed to: none of the models ``worked_on``, which the run has worked on."""
+    return tuple(candidate for candidate in candidates if candidate.ref.label not in worked_on)
+
+
 async def _routing(agent: AgentRun, ref: ModelRef, offers_tools: bool, fixed_tokens: int) -> tuple[_Candidate, ...]:
     """The models a step of this run may be routed to (``[agent] step_router``): the fast model and the first
     available helper, each when it is not the run's own model and can take the run over; empty when the router is off,
@@ -1911,6 +1916,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 standby.scaffold,
             )
             left = left | {ref.label}
+            # A step is routed to none of the models the run has worked on: one that stopped answering, or the one it
+            # is on now (the outside audit of 2026-10-17, R3).
+            candidates = still_routable(candidates, left)
             context = replace(context, output_chars=scaffold.tool_output_chars)
             if not info.vision:
                 history = drop_old_images(history, 0)

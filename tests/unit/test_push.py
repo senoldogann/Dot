@@ -342,3 +342,30 @@ async def test_each_subscription_is_pushed_on_its_own_and_the_caller_gets_the_to
         assert len(taken) == 1
     finally:
         await store.close()
+
+
+@pytest.mark.asyncio
+async def test_a_busy_push_service_is_asked_once_more(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A 503 lost the message before (the outside audit of 2026-10-17, R13); the service is asked once more, and a
+    second refusal is the outcome (pywebpush is a fake here: no push service is called)."""
+    answers: list[int] = [503]
+    taken: list[str] = []
+
+    def webpush(subscription_info: dict[str, str], data: str, **signing: object) -> None:
+        if answers:
+            raise WebPushException("Push failed", response=_Answer(answers.pop(0)))
+        taken.append(subscription_info["endpoint"])
+
+    monkeypatch.setattr(push, "webpush", webpush)
+    keys: PushKeys = read_or_create_keys(tmp_path / "vapid-key.pem")
+    p256dh, auth = _usable_keys()
+    subscription: PushSubscription = PushSubscription(
+        endpoint="https://push.example/busy", p256dh=p256dh, auth=auth, created_at=_NOW
+    )
+    message: PushMessage = PushMessage(title="t", body="b", route="#/activity", state="failed")
+    await push.send_push(keys, subscription, message)
+    assert taken == ["https://push.example/busy"]
+    answers.extend([503, 503])
+    with pytest.raises(PushError):
+        await push.send_push(keys, subscription, message)
+    assert answers == []

@@ -40,6 +40,9 @@ _WAIT_S: float = 1.0
 _BODY_CHARS: int = 140
 _PRIVATE_MODE: int = stat.S_IRUSR | stat.S_IWUSR
 _GONE: frozenset[int] = frozenset({404, 410})
+# What a push service answers when it is busy or failing, not taking the message: it is asked once more (R13).
+_ASKED_AGAIN: frozenset[int] = frozenset({429, 500, 502, 503, 504})
+_AGAIN_AFTER_S: float = 1.0
 _ASKED_KINDS: frozenset[str] = frozenset({"approval_requested", QUESTION_LEFT_EVENT})
 _ASKING_TITLE: dict[str, str] = {"question": "Dot has a question", "handoff": "Dot needs your help"}
 _FINISHED_TITLE: dict[str, str] = {"done": "A run is done", "failed": "A run failed", "cancelled": "A run was stopped"}
@@ -216,8 +219,17 @@ def _send(keys: PushKeys, subscription: PushSubscription, message: PushMessage) 
 
 
 async def send_push(keys: PushKeys, subscription: PushSubscription, message: PushMessage) -> None:
-    """Encrypt ``message`` for ``subscription`` and post it to its push service. Raises ``PushError``."""
-    await asyncio.to_thread(_send, keys, subscription, message)
+    """Encrypt ``message`` for ``subscription`` and post it to its push service; a service that is busy or failing (429,
+    5xx), which did not take it, is asked once more after a short wait (the outside audit of 2026-10-17, R13). Raises
+    ``PushError``."""
+    try:
+        await asyncio.to_thread(_send, keys, subscription, message)
+    except PushError as error:
+        if error.context.get("status") not in _ASKED_AGAIN:
+            raise
+        log.warning("push_asked_again", endpoint=subscription.endpoint, status=error.context.get("status"))
+        await asyncio.sleep(_AGAIN_AFTER_S)
+        await asyncio.to_thread(_send, keys, subscription, message)
 
 
 def gone(error: PushError) -> bool:

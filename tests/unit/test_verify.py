@@ -108,6 +108,20 @@ def test_a_secret_is_masked_before_a_long_target_or_result_is_cut() -> None:
     assert facts.failures == (CallFact(tool="shell", target=f"{'x' * 150} ***", ok=False, result=f"{'y' * 190} ***"),)
 
 
+def test_two_long_targets_that_start_alike_are_two_calls() -> None:
+    # Matched by their first 160 characters, the second's success hid the first's failure (the outside audit of
+    # 2026-10-17, R5).
+    stem: str = "x" * 170
+    failed: ToolOutcome = _ran("read_file", {}, "read", f"/{stem}/a.txt", fail("no such file"))
+    worked: ToolOutcome = _ran("read_file", {}, "read", f"/{stem}/b.txt", ok("text"))
+    facts: RunFacts = with_outcomes(new_facts(), [failed, worked])
+    assert [fact.target for fact in facts.failures] == [f"/{stem}/a.txt"]
+    assert facts.resolved == ()
+    # Where it is shown, a long target is cut.
+    shown: str = render_facts(facts, (), ())
+    assert f"- read_file /{stem[:150]}" in shown and "a.txt" not in shown
+
+
 @pytest.mark.parametrize(
     ("command", "check"),
     [
