@@ -19,10 +19,10 @@ tauri-plugin-notification = "2"
 tauri-plugin-global-shortcut = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-toml = "0.8"
-getrandom = "0.3"
+toml = "1.1"
+getrandom = "0.4"
 hex = "0.4"
-hmac = "0.12"
-sha2 = "0.10"
-ureq = { version = "2", features = ["json"] }
+hmac = "0.13"
+sha2 = "0.11"
+ureq = { version = "3", features = ["json"] }
 url = "2"
