@@ -5206,7 +5206,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
 | 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | done        | a8c5cb0 |
-| 268 | Office files show in the side panel as Quick Look draws them                          | in progress |         |
+| 268 | Office files show in the side panel as Quick Look draws them                          | done        | 53b8333 |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
 | 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | in progress |         |
@@ -11926,7 +11926,7 @@ awake, is item 271.
 
 ### 268. Office files show in the side panel as Quick Look draws them
 
-**Status: in progress.** The owner chose it on 2026-10-17 for this round, with 271, 280 and 281; it was built on
+**Status: done (`53b8333`).** The owner chose it on 2026-10-17 for this round, with 271, 280 and 281; it was built on
 2026-10-16 on `item-268-looks-loops-lean` and left uncommitted when the owner turned to the design, and is carried here
 onto `main`. **As built (2026-10-17).** `previews/quicklook.py`: a Word document, an Excel workbook and a presentation
 are drawn by `qlmanage -p -o` once per version of the file (its path, size and time of change, keyed with a secret the
