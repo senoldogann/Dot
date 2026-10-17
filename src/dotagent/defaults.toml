@@ -275,6 +275,11 @@ steer_single_actions = true
 # model calls use_tools or one of its tools, and stays on for the rest of the run. "auto": grouped for a model of the
 # weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help.
 tool_surface = "full"
+# How much the system prompt says (item 280). "full": how to work, each kind of tool at length, trust and safety.
+# "lean": the same rules of trust and safety, of hesitating and of how a run ends, and how to work and each kind of
+# tool in a few lines. With tool_surface = "grouped" as well, a run starts lean: the shortest prompt and the core tools.
+# "full" stays the default: the evals of item 280 (ROADMAP.md) did not show the lean start doing as well.
+prompt = "full"
 # A task or research run that ends with success but whose answer names paths that do not exist, and that no successful
 # call of the run named, is sent back once with the list: to create what is missing, to correct the answer or to finish
 # again with the same answer. The paths looked at are ~ paths and absolute paths under /Users, /tmp, /private, /var,

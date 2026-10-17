@@ -133,6 +133,7 @@ def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
             (),
             (),
             None,
+            "full",
         )
     )
 
@@ -208,6 +209,7 @@ def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
             (),
             (),
             None,
+            "full",
         )
     )
 
@@ -248,6 +250,7 @@ def _in_mode(mode: RunMode) -> str:
             (),
             (),
             None,
+            "full",
         )
     )
 
@@ -287,6 +290,7 @@ def test_task_and_research_runs_keep_acting_and_take_an_ask_to_keep_going_at_its
             (),
             (),
             None,
+            "full",
         )
     )
     for rule in rules:

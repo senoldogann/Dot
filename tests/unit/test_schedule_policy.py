@@ -65,6 +65,7 @@ def _prompt(source: str) -> str:
             (),
             (),
             None,
+            "full",
         )
     )
 

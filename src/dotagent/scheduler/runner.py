@@ -66,7 +66,8 @@ async def _emergency_stop_engaged() -> bool:
 
 
 class Scheduler:
-    """Looks for due schedules every ``tick_s`` seconds and starts a run in a new thread for each.
+    """Looks for due schedules every ``tick_s`` seconds and starts a run for each, in the chat a firing goes in
+    (:meth:`_firing_chat`).
 
     Every firing advances the schedule's next run before the run starts, so a crash can lose a firing but never repeat
     one. Firings that were missed collapse into one, and into none when they are overdue by more than the grace period.

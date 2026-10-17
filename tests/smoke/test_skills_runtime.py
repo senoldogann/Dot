@@ -235,6 +235,7 @@ async def test_the_prompt_lists_the_skills_and_tells_the_model_to_read_one_first
             (),
             (),
             None,
+            "full",
         )
     )
     assert "# Skills" in prompt

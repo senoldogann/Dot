@@ -39,6 +39,7 @@ def _prompt(devtools: str | None, tools: list[str]) -> str:
             (),
             (),
             devtools,
+            "full",
         )
     )
 

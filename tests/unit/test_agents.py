@@ -37,6 +37,7 @@ def _prompt(agent: AgentBrief | None) -> str:
             (),
             (),
             None,
+            "full",
         )
     )
 

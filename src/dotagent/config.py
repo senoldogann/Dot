@@ -216,6 +216,7 @@ class ModelsConfig(FrozenModel):
 type Tier = Literal["standard", "weak"]
 type ScaffoldMode = Literal["fixed", "measured"]
 type ToolSurface = Literal["full", "grouped", "auto"]
+type PromptStyle = Literal["full", "lean"]
 type ResumeMode = Literal["off", "safe"]
 type LessonsMode = Literal["off", "propose", "auto"]
 # A time of day as [agent] reflection_time takes it: 24-hour, two digits each.
@@ -262,6 +263,8 @@ class AgentConfig(FrozenModel):
     reminder_every: int
     steer_single_actions: bool
     tool_surface: ToolSurface
+    # How much the system prompt says (item 280): "lean" keeps its rules and gives the tools' habits in a line each.
+    prompt: PromptStyle
     verify_answer_paths: bool
     resume: ResumeMode
     resume_within_s: int

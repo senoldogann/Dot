@@ -2,7 +2,7 @@
 
 from typing import Literal
 
-from dotagent.config import Tier, ToolSurface
+from dotagent.config import PromptStyle, Tier, ToolSurface
 from dotagent.core.types import FrozenModel
 from dotagent.evals.types import TaskCategory
 from dotagent.store.models import RunStatus
@@ -86,7 +86,8 @@ class EvalSettings(FrozenModel):
     way to make it weak in an eval: an attempt's run history is empty. A report that does not record
     ``stall_escalation`` counts as run without it, one that does not record ``tier`` as run with the standard tier, one
     that does not record ``tool_surface`` as run with every tool offered at every step, one that does not record
-    ``verify_answer_paths`` as run without the check of the paths a final answer names."""
+    ``verify_answer_paths`` as run without the check of the paths a final answer names, one that does not record
+    ``prompt`` as run with the full system prompt."""
 
     effort: str
     goal_mode: bool
@@ -96,6 +97,7 @@ class EvalSettings(FrozenModel):
     tier: Tier = "standard"
     tool_surface: ToolSurface = "full"
     verify_answer_paths: bool = False
+    prompt: PromptStyle = "full"
 
 
 class EvalReport(FrozenModel):

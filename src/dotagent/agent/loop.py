@@ -1667,6 +1667,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 ],
                 owner_prompt_lines(await owner_section(runtime.store)),
                 devtools_address(browser.config),
+                config.prompt,
             )
         )
     )

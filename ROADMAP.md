@@ -5218,7 +5218,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 277 | Every chat wears a creature, its last message under its name                          | done        | d2476f5 |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | done        | 4f21322 |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | done        | 8aa45dd |
-| 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
+| 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | in progress |         |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | done        | 48e7219 |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | done        | 427c51e |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
@@ -5288,7 +5288,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | done        | 3dedca5 |
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 | 357 | Lines of at most 120 characters, held by `ruff check`                                  | done        | 4ebf951 |
-| 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | in progress |         |
+| 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | done        | 177b005 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12401,13 +12401,32 @@ opens, one removed, nothing wider than the phone).
 
 ### 280. Dot starts lean: the fewest words and tools, the rest found when needed
 
-**Status: planned; it waits for the owner's word on the evals (2026-10-17).** The owner chose it for this round on
-2026-10-17, and it was not built: its default is decided by `dotx eval run` of both ways on one model, which spends a
-hosted model's quota (Ollama's cloud answered 429 earlier in the month) or money, and that is the owner's to decide. The
-size is measured (part 9: a task run's first step carries a system prompt of 25,591 characters and 57 tool schemas of
-45,348, about 22 k tokens). To decide: `dotx eval run --repeat 2` with `[agent] tool_surface = "grouped"`, then with
-`"full"`, and `dotx eval report` of the two files; the lean prompt is written when the evals can say whether it does as
-well.
+**Status: in progress.** The owner's word of 2026-10-18: write it and run the evals on the main model, OpenRouter's
+DeepSeek V4.1 Flash. **As built (2026-10-18).** `[agent] prompt` (`full` or `lean`) chooses the system prompt's style:
+`lean` keeps the rules of trust and safety, of hesitating (item 327) and of how a run ends as `full` has them and says
+how to work and each kind of tool in a line or two (6,486 characters for a plain task, 5,944 when the evals ran, where
+`full` has 14,516). Eval reports keep the style. The evals' 41 tasks, twice each, with the owner's config in throw-away
+homes and the keys passed to each run only; the first ran on the code before the change, whose full prompt was the same
+byte for byte when the evals ran, and the runs overlapped, so the seconds were taken under unequal load. They cost about
+0.22, 0.16 and 0.14 dollars, in the order of the table:
+
+| Prompt, tools | Passed | Tokens a pass | Seconds a pass | Claimed done, were not | Injections followed |
+|---|---|---|---|---|---|
+| full, all (today) | 81 of 82 | 72.4 k | 12.5 | 1 | 0 of 6 |
+| full, grouped | 80 of 82 | 50.1 k | 12.1 | 2 | 1 of 6 |
+| lean, grouped | 78 of 82 | 40.5 k | 9.2 | 3 | 0 of 6 |
+
+Fewer words and tools took 31 to 44 % fewer tokens a pass (the lean prompt alone, beside grouped tools, 19 %), and
+passed a little less and claimed a little more often to be done when they were not; filter-headlines failed in every
+row, and without it the passes are 80, 79 and 78 of 80 and the false claims 0, 1 and 1. The difference is small for 82
+attempts, but it does not show that the lean start does as well, so both defaults stay `full` and `lean` is there for
+whoever weighs the tokens more. After the evals, the reviews restored two rules the lean text had dropped, hesitating
+and not saving what a page asks to be remembered, and gave it the full text's closing, which names the note on the other
+runs at work (about 2 % of a step's input), and both texts now say that a schedule's run goes on in the chat that made
+it (item 291), where the full text said a new thread. The evals could not judge the shortened words on plans, the
+desktop and memory: no attempt kept a plan, and they run without the desktop or embeddings. Tests:
+`tests/unit/test_lean_prompt.py` (every rule kept, under half the length), the callers of the prompt's inputs, `dotx
+eval check`. Docs: `docs/runs.md`. The reports are in the owner's `reports/evals-280/`.
 
 **What.** A run starts with a short system prompt and the core tools; the other groups of tools are named in a line and
 come when the run asks for them (`use_tools`), as `tool_surface = "grouped"` does. Evals of both ways on the same tasks
@@ -14213,8 +14232,8 @@ taken out. `pyproject.toml` no longer ignores E501, so `ruff check` holds every 
 
 ### 358. Settings › Browser: the zoom Dot's own Chrome draws pages at
 
-**Status: in progress.** The owner's choice of 2026-10-18, among the rows of T3 Code's Settings › Browser that item 354
-left out: the default zoom. **As built (2026-10-18).** `[browser] zoom` (percent, 25 to 500, 100 by default) is how
+**Status: done (`177b005`).** The owner's choice of 2026-10-18, among the rows of T3 Code's Settings › Browser that item
+354 left out: the default zoom. **As built (2026-10-18).** `[browser] zoom` (percent, 25 to 500, 100 by default) is how
 large Dot's own Chrome draws pages: `browser/profiles.py` writes it as Chrome's default zoom
 (`partition.default_zoom_level`, the level whose power of 1.2 is the factor, as Chrome's own settings page writes it)
 into the preferences of the profile in use before Chrome starts on it, the other preferences kept. Settings › Browser ›
@@ -15000,3 +15019,4 @@ redrawn at it (Playwright's CSS pixels leave Chrome's zoom out), and a scroll wi
 - 2026-10-17 (Opus 5.5): item 357 done (`4ebf951`); item 280 left for the owner's word on spending a hosted model's quota on its evals, with how to run them.
 - 2026-10-17 (Opus 5.5): item 271, after its merge: the live daemon could not read Tailscale's status, because the app's program answers as its command line only with `TAILSCALE_BE_CLI=true` when no terminal runs it; fixed on `item-271-tailscale-cli`.
 - 2026-10-18 (Opus 5.5): item 358 on the owner's choice of the same day (of the rows T3 Code's Settings › Browser has that item 354 left out, the default zoom), on `item-358-browser-zoom`.
+- 2026-10-18 (Opus 5.5): item 280 on the owner's word of the same day, on `item-280-lean`: a lean system prompt behind `[agent] prompt`, and three eval runs of the same 41 tasks that keep both defaults full.
