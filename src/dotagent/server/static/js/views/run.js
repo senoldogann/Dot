@@ -4,7 +4,7 @@
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
-import { BUSY_SEND, valueOf } from "../appearance/settings.js";
+import { AUTO_COMPUTER, BUSY_SEND, valueOf } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
@@ -1323,6 +1323,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onBrowserStep: (page) => {
       computer.notePage(page);
       screenButton.hidden = false;
+      // A run at work that opens its browser shows its page beside the chat (item 354, after T3 Code's floating
+      // preview) unless Settings › Browser turned that off; a phone keeps the button, which opens it over the page.
+      if (active && !elsewhere && valueOf(AUTO_COMPUTER) === "shown") {
+        inspector.peekTab("screen");
+      }
     },
     onGoalFiles: goalMessage === null ? null : (files) => showMessageFiles(goalMessage, files),
     onGoalPicks: goalMessage === null ? null : (picks) => showMessagePicks(goalMessage, picks),

@@ -13,10 +13,11 @@ from pathlib import Path
 
 from dotagent.browser.attach import CHROME_NOT_RUNNING, inspect_chrome, read_debug_endpoint
 from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profiles import profile_dir
 from dotagent.browser.session import BrowserSession
 from dotagent.config import BrowserConfig
 from dotagent.core.errors import BrowserError
-from dotagent.core.paths import browser_profile_dir, chrome_data_dir, default_chrome_data_dir
+from dotagent.core.paths import chrome_data_dir, default_chrome_data_dir
 from dotagent.store.models import BrowserMode
 
 CHECK_THREAD: str = "attach-check"
@@ -34,12 +35,12 @@ _POLL_S: float = 0.25
 ChromeOpener = Callable[[Path], Awaitable[None]]
 
 
-def browser_data_dir(mode: BrowserMode) -> Path:
-    """The directory the browser connector works from in ``mode``: Dot's own profile, or the data directory of the
-    Chrome the user has open (where it finds the debugging port)."""
+def browser_data_dir(mode: BrowserMode, profile: str) -> Path:
+    """The directory the browser connector works from in ``mode``: the folder of Dot's own profile ``profile`` (item
+    355), or the data directory of the Chrome the user has open (where it finds the debugging port)."""
     match mode:
         case "own":
-            return browser_profile_dir()
+            return profile_dir(profile)
         case "attach":
             return chrome_data_dir()
 
@@ -113,7 +114,7 @@ async def adopt_mode(session: BrowserSession, mode: BrowserMode, open_chrome: Ch
     call that needs it."""
     previous: BrowserConfig = session.config
     previous_dir: Path = session.profile_dir
-    target_dir: Path = browser_data_dir(mode)
+    target_dir: Path = browser_data_dir(mode, previous.profile)
     if mode == "attach":
         await reach_chrome(target_dir, open_chrome)
         await asyncio.to_thread(read_debug_endpoint, target_dir)

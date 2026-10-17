@@ -8,6 +8,7 @@ from pathlib import Path
 from dotagent.browser.attach import DebugEndpoint, read_debug_endpoint
 from dotagent.browser.chrome_import import ImportReport, has_stored_cookies, import_chrome_profile
 from dotagent.browser.login import open_profile_for_login
+from dotagent.browser.profiles import profile_dir
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import Attachment
 from dotagent.cli_commands import (
@@ -20,7 +21,7 @@ from dotagent.cli_commands import (
 from dotagent.config import AppConfig, BrowserConfig, ServerConfig, load_user_config
 from dotagent.config_edit import set_browser_mode
 from dotagent.core.errors import BrowserError, InvalidValueError
-from dotagent.core.paths import browser_profile_dir, chrome_data_dir, config_path, downloads_dir
+from dotagent.core.paths import chrome_data_dir, config_path, downloads_dir
 
 _MEGABYTE: int = 1_000_000
 _CHECK_THREAD: str = "attach-check"
@@ -43,7 +44,9 @@ async def _readable_cookies(config: BrowserConfig, server: ServerConfig, profile
 
 
 async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
-    dot_profile: Path = browser_profile_dir()
+    settings: AppConfig = load_user_config()
+    # Into the profile Dot's own Chrome works on (item 355).
+    dot_profile: Path = profile_dir(settings.browser.profile)
     if has_stored_cookies(dot_profile) and not command.replace:
         raise BrowserError(
             "Dot's own profile already holds sign-ins; repeat with --replace to replace them",
@@ -59,7 +62,6 @@ async def cmd_browser_import_chrome(command: BrowserImportChromeCommand) -> int:
         'Checking that Chrome can read them. macOS may ask whether Chrome may use "Chrome Safe Storage" in your '
         "Keychain: choose Always Allow.\n"
     )
-    settings: AppConfig = load_user_config()
     readable: int = await _readable_cookies(settings.browser, settings.server, dot_profile)
     if readable == 0:
         raise BrowserError(
@@ -120,7 +122,7 @@ async def cmd_browser_login(command: BrowserLoginCommand) -> int:
         "Chrome opens with Dot's own profile. Sign in to the sites Dot should be able to use, then quit Chrome "
         "(Cmd+Q). Dot keeps the cookies; it never sees your passwords.\n"
     )
-    code: int = await open_profile_for_login(browser_profile_dir(), command.url)
+    code: int = await open_profile_for_login(profile_dir(load_user_config().browser.profile), command.url)
     sys.stdout.write("Chrome closed; the sign-ins are saved in Dot's profile.\n")
     return code
 

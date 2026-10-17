@@ -10,6 +10,7 @@ from collections.abc import Callable
 from contextlib import AsyncExitStack
 from pathlib import Path
 
+from dotagent.browser.look import PageLook
 from dotagent.browser.modes import browser_data_dir
 from dotagent.browser.session import BrowserSession
 from dotagent.config import BrowserConfig, ServerConfig
@@ -28,7 +29,9 @@ class BrowserPool:
         self._downloads: Path = downloads_dir
         # The chats of the runs at work, whose tabs no session's idle reaper closes.
         self._kept: Callable[[], frozenset[str]] = kept
-        self.main: BrowserSession = BrowserSession(config, server, browser_data_dir(config.mode), downloads_dir, kept)
+        self.main: BrowserSession = BrowserSession(
+            config, server, browser_data_dir(config.mode, config.profile), downloads_dir, kept
+        )
         self._others: dict[BrowserMode, BrowserSession] = {}
 
     def session_for(self, mode: BrowserMode | None) -> BrowserSession:
@@ -42,7 +45,7 @@ class BrowserPool:
             found = BrowserSession(
                 self.main.config.model_copy(update={"mode": mode}),
                 self._server,
-                browser_data_dir(mode),
+                browser_data_dir(mode, self.main.config.profile),
                 self._downloads,
                 self._kept,
             )
@@ -74,6 +77,23 @@ class BrowserPool:
             await session.check_debug_port(port)
         for session in sessions:
             await session.set_debug_port(port)
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Whether runs are offered the browser tools (item 354), for every session's next runs."""
+        for session in (self.main, *self._others.values()):
+            session.set_enabled(enabled)
+
+    async def set_look(self, look: PageLook) -> None:
+        """How the pages of every session look from their next call on (item 354), as
+        :meth:`BrowserSession.set_look` says."""
+        for session in (self.main, *self._others.values()):
+            await session.set_look(look)
+
+    async def use_profile(self, profile: str) -> None:
+        """The profile of Dot's own Chrome every session works on from its next call on (item 355), as
+        :meth:`BrowserSession.use_profile` says."""
+        for session in (self.main, *self._others.values()):
+            await session.use_profile(profile)
 
     async def aclose(self) -> None:
         """Close every session; one that fails to close does not keep the others open (the error is raised once all

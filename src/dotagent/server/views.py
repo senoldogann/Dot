@@ -9,7 +9,9 @@ from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, At
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
-from dotagent.config import DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
+from dotagent.browser.look import PageLook
+from dotagent.browser.profiles import ProfileView
+from dotagent.config import BrowserProfileName, DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
 from dotagent.connections.catalogue import ConnectionKind
 from dotagent.connections.directory import PluginView
 from dotagent.connections.states import ConnectionState, ConnectionStep
@@ -440,6 +442,18 @@ class BrowserDebugPortRequest(FrozenModel):
     """The port of this Mac on which Dot's own Chrome takes DevTools connections (item 265); 0 for none."""
 
     debug_port: DebugPort
+
+
+class BrowserEnabledRequest(FrozenModel):
+    """Whether runs are offered the browser tools (item 354)."""
+
+    enabled: bool
+
+
+class BrowserProfileRequest(FrozenModel):
+    """A profile of Dot's own Chrome to add, or to work on (item 355)."""
+
+    name: BrowserProfileName
 
 
 class KeyRequest(FrozenModel):
@@ -883,7 +897,9 @@ class BrowserView(FrozenModel):
     is the port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), and ``devtools_address`` where
     a run's scripts reach it: set while the main session is Dot's own Chrome and a port is. ``signing_in`` is true
     while Dot's own profile is open in a plain Chrome window that Settings › Browser opened for the owner to sign in to
-    sites (item 344), until the owner quits it."""
+    sites (item 344), until the owner quits it. ``enabled`` says whether runs are offered the browser tools, and
+    ``look`` how pages look (item 354). ``profile`` is the profile Dot's own Chrome works on, of ``profiles`` (item
+    355)."""
 
     mode: BrowserMode
     connected: bool
@@ -898,6 +914,10 @@ class BrowserView(FrozenModel):
     raise_window: bool
     debug_port: int
     devtools_address: str | None
+    enabled: bool
+    look: PageLook
+    profile: str
+    profiles: tuple[ProfileView, ...]
 
 
 class ConnectionView(FrozenModel):

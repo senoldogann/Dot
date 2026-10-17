@@ -2,7 +2,7 @@
 
 import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
-import { AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, valueOf } from "../appearance/settings.js";
+import { AUTO_COMPUTER, AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, valueOf } from "../appearance/settings.js";
 import {
   notificationsAvailable,
   notificationsBlocked,
@@ -875,6 +875,23 @@ const BROWSER_MODES = [
   { id: "own", label: "Own Chrome", hint: "A Chrome profile of Dot's own, signed in to nothing" },
   { id: "attach", label: "My Chrome", hint: "Your Chrome, with your profiles and sign-ins; Dot opens it when it is closed" },
 ];
+// The sizes a page of Dot's own Chrome may have (item 354, after T3 Code's default viewport): its window's, or a screen's.
+const PAGE_SIZES = [
+  { id: "window", label: "Its window", fit: true, width: 0, height: 0 },
+  { id: "1280x860", label: "1280 × 860", fit: false, width: 1280, height: 860 },
+  { id: "1440x900", label: "1440 × 900", fit: false, width: 1440, height: 900 },
+  { id: "1024x768", label: "1024 × 768", fit: false, width: 1024, height: 768 },
+  { id: "820x1180", label: "820 × 1180, a tablet's", fit: false, width: 820, height: 1180 },
+  { id: "390x844", label: "390 × 844, a phone's", fit: false, width: 390, height: 844 },
+];
+// The names of the two profiles every Dot has (item 355); an added one is called by its own name.
+const PROFILE_KINDS = { default: "Default", incognito: "Incognito" };
+// The colour scheme pages are told to prefer (item 354).
+const APPEARANCES = [
+  { id: "system", label: "System", hint: "The Mac's" },
+  { id: "light", label: "Light", hint: "Light, whatever the Mac shows" },
+  { id: "dark", label: "Dark", hint: "Dark, whatever the Mac shows" },
+];
 
 /**
  * Which Chrome the agent browses with. Switching to "My Chrome" needs Chrome to allow remote debugging, which only the
@@ -941,6 +958,84 @@ function buildBrowser(isDisposed) {
       }
     },
   });
+  // After T3 Code's Settings › Browser (item 354): whether runs may use the browser, how its pages look, and whether a
+  // run's page shows by itself.
+  const enabled = switchSetting({
+    label: "Runs may use the browser",
+    hint: "Off, no run is offered the browser tools, an agent's neither, from the next run on; computer use still sees the screen.",
+    read: () => view !== null && view.enabled,
+    write: async (on) => {
+      view = await api.post("/browser/enabled", { enabled: on });
+    },
+    onToggled: () => {
+      if (!isDisposed()) {
+        enabled.paint();
+        toast("ok", view.enabled ? "Runs may use the browser." : "Runs do not use the browser.");
+      }
+    },
+  });
+  const sizes = el("select", { class: "select sm", "aria-label": "Size of a page" });
+  sizes.addEventListener("change", () => attempt(() => chooseSize(sizes.value)));
+  const sizeSetting = el(
+    "div",
+    { class: "setting" },
+    el("div", { class: "row" }, el("span", { class: "grow" }, "Size of a page"), sizes),
+    el("div", { class: "hint" }, "The page a run sees in Dot's own Chrome: as large as its window, or a screen's size. Your Chrome keeps the size of its window."),
+  );
+  const appearance = choiceSetting({
+    label: "Appearance of pages",
+    hint: "The colour scheme pages are told to prefer, in Dot's own Chrome and in the tabs Dot opens in yours.",
+    options: APPEARANCES,
+    selected: "system",
+    onSelect: (id) => attempt(() => chooseLook({ ...view.look, appearance: id })),
+  });
+  const autoComputer = switchSetting({
+    label: "Show Dot's computer when a run opens the browser",
+    hint: "On a wide window the details panel opens on the page the run works in, beside the chat; a phone keeps its button. Kept in this browser.",
+    read: () => valueOf(AUTO_COMPUTER) === "shown",
+    write: async (on) => setValue(AUTO_COMPUTER, on ? "shown" : "hidden"),
+    onToggled: () => autoComputer.paint(),
+  });
+  // The profiles of Dot's own Chrome (item 355, after T3 Code's): Default, Incognito and the ones added; runs work on
+  // the one in use.
+  const profileList = el("div", { class: "profile-list", role: "list", "aria-label": "Profiles" });
+  const profileName = el("input", {
+    class: "input sm grow",
+    type: "text",
+    maxlength: "48",
+    autocomplete: "off",
+    spellcheck: "false",
+    placeholder: "Work",
+    "aria-label": "Name of the new profile",
+  });
+  const addForm = el("form", { class: "row profile-add", hidden: true }, profileName, el("button", { class: "btn sm", type: "submit" }, "Add"));
+  addForm.addEventListener("submit", (event) => {
+    event.preventDefault();
+    attempt(addProfile);
+  });
+  const addButton = el(
+    "button",
+    {
+      class: "btn sm",
+      type: "button",
+      title: "Add a profile of Dot's Chrome",
+      "aria-label": "Add profile",
+      onclick: () => {
+        addForm.hidden = false;
+        profileName.focus();
+      },
+    },
+    icon("plus"),
+    el("span", { class: "label" }, "Add profile"),
+  );
+  const profileSetting = el(
+    "div",
+    { class: "setting", hidden: true },
+    el("div", { class: "row" }, el("span", { class: "grow" }, "Profiles"), addButton),
+    el("div", { class: "hint" }, "Each profile of Dot's own Chrome keeps its own cookies and sign-ins, and runs work on the one in use. Incognito keeps nothing once Dot's Chrome closes."),
+    profileList,
+    addForm,
+  );
   const port = el("input", {
     class: "input port-input mono",
     type: "text",
@@ -1078,8 +1173,129 @@ function buildBrowser(isDisposed) {
     toast("ok", wanted === 0 ? "Dot's Chrome takes no DevTools connections." : `Dot's Chrome takes DevTools connections on port ${wanted} from its next start.`);
   }
 
+  function profileLabel(profile) {
+    return PROFILE_KINDS[profile.kind] ?? profile.name;
+  }
+
+  function profileAction(label, name, onclick) {
+    return el("button", { class: "btn ghost sm", type: "button", "aria-label": name, onclick: () => attempt(onclick) }, label);
+  }
+
+  function paintProfiles() {
+    profileSetting.hidden = view.mode !== "own";
+    profileList.replaceChildren(
+      ...view.profiles.map((profile) => {
+        const label = profileLabel(profile);
+        const inUse = profile.name === view.profile;
+        return el(
+          "div",
+          { class: "profile-row", role: "listitem", "data-profile": profile.name },
+          el("span", { class: "grow" }, el("span", null, label), inUse ? el("span", { class: "badge b-info" }, "In use") : null),
+          inUse ? null : profileAction("Use", `Use ${label} for runs`, () => changeProfiles(api.post("/browser/profile", { name: profile.name }), `Runs use ${label} from Chrome's next start.`)),
+          profile.kind === "incognito" ? null : profileAction("Clear", `Clear the cookies and cache of ${label}`, () => clearProfile(profile, label)),
+          profile.kind !== "added" || inUse ? null : profileAction("Delete", `Delete ${label}`, () => deleteProfile(profile, label)),
+        );
+      }),
+    );
+  }
+
+  // A change of the profiles, answered with how the card stands; refused while a run works or a Chrome window holds the
+  // profile, when the card shows again what holds.
+  async function changeProfiles(request, done) {
+    let changed = null;
+    try {
+      changed = await request;
+    } finally {
+      if (!isDisposed()) {
+        view = changed ?? view;
+        paint();
+      }
+    }
+    if (!isDisposed()) {
+      toast("ok", done);
+    }
+  }
+
+  async function addProfile() {
+    const name = profileName.value.trim();
+    if (name === "") {
+      return;
+    }
+    await changeProfiles(api.post("/browser/profiles", { name }), `${name} is added; Use makes runs work on it.`);
+    profileName.value = "";
+    addForm.hidden = true;
+  }
+
+  async function clearProfile(profile, label) {
+    const sure = await confirmDialog({
+      title: `Clear ${label}?`,
+      message: "Its cookies and its cache are deleted, so the sites it was signed in to sign it out. Its settings stay.",
+      confirmLabel: "Clear",
+      danger: true,
+      focusCancel: true,
+    });
+    if (sure) {
+      await changeProfiles(api.post(`/browser/profiles/${encodeURIComponent(profile.name)}/clear`, {}), `${label} is cleared.`);
+    }
+  }
+
+  async function deleteProfile(profile, label) {
+    const sure = await confirmDialog({
+      title: `Delete ${label}?`,
+      message: "The profile goes with its cookies, sign-ins and history.",
+      confirmLabel: "Delete",
+      danger: true,
+      focusCancel: true,
+    });
+    if (sure) {
+      await changeProfiles(api.del(`/browser/profiles/${encodeURIComponent(profile.name)}`), `${label} is deleted.`);
+    }
+  }
+
+  function paintSizes() {
+    const look = view.look;
+    const chosen = look.fit_window ? "window" : `${look.viewport_width}x${look.viewport_height}`;
+    // A size set by hand in the config file is shown as it is, among the others.
+    const known = PAGE_SIZES.some((size) => size.id === chosen);
+    const options = known ? PAGE_SIZES : [...PAGE_SIZES, { id: chosen, label: `${look.viewport_width} × ${look.viewport_height}` }];
+    sizes.replaceChildren(...options.map((size) => el("option", { value: size.id }, size.label)));
+    sizes.value = chosen;
+    sizes.disabled = view.mode !== "own";
+  }
+
+  async function chooseSize(id) {
+    const size = PAGE_SIZES.find((candidate) => candidate.id === id);
+    if (size === undefined) {
+      paintSizes();
+      return;
+    }
+    await chooseLook(size.fit ? { ...view.look, fit_window: true } : { ...view.look, fit_window: false, viewport_width: size.width, viewport_height: size.height });
+  }
+
+  // How pages look is kept by the daemon, which lets go of Chrome so that it starts again with it; refused while a run
+  // works, when the controls show again what holds.
+  async function chooseLook(look) {
+    let changed = null;
+    try {
+      changed = await api.post("/browser/look", look);
+    } finally {
+      if (!isDisposed()) {
+        view = changed ?? view;
+        paint();
+      }
+    }
+    if (!isDisposed()) {
+      toast("ok", "Saved for Chrome's next start.");
+    }
+  }
+
   function paint() {
     modes.set(view.mode);
+    enabled.paint();
+    paintProfiles();
+    paintSizes();
+    appearance.choice.set(view.look.appearance);
+    autoComputer.paint();
     raise.paint();
     paintPort();
     signInSetting.hidden = view.mode !== "own";
@@ -1217,6 +1433,7 @@ function buildBrowser(isDisposed) {
     el(
       "div",
       { class: "card-pad stack" },
+      enabled.element,
       el(
         "div",
         { class: "setting" },
@@ -1228,7 +1445,11 @@ function buildBrowser(isDisposed) {
         ),
       ),
       signInSetting,
+      profileSetting,
+      sizeSetting,
+      appearance.element,
       raise.element,
+      autoComputer.element,
       el(
         "div",
         { class: "setting" },

@@ -24,7 +24,9 @@ Anthropic one), a site under `[policy.spend]` that is not a bare host in lower c
 | `mcp-sign-ins/`                                  | what signing in to those servers gave: tokens and client (mode 0600) |
 | `opencode/`                                      | the OpenCode server Dot starts, the chats' sessions, the free models |
 | `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |
-| `browser-profile/`                               | the Chrome profile of the browser tools                              |
+| `browser-profile/`                               | the Default profile of Dot's Chrome, the browser tools' own          |
+| `browser-incognito/`                             | the Incognito profile of Dot's Chrome, emptied as Chrome starts and closes |
+| `browser-profiles/`                              | the profiles of Dot's Chrome added in Settings › Browser, one folder each |
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
 | `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |

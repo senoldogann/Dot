@@ -15,11 +15,13 @@ from dotagent.llm.types import Message, ToolSpec
 from dotagent.mcp.naming import PREFIX
 
 CORE_GROUP: str = "core"
+# The browser tools, which Settings › Browser can keep from every run (item 354).
+BROWSER_GROUP: str = "browser"
 
 # The groups whose tools share a name prefix. A tool with none of these prefixes is in its group of _GROUP_OF_TOOL, or
 # in core.
 _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
-    ("browser_", "browser"),
+    ("browser_", BROWSER_GROUP),
     ("desktop_", "desktop"),
     ("schedule_", "schedule"),
     ("terminal_", "terminal"),

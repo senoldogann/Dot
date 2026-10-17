@@ -61,8 +61,10 @@ from dotagent.browser.driver import (
     wait_for_text,
 )
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
+from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
 from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profiles import INCOGNITO_PROFILE, empty_incognito, profile_dir
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
@@ -501,6 +503,9 @@ class BrowserSession:
             )
         if config.debug_port and await asyncio.to_thread(port_is_taken, config.debug_port):
             raise port_taken(config.debug_port)
+        # Incognito starts with nothing, however its last Chrome ended (item 355).
+        if config.profile == INCOGNITO_PROFILE:
+            await asyncio.to_thread(empty_incognito)
         keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, self._profile)
         playwright: Playwright = await self._driver()
         # With the window kept in the background (item 97), whoever has the focus now gets it back after the launch.
@@ -512,7 +517,12 @@ class BrowserSession:
                 user_data_dir=str(self._profile),
                 channel=config.channel,
                 headless=config.headless,
-                viewport={"width": config.viewport_width, "height": config.viewport_height},
+                # A page fills the window, or has the size Settings › Browser gave it (item 354).
+                viewport=None
+                if config.fit_window
+                else {"width": config.viewport_width, "height": config.viewport_height},
+                no_viewport=config.fit_window,
+                color_scheme=color_scheme(config.appearance),
                 accept_downloads=True,
                 # A service worker of a page would fetch on the page's behalf from outside the route that reads the
                 # URL rules (``_EVERY_URL``); none is registered.
@@ -720,6 +730,33 @@ class BrowserSession:
         """Whether a Chrome is started or connected at the moment (one starts on the first call that needs it)."""
         return self._context is not None
 
+    def set_enabled(self, enabled: bool) -> None:
+        """Whether runs are offered the browser tools, for the runs that start from now on (item 354): a run at work
+        keeps the tools it started with, and Chrome is not let go of."""
+        self._config = self._config.model_copy(update={"enabled": enabled})
+        _log.info("browser_enabled", mode=self._config.mode, enabled=enabled)
+
+    async def set_look(self, look: PageLook) -> None:
+        """How pages look from the next call on (item 354). Dot's own Chrome is let go of first, as for a switch, so
+        that it starts again with the size and the colour scheme, which is refused while a chat's run is at work in it;
+        in the Chrome of the user the connection stays, and the tabs Dot opens from now on are told the colour
+        scheme."""
+        if self._config.mode == "own":
+            await self.switch(self._config.model_copy(update=look.model_dump()), self._profile)
+            return
+        self._config = self._config.model_copy(update=look.model_dump())
+        _log.info("browser_look", mode=self._config.mode, appearance=look.appearance)
+
+    async def use_profile(self, profile: str) -> None:
+        """Work on the profile ``profile`` of Dot's own Chrome from the next call on (item 355), as a switch does: Dot's
+        own Chrome is let go of first, and the change is refused while a chat's run is at work in it. A session in the
+        Chrome of the user goes on there, and takes the profile up when it is moved to Dot's own Chrome."""
+        if self._config.mode == "own":
+            await self.switch(self._config.model_copy(update={"profile": profile}), profile_dir(profile))
+            return
+        self._config = self._config.model_copy(update={"profile": profile})
+        _log.info("browser_profile", mode=self._config.mode, profile=profile)
+
     def set_raise_window(self, raise_window: bool) -> None:
         """Whether the window is raised while a run works, from the next call on; Chrome is not restarted."""
         self._config = self._config.model_copy(update={"raise_window": raise_window})
@@ -824,6 +861,9 @@ class BrowserSession:
             if self._playwright is not None:
                 await self._playwright.stop()
                 self._playwright = None
+            # What Incognito kept goes with its Chrome (item 355).
+            if self._config.mode == "own" and self._config.profile == INCOGNITO_PROFILE and context is not None:
+                await asyncio.to_thread(empty_incognito)
             self._threads.clear()
             self._initial_pages = []
 
@@ -1103,9 +1143,10 @@ class BrowserSession:
         await wait_dom_quiet(tab.page, config.settle_quiet_ms, config.settle_max_ms, _ms(config.navigation_timeout_s))
 
     async def _viewport(self, tab: Tab) -> Viewport:
-        """The page area the model sees: the configured size in Dot's own Chrome, the real window in the open Chrome."""
+        """The page area the model sees: the configured size in Dot's own Chrome, the real window where the page fills
+        it (item 354) and in the open Chrome."""
         config: BrowserConfig = self._config
-        if config.mode == "own":
+        if config.mode == "own" and not config.fit_window:
             return Viewport(width=config.viewport_width, height=config.viewport_height)
         return await measure_viewport(tab.page)
 
@@ -1549,13 +1590,20 @@ class BrowserSession:
         """A thread's new tab: in the background, unless the window may be raised (item 97), when it is the window's
         visible tab as before."""
         if self._config.raise_window:
-            return await context.new_page()
-        return await self._background_tab(context)
+            return await self._dressed(await context.new_page())
+        return await self._dressed(await self._background_tab(context))
 
     async def _scratch_page(self, context: BrowserContext) -> Page:
         """A new tab for a quiet read, always in the background: the tab the user works in, and the application in
         front, keep the front."""
-        return await self._background_tab(context)
+        return await self._dressed(await self._background_tab(context))
+
+    async def _dressed(self, page: Page) -> Page:
+        """``page`` told the colour scheme Settings › Browser chose (item 354): Dot's own Chrome tells each of its pages
+        from its start, the Chrome of the user only the tabs Dot opens in it, one by one."""
+        if self._config.mode == "attach" and self._config.appearance != "system":
+            await page.emulate_media(color_scheme=color_scheme(self._config.appearance))
+        return page
 
     async def _close_scratch(self, page: Page) -> None:
         self._refusals.pop(page, None)

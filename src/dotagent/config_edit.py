@@ -33,7 +33,17 @@ _EDITING: threading.Lock = threading.Lock()
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
 type ConfigTable = Literal["agent", "browser", "judge", "models", "shell"]
 type AgentSetting = Literal["resume"]
-type BrowserSetting = Literal["mode", "raise_window", "debug_port"]
+type BrowserSetting = Literal[
+    "mode",
+    "raise_window",
+    "debug_port",
+    "enabled",
+    "profile",
+    "fit_window",
+    "viewport_width",
+    "viewport_height",
+    "appearance",
+]
 type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]
 type ShellSetting = Literal["sandbox"]

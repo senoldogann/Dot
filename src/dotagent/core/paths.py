@@ -56,6 +56,17 @@ def browser_profile_dir() -> Path:
     return dot_home() / "browser-profile"
 
 
+def browser_incognito_dir() -> Path:
+    """The profile of Dot's own Chrome that keeps nothing (item 355): emptied before Chrome starts on it and after it
+    closes."""
+    return dot_home() / "browser-incognito"
+
+
+def browser_profiles_dir() -> Path:
+    """The profiles of Dot's own Chrome the owner added (item 355), a folder each."""
+    return dot_home() / "browser-profiles"
+
+
 def default_chrome_data_dir() -> Path:
     """Where Google Chrome keeps its profiles on this Mac."""
     return Path.home() / "Library" / "Application Support" / "Google" / "Chrome"

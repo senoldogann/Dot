@@ -5283,8 +5283,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 350 | The audit of 2026-10-17: what held in the paths a human merges                         | done        | 410af27 |
 | 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | done        | 2f94b84 |
 | 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | done        | b2e8090 |
-| 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | in progress |         |
-| 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | in progress |         |
+| 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | done        | 9c1352e |
+| 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| in progress |         |
+| 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | in progress |         |
+| 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14076,7 +14078,7 @@ wide window too). Docs: `docs/daemon.md`, `docs/phone.md`.
 
 ### 353. Keep going is chosen from the composer's "+", beside Goal mode
 
-**Status: in progress.** The owner's word of 2026-10-17: "daha önce keep going modu vardı ama şimdi + işaretine
+**Status: done (`9c1352e`).** The owner's word of 2026-10-17: "daha önce keep going modu vardı ama şimdi + işaretine
 tıklandığında plan gibi bir şey var plan ben eklediğimi hatırlamıyorum" (there was a Keep going mode before, but the "+"
 now shows something like a plan, which I don't remember adding); asked, the owner chose to bring Keep going into the "+"
 beside Goal mode and to keep Plan first. **As built (2026-10-17).** `views/runs.js`: the home's Keep going switch
@@ -14086,10 +14088,48 @@ chat's page has none. Test: `tests/smoke/test_composer.py` (the "+" holds Goal m
 hides goal mode and shows the line under the frame; the Options no longer hold it), which failed on the code before.
 Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
 
+### 354. Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view
+
+**Status: in progress.** The owner's word of 2026-10-17, with a screenshot of T3 Code's Settings › Browser: "Amacımız
+t3code daki browser sistemini temizce ve daha iyisini kendi sistemimize entegre etmekti. T3Code zaten opensource
+istersen bakabilirsin." (our aim was to bring T3 Code's browser system into ours, cleanly and better; T3 Code is open
+source). **As built (2026-10-17).** Four of T3 Code's rows in Settings › Browser, on what Dot's browser already does
+(its own Chrome or the owner's, Dot's computer, Take over): **Runs may use the browser** (`[browser] enabled`; off, no
+run is offered a `browser_*` tool, OpenCode's agent neither; T3 Code's override per project is an agent's own tools,
+which only narrow it); **Size of a page** (a page of Dot's own Chrome fills its window, `fit_window`, or has one of five
+sizes, and the model is told the size the page has) and **Appearance of pages** (System, Light or Dark: Playwright's
+`color_scheme`, "null" for the Mac's, and `emulate_media` on the tabs Dot opens in the owner's Chrome), both `POST
+/api/browser/look` (`browser/look.py`), which lets go of Chrome so that it starts with them; **Show Dot's computer when
+a run opens the browser** (`dot.autoComputer`, this browser's): a run at work that first uses its browser opens the
+panel's Screen tab beside the chat (`inspector.peekTab`, which leaves the panel and the tab the reader chose as they
+were), and a phone keeps its button. Left out: the zoom of a page (Chrome keeps it per site) and where links open (Dot's
+links open where the owner reads Dot). Tests: `tests/smoke/test_browser_settings.py` (the tools of a run with the
+browser on and off, through the real loop; a real headless Chrome's page at 1024 × 768 dark, 390 × 844 light and filling
+its window; the rows wide and on a phone, light and dark, kept in `config.toml`; the Screen tab shown by itself for a
+run that waits on its question, not once turned off, and a phone's drawer left closed). Docs:
+`docs/browser-and-computer-use.md`, `docs/daemon.md`.
+
+### 355. Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added
+
+**Status: in progress.** The owner's word of 2026-10-17 (T3 Code's browser system in Dot, cleanly and better; its
+Settings › Browser lists Browser profiles: Default, Set as default, Clear cookies and cache, Add profile, and Incognito,
+whose data is cleared when the app closes). **As built (2026-10-17).** `browser/profiles.py`: Dot's own Chrome works on
+one profile at a time (`[browser] profile`): Default (`browser-profile`), Incognito (`browser-incognito`, emptied before
+Chrome starts on it and after it closes) and the ones added (`browser-profiles/<name>`, up to 24, a name of up to 48
+letters of any script, digits, spaces, `-` and `_`). Settings › Browser lists them with In use: Use (`POST
+/api/browser/profile`, which lets go of Chrome, refused while runs are active), Clear (its cookies and caches; Chrome
+let go of when it works on it), Delete (an added profile not in use), Add profile; a profile a Chrome window has open is
+not changed. Sign in…, `dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use,
+and the new folders are guarded as Default is. Tests: `tests/unit/test_browser_profiles.py` (the list, the names,
+adding, deleting, clearing, emptying), `tests/smoke/test_browser_settings.py` (a real headless Chrome works on Default,
+then on an added profile, then on Incognito, whose folder is gone once its Chrome closed; Settings › Browser adds, uses
+and deletes a profile, wide and on a phone). Docs: `docs/browser-and-computer-use.md`, `docs/configuration.md`,
+`docs/safety.md`.
+
 ### 356. The second audit of 2026-10-17: what held outside the shell guard, fixed
 
-**Status: in progress.** The owner's word of 2026-10-17, with a second outside report pasted (its claims 1A-1B and 32
-more): "başka bir ajanın review bulgularını da sıraya kat ... problemler var ise düzeltme yap" (queue another agent's
+**Status: done (`e82ee9f`).** The owner's word of 2026-10-17, with a second outside report pasted (its claims 1A-1B and
+32 more): "başka bir ajanın review bulgularını da sıraya kat ... problemler var ise düzeltme yap" (queue another agent's
 review findings, and fix them where they are real). Each claim was checked by reading the code and calling Dot's own
 functions (two read-only verifiers): many names in it do not exist, and most claims were false. **As built
 (2026-10-17).** What held, outside the shell guard: what signing in to an MCP server gave Dot (`mcp-sign-ins/`) is
@@ -14868,4 +14908,7 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 - 2026-10-17 (Opus 5.5): PR #334 (item 349, OpenRouter) merged as `196ff64` after CI and a second fresh-context review whose findings it fixes (a variant id the doctor did not know, lines over 120 columns, the lists of providers). Item 351 on `items-351-audit-fixes` as PR #335; its review's findings fixed (a failing one-time schedule waits between tries, the answer check reads only the word after a folder, a known address may gain a query or a closing slash); `test_browser_sign_in`'s stand-in no longer writes its pid before its arguments (300 of 300 probes failed before, none after).
 - 2026-10-17 (Opus 5.5): PR #335 (item 351, the audit's fixes) merged as `2f94b84` after CI; main's checkout moved to it and the daemon restarted at 17:36:46 while no run worked. Item 352 on the owner's word of the same day (fewer info lines, a live line over the composer, a phone's chat as one screen), on `items-352-chat-calm`.
 - 2026-10-17 (Opus 5.5): item 353 on the owner's answer of the same day (Keep going into the "+" beside Goal mode, Plan first kept), on `item-353-keep-going`: the home's Keep going switch is a row of the composer's "+" after Goal mode's, the Options pill holds the approvals alone; `test_composer.py` failed on the code before.
+- 2026-10-17 (Opus 5.5): item 354 on the owner's word of the same day (T3 Code's browser system in Dot, cleanly and better, with a screenshot of its Settings › Browser), on `item-354-browser-settings`: runs may be kept off the browser, a page of Dot's own Chrome fills its window or has a size, pages are told the Mac's colour scheme or one chosen, and a run at work shows its page beside the chat by itself; T3 Code's zoom and link target left out, with the reason.
+- 2026-10-17 (Opus 5.5): item 355 on the same word, on `item-354-browser-settings` after 354: profiles of Dot's own Chrome (Default, Incognito, added ones; Use, Clear, Delete, Add profile). T3 Code's recordings (frame rate, key and mouse presses) are not built: what they would record is too close to what the session's safety check stopped twice that day, and they were the largest, least needed part.
+
 - 2026-10-17 (Opus 5.5): item 356 on the owner's word of the same day (a second outside report: fix what is real), on `item-356-audit-runtime`: two read-only verifiers checked every claim; the shell guard's findings stay reported for the owner, the six that held elsewhere are fixed, each with a test that fails on the code before.

@@ -58,6 +58,23 @@ def _debug_port(value: int) -> int:
     return value
 
 
+# A profile of Dot's own Chrome (item 355, after T3 Code's): "default", "incognito", or the name of one the owner added,
+# which names its folder.
+_PROFILE_NAME: re.Pattern[str] = re.compile(r"^[^\W_][\w -]{0,47}$")
+_RESERVED_PROFILES: frozenset[str] = frozenset({"default", "incognito"})
+
+
+def _profile_name(value: str) -> str:
+    """A profile of ``[browser] profile``: up to 48 letters (of any script), digits, spaces, dashes and underscores,
+    from a letter or a digit, so that it names a folder of its own and nothing else."""
+    if _PROFILE_NAME.fullmatch(value) is None or value != value.strip():
+        raise ValueError("a profile's name is up to 48 letters, digits, spaces, - and _, from a letter or a digit")
+    # Default and Incognito are named in one way only, so that "Incognito" is never a folder that keeps what it got.
+    if value.casefold() in _RESERVED_PROFILES and value not in _RESERVED_PROFILES:
+        raise ValueError("the two profiles every Dot has are written default and incognito")
+    return value
+
+
 # The smallest context size a model's runs may be given (item 250, [models] context): the budget every run had before
 # 2026-10-11. A run's first step alone sends its instructions, its tools and the request (29,294 tokens at the median
 # of 48 runs, measured 2026-10-15), so a smaller budget would summarise a run after its first few steps.
@@ -67,7 +84,10 @@ type ServiceAddress = Annotated[str, AfterValidator(_service_address)]
 type ModelReference = Annotated[str, AfterValidator(_model_reference)]
 type SpendSite = Annotated[str, AfterValidator(_spend_site)]
 type DebugPort = Annotated[int, Field(ge=0, le=65535), AfterValidator(_debug_port)]
+type BrowserProfileName = Annotated[str, AfterValidator(_profile_name)]
 type ContextSize = Annotated[int, Field(ge=CONTEXT_FLOOR)]
+# The colour scheme the pages of Dot's browser are told to prefer: the Mac's, or one of the two whatever the Mac shows.
+type PageAppearance = Literal["system", "light", "dark"]
 
 
 class ServerConfig(FrozenModel):
@@ -298,6 +318,8 @@ class PolicyConfig(FrozenModel):
 
 
 class BrowserConfig(FrozenModel):
+    # Whether runs are offered the browser tools at all (item 354); an agent's own tools only narrow what is offered.
+    enabled: bool
     mode: BrowserMode
     attach_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     channel: str
@@ -307,9 +329,14 @@ class BrowserConfig(FrozenModel):
     # The port of this Mac on which Dot's own Chrome also takes DevTools connections, from a run's scripts (item 265);
     # 0 for none.
     debug_port: DebugPort
+    # The profile Dot's own Chrome works on (item 355): "default", "incognito" or one the owner added.
+    profile: BrowserProfileName
+    # Whether a page of Dot's own Chrome fills its window instead of having the size below (item 354).
+    fit_window: bool
     # A page Chrome can open: from a small phone's to a 4K screen's.
     viewport_width: int = Field(ge=320, le=3840)
     viewport_height: int = Field(ge=240, le=2160)
+    appearance: PageAppearance
     navigation_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     action_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     snapshot_max_chars: int
