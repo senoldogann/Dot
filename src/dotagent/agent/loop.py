@@ -1591,9 +1591,16 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     recalled: Remembered = await _start_notes(runtime, run, query, notes_budget)
     remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
-        await runtime.store.mark_memories_used(run.id, [record.id for record in remembered], memory_seen_at, "start")
+        handed: list[str] = [record.id for record in remembered]
+        # How many of them no earlier run of the chat was handed: the chat's page says nothing of notes it recalled
+        # before (item 335).
+        before: set[str] = await runtime.store.handed_in_thread(run.thread_id, run.id)
+        await runtime.store.mark_memories_used(run.id, handed, memory_seen_at, "start")
         await runtime.bus.emit(
-            run.id, "memories", {"ids": [record.id for record in remembered], "tokens": recalled.tokens}, True
+            run.id,
+            "memories",
+            {"ids": handed, "tokens": recalled.tokens, "fresh": sum(1 for one in handed if one not in before)},
+            True,
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     questions: QuestionMode = question_mode(config.questions, can_ask)

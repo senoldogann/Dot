@@ -1142,16 +1142,24 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       }
     },
 
+    // The notes a run was handed. At its start the line shows only when the chat had not recalled one of them before
+    // (`fresh`, item 335): a follow-up handed the same notes again says nothing. An event older than `fresh` shows.
     memories(scope, record) {
-      const count = plural(record.data.ids.length, "memory", "memories");
-      const tokens = typeof record.data.tokens === "number" ? `, ${plural(record.data.tokens, "token", "tokens")}` : "";
+      const data = record.data;
+      const fresh = typeof data.fresh === "number" ? data.fresh : data.ids.length;
+      if (data.live !== true && typeof data.site !== "string" && fresh === 0) {
+        return;
+      }
+      const count = plural(data.ids.length, "memory", "memories");
+      const tokens = typeof data.tokens === "number" ? `, ${plural(data.tokens, "token", "tokens")}` : "";
+      const newer = fresh < data.ids.length ? ` (${fresh} new)` : "";
       // Item 308: the lessons of a site the run just reached say where they were learned.
       const text =
-        record.data.live === true
+        data.live === true
           ? `Picked up ${count} saved while the run worked`
-          : typeof record.data.site === "string"
-            ? `Recalled ${count} learned on ${record.data.site}`
-            : `Recalled ${count}${tokens}`;
+          : typeof data.site === "string"
+            ? `Recalled ${count} learned on ${data.site}`
+            : `Recalled ${count}${newer}${tokens}`;
       note(scope, record.ts, "database", text, "");
     },
 
