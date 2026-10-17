@@ -153,7 +153,7 @@ async def _quick_look(path: Path, workshop: Path) -> None:
 @dataclass
 class QuickLook:
     """The drawings of this daemon's life (module docstring). A file version is drawn by one call at a time, under a
-    lock of its own (one for each version drawn while the daemon runs)."""
+    lock of its own: one for each version asked for, given up with its drawing when that is let go."""
 
     folder: Path
     secret: bytes
@@ -183,7 +183,7 @@ class QuickLook:
             await asyncio.to_thread(os.replace, drawn, self.folder / drawing)
             for old in await asyncio.to_thread(_oldest_beyond, self.folder, KEPT_LOOKS):
                 await asyncio.to_thread(shutil.rmtree, old)
-                # Its lock goes with it, so the locks stay as few as the drawings kept.
+                # Its lock goes with it.
                 self._drawing.pop(old.name, None)
         finally:
             await asyncio.to_thread(shutil.rmtree, workshop)

@@ -33,8 +33,6 @@ PAIR_PATH: str = f"{API_ROOT}/phone/pair"
 PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH, PAIR_PATH})
 PAGES_PREFIX: str = "/pages/"
 LOOKS_PREFIX: str = "/looks/"
-# What a browser sends as the Origin of a sandboxed page, whose origin is opaque.
-_OPAQUE_ORIGIN: str = "null"
 
 _PRIVATE_FILE_MODE: int = 0o600
 _PERMISSION_BITS: int = 0o777
@@ -229,9 +227,7 @@ def check_request(
     """Why a request must not be served, or ``None`` when it may be."""
     if not host_is_local(host, port, reach):
         return Refusal(status=_HTTP_MISDIRECTED, message="this server answers only to its loopback address")
-    # A drawing of an Office file asks for its own parts from its opaque origin, as "null" (a font, item 268).
-    drawing_part: bool = is_look_path(path) and origin is not None and origin.lower() == _OPAQUE_ORIGIN
-    if not origin_is_local(origin, port, reach) and not drawing_part:
+    if not origin_is_local(origin, port, reach):
         return Refusal(status=_HTTP_FORBIDDEN, message="requests from other origins are refused")
     if navigation_is_foreign(fetch_site, fetch_mode) and not reached_from_other_sites(path):
         return Refusal(status=_HTTP_FORBIDDEN, message="navigations from pages of other sites are refused")

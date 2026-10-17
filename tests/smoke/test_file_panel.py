@@ -42,6 +42,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.office import OFFICE_MEDIA_TYPES
+from dotagent.previews import quicklook
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import routes_files
 from dotagent.server.app import create_app
@@ -478,5 +479,49 @@ async def test_a_file_a_message_carries_or_an_answer_names_opens_beside_the_conv
                 for size in _SHOTS:
                     await _one_size(browser, runtime, manager, address, files, user_home, opened, size, tmp_path)
                 await _refusals(browser, address, files[0], opened)
+            finally:
+                await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_file_quick_look_cannot_draw_shows_what_dot_reads_of_it_whole(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Before, the panel kept the layout of a drawing after Quick Look failed, and the contents showed cut off."""
+    monkeypatch.setattr(quicklook, "QUICK_LOOK", "/usr/bin/false")
+    with scratch_home() as home, eval_environment(home, {}):
+        async with (
+            _daemon(login_env, _user_home(home)) as (runtime, manager, address),
+            async_playwright() as playwright,
+        ):
+            minutes: StoredAttachment = store_attachment(
+                runtime.workspace, "minutes.docx", OFFICE_MEDIA_TYPES["document"], _document()
+            )
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                run: RunRecord = await manager.start(
+                    "Look at the minutes",
+                    "task",
+                    SCRIPTED_MODEL,
+                    None,
+                    "test",
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    "ask",
+                    False,
+                    (minutes,),
+                )
+                async with asyncio.timeout(WAIT_S):
+                    assert (await manager.wait(run.id)).status == "done"
+                await page.goto(f"{address}/#/runs/{run.id}")
+                await page.locator("button.attach-chip").filter(has_text="minutes.docx").click()
+                view: Locator = page.locator(".file-view")
+                await expect(view.get_by_text("Quick Look could not draw this file")).to_be_visible()
+                await expect(view.locator(".file-body")).to_have_attribute("data-view", "contents")
+                await expect(view.get_by_role("heading", name="Budget 2027")).to_be_visible()
             finally:
                 await browser.close()
