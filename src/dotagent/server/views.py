@@ -876,13 +876,17 @@ class DeletedThreads(FrozenModel):
 
 class BrowserView(FrozenModel):
     """Which Chrome the browser tools work in (``mode`` is the live one, which a switch changes without a restart),
-    whether one is started or connected now, and what the files of the Chrome of the user say: whether it runs and
+    whether one is started or connected now, whether the Chrome of the user went away since Dot was connected to it
+    (``lost``) and whether Dot waits now for its Allow (``waiting_allow``, item 341), and what the files of the Chrome
+    of the user say: whether it runs and
     allows remote debugging, and on which port. ``inspect_page`` is where the user switches that on. ``debug_port``
     is the port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), and ``devtools_address`` where
     a run's scripts reach it: set while the main session is Dot's own Chrome and a port is."""
 
     mode: BrowserMode
     connected: bool
+    lost: bool
+    waiting_allow: bool
     chrome_running: bool
     remote_debugging: bool
     port: int | None

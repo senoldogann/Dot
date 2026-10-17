@@ -25,6 +25,8 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         return BrowserView(
             mode=session.mode,
             connected=session.connected,
+            lost=session.lost,
+            waiting_allow=session.waiting_allow,
             chrome_running=chrome.running,
             remote_debugging=chrome.remote_debugging,
             port=chrome.port,

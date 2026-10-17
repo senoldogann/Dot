@@ -60,6 +60,8 @@ _READY_TIMEOUT_S: float = 30.0
 _EXIT_TIMEOUT_S: float = 20.0
 # The longest a Back may take on a page of this Mac: a navigation, not the navigation timeout.
 _BACK_MOST_S: float = 5.0
+# How long the browser card takes at most to show how Chrome stands now: two of its reads (item 341).
+_CARD_READS_MS: int = 7000
 _TABS_TIMEOUT_S: float = 10.0
 _POLL_S: float = 0.1
 # Events that Chrome sends when a tab opens or when it quits arrive a few milliseconds after the fact.
@@ -424,13 +426,23 @@ async def test_a_tab_that_a_tab_of_the_agent_opens_is_the_agents_and_closes_with
 async def test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrome_is_back(
     data_dir: Path, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
+    """Chrome quits: the session says so (item 341), a step meanwhile says Chrome is not running; Chrome is back: the
+    next step connects again by itself, and the owner is told once, as Chrome asks for its Allow then."""
     first: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
     session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
+    told: list[str] = []
+
+    async def notice() -> None:
+        told.append("told")
+
+    session.tell_reconnects(notice)
     try:
         await session.open_url("agent", f"{site}/")
+        assert not session.lost and told == []
         await stop_chrome(first)
         assert profile_holder_pid(data_dir) is None
         await asyncio.sleep(_EVENT_GRACE_S)
+        assert session.lost and not session.connected
         with pytest.raises(BrowserError, match="Chrome is not running; open Chrome"):
             await session.snapshot("agent")
         second: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
@@ -438,6 +450,33 @@ async def test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrom
             view: PageView = await session.open_url("agent", f"{site}/")
             assert view.title == "Home"
             assert await open_tabs(second.port) == sorted([f"{site}/mine", f"{site}/"])
+            assert told == ["told"] and not session.lost and not session.waiting_allow
+        finally:
+            await stop_chrome(second)
+    finally:
+        await session.aclose()
+
+
+async def test_a_chrome_that_restarted_and_refuses_says_so_in_one_line(
+    data_dir: Path, attach_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """Item 341: after Chrome went away, a connection it does not accept (the Allow not given in time) says that Chrome
+    was closed or restarted and what to do, not only that it refused."""
+    first: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
+    session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
+    try:
+        await session.open_url("agent", f"{site}/")
+        await stop_chrome(first)
+        await asyncio.sleep(_EVENT_GRACE_S)
+        second: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
+        try:
+            wrong: str = "00000000-0000-4000-8000-000000000000"
+            (data_dir / _PORT_FILE).write_text(f"{second.port}\n/devtools/browser/{wrong}\n", encoding="utf-8")
+            with pytest.raises(
+                BrowserError, match=r"^Chrome was closed or restarted; keep a Chrome window open, click Allow"
+            ):
+                await session.open_url("agent", f"{site}/")
+            assert session.lost and not session.waiting_allow
         finally:
             await stop_chrome(second)
     finally:
@@ -567,6 +606,85 @@ def held_until(released: asyncio.Event) -> Callable[[Route], Awaitable[None]]:
         await route.continue_()
 
     return hold
+
+
+@asynccontextmanager
+async def _served_attached(home: Path) -> AsyncIterator[tuple[Runtime, str]]:
+    """A daemon on the Dot home ``home`` that works in the Chrome of the user (the scratch Chrome), with its runtime."""
+    (home / "config.toml").write_text(
+        '[browser]\nmode = "attach"\nheadless = true\nattach_timeout_s = 10.0\n', encoding="utf-8"
+    )
+    runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
+    manager: RunManager = RunManager(runtime)
+    try:
+        stopping: asyncio.Event = asyncio.Event()
+        listener = bind_listener("127.0.0.1", 0)
+        port: int = listener.getsockname()[1]
+        context: ServerContext = ServerContext(
+            runtime=runtime,
+            manager=manager,
+            scheduler=None,
+            token=TOKEN,
+            host="127.0.0.1",
+            port=port,
+            started_at=time.time(),
+            stopping=stopping,
+        )
+        server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+        serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
+        while not server.started:
+            assert not serving.done(), "the server stopped while starting"
+            await asyncio.sleep(0.05)
+        try:
+            yield runtime, f"http://127.0.0.1:{port}"
+        finally:
+            server.should_exit = True
+            stopping.set()
+            await serving
+    finally:
+        await manager.shutdown()
+        await close_runtime(runtime)
+
+
+async def test_the_settings_card_follows_chrome_as_it_quits_and_comes_back(
+    data_dir: Path, own_home: Path, site: str
+) -> None:
+    """Item 341: with My Chrome the browser card reads Chrome again while it is open, so it says, with no click, that
+    Dot is connected, that Chrome is closed, that Chrome restarted and asks for Allow on the next step, and that Dot is
+    connected again; each with the one line that says what to do."""
+    first: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
+    async with _served_attached(own_home) as (runtime, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(
+            channel=load_default_config().browser.channel, headless=True
+        )
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, service_workers="block")
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/settings/browser")
+            card: Locator = page.locator("section.card").filter(
+                has=page.locator(".card-head .grow", has_text=re.compile(r"^Browser$"))
+            )
+            connection: Locator = (
+                card.locator("dl div")
+                .filter(has=page.locator("dt", has_text=re.compile(r"^Agent connection$")))
+                .locator("dd")
+            )
+            line: Locator = card.locator(".attach-standing")
+            await runtime.browsers.main.open_url("card", f"{site}/")
+            await expect(connection).to_have_text("connected", timeout=_CARD_READS_MS)
+            await expect(line).to_contain_text("later runs connect with no click")
+            await stop_chrome(first)
+            await expect(line).to_contain_text("Chrome is closed", timeout=_CARD_READS_MS)
+            second: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
+            try:
+                await expect(connection).to_have_text("Chrome restarted", timeout=_CARD_READS_MS)
+                await expect(line).to_contain_text("Chrome asks you to Allow")
+                await runtime.browsers.main.open_url("card", f"{site}/")
+                await expect(connection).to_have_text("connected", timeout=_CARD_READS_MS)
+            finally:
+                await stop_chrome(second)
+        finally:
+            await browser.close()
 
 
 @asynccontextmanager

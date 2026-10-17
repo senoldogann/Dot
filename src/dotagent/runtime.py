@@ -4,6 +4,7 @@ import asyncio
 import sys
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -13,7 +14,7 @@ from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
 from dotagent.agent.peers import Peers
 from dotagent.agent.sizes import ContextSizes
 from dotagent.browser.pool import BrowserPool
-from dotagent.browser.session import BrowserSession
+from dotagent.browser.session import RECONNECT_NOTICE, BrowserSession
 from dotagent.config import AppConfig, McpServerConfig
 from dotagent.core.errors import ElsewhereError, McpError, StoreError
 from dotagent.core.logs import get_logger
@@ -380,6 +381,9 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             notify=show_notification,
             peers=peers,
         )
+        # Chrome asks for its Allow again when Dot connects again to the Chrome of the user it lost, maybe behind
+        # another window while a step waits on it: the owner is told on the Mac (item 341).
+        browsers.main.tell_reconnects(partial(show_notification, "Chrome asks to allow Dot", RECONNECT_NOTICE))
         cleanup.pop_all()
     return runtime
 

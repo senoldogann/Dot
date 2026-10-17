@@ -14,7 +14,7 @@ import contextlib
 import re
 import secrets
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -132,6 +132,10 @@ _LAUNCH_ERROR_CHARS: int = 900
 _CHALLENGE_STATUS: frozenset[int] = frozenset({202, 403, 429, 503, 999})
 _CHALLENGE_WAIT_MS: int = 8000
 _DRIVER_LOST: str = "Connection closed while reading from the driver"
+# What a step says when the Chrome of the user went away since Dot connected to it, and what the owner is told on the
+# Mac when Dot connects to it again (item 341).
+CHROME_RESTARTED: str = "Chrome was closed or restarted"
+RECONNECT_NOTICE: str = "Chrome was closed or restarted: click Allow in Chrome so that Dot can go on."
 # The URL rules on every request of Dot's own Chrome (item 135, measured 2026-10-15 with Playwright 1.63 and Chrome
 # 155): a route on the context sees the first request of every page, popups included, each resource a page loads and
 # the fetches of a service worker, on the address as Chrome read it; what it does not see is the hops of a redirect
@@ -421,8 +425,29 @@ class BrowserSession:
         self._chrome_pid: int | None = None
         self._front_before: int | None = None
         self._front_returns: set[asyncio.Task[None]] = set()
+        # The Chrome of the user went away (quit, restarted, the connection broke) since Dot was last connected to it, and
+        # Dot waits now for its Allow (item 341): what the browser card and a call that meets the loss say.
+        self._lost: bool = False
+        self._waiting_allow: bool = False
+        # Told when Dot connects again to a Chrome of the user that went away, before Chrome asks for its Allow.
+        self._on_reconnect: Callable[[], Awaitable[None]] | None = None
 
     # ------------------------------------------------------------------ lifecycle
+
+    def tell_reconnects(self, notice: Callable[[], Awaitable[None]]) -> None:
+        """Have ``notice`` told each time Dot connects again to a Chrome of the user that went away (item 341): Chrome
+        asks for Allow again then, maybe behind another window, while the step that needs it waits."""
+        self._on_reconnect = notice
+
+    @property
+    def lost(self) -> bool:
+        """Whether the Chrome of the user went away since Dot was last connected to it."""
+        return self._lost
+
+    @property
+    def waiting_allow(self) -> bool:
+        """Whether Dot waits now for the Chrome of the user to let it connect (its Allow)."""
+        return self._waiting_allow
 
     async def _driver(self) -> Playwright:
         if self._playwright is None:
@@ -536,6 +561,10 @@ class BrowserSession:
         config: BrowserConfig = self._config
         endpoint: DebugEndpoint = await asyncio.to_thread(read_debug_endpoint, self._profile)
         playwright: Playwright = await self._driver()
+        again: bool = self._lost
+        if again and self._on_reconnect is not None:
+            await self._on_reconnect()
+        self._waiting_allow = True
         try:
             browser: Browser = await playwright.chromium.connect_over_cdp(
                 endpoint_url(endpoint),
@@ -546,8 +575,9 @@ class BrowserSession:
             )
         except PlaywrightError as error:
             raise BrowserError(
-                "Chrome did not accept the connection; keep a Chrome window open, click Allow when Chrome asks, and "
-                f"check that remote debugging is on ({INSPECT_PAGE})",
+                (CHROME_RESTARTED if again else "Chrome did not accept the connection")
+                + f"; keep a Chrome window open, click Allow when Chrome asks, and check that remote debugging is on "
+                f"({INSPECT_PAGE})",
                 {
                     "data_dir": str(self._profile),
                     "port": endpoint.port,
@@ -555,6 +585,9 @@ class BrowserSession:
                     "error": truncate_middle(redact_endpoint(str(error)), _LAUNCH_ERROR_CHARS),
                 },
             ) from error
+        finally:
+            self._waiting_allow = False
+        self._lost = False
         if not browser.contexts:
             await browser.close()
             raise BrowserError(
@@ -587,13 +620,15 @@ class BrowserSession:
         self._context = None
 
     def _on_browser_disconnected(self, browser: Browser) -> None:
-        """Chrome quit, or the connection to it broke. A later connection must not be mistaken for this one."""
+        """Chrome quit, or the connection to it broke. A later connection must not be mistaken for this one, and the
+        next call connects again, which Chrome asks the user to allow again (item 341)."""
         if self._closed or browser is not self._browser:
             return
         _log.warning("browser_disconnected", threads=len(self._threads))
         self._forget_tabs()
         self._context = None
         self._browser = None
+        self._lost = True
 
     def _forget_tabs(self) -> None:
         self._initial_pages = []
@@ -716,6 +751,8 @@ class BrowserSession:
         self._context = None
         self._browser = None
         self._chrome_pid = None
+        # Let go of on purpose: nothing went away behind Dot's back.
+        self._lost = False
         try:
             if browser is not None:
                 await self._detach(browser)
@@ -964,9 +1001,18 @@ class BrowserSession:
             await self._note_front()
             playwright: Playwright | None = self._playwright
             thread.last_used = time.monotonic()
+            browser: Browser | None = self._browser
             try:
                 yield thread
             except Exception as error:
+                # The Chrome of the user went away under the step (item 341): one clear line instead of what
+                # Playwright says of a closed target.
+                if browser is not None and browser is not self._browser and self._lost:
+                    raise BrowserError(
+                        f"{CHROME_RESTARTED} while this step ran; the next step connects again: click Allow when "
+                        "Chrome asks",
+                        {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)},
+                    ) from error
                 if playwright is None or not driver_lost(error):
                     raise
                 async with self._launch_lock:

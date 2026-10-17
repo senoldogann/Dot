@@ -864,9 +864,38 @@ const BROWSER_MODES = [
  * opened by the switch (item 261), and while the switch is under way the card says what it waits for. The DevTools
  * port (item 265) has Dot's own Chrome take connections from a run's scripts too.
  */
+// How often the browser card reads again how the Chrome of the user stands, while it is open (item 341).
+const BROWSER_POLL_MS = 3000;
+
+/** How Dot stands with the Chrome of the user (item 341): what the card's connection says, and the one line that says
+ * what to do, with its tone; null in Dot's own Chrome. */
+function attachStanding(view) {
+  if (view.mode !== "attach") {
+    return null;
+  }
+  if (view.connected) {
+    return { word: "connected", line: "Dot is connected to your Chrome; later runs connect with no click.", tone: "ok" };
+  }
+  if (view.waiting_allow) {
+    return { word: "waiting for Allow", line: "Chrome asks whether Dot may connect: choose Allow in Chrome.", tone: "warn" };
+  }
+  if (!view.chrome_running) {
+    return { word: "not connected", line: "Chrome is closed: open it, and Dot connects on its next step.", tone: "warn" };
+  }
+  if (!view.remote_debugging) {
+    return { word: "not connected", line: `Remote debugging is off in Chrome: switch it on at ${view.inspect_page}.`, tone: "warn" };
+  }
+  if (view.lost) {
+    return { word: "Chrome restarted", line: "Chrome was closed or restarted: the next step connects again, and Chrome asks you to Allow.", tone: "warn" };
+  }
+  return { word: "not connected", line: "Dot connects on the next step that needs Chrome; Chrome asks you to Allow once.", tone: "" };
+}
+
 function buildBrowser(isDisposed) {
   let view = null;
+  let polling = null;
   const facts = el("dl", { class: "kv kv-pairs" }, inlineLoading());
+  const standing = el("div", { class: "note attach-standing", "aria-live": "polite", hidden: true }, icon("plug"), el("span"));
   const problem = el("div", { class: "note bad", hidden: true }, icon("alert"), el("span"));
   const waiting = el(
     "div",
@@ -1005,12 +1034,18 @@ function buildBrowser(isDisposed) {
     raise.paint();
     paintPort();
     const port = view.port === null ? "" : `, port ${view.port}`;
+    const stands = attachStanding(view);
     facts.replaceChildren(
       entry("Chrome", view.chrome_running ? "running" : "not running"),
       entry("Remote debugging", view.remote_debugging ? `on${port}` : "off"),
-      entry("Agent connection", view.connected ? "connected" : "not connected"),
+      entry("Agent connection", stands === null ? (view.connected ? "connected" : "not connected") : stands.word),
       entry("Attach timeout", `${view.attach_timeout_s} s`),
     );
+    standing.hidden = stands === null;
+    if (stands !== null) {
+      standing.className = stands.tone === "" ? "note attach-standing" : `note attach-standing ${stands.tone}`;
+      standing.lastChild.textContent = stands.line;
+    }
     steps.replaceChildren(
       copyStep(),
       el("li", null, "Chrome asks once whether Dot may connect; choose Allow."),
@@ -1040,6 +1075,22 @@ function buildBrowser(isDisposed) {
     if (await read()) {
       problem.hidden = true;
     }
+    keepReading();
+  }
+
+  // With My Chrome the card reads again how Chrome stands while it is open, so a restart of Chrome, its Allow and the
+  // connection show as they happen.
+  function keepReading() {
+    clearTimeout(polling);
+    polling = setTimeout(async () => {
+      if (isDisposed()) {
+        return;
+      }
+      if (view !== null && view.mode === "attach") {
+        await read();
+      }
+      keepReading();
+    }, BROWSER_POLL_MS);
   }
 
   async function choose(id) {
@@ -1094,6 +1145,7 @@ function buildBrowser(isDisposed) {
         portHint,
       ),
       facts,
+      standing,
       waiting,
       problem,
       el("div", { class: "stack tight" }, el("div", { class: "section-label" }, "To let Dot join your Chrome"), steps),
