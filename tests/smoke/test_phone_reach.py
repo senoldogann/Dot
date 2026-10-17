@@ -1,5 +1,6 @@
-"""Settings › Phone sets up Tailscale and keeps the Mac awake (item 271), against stand-ins of ``tailscale`` and
-``caffeinate`` put first on the PATH: neither the real Tailscale nor the Mac's sleep is touched.
+"""Settings › Phone sets up Tailscale and keeps the Mac awake (item 271), against a stand-in ``tailscale`` that
+``DOT_TAILSCALE`` names and a stand-in ``caffeinate`` put first on the PATH: neither the real Tailscale nor the Mac's
+sleep is touched.
 
 The daemon is served on this Mac in a throw-away home; the stand-in Tailscale answers as its command line does, and
 writes down what it is asked to serve.
@@ -43,8 +44,9 @@ def _executable(path: Path, text: str) -> None:
 
 @pytest.fixture
 def stand_ins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
-    """A folder first on the PATH with a ``tailscale`` that runs signed in and serves nothing until it is asked, and a
-    ``caffeinate`` that only waits. Yields the folder, where the stand-in writes what it was asked to serve."""
+    """A folder with a ``tailscale``, which ``DOT_TAILSCALE`` names, that runs signed in and serves nothing until it is
+    asked, and a ``caffeinate``, first on the PATH, that only waits. Yields the folder, where the stand-in writes what it
+    was asked to serve."""
     folder: Path = tmp_path / "bin"
     folder.mkdir()
     (folder / "status.json").write_text(
@@ -66,6 +68,7 @@ esac
 """,
     )
     _executable(folder / "caffeinate", "#!/bin/sh\nexec sleep 60\n")
+    monkeypatch.setenv("DOT_TAILSCALE", str(folder / "tailscale"))
     monkeypatch.setenv("PATH", f"{folder}{os.pathsep}{os.environ['PATH']}")
     yield folder
 
@@ -144,9 +147,8 @@ async def test_set_up_serves_dot_and_writes_its_name_and_the_mac_is_kept_awake_o
         assert "keep_awake = false" in config_path().read_text(encoding="utf-8")
 
 
-async def test_a_mac_without_tailscale_is_told_how_to_get_it(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("PATH", str(tmp_path))
-    monkeypatch.setattr("dotagent.tailnet._APP_CLI", tmp_path / "no-tailscale")
+async def test_a_mac_without_tailscale_is_told_how_to_get_it() -> None:
+    # The Tailscale of every smoke test is one that does not exist (tests/smoke/conftest.py).
     async with (
         _daemon() as (_runtime, address),
         httpx.AsyncClient(

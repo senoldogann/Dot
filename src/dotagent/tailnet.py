@@ -4,6 +4,7 @@ runs on the Mac signed in, ``tailscale serve`` presents this daemon's port to th
 """
 
 import asyncio
+import os
 import shutil
 from pathlib import Path
 
@@ -63,7 +64,11 @@ class _Serve(BaseModel):
 
 
 def tailscale_program() -> str | None:
-    """Tailscale's command line on this Mac: the one on the PATH, else the app's own; ``None`` when there is none."""
+    """Tailscale's command line on this Mac: the one ``DOT_TAILSCALE`` names, so that tests point at their own and never
+    reach the owner's; else the one on the PATH, else the app's own; ``None`` when there is none."""
+    override: str | None = os.environ.get("DOT_TAILSCALE")
+    if override is not None and override != "":
+        return override if Path(override).is_file() else None
     found: str | None = shutil.which("tailscale")
     if found is not None:
         return found

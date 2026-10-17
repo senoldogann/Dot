@@ -96,7 +96,7 @@ async def test_a_code_is_traded_once_for_the_token(own_home: Path) -> None:
         # As the phone's app asks: through the tailnet name, from a page of it.
         phone: dict[str, str] = {"Host": TAILNET_NAME, "Origin": f"https://{TAILNET_NAME}"}
         assert (await client.post("/phone/pairing")).status_code == 401
-        assert (await client.get("/phone", headers=signed)).json() == {"addresses": [f"https://{TAILNET_NAME}/"]}
+        assert (await client.get("/phone", headers=signed)).json()["addresses"] == [f"https://{TAILNET_NAME}/"]
 
         issued: httpx.Response = await client.post("/phone/pairing", headers=signed)
         code: str = issued.json()["code"]

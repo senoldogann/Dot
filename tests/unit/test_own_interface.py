@@ -9,7 +9,7 @@ from dotagent.config import AppConfig, ServerConfig, load_default_config
 from dotagent.core.errors import ToolInputError
 from dotagent.tools.browser import checked_url
 
-SERVER: ServerConfig = ServerConfig(host="127.0.0.1", port=8765, reach=["mac.tail1234.ts.net"])
+SERVER: ServerConfig = ServerConfig(host="127.0.0.1", port=8765, reach=["mac.tail1234.ts.net"], keep_awake=False)
 
 
 @pytest.mark.parametrize(
