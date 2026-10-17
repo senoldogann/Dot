@@ -39,6 +39,18 @@ def test_a_page_is_sandboxed_loads_nothing_of_the_daemon_and_only_the_ui_frames_
     assert dict(response_headers("/api/status"))["Cache-Control"] == "no-store"
 
 
+def test_a_drawing_of_an_office_file_is_sandboxed_and_loads_only_its_own_parts() -> None:
+    """Item 268: Quick Look's scripts run with an opaque origin; the parts they load are the server's own, which that
+    origin may load (no Cross-Origin-Resource-Policy), and nothing else."""
+    look: dict[str, str] = dict(response_headers(f"/looks/{'a' * 32}/Preview.html"))
+    policy: str = look["Content-Security-Policy"]
+    assert policy.startswith("sandbox allow-scripts; default-src 'none';")
+    assert "connect-src" not in policy and "http" not in policy
+    assert "frame-ancestors 'self'" in policy and "frame-src 'self'" in policy
+    assert "Cross-Origin-Resource-Policy" not in look and "X-Frame-Options" not in look
+    assert (look["X-Content-Type-Options"], look["Cache-Control"]) == ("nosniff", "no-store")
+
+
 async def _ended_run(store: Store, thread: ThreadRecord) -> RunRecord:
     run: RunRecord = await store.create_run(
         thread.id, "chart", "task", "ollama:x", None, "test", None, "standard", None, "ask", False, None, None, None

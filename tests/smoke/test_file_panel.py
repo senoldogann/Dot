@@ -1,14 +1,14 @@
 """Files in the panel beside the conversation (item 195), on the pages of a daemon in Chrome. A file a message carries
-opens beside the conversation when its chip is clicked: a PDF's pages as pictures the daemon draws, a workbook as a grid
-with a tab for each sheet and what a cell holds, a document's headings, list and table, a presentation's slides with
-their charts. A file the answer names by its path opens the same way: a CSV file as a grid, which opens on the Mac, an
-image, and a Markdown file formatted, its HTML never drawn, with its source a click away (item 269); a path the panel
-does not show says why. The side panel lists the conversation's files, and the file the run wrote opens from its path
-in Actions. A long text pasted into the conversation's box goes as a file, which opens beside the conversation from its
-chip (item 269). Closing the file gives the panel back as it was and the focus to what opened it. Wide and on a phone,
-light and dark. The daemon's routes refuse a file outside the home folder and a script to open, and serve a PDF's page
-as a PNG.
-
+opens beside the conversation when its chip is clicked: a PDF's pages as pictures the daemon draws; a workbook, a
+document and a presentation first as macOS's Quick Look draws them, in a sandboxed frame (item 268, the real
+``qlmanage``), then, a click away, as a grid with a tab for each sheet and what a cell holds, a document's headings,
+list and table, and a presentation's slides with their charts. A file the answer names by its path opens the same
+way: a CSV file as a grid, which opens on the Mac, an image, and a Markdown file formatted, its HTML never drawn,
+with its source a click away (item 269); a path the panel does not show says why. The side panel lists the
+conversation's files, and the file the run wrote opens from its path in Actions. A long text pasted into the
+conversation's box goes as a file, which opens beside the conversation from its chip (item 269). Closing the file
+gives the panel back as it was and the focus to what opened it. Wide and on a phone, light and dark. The daemon's
+routes refuse a file outside the home folder and a script to open, and serve a PDF's page as a PNG.
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server, the
 home folder the daemon shows files of is a scratch one, and a stand-in takes the place of Launch Services: a test
 never opens an application.
@@ -29,7 +29,7 @@ import pptx
 import pytest
 import pytest_asyncio
 from PIL import Image, ImageDraw
-from playwright.async_api import APIResponse, Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import APIResponse, Browser, FrameLocator, Locator, Page, async_playwright, expect
 from pptx.chart.data import CategoryChartData
 from pptx.enum.chart import XL_CHART_TYPE
 from pptx.util import Inches
@@ -42,6 +42,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
 from dotagent.office import OFFICE_MEDIA_TYPES
+from dotagent.previews import quicklook
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import routes_files
 from dotagent.server.app import create_app
@@ -278,10 +279,18 @@ async def _one_size(
     await page.screenshot(path=str(shots / f"pdf-{width}-{scheme}.png"))
     await _close(page, view, report)
 
-    # A workbook: a tab for each sheet, the hidden one named so, and what a cell holds.
+    # A workbook as Quick Look draws it (item 268): a sheet framed as it is, in a sandboxed frame; Quick Look leaves the
+    # hidden sheet out, so the one sheet has no tabs over it. Then what Dot reads of it: a tab for each sheet, the
+    # hidden one named so, and what a cell holds.
     budget: Locator = chips.filter(has_text="budget.xlsx")
     await budget.click()
     await expect(view).to_have_attribute("data-kind", "workbook")
+    drawn: FrameLocator = view.frame_locator("iframe.file-look")
+    await expect(drawn.locator("td")).to_contain_text(["Item", "Amount", "Rent", "1200"])
+    await expect(view.locator(".file-tabs[aria-label='Sheets']")).to_have_count(0)
+    await expect(view.locator("iframe.file-look")).to_have_attribute("sandbox", "allow-scripts")
+    await page.screenshot(path=str(shots / f"workbook-drawn-{width}-{scheme}.png"))
+    await view.get_by_role("button", name="Contents").click()
     grid: Locator = view.locator(".file-grid")
     await expect(grid.locator("td")).to_have_text(["Item", "Amount", "Rent", "1200", "Food", "300", "", "=SUM(B2:B3)"])
     await grid.locator("td.pending").click()
@@ -291,20 +300,27 @@ async def _one_size(
     await expect(grid.locator("td")).to_have_text(["Paid on the first"])
     await _close(page, view, budget)
 
-    # A document: its heading, its list and its table.
+    # A document as Quick Look draws it, then what Dot reads of it: its heading, its list and its table.
     minutes: Locator = chips.filter(has_text="minutes.docx")
     await minutes.click()
     await expect(view).to_have_attribute("data-kind", "document")
+    await expect(view.frame_locator("iframe.file-look").get_by_text("Budget 2027")).to_be_visible()
+    await page.screenshot(path=str(shots / f"document-drawn-{width}-{scheme}.png"))
+    await view.get_by_role("button", name="Contents").click()
     await expect(view.get_by_role("heading", name="Budget 2027")).to_be_visible()
     await expect(view.locator("li")).to_have_text(["Rent", "Food"])
     await expect(view.locator("tbody td")).to_have_text(["Rent", "1200"])
     await page.screenshot(path=str(shots / f"document-{width}-{scheme}.png"))
     await _close(page, view, minutes)
 
-    # A presentation: its slide's title, its text and its chart's series by quarter.
+    # A presentation as Quick Look draws it, then what Dot reads of it: its slide's title, its text and its chart's
+    # series by quarter.
     deck: Locator = chips.filter(has_text="deck.pptx")
     await deck.click()
     await expect(view).to_have_attribute("data-kind", "presentation")
+    await expect(view.frame_locator("iframe.file-look").get_by_text("Up in the spring")).to_be_visible()
+    await page.screenshot(path=str(shots / f"presentation-drawn-{width}-{scheme}.png"))
+    await view.get_by_role("button", name="Contents").click()
     slide: Locator = view.locator(".file-slide")
     await expect(slide.get_by_role("heading", name="Sales")).to_be_visible()
     await expect(slide.locator(".file-line")).to_have_text(["Up in the spring"])
@@ -463,5 +479,49 @@ async def test_a_file_a_message_carries_or_an_answer_names_opens_beside_the_conv
                 for size in _SHOTS:
                     await _one_size(browser, runtime, manager, address, files, user_home, opened, size, tmp_path)
                 await _refusals(browser, address, files[0], opened)
+            finally:
+                await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_file_quick_look_cannot_draw_shows_what_dot_reads_of_it_whole(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Before, the panel kept the layout of a drawing after Quick Look failed, and the contents showed cut off."""
+    monkeypatch.setattr(quicklook, "QUICK_LOOK", "/usr/bin/false")
+    with scratch_home() as home, eval_environment(home, {}):
+        async with (
+            _daemon(login_env, _user_home(home)) as (runtime, manager, address),
+            async_playwright() as playwright,
+        ):
+            minutes: StoredAttachment = store_attachment(
+                runtime.workspace, "minutes.docx", OFFICE_MEDIA_TYPES["document"], _document()
+            )
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                run: RunRecord = await manager.start(
+                    "Look at the minutes",
+                    "task",
+                    SCRIPTED_MODEL,
+                    None,
+                    "test",
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    "ask",
+                    False,
+                    (minutes,),
+                )
+                async with asyncio.timeout(WAIT_S):
+                    assert (await manager.wait(run.id)).status == "done"
+                await page.goto(f"{address}/#/runs/{run.id}")
+                await page.locator("button.attach-chip").filter(has_text="minutes.docx").click()
+                view: Locator = page.locator(".file-view")
+                await expect(view.get_by_text("Quick Look could not draw this file")).to_be_visible()
+                await expect(view.locator(".file-body")).to_have_attribute("data-view", "contents")
+                await expect(view.get_by_role("heading", name="Budget 2027")).to_be_visible()
             finally:
                 await browser.close()

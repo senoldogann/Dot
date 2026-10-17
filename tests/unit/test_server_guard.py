@@ -79,6 +79,9 @@ def test_only_a_bearer_header_carries_the_token(header: str | None, expected: st
         ("/api/status", LOCAL_HOST, "https://attacker.example", GOOD_AUTH, 403),
         ("/api/status", LOCAL_HOST, f"http://127.0.0.1:{PORT + 1}", GOOD_AUTH, 403),
         ("/", LOCAL_HOST, "null", None, 403),
+        # A drawing of an Office file (item 268) asks for its parts with no Origin (its styles, pictures and script
+        # load without CORS): one that names an opaque origin is refused as anywhere else.
+        ("/looks/0123456789abcdef0123456789abcdef/Attachment1.css", LOCAL_HOST, "null", None, 403),
         ("/api/health", "attacker.example", None, None, 421),
     ],
 )
@@ -119,10 +122,11 @@ def test_a_navigation_a_page_of_another_site_started_is_refused(
         assert (refusal is not None and refusal.status == 403) is refused, (path, refusal)
 
 
-@pytest.mark.parametrize("path", ["/oauth/callback", "/pages/abc123"])
+@pytest.mark.parametrize("path", ["/oauth/callback", "/pages/abc123", f"/looks/{'a' * 32}/Attachment7.html"])
 def test_what_other_sites_send_a_browser_to_by_design_is_served_to_a_foreign_navigation(path: str) -> None:
-    """A sign-in comes back from the authorization server's site (item 279), and a page a run showed opens with an
-    opaque origin wherever it is opened from: neither is the UI, so neither is refused on Fetch Metadata."""
+    """A sign-in comes back from the authorization server's site (item 279), and a page a run showed or a drawing of an
+    Office file (item 268) opens with an opaque origin wherever it is opened from, which makes its own frames foreign
+    navigations: none is the UI, so none is refused on Fetch Metadata."""
     assert check_request(path, LOCAL_HOST, None, "cross-site", "navigate", None, TOKEN, PORT, frozenset()) is None
 
 

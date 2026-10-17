@@ -19,6 +19,7 @@ from dotagent.core.errors import (
     InvalidValueError,
     NotFoundError,
     PairingRefused,
+    PreviewError,
     ProviderError,
     RunConflict,
     ToolExecutionError,
@@ -26,7 +27,9 @@ from dotagent.core.errors import (
     UndoError,
 )
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import looks_dir
 from dotagent.core.text import redact_secrets, truncate_middle
+from dotagent.previews.quicklook import QuickLook, open_quick_look
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
 from dotagent.server.kept_pages import KeptPages, ServedPages, keep_pages
@@ -36,7 +39,7 @@ from dotagent.server.routes_campaigns import campaigns_router
 from dotagent.server.routes_connections import connections_router
 from dotagent.server.routes_data import memories_router, rules_router, schedules_router
 from dotagent.server.routes_drafts import drafts_router
-from dotagent.server.routes_files import files_router
+from dotagent.server.routes_files import files_router, looks_router
 from dotagent.server.routes_keys import keys_router
 from dotagent.server.routes_mcp import mcp_router
 from dotagent.server.routes_pages import pages_router
@@ -70,6 +73,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (ToolInputError, 422),
     (ToolExecutionError, 422),
     (BrowserError, 422),
+    (PreviewError, 422),
     (ProviderError, 502),
 )
 
@@ -108,7 +112,9 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(keys_router(ctx))
     app.include_router(themes_router())
     app.include_router(pages_router(ctx))
-    app.include_router(files_router(ctx))
+    looks: QuickLook = open_quick_look(looks_dir())
+    app.include_router(files_router(ctx, looks))
+    app.include_router(looks_router(looks))
     app.include_router(phone_router(ctx))
 
     @app.exception_handler(DotError)

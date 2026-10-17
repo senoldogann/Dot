@@ -147,8 +147,10 @@ def build_apple_tool() -> RegisteredTool:
         description=(
             "Run an AppleScript (or JavaScript for Automation) with osascript and return its result as text. For "
             "applications with a scripting dictionary (Finder, Mail, Calendar, Reminders, Notes, Music, Safari, "
-            "Messages, System Events) this is much faster and more reliable than operating their windows: read and "
-            'change their data directly, for example `tell application "Notes" to get name of every note`. '
+            "Messages, System Events, and Microsoft Excel, Word and PowerPoint where they are installed) this is much "
+            "faster and more reliable than operating their windows: read and change their data directly, for example "
+            '`tell application "Notes" to get name of every note` or `tell application "Microsoft Excel" to get '
+            'value of range "A1:C3" of active sheet`. '
             "find_help says which applications of this Mac can do a task, from their dictionaries, and `sdef` with "
             "an application's path prints its whole dictionary. The first use of an application can make macOS ask "
             "the user for Automation permission; a call that times out may be waiting for that answer. Prefer "
