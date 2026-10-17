@@ -276,9 +276,9 @@ steer_single_actions = true
 # weak tier or whose window cut the context budget, full otherwise. "full" until evals show that groups help.
 tool_surface = "full"
 # How much the system prompt says (item 280). "full": how to work, each kind of tool at length, trust and safety.
-# "lean": the same rules of trust and safety and how a run ends, and how to work and each kind of tool in a few lines;
-# with tool_surface = "grouped" a run starts lean. "full" stays the default: on 2026-10-18 the evals' 41 tasks, twice
-# each on DeepSeek V4.1 Flash, passed 81 of 82 the full way and 78 of 82 the lean way, which took 44 % fewer tokens.
+# "lean": the same rules of trust and safety, of hesitating and of how a run ends, and how to work and each kind of
+# tool in a few lines. With tool_surface = "grouped" as well, a run starts lean: the shortest prompt and the core tools.
+# "full" stays the default: the evals of item 280 (ROADMAP.md) did not show the lean start doing as well.
 prompt = "full"
 # A task or research run that ends with success but whose answer names paths that do not exist, and that no successful
 # call of the run named, is sent back once with the list: to create what is missing, to correct the answer or to finish

@@ -12403,10 +12403,11 @@ opens, one removed, nothing wider than the phone).
 
 **Status: in progress.** The owner's word of 2026-10-18: write it and run the evals on the main model, OpenRouter's
 DeepSeek V4.1 Flash. **As built (2026-10-18).** `[agent] prompt` (`full` or `lean`) chooses the system prompt's style:
-`lean` keeps the rules of trust and safety and how a run ends as `full` has them and says how to work and each kind of
-tool in a line or two (5,944 characters for a plain task, where `full` has 14,542); `full` is the prompt of before, byte
-for byte. Eval reports keep the style. The evals' 41 tasks, twice each, from the same commit and home (the owner's
-config, in a throw-away home, the keys passed to that run only), cost about 0.22, 0.16 and 0.14 dollars, in the order of
+`lean` keeps the rules of trust and safety, of hesitating (item 327) and of how a run ends as `full` has them and says
+how to work and each kind of tool in a line or two (6,373 characters for a plain task, where `full` has 14,516). Eval
+reports keep the style. The evals' 41 tasks, twice each, with the owner's config in throw-away homes and the keys passed
+to each run only; the first ran on the code before the change, whose full prompt is the same byte for byte, and the runs
+overlapped, so the seconds were taken under unequal load. They cost about 0.22, 0.16 and 0.14 dollars, in the order of
 the table:
 
 | Prompt, tools | Passed | Tokens a pass | Seconds a pass | Claimed done, were not | Injections followed |
@@ -12415,11 +12416,16 @@ the table:
 | full, grouped | 80 of 82 | 50.1 k | 12.1 | 2 | 1 of 6 |
 | lean, grouped | 78 of 82 | 40.5 k | 9.2 | 3 | 0 of 6 |
 
-Fewer words and tools took 31 to 44 % fewer tokens a pass, and passed a little less and claimed a little more often to
-be done when they were not; the difference is small for 82 attempts, but it does not show that the lean start does as
-well, so both defaults stay `full` and `lean` is there for whoever weighs the tokens more. Tests:
-`tests/unit/test_lean_prompt.py` (every rule kept, under half the length), the callers of the prompt's inputs, `dotx
-eval check`. Docs: `docs/runs.md`. The reports are in the owner's `reports/evals-280/`.
+Fewer words and tools took 31 to 44 % fewer tokens a pass (the lean prompt alone, beside grouped tools, 19 %), and
+passed a little less and claimed a little more often to be done when they were not; filter-headlines failed in every
+row, and without it the passes are 80, 79 and 78 of 80 and the false claims 0, 1 and 1. The difference is small for 82
+attempts, but it does not show that the lean start does as well, so both defaults stay `full` and `lean` is there for
+whoever weighs the tokens more. After the evals, the review restored two rules the lean text had dropped, hesitating and
+not saving what a page asks to be remembered (about 1 % of a step's input), and both texts now say that a schedule's run
+goes on in the chat that made it (item 291), where the full text said a new thread. The evals could not judge the
+shortened words on plans, the desktop and memory: no attempt kept a plan, and they run without the desktop or
+embeddings. Tests: `tests/unit/test_lean_prompt.py` (every rule kept, under half the length), the callers of the
+prompt's inputs, `dotx eval check`. Docs: `docs/runs.md`. The reports are in the owner's `reports/evals-280/`.
 
 **What.** A run starts with a short system prompt and the core tools; the other groups of tools are named in a line and
 come when the run asks for them (`use_tools`), as `tool_surface = "grouped"` does. Evals of both ways on the same tasks
