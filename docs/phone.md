@@ -19,7 +19,8 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
    it happens before a page is back: the daemon started again after it did not stop cleanly (it was killed, crashed or
    ended with an error; it leaves `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon
    signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store
-   and go when their push service says they are gone. A subscription whose keys cannot encrypt a message is refused
+   and go when their push service says they are gone; a service that is busy or failing (429, 5xx) is asked once
+   more a second later. A subscription whose keys cannot encrypt a message is refused
    (422), and one stored before that check is dropped with a warning while the others still get theirs. Settings ›
    General › Notifications off drops the subscription.
 

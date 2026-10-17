@@ -1911,6 +1911,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 standby.scaffold,
             )
             left = left | {ref.label}
+            # A step is routed to none of the models the run has worked on: one that stopped answering, or the one it
+            # is on now (the outside audit of 2026-10-17, R3).
+            candidates = tuple(candidate for candidate in candidates if candidate.ref.label not in left)
             context = replace(context, output_chars=scaffold.tool_output_chars)
             if not info.vision:
                 history = drop_old_images(history, 0)

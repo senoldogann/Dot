@@ -17,6 +17,7 @@ from dotagent.core.errors import (
     ProviderAccessError,
     ProviderAuthError,
     ProviderHttpError,
+    ProviderProtocolError,
     ProviderQuotaError,
     ProviderRateLimitError,
 )
@@ -324,6 +325,14 @@ def test_stream_error_frame_without_http_error_is_raised() -> None:
     )
     with pytest.raises(ProviderQuotaError):
         codec.fold(codec.initial("m"), frame, {})
+
+
+def test_an_error_event_of_the_responses_stream_that_names_no_error_is_raised() -> None:
+    # An "event: error" line whose data says nothing was taken for nothing, and the stream went on as if the model had
+    # stopped (the outside audit of 2026-10-17, R10).
+    codec = responses_codec(classify_openai)
+    with pytest.raises(ProviderProtocolError):
+        codec.fold(codec.initial("m"), sse({}, "error"), {})
 
 
 # ------------------------------------------------------------------------------------ error classes

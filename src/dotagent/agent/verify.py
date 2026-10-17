@@ -91,6 +91,11 @@ def _flat(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
+def _whole(text: str) -> str:
+    """``text`` on one line, its secrets masked."""
+    return " ".join(redact_secrets(text).split())
+
+
 def _first_line(text: str) -> str:
     lines: list[str] = [line for line in text.splitlines() if line.strip()]
     return _flat(lines[0], _RESULT_CHARS) if lines else ""
@@ -134,7 +139,9 @@ def _with_outcome(facts: RunFacts, outcome: ToolOutcome) -> RunFacts:
         return facts
     succeeded: bool = not outcome.result.is_error
     tool: str = outcome.call.name
-    target: str = _flat(action.target, _TARGET_CHARS)
+    # The whole target names the call: two long ones that start alike are two calls (the outside audit of 2026-10-17,
+    # R5); it is cut where it is shown.
+    target: str = _whole(action.target)
     failures: tuple[CallFact, ...] = tuple(
         fact for fact in facts.failures if (fact.tool, fact.target) != (tool, target)
     )
@@ -258,11 +265,14 @@ def render_facts(facts: RunFacts, missing: Sequence[str], unopened: Sequence[str
         ("Files the file tools wrote or edited", _listed(facts.written)),
         (
             "Failed calls that no later success of the same tool and target followed",
-            [f"- {fact.tool} {fact.target}: {fact.result}" for fact in facts.failures],
+            [f"- {fact.tool} {_flat(fact.target, _TARGET_CHARS)}: {fact.result}" for fact in facts.failures],
         ),
         (
             "Commands that test, build or lint, with their results",
-            [f"- {fact.target}: {'succeeded' if fact.ok else 'failed'}, {fact.result}" for fact in facts.checks],
+            [
+                f"- {_flat(fact.target, _TARGET_CHARS)}: {'succeeded' if fact.ok else 'failed'}, {fact.result}"
+                for fact in facts.checks
+            ],
         ),
         ("Paths the final answer names that do not exist and that no successful call named", _listed(missing)),
         ("Addresses the final answer names that no call of the run opened", _listed(unopened)),

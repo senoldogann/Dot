@@ -94,12 +94,19 @@ def _within(path: Path, root: Path) -> tuple[str, ...] | None:
 
 def located_file(raw: str, home: Path, workspace: Path) -> Path:
     """The file ``raw`` names (``~/`` standing for ``home``), its links followed, when it is in a place the panel shows
-    files of. ``NotFoundError`` when there is no such file; ``InvalidValueError`` when it is no file or is elsewhere,
-    and where."""
+    files of. ``NotFoundError`` when there is no such file; ``InvalidValueError`` when it is no file, is elsewhere (and
+    where), or its path cannot be followed."""
     try:
         path: Path = _named(raw, home).resolve(strict=True)
-    except FileNotFoundError as error:
+    except (FileNotFoundError, NotADirectoryError) as error:
+        # A file where the path needs a folder names no file either.
         raise NotFoundError("there is no such file", {"path": raw}) from error
+    except OSError as error:
+        # Links that lead round in a loop, or a folder this Mac does not let Dot look into, were a 500 (the outside
+        # audit of 2026-10-17, S13).
+        raise InvalidValueError(
+            f"the path cannot be followed: {error.strerror}", {"path": raw, "errno": error.errno}
+        ) from error
     if not path.is_file():
         raise InvalidValueError("the path is no file", {"path": raw})
     if _within(path, workspace.resolve()) is not None:

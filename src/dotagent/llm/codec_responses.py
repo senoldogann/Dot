@@ -9,6 +9,7 @@ from collections.abc import Sequence
 
 from pydantic import JsonValue
 
+from dotagent.core.errors import ProviderProtocolError
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.connector import StreamCodec, parse_event_object
 from dotagent.llm.http import SseEvent
@@ -280,6 +281,10 @@ def fold_responses_event(
         wire: WireError | None = wire_error_from_object(data)
         if wire is not None:
             raise error_from_stream(wire, context, classify)
+        # An error event that names no error still ends the answer, as in codec_messages (the outside audit of
+        # 2026-10-17, R10): taken for nothing, the stream would end as if the model had stopped.
+        if kind == "error":
+            raise ProviderProtocolError("error event carries no error description", context)
         return state, ()
     if kind in ("response.output_text.delta", "response.refusal.delta"):
         return _with_text(state, get_str(data, "delta"))

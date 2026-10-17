@@ -63,6 +63,19 @@ def test_the_panel_shows_files_of_the_workspace_and_of_the_home_folder_outside_h
         located_file("~/Documents/gone.txt", home, workspace)
 
 
+def test_a_path_through_a_file_is_not_found_and_a_loop_of_links_is_refused(tmp_path: Path) -> None:
+    # Both were a 500 (the outside audit of 2026-10-17, S13).
+    home: Path = tmp_path / "home"
+    workspace: Path = home / "workspace"
+    _file(workspace / "notes.txt", b"notes")
+    with pytest.raises(NotFoundError):
+        located_file("~/workspace/notes.txt/inside.txt", home, workspace)
+    (workspace / "a").symlink_to(workspace / "b")
+    (workspace / "b").symlink_to(workspace / "a")
+    with pytest.raises(InvalidValueError, match="cannot be followed"):
+        located_file("~/workspace/a", home, workspace)
+
+
 def test_the_files_of_applications_stay_hidden_whatever_case_their_path_is_written_in(tmp_path: Path) -> None:
     """Item 215: the Mac's disk finds a file whatever case its path is written in, so ~/Library is told apart from the
     home's other folders in any case."""
