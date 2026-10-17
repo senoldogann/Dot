@@ -5265,6 +5265,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | done        | 34ad323 |
 | 333 | `dotx setup` leads to a working model, and the home says when none answers             | done        | 34ad323 |
 | 334 | The repository opens with a short README, its details under docs/                      | done        | 34ad323 |
+| 335 | A chat says it recalled notes only when one of them is new                             | in progress |         |
+| 336 | A message's foot follows it closely                                                    | in progress |         |
+| 337 | On a phone a switch is smaller                                                         | in progress |         |
+| 338 | On a phone the button at the top left is the one way back                              | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13705,6 +13709,51 @@ had no links or classifiers, and nothing said plainly that Dot runs on macOS alo
 - Left as they are, for the owner to decide: ROADMAP.md in the repository, the item numbers in comments and in the
   pages, and a release on PyPI.
 
+## Part 54: the owner's four fixes of 2026-10-17
+
+The owner's word of 2026-10-17, in the chat: "Her zaman recalled .. memoires textini göstermesin sohbette, ajanin ve
+bizim mesajimzia mesajin altindaki koplyama , saat ve kac saniyede bittigi alani cok uzak aradaki üstten boslugu biraz
+azalt, ve mobilde on off butonlari cok büyük lütfen bunlarinda boyutunu düzelt ve mobilde bir sayfaya gittigimizde geri
+butonuna tikladigimizda en bas sayfaya atiyor. 2 farkli geri butonu olmamamli tek bir tane sol üstte olmali, en sonki
+sayfaya döndürmeli." (the chat should not always show the recalled memories; the copy, time and duration under a
+message stand too far from it; on a phone the on/off switches are too big; on a phone Back leads to the first page, and
+there should be one way back, at the top left, to the page before.) Built on `items-335-338-phone-fixes`, after
+`items-316-317-customize`; not merged.
+
+### 335. A chat says it recalled notes only when one of them is new
+
+**Status: in progress.** **As built (2026-10-17).** A run's `memories` event counts the notes its chat had not been
+handed before (`fresh`; `Store.handed_in_thread` reads `memory_uses`). The chat's page draws "Recalled N memories" only
+when one is fresh, with "(M new)" when some are not; notes learned on a site and those picked up while the run works
+still show, and an event stored before this item shows as before. Test: `tests/smoke/test_recalled_line.py` (three chat
+runs of one thread through the real loop: fresh 2, 0 and 1 of 3; on the pages a line, none, and "Recalled 3 memories
+(1 new)").
+
+### 336. A message's foot follows it closely
+
+**Status: in progress.** **As built (2026-10-17).** The answer's foot (the copy button, the time, how long the run took)
+drops its 12 px margin and rises 4 px into the last line's own spacing; on a phone your message's foot rises by the band
+its finger-sized buttons add above their marks. Measured from the bubble and from the answer's last line to the first
+thing of the foot that shows: 8 and 26 px in a Mac's window before, 8 and 10 after; 13 and 23 px on an iPhone before, 5
+and 7 after. Test: `tests/smoke/test_message_foot.py` (Chrome as a Mac's window, WebKit as an iPhone).
+
+### 337. On a phone a switch is smaller
+
+**Status: in progress.** **As built (2026-10-17).** On a phone a switch draws a 40 by 24 px track with a 20 px knob,
+not iOS's 52 by 32 px (item 329), in a 48 by 44 px box whose band is clear, so it still takes a finger and a tap on its
+row still turns it; a Mac's window keeps 34 by 20 px. Test: `test_phone_type.py` (the box and the track on an iPhone).
+
+### 338. On a phone the button at the top left is the one way back
+
+**Status: in progress.** **As built (2026-10-17).** The router keeps the trail of the pages opened by the pages' own
+links (`main.js` `followTrail`). On a phone a page reached that way says Back and returns along it (`history.back`); a
+page opened directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team:
+`ROUTES`' `parent`) leads there; any other page keeps the button that opens the list of chats. The sidebar, an address
+and the browser's own Back start the trail anew or step back on it. On a phone the pages' own links back are hidden,
+and the settings' "All settings" is gone. Docs: `docs/phone.md`. Test: `tests/smoke/test_phone_back.py` (the settings,
+a service's page by its address and from its tile, a run from Activity and a chat from the sidebar in WebKit as an
+iPhone, then a Mac's window); `test_phone_settings.py` goes back with Back.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -14457,3 +14506,4 @@ had no links or classifiers, and nothing said plainly that Dot runs on macOS alo
 - 2026-10-16 (Opus 5.5): item 318, the first of the plan's B group as the owner chose: a "+" in the composer picks plugins (MCP servers), skills and Plan first for a message, as chips; the run starts with the picked servers' tools on and the skills' instructions after the owner's words; Save skill writes a learned skill at the owner's word. Built on `item-318-composer-picks`, after PR #326.
 - 2026-10-17 (Opus 5.5): items 316 and 317 on the owner's word ("Bunların hepsini onaylıyorum yap"): Customize, with Plugins (34 services in six sections, 26 tried, the marks of Simple Icons, a page for each service, the steps of Connect apps) and Skills (cards two a row, Personal and System, Save from a chat); on `items-316-317-customize`.
 - 2026-10-17 (Opus 5.5): on the owner's word ("Bunların hepsini onaylıyorum yap"): PR #326 merged as `5655e6f`, after its one failing test was made to hold on any Mac (`cp $(echo case x)` now writes over /etc/hosts, which every machine has, instead of a ~/.zshrc the CI runner lacks); PR #327 (item 318) merged as `1334b9f`, with the event loop's heartbeat tests given limits between the runner's own pauses and the faults they guard against (0.25 s and 0.5 s) and a check that the notes are compared off the loop's thread; PR #328 (items 328 to 334) merged as `34ad323`. Main's checkout moved to it (its 181 uncommitted entries were the copy of PR #326 and were kept in a backup first) and the daemon restarted at 06:21:27 while no run worked.
+- 2026-10-17 (Opus 5.5): items 335 to 338 on the owner's word of the same day (the recalled line, the foot of a message, a phone's switches and its one way back), on `items-335-338-phone-fixes`.
