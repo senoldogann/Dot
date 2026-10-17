@@ -13727,21 +13727,29 @@ handed before (`fresh`; `Store.handed_in_thread` reads `memory_uses`). The chat'
 when one is fresh, with "(M new)" when some are not; notes learned on a site and those picked up while the run works
 still show, and an event stored before this item shows as before. Test: `tests/smoke/test_recalled_line.py` (three chat
 runs of one thread through the real loop: fresh 2, 0 and 1 of 3; on the pages a line, none, and "Recalled 3 memories
-(1 new)").
+(1 new)"). After the review: a run a rewind took out of the chat (item 282) no longer counts its notes
+(`rewound_at IS NULL`; the test rewinds a stored run).
 
 ### 336. A message's foot follows it closely
 
 **Status: in progress.** **As built (2026-10-17).** The answer's foot (the copy button, the time, how long the run took)
 drops its 12 px margin and rises 4 px into the last line's own spacing; on a phone your message's foot rises by the band
 its finger-sized buttons add above their marks. Measured from the bubble and from the answer's last line to the first
-thing of the foot that shows: 8 and 26 px in a Mac's window before, 8 and 10 after; 13 and 23 px on an iPhone before, 5
-and 7 after. Test: `tests/smoke/test_message_foot.py` (Chrome as a Mac's window, WebKit as an iPhone).
+thing of the foot that shows: 8 and 26 px in a Mac's window before, 4 and 10 after; 13 and 23 px on an iPhone before, 5
+and 7 after. After the review the feet rise only right under a bubble or under a text's last line: under a sent file or
+pick, under a code block, table or picture, and in a foot with no copy button, they keep clear (8 px); and a ghost
+button's hover ground shows only where a pointer hovers, so a tap does not leave it drawn over the bubble. Test:
+`tests/smoke/test_message_foot.py` (Chrome as a Mac's window, WebKit as an iPhone; the file, the block and the foot
+without a button are put on the page by the test).
 
 ### 337. On a phone a switch is smaller
 
 **Status: in progress.** **As built (2026-10-17).** On a phone a switch draws a 40 by 24 px track with a 20 px knob,
 not iOS's 52 by 32 px (item 329), in a 48 by 44 px box whose band is clear, so it still takes a finger and a tap on its
-row still turns it; a Mac's window keeps 34 by 20 px. Test: `test_phone_type.py` (the box and the track on an iPhone).
+row still turns it; a Mac's window keeps 34 by 20 px. After the review the track is the switch's ::before, a pill in
+either state, and the box's ground stays clear (before, on painted the whole 48 by 44 px box and the corners were
+ellipses). Test: `test_phone_type.py` (the box, the track's size and shape and the box's ground, on and off, on an
+iPhone).
 
 ### 338. On a phone the button at the top left is the one way back
 
@@ -13752,7 +13760,12 @@ page opened directly that has one above it (a settings tab, a service's page, an
 and the browser's own Back start the trail anew or step back on it. On a phone the pages' own links back are hidden,
 and the settings' "All settings" is gone. Docs: `docs/phone.md`. Test: `tests/smoke/test_phone_back.py` (the settings,
 a service's page by its address and from its tile, a run from Activity and a chat from the sidebar in WebKit as an
-iPhone, then a Mac's window); `test_phone_settings.py` goes back with Back.
+iPhone, then a Mac's window); `test_phone_settings.py` goes back with Back. After the review each history entry
+keeps whether its page was opened by a link (`history.state.dotLinked`), so the browser's Forward and a reload keep
+Back; a link is told by a capture-phase click anywhere but the sidebar (a helper's row stops its clicks; a modified
+click opens another tab), a link to an old address counts for the page it leads to, the page above replaces the page
+Back leaves in the history, `#/customize` is `#/customize/plugins`, Back is reckoned again when a phone turns, and as
+Back the button names no panel (no `aria-controls` or `aria-expanded`). The test walks each of them.
 
 ## Log
 

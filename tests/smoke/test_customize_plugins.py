@@ -201,7 +201,7 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 link_box: FloatRect = await _box(link)
                 assert link_box["y"] + link_box["height"] <= 860, link_box
                 await link.click()
-                await expect(page).to_have_url(f"{address}/#/customize")
+                await expect(page).to_have_url(f"{address}/#/customize/plugins")
                 await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Plugins")
                 # Every service in its section, each with its mark, what Dot does with it and how it connects.
                 tiles: Locator = page.locator(".plugin-tile[data-plugin]")

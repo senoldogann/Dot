@@ -35,9 +35,32 @@ _RUN_WAIT_S: float = 60.0
 # How far the foot's first visible line may stand under the bubble and under the answer's last line, in pixels, as a
 # Mac's window and as a phone. Before item 336 they stood 8 and 26 px under them in the window, 13 and 23 on the phone.
 _MOST_GAP_PX: dict[str, dict[str, float]] = {
-    "wide": {"user": 8.0, "answer": 12.0},
+    "wide": {"user": 6.0, "answer": 12.0},
     "phone": {"user": 8.0, "answer": 8.0},
 }
+# What the page measures once the test has put on it a file sent with the message, a code block that ends the answer
+# and an answer's foot with no copy button: how far each foot stands under what is above it (review B7: the feet rose
+# over the file and the block, and a foot with no button touched the line above).
+_UNDER: str = """() => {
+  const user = document.querySelector(".user-message");
+  const foot = user.querySelector(".message-foot");
+  const chip = document.createElement("div");
+  chip.className = "attach-list sent";
+  chip.textContent = "report.pdf";
+  foot.before(chip);
+  const prose = document.querySelector(".answer .prose");
+  const block = document.createElement("pre");
+  block.textContent = "weekly-report.md";
+  prose.append(block);
+  const answerFoot = document.querySelector(".answer .answer-foot");
+  const underFile = foot.getBoundingClientRect().top - chip.getBoundingClientRect().bottom;
+  const underBlock = answerFoot.getBoundingClientRect().top - block.getBoundingClientRect().bottom;
+  block.remove();
+  answerFoot.querySelector(".btn").remove();
+  const facts = answerFoot.querySelector(".answer-facts").getBoundingClientRect();
+  const underText = facts.top - prose.getBoundingClientRect().bottom;
+  return { file: underFile, block: underBlock, text: underText };
+}"""
 # What the page measures: from the bubble's foot to the top of the time under it, and from the answer's last line to
 # the top of the first thing of its foot that shows (the copy button's mark, the time).
 _MEASURE: str = """() => {
@@ -144,6 +167,10 @@ async def test_the_foot_of_a_message_follows_it_closely(runtime: Runtime, tmp_pa
                     for look, gaps in measured.items():
                         for where, gap in gaps.items():
                             assert 0.0 <= gap <= _MOST_GAP_PX[look][where], measured
+                    for page in (wide, phone):
+                        under: object = await page.evaluate(_UNDER)
+                        assert isinstance(under, dict), under
+                        assert under["file"] >= 0 and under["block"] >= 4 and under["text"] >= 8, under
                     await wide.screenshot(path=str(tmp_path / "foot-wide.png"))
                     await phone.screenshot(path=str(tmp_path / "foot-phone.png"))
                 finally:

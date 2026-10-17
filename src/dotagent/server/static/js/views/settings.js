@@ -119,7 +119,7 @@ export function mount(root, ctx) {
   const pane = el("div", { class: "settings-pane" });
   const links = TABS.map((candidate) => tabLink(candidate, candidate.id === tab.id));
   const nav = el("nav", { class: "settings-nav", "aria-label": "Settings" }, links);
-  // On a phone the rail is not drawn: the bar's Back at the top left leads to the list (item 338).
+  // On a phone the rail is hidden (settings.css): the bar's Back at the top left leads to the list (item 338).
   root.append(el("div", { class: "settings-frame" }, el("div", { class: "settings" }, el("div", { class: "settings-side" }, nav), pane)));
   // In the row that scrolls sideways (a narrow window, item 272) the open tab is brought to its middle, and the row's
   // edge fades while more tabs lie to the right. A row drawn before the webfont came in was measured in the fallback

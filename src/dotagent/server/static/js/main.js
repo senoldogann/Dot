@@ -41,6 +41,8 @@ const MOVED = new Map([
   ["/system", "/settings/system"],
   // Connect apps and the settings' Skills became Customize's two tabs (items 316 and 317).
   ["/connect", "/customize/plugins"],
+  // Customize opens on Plugins, under Plugins' own address, so that the open tab is one page with one address.
+  ["/customize", "/customize/plugins"],
   ["/settings/skills", "/customize/skills"],
 ]);
 // `layout` is put on the page element as `data-layout`, so the style sheets can give each kind of page its own width.
@@ -364,37 +366,56 @@ function beginSession() {
     root.prepend(shell.element);
   }
 
-  // The pages this tab went through by their own links, the one on screen last (item 338): a phone's Back goes back
-  // along it. A page opened any other way (the sidebar, an address, a page's own move) starts it anew, and the browser's
-  // own Back takes a page off it.
-  let trail = [];
-  // The page the last link of a page leads to: the next page is opened by that link when it is that page.
+  // Each entry of the tab's history says whether its page was opened by a link of the page before it
+  // (`history.state.dotLinked`, item 338), so the browser's own Back and Forward and a reload keep a phone's Back as
+  // it was: such a page goes back to the page before it; another goes to the page above it, or opens the chats. The
+  // link is told by the click that leads to it, wherever on the page it is (a dialog, a helper's row that stops its
+  // clicks), but in the sidebar, whose pages start anew, and but a click that opens another tab.
   let linkedTo = null;
-  shell.main.addEventListener("click", (event) => {
-    const link = event.target instanceof Element ? event.target.closest("a[href^='#/']") : null;
-    if (link !== null && link.target === "") {
-      linkedTo = link.getAttribute("href").slice(1).split("?")[0];
-    }
-  });
+  document.addEventListener(
+    "click",
+    (event) => {
+      const link = event.target instanceof Element ? event.target.closest("a[href^='#/']") : null;
+      const plain = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
+      if (link !== null && link.target === "" && plain && link.closest("#sidebar") === null) {
+        const path = link.getAttribute("href").slice(1).split("?")[0];
+        // A link to an old address counts for the page it leads to.
+        linkedTo = MOVED.get(path) ?? path;
+      }
+    },
+    true,
+  );
+  // The page on screen and whether it was opened by a link: Back is reckoned again when a phone turns (a settings tab
+  // has a page above it on a phone alone).
+  let current = null;
 
-  function followTrail(path) {
+  /** Whether the page on screen at `path` was opened by a link of the page before it, kept in its history entry. */
+  function linkedHere(path) {
+    const state = history.state;
+    if (state !== null && typeof state === "object" && state.dotPath === path && typeof state.dotLinked === "boolean") {
+      linkedTo = null;
+      return state.dotLinked;
+    }
     const linked = linkedTo === path;
     linkedTo = null;
-    if (!linked && trail.length >= 2 && trail[trail.length - 2] === path) {
-      trail.pop();
-    } else if (trail[trail.length - 1] !== path) {
-      trail = linked ? [...trail, path] : [path];
-    }
+    history.replaceState({ ...(state !== null && typeof state === "object" ? state : {}), dotPath: path, dotLinked: linked }, "");
+    return linked;
   }
 
-  /** Where a phone's Back leads from `path`: back along the trail, else to the page's parent, else nowhere (null). */
-  function backFrom(found) {
-    if (trail.length >= 2) {
+  /** Where a phone's Back leads from the page `found`: the page before it, the page above it, or nowhere (null). */
+  function backFrom(found, linked) {
+    if (linked) {
       return { to: "history" };
     }
     const parent = found.route.parent(found.params);
     return parent === null ? null : { to: `#${parent}` };
   }
+
+  PHONE.addEventListener("change", () => {
+    if (current !== null) {
+      shell.setBack(backFrom(current.found, current.linked));
+    }
+  });
 
   function show() {
     disposeView();
@@ -416,12 +437,13 @@ function beginSession() {
     if (found.route.tab === "runs") {
       writePref(LAST_CHAT_KEY, path);
     }
-    followTrail(path);
+    const linked = linkedHere(path);
+    current = { found, linked };
     shell.setRoute({
       tab: found.route.tab,
       runId: found.route.layout === "run" ? found.params[0] : null,
       layout: found.route.layout,
-      back: backFrom(found),
+      back: backFrom(found, linked),
     });
     setPageTitle(`${found.route.title} · Dot`);
     window.scrollTo(0, 0);

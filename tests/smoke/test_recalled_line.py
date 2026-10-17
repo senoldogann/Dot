@@ -20,12 +20,14 @@ from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedTurn
 from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import assistant_message, user_message
 from dotagent.memory.service import save_memory
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
+from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, RunRecord
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -143,3 +145,39 @@ async def test_a_chat_says_it_recalled_notes_only_when_one_is_new(runtime: Runti
             await serving
     finally:
         await manager.shutdown()
+
+
+async def test_a_run_a_rewind_took_out_of_the_chat_no_longer_counts_its_notes(runtime: Runtime) -> None:
+    """Edit from here (item 282) takes a run out of its chat: the notes it was handed are new again to the run that
+    takes its place (review B6)."""
+    store: Store = runtime.store
+    thread: str = (await store.create_thread("Rewound", "test")).id
+    note: str = (await save_memory(runtime.memory, "The rewound chat's note.", (), None, None, None)).record.id
+    first: RunRecord = await _stored_run(store, thread, "First message")
+    await store.mark_memories_used(first.id, [note], time.time(), "start")
+    await store.rewind_chat(first.id, [run.id for run in await store.runs_from(first.id)])
+    again: RunRecord = await _stored_run(store, thread, "The message written again")
+    assert await store.handed_in_thread(thread, again.id) == set()
+
+
+async def _stored_run(store: Store, thread_id: str, goal: str) -> RunRecord:
+    """A run of the chat ``thread_id`` that said ``goal`` and ended, as the store keeps one."""
+    run: RunRecord = await store.create_run(
+        thread_id,
+        goal,
+        "chat",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        "medium",
+        "standard",
+        None,
+        "ask",
+        False,
+        None,
+        None,
+        None,
+    )
+    await store.append_messages(thread_id, [user_message(goal, ()), assistant_message("Done.", None, ())])
+    await store.set_run_status(run.id, "done")
+    return run

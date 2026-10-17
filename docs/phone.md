@@ -75,7 +75,8 @@ to the side panel when it closes.
 The round button at the top left is the one way back (item 338). On a page opened by a link of another page (a run from
 Activity, a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on a page opened
 directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;
-on a page opened from the sidebar it is the way back to the list of chats. The pages' own links back show in a wider
+on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and Forward and a
+reload keep it as it was, and it is reckoned again when the phone turns. The pages' own links back show in a wider
 window only.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token

@@ -63,7 +63,7 @@ function buildIndicators() {
 
 /**
  * Build the frame. `homeRoute` is where "New chat" leads. Returns the element, the `main` element the pages draw into,
- * `setRoute({ tab, runId, layout, back })`, `paint(snapshot)` and `dispose()`.
+ * `setRoute({ tab, runId, layout, back })`, `setBack(back)`, `paint(snapshot)` and `dispose()`.
  */
 export function buildShell({ homeRoute }) {
   const homeHref = `#${homeRoute}`;
@@ -98,11 +98,13 @@ export function buildShell({ homeRoute }) {
   function backs() {
     return PHONE.matches && back !== null;
   }
+  // The page above takes this page's place in the history, so that the browser's own Back after it does not come back
+  // here.
   function goBack() {
     if (back.to === "history") {
       history.back();
     } else {
-      location.hash = back.to;
+      location.replace(back.to);
     }
   }
   // On a phone the button at the top left is the one way back, a chevron as in T3 Code's phone app (item 295): to the
@@ -113,6 +115,14 @@ export function buildShell({ homeRoute }) {
     const label = backs() ? "Back" : "Show sidebar";
     menu.title = label;
     menu.setAttribute("aria-label", label);
+    // As Back the button opens no panel: it names none and has no open state.
+    if (backs()) {
+      menu.removeAttribute("aria-controls");
+      menu.removeAttribute("aria-expanded");
+    } else {
+      menu.setAttribute("aria-controls", "sidebar");
+      menu.setAttribute("aria-expanded", String(isOpen()));
+    }
   }
   paintOpener();
   // While the sidebar is closed the bar holds its opener alone (item 273).
@@ -142,7 +152,7 @@ export function buildShell({ homeRoute }) {
     sidebar.element.inert = !open;
     stage.inert = narrow && open;
     opener.hidden = open;
-    menu.setAttribute("aria-expanded", String(open));
+    paintOpener();
   }
 
   function setOpen(next) {
@@ -222,6 +232,11 @@ export function buildShell({ homeRoute }) {
       if (narrow && drawer) {
         setOpen(false);
       }
+    },
+    /** Where the page's Back leads now (a phone turned): as `setRoute`'s `back`. */
+    setBack(next) {
+      back = next;
+      paintOpener();
     },
     paint: indicators.paint,
     dispose() {

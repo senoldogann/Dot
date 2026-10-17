@@ -1599,7 +1599,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         await runtime.bus.emit(
             run.id,
             "memories",
-            {"ids": handed, "tokens": recalled.tokens, "fresh": sum(1 for one in handed if one not in before)},
+            {"ids": [*handed], "tokens": recalled.tokens, "fresh": sum(1 for one in handed if one not in before)},
             True,
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)

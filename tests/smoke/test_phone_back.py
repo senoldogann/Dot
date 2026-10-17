@@ -37,6 +37,21 @@ from dotagent.store.models import RunRecord
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "phone-back-token"
+# Links the test puts on Activity: one to an old address, one inside a part that stops its clicks, in the page.
+_LINKS: str = """() => {
+  const old = document.createElement("a");
+  old.id = "old-address";
+  old.href = "#/memory";
+  old.textContent = "Memory, at its old address";
+  const stopper = document.createElement("span");
+  stopper.addEventListener("click", (event) => event.stopPropagation());
+  const stopped = document.createElement("a");
+  stopped.id = "stopped-link";
+  stopped.href = "#/customize/plugins/notion";
+  stopped.textContent = "Notion, through a part that stops its clicks";
+  stopper.append(stopped);
+  document.querySelector("main").prepend(old, stopper);
+}"""
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _RUN_WAIT_S: float = 60.0
 
@@ -98,6 +113,42 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
     await expect(page).to_have_url(f"{address}/#/activity")
+    # The browser's Forward to the run, and a reload of it, keep its Back (review B5); as Back it opens no panel and
+    # says it controls none (review B8).
+    await page.go_forward()
+    await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
+    await expect(button).to_have_attribute("aria-label", "Back")
+    await page.reload()
+    await expect(page.locator(".answer").last).to_contain_text("Done.")
+    await expect(button).to_have_attribute("aria-label", "Back")
+    assert await button.get_attribute("aria-expanded") is None and await button.get_attribute("aria-controls") is None
+    await button.click()
+    await expect(page).to_have_url(f"{address}/#/activity")
+    # A link to an old address counts for the page it leads to (review B3), and so does a link whose clicks a part of
+    # the page stops, or one in a dialog outside the page (review B4).
+    await page.evaluate(_LINKS)
+    await page.locator("#old-address").click()
+    await expect(page).to_have_url(f"{address}/#/settings/memory")
+    await expect(button).to_have_attribute("aria-label", "Back")
+    await button.click()
+    await expect(page).to_have_url(f"{address}/#/activity")
+    await page.evaluate(_LINKS)
+    await page.locator("#stopped-link").click()
+    await expect(page).to_have_url(f"{address}/#/customize/plugins/notion")
+    await expect(button).to_have_attribute("aria-label", "Back")
+    await button.click()
+    await expect(page).to_have_url(f"{address}/#/activity")
+    # The page above takes the place of the page Back leaves (review B5): the browser's Back after it does not come
+    # back to the tab.
+    await page.goto(f"{address}/#/settings/appearance")
+    await expect(button).to_have_attribute("aria-label", "Back")
+    await button.click()
+    await expect(page).to_have_url(f"{address}/#/settings")
+    await page.go_back()
+    await expect(page).to_have_url(f"{address}/#/activity")
+    # Customize has one address for its open tab.
+    await page.goto(f"{address}/#/customize")
+    await expect(page).to_have_url(f"{address}/#/customize/plugins")
     # A chat opened from the sidebar: the button is the way to the list of chats.
     await page.get_by_role("button", name="Show sidebar").click()
     await page.locator(f"#sidebar a[href='#/runs/{run.id}']").first.click()
@@ -162,6 +213,17 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await phone.goto(ui_url("127.0.0.1", port, TOKEN))
                     await _phone_walk(phone, address, ended)
                     await phone.screenshot(path=str(tmp_path / "back-phone.png"))
+                    # A settings tab opened with the phone on its side, wider than a phone's layout, has its page
+                    # above it once the phone stands up (review B5).
+                    standing: dict[str, int] = dict(phone.viewport_size or {})
+                    await phone.set_viewport_size({"width": standing["height"], "height": standing["width"]})
+                    await phone.goto(f"{address}/#/settings/appearance")
+                    await expect(phone.locator(".settings-side")).to_be_visible()
+                    await expect(phone.get_by_role("button", name="Back")).to_have_count(0)
+                    await phone.set_viewport_size({"width": standing["width"], "height": standing["height"]})
+                    await expect(phone.locator(".stagebar-left button")).to_have_attribute("aria-label", "Back")
+                    await phone.locator(".stagebar-left button").click()
+                    await expect(phone).to_have_url(f"{address}/#/settings")
                     # In a Mac's window a page keeps its own link back, and no Back shows.
                     wide: Page = await chrome.new_page(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
                     await wide.add_init_script("sessionStorage.setItem('dot.opened', '1')")
