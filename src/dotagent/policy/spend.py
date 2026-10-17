@@ -1,8 +1,9 @@
 """Pre-approved spending: a payment step on a listed site under its caps is a question instead of a hand-off.
 
 ``[policy.spend]`` lists sites with a cap per purchase and per day. The amount of a payment step is read from the
-control's label ("Pay €19.90") or, failing that, from the total on the page ("Order total: $12.00"); a step whose
-amount cannot be read keeps the hand-off. Under both caps the policy asks instead of handing the step to the user, so
+control's label ("Pay €19.90") or, failing that, from the totals on the page ("Order total: $12.00"); where several
+amounts stand, the largest is taken, so a misread errs towards the hand-off. A step whose amount cannot be read keeps
+the hand-off. Under both caps the policy asks instead of handing the step to the user, so
 a ``yolo`` run goes on, an ``auto`` run lets the review model answer, and an ``ask`` run asks once; the spend is then
 recorded and counts against the site's day. The caps are plain numbers compared with the number on the page, whatever
 its currency: set caps for sites that bill in one currency.
@@ -18,8 +19,11 @@ from dotagent.policy.types import Amount, Decision
 
 DAY_S: float = 86400.0
 # What a payment control or a total line says: a currency sign or code before or after a number with thousands and
-# decimals in either style.
-_NUMBER: str = r"\d{1,3}(?:[.,]\d{3})*(?:[.,]\d{1,2})?|\d+(?:[.,]\d{1,2})?"
+# decimals in either style, its thousands grouped by a point, a comma, an apostrophe ("CHF 1'234.50") or a space, a
+# no-break one too ("1 234,56 €"). A number is taken whole, never a part of its digits (item 350: "$1500.00" was read
+# as 150, "CHF 1'234.50" as 1).
+_GROUPING: str = "[.,'\u2019\u00a0\u202f ]"
+_NUMBER: str = rf"(?<![\d.,'\u2019])(?:\d{{1,3}}(?:{_GROUPING}\d{{3}})+(?:[.,]\d{{1,2}})?|\d+(?:[.,]\d{{1,2}})?)(?!\d)"
 _CODES: str = r"USD|EUR|GBP|TRY|TL|CHF|JPY|CAD|AUD|SEK|NOK|DKK|PLN"
 _SIGNS: str = r"[$€£₺¥]"
 _AMOUNT: re.Pattern[str] = re.compile(
@@ -40,12 +44,12 @@ class SpendState(FrozenModel):
 
 
 def _value(digits: str) -> float:
-    """The number ``digits`` holds, in either style: the last separator followed by one or two digits is the decimal
-    mark, every other separator groups thousands."""
+    """The number ``digits`` holds, in either style: the last point or comma followed by one or two digits is the
+    decimal mark, every other separator groups thousands."""
     match: re.Match[str] | None = re.search(r"[.,](\d{1,2})$", digits)
     if match is None:
-        return float(re.sub(r"[.,]", "", digits))
-    whole: str = re.sub(r"[.,]", "", digits[: match.start()])
+        return float(re.sub(_GROUPING, "", digits))
+    whole: str = re.sub(_GROUPING, "", digits[: match.start()])
     return float(f"{whole or '0'}.{match.group(1)}")
 
 
@@ -61,20 +65,25 @@ def find_amounts(text: str) -> tuple[Amount, ...]:
     return tuple(found)
 
 
+def _largest(amounts: tuple[Amount, ...]) -> Amount | None:
+    return max(amounts, key=lambda amount: amount.value) if amounts else None
+
+
 def amount_in_label(label: str) -> Amount | None:
-    """The amount a control's label names ("Pay €19.90"), or ``None``."""
-    amounts: tuple[Amount, ...] = find_amounts(label)
-    return amounts[0] if amounts else None
+    """The amount a control's label names ("Pay €19.90"), the largest of several ("Save $5 · Pay $500"), or ``None``."""
+    return _largest(find_amounts(label))
 
 
 def total_on_page(text: str) -> Amount | None:
-    """The amount after the last total cue of the page's text ("Order total: $12.00"), or ``None``."""
-    cues: list[re.Match[str]] = list(_TOTAL_CUE.finditer(text))
-    for cue in reversed(cues):
-        amounts: tuple[Amount, ...] = find_amounts(text[cue.end() : cue.end() + _TOTAL_WINDOW_CHARS])
-        if amounts:
-            return amounts[0]
-    return None
+    """The largest amount after a total cue of the page's text ("Order total: $12.00"), or ``None``: a total of
+    savings or of a part of the order may stand after the cue of the order's own."""
+    return _largest(
+        tuple(
+            amount
+            for cue in _TOTAL_CUE.finditer(text)
+            for amount in find_amounts(text[cue.end() : cue.end() + _TOTAL_WINDOW_CHARS])
+        )
+    )
 
 
 def spend_host(target: str) -> str | None:

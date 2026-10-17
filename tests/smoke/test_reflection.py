@@ -187,7 +187,9 @@ def _lessons(*lessons: str) -> ScriptedTurn:
 
 def _kept() -> ScriptedTurn:
     """The second look's answer that keeps the one lesson it is asked about."""
-    return _turn(ScriptedCall(tool=VET_TOOL, arguments={"verdicts": [{"keep": True, "reason": "know-how"}]}))
+    return _turn(
+        ScriptedCall(tool=VET_TOOL, arguments={"verdicts": [{"lesson": 1, "keep": True, "reason": "know-how"}]})
+    )
 
 
 async def _start(home: Home, goal: str, approvals: str) -> RunRecord:

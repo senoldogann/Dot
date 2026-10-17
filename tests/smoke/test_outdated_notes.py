@@ -64,7 +64,7 @@ def _config() -> AppConfig:
 
 
 def _outdated() -> ScriptedTurn:
-    verdicts: list[dict[str, bool | str]] = [{"outdated": True, "reason": "the folder moved"}]
+    verdicts: list[dict[str, bool | str | int]] = [{"pair": 1, "outdated": True, "reason": "the folder moved"}]
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=OUTDATED_TOOL, arguments={"verdicts": verdicts}),))
 
 

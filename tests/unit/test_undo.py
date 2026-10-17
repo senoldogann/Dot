@@ -187,3 +187,45 @@ def test_a_copy_that_is_not_the_one_noted_is_not_written_back(tmp_path: Path) ->
     with pytest.raises(UndoError, match="a change could not be taken back"):
         apply_undo(due_steps(_plan(_changes(root, (RUN_ID,)))), root)
     assert notes.read_text(encoding="utf-8") == "two\n"
+
+
+def test_a_link_that_came_above_a_changed_file_is_not_followed(tmp_path: Path) -> None:
+    """Item 350: the tools note a path with its links resolved, so a folder above it that is a link now came since.
+    Taking the change back through it would put the file back, or delete it, in the folder the link names; the step
+    cannot be taken, even with force, and a link that comes after the plan was made is refused when it is carried
+    out."""
+    root: Path = tmp_path / "undo"
+    work: Path = tmp_path / "work"
+    elsewhere: Path = tmp_path / "elsewhere"
+    work.mkdir()
+    elsewhere.mkdir()
+    made: Path = work / "project" / "config"
+    atomic_write(made, "made by the run\n", _target(root, RUN_ID, MIB, MIB))
+    # The folder is moved away and a link to another folder, holding a file of that name, put in its place.
+    (work / "project").rename(tmp_path / "moved")
+    (elsewhere / "config").write_text("made by the run\n", encoding="utf-8")
+    (work / "project").symlink_to(elsewhere, target_is_directory=True)
+    plan: list[UndoStep] = _plan(_changes(root, (RUN_ID,)))
+    assert [(step.state, step.action) for step in plan] == [("cannot", "delete")]
+    assert plan[0].reason is not None and "link" in plan[0].reason
+    assert forced_steps(plan) == []
+    # A plan made before the link came is refused when it is carried out.
+    with pytest.raises(UndoError, match="link"):
+        apply_undo([plan[0].model_copy(update={"state": "ready"})], root)
+    assert (elsewhere / "config").read_text(encoding="utf-8") == "made by the run\n"
+
+
+def test_a_folder_the_run_made_below_a_link_that_came_since_is_not_removed(tmp_path: Path) -> None:
+    """Item 350: the empty folders a run made are removed when its changes are taken back, but not one that a link
+    above it now puts in another folder."""
+    root: Path = tmp_path / "undo"
+    work: Path = tmp_path / "work"
+    elsewhere: Path = tmp_path / "elsewhere"
+    work.mkdir()
+    (elsewhere / "b").mkdir(parents=True)
+    atomic_write(work / "a" / "b" / "new.txt", "new\n", _target(root, RUN_ID, MIB, MIB))
+    changes: list[RunChange] = _changes(root, (RUN_ID,))
+    shutil.rmtree(work / "a")
+    (work / "a").symlink_to(elsewhere, target_is_directory=True)
+    assert remove_empty_dirs(created_dirs(changes)) == []
+    assert (elsewhere / "b").is_dir()

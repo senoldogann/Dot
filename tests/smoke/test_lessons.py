@@ -242,9 +242,11 @@ def _lessons(*lessons: str) -> ScriptedTurn:
 def _vet(*reasons: str | None) -> ScriptedTurn:
     """The review model's answer to the second look: a verdict per lesson it is asked about, ``None`` to keep it and a
     reason to leave it out."""
-    verdicts: list[dict[str, str | bool]] = [
-        {"keep": True, "reason": "know-how about a tool"} if reason is None else {"keep": False, "reason": reason}
-        for reason in reasons
+    verdicts: list[dict[str, str | bool | int]] = [
+        {"lesson": number, "keep": True, "reason": "know-how about a tool"}
+        if reason is None
+        else {"lesson": number, "keep": False, "reason": reason}
+        for number, reason in enumerate(reasons, start=1)
     ]
     return _turn(ScriptedCall(tool=VET_TOOL, arguments={"verdicts": verdicts}))
 

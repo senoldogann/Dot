@@ -330,8 +330,8 @@ def test_the_second_look_keeps_only_what_it_was_asked_about_and_kept() -> None:
     checked: tuple[str | None, ...] = (None, "a link", None, None)
     vetting: LessonVetting = LessonVetting(
         verdicts=[
-            LessonVerdict(keep=True, reason="know-how about a tool"),
-            LessonVerdict(keep=False, reason="tells the agent where to go"),
+            LessonVerdict(lesson=1, keep=True, reason="know-how about a tool"),
+            LessonVerdict(lesson=2, keep=False, reason="tells the agent where to go"),
         ]
     )
     # The third lesson asked about got no verdict: it is left out too.
@@ -341,3 +341,12 @@ def test_the_second_look_keeps_only_what_it_was_asked_about_and_kept() -> None:
         "tells the agent where to go",
         "no verdict was given on it",
     )
+    # Item 350: a verdict goes to the lesson it names, not to the next one in turn; before, one left out gave the
+    # verdict of the third lesson asked about to the second.
+    skipped: LessonVetting = LessonVetting(
+        verdicts=[
+            LessonVerdict(lesson=1, keep=True, reason="know-how about a tool"),
+            LessonVerdict(lesson=3, keep=True, reason="know-how about a file format"),
+        ]
+    )
+    assert vetted(lessons, checked, skipped) == (None, "a link", "no verdict was given on it", None)

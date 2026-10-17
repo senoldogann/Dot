@@ -55,7 +55,12 @@ def _script() -> list[ScriptedTurn]:
         _turn(LESSONS_TOOL, {"lessons": [_KEPT, _LEFT]}),
         _turn(
             VET_TOOL,
-            {"verdicts": [{"keep": True, "reason": "know-how about read_file"}, {"keep": False, "reason": _WHY}]},
+            {
+                "verdicts": [
+                    {"lesson": 1, "keep": True, "reason": "know-how about read_file"},
+                    {"lesson": 2, "keep": False, "reason": _WHY},
+                ]
+            },
         ),
     ]
 

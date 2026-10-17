@@ -17,6 +17,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
+What `review` is asked has the secrets Dot holds and the ones it recognises masked, as it may be another provider's.
 
 Settings › Models chooses `fast`, `review` and `vision` under the default model (item 232), each from the models that
 can do its work: those that call tools for `fast` and `review`, those that see for `vision`. A choice holds from the
@@ -218,7 +219,8 @@ level, says the choice waits for a message that starts a run.
 **Keys** are read from the environment of the process, then from `<home>/.env`, then from the macOS Keychain (service
 `dot-agent`, account = the variable name); a Keychain that does not answer within 15 seconds (locked, or waiting for a
 prompt nobody answers) is an error that says so. `dotx auth set OPENAI_API_KEY` reads the value from the terminal
-without echoing it and writes the file with mode 0600; `dotx auth status` shows which keys are present. `.env.example`
+without echoing it and writes the file with mode 0600 (a value with a line break in it is refused, and two processes
+changing the file take turns); `dotx auth status` shows which keys are present. `.env.example`
 is a template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the
 OpenCode Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed
 to Go; an Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys; an
