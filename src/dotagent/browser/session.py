@@ -1403,8 +1403,12 @@ class BrowserSession:
     async def _background_tab(self, context: BrowserContext) -> Page:
         """A new tab created in the background through CDP. Playwright's ``new_page`` opens in the foreground, which
         brings Chrome to the front of the Mac (measured 2026-10-12, item 118) and takes the user's tab in the user's
-        Chrome; a tab made this way does neither, and it still paints, screencasts and takes screenshots as a visible tab
-        does. ``new_page`` stays for a context without a browser at hand."""
+        Chrome; a tab made this way does neither, and it still takes screenshots. In the Chrome of the user it opens in
+        a window of its own (item 340): a background tab is hidden, so Chrome draws no frame of its page and cuts its
+        timers to 8 a second, while a window of its own, made in the background, runs it at full speed (61 frames and
+        208 timer ticks a second, measured 2026-10-17), stays behind the window the user works in and leaves the app in
+        front as it was, and it keeps Dot's tabs out of the user's windows. ``new_page`` stays for a context without a
+        browser at hand."""
         browser: Browser | None = context.browser
         if browser is None:
             return await context.new_page()
@@ -1412,10 +1416,13 @@ class BrowserSession:
         # would otherwise all be handed the first new page (measured 2026-10-12: five calls, one page). It goes back to a
         # plain blank page at once, the address the URL rules and the tab views know.
         mark: str = f"about:blank#dot-{secrets.token_hex(_TAB_MARK_BYTES)}"
+        target: dict[str, object] = {"url": mark, "background": True}
+        if self._config.mode == "attach":
+            target["newWindow"] = True
         cdp: CDPSession = await browser.new_browser_cdp_session()
         try:
             async with context.expect_page(lambda page: page.url == mark) as opened:
-                await cdp.send("Target.createTarget", {"url": mark, "background": True})
+                await cdp.send("Target.createTarget", target)
             page: Page = await opened.value
         finally:
             await cdp.detach()

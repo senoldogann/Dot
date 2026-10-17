@@ -272,6 +272,41 @@ async def chrome(data_dir: Path, site: str) -> AsyncIterator[ScratchChrome]:
         await stop_chrome(running)
 
 
+async def _windows_by_url(port: int) -> dict[str, int]:
+    """The window each tab of the scratch Chrome is in, by its address, as a second client of its DevTools reads it."""
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.connect_over_cdp(f"http://127.0.0.1:{port}", is_local=True)
+        try:
+            cdp = await browser.new_browser_cdp_session()
+            targets: list[dict[str, str]] = (await cdp.send("Target.getTargets"))["targetInfos"]
+            windows: dict[str, int] = {}
+            for target in targets:
+                if target["type"] == "page":
+                    found = await cdp.send("Browser.getWindowForTarget", {"targetId": target["targetId"]})
+                    windows[target["url"]] = int(found["windowId"])
+            return windows
+        finally:
+            await browser.close()
+
+
+async def test_a_tab_of_dot_opens_in_a_window_of_its_own(
+    chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """Item 340: a tab Dot opens in the Chrome of the user is in a window of its own, not among the user's tabs (a
+    background tab is hidden there, so its page drew no frame and its timers ran 8 a second); a second thread's tab is
+    in another window again."""
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        await session.open_url("own-window", f"{site}/")
+        await session.open_url("other-window", f"{site}/other")
+        windows: dict[str, int] = await _windows_by_url(chrome.port)
+        assert len({windows[f"{site}/mine"], windows[f"{site}/"], windows[f"{site}/other"]}) == 3, windows
+    finally:
+        await session.aclose()
+
+
 async def test_back_in_the_chrome_of_the_user_takes_no_longer_than_a_page(
     chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
