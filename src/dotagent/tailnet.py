@@ -11,8 +11,11 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from dotagent.core.errors import PhoneSetupError
+from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
+
+log = get_logger(__name__)
 
 # The command line Tailscale's app for the Mac carries, when no tailscale is on the PATH.
 _APP_CLI: Path = Path("/Applications/Tailscale.app/Contents/MacOS/Tailscale")
@@ -138,7 +141,13 @@ async def tailnet_state(port: int, reach: tuple[str, ...], written: tuple[str, .
     program: str | None = tailscale_program()
     if program is None:
         return TailnetState(installed=False, running=False, name=None, served=False, reached=False, written=False)
-    running, name = running_name(await _tailscale(program, ("status", "--json"), _STATUS_TIMEOUT_S))
+    try:
+        status: str = await _tailscale(program, ("status", "--json"), _STATUS_TIMEOUT_S)
+    except PhoneSetupError as error:
+        # Tailscale's command line reaches no Tailscale while its app is not open: Tailscale is not running.
+        log.warning("tailnet_status_failed", error=error.message, context=error.context)
+        return TailnetState(installed=True, running=False, name=None, served=False, reached=False, written=False)
+    running, name = running_name(status)
     if not running or name is None:
         return TailnetState(installed=True, running=running, name=name, served=False, reached=False, written=False)
     served: bool = serves(await _tailscale(program, ("serve", "status", "--json"), _STATUS_TIMEOUT_S), name, port)

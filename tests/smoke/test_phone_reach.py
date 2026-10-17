@@ -160,6 +160,28 @@ async def test_a_mac_without_tailscale_is_told_how_to_get_it() -> None:
         assert refused.status_code == 422 and "install it from tailscale.com" in refused.text
 
 
+async def test_a_tailscale_whose_app_is_closed_is_not_running_and_the_phone_screen_still_shows(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Tailscale's command line, as it answers while the app on the Mac is not open.
+    closed: Path = tmp_path / "tailscale"
+    _executable(
+        closed, "#!/bin/sh\necho 'failed to connect to local Tailscale service; is Tailscale running?' >&2\nexit 1\n"
+    )
+    monkeypatch.setenv("DOT_TAILSCALE", str(closed))
+    async with (
+        _daemon() as (_runtime, address),
+        httpx.AsyncClient(
+            base_url=f"{address}/api", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30
+        ) as client,
+    ):
+        shown = await client.get("/phone")
+        assert shown.status_code == 200, shown.text
+        assert (shown.json()["tailnet"]["installed"], shown.json()["tailnet"]["running"]) == (True, False)
+        refused = await client.post("/phone/tailnet")
+        assert refused.status_code == 422 and "open it on this Mac and sign in" in refused.text
+
+
 @pytest.mark.browser
 async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins: Path, tmp_path: Path) -> None:
     async with _daemon() as (_runtime, address), async_playwright() as playwright:
