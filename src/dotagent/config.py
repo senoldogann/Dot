@@ -68,6 +68,8 @@ type ModelReference = Annotated[str, AfterValidator(_model_reference)]
 type SpendSite = Annotated[str, AfterValidator(_spend_site)]
 type DebugPort = Annotated[int, Field(ge=0, le=65535), AfterValidator(_debug_port)]
 type ContextSize = Annotated[int, Field(ge=CONTEXT_FLOOR)]
+# The colour scheme the pages of Dot's browser are told to prefer: the Mac's, or one of the two whatever the Mac shows.
+type PageAppearance = Literal["system", "light", "dark"]
 
 
 class ServerConfig(FrozenModel):
@@ -298,6 +300,8 @@ class PolicyConfig(FrozenModel):
 
 
 class BrowserConfig(FrozenModel):
+    # Whether runs are offered the browser tools at all (item 354); an agent's own tools only narrow what is offered.
+    enabled: bool
     mode: BrowserMode
     attach_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     channel: str
@@ -307,9 +311,12 @@ class BrowserConfig(FrozenModel):
     # The port of this Mac on which Dot's own Chrome also takes DevTools connections, from a run's scripts (item 265);
     # 0 for none.
     debug_port: DebugPort
+    # Whether a page of Dot's own Chrome fills its window instead of having the size below (item 354).
+    fit_window: bool
     # A page Chrome can open: from a small phone's to a 4K screen's.
     viewport_width: int = Field(ge=320, le=3840)
     viewport_height: int = Field(ge=240, le=2160)
+    appearance: PageAppearance
     navigation_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     action_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     snapshot_max_chars: int

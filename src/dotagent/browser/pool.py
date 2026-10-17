@@ -10,6 +10,7 @@ from collections.abc import Callable
 from contextlib import AsyncExitStack
 from pathlib import Path
 
+from dotagent.browser.look import PageLook
 from dotagent.browser.modes import browser_data_dir
 from dotagent.browser.session import BrowserSession
 from dotagent.config import BrowserConfig, ServerConfig
@@ -74,6 +75,17 @@ class BrowserPool:
             await session.check_debug_port(port)
         for session in sessions:
             await session.set_debug_port(port)
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Whether runs are offered the browser tools (item 354), for every session's next runs."""
+        for session in (self.main, *self._others.values()):
+            session.set_enabled(enabled)
+
+    async def set_look(self, look: PageLook) -> None:
+        """How the pages of every session look from their next call on (item 354), as
+        :meth:`BrowserSession.set_look` says."""
+        for session in (self.main, *self._others.values()):
+            await session.set_look(look)
 
     async def aclose(self) -> None:
         """Close every session; one that fails to close does not keep the others open (the error is raised once all

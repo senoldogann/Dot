@@ -465,6 +465,9 @@ robots = "report"
 page_max_chars = 20000
 
 [browser]
+# Whether runs are offered the browser tools at all (item 354); Settings › Browser switches it. An agent's own tools
+# can only narrow what is offered.
+enabled = true
 # "own": Dot starts a Chrome of its own on its own profile (sign in once with `dotx browser login`, or copy your sign-ins
 # with `dotx browser import-chrome`). "attach": Dot works in new tabs of the Chrome you already have open, signed in as
 # you are; Chrome 144 or later, switched on with `dotx browser attach`.
@@ -483,8 +486,14 @@ raise_window = false
 # Dot's Chrome does not start while another program holds the port. The port asks for no token: any program on this
 # Mac can drive Dot's Chrome through it while it runs. Settings › Browser sets it.
 debug_port = 0
+# The size of a page of Dot's own Chrome: the window's (fit_window = true) or the one below. Settings › Browser sets them
+# (item 354); Chrome starts again with the next call that needs it.
+fit_window = false
 viewport_width = 1280
 viewport_height = 860
+# The colour scheme pages are told to prefer: "system" (the Mac's), "light" or "dark", in Dot's own Chrome and in the tabs
+# Dot opens in your Chrome. Settings › Browser sets it (item 354).
+appearance = "system"
 navigation_timeout_s = 30.0
 action_timeout_s = 8.0
 # Largest page observation handed to the model (the agent's tool_output_chars caps it further).

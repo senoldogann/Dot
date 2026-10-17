@@ -230,7 +230,16 @@ from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL, closing_step, delegated_evidence
-from dotagent.tools.groups import CORE_GROUP, groups_event, groups_of, hidden_tools, offered_specs, used_groups
+from dotagent.tools.groups import (
+    BROWSER_GROUP,
+    CORE_GROUP,
+    group_of,
+    groups_event,
+    groups_of,
+    hidden_tools,
+    offered_specs,
+    used_groups,
+)
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
@@ -1545,6 +1554,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if agent_record is not None and agent_record.tools:
         agent_tools: frozenset[str] = frozenset(agent_record.tools) | frozenset(AGENT_CORE_TOOLS)
         specs = tuple(spec for spec in specs if spec.name in agent_tools)
+    # Settings › Browser may keep every run off the browser (item 354).
+    if not runtime.browser.config.enabled:
+        specs = tuple(spec for spec in specs if group_of(spec.name) != BROWSER_GROUP)
     # Without a teammate the message tool goes, unless the run may make one (item 99): then it stays, so a teammate
     # made mid-run can be messaged at once.
     if not team and all(spec.name != CREATE_AGENT_TOOL for spec in specs):

@@ -146,6 +146,16 @@ export const AUTO_LINES = {
   paint: () => undefined,
 };
 
+/** Whether the details panel opens on Dot's computer when a run that is going on first works in its browser (item 354,
+ * after T3 Code's floating preview), beside the chat on a wide window; a phone keeps the button of its bar. Settings ›
+ * Browser chooses it; it puts nothing on the page. */
+export const AUTO_COMPUTER = {
+  key: "dot.autoComputer",
+  initial: "shown",
+  parse: oneOf(["shown", "hidden"]),
+  paint: () => undefined,
+};
+
 /** How long the sidebar and the details panel slide, 0 to 400 ms on steps of 25. */
 export const PANEL_MOTION = {
   key: "dot.panelMotion",

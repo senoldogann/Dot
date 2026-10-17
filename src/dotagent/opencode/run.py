@@ -81,7 +81,7 @@ from dotagent.tools.base import ToolResult
 from dotagent.tools.channels import Channel
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_action, write_action
-from dotagent.tools.groups import group_of
+from dotagent.tools.groups import BROWSER_GROUP, group_of
 from dotagent.tools.registry import ToolRegistry, tools_for_mode
 from dotagent.web.addresses import is_public_address
 
@@ -769,6 +769,11 @@ async def run_in_opencode(agent: AgentRun) -> RunEnd:
     directory: Path = runtime.workspace
     earlier: list[Message] = await runtime.store.load_messages(run.thread_id, 0)
     tools: ToolRegistry = bridged_tools(runtime.registry, run.mode, await _agent_tools(runtime, run.agent_id))
+    # Settings › Browser may keep every run off the browser (item 354), OpenCode's agent too.
+    if not runtime.browser.config.enabled:
+        tools = ToolRegistry(
+            tools={name: tool for name, tool in tools.tools.items() if group_of(name) != BROWSER_GROUP}
+        )
     door: Door = new_door(
         run.thread_id,
         tuple(tool.spec for tool in tools.tools.values()),

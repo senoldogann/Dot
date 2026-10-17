@@ -88,6 +88,23 @@ checked before any changes, Dot's Chrome, open on another port, is closed and st
 that needs it, and the value is written to `config.toml`. The port asks for no token: while Dot's Chrome runs, any
 program on this Mac can connect to it and drive Chrome with the sign-ins of Dot's profile.
 
+
+Settings › Browser has four more rows, after T3 Code's (item 354). **Runs may use the browser** (`[browser] enabled`, on
+by default; `POST /api/browser/enabled` with `{"enabled": false}`) keeps the browser tools from every run that starts
+after it, an agent's and OpenCode's agent's too; a run at work keeps the tools it started with, and computer use still
+sees the screen. **Size of a page** and **Appearance of pages** are `POST /api/browser/look` with `fit_window`,
+`viewport_width`, `viewport_height` and `appearance`, refused with 409 while runs are active and kept in `config.toml`.
+A page of Dot's own Chrome fills its window (`fit_window = true`; the model is told the size the page has) or has the
+size given (1280 × 860 by default), and pages are told to prefer the Mac's colour scheme (`appearance = "system"`, the
+default), light or dark. Dot's own Chrome is let go of and starts with them at the next call that needs it; the tabs Dot
+opens in your Chrome are told the colour scheme one by one, and keep the size of its window. Before, Dot's own Chrome
+told every page Playwright's default, light. **Show Dot's computer when a run opens the browser** (kept in the browser
+you read Dot in, on by default) opens the details panel on its Screen tab when a run at work first uses its browser,
+beside the chat on a wide window, without making it the panel or the tab you chose; its switch hides it, and a phone
+keeps the button of its bar. Two rows of T3 Code's are left out: the zoom of a page (Chrome keeps the zoom of each site
+in its profile, which ⌘+ and ⌘− set in Dot's Chrome) and where links open (a link in Dot's chats opens in the browser
+you read Dot in, and Sign in… covers signing in for Dot).
+
 Both modes share what follows.
 
 - The page is observed as an accessibility snapshot in which every element has a ref (`e12`). It covers the viewport

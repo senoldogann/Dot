@@ -35,6 +35,7 @@ const DRAG_CLOSE_PX = 96;
  * (the panel) and `scrim` (the veil behind the drawer), both to put inside the frame, `toggle` (the header button that
  * shows or hides the panel), `arrange()` (call it once the frame is on the page), `addImage(name)`, `setCount(tabId,
  * text)` (a short count beside a tab's name; "" for none), `openTab(id)` (show the tab `id`, the drawer opened for it),
+ * `peekTab(id)` (show it beside the conversation for now, the reader's choices kept, item 354),
  * `showFile(source, opener)` (see `fileView`; `opener` gets the focus back when the file closes) and `dispose()`.
  */
 export function createInspector({ layout, tabs, screensIn }) {
@@ -250,7 +251,7 @@ export function createInspector({ layout, tabs, screensIn }) {
     if (room) {
       drawerOpen = false;
     }
-    const wanted = showInspector() || file !== null;
+    const wanted = showInspector() || file !== null || peeking;
     element.dataset.mode = room ? "docked" : "drawer";
     if (room) {
       clearTimeout(hideTimer);
@@ -388,6 +389,22 @@ export function createInspector({ layout, tabs, screensIn }) {
     (dropped.opener.isConnected ? dropped.opener : toggle).focus();
   }
 
+  // A tab shown by itself (item 354: Dot's computer when a run opens its browser) beside the conversation, without
+  // becoming the reader's choice: the tab and the panel the reader chose come back with the next page, and the panel's
+  // switch hides it.
+  let peeking = false;
+
+  /** Show the tab `id` beside the conversation for now, the reader's choices kept as they are; on a window too narrow
+   * for the panel nothing changes (a phone has the button of its bar). */
+  function peekTab(id) {
+    if (file !== null || measuredWidth < MIN_WIDTH_PX) {
+      return;
+    }
+    show(id);
+    peeking = true;
+    arrange();
+  }
+
   /** Show the tab `id`: beside the conversation, or in the drawer opened for it (the buttons of a phone's bar and the
    * line over its composer, items 295 and 297). */
   function openTab(id) {
@@ -463,6 +480,13 @@ export function createInspector({ layout, tabs, screensIn }) {
       return;
     }
     if (measuredWidth >= MIN_WIDTH_PX) {
+      // A tab shown by itself goes as it came, the reader's choice of the panel untouched.
+      if (peeking && !showInspector()) {
+        peeking = false;
+        arrange();
+        return;
+      }
+      peeking = false;
       setShowInspector(!showInspector());
       arrange();
       return;
@@ -502,6 +526,7 @@ export function createInspector({ layout, tabs, screensIn }) {
     addImage,
     setCount,
     openTab,
+    peekTab,
     showFile,
     dispose: () => {
       stopLeaving();

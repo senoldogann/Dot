@@ -5283,7 +5283,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 350 | The audit of 2026-10-17: what held in the paths a human merges                         | done        | 410af27 |
 | 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | done        | 2f94b84 |
 | 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | done        | b2e8090 |
-| 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | in progress |         |
+| 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | done        | 9c1352e |
+| 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14075,7 +14076,7 @@ wide window too). Docs: `docs/daemon.md`, `docs/phone.md`.
 
 ### 353. Keep going is chosen from the composer's "+", beside Goal mode
 
-**Status: in progress.** The owner's word of 2026-10-17: "daha önce keep going modu vardı ama şimdi + işaretine
+**Status: done (`9c1352e`).** The owner's word of 2026-10-17: "daha önce keep going modu vardı ama şimdi + işaretine
 tıklandığında plan gibi bir şey var plan ben eklediğimi hatırlamıyorum" (there was a Keep going mode before, but the "+"
 now shows something like a plan, which I don't remember adding); asked, the owner chose to bring Keep going into the "+"
 beside Goal mode and to keep Plan first. **As built (2026-10-17).** `views/runs.js`: the home's Keep going switch
@@ -14084,6 +14085,27 @@ holds the approvals alone. As before it shows only for a task of Dot's, goal mod
 chat's page has none. Test: `tests/smoke/test_composer.py` (the "+" holds Goal mode and Keep going; switching it on
 hides goal mode and shows the line under the frame; the Options no longer hold it), which failed on the code before.
 Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
+
+### 354. Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view
+
+**Status: in progress.** The owner's word of 2026-10-17, with a screenshot of T3 Code's Settings › Browser: "Amacımız
+t3code daki browser sistemini temizce ve daha iyisini kendi sistemimize entegre etmekti. T3Code zaten opensource
+istersen bakabilirsin." (our aim was to bring T3 Code's browser system into ours, cleanly and better; T3 Code is open
+source). **As built (2026-10-17).** Four of T3 Code's rows in Settings › Browser, on what Dot's browser already does
+(its own Chrome or the owner's, Dot's computer, Take over): **Runs may use the browser** (`[browser] enabled`; off, no
+run is offered a `browser_*` tool, OpenCode's agent neither; T3 Code's override per project is an agent's own tools,
+which only narrow it); **Size of a page** (a page of Dot's own Chrome fills its window, `fit_window`, or has one of five
+sizes, and the model is told the size the page has) and **Appearance of pages** (System, Light or Dark: Playwright's
+`color_scheme`, "null" for the Mac's, and `emulate_media` on the tabs Dot opens in the owner's Chrome), both `POST
+/api/browser/look` (`browser/look.py`), which lets go of Chrome so that it starts with them; **Show Dot's computer when
+a run opens the browser** (`dot.autoComputer`, this browser's): a run at work that first uses its browser opens the
+panel's Screen tab beside the chat (`inspector.peekTab`, which leaves the panel and the tab the reader chose as they
+were), and a phone keeps its button. Left out: the zoom of a page (Chrome keeps it per site) and where links open (Dot's
+links open where the owner reads Dot). Tests: `tests/smoke/test_browser_settings.py` (the tools of a run with the
+browser on and off, through the real loop; a real headless Chrome's page at 1024 × 768 dark, 390 × 844 light and filling
+its window; the rows wide and on a phone, light and dark, kept in `config.toml`; the Screen tab shown by itself for a
+run that waits on its question, not once turned off, and a phone's drawer left closed). Docs:
+`docs/browser-and-computer-use.md`, `docs/daemon.md`.
 
 ## Log
 
@@ -14848,3 +14870,4 @@ Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
 - 2026-10-17 (Opus 5.5): PR #334 (item 349, OpenRouter) merged as `196ff64` after CI and a second fresh-context review whose findings it fixes (a variant id the doctor did not know, lines over 120 columns, the lists of providers). Item 351 on `items-351-audit-fixes` as PR #335; its review's findings fixed (a failing one-time schedule waits between tries, the answer check reads only the word after a folder, a known address may gain a query or a closing slash); `test_browser_sign_in`'s stand-in no longer writes its pid before its arguments (300 of 300 probes failed before, none after).
 - 2026-10-17 (Opus 5.5): PR #335 (item 351, the audit's fixes) merged as `2f94b84` after CI; main's checkout moved to it and the daemon restarted at 17:36:46 while no run worked. Item 352 on the owner's word of the same day (fewer info lines, a live line over the composer, a phone's chat as one screen), on `items-352-chat-calm`.
 - 2026-10-17 (Opus 5.5): item 353 on the owner's answer of the same day (Keep going into the "+" beside Goal mode, Plan first kept), on `item-353-keep-going`: the home's Keep going switch is a row of the composer's "+" after Goal mode's, the Options pill holds the approvals alone; `test_composer.py` failed on the code before.
+- 2026-10-17 (Opus 5.5): item 354 on the owner's word of the same day (T3 Code's browser system in Dot, cleanly and better, with a screenshot of its Settings › Browser), on `item-354-browser-settings`: runs may be kept off the browser, a page of Dot's own Chrome fills its window or has a size, pages are told the Mac's colour scheme or one chosen, and a run at work shows its page beside the chat by itself; T3 Code's zoom and link target left out, with the reason.

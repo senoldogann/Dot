@@ -8,14 +8,21 @@ from pydantic import JsonValue
 from dotagent.browser.attach import INSPECT_PAGE, ChromeState, inspect_chrome
 from dotagent.browser.devtools import devtools_address
 from dotagent.browser.login import open_sign_in_window
+from dotagent.browser.look import PageLook
 from dotagent.browser.modes import adopt_mode, open_users_chrome
 from dotagent.browser.session import BrowserSession
-from dotagent.config_edit import set_browser_mode, set_browser_setting
+from dotagent.config_edit import BrowserSetting, SettingValue, set_browser_mode, set_browser_setting
 from dotagent.core.errors import RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, config_path
 from dotagent.server.context import ServerContext
-from dotagent.server.views import BrowserDebugPortRequest, BrowserModeRequest, BrowserRaiseRequest, BrowserView
+from dotagent.server.views import (
+    BrowserDebugPortRequest,
+    BrowserEnabledRequest,
+    BrowserModeRequest,
+    BrowserRaiseRequest,
+    BrowserView,
+)
 
 _log = get_logger("dotagent.server.routes_browser")
 
@@ -49,6 +56,13 @@ def browser_router(ctx: ServerContext) -> APIRouter:
             raise_window=session.config.raise_window,
             debug_port=session.config.debug_port,
             devtools_address=devtools_address(session.config),
+            enabled=session.config.enabled,
+            look=PageLook(
+                fit_window=session.config.fit_window,
+                viewport_width=session.config.viewport_width,
+                viewport_height=session.config.viewport_height,
+                appearance=session.config.appearance,
+            ),
         )
 
     @router.get("/browser")
@@ -101,6 +115,31 @@ def browser_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict("the DevTools port cannot be changed while runs are active", {"active_runs": active})
         await ctx.runtime.browsers.set_debug_port(request.debug_port)
         await asyncio.to_thread(set_browser_setting, config_path(), "debug_port", request.debug_port)
+        return await state()
+
+    @router.post("/browser/enabled")
+    async def set_enabled(request: BrowserEnabledRequest) -> BrowserView:
+        """Whether runs are offered the browser tools (item 354), for the runs that start from now on; kept."""
+        ctx.runtime.browsers.set_enabled(request.enabled)
+        await asyncio.to_thread(set_browser_setting, config_path(), "enabled", request.enabled)
+        return await state()
+
+    @router.post("/browser/look")
+    async def set_look(request: PageLook) -> BrowserView:
+        """How pages look (item 354): the size of a page of Dot's own Chrome and the colour scheme, kept in the config
+        file. Chrome is let go of so that it starts again with them, so the change is refused while runs are active."""
+        active: list[JsonValue] = list(ctx.manager.active_run_ids())
+        if active:
+            raise RunConflict("how pages look cannot be changed while runs are active", {"active_runs": active})
+        await ctx.runtime.browsers.set_look(request)
+        settings: tuple[tuple[BrowserSetting, SettingValue], ...] = (
+            ("fit_window", request.fit_window),
+            ("viewport_width", request.viewport_width),
+            ("viewport_height", request.viewport_height),
+            ("appearance", request.appearance),
+        )
+        for key, value in settings:
+            await asyncio.to_thread(set_browser_setting, config_path(), key, value)
         return await state()
 
     return router
