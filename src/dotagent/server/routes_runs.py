@@ -13,6 +13,7 @@ from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_atta
 from dotagent.agent.campaign import session_number
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import run_lessons
+from dotagent.agent.playbooks import save_playbook
 from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
     NOTHING_TO_TAKE_BACK,
@@ -44,13 +45,23 @@ from dotagent.server.views import (
     RunActions,
     RunDetail,
     RunsQuery,
+    SavedSkill,
     StartRunRequest,
     SteerRequest,
     StreamQuery,
     UndoRequest,
+    picks_of,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import AgentRecord, ApprovalRecord, CampaignRecord, EventRecord, RewindCut, RunRecord
+from dotagent.store.models import (
+    AgentRecord,
+    ApprovalRecord,
+    CampaignRecord,
+    EventRecord,
+    RewindCut,
+    RunPicks,
+    RunRecord,
+)
 from dotagent.store.stats import RunCosts
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
@@ -106,6 +117,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         if request.model is not None:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
+        picks: RunPicks = picks_of(request.plugins, request.skills, request.plan_first)
 
         async def start() -> str:
             run: RunRecord
@@ -139,9 +151,10 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.approvals,
                     request.goal_mode,
                     files,
+                    picks,
                 )
             else:
-                run = await ctx.manager.start(
+                run = await ctx.manager.start_picked(
                     request.goal,
                     request.mode,
                     request.model,
@@ -154,10 +167,17 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     request.approvals,
                     request.goal_mode,
                     files,
+                    picks,
                 )
             return run.id
 
         return await store.get_run(await send_once(store, "run", request.key, start))
+
+    @router.post("/runs/{run_id}/skill", status_code=201)
+    async def save_skill(run_id: str) -> SavedSkill:
+        """Save what the run did as a skill, at the owner's word (item 318, :func:`save_playbook`)."""
+        name, updated = await save_playbook(ctx.runtime, await store.get_run(run_id))
+        return SavedSkill(name=name, updated=updated)
 
     @router.get("/runs/{run_id}")
     async def get_run(run_id: str) -> RunDetail:

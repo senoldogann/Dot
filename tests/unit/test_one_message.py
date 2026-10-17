@@ -7,7 +7,7 @@ from pathlib import Path
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.llm.types import ONE_MESSAGE_LEVELS, splits_work
 from dotagent.store.db import Store
-from dotagent.store.models import CampaignRecord, QueuedMessage, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, CampaignRecord, QueuedMessage, RunRecord, ThreadRecord
 from dotagent.tools.delegate import DELEGATE_TOOL
 
 OPUS: str = "anthropic:claude-opus-5-5"
@@ -72,7 +72,19 @@ async def test_the_store_keeps_the_choice_with_a_run_a_queued_message_and_a_camp
             None,
         )
         queued: QueuedMessage = await store.add_queued(
-            thread.id, "And the third one", [], "task", None, "high", "standard", "ultrathink", None, None, None, "test"
+            thread.id,
+            "And the third one",
+            [],
+            "task",
+            None,
+            "high",
+            "standard",
+            "ultrathink",
+            NO_PICKS,
+            None,
+            None,
+            None,
+            "test",
         )
         campaign: CampaignRecord = await store.create_campaign(
             "Compare the reports",

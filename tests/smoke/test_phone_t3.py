@@ -35,7 +35,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import RunRecord
+from dotagent.store.models import NO_PICKS, RunRecord
 from dotagent.tools.delegate import DELEGATE_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
@@ -168,7 +168,7 @@ async def test_a_phones_run_page_and_list_of_chats_follow_t3_codes_phone_app(own
             )
             await _at_work(runtime, run)
             await runtime.store.add_queued(
-                run.thread_id, _QUEUED, (), "task", None, None, "standard", None, None, None, None, "test"
+                run.thread_id, _QUEUED, (), "task", None, None, "standard", None, NO_PICKS, None, None, None, "test"
             )
             title: str = (await runtime.store.get_thread(run.thread_id)).title
             port: int = int(address.rpartition(":")[2])

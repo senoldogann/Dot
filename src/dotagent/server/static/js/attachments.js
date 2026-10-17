@@ -70,7 +70,8 @@ export function sentFiles(files) {
 }
 
 /**
- * The attach button, the list of attached files and the drop/paste handling for one message box. `dropTarget` takes
+ * The file picker, the list of attached files and the drop/paste handling for one message box (the composer's "+"
+ * menu opens the picker, item 318). `dropTarget` takes
  * dropped files and `input` pasted ones, and a long text pasted into `input` as a file (item 269), which can be put back
  * into the box as text. A file uploaded opens beside the conversation from its chip (`requestFile`). `ids()` names the
  * uploaded files for the message, `ready()` describes them (`{ id, name, size }`) for a draft and `restore(files)` lists
@@ -80,11 +81,6 @@ export function sentFiles(files) {
 export function createAttachments({ dropTarget, input, onChange }) {
   const entries = [];
   const picker = el("input", { type: "file", multiple: true, hidden: true, "aria-hidden": "true", tabindex: "-1" });
-  const button = el(
-    "button",
-    { class: "btn ghost sm attach-button", type: "button", title: "Attach files (or drop or paste them)", "aria-label": "Attach files", onclick: () => picker.click() },
-    icon("paperclip"),
-  );
   const list = el("div", { class: "attach-list", hidden: true });
 
   function paint() {
@@ -226,7 +222,6 @@ export function createAttachments({ dropTarget, input, onChange }) {
   });
 
   return {
-    button,
     picker,
     list,
     ids: () => entries.filter((entry) => entry.state === "ready").map((entry) => entry.id),

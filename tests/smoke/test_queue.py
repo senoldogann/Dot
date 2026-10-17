@@ -45,7 +45,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_SHUTDOWN
-from dotagent.store.models import EventRecord, QueuedMessage, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, EventRecord, QueuedMessage, RunRecord, ThreadRecord
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -196,7 +196,19 @@ async def _ended(manager: RunManager, run_id: str) -> RunRecord:
 
 async def _queue(manager: RunManager, run: RunRecord, text: str, approvals: ApprovalMode) -> QueuedMessage:
     return await manager.queue(
-        run.thread_id, text, (), "task", SCRIPTED_MODEL, None, "standard", None, approvals, False, None, UI_SOURCE
+        run.thread_id,
+        text,
+        (),
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "standard",
+        None,
+        NO_PICKS,
+        approvals,
+        False,
+        None,
+        UI_SOURCE,
     )
 
 
@@ -445,7 +457,19 @@ async def test_a_run_a_crash_left_active_holds_its_chats_queue_when_the_daemon_s
         )
         await runtime.store.set_run_status(run.id, "running")
         await runtime.store.add_queued(
-            thread.id, SUMMARY, (), "task", SCRIPTED_MODEL, None, "standard", None, "yolo", False, None, UI_SOURCE
+            thread.id,
+            SUMMARY,
+            (),
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "standard",
+            None,
+            NO_PICKS,
+            "yolo",
+            False,
+            None,
+            UI_SOURCE,
         )
         assert await manager.recover() == 1
         assert (await runtime.store.get_run(run.id)).result == RESULT_RESTARTED

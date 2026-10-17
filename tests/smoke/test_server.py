@@ -45,7 +45,7 @@ from dotagent.server.kept_pages import keep_pages
 from dotagent.server.links import ui_url
 from dotagent.server.views import PermissionsView
 from dotagent.store.endings import RESULT_RESTARTED, RESULT_STOPPED
-from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord, ThreadRecord, ThreadSummary
+from dotagent.store.models import NO_PICKS, ApprovalRecord, EventRecord, RunRecord, ThreadRecord, ThreadSummary
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -1255,7 +1255,7 @@ async def test_deleting_chats_takes_their_runs_delegations_events_and_approvals_
     # thread, a chat of its own, keeps its queue.
     for thread_id in (child.thread_id, grandchild.thread_id):
         await runtime.store.add_queued(
-            thread_id, "next", [], "task", None, None, "standard", None, None, None, None, "test"
+            thread_id, "next", [], "task", None, None, "standard", None, NO_PICKS, None, None, None, "test"
         )
         await runtime.store.hold_queue(thread_id)
     # Runs this daemon does not drive, as a dotx command's, keep their chat while they work (item 179).

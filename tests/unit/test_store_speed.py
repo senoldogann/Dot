@@ -6,7 +6,7 @@ import sqlite3
 from pathlib import Path
 
 from dotagent.store.db import Store
-from dotagent.store.models import CampaignRecord, ChatChoices, QueuedMessage, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, CampaignRecord, ChatChoices, QueuedMessage, RunRecord, ThreadRecord
 
 OPUS: str = "anthropic:claude-opus-5-5"
 
@@ -47,7 +47,9 @@ async def test_a_store_keeps_the_speed_and_one_from_before_fast_mode_holds_the_s
         await store.set_chat_choices(
             thread.id, ChatChoices(mode="chat", model=OPUS, effort=None, speed="fast", approvals=None, goal_mode=None)
         )
-        await store.add_queued(thread.id, "Again.", [], "chat", OPUS, None, "fast", None, None, None, None, "test")
+        await store.add_queued(
+            thread.id, "Again.", [], "chat", OPUS, None, "fast", None, NO_PICKS, None, None, None, "test"
+        )
         campaign: CampaignRecord = await store.create_campaign(
             "Keep at it", "Keep at it.", thread.id, OPUS, "high", "fast", None, "ask", [], "own"
         )

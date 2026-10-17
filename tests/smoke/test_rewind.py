@@ -38,6 +38,7 @@ from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.db import Store
 from dotagent.store.models import (
+    NO_PICKS,
     ApprovalRecord,
     QueuedMessage,
     RewindCut,
@@ -449,7 +450,7 @@ async def test_a_rewind_across_a_compaction_reads_the_history_kept_aside_and_is_
     with pytest.raises(RunConflict, match="changed while it was being rewound"):
         await store.rewind_chat(one.id, [one.id, six.id])
     waiting: QueuedMessage = await store.add_queued(
-        thread.id, "eight", (), "task", None, None, "standard", None, None, None, None, "test"
+        thread.id, "eight", (), "task", None, None, "standard", None, NO_PICKS, None, None, None, "test"
     )
     with pytest.raises(RunConflict, match="messages wait in the chat's queue"):
         await _rewind(store, one.id)

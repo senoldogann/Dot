@@ -5254,6 +5254,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 313 | A note a run saves, corrects or forgets is a quiet line in the chat                    | in progress |         |
 | 314 | A run drafts an email or a message; the owner sends, edits or discards it              | in progress |         |
 | 315 | An agent starts from one of eight templates and goes to another home as a file         | in progress |         |
+| 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | in progress |         |
 | 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -13281,10 +13282,67 @@ imported as the same agent, whose page opens with Edit, Export and Delete inside
 before, and with the routes of before alone, the test finds none of the eight cards; without the home's secrets, the
 agent holding one is exported.
 
+### 318. A "+" in the composer picks plugins, skills and Plan first, as chips
+
+**Status: in progress.** On the branch `item-318-composer-picks`, after PR #326; not merged.
+
+**What was found.** The owner's word of 2026-10-16, with five screenshots of Codex's desktop app: "Codex sistemindkei
+gibi eklentiler ve beceriler sayfasi yapma sansimiz var mi daha otrurakli kurumsal ve hos görünüm ve daha cok cesitlilik
+? Ayrica composer dan eklentileri de ekleyebilsek ? Daha hos durur sanki" (could we have plugins and skills pages as in
+Codex, a more settled, professional and pleasant look with more variety; and could we add plugins from the composer too).
+The plan's item 318 (the owner chose "Önce PR, sonra B grubu", 318 first): a "+" in place of the attach button with Add
+files, Goal, Plan first, Save skill, then the plugins and the skills; a pick a chip with its mark and colour, one from the
+slash menu the same chip; the run request takes `plugins` and `skills`, the run starts with those tool groups on and
+the skill's text in its instructions. Until then the slash menu typed "use the skill NAME: " or a tool's name into the
+box, and the model chose among every tool itself.
+
+**As built (2026-10-16).** `store/models.py` `RunPicks` (`plugins`, `skills`, `plan_first`), `queued_messages.picks`
+(an added column). `agent/picks.py`: `picks_problems` (a server that is not connected or none of whose tools the run
+may use, its mode's within its agent's bounds; a skill not offered; Plan first in a chat or where nobody can be asked,
+as under YOLO), `with_picks` (the first message: the owner's words, the servers to use, Plan first, each skill as
+`tools/skill.py` `skill_instructions` renders it), the `picks` event. `agent/loop.py`: `RunOpening.picks`; a grouped run
+starts with the picked servers' groups on; the goal message is `_opening_text`; `run.goal` stays the owner's words.
+`agent/manager.py`: `start_picked` (`start` is it without picks), `start_for_agent` and `queue` take picks, and
+`_check_picks` refuses at the launch and at the queue. `server/views.py`: `plugins` (8 at most), `skills` (4) and
+`plan_first` on `StartRunRequest` and `QueueMessageRequest`, refused with `standing`. Save skill: `agent/playbooks.py`
+`save_playbook` and `unsavable`, `POST /api/runs/{id}/skill`. Web UI: `picks.js` (the chips, their colours from the
+characters' palette), `composer.js` (the "+" menu, the slash menu's picks, the draft keeps them), `choices.js` (goal
+mode moves from Options to the "+", a chat hides it and Plan first), the home's, a run's and an agent's composer send
+them, a steer keeps them and says so, `timeline.js`/`messages.js` (the chips under a sent message), `app.css`. README:
+the web UI. Tests: `tests/smoke/test_composer_picks.py` (with the fixture MCP server and the scripted model: a picked
+server's group on at step 0 and its tools in the first request, without the pick off; the skill and Plan first in the
+first message and not in the goal; a queued message keeps its picks; six refusals over HTTP and nothing started; Save
+skill writes a skill after one acting step and refuses a run with none; in the browser at 1280 px light and 390 px dark,
+the "+" menu, the chips, the ×, the slash pick, the chips under the sent message, nothing wider than its box, no error in
+the console), `test_composer.py` and `test_dock_choices.py` (goal mode in the "+"). Without the loop's change the
+group test and the queue test fail (`on: ['core']`). Not tested: what a real model does with Plan first and a picked
+skill.
+
+**After the review (2026-10-16).** An independent review against the criteria found three things to fix first, and
+they are fixed:
+
+- A run on one of OpenCode's models goes whole to OpenCode's own agent (item 283), whose first message is the owner's
+  words alone, so its picks were taken and then dropped without a word. `_check_picks` now refuses any pick on such a
+  model, with why.
+- Steering a queued message into the run at work (the row's button, or ⌘⇧Enter with an empty box) dropped its picks.
+  `steer_queued` now refuses a message with picks, and it stays in the queue to start a run of its own.
+- That a run that goes on from another (resumed, or started by an answer after its run ended) starts without picks was
+  written nowhere. `RunOpening` and the README now say it: the first message, with the picks' lines and skills, stays
+  in the chat, and with grouped tools `use_tools` turns a picked server's group on.
+
+Also from the review: the Options tooltips no longer name goal mode, and the README gives the "+" menu's order as it
+is (Add files, Save skill in a run's box, Goal mode, Plan first, Plugins, Skills). The tests add the OpenCode refusal
+and the refused steer, and the browser test runs each width in both schemes, checks that the "+" menu's foot is on the
+screen, and that the chips under the sent message come back with the page. Known limits, left as they are: "Edit from
+here" gives back the text and the files but not the picks; the "+" lists every server and skill, so on an agent's page
+one outside its bounds is refused only when sent; Save skill pressed while the skill of a long run is being written on
+its own can write a second one; a server that disconnects between the check and the run's first step leaves the line
+that names it.
+
 ### 327. A run that hesitates over what it was asked says so at once
 
-**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed. Numbers 316 to 326 are
-the items of the plan `reports/grok-bot-ve-codex-plani-2026-10-16.md`, not yet taken into this roadmap.
+**Status: in progress.** Built in the worktree `item-305-sessions-memory-teams`, not committed. Numbers 316, 317 and 319
+to 326 are the items of the plan `reports/grok-bot-ve-codex-plani-2026-10-16.md`, not yet taken into this roadmap.
 
 **What was found.** The owner's word of 2026-10-16: they asked a run on a Claude model to sit and pass a certification
 exam, and the run spent its steps on the exam's rules (a search, the exam guide, its terms of service twice) before it
@@ -14048,3 +14106,5 @@ use shows, since the tests call no model.
 - 2026-10-16 (Opus 5.5): items 313 to 315 reviewed against their done criteria by a read-only reviewer: 313 and 315 meet them; in 314 `osascript` read a first argument that starts with a dash as one of its options (a subject that starts with `-e` would have run as script at the owner's Send), so the values now come after `--`, and the export of 315 refuses every secret Dot holds and the forms the masking of secrets knows, not only the forms of `looks_like_key`. A draft's key check takes in its addresses too; a README sentence that called the first four templates of the list the bounded ones names the four.
 - 2026-10-16 (Opus 5.5): items 313 to 315 and 327 copied into main's working tree at 20:36, not committed, as the owner chose ("Aktar, boştayken yeniden başlat"): the 29 changed and 11 new files, each compared after the copy; before it, main's copies of the changed files were the worktree's starting point and its 740 other tracked files were the worktree's, so main holds what the gate tested. The daemon restarts once when no run works.
 - 2026-10-16 (Opus 5.5): the daemon restarted at 20:55:39 on the owner's word ("Kapat yeniden aç, session devam ediyor olması farketmez"), with two runs at work, after the wait for an idle moment was stopped: pid 56472, from main's environment, healthy at 20:55:46; the pages it serves are main's (`drafts.js`, `views/agents.js`, `timeline.js`, `views/memory.js`, `views/run.js`, `attention.js`, `icons.js` and `app.css` alike byte for byte), and both runs went on after it, each with events of its own since.
+- 2026-10-16 (Opus 5.5): PR #326 opened for items 284, 301 to 315 and 327 (the branch `items-301-to-327`, 21 commits over `main`, its tree main's working tree); its gate green, browser tests included (633 passed). The merge waits for the owner.
+- 2026-10-16 (Opus 5.5): item 318, the first of the plan's B group as the owner chose: a "+" in the composer picks plugins (MCP servers), skills and Plan first for a message, as chips; the run starts with the picked servers' tools on and the skills' instructions after the owner's words; Save skill writes a learned skill at the owner's word. Built on `item-318-composer-picks`, after PR #326.

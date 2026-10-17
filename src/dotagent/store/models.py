@@ -64,6 +64,19 @@ class ChatChoices(FrozenModel):
         return self
 
 
+class RunPicks(FrozenModel):
+    """What the owner picked in the composer for one message (item 318): ``plugins``, the MCP servers whose tools the
+    run starts with (by the server's name, a connected app's among them); ``skills``, the skills whose instructions it
+    starts with (by name); ``plan_first``, that it writes its plan and asks before it changes anything."""
+
+    plugins: tuple[str, ...]
+    skills: tuple[str, ...]
+    plan_first: bool
+
+
+NO_PICKS: RunPicks = RunPicks(plugins=(), skills=(), plan_first=False)
+
+
 class ThreadSummary(FrozenModel):
     """One chat of the sidebar: a thread with the runs a person started on it (``run_count`` of them) and the latest of
     those runs, which the chat opens on. ``updated_at`` is the later of the last message and the start of the latest
@@ -292,8 +305,9 @@ class RuleRecord(FrozenModel):
 class QueuedMessage(FrozenModel):
     """A message sent to a chat while a run worked there: it waits in the chat's queue, in ``position`` order, and
     starts as the chat's next run, with the choices it was sent with, once the run before it has ended done (see
-    ``RunManager.queue``); ``once`` is one of them, for this message only (item 251). ``attachments`` are the ids of
-    its uploaded files; ``source`` is where it was sent from, and the source of the run it starts."""
+    ``RunManager.queue``); ``once`` is one of them, for this message only (item 251), and so are ``picks`` (item
+    318). ``attachments`` are the ids of its uploaded files; ``source`` is where it was sent from, and the source of the
+    run it starts."""
 
     id: str
     thread_id: str
@@ -305,6 +319,7 @@ class QueuedMessage(FrozenModel):
     effort: Effort | None
     speed: Speed
     once: OneMessage | None
+    picks: RunPicks
     approvals: ApprovalMode | None
     goal_mode: bool | None
     agent_id: str | None

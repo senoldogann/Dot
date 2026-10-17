@@ -31,7 +31,7 @@ from dotagent.llm.types import Message
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.store.db import Store
 from dotagent.store.endings import classify_ending
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import NO_PICKS, EventRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -205,7 +205,19 @@ async def test_the_daemon_closes_the_run_of_a_dotx_run_that_died_as_cut_off_by_i
                 left: RunRecord = await runtime.store.get_run(run_id)
                 # A message the owner queued on the chat while the run worked.
                 await runtime.store.add_queued(
-                    left.thread_id, "Next.", [], "task", None, None, "standard", None, None, None, None, "test"
+                    left.thread_id,
+                    "Next.",
+                    [],
+                    "task",
+                    None,
+                    None,
+                    "standard",
+                    None,
+                    NO_PICKS,
+                    None,
+                    None,
+                    None,
+                    "test",
                 )
                 # What the daemon does every half minute while it runs.
                 async with runtime.bus.subscribe(run_id) as subscription:

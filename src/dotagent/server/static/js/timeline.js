@@ -18,6 +18,7 @@ import { foldSteps } from "./layout.js";
 import { parseSourcedBlocks } from "./markdown.js";
 import { answerMessage, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
+import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
 import { describeArguments, toolRow } from "./tools.js";
 
@@ -259,9 +260,10 @@ function buildFlock() {
  * `onRunStatus({ status, model, endedAt })` (`endedAt` is null until the run is over), `onAnswer(node)` when the answer is
  * on the page, `onImage(name)` for every screenshot a tool returned and `onBrowserStep()` for the root run's first
  * browser tool call (Dot's computer starts its view on it). `onGoalFiles(files)` takes the files that came
- * with the run's goal, to show them under it; null where the page shows no goal, and they stand in the timeline.
+ * with the run's goal, to show them under it, and `onGoalPicks(picks)` what the owner picked for it in the composer
+ * (item 318); null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles }) {
+export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -1019,6 +1021,15 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         return;
       }
       place(scope, sentFiles(record.data.files), record.ts);
+    },
+
+    // What the goal was sent with from the composer (item 318): its chips sit under the goal's bubble too.
+    picks(scope, record) {
+      if (scope.runId === rootRunId && onGoalPicks !== null) {
+        onGoalPicks(record.data);
+        return;
+      }
+      place(scope, sentPicks(record.data), record.ts);
     },
 
     // A page the run showed (`show_page`, item 193), in its frame.

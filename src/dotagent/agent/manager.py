@@ -34,10 +34,12 @@ from dotagent.agent.learning_health import (
     record_learning,
 )
 from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
-from dotagent.agent.loop import AgentRun, RunEnd, RunOpening, browser_of, run_agent
+from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
+from dotagent.agent.picks import picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
-from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, playbook_case
+from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, offered_to_run, playbook_case
+from dotagent.agent.progress import can_ask_user
 from dotagent.agent.reflection import reflect
 from dotagent.agent.reflection_record import Reflection
 from dotagent.agent.resume import (
@@ -79,6 +81,8 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.timing import next_firing
+from dotagent.skills.catalog import load_skills, playbook_root
+from dotagent.skills.types import Skill, SkillCatalog
 from dotagent.store.db import Store
 from dotagent.store.endings import (
     PREFIX_EMERGENCY_STOP,
@@ -93,6 +97,7 @@ from dotagent.store.endings import (
     classify_ending,
 )
 from dotagent.store.models import (
+    NO_PICKS,
     WORKING_STATUSES,
     AgentRecord,
     ApprovalRecord,
@@ -103,6 +108,7 @@ from dotagent.store.models import (
     EventRecord,
     QueuedMessage,
     RunMode,
+    RunPicks,
     RunRecord,
     RunStatus,
     ThreadRecord,
@@ -111,7 +117,9 @@ from dotagent.store.models import (
 from dotagent.terminal.session import TerminalSession, ended_notice
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
+from dotagent.tools.groups import groups_of
 from dotagent.tools.meta import ASK_USER_TOOL
+from dotagent.tools.registry import tools_for_mode
 from dotagent.tools.team import TEAM_SOURCE
 
 log = get_logger(__name__)
@@ -557,6 +565,40 @@ class RunManager:
         refused, and the configured default does not apply to a chat. A task or research run whose goal asks it to
         keep going until it is done runs in goal mode whatever was chosen (see :func:`goal_mode_asked`).
         """
+        return await self.start_picked(
+            goal,
+            mode,
+            model,
+            thread_id,
+            source,
+            parent_run_id,
+            effort,
+            speed,
+            once,
+            approvals,
+            goal_mode,
+            files,
+            NO_PICKS,
+        )
+
+    async def start_picked(
+        self,
+        goal: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str | None,
+        source: str,
+        parent_run_id: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        once: OneMessage | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        files: tuple[StoredAttachment, ...],
+        picks: RunPicks,
+    ) -> RunRecord:
+        """Queue a run as :meth:`start` does, with what the owner picked in the composer for its message (item 318),
+        which are refused unless the run can start with them (:meth:`_check_picks`)."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         if effort is not None:
@@ -573,7 +615,7 @@ class RunManager:
             speed,
             approvals,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=goal, files=files, resumed=None, once=once, carried=()),
+            RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=picks),
             None,
             None,
         )
@@ -613,7 +655,7 @@ class RunManager:
             speed,
             approvals,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried),
+            RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried, picks=NO_PICKS),
             None,
             None,
         )
@@ -633,11 +675,12 @@ class RunManager:
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         files: tuple[StoredAttachment, ...],
+        picks: RunPicks,
     ) -> RunRecord:
         """Queue a run of ``agent`` (item 86): what the request leaves out, the agent's own bounds fill in (its model,
         effort and approvals), and what the agent leaves out, the configured ones; the run carries the agent's id and
-        the loop adds its instructions to the prompt and keeps its tools. Goal mode and ``once`` are as for
-        :meth:`start`."""
+        the loop adds its instructions to the prompt and keeps its tools. Goal mode, ``once`` and ``picks`` are as for
+        :meth:`start_picked`: a server the agent's bounds leave out is refused."""
         model_ref: str | None = model if model is not None else (agent.model if agent.model != "" else None)
         level: Effort | None = effort if effort is not None else agent.effort
         approval_mode: ApprovalMode | None = approvals if approvals is not None else agent.approvals
@@ -657,7 +700,7 @@ class RunManager:
             speed,
             approval_mode,
             goal_mode_asked(goal, mode, goal_mode),
-            RunOpening(text=goal, files=files, resumed=None, once=once, carried=()),
+            RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=picks),
             None,
             agent.id,
         )
@@ -735,7 +778,7 @@ class RunManager:
                 speed,
                 approval_mode,
                 False,
-                RunOpening(text=goal, files=files, resumed=None, once=once, carried=()),
+                RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=NO_PICKS),
                 campaign.id,
                 None,
             )
@@ -799,7 +842,7 @@ class RunManager:
                 campaign.speed,
                 campaign.approvals,
                 False,
-                RunOpening(text=brief, files=(), resumed=None, once=campaign.once, carried=()),
+                RunOpening(text=brief, files=(), resumed=None, once=campaign.once, carried=(), picks=NO_PICKS),
                 campaign.id,
                 None,
             )
@@ -888,7 +931,7 @@ class RunManager:
             if agent is None or agent.approvals is None
             else stricter_approvals(parent.approvals, agent.approvals),
             False,
-            RunOpening(text=goal, files=(), resumed=None, once=None, carried=()),
+            RunOpening(text=goal, files=(), resumed=None, once=None, carried=(), picks=NO_PICKS),
             None,
             agent_id,
         )
@@ -930,6 +973,7 @@ class RunManager:
         effort: Effort | None,
         speed: Speed,
         once: OneMessage | None,
+        picks: RunPicks,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         agent_id: str | None,
@@ -941,11 +985,20 @@ class RunManager:
         plans what follows its sessions; nor does the thread of a delegated run, which is no chat: the run that
         delegated it decides what follows (:meth:`_follow_queue` leaves it alone). Fast mode is refused at once for a
         model without it (item 223), and so is a choice for one message whose level the model does not offer (item
-        251)."""
+        251), and picks the run could not start with (item 318, :meth:`_check_picks`)."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         await self._check_once(ref, once)
         store: Store = self._runtime.store
+        agent: AgentRecord | None = None if agent_id is None else await store.get_agent(agent_id)
+        asked: ApprovalMode | None = approvals if approvals is not None or agent is None else agent.approvals
+        # The model the message's run will work on: its agent's own when none is chosen (as start_for_agent takes it).
+        runs_on: ModelRef = (
+            parse_model_ref(agent.model) if model is None and agent is not None and agent.model != "" else ref
+        )
+        await self._check_picks(
+            picks, mode, runs_on, agent_id, self._runtime.config.policy.approvals if asked is None else asked, source
+        )
         await store.get_thread(thread_id)
         newest: list[RunRecord] = await store.list_runs(1, thread_id)
         if not newest:
@@ -966,6 +1019,7 @@ class RunManager:
             effort,
             speed,
             once,
+            picks,
             approvals,
             goal_mode,
             agent_id,
@@ -998,10 +1052,17 @@ class RunManager:
     async def steer_queued(self, message_id: str) -> str:
         """Send a queued message, with its files, to the run at work on its chat now (:meth:`steer`) and take it out of
         the queue; returns its chat. A chat where no run of this process works has none to steer, and a message starting
-        as the chat's next run is refused. The message leaves the queue as it is before it is sent, so that nothing
-        starts, changes or removes it meanwhile, and goes back when the run ended in that moment."""
+        as the chat's next run is refused, as is one queued with picks (item 318), which a run at work cannot take: it
+        stays in the queue to start a run of its own. The message leaves the queue as it is before it is sent, so that
+        nothing starts, changes or removes it meanwhile, and goes back when the run ended in that moment."""
         store: Store = self._runtime.store
         message: QueuedMessage = await store.get_queued(message_id)
+        if message.picks != NO_PICKS:
+            raise InvalidValueError(
+                "a message queued with plugins, skills or Plan first starts a run of its own, since the run at work "
+                "cannot take them: it stays in the queue",
+                {"message_id": message_id, "thread_id": message.thread_id},
+            )
         if self._active_on(message.thread_id) is None:
             raise RunConflict("no run works on the chat to steer", {"thread_id": message.thread_id})
         files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
@@ -1331,7 +1392,7 @@ class RunManager:
             asked.speed,
             asked.approvals,
             asked.goal_mode,
-            RunOpening(text=goal, files=(), resumed=None, once=asked.once, carried=()),
+            RunOpening(text=goal, files=(), resumed=None, once=asked.once, carried=(), picks=NO_PICKS),
             None,
             None,
         )
@@ -1444,7 +1505,14 @@ class RunManager:
             old.speed,
             old.approvals,
             old.goal_mode,
-            RunOpening(text=resume_note(old.goal, resumption), files=(), resumed=resumption, once=old.once, carried=()),
+            RunOpening(
+                text=resume_note(old.goal, resumption),
+                files=(),
+                resumed=resumption,
+                once=old.once,
+                carried=(),
+                picks=NO_PICKS,
+            ),
             None,
             None,
         )
@@ -1510,11 +1578,12 @@ class RunManager:
         ``campaign_id`` makes it a session of that campaign."""
         runtime: Runtime = self._runtime
         model_ref: str = model if model is not None else self._main_model
-        parse_model_ref(model_ref)
+        runs_on: ModelRef = parse_model_ref(model_ref)
         level: Effort = runtime.config.models.effort if effort is None else effort
         approval_mode: ApprovalMode = runtime.config.policy.approvals if approvals is None else approvals
         if goal_mode is True and mode == "chat":
             raise ConfigError("goal mode is for task and research runs, not for a chat", {"mode": mode})
+        await self._check_picks(opening.picks, mode, runs_on, agent_id, approval_mode, source)
         with_goal_mode: bool = mode != "chat" and (runtime.config.agent.goal_mode if goal_mode is None else goal_mode)
         if thread_id is None:
             thread: ThreadRecord = await runtime.store.create_thread(thread_title(goal), source)
@@ -1557,6 +1626,55 @@ class RunManager:
             )
         finally:
             self._claimed.discard(thread_id)
+
+    async def _check_picks(
+        self,
+        picks: RunPicks,
+        mode: RunMode,
+        model: ModelRef,
+        agent_id: str | None,
+        approvals: ApprovalMode,
+        source: str,
+    ) -> None:
+        """Refuse ``picks`` (item 318) that a run of ``mode`` on ``model`` for ``agent_id`` (``None`` for Dot) with
+        ``approvals``, sent from ``source``, could not start with (:func:`picks_problems`): the tools it may use are its
+        mode's, within the agent's bounds, as the loop gives them. A run on one of OpenCode's models goes whole to
+        OpenCode's own agent (item 283), whose first message is the owner's words alone, so it takes no picks."""
+        if picks == NO_PICKS:
+            return
+        if model.provider == OPENCODE_PROVIDER:
+            raise InvalidValueError(
+                f"the message cannot start with what was picked for it: {model.label} works as OpenCode's own agent, "
+                "which takes no plugins, skills or Plan first; send it without them, or on one of Dot's own models",
+                {
+                    "model": model.label,
+                    "plugins": list(picks.plugins),
+                    "skills": list(picks.skills),
+                    "plan_first": picks.plan_first,
+                },
+            )
+        runtime: Runtime = self._runtime
+        names: list[str] = [tool.spec.name for tool in tools_for_mode(runtime.registry, mode)]
+        agent: AgentRecord | None = None if agent_id is None else await runtime.store.get_agent(agent_id)
+        if agent is not None and agent.tools:
+            bounds: frozenset[str] = frozenset(agent.tools) | frozenset(AGENT_CORE_TOOLS)
+            names = [name for name in names if name in bounds]
+        catalog: SkillCatalog = await asyncio.to_thread(
+            load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
+        )
+        offered: tuple[Skill, ...] = await offered_to_run(runtime.config, catalog, agent_id)
+        problems: list[str] = picks_problems(
+            picks,
+            mode,
+            frozenset(groups_of(names)),
+            [skill.name for skill in offered],
+            can_ask_user(source, None, approvals),
+        )
+        if problems:
+            raise InvalidValueError(
+                f"the message cannot start with what was picked for it: {'; '.join(problems)}",
+                {"plugins": list(picks.plugins), "skills": list(picks.skills), "plan_first": picks.plan_first},
+            )
 
     def _owner_id(self) -> str:
         """The owner of this process's runs, taken with the first of them; nothing awaits between the check and the
@@ -2036,8 +2154,9 @@ class RunManager:
                 message.approvals,
                 message.goal_mode,
                 files,
+                message.picks,
             )
-        return await self.start(
+        return await self.start_picked(
             message.text,
             message.mode,
             message.model,
@@ -2050,6 +2169,7 @@ class RunManager:
             message.approvals,
             message.goal_mode,
             files,
+            message.picks,
         )
 
     async def _queue_changed(
@@ -2116,6 +2236,7 @@ class RunManager:
             effort,
             choices.speed,
             None,
+            NO_PICKS,
             choices.approvals,
             choices.goal_mode,
             newest.agent_id,

@@ -65,7 +65,7 @@ function buildComposer(ctx, listener) {
   const choices = runChoices({
     frame,
     kept: HOME_KEPT,
-    optionsTitle: "Approvals, goal mode and keep going",
+    optionsTitle: "Approvals and keep going",
     more: () => [standing.element],
     onMode: modePicked,
     // HOME_KEPT keeps what it keeps as it is chosen.
@@ -169,10 +169,12 @@ function buildComposer(ctx, listener) {
           thread_id: null,
           attachments: attachments.ids(),
           agent_id: agentId === "" ? null : agentId,
+          ...frame.picks.body(),
         };
         const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
         keys.sent();
         choices.sent();
+        frame.picks.sent();
         frame.clear();
         ctx.navigate(`/runs/${created.id}`);
       });

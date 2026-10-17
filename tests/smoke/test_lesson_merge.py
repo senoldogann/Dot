@@ -1,12 +1,13 @@
 """The nightly reflection folds the lesson notes that say the same without holding the daemon (review Y19): five hundred
-notes with embeddings of a real model's size in a real store, merged while a heartbeat measures the longest gap between
-turns of the event loop, and folded as they were before only the newest notes were looked for a twin; a folded note
-rests and names the note it was folded into (item 306).
+notes with embeddings of a real model's size in a real store, compared in a thread other than the event loop's and
+merged while a heartbeat measures the longest gap between turns of the loop, and folded as they were before only the
+newest notes were looked for a twin; a folded note rests and names the note it was folded into (item 306).
 """
 
 import asyncio
 import math
 import random
+import threading
 import time
 from pathlib import Path
 
@@ -29,9 +30,10 @@ _TWINS: dict[int, int] = {480: 20, 490: 250, 470: 400, 499: 450}
 _NEARBY: float = 0.003
 _TOPIC_TAG: str = "reports"
 _HEARTBEAT_S: float = 0.01
-# The longest the event loop may go without a turn while the notes are merged; comparing them on it held it for 0.4 s
-# (for 3 s before math.sumprod).
-_LONGEST_GAP_S: float = 0.1
+# The longest the event loop may go without a turn while the notes are merged. Comparing them on it held it for 0.4 s
+# on the developer's Mac (for 3 s before math.sumprod). Compared in a thread, the loop still waits at times for the
+# interpreter's lock and for its garbage collector: up to 0.07 s on that Mac, and up to 0.12 s on GitHub's macOS runners.
+_LONGEST_GAP_S: float = 0.25
 
 
 class Heartbeat:
@@ -89,12 +91,20 @@ async def test_five_hundred_lesson_notes_merge_without_holding_the_event_loop(
             )
             ids.append(saved.id)
 
+        threads: list[int] = []
+
+        def compared(*args: object) -> object:
+            threads.append(threading.get_ident())
+            return duplicate_pairs(*args)  # type: ignore[arg-type]
+
+        monkeypatch.setattr(reflection, "duplicate_pairs", compared)
         heartbeat: Heartbeat = Heartbeat()
         heartbeat.start()
         notes: list[MemoryRecord] = await store.memories_with_tag(LESSON_TAG, _NOTES)
         vectors: dict[str, Vector] = dict(await store.all_memory_vectors())
         merged: int = await merge_duplicates(store, notes, vectors, set())
         assert await heartbeat.stop() < _LONGEST_GAP_S
+        assert threads and threading.get_ident() not in threads, "the notes were compared on the event loop's thread"
 
         # Each older note is folded into the one learnt again, which takes its tags, and rests naming it; nothing else
         # changes, and no note is gone.

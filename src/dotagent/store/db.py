@@ -34,6 +34,7 @@ from dotagent.llm.types import Effort, ImageData, Message, OneMessage, Speed
 from dotagent.policy.types import ApprovalMode, PaceClass
 from dotagent.store.endings import RESULT_RESTARTED
 from dotagent.store.models import (
+    NO_PICKS,
     WORKING_STATUSES,
     AgentLook,
     AgentRecord,
@@ -57,6 +58,7 @@ from dotagent.store.models import (
     RewindCut,
     RuleRecord,
     RunMode,
+    RunPicks,
     RunRecord,
     RunStatus,
     ScheduleOptions,
@@ -546,6 +548,7 @@ def _rule(row: aiosqlite.Row) -> RuleRecord:
 def _queued(row: aiosqlite.Row) -> QueuedMessage:
     attachments: str = row["attachments"]
     goal_mode: int | None = row["goal_mode"]
+    picks: str | None = row["picks"]
     return QueuedMessage(
         id=row["id"],
         thread_id=row["thread_id"],
@@ -557,6 +560,7 @@ def _queued(row: aiosqlite.Row) -> QueuedMessage:
         effort=row["effort"],
         speed=row["speed"],
         once=row["once"],
+        picks=NO_PICKS if picks is None else RunPicks.model_validate_json(picks),
         approvals=row["approvals"],
         goal_mode=None if goal_mode is None else bool(goal_mode),
         agent_id=row["agent_id"],
@@ -688,10 +692,11 @@ _ADDED_CAMPAIGN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("once", "TEXT"),
 )
 # Columns of ``queued_messages`` added later: an older message was sent at the standard speed, without a choice for one
-# message.
+# message and without picks (item 318; a ``RunPicks`` as JSON, NULL for none).
 _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("speed", "TEXT NOT NULL DEFAULT 'standard'"),
     ("once", "TEXT"),
+    ("picks", "TEXT"),
 )
 # Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
@@ -2191,6 +2196,7 @@ class Store:
         effort: Effort | None,
         speed: Speed,
         once: OneMessage | None,
+        picks: RunPicks,
         approvals: ApprovalMode | None,
         goal_mode: bool | None,
         agent_id: str | None,
@@ -2211,6 +2217,7 @@ class Store:
             effort=effort,
             speed=speed,
             once=once,
+            picks=picks,
             approvals=approvals,
             goal_mode=goal_mode,
             agent_id=agent_id,
@@ -2225,7 +2232,8 @@ class Store:
         """Store ``record`` in its chat's queue; the caller commits."""
         await self._db.execute(
             "INSERT INTO queued_messages(id, thread_id, position, text, attachments, mode, model, effort, speed, once,"
-            " approvals, goal_mode, agent_id, source, created_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " picks, approvals, goal_mode, agent_id, source, created_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.thread_id,
@@ -2237,6 +2245,7 @@ class Store:
                 record.effort,
                 record.speed,
                 record.once,
+                None if record.picks == NO_PICKS else record.picks.model_dump_json(),
                 record.approvals,
                 None if record.goal_mode is None else int(record.goal_mode),
                 record.agent_id,

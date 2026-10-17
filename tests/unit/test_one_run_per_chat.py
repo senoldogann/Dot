@@ -9,7 +9,7 @@ import pytest
 
 from dotagent.core.errors import RunConflict
 from dotagent.store.db import Store
-from dotagent.store.models import QueuedMessage, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, QueuedMessage, RunRecord, ThreadRecord
 
 ACTIVE: str = "a run is already active on this thread"
 
@@ -60,7 +60,7 @@ async def test_a_chat_whose_queued_message_another_process_starts_takes_that_run
     try:
         thread: ThreadRecord = await daemon.create_thread("t", "test")
         message: QueuedMessage = await daemon.add_queued(
-            thread.id, "next", [], "task", None, None, "standard", None, None, None, None, "test"
+            thread.id, "next", [], "task", None, None, "standard", None, NO_PICKS, None, None, None, "test"
         )
         assert await daemon.claim_queued(thread.id, "owner-a") == message
         with pytest.raises(RunConflict, match=ACTIVE):
