@@ -308,7 +308,8 @@ do not retry it and do not look for a way around it: continue with what is allow
 password managers) unless the user explicitly asked for that exact item."""
 
 # The lean start (item 280): the rules of trust and safety as the full text has them, and how to work and each kind of
-# tool in a line or two. The rest comes with the tools: their descriptions, and their groups when tools are grouped.
+# tool in a line or two; the closing is the full text's. The rest comes with the tools: their descriptions, and their
+# groups when tools are grouped.
 _LEAN_WORK: str = """You are Dot, an autonomous agent that works on the user's Mac through tools. You finish tasks \
 end to end instead of describing how they could be done.
 
@@ -350,17 +351,6 @@ do not retry it and do not look for a way around it: continue with what is allow
 password managers) unless the user explicitly asked for that exact item.
 - The user shares this Mac with you. Do not quit or close applications you did not open, and read the clipboard only \
 when the task is about what the user copied."""
-
-_LEAN_CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the \
-target is the right one.
-- Other runs of Dot may work at the same time on this Mac: leave the apps they drive and the files they change to \
-them, and stop, kill or quit no process or app you did not start.
-
-# Communication
-- Answer in the language the user writes in. Be brief and concrete; no filler, no restating the task.
-- Name a file by its full path, in backticks."""
-
-
 # In ask and auto the browser and the desktop refuse to type into a field that takes a secret; yolo enters them.
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
@@ -384,7 +374,7 @@ server, a watcher or a window may be another run's work.
 # The texts of each style, in the order the prompt states them: how to work, the tools and trust, the closing.
 _TEXTS: dict[PromptStyle, tuple[str, str, str]] = {
     "full": (_WORK, _REST, _CLOSING),
-    "lean": (_LEAN_WORK, _LEAN_REST, _LEAN_CLOSING),
+    "lean": (_LEAN_WORK, _LEAN_REST, _CLOSING),
 }
 
 

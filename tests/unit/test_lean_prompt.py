@@ -21,7 +21,8 @@ _RULES: tuple[str, ...] = (
     "Do not read secret stores (Keychain, ~/.ssh, password managers) unless the user explicitly asked",
     "Do not quit or close applications you did not open",
     "read the clipboard only when the task is about what the user copied",
-    "leave the apps they drive and the files they change to them",
+    "in other chats; a note names them and what they hold",
+    "Leave the apps they drive and the files they change to them",
     "stop, kill or quit no process or app you did not start",
     "Prefer reversible actions. Before deleting, overwriting or sending something, make sure the target is the "
     "right one.",

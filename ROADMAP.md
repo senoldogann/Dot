@@ -12404,7 +12404,7 @@ opens, one removed, nothing wider than the phone).
 **Status: in progress.** The owner's word of 2026-10-18: write it and run the evals on the main model, OpenRouter's
 DeepSeek V4.1 Flash. **As built (2026-10-18).** `[agent] prompt` (`full` or `lean`) chooses the system prompt's style:
 `lean` keeps the rules of trust and safety, of hesitating (item 327) and of how a run ends as `full` has them and says
-how to work and each kind of tool in a line or two (6,373 characters for a plain task, 5,944 when the evals ran, where
+how to work and each kind of tool in a line or two (6,486 characters for a plain task, 5,944 when the evals ran, where
 `full` has 14,516). Eval reports keep the style. The evals' 41 tasks, twice each, with the owner's config in throw-away
 homes and the keys passed to each run only; the first ran on the code before the change, whose full prompt was the same
 byte for byte when the evals ran, and the runs overlapped, so the seconds were taken under unequal load. They cost about
@@ -12420,12 +12420,13 @@ Fewer words and tools took 31 to 44 % fewer tokens a pass (the lean prompt alone
 passed a little less and claimed a little more often to be done when they were not; filter-headlines failed in every
 row, and without it the passes are 80, 79 and 78 of 80 and the false claims 0, 1 and 1. The difference is small for 82
 attempts, but it does not show that the lean start does as well, so both defaults stay `full` and `lean` is there for
-whoever weighs the tokens more. After the evals, the review restored two rules the lean text had dropped, hesitating and
-not saving what a page asks to be remembered (about 1 % of a step's input), and both texts now say that a schedule's run
-goes on in the chat that made it (item 291), where the full text said a new thread. The evals could not judge the
-shortened words on plans, the desktop and memory: no attempt kept a plan, and they run without the desktop or
-embeddings. Tests: `tests/unit/test_lean_prompt.py` (every rule kept, under half the length), the callers of the
-prompt's inputs, `dotx eval check`. Docs: `docs/runs.md`. The reports are in the owner's `reports/evals-280/`.
+whoever weighs the tokens more. After the evals, the reviews restored two rules the lean text had dropped, hesitating
+and not saving what a page asks to be remembered, and gave it the full text's closing, which names the note on the other
+runs at work (about 2 % of a step's input), and both texts now say that a schedule's run goes on in the chat that made
+it (item 291), where the full text said a new thread. The evals could not judge the shortened words on plans, the
+desktop and memory: no attempt kept a plan, and they run without the desktop or embeddings. Tests:
+`tests/unit/test_lean_prompt.py` (every rule kept, under half the length), the callers of the prompt's inputs, `dotx
+eval check`. Docs: `docs/runs.md`. The reports are in the owner's `reports/evals-280/`.
 
 **What.** A run starts with a short system prompt and the core tools; the other groups of tools are named in a line and
 come when the run asks for them (`use_tools`), as `tool_surface = "grouped"` does. Evals of both ways on the same tasks
