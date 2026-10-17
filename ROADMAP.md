@@ -5276,8 +5276,9 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 343 | Computer use checks only what it needs, and "Google Chrome" is the Chrome Dot works in | done        | 1bf81a1 |
 | 344 | Settings › Browser opens Dot's own Chrome to sign in to sites                          | done        | 1bf81a1 |
 | 345 | A chat that goes on at another of its runs keeps its way back                          | done        | aa6093b |
-| 346 | A chat may leave out the lines of what ran without asking                              | in progress |         |
-| 347 | On a phone the text can be as small as 12 px                                           | in progress |         |
+| 346 | A chat may leave out the lines of what ran without asking                              | done        | a2f619b |
+| 347 | On a phone the text can be as small as 12 px                                           | done        | a2f619b |
+| 348 | Dot can be published to PyPI as dotagent-macos, by a tag                               | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13932,7 +13933,7 @@ Activity on a WebKit iPhone and goes back to Activity (fails on `main`: "Show si
 
 ### 346. A chat may leave out the lines of what ran without asking
 
-**Status: in progress.** The owner's word of 2026-10-17: "Yolo modda streaming sırasında çıkan YOLO, not asked: click
+**Status: done (`a2f619b`).** The owner's word of 2026-10-17: "Yolo modda streaming sırasında çıkan YOLO, not asked: click
 f10e2420 'Yanıtla' — untrusted content is in context and this action reaches outside the Mac bu gibi uyarıları kapatıp
 açabilelim" (in yolo mode, lines such as "YOLO, not asked: …" that come during streaming: let us turn them off and on).
 **As built (2026-10-17).** Settings › General has a Chat card with "Show what ran without asking" (on by default, kept
@@ -13944,12 +13945,26 @@ back, wide and light, on a phone and dark).
 
 ### 347. On a phone the text can be as small as 12 px
 
-**Status: in progress.** The owner's word of 2026-10-17: "mobil tarafta font-size küçültebilmeyi daha fazla yapabilir
+**Status: done (`a2f619b`).** The owner's word of 2026-10-17: "mobil tarafta font-size küçültebilmeyi daha fazla yapabilir
 miyiz?" (on mobile, can the font size go smaller). **As built (2026-10-17).** Settings › Appearance › Text size on a
 phone runs from 12 px (14 before) to 20 px, the body's own 16 px; the seven sizes still scale together, the smallest
 under 10 px at 12. A field does not make the page zoom: an iPhone's and an iPad's viewport do not zoom into a field
 (item 311), and other touch screens keep a field at 16 px (item 275). Test: `test_phone_text.py` (the slider's ends,
 and at 12 px the answer, a row of the sidebar and a label of the settings shrink by 12/16 together).
+
+### 348. Dot can be published to PyPI as dotagent-macos, by a tag
+
+**Status: in progress, for the owner (it touches `.github/workflows/`).** The owner's word of 2026-10-17: "PyPI olayı
+ne, kayıt oldum ama ne yapacağız?" (what about PyPI: I signed up, what do we do), after approving publication on
+2026-10-17 ("Paket PyPI'ye yayımlansın mı?", approved). **As built (2026-10-17).** `dotagent` and `dotx` are taken on PyPI (its JSON API answered 200;
+`dotagent-macos` 404); the distribution is `dotagent-macos`, the package it installs stays `dotagent`
+(`[tool.uv.build-backend] module-name`) and the command `dotx`. `.github/workflows/release.yml` builds on a tag `v*`
+whose version is `pyproject.toml`'s and uploads with `uv publish` through trusted publishing (`id-token: write`,
+environment `pypi`), so no token is kept. Checked: `uv build` with uv 0.13 makes the sdist and the wheel (the local uv
+0.10.9 could not unpack the sdist uv_build 0.13 writes; CI installs a current uv), the wheel holds the web UI, Dot.app's
+source, the defaults, the built-in skills and the evals, and `uv tool run --from <wheel> dotx --help` runs. Docs:
+`docs/development.md` › Releasing to PyPI, with the values of PyPI's pending publisher. The first upload waits for the
+owner: the pending publisher on pypi.org is theirs to add, and the first upload claims the name.
 
 ## Log
 
