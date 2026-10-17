@@ -2,8 +2,9 @@
 raised), the default model, ``[models] main`` (item 199), a model of Dot's own work, ``[models] fast``, ``review`` or
 ``vision`` (item 232), whether the daemon resumes on its own the runs it cut off, ``[agent] resume`` (item 231), or the
 context size of a model, a key of ``[models.context]`` (item 250), whether the typed judge answers, ``[judge] provider``
-(item 255), or whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), so the comments and
-the other settings stay as written."""
+(item 255), whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), or the names the
+daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), so the comments
+and the other settings stay as written."""
 
 import os
 import re
@@ -83,7 +84,9 @@ def _key_line(key: str) -> re.Pattern[str]:
 
 
 def _key_value(key: str) -> re.Pattern[str]:
-    return re.compile(rf"""^(\s*{_key_pattern(key)}\s*=\s*)("[^"]*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*)(.*)$""")
+    return re.compile(
+        rf"""^(\s*{_key_pattern(key)}\s*=\s*)("[^"]*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*|\[[^\]]*\])(.*)$"""
+    )
 
 
 def _replaced_line(line: str, key: str, setting: str) -> str:

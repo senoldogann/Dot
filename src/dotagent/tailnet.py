@@ -11,11 +11,8 @@ from pathlib import Path
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from dotagent.core.errors import PhoneSetupError
-from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
-
-log = get_logger(__name__)
 
 # The command line Tailscale's app for the Mac carries, when no tailscale is on the PATH.
 _APP_CLI: Path = Path("/Applications/Tailscale.app/Contents/MacOS/Tailscale")
@@ -30,7 +27,8 @@ class TailnetState(FrozenModel):
     """How a phone reaches Dot: ``installed``, Tailscale is on this Mac; ``running``, it runs signed in; ``name``, the
     Mac's name on the tailnet (``None`` while it is not known); ``served``, ``tailscale serve`` presents this daemon's
     port at ``https://<name>/``; ``reached``, the running daemon serves requests for that name (``[server] reach``);
-    ``written``, the config file names it, which a daemon takes up at its start."""
+    ``written``, the config file names it, which a daemon takes up at its start; ``problem``, what Tailscale said when
+    it could not be asked (its app closed, a call that failed or took too long), ``None`` when it answered."""
 
     installed: bool
     running: bool
@@ -38,6 +36,7 @@ class TailnetState(FrozenModel):
     served: bool
     reached: bool
     written: bool
+    problem: str | None
 
 
 class _Peer(BaseModel):
@@ -68,14 +67,13 @@ class _Serve(BaseModel):
 
 def tailscale_program() -> str | None:
     """Tailscale's command line on this Mac: the one ``DOT_TAILSCALE`` names, so that tests point at their own and never
-    reach the owner's; else the one on the PATH, else the app's own; ``None`` when there is none."""
+    reach the owner's; else the app's own, else the one on the PATH (Homebrew's); ``None`` when there is none."""
     override: str | None = os.environ.get("DOT_TAILSCALE")
     if override is not None and override != "":
         return override if Path(override).is_file() else None
-    found: str | None = shutil.which("tailscale")
-    if found is not None:
-        return found
-    return str(_APP_CLI) if _APP_CLI.is_file() else None
+    if _APP_CLI.is_file():
+        return str(_APP_CLI)
+    return shutil.which("tailscale")
 
 
 def running_name(status: str) -> tuple[bool, str | None]:
@@ -103,29 +101,50 @@ def serves(serve_status: str, name: str, port: int) -> bool:
     return handler is not None and handler.Proxy in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
 
 
+def _with_said(message: str, *printed: bytes) -> str:
+    """``message`` with the first line Tailscale printed, its error output first, which says what it wants."""
+    for text in printed:
+        for line in text.decode("utf-8", errors="replace").splitlines():
+            if line.strip():
+                return f"{message}: {truncate_middle(line.strip(), _ERROR_CHARS)}"
+    return message
+
+
 async def _tailscale(program: str, arguments: tuple[str, ...], timeout_s: float) -> str:
-    """What ``tailscale <arguments>`` prints; :class:`PhoneSetupError` with what it said when it fails or takes too
-    long, its process ended either way."""
-    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-        program,
-        *arguments,
-        stdin=asyncio.subprocess.DEVNULL,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    """What ``tailscale <arguments>`` prints; :class:`PhoneSetupError`, with the first line it printed, when it cannot
+    start, fails or takes too long, its process ended either way."""
     try:
-        out, err = await asyncio.wait_for(process.communicate(), timeout_s)
-    except TimeoutError as error:
+        process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            program,
+            *arguments,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except OSError as error:
         raise PhoneSetupError(
-            "Tailscale did not answer in time", {"arguments": list(arguments), "timeout_s": timeout_s}
+            f"Tailscale's command line could not be started: {error.strerror or error}",
+            {"program": program, "arguments": list(arguments)},
+        ) from error
+    reading: asyncio.Task[tuple[bytes, bytes]] = asyncio.create_task(process.communicate())
+    try:
+        out, err = await asyncio.wait_for(asyncio.shield(reading), timeout_s)
+    except TimeoutError as error:
+        process.kill()
+        # What it printed before it was ended, which may say what it was waiting for.
+        out, err = await reading
+        raise PhoneSetupError(
+            _with_said(f"Tailscale did not answer in {timeout_s:g} s", err, out),
+            {"arguments": list(arguments), "timeout_s": timeout_s},
         ) from error
     finally:
         if process.returncode is None:
             process.kill()
             await process.wait()
+        reading.cancel()
     if process.returncode != 0:
         raise PhoneSetupError(
-            "Tailscale refused",
+            _with_said("Tailscale refused", err, out),
             {
                 "arguments": list(arguments),
                 "returncode": process.returncode,
@@ -140,26 +159,38 @@ async def tailnet_state(port: int, reach: tuple[str, ...], written: tuple[str, .
     the config file's."""
     program: str | None = tailscale_program()
     if program is None:
-        return TailnetState(installed=False, running=False, name=None, served=False, reached=False, written=False)
+        return TailnetState(
+            installed=False, running=False, name=None, served=False, reached=False, written=False, problem=None
+        )
     try:
-        status: str = await _tailscale(program, ("status", "--json"), _STATUS_TIMEOUT_S)
+        running, name = running_name(await _tailscale(program, ("status", "--json"), _STATUS_TIMEOUT_S))
     except PhoneSetupError as error:
-        # Tailscale's command line reaches no Tailscale while its app is not open: Tailscale is not running.
-        log.warning("tailnet_status_failed", error=error.message, context=error.context)
-        return TailnetState(installed=True, running=False, name=None, served=False, reached=False, written=False)
-    running, name = running_name(status)
+        # Its command line reaches no Tailscale while the app is not open: Tailscale is not running, and says why.
+        return TailnetState(
+            installed=True, running=False, name=None, served=False, reached=False, written=False, problem=error.message
+        )
     if not running or name is None:
-        return TailnetState(installed=True, running=running, name=name, served=False, reached=False, written=False)
-    served: bool = serves(await _tailscale(program, ("serve", "status", "--json"), _STATUS_TIMEOUT_S), name, port)
-    known: set[str] = {host.lower() for host in reach}
+        return TailnetState(
+            installed=True, running=running, name=name, served=False, reached=False, written=False, problem=None
+        )
+    served, problem = await _served(program, name, port)
     return TailnetState(
         installed=True,
         running=True,
         name=name,
         served=served,
-        reached=name.lower() in known,
+        reached=name.lower() in {host.lower() for host in reach},
         written=name.lower() in {host.lower() for host in written},
+        problem=problem,
     )
+
+
+async def _served(program: str, name: str, port: int) -> tuple[bool, str | None]:
+    """Whether Tailscale serves the daemon's ``port`` at ``https://<name>/``, and what it said if it could not tell."""
+    try:
+        return serves(await _tailscale(program, ("serve", "status", "--json"), _STATUS_TIMEOUT_S), name, port), None
+    except PhoneSetupError as error:
+        return False, error.message
 
 
 async def serve_daemon(port: int) -> None:

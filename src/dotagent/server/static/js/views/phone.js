@@ -34,14 +34,15 @@ function addressRow(address) {
 }
 
 // What a phone needs to reach Dot away from home through Tailscale (item 271), a line each: whether it holds, and what
-// to do when it does not.
+// to do when it does not; then what Tailscale said when it could not be asked.
 function tailnetLines(tailnet) {
   const line = (ok, text) => el("li", { class: ok ? "tailnet-ok" : "tailnet-missing" }, icon(ok ? "check" : "alert"), el("span", null, text));
+  const said = tailnet.problem === null ? [] : [line(false, tailnet.problem)];
   if (!tailnet.installed) {
     return [line(false, "Tailscale is not on this Mac: install it from tailscale.com, open it and sign in, on the phone too.")];
   }
   if (!tailnet.running || tailnet.name === null) {
-    return [line(false, "Tailscale is not running signed in: open it on this Mac and sign in.")];
+    return [line(false, "Tailscale is not running signed in: open it on this Mac and sign in."), ...said];
   }
   return [
     line(true, `Tailscale runs: this Mac is ${tailnet.name} on your tailnet.`),
@@ -51,15 +52,16 @@ function tailnetLines(tailnet) {
       tailnet.reached
         ? "Dot answers to that name."
         : tailnet.written
-          ? "Dot's config file names it: Dot answers to it from its next start (quit Dot and open it again)."
+          ? "Dot's config file names it: Dot answers to it from the daemon's next start (dotx service install restarts it)."
           : "Dot's config file does not name it yet.",
     ),
+    ...said,
   ];
 }
 
 export function mount(root, ctx) {
   let disposed = false;
-  const holder = el("div", null, loadingPanel());
+  const holder = el("div", { class: "stack" }, loadingPanel());
   const code = el("output", { class: "pair-code mono", "aria-label": "Pairing code", hidden: true });
   const codeHint = el("p", { class: "hint", hidden: true });
   const pairButton = el("button", { class: "btn primary", type: "button", onclick: () => attempt(pair) }, icon("smartphone"), "Pair a phone");
@@ -86,7 +88,20 @@ export function mount(root, ctx) {
     const missing = tailnet.installed && tailnet.running && tailnet.name !== null && (!tailnet.served || !tailnet.written);
     const setUp = el(
       "button",
-      { class: "btn sm", type: "button", hidden: !missing, onclick: () => attempt(() => change(api.post("/phone/tailnet", {}), "Set up for your tailnet.")) },
+      {
+        class: "btn sm",
+        type: "button",
+        hidden: !missing,
+        onclick: () =>
+          attempt(async () => {
+            setUp.disabled = true;
+            try {
+              await change(api.post("/phone/tailnet", {}), "Set up for your tailnet.");
+            } finally {
+              setUp.disabled = false;
+            }
+          }),
+      },
       icon("plug"),
       el("span", { class: "label" }, "Set up"),
     );
@@ -136,7 +151,7 @@ export function mount(root, ctx) {
             el(
               "span",
               null,
-              "No address yet: Set up, above, serves Dot on your tailnet and names the Mac in Dot's config file; then quit Dot and open it again. ",
+              "No address yet: Set up, above, serves Dot on your tailnet and names the Mac in Dot's config file; then restart the daemon with dotx service install. ",
               el("span", { class: "faint" }, "In the config file: [server] reach."),
             ),
           );

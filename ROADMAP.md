@@ -12005,18 +12005,22 @@ a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; b
 ### 271. Settings › Phone sets up Tailscale and keeps the Mac awake
 
 **Status: in progress.** The owner chose it on 2026-10-17 for this round, with 268, 280 and 281. **As built
-(2026-10-17).** `tailnet.py` reads Tailscale's command line (`tailscale status --json`, `tailscale serve status --json`,
-its JSON validated) and `awake.py` holds `caffeinate -s -w <daemon pid>`. Settings › Phone › Reach Dot from anywhere
-says whether Tailscale runs signed in and the Mac's name, whether it serves this daemon's port at `https://<name>/`, and
-whether Dot answers to the name, the config file naming it already when the daemon has not taken it up; **Set up** runs
-`tailscale serve --bg <port>` and writes the name into `[server] reach` (`config_edit` writes a list now), and says that
-the daemon answers to it from its next start: taking a name up without a restart would change the guard
-(`server/guard.py`), which is left as it is. **Keep this Mac awake while it charges** (`[server] keep_awake`) starts and
-stops the hold at once and with the daemon. Left out: the QR code of the signed-in address, which would put the token on
-the screen; the pairing code signs a phone in. Tests: `tests/unit/test_tailnet.py`, `tests/smoke/test_phone_reach.py`
-(a stand-in `tailscale` that `DOT_TAILSCALE` names, every other smoke test naming one that does not exist, and a
-stand-in `caffeinate` first on the PATH: the state, Set up once and twice, the switch on and off, a Mac without
-Tailscale, a Tailscale whose app is closed; the card wide and on a phone). Docs: `docs/phone.md`.
+(2026-10-17).** `tailnet.py` reads Tailscale's command line, the app's own before one on the PATH (`tailscale status
+--json`, `tailscale serve status --json`, its JSON validated), and `awake.py` holds macOS's `/usr/bin/caffeinate -s -w
+<daemon pid>`. Settings › Phone › Reach Dot from anywhere says whether Tailscale runs signed in and the Mac's name,
+whether it serves this daemon's port at `https://<name>/`, whether Dot answers to the name, the config file naming it
+already when the daemon has not taken it up, and what Tailscale said when it could not be asked (its app closed, a call
+that failed); **Set up** runs `tailscale serve --bg <port>` and writes the name into `[server] reach` (`config_edit`
+writes a list now), one press at a time, and says that the daemon answers to it from its next start (`dotx service
+install`): taking a name up without a restart would change the guard (`server/guard.py`), which is left as it is. **Keep
+this Mac awake while it charges** (`[server] keep_awake`) starts and stops the hold at once and with the daemon, and a
+config file that cannot be changed leaves it as it was. The tailnet name is never logged. Left out: the QR code of the
+signed-in address, which would put the token on the screen; the pairing code signs a phone in. Tests:
+`tests/unit/test_tailnet.py`, `test_config_edit.py`, `tests/smoke/test_phone_reach.py` (a stand-in `tailscale` and
+`caffeinate` that `DOT_TAILSCALE` and `DOT_CAFFEINATE` name, every other smoke test naming ones that do not exist: the
+state, Set up pressed twice at once and again, the switch on and off, a config file that cannot be changed, a Mac
+without Tailscale, a Tailscale whose app is closed or whose answer cannot be read; the card wide in Chrome and on a
+phone in WebKit, light and dark). Docs: `docs/phone.md`, `docs/daemon.md`.
 
 **What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
 `[server] reach` names it, sets up what is missing with one button (reach taken up without a restart), shows the

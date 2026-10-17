@@ -9,7 +9,7 @@ from fastapi import APIRouter
 
 from dotagent.config import load_user_config
 from dotagent.config_edit import set_setting
-from dotagent.core.errors import PairingRefused, PhoneSetupError
+from dotagent.core.errors import ConfigError, PairingRefused, PhoneSetupError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path
 from dotagent.server.context import ServerContext
@@ -24,6 +24,9 @@ def phone_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     # The code that is good now; one at a time, held only in memory.
     current: PairingCode | None = None
+    # One set-up and one switch at a time: a second press waits for the first and finds what it did.
+    setting_up: asyncio.Lock = asyncio.Lock()
+    switching: asyncio.Lock = asyncio.Lock()
 
     async def written_reach() -> tuple[str, ...]:
         """``[server] reach`` as the config file has it now, which the daemon takes up at its next start."""
@@ -44,31 +47,37 @@ def phone_router(ctx: ServerContext) -> APIRouter:
     @router.post("/phone/tailnet")
     async def set_up_tailnet() -> PhoneView:
         """Set up what a phone needs to reach Dot through Tailscale (item 271): ``tailscale serve`` for this daemon's
-        port, and the Mac's name in ``[server] reach``, which the daemon takes up at its next start."""
-        state: TailnetState = (await view()).tailnet
-        if not state.installed:
-            raise PhoneSetupError(
-                "Tailscale is not on this Mac: install it from tailscale.com, open it and sign in", {}
-            )
-        if not state.running or state.name is None:
-            raise PhoneSetupError("Tailscale is not running signed in: open it on this Mac and sign in", {})
-        if not state.served:
-            await serve_daemon(ctx.port)
-            log.info("phone_tailnet_served", name=state.name, port=ctx.port)
-        if not state.written:
-            reach: list[str] = [*await written_reach(), state.name]
-            await asyncio.to_thread(set_setting, config_path(), "server", "reach", reach)
-            log.info("phone_tailnet_reach_written", name=state.name)
-        return await view()
+        port, and the Mac's name in ``[server] reach``, which the daemon takes up at its next start. The name is never
+        logged."""
+        async with setting_up:
+            state: TailnetState = (await view()).tailnet
+            if not state.installed:
+                raise PhoneSetupError(
+                    "Tailscale is not on this Mac: install it from tailscale.com, open it and sign in", {}
+                )
+            if not state.running or state.name is None:
+                raise PhoneSetupError("Tailscale is not running signed in: open it on this Mac and sign in", {})
+            if not state.served:
+                await serve_daemon(ctx.port)
+                log.info("phone_tailnet_served", port=ctx.port)
+            if not state.written:
+                reach: list[str] = [*await written_reach(), state.name]
+                await asyncio.to_thread(set_setting, config_path(), "server", "reach", reach)
+                log.info("phone_tailnet_reach_written")
+            return await view()
 
     @router.post("/phone/awake")
     async def keep_awake(request: AwakeRequest) -> PhoneView:
-        """Whether the daemon keeps the Mac awake while it charges (item 271): at once, and kept in the config file."""
-        if request.on:
-            await ctx.runtime.awake.start()
-        else:
-            await ctx.runtime.awake.stop()
-        await asyncio.to_thread(set_setting, config_path(), "server", "keep_awake", request.on)
+        """Whether the daemon keeps the Mac awake while it charges (item 271): at once, and kept in the config file; a
+        config file that cannot be changed leaves it as it was."""
+        async with switching:
+            before: bool = ctx.runtime.awake.on
+            await ctx.runtime.awake.switch(request.on)
+            try:
+                await asyncio.to_thread(set_setting, config_path(), "server", "keep_awake", request.on)
+            except (ConfigError, OSError):
+                await ctx.runtime.awake.switch(before)
+                raise
         return await view()
 
     @router.post("/phone/pairing")

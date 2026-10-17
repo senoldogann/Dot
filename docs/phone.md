@@ -10,11 +10,12 @@ needs to reach the Mac, and a push needs a secure address, so the way there is y
 Settings › Phone › **Reach Dot from anywhere** (item 271) says, a line each, whether Tailscale runs on the Mac signed in
 and under which name, whether it serves Dot to the tailnet over HTTPS, and whether Dot answers to that name; **Set up**
 does what is missing of the first two steps below (`tailscale serve --bg <port>`, and the name written into `[server]
-reach`), and the daemon answers to the name from its next start (`GET /api/phone` reads the state, `POST
-/api/phone/tailnet` sets it up, 422 with why when Tailscale is missing or not signed in). Its switch **Keep this Mac
-awake while it charges** (`[server] keep_awake`, `POST /api/phone/awake`) has the daemon hold macOS's `caffeinate -s`,
-which keeps the Mac from sleeping on power while the daemon runs; a closed lid still puts a MacBook to sleep. The same
-by hand:
+reach`), and the daemon answers to the name from its next start, which `dotx service install` makes (`GET /api/phone`
+reads the state, `POST /api/phone/tailnet` sets it up, 422 with why when Tailscale is missing or not signed in). When
+Tailscale cannot be asked, its app closed or a call that failed, the card says what it said. Its switch **Keep this Mac
+awake while it charges** (`[server] keep_awake`, `POST /api/phone/awake`) has the daemon hold macOS's
+`/usr/bin/caffeinate -s`, which keeps the Mac from sleeping on power while the daemon runs; a closed lid still puts a
+MacBook to sleep. The same by hand:
 
 1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
    presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.
