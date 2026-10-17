@@ -12,6 +12,8 @@ this Mac.
 
 Each is done five times; the medians (milliseconds) are printed as JSON, and written to the file DOT_SPEED_OUT names when
 it is set. The test checks that each call did its work, never how fast: the numbers are for the record of a change.
+With DOT_SPEED_VISIBLE=1 the scratch Chrome is on screen, as the owner's is: a tab made behind the active one is then
+hidden and throttled, which no tab of a hidden Chrome is; the app in front gets the front back once Chrome started.
 """
 
 import asyncio
@@ -27,9 +29,11 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 from test_browser import ref_of
-from test_browser_attach import SERVER, ScratchChrome, start_chrome, stop_chrome
+from test_browser_attach import SERVER, ScratchChrome, start_chrome, stop_chrome, wait_for_port
 
 from dotagent.agent.manager import RunManager
+from dotagent.browser.keychain import KeychainMode, read_keychain_mode
+from dotagent.browser.login import chrome_arguments
 from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
 from dotagent.browser.types import ActOutcome, PageView, Step, TextWait
@@ -56,6 +60,7 @@ _FORM: str = """<!doctype html><html><head><title>Form</title></head><body>
 <a href="/second">Second page</a>
 <ul>{items}</ul>
 </body></html>"""
+_FRONT_APP: str = 'tell application "System Events" to get name of first application process whose frontmost is true'
 _SECOND: str = "<!doctype html><title>Second</title><h1>Second page</h1><a href='/form'>Back to the form</a>"
 # Drawn two frames after it loads, as an app draws its first view: a tab Chrome draws no frames for never shows it.
 _APP: str = """<!doctype html><title>App</title><div id="root">Starting</div>
@@ -98,9 +103,36 @@ def data_dir(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return tmp_path_factory.mktemp("chrome")
 
 
+async def _osascript(script: str) -> str:
+    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        "/usr/bin/osascript", "-e", script, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL
+    )
+    out, _ = await process.communicate()
+    return out.decode().strip()
+
+
+async def start_visible_chrome(data_dir: Path, url: str) -> ScratchChrome:
+    """A scratch Chrome on screen with one tab on ``url``; the app in front gets the front back once it answers."""
+    before: str = await _osascript(_FRONT_APP)
+    keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, data_dir)
+    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        *chrome_arguments(data_dir, url, keychain),
+        "--remote-debugging-port=0",
+        "--window-position=40,40",
+        "--window-size=1280,800",
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+    )
+    port: int = await wait_for_port(data_dir)
+    if before:
+        await _osascript(f'tell application "{before}" to activate')
+    return ScratchChrome(data_dir=data_dir, port=port, process=process)
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def chrome(data_dir: Path, site: str) -> AsyncIterator[ScratchChrome]:
-    running: ScratchChrome = await start_chrome(data_dir, f"{site}/second")
+    visible: bool = os.environ.get("DOT_SPEED_VISIBLE") == "1"
+    running: ScratchChrome = await (start_visible_chrome if visible else start_chrome)(data_dir, f"{site}/second")
     try:
         yield running
     finally:
