@@ -291,6 +291,13 @@ class AttachmentUpload(FrozenModel):
     data_b64: str = Field(min_length=1, max_length=_UPLOAD_B64_CHARS)
 
 
+class LoopRequest(FrozenModel):
+    """A loop of a chat (item 281): ``text`` asked again on the rhythm ``every`` (``30m``, ``2h``)."""
+
+    every: str = Field(min_length=2, max_length=8)
+    text: str = Field(min_length=1, max_length=_TEXT_CHARS)
+
+
 class AsideRequest(FrozenModel):
     """A side question to a run (``/btw``)."""
 

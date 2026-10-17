@@ -4785,15 +4785,18 @@ a.memory-line:hover .memory-change {
 
 /* A dock with nothing to type in (a delegated run's, item 244) holds the run's pill; the commands at work in its chat
    close their sheet above the pill, with no frame to draw over its lower edge. */
-.dock.dock-bare .background-work {
+.dock.dock-bare .background-work,
+.dock.dock-bare .chat-loops {
   margin-bottom: var(--space-2);
   padding-bottom: var(--space-1);
   border-radius: var(--radius-lg);
 }
 
 /* The commands at work in a chat (item 229), after T3 Code's line of background work: a sheet as the queue's, right
-   above the composer and under the queue; the frame is drawn over its lower edge, and it over the queue's. */
-.background-work {
+   above the composer and under the queue; the frame is drawn over its lower edge, and it over the queue's. The loops
+   of the chat (item 281) are the same sheet, above the commands. */
+.background-work,
+.chat-loops {
   position: relative;
   margin: 0 var(--space-4) calc(-1 * var(--radius-composer));
   padding: var(--space-1) var(--space-1) calc(var(--radius-composer) + var(--space-1));
@@ -4802,11 +4805,14 @@ a.memory-line:hover .memory-change {
   background: var(--surface-2);
 }
 
-.queue + .background-work {
+.queue + .background-work,
+.queue + .chat-loops,
+.chat-loops + .background-work {
   z-index: 1;
 }
 
-.background-work + .composer {
+.background-work + .composer,
+.chat-loops ~ .composer {
   position: relative;
   z-index: 2;
 }
@@ -4860,6 +4866,19 @@ a.memory-line:hover .memory-change {
   color: var(--muted);
   font-size: var(--text-xs);
   font-variant-numeric: tabular-nums;
+}
+
+/* A loop's row (item 281): its message keeps room beside how often it asks again and when next, which give way
+   first on a phone. */
+.chat-loops .background-label {
+  min-width: 6em;
+}
+
+.chat-loops .background-time {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* A list that could not be read says why, with a way to read it again. */

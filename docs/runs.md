@@ -175,6 +175,13 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the run has done so far,
   without tools, and the run neither sees the question nor stops for it. Several can be asked at once. The question and
   the answer are `aside_question` and `aside_answer` events, never messages of the conversation.
+- `/loop <rhythm> <message>` in the box of a run (item 281; the slash menu offers it, `/loop 30m check the build`) makes
+  the message a loop of the chat: the message goes at once, and a schedule of the chat (item 291) asks it again every 5,
+  10, 15, 20 or 30 minutes or every 1, 2, 3, 4, 6, 8 or 12 hours, in the chat, as its follow-ups start (its model,
+  reasoning level, speed, approvals and goal mode). Each run of it is told how the loop ends: it deletes its schedule
+  (`schedule_delete`) once the work is done for good. Right above the composer a line shows each loop of the chat, how
+  often it asks again, when next, and a Stop that deletes it. A rhythm a cron expression cannot keep exactly is refused
+  (422).
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB each). A
   text pasted into the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it

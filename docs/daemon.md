@@ -97,42 +97,42 @@ its title, which counts its rows, and the folds are kept in that browser. The li
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
 and `due`. The composer is one frame on a 24 px corner with a soft shadow under it: the goal in a box of one line that
 grows with it, the files attached and the picks under it, then one bar that never wraps: the **+** and the mode (Task,
-Chat or Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent exists
-(its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's default or
-one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser per model)
-and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill always
-shows, see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
-fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no
-ground until the pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the
-agent's name go and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273),
-so on a phone the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen
-for it, at least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller
-one (item 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a
-pick or Escape or a click outside closes it. The model's menu (item 208, after T3 Code's) has a rail on its left, a star
-for the favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the
-models of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model
-a star that keeps it among the favourites in that browser, where the menu opens once there are any. The arrows and Enter
-pick a model, ⌘1 to ⌘9 the rows that show those keys, and ⌘D stars the row the keys are on. The default's row, the first
-of every view, has **Change** (item 209): the list then chooses the model new chats start on, a bar under the search
-says so and the default has the tick, and the model picked (by a click, Enter or ⌘1 to ⌘9) becomes the default, as in
+Chat or Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent
+exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
+default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
+per model) and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill
+always shows, see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
+fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no ground until the
+pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
+and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
+the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
+least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
+311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
+or a click outside closes it. The model's menu (item 208, after T3 Code's) has a rail on its left, a star for the
+favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the models
+of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model a star
+that keeps it among the favourites in that browser, where the menu opens once there are any. The arrows and Enter pick a
+model, ⌘1 to ⌘9 the rows that show those keys, and ⌘D stars the row the keys are on. The default's row, the first of
+every view, has **Change** (item 209): the list then chooses the model new chats start on, a bar under the search says
+so and the default has the tick, and the model picked (by a click, Enter or ⌘1 to ⌘9) becomes the default, as in
 Settings › Models; the menu goes back to the chat's model and stays open. A chat that has a model of its own keeps it,
 and one that follows the default moves with it. Escape or Cancel goes back without a change. What you typed and attached
 and did not send is kept in this browser and is there again when you come back (so is the box of each run). Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
 ⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
-browser (item 230, after T3 Code's settings). The
-markdown in the box shows as it reads (item 207, after T3 Code's composer): its marks (a heading's hashes, a list's
-mark, the stars of bold, the backticks of code, a link's brackets, a table's pipes) quieter than its words, bold words,
-headings and a table's head heavier, code tinted, quotes softer and links in the colour of links; the box is still a
-text field, with its caret, selection, spelling and undo, and what is sent is the text as typed. A message whose answer
-was lost on its way back (the page says the sending failed and keeps the message) is done once when it is sent again,
-here and in the box of a run: the page sends each new message with a key of its own, and the daemon answers the same
-message sent again with what its first sending made. `/` at the start of a word opens the slash menu over the box: the
-commands of the composer (`/task`, `/chat`, `/research` here; `/btw` in the box of a run), the skills by name with their
-description, and each MCP server with its tools, read from the daemon as a run reads them (`GET /api/palette`); letters
-filter, the arrows move, Enter or Tab picks and Escape closes. A skill picked is a chip under the box, a tool the chip of
-its server, as from the **+** (below), and the slash word goes; a command does its work. A run that waits for your
-approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
+browser (item 230, after T3 Code's settings). The markdown in the box shows as it reads (item 207, after T3 Code's
+composer): its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
+table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
+links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
+sent is the text as typed. A message whose answer was lost on its way back (the page says the sending failed and keeps
+the message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a
+key of its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of
+a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` here; `/btw` and
+`/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools, read from
+the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape
+closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the slash
+word goes; a command does its work. A run that waits for your approval shows above the composer, as a card, and moves it
+down only when the cards do not fit there.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens **Add files**, in the box of a run **Save
 skill**, the **Goal mode** switch, on the home for a task of Dot's **Keep going** (item 353), and **Plan first**, then
@@ -512,6 +512,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
+| `POST /runs/{id}/loop` (`{"every": "30m", "text": …}`)                         | a loop of the run's chat (item 281): a schedule of the chat, returned |
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
 | `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |

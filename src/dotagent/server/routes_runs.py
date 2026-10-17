@@ -3,6 +3,7 @@
 import asyncio
 import base64
 import binascii
+import time
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -25,6 +26,8 @@ from dotagent.agent.rewind import (
 )
 from dotagent.core.errors import InvalidValueError
 from dotagent.llm.router import parse_model_ref
+from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
+from dotagent.scheduler.plans import ScheduleRequest, create_schedule
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.activity import current_activity
@@ -40,6 +43,7 @@ from dotagent.server.views import (
     CampaignChip,
     DecisionRequest,
     EventsQuery,
+    LoopRequest,
     RewindRequest,
     RewindView,
     RunActions,
@@ -57,12 +61,15 @@ from dotagent.store.models import (
     AgentRecord,
     ApprovalRecord,
     CampaignRecord,
+    ChatChoices,
     EventRecord,
     RewindCut,
     RunPicks,
     RunRecord,
+    ScheduleRecord,
 )
 from dotagent.store.stats import RunCosts
+from dotagent.tools.schedule import chat_options, schedule_mode
 from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_children, undo_path
 
 # As many events as the Actions panel reads of a run: the acting steps are among them.
@@ -269,6 +276,28 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def ask_aside(run_id: str, request: AsideRequest) -> AsideAnswer:
         """A side question about the run, answered without the run seeing it (see ``agent.aside``)."""
         return await answer_aside(ctx.runtime, run_id, request.text)
+
+    @router.post("/runs/{run_id}/loop", status_code=201)
+    async def start_loop(run_id: str, request: LoopRequest) -> ScheduleRecord:
+        """Make the chat of the run ask ``text`` again on the rhythm ``every`` (item 281): one of the chat's schedules,
+        whose runs go on in it as its follow-ups do and start as they do (item 291). The page sends the message itself
+        as a follow-up at once."""
+        run: RunRecord = await store.get_run(run_id)
+        owner: RunRecord = run if run.parent_run_id is None else await store.get_run(run.parent_run_id)
+        choices: ChatChoices | None = await store.chat_choices(owner.thread_id)
+        rhythm: LoopRhythm = loop_rhythm(request.every)
+        name: str = loop_name(request.text)
+        plan: ScheduleRequest = ScheduleRequest(
+            name=name,
+            goal=loop_goal(request.text, rhythm, name),
+            cron=rhythm.cron,
+            at=None,
+            mode=schedule_mode(None, owner.mode if choices is None else choices.mode),
+            options=chat_options(owner, choices),
+        )
+        return await create_schedule(
+            store, ctx.runtime.config.scheduler, ctx.runtime.schedule_zone, plan, time.time(), owner.thread_id
+        )
 
     @router.post("/runs/{run_id}/resume", status_code=201)
     async def resume_run(run_id: str) -> RunRecord:

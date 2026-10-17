@@ -5219,7 +5219,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | done        | 4f21322 |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | done        | 8aa45dd |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
-| 281 | A chat can be a loop that asks Dot again until it is done                             | planned     |         |
+| 281 | A chat can be a loop that asks Dot again until it is done                             | in progress |         |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | done        | 427c51e |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
 | 284 | OpenCode's agent uses Dot's own tools over MCP                                        | done        | 5655e6f |
@@ -12379,7 +12379,18 @@ parts, `dotx eval check`.
 
 ### 281. A chat can be a loop that asks Dot again until it is done
 
-**Status: planned.**
+**Status: in progress.** The owner chose it on 2026-10-17, with 268, 271 and 280, for this round. **As built
+(2026-10-17).** `/loop <rhythm> <message>` in the box of a run (the slash menu offers it) sends the message at once and
+makes a schedule of the chat (`POST /api/runs/{id}/loop`, `scheduler/loops.py`): a cron expression that keeps the rhythm
+exactly (every 5, 10, 15, 20 or 30 minutes, or every 1, 2, 3, 4, 6, 8 or 12 hours; others are refused), the message as
+its goal with a line that tells each run how the loop ends (it deletes the schedule with `schedule_delete` once the work
+is done for good), and the chat's own choices, as a schedule a run makes in a chat has them (item 291). Right above the
+composer a line lists the chat's loops (`loops.js`, after the commands at work): the message, how often, when next, and
+a Stop that deletes the schedule; it is read again as the chat's runs come and go. A loop that asks again "when the last
+run said to look again" is left out: a run that wants another rhythm deletes its loop and the owner makes another.
+Tests: `tests/unit/test_loops.py` (the rhythms, refused ones, the name and the goal), `tests/smoke/test_chat_loop.py`
+(the schedule of the chat with its choices, a refused rhythm; `/loop` in a chat, wide and on a phone: the line, the
+message sent, Stop). Docs: `docs/runs.md`, `docs/daemon.md`, `docs/memory-and-schedules.md`.
 
 **What.** `/loop` in the composer makes the message a loop of the chat: asked again every so often (`/loop 30m …`) or
 when the last run said to look again, in the same chat, until the owner stops it or a run says it is done. The chat
@@ -14912,3 +14923,4 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 - 2026-10-17 (Opus 5.5): item 355 on the same word, on `item-354-browser-settings` after 354: profiles of Dot's own Chrome (Default, Incognito, added ones; Use, Clear, Delete, Add profile). T3 Code's recordings (frame rate, key and mouse presses) are not built: what they would record is too close to what the session's safety check stopped twice that day, and they were the largest, least needed part.
 
 - 2026-10-17 (Opus 5.5): item 356 on the owner's word of the same day (a second outside report: fix what is real), on `item-356-audit-runtime`: two read-only verifiers checked every claim; the shell guard's findings stay reported for the owner, the six that held elsewhere are fixed, each with a test that fails on the code before.
+- 2026-10-17 (Opus 5.5): item 281 on the owner's choice of the same day, on `item-281-loop`: `/loop 30m <message>` makes a schedule of the chat that asks it again until a run deletes it or the owner stops it, with a line over the composer.
