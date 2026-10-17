@@ -272,8 +272,8 @@ def _revisiting(window: Sequence[Observation], limits: Limits) -> Detection | No
         return Detection(
             pattern="revisiting",
             detail=(
-                f"The last {limits.revisit_window} steps only repeated calls that had been made before, with the same "
-                "results."
+                f"The last {limits.revisit_window} steps only repeated calls that had been made before, with the "
+                "same results."
             ),
         )
     return None

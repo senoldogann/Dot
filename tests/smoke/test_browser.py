@@ -90,8 +90,9 @@ _PAGES: dict[str, str] = {
     "/late-tab": "<!doctype html><title>Late tab</title><h1>Late tab</h1>",
     "/later-tab": "<!doctype html><title>Later tab</title><h1>Later tab</h1>",
     # A popup that does its job and closes at once, the way a sign-in callback does (item 57).
-    "/opener": '<!doctype html><title>Opener</title><a href="/selfclose" target="_blank">Sign '
-    "in</a><button>Stay</button>",
+    "/opener": (
+        '<!doctype html><title>Opener</title><a href="/selfclose" target="_blank">Sign in</a><button>Stay</button>'
+    ),
     "/selfclose": "<!doctype html><title>Callback</title><script>window.close()</script>",
     "/frame": """<!doctype html><title>Frame</title>
 <button onclick="document.getElementById('o').textContent = 'clicked inside frame'">Frame button</button>

@@ -269,8 +269,10 @@ def _claim(claim: str) -> JsonObject:
             "https://x.com/dot_example and read the follower count on the profile."
         ),
         "ledger": (
-            "Progress recorded in the campaign's ledger:\n- 3 days ago: 212 followers\n- yesterday: 431 followers\n- "
-            "2 hours ago: 488 followers"
+            "Progress recorded in the campaign's ledger:\n"
+            "- 3 days ago: 212 followers\n"
+            "- yesterday: 431 followers\n"
+            "- 2 hours ago: 488 followers"
         ),
         "session_facts": render_facts(new_facts(), (), ()),
         "claim": claim,

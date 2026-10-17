@@ -14193,12 +14193,13 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 **Status: in progress.** The owner's word of 2026-10-17: "Tüm bu açık problemleri düzelt" (fix all these open problems).
 Lines over 120 characters came back in the review of nearly every pull request, so the rule that finds them is on: a
 finding that recurs is fixed at its source. **As built (2026-10-17).** The 391 lines over 120 characters in `src` and
-`tests` are wrapped: comments and docstrings reflowed, a long piece of a string cut into pieces that join to the same
-value, the prompt's lines continued with a backslash as it does already, and JavaScript, HTML and SQL inside strings
-broken where their language ignores the break. Every changed file but 14 parses to the same tree as before, docstrings
-compared by their words; the 14 are two SQL queries, the pages' script, two local names in `evals/scoring.py`, and the
-pages and scripts of tests. `pyproject.toml` no longer ignores E501, so `ruff check` holds every line of Python to 120
-characters. Docs: `CONTRIBUTING.md`.
+`tests` are wrapped: comments and docstrings reflowed, a string's pieces regrouped up to the end of a line of its text
+and a value over several lines put in parentheses, the prompt's backslash-continued lines reflowed, and JavaScript, HTML
+and SQL inside strings broken where their language ignores the break. Every changed file but 15 parses to the same tree
+as before, docstrings compared by their words; the 15 are two SQL queries, the pages' script, two local names in
+`evals/scoring.py`, the pages and scripts of tests, and the words of one test's docstring, a stray fragment taken out.
+`pyproject.toml` no longer ignores E501, so `ruff check` holds every line of Python to 120 characters. Docs:
+`CONTRIBUTING.md`.
 
 ## Log
 
