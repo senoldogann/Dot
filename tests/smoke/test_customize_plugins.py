@@ -228,7 +228,10 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 await page.screenshot(path=str(tmp_path / f"plugins-{width}-{scheme}.png"), full_page=True)
                 # The search, and Connected next to All.
                 search: Locator = page.get_by_role("searchbox", name="Search plugins")
-                await search.fill("linked")
+                # Typed a key at a time, the search keeps its focus while the tiles are drawn anew.
+                await search.press_sequentially("linked")
+                await expect(search).to_be_focused()
+                await expect(search).to_have_value("linked")
                 await expect(tiles).to_have_count(1)
                 await expect(_tile(page, "linkedin")).to_be_visible()
                 # The sections the search leaves empty are not drawn, not even as a word.

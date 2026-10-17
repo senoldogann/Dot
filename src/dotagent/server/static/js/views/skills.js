@@ -599,9 +599,26 @@ export function mount(root) {
     );
   }
 
-  /** The skills Dot copied from the Mac's other agents, by name: the agent each came from. */
+  /** The skills Dot copied from the Mac's other agents, by name: the agent each came from, its description (Dot's
+   * copy's, for one its agent no longer has) and whether its agent still has it. */
   function imported() {
-    return new Map(found === null ? [] : found.skills.filter((skill) => skill.added).map((skill) => [skill.name, skill]));
+    if (found === null) {
+      return new Map();
+    }
+    const described = new Map(palette.skills.map((skill) => [skill.name, skill.description]));
+    const kept = found.skills.filter((skill) => skill.added).map((skill) => [skill.name, { ...skill, gone: false }]);
+    const gone = found.gone
+      .filter((item) => item.kind === "skill")
+      .map((item) => [item.name, { ...item, description: described.get(item.name) ?? "", gone: true }]);
+    return new Map([...kept, ...gone]);
+  }
+
+  /** Take an imported skill back, after a yes: through what is found, or as one its agent no longer has. */
+  async function removeImported(skill) {
+    if (!skill.gone) {
+      return changeFound("skill", skill, false);
+    }
+    return askAndChange(goneDialog(skill), { kind: "skill", agent: skill.agent, name: skill.name, added: false }, `Removed ${skill.name}.`);
   }
 
   function personal() {
@@ -614,8 +631,9 @@ export function mount(root) {
       .filter((skill) => matches(skill.name, skill.description))
       .map((skill) => {
         const remove = el("button", { class: "btn ghost sm", type: "button" }, "Remove");
-        remove.addEventListener("click", () => attempt(async () => foundChanged(await changeFound("skill", skill, false))));
-        return skillCard({ name: skill.name, description: skill.description, mark: "download", facts: factsOf([], [`Imported from ${skill.agent}`]), actions: [remove], have: "Installed" });
+        remove.addEventListener("click", () => attempt(async () => foundChanged(await removeImported(skill))));
+        const from = skill.gone ? `Imported from ${skill.agent}, which no longer has it` : `Imported from ${skill.agent}`;
+        return skillCard({ name: skill.name, description: skill.description, mark: "download", facts: factsOf([], [from]), actions: [remove], have: "Installed" });
       });
     const named = withAgentNames(items, agents).filter((skill) => matches(skill.name, skill.description));
     const learnedCards = named.map((skill) => learnedCard(skill, changed));
@@ -665,7 +683,7 @@ export function mount(root) {
     personalButton.textContent = `Personal ${personalCount}`;
     systemButton.textContent = `System ${systemCount}`;
     const parts = shown === "personal" ? personal() : system();
-    holder.replaceChildren(el("div", { class: "plugin-bar" }, search, tabs.element, saveButton, importButton), ...parts.filter((part) => part !== null));
+    holder.replaceChildren(...parts.filter((part) => part !== null));
   }
 
   function foundChanged(after) {
@@ -731,7 +749,8 @@ export function mount(root) {
     }
   }
 
-  root.append(holder);
+  // Out of what paints again, so that the search keeps the focus while the cards are drawn anew.
+  root.append(el("div", { class: "plugin-bar" }, search, tabs.element, saveButton, importButton), holder);
   load();
   loadFound();
   return () => {

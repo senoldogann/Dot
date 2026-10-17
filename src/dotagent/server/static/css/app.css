@@ -1507,6 +1507,12 @@ a.pill:hover {
   box-shadow: var(--shadow-seg);
 }
 
+.customize-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
 .plugin-bar {
   display: flex;
   flex-wrap: wrap;
@@ -1517,6 +1523,13 @@ a.pill:hover {
 .plugin-search {
   flex: 1 1 220px;
   min-width: 0;
+}
+
+.plugin-page-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .plugin-section-title {

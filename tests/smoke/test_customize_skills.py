@@ -164,7 +164,9 @@ async def test_skills_are_in_their_tabs_and_are_saved_shared_and_removed_from_th
                         assert first["y"] == second["y"] and second["x"] > first["x"], (first, second)
                         # The search finds one skill by its name.
                         search: Locator = page.get_by_role("searchbox", name="Search skills")
-                        await search.fill("own-skill-7")
+                        await search.press_sequentially("own-skill-7")
+                        await expect(search).to_be_focused()
+                        await expect(search).to_have_value("own-skill-7")
                         await expect(page.locator(".skill-card")).to_have_count(1)
                         await expect(_card(page, "own-skill-7")).to_be_visible()
                         await search.fill("")

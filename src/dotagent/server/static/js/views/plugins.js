@@ -173,13 +173,28 @@ export function mount(root, ctx) {
     return plugin.ways.some(wayConnected);
   }
 
-  /** The first step `plugin` offers: `{ label, take }`, or null when it has none to take. */
+  /** The first step `plugin` offers, by its ways in order: `{ label, take }` for a button, `{ label, link }` for the
+   * sign-in page an MCP server waits on, or null when it has none to take, as while Dot tries its server. A service
+   * whose name a server of the config or of a plugin holds already is not added again. */
   function firstStep(plugin) {
     for (const way of plugin.ways) {
       const now = wayNow(way);
       if (way.kind === "mcp") {
         if (now.server === null) {
+          if (now.service !== null && now.service.added) {
+            continue;
+          }
           return { label: "Add", take: (button) => add({ service: way.ref, name: null, address: null }, button) };
+        }
+        if (now.server.state === "signing_in" && now.server.link !== null) {
+          return { label: "Sign in", link: now.server.link };
+        }
+        if (now.server.state === "trying" || now.server.state === "signing_in") {
+          return null;
+        }
+        if (now.server.state === "left_out" && now.server.origin === "connected") {
+          const server = now.server;
+          return { label: server.signs_in ? "Sign in again" : "Try again", take: (button) => connectAgain(server, button) };
         }
         continue;
       }
@@ -190,26 +205,23 @@ export function mount(root, ctx) {
     return null;
   }
 
-  /** Where `plugin` stands, in a badge: the state of its first way that has one; null for a service not tried yet. */
+  /** Where `plugin` stands, in a badge: a way that is connected, else the server Dot has for it, else its first way;
+   * null for a service not tried yet, and for an MCP service Dot has no server of. */
   function standing(plugin) {
-    for (const way of plugin.ways) {
-      const now = wayNow(way);
-      if (way.kind === "mcp" && now.server !== null) {
-        return el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
-      }
-      if (now.app !== undefined && now.app !== null && CONNECTED_STATES.has(now.app.state)) {
-        return el("span", { class: "badge b-ok" }, STATE_WORDS[now.app.state]);
-      }
-    }
-    const first = plugin.ways.find((way) => way.kind !== "untried");
-    if (first === undefined) {
+    const ways = plugin.ways.filter((way) => way.kind !== "untried");
+    const shown = ways.find(wayConnected) ?? ways.find((way) => way.kind === "mcp" && wayNow(way).server !== null) ?? ways[0];
+    if (shown === undefined) {
       return null;
     }
-    const now = wayNow(first);
-    if (now.app !== undefined && now.app !== null) {
-      return el("span", { class: `badge ${now.app.state === "refused" ? "b-bad" : "b-muted"}` }, STATE_WORDS[now.app.state] ?? now.app.state);
+    const now = wayNow(shown);
+    if (shown.kind === "mcp") {
+      return now.server === null ? null : el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
     }
-    return null;
+    if (now.app === null) {
+      return null;
+    }
+    const tone = CONNECTED_STATES.has(now.app.state) ? "b-ok" : now.app.state === "refused" ? "b-bad" : "b-muted";
+    return el("span", { class: `badge ${tone}` }, STATE_WORDS[now.app.state] ?? now.app.state);
   }
 
   /** How `plugin` connects, in a chip: its first tried way, an MCP server's sign-in with it; else Not tried yet. */
@@ -229,7 +241,14 @@ export function mount(root, ctx) {
     const isConnected = connected(plugin);
     const step = isConnected ? null : firstStep(plugin);
     let action = null;
-    if (step !== null) {
+    if (step !== null && step.link !== undefined) {
+      action = el(
+        "a",
+        { class: "btn sm primary plugin-add", href: step.link, target: "_blank", rel: "noopener noreferrer", "aria-label": `Open the sign-in page of ${plugin.name}` },
+        icon("external"),
+        step.label,
+      );
+    } else if (step !== null) {
       action = el(
         "button",
         { class: "btn sm icon-only plugin-add", type: "button", title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` },
@@ -413,6 +432,9 @@ export function mount(root, ctx) {
   tabs.element.classList.add("plugin-tabs");
   tabs.element.setAttribute("aria-label", "Plugins to show");
   const recheck = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
+  // Out of what paints again, so that the search keeps the focus while the tiles are drawn anew; a service's page has
+  // none of it.
+  const bar = el("div", { class: "plugin-bar", hidden: pluginId !== undefined }, search, tabs.element, recheck);
 
   function paintTabs() {
     const [connectedButton, allButton] = tabs.element.children;
@@ -439,7 +461,7 @@ export function mount(root, ctx) {
     paintTabs();
     const showing = plugins.filter((plugin) => (shown === "all" || connected(plugin)) && matches(plugin));
     const others = servers.servers.filter((server) => server.service === null && (words === "" || foldSearch(`${server.name} ${server.address}`).includes(words)));
-    const parts = [el("div", { class: "plugin-bar" }, search, tabs.element, recheck), ...sections(showing)];
+    const parts = sections(showing);
     if (others.length > 0 && (shown === "connected" || words !== "")) {
       parts.push(
         el(
@@ -468,7 +490,7 @@ export function mount(root, ctx) {
           "div",
           null,
           el("p", { class: "hint connect-hint" }, "MCP servers hand their tools to Dot. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after."),
-          shown === "all" && others.length > 0 ? others.map(serverTile) : null,
+          shown === "all" && words === "" ? others.map(serverTile) : null,
           form,
         ),
       ),
@@ -483,7 +505,10 @@ export function mount(root, ctx) {
     let guideLine = null;
     let actions = null;
     if (way.kind === "mcp") {
-      if (now.server === null) {
+      if (now.server === null && now.service !== null && now.service.added) {
+        badge = el("span", { class: "badge b-muted" }, "Name taken");
+        guideLine = `A server of Dot's config or of a plugin is named ${way.ref} already: Connected lists it.`;
+      } else if (now.server === null) {
         const button = el("button", { class: "btn sm primary", type: "button" }, "Add");
         button.addEventListener("click", () => attempt(() => add({ service: way.ref, name: null, address: null }, button)));
         actions = el("div", { class: "plugin-actions" }, button);
@@ -531,8 +556,9 @@ export function mount(root, ctx) {
     const named = (way, text) => (data.length > 1 ? `${WAY_NAMES[way.kind]}: ${text}` : text);
     const card = (kind, title, mark, body) =>
       el("section", { class: "card connect-section plugin-card", dataset: { kind } }, el("div", { class: "card-head" }, icon(mark), el("span", { class: "grow" }, title)), el("div", null, body));
+    const again = el("button", { class: "btn sm", type: "button", onclick: () => attempt(load) }, icon("refresh"), "Check again");
     const parts = [
-      el("a", { class: "back", href: "#/customize/plugins" }, icon("arrowLeft"), "Plugins"),
+      el("div", { class: "plugin-page-bar" }, el("a", { class: "back", href: "#/customize/plugins" }, icon("arrowLeft"), "Plugins"), again),
       el(
         "header",
         { class: "plugin-hero", dataset: { plugin: plugin.id } },
@@ -582,7 +608,7 @@ export function mount(root, ctx) {
     }
   }
 
-  root.append(holder);
+  root.append(bar, holder);
   attempt(load);
   return () => {
     disposed = true;
