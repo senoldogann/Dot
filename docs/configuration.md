@@ -20,7 +20,7 @@ Anthropic one), a site under `[policy.spend]` that is not a bare host in lower c
 | `workspace/`                                     | the working directory of the shell and the file tools                |
 | `skills/`, `plugins/`                            | skills and plugins Dot always reads (more via `[skills]`/`[plugins]` dirs) |
 | `added-servers.json`                             | the MCP servers you added from other agents, by name and fingerprint |
-| `connected-servers.json`                         | the MCP servers you added on Connect apps, by address or command     |
+| `connected-servers.json`                         | the MCP servers you added in Customize, by address or command        |
 | `mcp-sign-ins/`                                  | what signing in to those servers gave: tokens and client (mode 0600) |
 | `opencode/`                                      | the OpenCode server Dot starts, the chats' sessions, the free models |
 | `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |

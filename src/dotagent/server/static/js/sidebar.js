@@ -1,4 +1,4 @@
-// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns and Connect apps,
+// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns and Customize,
 // what waits and what works (folded or not, as the owner left them), the chats themselves (several of them can be
 // deleted at once) and, in the foot, the way to the settings; a run stops from its composer (item 289). A row whose
 // run works says Working and for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it,
@@ -368,8 +368,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const activityLink = el("a", { class: "side-link", href: "#/activity", onclick: onNavigate }, icon("bolt"), el("span", null, "Activity"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
-  // Connect apps (item 278): the applications Dot is set up with, a page among the others under Campaigns (item 289).
-  const connectLink = el("a", { class: "side-link", href: "#/connect", onclick: onNavigate }, icon("plug"), el("span", null, "Connect apps"));
+  // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns.
+  const customizeLink = el("a", { class: "side-link", href: "#/customize", onclick: onNavigate }, icon("plug"), el("span", null, "Customize"));
 
   // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
   // under a chat among them; while chats are being chosen, their boxes. A row folded away is left out.
@@ -1127,7 +1127,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       el("span", { class: "grow" }, "New chat"),
       el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
     ),
-    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink, connectLink),
+    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink, customizeLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
   );
@@ -1169,7 +1169,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(activityLink, tab === "activity");
       mark(campaignsLink, tab === "campaigns");
       mark(settingsLink, tab === "settings");
-      mark(connectLink, tab === "connect");
+      mark(customizeLink, tab === "customize");
       routeRunId = runId;
       routeThreadId = null;
       keptUnread = null;

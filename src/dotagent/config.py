@@ -437,7 +437,7 @@ class McpServerConfig(FrozenModel):
 
     Values of ``env`` and ``headers`` may refer to secrets as ``${NAME}``; they are looked up like API keys
     (environment, ``.env``, Keychain). ``allow`` lists the server's tools to offer to the model (empty: all of them, up
-    to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Connect apps
+    to a limit). ``oauth`` says that a server at a URL is signed in to as MCP's authorization asks, on Customize › Plugins
     (item 279): Dot then sends the access token it keeps for the server and renews it.
     """
 

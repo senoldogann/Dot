@@ -5254,6 +5254,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 313 | A note a run saves, corrects or forgets is a quiet line in the chat                    | in progress |         |
 | 314 | A run drafts an email or a message; the owner sends, edits or discards it              | in progress |         |
 | 315 | An agent starts from one of eight templates and goes to another home as a file         | in progress |         |
+| 316 | Customize › Plugins: every service Dot works with, its way to connect and its own page | in progress |         |
+| 317 | Customize › Skills: the skills Dot reads as cards, personal and system                 | in progress |         |
 | 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | in progress |         |
 | 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
 | 328 | A phone that comes back to Dot finds it calm                                           | in progress |         |
@@ -13289,6 +13291,64 @@ imported as the same agent, whose page opens with Edit, Export and Delete inside
 before, and with the routes of before alone, the test finds none of the eight cards; without the home's secrets, the
 agent holding one is exported.
 
+### 316. Customize › Plugins: every service Dot works with, its way to connect and its own page
+
+**Status: in progress.** On the branch `items-316-317-customize`, after `items-328-phone`; not merged. The plan is
+`reports/grok-bot-ve-codex-plani-2026-10-16.md` (B group), with the owner's answers of 2026-10-17.
+
+**What was found.** The owner's word of 2026-10-16, with screenshots of Codex's desktop app: a Plugins page and a Skills
+page as Codex has them, more settled and with more variety. Connect apps listed the Mac's applications, the web's and
+the MCP services in three lists of rows, with no search, no marks and no page of a service's own. The marks needed
+files from outside and the services that were not tried needed a word from the owner: on 2026-10-17 the owner allowed
+the download of the marks from Simple Icons and approved the plan as a whole, and the services not tried are shown as
+such ("Not tried yet"), which is how the page reaches the plan's 25 and more.
+
+**As built (2026-10-17).**
+
+- `connections/directory.py`: 34 listings in six sections (Popular, Communication, Development, Business,
+  Productivity, This Mac), each with the ways Dot reaches its service: an entry of the connections' catalogues (an MCP
+  service, an application of the Mac, a synced folder, an application of the web) or a way not tried yet, which says
+  what it would take. 26 are tried; Vercel, Supabase, Hugging Face, Figma, Atlassian, Canva, Asana and Box are not.
+  `plugin_views` adds how each way connects, where its data goes and what it lets Dot do; a way no catalogue holds
+  raises. `GET /api/plugins` returns them.
+- The marks: 18 of Simple Icons 16.35.0 (CC0), each rebuilt from its one path, in `static/icons/plugins` with a LICENSE
+  that names the brands' guidelines; a service without one (Slack, Canva, LinkedIn, Microsoft's and Apple's
+  applications, DeepWiki) has letters or an icon of the interface. A mark takes the brand's colour where it reads on both
+  grounds (WCAG luminance between 0.06 and 0.55), else the ink, on a tile tinted with it.
+- `views/customize.js` (Customize, two tabs) and `views/plugins.js` (Plugins): a search, Connected and All with their
+  counts, tiles two a row (one on a phone) with the mark, what Dot does, how it connects and where it stands, and a "+"
+  that takes the first step of items 278 and 279; a service's page with how it connects (each way, its state, what to
+  do and its step), its tools and where its data goes; Your own MCP server at the foot, and the servers of the config,
+  plugins and other agents under Connected. The sidebar's Connect apps is Customize; `#/connect` leads to Plugins;
+  `views/connect.js` is gone, its steps in `plugins.js`. The words that sent the owner to Connect apps send them here.
+- Docs: `docs/extending.md` (Customize › Plugins), `docs/daemon.md`, `docs/phone.md`, `docs/configuration.md`.
+- Tests: `tests/unit/test_plugins_directory.py` (25 and more, each once with what it does; every catalogue entry
+  listed; tried exactly when a way is a catalogue's; each mark a file of one path named in the LICENSE, an icon or
+  letters); `tests/smoke/test_customize_plugins.py` (was `test_connect_apps.py`: the sidebar, the sections, every
+  tile's mark, words and chip, each state, Not tried yet without a step, the search, Connected, Notes' page and its
+  step, Calendar's "+", the old address, no "null" for an empty section, nothing wider than a phone);
+  `test_mcp_sign_in.py`, `test_phone_lists.py`, `test_phone_type.py` and `test_tour.py` on the new page.
+
+### 317. Customize › Skills: the skills Dot reads as cards, personal and system
+
+**Status: in progress.** On the branch `items-316-317-customize`, with item 316; not merged.
+
+**What was found.** The same word of the owner's. The skills were a tab of the settings that listed the learned ones
+and what the Mac's other agents set up, but neither the owner's own skills, nor those that come with Dot or its
+plugins, nor a way to save a chat's work as a skill there.
+
+**As built (2026-10-17).** `views/skills.js` is Customize's Skills tab: cards two a row (one on a phone), each with its
+mark, name, what it is for and Installed, Learned or Retired. Personal: Yours (Dot's skills folder and the config's),
+Imported (from another agent, with Remove), Learned (kind, agent, where, the runs and the record, with Share and
+Drop); under them Found on this Mac and Import from other apps, as before. System: Comes with Dot and From plugins. A
+search, and a section past its sixth card shows See N more. Save from a chat lists the chats that ended done and writes
+the chosen one's skill with the review model (`POST /api/runs/{id}/skill`, item 318). The settings' Skills tab is gone:
+`#/settings/skills` leads here, and the phone's settings list has ten rows. Docs: `docs/extending.md` (Skills and
+plugins). Tests: `tests/smoke/test_customize_skills.py` (every source in its tab and section, See 1 more, two a row and
+one on a phone, the search, Share, Save from a chat through the scripted review model, Drop and Remove, the old address);
+`test_side_scroll.py` (twenty learned skills show six and See 14 more), `test_phone_settings.py`,
+`test_import_elsewhere.py` and `test_found_elsewhere.py` on the new page.
+
 ### 318. A "+" in the composer picks plugins, skills and Plan first, as chips
 
 **Status: in progress.** On the branch `item-318-composer-picks`, after PR #326; not merged.
@@ -14401,3 +14461,4 @@ had no links or classifiers, and nothing said plainly that Dot runs on macOS alo
 - 2026-10-16 (Opus 5.5): the daemon restarted at 20:55:39 on the owner's word ("Kapat yeniden aç, session devam ediyor olması farketmez"), with two runs at work, after the wait for an idle moment was stopped: pid 56472, from main's environment, healthy at 20:55:46; the pages it serves are main's (`drafts.js`, `views/agents.js`, `timeline.js`, `views/memory.js`, `views/run.js`, `attention.js`, `icons.js` and `app.css` alike byte for byte), and both runs went on after it, each with events of its own since.
 - 2026-10-16 (Opus 5.5): PR #326 opened for items 284, 301 to 315 and 327 (the branch `items-301-to-327`, 21 commits over `main`, its tree main's working tree); its gate green, browser tests included (633 passed). The merge waits for the owner.
 - 2026-10-16 (Opus 5.5): item 318, the first of the plan's B group as the owner chose: a "+" in the composer picks plugins (MCP servers), skills and Plan first for a message, as chips; the run starts with the picked servers' tools on and the skills' instructions after the owner's words; Save skill writes a learned skill at the owner's word. Built on `item-318-composer-picks`, after PR #326.
+- 2026-10-17 (Opus 5.5): items 316 and 317 on the owner's word ("Bunların hepsini onaylıyorum yap"): Customize, with Plugins (34 services in six sections, 26 tried, the marks of Simple Icons, a page for each service, the steps of Connect apps) and Skills (cards two a row, Personal and System, Save from a chat); on `items-316-317-customize`.

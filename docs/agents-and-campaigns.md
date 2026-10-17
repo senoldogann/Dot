@@ -39,7 +39,7 @@ An agent learns for itself. A lesson drawn from an agent's run is the agent's ow
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
 agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
 `memory_search` alike; it is offered its own learned skills and Dot's, and another agent's only once you mark that skill
-shared (Settings › Skills or the agent's page, `PUT /api/skills/learned/{name}` with `shared`). A skill a run is not
+shared (Customize › Skills or the agent's page, `PUT /api/skills/learned/{name}` with `shared`). A skill a run is not
 offered stays out of its reach: the `skill` tool reads only one the run is offered, and asked for another by its name,
 it says that no skill offered to the run is called so and names only those that are. The scores the agent ranks its
 notes by, and the ones its page shows, count its own runs alone. An agent's page lists what it learned ("What it

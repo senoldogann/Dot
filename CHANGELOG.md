@@ -22,7 +22,8 @@ The first public version of Dot, an always-on autonomous agent for macOS.
 - **A memory** lasts between runs. There are **schedules**, **agents** of your own, and **campaigns** that keep working
   on a goal, through restarts and days, until its outcome is verified. See
   [Memory and schedules](docs/memory-and-schedules.md) and [Agents and campaigns](docs/agents-and-campaigns.md).
-- **MCP servers, skills and plugins** add tools, and apps connect with your own accounts. See
+- **MCP servers, skills and plugins** add tools, and apps connect with your own accounts. **Customize** lists the 34
+  services Dot works with, how each connects and the skills it reads. See
   [Apps, MCP servers, skills and plugins](docs/extending.md).
 - **`dotx setup`** checks the Mac, stores a provider's key and chooses the model. The home of the web UI says when the
   default model cannot answer. See the [README](README.md#install).

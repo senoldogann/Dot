@@ -1,4 +1,5 @@
-"""Routes of Connect apps (item 278): where each application stands, and the step that sets it up."""
+"""Routes of the applications of Customize › Plugins (item 278): where each one stands, and the step that sets it up;
+and the listings of the Plugins page (item 316), which takes those steps."""
 
 import asyncio
 import time
@@ -9,6 +10,7 @@ from fastapi import APIRouter
 from dotagent.browser.session import BrowserSession
 from dotagent.connections import mac
 from dotagent.connections.catalogue import FOLDER_APPS, MAC_APPS, WEB_APPS, FolderApp, MacApp, WebApp
+from dotagent.connections.directory import plugin_views
 from dotagent.connections.states import (
     ConnectionState,
     folder_state,
@@ -23,7 +25,7 @@ from dotagent.core.errors import NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.desktop import perms
 from dotagent.server.context import ServerContext
-from dotagent.server.views import ConnectionsView, ConnectionView
+from dotagent.server.views import ConnectionsView, ConnectionView, PluginsView
 from dotagent.skills.office import CLOUD_STORAGE, onedrive_folders
 from dotagent.store.db import Store
 
@@ -125,6 +127,12 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             runner=perms.program_name(program),
         )
 
+    @router.get("/plugins")
+    async def list_plugins() -> PluginsView:
+        """The listings of the Plugins page, each with the ways Dot reaches its service; where each way stands is
+        read from ``GET /connections`` and ``GET /mcp/servers``, and its step taken there."""
+        return PluginsView(plugins=plugin_views())
+
     async def ask(app: MacApp) -> None:
         """Ask macOS about ``app`` once at a time, and wait a while for the owner's answer."""
         question: asyncio.Future[mac.AutomationState] | None = asking.get(app.id)
@@ -164,7 +172,7 @@ def connections_router(ctx: ServerContext) -> APIRouter:
             return current
         found_web: WebApp | None = next((app for app in WEB_APPS if app.id == app_id), None)
         if found_web is None:
-            raise NotFoundError("Connect apps has no such application", {"app_id": app_id})
+            raise NotFoundError("Dot lists no such application", {"app_id": app_id})
         if session.mode == "attach":
             raise RunConflict(
                 "Dot works in your own Chrome (Settings › Browser › My Chrome), where you sign in as you always do",

@@ -59,7 +59,7 @@ works and This Mac, each row a page's name and what it holds (the theme on scree
 schedules there are). A row opens its page on its own, the bar naming it and "All settings" at its top to go back, and
 a card's name stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's
-16 px (item 331). Activity, Connect apps and an agent's editor name their cards the same way, a row of Activity keeps
+16 px (item 331). Activity, a service's page of Customize › Plugins and an agent's editor name their cards the same way, a row of Activity keeps
 its facts to one line that fades where it runs out of room, and Team's empty page says what brings messages there
 (item 332).
 

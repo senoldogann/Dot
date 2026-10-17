@@ -1,11 +1,11 @@
-"""MCP servers on Connect apps (item 279), for real: an MCP server that is its own authorization server, served in this
+"""MCP servers on Customize › Plugins (items 279 and 316), for real: an MCP server that is its own authorization server, served in this
 process (the MCP library's own, with a provider that says yes to every sign-in), and Dot's own server in front of a
 runtime. Added by its address, the server asks for a sign-in: the page the add answers with is followed as a browser
 would, to Dot's ``/oauth/callback``, and the server is then offered to runs with its tool, kept with its sign-in
 (readable by the owner alone) and connected again at the next start, its token renewed once it ran out. A server whose
-sign-in is gone is left out with words that send the owner to Connect apps; Remove forgets the server and its sign-in.
+sign-in is gone is left out with words that send the owner to Customize › Plugins; Remove forgets the server and its sign-in.
 A server open to all is added without a sign-in, and a bad name, a page of another address and a stray callback are
-refused. Connect apps itself, in a real headless Chrome, wide and light and on a phone and dark: the server of Dot's
+refused. The Plugins page itself, in a real headless Chrome, wide and light and on a phone and dark: the server of Dot's
 config with its tools and where it is set up, one added by its address, signed in to on the page that opens, and
 removed.
 
@@ -423,10 +423,10 @@ async def test_a_bad_name_an_unknown_page_and_a_stray_callback_are_refused(world
 
 
 def _server_row(page: Page, name: str) -> Locator:
-    return page.locator(f".connect-row[data-server='{name}']")
+    return page.locator(f".plugin-server[data-server='{name}']")
 
 
-async def test_connect_apps_lists_adds_signs_in_to_and_removes_mcp_servers(
+async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
     world: _World, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     # The page's other sections ask macOS about its applications: here every one is allowed, and none is asked.
@@ -442,16 +442,16 @@ async def test_connect_apps_lists_adds_signs_in_to_and_removes_mcp_servers(
             )
             await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await page.goto(ui_url("127.0.0.1", port, TOKEN))
-            await page.goto(f"{world.dot}/#/connect")
+            await page.goto(f"{world.dot}/#/customize/plugins")
             fixture: Locator = _server_row(page, "fixture")
             await expect(fixture.locator(".badge")).to_have_text("Ready")
             await expect(fixture).to_contain_text("Set up in Dot's config.")
             await expect(fixture).to_contain_text("10 tools: ")
             await expect(fixture.get_by_role("button")).to_have_count(0)
-            # The server added by the API before is Connect apps' own: it can be removed.
+            # The server added by the API before is the Plugins page's own: it can be removed.
             await expect(_server_row(page, "open").get_by_role("button", name="Remove")).to_be_visible()
-            await expect(page.locator(".connect-row[data-service='notion']")).to_contain_text("Signs in")
-            await expect(page.locator(".connect-row[data-service='deepwiki']")).to_contain_text("Open to all")
+            await expect(page.locator(".plugin-tile[data-plugin='notion'] .chip")).to_have_text("MCP · Sign in")
+            await expect(page.locator(".plugin-tile[data-plugin='deepwiki'] .chip")).to_have_text("MCP · Open to all")
             # Added by its address: it asks for a sign-in, which happens on the page that opens, and comes back here.
             await page.get_by_label("Server name").fill("signed")
             await page.get_by_label("Server address or command").fill(f"{world.signed}/mcp")
@@ -480,7 +480,7 @@ async def test_connect_apps_lists_adds_signs_in_to_and_removes_mcp_servers(
             )
             await phone.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await phone.goto(ui_url("127.0.0.1", port, TOKEN))
-            await phone.goto(f"{world.dot}/#/connect")
+            await phone.goto(f"{world.dot}/#/customize/plugins")
             await expect(_server_row(phone, "signed").locator(".badge")).to_have_text("Ready")
             wide: bool = await phone.evaluate("document.documentElement.scrollWidth > window.innerWidth")
             assert not wide

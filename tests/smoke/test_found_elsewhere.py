@@ -318,7 +318,7 @@ async def test_find_help_tells_a_run_of_a_skill_another_agent_set_up_and_to_ask_
     lines: list[str] = answers[0].splitlines()
     assert lines[1] == (
         "1. Skill found elsewhere pdf-tools: Fill and merge PDF forms (set up in Claude Code). Use: ask the owner to "
-        'add it to Dot in Settings › Skills, under Found on this Mac; once it is added, call skill with name "pdf-tools".'
+        'add it to Dot in Customize › Skills, under Found on this Mac; once it is added, call skill with name "pdf-tools".'
     ), answers[0]
     assert lines[-1].endswith(
         " Also searched 1 skill and 1 MCP server that other agents of this Mac set up and the owner can add."

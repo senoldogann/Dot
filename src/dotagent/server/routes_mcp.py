@@ -1,4 +1,4 @@
-"""Routes of the MCP servers on Connect apps (item 279): every server Dot has with where it stands, the catalogue's
+"""Routes of the MCP servers on Customize › Plugins (items 279 and 316): every server Dot has with where it stands, the catalogue's
 services, adding one, connecting one again (signing in again) and removing one, and the page an authorization server sends the
 browser back to after a sign-in (``/oauth/callback``, outside ``/api``, so that it needs no token).
 
@@ -52,7 +52,7 @@ _TAKEN_NAME: str = "another MCP server has its name"
 _PAGE: str = (
     '<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8">'
     '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Dot</title></head>\n'
-    '<body>\n<h1>{title}</h1>\n<p>{text}</p>\n<p><a href="/#/connect">Back to Connect apps</a></p>\n</body>\n</html>\n'
+    '<body>\n<h1>{title}</h1>\n<p>{text}</p>\n<p><a href="/#/customize/plugins">Back to Plugins</a></p>\n</body>\n</html>\n'
 )
 
 
@@ -92,7 +92,7 @@ def requested_server(body: McpServerAdd) -> McpServerConfig:
     if body.service is not None:
         service: McpService | None = next((one for one in MCP_SERVICES if one.id == body.service), None)
         if service is None:
-            raise NotFoundError("Connect apps has no such service", {"service": body.service})
+            raise NotFoundError("the MCP catalogue has no such service", {"service": body.service})
         return McpServerConfig(name=service.id, url=service.url, transport="http")
     if body.name is None or body.address is None or body.address.strip() == "":
         raise ConfigError("name a service of the list, or a server's name and its address", {})
@@ -130,7 +130,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     def known(record: ConnectedServers) -> dict[str, tuple[McpServerConfig, McpOrigin]]:
         """Every server Dot has, by name, with where it is set up: its config's first, then the plugins', the other
-        agents', those of Connect apps (``record``), and the tries of servers it does not have yet."""
+        agents', those added on the Plugins page (``record``), and the tries of servers it does not have yet."""
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = {}
         for config in ctx.runtime.config.mcp:
             servers.setdefault(config.name, (config, "config"))
@@ -262,7 +262,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/api/mcp/servers/{name}/connect")
     async def connect_again(name: str, body: McpReconnect) -> McpServerView:
-        """Connect the server ``name`` again: tried once more, and signed in to again when it asks. One of Connect apps,
+        """Connect the server ``name`` again: tried once more, and signed in to again when it asks. One added on the Plugins page,
         or one of Dot's config that signs in (``oauth = true``)."""
         page: str = page_origin(body.origin)
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
@@ -278,7 +278,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:
-        """Remove a server of Connect apps, or let go of a try: its tools leave the runs that start after, and Dot
+        """Remove a server added on the Plugins page, or let go of a try: its tools leave the runs that start after, and Dot
         forgets its address and its sign-in."""
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
@@ -309,7 +309,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             return HTMLResponse(
                 _page(
                     "Dot does not wait for this sign-in",
-                    "It ended, or Dot started again since. Start it again on Connect apps.",
+                    "It ended, or Dot started again since. Start it again on Customize › Plugins.",
                 ),
                 status_code=400,
             )
@@ -317,7 +317,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             return HTMLResponse(
                 _page(
                     f"Not signed in to {server}",
-                    f"The sign-in ended without a yes ({error or 'no code'}). Start it again on Connect apps.",
+                    f"The sign-in ended without a yes ({error or 'no code'}). Start it again on Customize › Plugins.",
                 )
             )
         return HTMLResponse(

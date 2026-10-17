@@ -1,16 +1,20 @@
-"""Connect apps (item 278) end to end: the sidebar's link under Campaigns (item 289) opens the page, wide and light and
-on a phone and dark. With macOS's answers given by the test (an application allowed, one not asked, one refused, one
-not installed), Allow asks macOS and its row says Allowed, and still does once the application is closed and macOS
-tells nothing about it (item 288); Open System Settings shows the Automation pane, under a line that names Dot, the
-program to open there, and goes under that line on a phone; OneDrive syncs a folder; a web application whose cookie
-the profile of Dot's browser holds is signed in, and another is not, with no Sign in in a browser without a window,
-which the web's section says once.
+"""Customize › Plugins (items 278 and 316) end to end: the sidebar's link under Campaigns (item 289) opens the page,
+wide and light and on a phone and dark. Every service in its section, 25 or more, each with its mark, what Dot does
+with it and how it connects; a search, and Connected next to All. With macOS's answers given by the test (an
+application allowed, one not asked, one refused, one not installed), Mail is connected and offers no step, Outlook is
+not installed, OneDrive syncs a folder, GitHub's cookie in the profile of Dot's browser signs it in and Slack is not, with
+no Sign in in a browser without a window; a service not tried yet says so and offers none. A service's own page says
+how it connects, where it stands and where its data goes: Notes' Open System Settings shows the Automation pane under a
+line that names Dot, the program to open there, and goes under that line on a phone. The "+" of Calendar asks macOS and
+its tile says Allowed, and still does once the application is closed and macOS tells nothing about it (item 288). The
+old address of Connect apps leads to the page.
 
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.
 """
 
 import asyncio
+import re
 import sqlite3
 import time
 from collections.abc import AsyncIterator
@@ -38,7 +42,7 @@ from dotagent.server.links import ui_url
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
-TOKEN: str = "connect-apps-token"
+TOKEN: str = "customize-plugins-token"
 _MAIL: str = "com.apple.mail"
 _CALENDAR: str = "com.apple.iCal"
 _NOTES: str = "com.apple.Notes"
@@ -143,8 +147,8 @@ def _signed_in_to_github(profile: Path) -> None:
         connection.close()
 
 
-def _row(page: Page, app_id: str) -> Locator:
-    return page.locator(f".connect-row[data-app='{app_id}']")
+def _tile(page: Page, plugin_id: str) -> Locator:
+    return page.locator(f".plugin-tile[data-plugin='{plugin_id}']")
 
 
 async def _box(locator: Locator) -> FloatRect:
@@ -153,7 +157,7 @@ async def _box(locator: Locator) -> FloatRect:
     return box
 
 
-async def test_connect_apps_shows_where_each_application_stands_and_takes_its_step(
+async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
     runtime: Runtime, address: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     macos: _Mac = _Mac()
@@ -181,60 +185,103 @@ async def test_connect_apps_shows_where_each_application_stands_and_takes_its_st
                     await page.get_by_role("button", name="Show sidebar").first.click()
                 # A page among the others, under Campaigns (item 289).
                 pages: Locator = page.locator("#sidebar nav.side-links a.side-link")
-                await expect(pages).to_have_text(["Agents", "Activity", "Campaigns", "Connect apps"])
+                await expect(pages).to_have_text(["Agents", "Activity", "Campaigns", "Customize"])
                 link: Locator = pages.nth(3)
                 link_box: FloatRect = await _box(link)
                 assert link_box["y"] + link_box["height"] <= 860, link_box
                 await link.click()
-                await expect(page).to_have_url(f"{address}/#/connect")
-                mail: Locator = _row(page, "mail")
+                await expect(page).to_have_url(f"{address}/#/customize")
+                await expect(page.locator(".customize-tabs a[aria-current='page']")).to_have_text("Plugins")
+                # Every service in its section, each with its mark, what Dot does with it and how it connects.
+                tiles: Locator = page.locator(".plugin-tile[data-plugin]")
+                await expect(tiles.first).to_be_visible()
+                assert await tiles.count() >= 25
+                await expect(page.locator(".plugin-section-title")).to_have_text(
+                    ["Popular", "Communication", "Development", "Business", "Productivity", "This Mac"]
+                )
+                for index in range(await tiles.count()):
+                    tile: Locator = tiles.nth(index)
+                    await expect(tile.locator(".plugin-mark")).to_have_count(1)
+                    await expect(tile.locator(".plugin-does")).not_to_be_empty()
+                    await expect(tile.locator(".chip")).to_have_count(1)
+                mail: Locator = _tile(page, "mail")
                 await expect(mail.locator(".badge")).to_have_text("Allowed")
                 await expect(mail.get_by_role("button")).to_have_count(0)
-                outlook: Locator = _row(page, "outlook")
+                outlook: Locator = _tile(page, "outlook")
                 await expect(outlook.locator(".badge")).to_have_text("Not installed")
                 await expect(outlook.get_by_role("button")).to_have_count(0)
-                await expect(_row(page, "onedrive").locator(".badge")).to_have_text("Syncing")
-                await expect(_row(page, "github").locator(".badge")).to_have_text("Signed in")
-                # How to sign in is said once above the applications of the web, not under each of them.
-                slack: Locator = _row(page, "slack")
+                await expect(_tile(page, "onedrive").locator(".badge")).to_have_text("Syncing")
+                await expect(_tile(page, "github").locator(".badge")).to_have_text("Signed in")
+                # No Sign in in a browser without a window.
+                slack: Locator = _tile(page, "slack")
                 await expect(slack.locator(".badge")).to_have_text("Not signed in")
                 await expect(slack.get_by_role("button")).to_have_count(0)
-                await expect(slack.locator(".connect-guide")).to_have_count(0)
-                await expect(page.locator("section[data-kind='web'] .connect-note")).to_contain_text(
-                    "runs without a window"
-                )
-                notes: Locator = _row(page, "notes")
-                await expect(notes.locator(".badge")).to_have_text("Refused")
-                await expect(notes.locator(".connect-guide")).to_contain_text("Privacy & Security › Automation")
-                await expect(notes.locator(".connect-guide")).to_contain_text("open Dot and switch on Notes")
+                # A service not tried yet says so and offers no step.
+                vercel: Locator = _tile(page, "vercel")
+                await expect(vercel.locator(".chip")).to_have_text("Not tried yet")
+                await expect(vercel.get_by_role("button")).to_have_count(0)
+                await expect(_tile(page, "linear").locator(".chip")).to_have_text("MCP · Sign in")
+                await expect(_tile(page, "linear").get_by_role("button", name="Add Linear")).to_be_visible()
+                # Nothing is wider than the screen.
+                wide: int = await page.evaluate("document.scrollingElement.scrollWidth - window.innerWidth")
+                assert wide <= 0, wide
+                await page.screenshot(path=str(tmp_path / f"plugins-{width}-{scheme}.png"), full_page=True)
+                # The search, and Connected next to All.
+                search: Locator = page.get_by_role("searchbox", name="Search plugins")
+                await search.fill("linked")
+                await expect(tiles).to_have_count(1)
+                await expect(_tile(page, "linkedin")).to_be_visible()
+                # The sections the search leaves empty are not drawn, not even as a word.
+                await expect(page.locator(".plugin-section-title")).to_have_text(["Communication"])
+                await expect(page.locator(".customize-body")).not_to_contain_text("null")
+                await search.fill("")
+                await page.get_by_role("button", name=re.compile(r"^Connected \d+$")).click()
+                await expect(tiles).to_have_count(3)
+                assert sorted(await tiles.evaluate_all("tiles => tiles.map(tile => tile.dataset.plugin)")) == [
+                    "github",
+                    "mail",
+                    "onedrive",
+                ]
+                await page.get_by_role("button", name=re.compile(r"^All \d+$")).click()
+                # Notes' own page: how it connects, where it stands, where its data goes, and its step.
+                await _tile(page, "notes").locator(".plugin-name").click()
+                await expect(page).to_have_url(f"{address}/#/customize/plugins/notes")
+                way: Locator = page.locator(".plugin-way[data-way='mac']")
+                await expect(way.locator(".badge")).to_have_text("Refused")
+                await expect(way.locator(".plugin-guide")).to_contain_text("Privacy & Security › Automation")
+                await expect(way.locator(".plugin-guide")).to_contain_text("open Dot and switch on Notes")
+                await expect(page.locator(".plugin-card[data-kind='data']")).to_contain_text("It stays on this Mac")
+                await expect(page.locator(".customize-body")).not_to_contain_text("null")
                 # On a phone the wide button goes under the text instead of squeezing it; on a wide page it sits beside.
-                settings: Locator = notes.get_by_role("button", name="Open System Settings")
-                text_box: FloatRect = await _box(notes.locator(".row-main"))
+                settings: Locator = way.get_by_role("button", name="Open System Settings")
+                text_box: FloatRect = await _box(way.locator(".row-main"))
                 button_box: FloatRect = await _box(settings)
                 under: bool = button_box["y"] >= text_box["y"] + text_box["height"]
                 assert under == (width < _PHONE_PX), (width, text_box, button_box)
-                await page.screenshot(path=str(tmp_path / f"connect-{width}-{scheme}.png"), full_page=True)
+                await page.screenshot(path=str(tmp_path / f"plugin-notes-{width}-{scheme}.png"), full_page=True)
                 async with page.expect_response(
                     lambda response: response.request.method == "POST" and response.url.endswith("/connections/notes")
                 ) as answered:
                     await settings.click()
                 assert (await answered.value).ok
                 assert macos.panes == ["automation"] * shot
-                await expect(notes.locator(".badge")).to_have_text("Refused")
+                await expect(way.locator(".badge")).to_have_text("Refused")
                 await page.close()
             calendar_page: Page = await browser.new_page(viewport={"width": 1280, "height": 860})
             await calendar_page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
             await calendar_page.goto(ui_url("127.0.0.1", port, TOKEN))
+            # The old address of Connect apps leads to the page.
             await calendar_page.goto(f"{address}/#/connect")
-            calendar: Locator = _row(calendar_page, "calendar")
+            await expect(calendar_page).to_have_url(f"{address}/#/customize/plugins")
+            calendar: Locator = _tile(calendar_page, "calendar")
             await expect(calendar.locator(".badge")).to_have_text("Not asked yet")
-            await calendar.get_by_role("button", name="Allow").click()
+            await calendar.get_by_role("button", name="Allow Calendar").click()
             await expect(calendar.locator(".badge")).to_have_text("Allowed")
             await expect(calendar.get_by_role("button")).to_have_count(0)
             # Allow asked macOS about Calendar alone, and showed no pane of System Settings.
             assert macos.asked == [_CALENDAR]
             assert macos.panes == ["automation"] * len(_SHOTS)
-            # Calendar closed, macOS tells nothing about it: its row keeps the answer macOS gave (item 288).
+            # Calendar closed, macOS tells nothing about it: its tile keeps the answer macOS gave (item 288).
             del macos.states[_CALENDAR]
             await calendar_page.reload()
             await expect(calendar.locator(".badge")).to_have_text("Allowed")

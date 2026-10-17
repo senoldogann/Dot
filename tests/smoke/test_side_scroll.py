@@ -1,8 +1,8 @@
 """Adding or deleting keeps the page where it is (item 204). The side menu brings the open chat into view when the
 page comes to another chat, and a list painted again after a delete, a pin, a run that starts or a follow-up in the
 open chat stays where the reader scrolled it; the Memory page keeps the notes it has read, and its place, when one of
-them is forgotten. The learned skills and the notes keep a size and scroll inside it (item 218). Chats, notes and
-skills in a home of their own, scripted runs, served by a real server, wide and on a phone, light and dark."""
+them is forgotten. The notes keep a size and scroll inside it (item 218); the learned skills show their first six and
+the rest a click away (item 317). Chats, notes and skills in a home of their own, scripted runs, served by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import re
@@ -46,8 +46,10 @@ _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
 # A list one row shorter may move by about a row; a jump back to the open chat moves it by the whole list.
 _ROW_SLACK_PX: int = 80
-# Enough learned skills for their list to scroll inside its box, and the most the box may be tall (.list-box, app.css).
+# Enough learned skills for more than a section shows at first, and the most the box of notes may be tall (.list-box,
+# app.css).
 _SKILLS: int = 20
+_SHOWN_SKILLS: int = 6
 _BOX_MOST_PX: int = 560
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
 
@@ -379,11 +381,11 @@ def _learned(number: int) -> Playbook:
     )
 
 
-async def test_the_learned_skills_keep_a_size_and_scroll_inside(
+async def test_the_learned_skills_show_six_and_the_rest_a_click_away(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Item 218: a long list of learned skills sits in a box of its own size that scrolls inside, wide and on a phone,
-    and a wheel over it stops at its edge, so what the Mac's other agents set up stays in reach under it."""
+    """Items 218 and 317: a long list of learned skills shows its first six cards, wide and on a phone, so what the
+    Mac's other agents set up stays in reach under it; See 14 more shows the rest."""
     _, address = served
     for number in range(1, _SKILLS + 1):
         await asyncio.to_thread(write_playbook, playbooks_dir(), _learned(number))
@@ -393,17 +395,13 @@ async def test_the_learned_skills_keep_a_size_and_scroll_inside(
         monkeypatch.setenv("HOME", str(tmp_path))
         try:
             for width, scheme in _SHOTS:
-                page: Page = await _page(browser, address, width, scheme, "/settings/skills")
-                box: Locator = page.locator(".list-box").first
-                await expect(box.locator(".list-row")).to_have_count(_SKILLS)
-                await expect(page.get_by_text("Nothing found")).to_be_visible()
-                assert await _scrolls_inside(box)
-                await box.hover()
-                page_at: int = int(await page.evaluate("window.scrollY"))
-                await page.mouse.wheel(0, 4000)
-                await page.wait_for_function("() => document.querySelector('.list-box').scrollTop > 400")
-                assert int(await page.evaluate("window.scrollY")) == page_at
+                page: Page = await _page(browser, address, width, scheme, "/customize/skills")
+                learned: Locator = page.locator("section.plugin-section[data-section='learned']")
+                await expect(learned.locator(".skill-card")).to_have_count(_SHOWN_SKILLS)
+                await expect(page.get_by_text("Nothing found")).to_be_attached()
                 await page.screenshot(path=str(tmp_path / f"skills-{width}-{scheme}.png"), animations="disabled")
+                await learned.get_by_role("button", name=f"See {_SKILLS - _SHOWN_SKILLS} more").click()
+                await expect(learned.locator(".skill-card")).to_have_count(_SKILLS)
                 await page.close()
         finally:
             await browser.close()

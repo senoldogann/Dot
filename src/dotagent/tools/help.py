@@ -60,7 +60,7 @@ _KINDS: dict[HelpKind, str] = {
     "found_skill": "Skill found elsewhere",
     "found_server": "MCP server found elsewhere",
 }
-_ASK: str = "ask the owner to add it to Dot in Settings › Skills, under Found on this Mac"
+_ASK: str = "ask the owner to add it to Dot in Customize › Skills, under Found on this Mac"
 _NOTHING: str = (
     "Nothing found for it. Try other words (the thing the work acts on: an event, a message, an issue), or go on with "
     "the command-line programs of this Mac (their --help and man pages), then the web."

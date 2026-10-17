@@ -1,4 +1,4 @@
-"""The applications Connect apps sets Dot up with (item 278). Dot drives the Mac's applications with AppleScript once
+"""The applications Customize › Plugins sets Dot up with (items 278 and 316). Dot drives the Mac's applications with AppleScript once
 macOS lets the app that runs Dot control them (Privacy & Security › Automation); it works in the web's applications in
 its own browser once the owner has signed in there; and it reads and writes the files OneDrive keeps in a folder of the
 Mac once OneDrive syncs one. Each says what Dot does with it."""

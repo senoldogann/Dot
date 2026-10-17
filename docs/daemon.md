@@ -26,9 +26,9 @@ them, and the fold is kept. Working lists too what is no chat's: a schedule abou
 (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
 days, and what it asks stands under **Waiting for you**. Working counts what it lists, and Activity the runs that work,
 which it shows under the run too. Folded, Working keeps the open chat in sight, and the search finds the chats at work
-too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity**
-and **Campaigns**; in the foot, the **Connect apps** pill ([Connect apps](extending.md#connect-apps)) above **Settings** and the red
-square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
+too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity**,
+**Campaigns** and **Customize** ([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
+the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the approvals waiting, and the connection to the daemon while it is being made or lost; what
 works stands under Working. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds
@@ -517,8 +517,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
-| `GET /connections`, `POST /connections/{id}`                                    | the applications of Connect apps, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
-| `GET\|POST /mcp/servers`, `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`) and the services to add; add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one of Connect apps (409 for one set up elsewhere) |
+| `GET /connections`, `POST /connections/{id}`                                    | the applications of Customize › Plugins, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
+| `GET\|POST /mcp/servers`, `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`) and the services to add; add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there (409 for one set up elsewhere) |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state` (400 for none) |
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`); a new pairing code (item 267) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |

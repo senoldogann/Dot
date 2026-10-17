@@ -16,7 +16,6 @@ import * as memory from "./memory.js";
 import * as phone from "./phone.js";
 import * as rules from "./rules.js";
 import * as schedules from "./schedules.js";
-import * as skills from "./skills.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
 
 const DEFAULT_TAB = "general";
@@ -28,7 +27,6 @@ const TABS = [
   { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },
   { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
-  { id: "skills", label: "Skills", icon: "sparkle", mount: skills.mount },
   { id: "schedules", label: "Schedules", icon: "calendar", mount: schedules.mount },
   { id: "phone", label: "Phone", icon: "smartphone", mount: phone.mount },
   { id: "system", label: "System", icon: "monitor", mount: mountSystem },
@@ -37,7 +35,7 @@ const TABS = [
 const GROUPS = [
   { title: "Interface", tabs: ["general", "appearance"] },
   { title: "Models", tabs: ["models", "keys"] },
-  { title: "How Dot works", tabs: ["rules", "memory", "skills", "schedules"] },
+  { title: "How Dot works", tabs: ["rules", "memory", "schedules"] },
   { title: "This Mac", tabs: ["browser", "phone", "system"] },
 ];
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");

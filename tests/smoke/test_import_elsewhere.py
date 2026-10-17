@@ -1,4 +1,4 @@
-"""Import from other apps (item 219): a button at the head of the Skills page opens a checklist of what the Mac's other
+"""Import from other apps (item 219): a button at the head of Customize › Skills opens a checklist of what the Mac's other
 agents set up and Dot can add, the skills chosen at first and the MCP servers not; one request adds what the owner
 chose, each as the one scan before them found it, and says what it could not add and why. A home folder of the test's
 own with skills of Claude Code and Codex and a server of Claude Desktop, served by a real server, wide and on a phone,
@@ -115,7 +115,7 @@ async def test_import_adds_what_the_owner_chose_and_says_what_it_could_not(
                     viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
                 )
                 await page.goto(ui_url(host, port, TOKEN))
-                await page.goto(f"{served}/#/settings/skills")
+                await page.goto(f"{served}/#/customize/skills")
                 button: Locator = page.get_by_role("button", name="Import from other apps")
                 await expect(button).to_be_enabled()
                 await button.click()

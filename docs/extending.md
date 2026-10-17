@@ -1,46 +1,64 @@
 # Apps, MCP servers, skills and plugins
 
-## Connect apps
+## Customize › Plugins
 
-**Connect apps**, the sidebar's page under Campaigns (items 278 and 289), lists the applications Dot works with, each with what Dot
-does with it, where it stands and the one step that sets it up; **Check again** reads them all anew.
+**Customize**, the sidebar's page under Campaigns (items 278, 289 and 316), has two tabs: **Plugins**, the services Dot
+works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
+leads to Plugins.
 
-- **On this Mac**: Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint and Outlook, which Dot
-  drives with AppleScript. macOS lets an app send Apple events to another only once you have said yes to its question
-  (Privacy & Security › Automation), so a row says **Allowed**, **Not asked yet**, **Refused**, **Not checked** or
-  **Not installed**. macOS tells about an application only while it runs: while one is closed, its row keeps the last
-  answer macOS gave about it (item 288), kept for the program macOS asks for Dot, and says **Not checked** only when
-  there is none. **Allow** asks macOS, which shows its question on the Mac; an application that is not open is opened
-  hidden first, without coming to the front. The page waits a minute for your answer, then says that the question waits
-  on the Mac. After a no macOS does not ask again: **Open System Settings** opens the Automation pane, and the row says
-  what to switch on there, under the program macOS asks for Dot: Dot for the service, else the app Dot was started
-  from (Terminal, iTerm, Claude).
-- **Your files**: OneDrive, whose folders (`~/Library/CloudStorage/OneDrive-*`) Dot's `onedrive` skill works in. It
+**Plugins** lists 34 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
+Communication, Development, Business, Productivity and This Mac. Each tile has the service's mark, what Dot does with
+it, how it connects (MCP · Sign in, MCP · Open to all, AppleScript, Dot's browser or Synced folder), where it stands,
+and a **+** that takes its first step; a tile opens the service's own page: each way it connects, with where it stands
+and its step, the tools of its MCP server once it is ready, and where its data goes. **Check again** reads them all
+anew. The marks of the services Simple Icons draws (version 16.35.0, CC0) are files of `static/icons/plugins`, with the
+brands' guidelines in its LICENSE; a mark identifies its service and nothing more. `GET /api/plugins` returns the
+listings (`connections/directory.py`).
+
+A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel, Figma and Canva (their MCP
+servers let in approved clients only), Atlassian (allow-listed clients only), Asana and Box (clients registered by
+hand), and Supabase and Hugging Face (clients with a secret, which Dot's sign-in has not been tried with). Google,
+GitHub and Slack work in Dot's browser; their pages name their MCP servers as not tried: GitHub's takes a personal
+token (an `[[mcp]]` table with an `Authorization` header), Google's and Slack's sign in only clients registered by hand.
+Any MCP server can still be added by its address (below).
+
+The ways a service connects:
+
+- **AppleScript** (This Mac): Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint and Outlook.
+  macOS lets an app send Apple events to another only once you have said yes to its question (Privacy & Security ›
+  Automation), so a tile says **Allowed**, **Not asked yet**, **Refused**, **Not checked** or **Not installed**. macOS
+  tells about an application only while it runs: while one is closed, its tile keeps the last answer macOS gave about
+  it (item 288), kept for the program macOS asks for Dot, and says **Not checked** only when there is none. **Allow**
+  asks macOS, which shows its question on the Mac; an application that is not open is opened hidden first, without
+  coming to the front. The page waits a minute for your answer, then says that the question waits on the Mac. After a
+  no macOS does not ask again: **Open System Settings** opens the Automation pane, and the service's page says what to
+  switch on there, under the program macOS asks for Dot: Dot for the service, else the app Dot was started from
+  (Terminal, iTerm, Claude).
+- **Synced folder**: OneDrive, whose folders (`~/Library/CloudStorage/OneDrive-*`) Dot's `onedrive` skill works in. It
   says **Syncing** once a folder of it is there; else **Open** opens OneDrive to sign in.
-- **On the web**: Google, Microsoft 365, GitHub, Slack, Notion, LinkedIn, X and Instagram, used in Dot's own browser.
-  A row says **Signed in** when that browser holds a cookie the site keeps only for a signed-in visitor, read by host
-  and name and never by value: from Chrome while it runs, else from a copy of its profile's cookie file. **Sign in**
-  opens the sign-in page in a tab of Dot's browser on the Mac. With My Chrome (Settings › Browser) Dot works in your own
-  Chrome, where you are signed in as you always are; a browser without a window (`headless = true` under `[browser]`)
-  has none to sign in in, which the section says once.
-- **Tools of other services** (item 279): every [MCP server](#mcp-servers) Dot has, from its config, a plugin, another
-  agent (Skills › Found elsewhere) or this page, with **Ready** and its tools, **Left out** and why, or **Off**. Below
-  it, **Services to add**: Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account, and
-  DeepWiki and Microsoft Learn, open to all; or any server by its name and address, a URL or the command that starts it
-  on this Mac. **Add** tries the server first and keeps it only once it answered with its tools, which go to the runs
-  that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using: the row
-  says **Waiting for your sign-in** with **Open the sign-in page**, the service's own page, which sends you back to
-  Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through `[server] reach`), and
-  the row turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself with the service as
-  a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before
-  they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words
-  that bring you back here (**Sign in again**). **Remove** takes a server of this page out, with its tools and its
-  sign-in; one set up elsewhere is removed there.
+- **Dot's browser**: Google, Microsoft 365, GitHub, Slack, Notion, LinkedIn, X and Instagram. A tile says **Signed in**
+  when that browser holds a cookie the site keeps only for a signed-in visitor, read by host and name and never by
+  value: from Chrome while it runs, else from a copy of its profile's cookie file. **Sign in** opens the sign-in page in
+  a tab of Dot's browser on the Mac. With My Chrome (Settings › Browser) Dot works in your own Chrome, where you are
+  signed in as you always are; a browser without a window (`headless = true` under `[browser]`) has none to sign in
+  in, which the service's page says. A sign-in is told by its cookie alone: a session the site ended stays **Signed
+  in** until its cookie expires.
+- **MCP server** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
+  and DeepWiki and Microsoft Learn, open to all (checked 2026-10-15). **Add** tries the server first and keeps it only
+  once it answered with its tools, which go to the runs that start next, without a restart. A server that asks for a
+  sign-in gets one in the browser you are using: its tile says **Waiting for your sign-in**, and its page has **Open
+  the sign-in page**, the service's own page, which sends you back to Dot's `/oauth/callback` on the address you added
+  it from (the Mac's, or your phone's through `[server] reach`); then it turns **Ready**. This is MCP's own
+  authorization: OAuth with PKCE, Dot registering itself with the service as a client without a secret. Dot keeps the
+  tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before they run out, after a restart too; a run
+  never signs in, so a server whose sign-in is gone is left out with words that bring you back here (**Sign in
+  again**). **Remove** takes a server added here out, with its tools and its sign-in; one set up elsewhere is removed
+  there.
 
-A sign-in is told by its cookie alone: a session the site ended stays **Signed in** until its cookie expires. Not in
-the services' list, as Dot cannot register with them by itself (checked 2026-10-15): GitHub, which takes a personal
-token (an `[[mcp]]` table with an `Authorization` header), Asana, Slack, Google and Box (clients registered by hand),
-and Vercel, Figma, Canva and Atlassian (approved clients only, or lists of allowed ones).
+**Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
+command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
+has from its config, a plugin or another agent (Customize › Skills › Found on this Mac), with **Ready** and its tools,
+**Left out** and why, or **Off**.
 
 ## MCP servers
 
@@ -66,7 +84,7 @@ headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; header
 
 `dotx mcp list` starts every configured server and shows its tools, or why it does not start. Only tools are used (no
 resources, prompts or sampling). A server at a URL may sign in as MCP's authorization asks (OAuth): `oauth = true` has
-Dot send the token it keeps for it, which **Sign in again** on [Connect apps](#connect-apps) gets, and the servers added
+Dot send the token it keeps for it, which **Sign in again** on [Customize › Plugins](#customize--plugins) gets, and the servers added
 there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on Connect
 apps, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
@@ -80,6 +98,13 @@ read-only (`readOnlyHint`) is taken at its word and runs as a read, with no flag
 change things (`destructive`) and send to the world (`external_send`), unless its server says it does not.
 
 ## Skills and plugins
+
+**Customize › Skills** (item 317) lists the skills Dot reads as cards, two a row (one on a phone), each with what it is
+for and that Dot has it, with a search and, past a section's first six cards, See N more. **Personal** holds yours (Dot's
+skills folder and the `[skills] dirs` folders), those imported from the Mac's other agents (with Remove) and the learned
+ones (below, with Share and Drop); **System** holds those that come with Dot and those of its plugins. **Save from a
+chat** writes the skill of a chat that ended done, as Save skill in a run's box does (`POST /api/runs/{id}/skill`).
+Under Personal, Found on this Mac and Import from other apps (below). The old address `#/settings/skills` leads here.
 
 A skill is a folder of instructions for one kind of work, in the Agent Skills layout: `<name>/SKILL.md` with a YAML
 frontmatter (`name`, `description`) and optional `scripts/`, `references/` and `assets/`. Every model is given, in its
@@ -139,7 +164,7 @@ with why: a file, a skill whose `SKILL.md` Dot cannot use, a skill named as one 
 second copy reached through a link is not counted), a plugin named as one of another marketplace before it, a server
 that names no command or URL to use, whose command does not start with the name of a program (a URL, or a variable set
 before it), whose URL names no host, or whose entry holds values of the wrong kind (told by their keys).
-`dotx skills list` shows them after Dot's own, with `?` for any character a terminal would act on; Settings › Skills
+`dotx skills list` shows them after Dot's own, with `?` for any character a terminal would act on; Customize › Skills
 shows them under "Found on this Mac", read apart from the learned skills; and `GET /api/skills/elsewhere` returns them.
 Runs do not see them: Dot uses one only once you add it (below), or name its folder in `[skills] dirs` or
 `[plugins] dirs`.
@@ -166,7 +191,7 @@ server whose name does not fit Dot's rule for server names (a lower-case letter,
 hyphens, at most 24 characters) or is taken, or that uses a variable its agent fills in: any `${...}` in its command,
 arguments or URL, or one in its environment or headers other than `${NAME}`, which Dot looks up like an API key.
 
-**Importing several at once.** Import from other apps, at the head of Settings › Skills, opens a checklist of what is
+**Importing several at once.** Import from other apps, at the head of Customize › Skills, opens a checklist of what is
 found that Dot can add: the skills by agent, each with its description, ticked at first, then the MCP servers, each
 with its agent and what it starts or reaches, not ticked, as a server starts a program of this Mac; Choose all ticks
 or clears every one, and a line says how many others Dot has already or cannot add (Found on this Mac says why). The
@@ -216,9 +241,9 @@ fails, or a folder that cannot be written, leaves a `playbook_failed` event on t
 whether it worked, never what it returned nor the run's answer; a skill that names a web address, an account or an
 e-mail address the run's own goal and calls never did is not kept (`playbook_failed` says why), and the skill says
 where it comes from (`read_outside` in its record). The skill never takes an instruction from a page as a step, and
-never holds a secret, a one-time code, an e-mail address or a home path. Settings › Skills lists the learned skills
-(kind, where, the runs, how they fared, the retired ones apart, an agent's with its name and Share) with Drop, each list
-in a box that keeps its size and scrolls inside past its first rows (item 218); `dotx playbooks list` shows them with
+never holds a secret, a one-time code, an e-mail address or a home path. Customize › Skills lists the learned skills
+under Learned (kind, where, the runs, how they fared, Retired on a retired one, an agent's with its name and Share)
+with Drop; `dotx playbooks list` shows them with
 their use, `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired.
 Delegated runs, chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills
 written, retired and read, and compares, per host, the runs that read a skill with the runs on that host that did not
