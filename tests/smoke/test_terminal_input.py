@@ -23,9 +23,10 @@ _SEND_CHARS: int = 10_000
 _LINE: str = "x" * 79 + "\n"
 _SEND: str = (_LINE * (_SEND_CHARS // len(_LINE) + 1))[:_SEND_CHARS]
 _HEARTBEAT_S: float = 0.01
-# The longest the event loop may go without a turn while input is typed and waits; a blocking write held it for as
-# long as the program did not read (seconds).
-_LONGEST_GAP_S: float = 0.1
+# The longest the event loop may go without a turn while input is typed and waits. A blocking write held it for as long
+# as the program did not read (1.5 s here); a write that does not block still leaves the loop waiting at times for the
+# runner, up to 0.3 s on GitHub's macOS runners.
+_LONGEST_GAP_S: float = 0.5
 _SEND_CALL_S: float = 0.05
 
 
