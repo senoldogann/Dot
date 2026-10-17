@@ -32,6 +32,7 @@ PROOF_PATH: str = f"{API_ROOT}/proof"
 PAIR_PATH: str = f"{API_ROOT}/phone/pair"
 PUBLIC_PATHS: frozenset[str] = frozenset({f"{API_ROOT}/health", PROOF_PATH, PAIR_PATH})
 PAGES_PREFIX: str = "/pages/"
+LOOKS_PREFIX: str = "/looks/"
 
 _PRIVATE_FILE_MODE: int = 0o600
 _PERMISSION_BITS: int = 0o777
@@ -80,6 +81,22 @@ PAGE_HEADERS: tuple[tuple[str, str], ...] = (
     ("X-Content-Type-Options", "nosniff"),
     ("Referrer-Policy", "no-referrer"),
     ("Cross-Origin-Resource-Policy", "same-origin"),
+    ("X-DNS-Prefetch-Control", "off"),
+)
+# The drawing Quick Look made of an Office file (item 268) runs Quick Look's scripts (a workbook's tabs). Sandboxed, its
+# origin is opaque wherever it opens: it reads no storage of the UI, reaches neither the API nor the pages that frame
+# it, and loads nothing but its own parts. Its parts are loaded by that opaque origin, so they are not kept to this
+# server's own (no ``Cross-Origin-Resource-Policy``).
+LOOK_HEADERS: tuple[tuple[str, str], ...] = (
+    (
+        "Content-Security-Policy",
+        "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline'; "
+        "style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:; frame-src 'self'; "
+        "base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+    ),
+    ("Permissions-Policy", "camera=(), microphone=(), geolocation=()"),
+    ("X-Content-Type-Options", "nosniff"),
+    ("Referrer-Policy", "no-referrer"),
     ("X-DNS-Prefetch-Control", "off"),
 )
 
@@ -143,10 +160,11 @@ def navigation_is_foreign(fetch_site: str | None, fetch_mode: str | None) -> boo
 
 def reached_from_other_sites(path: str) -> bool:
     """The paths that other sites send a browser to by design, which a foreign navigation reaches: the page a sign-in
-    comes back to (an authorization server redirects the browser there, item 279) and the pages runs showed, whose
-    origin is opaque wherever they open (:data:`PAGE_HEADERS`), so a page of another site gains nothing by opening
-    one. The UI and the API, where the token is, are reached from this server's own pages alone."""
-    return path == CALLBACK_PATH or is_page_path(path)
+    comes back to (an authorization server redirects the browser there, item 279), and the pages runs showed and the
+    drawings of Office files, whose origin is opaque wherever they open (:data:`PAGE_HEADERS`, :data:`LOOK_HEADERS`),
+    so a page of another site gains nothing by opening one; a drawing's own frames are such navigations. The UI and the
+    API, where the token is, are reached from this server's own pages alone."""
+    return path == CALLBACK_PATH or is_page_path(path) or is_look_path(path)
 
 
 def bearer_token(authorization: str | None) -> str | None:
@@ -181,11 +199,17 @@ def is_page_path(path: str) -> bool:
     return path.startswith(PAGES_PREFIX)
 
 
+def is_look_path(path: str) -> bool:
+    return path.startswith(LOOKS_PREFIX)
+
+
 def response_headers(path: str) -> tuple[tuple[str, str], ...]:
     """The security headers of the response to ``path``, with how long it may be cached: the API's answers and the
     pages runs showed never, the files of the UI once checked again."""
     if is_page_path(path):
         return (*PAGE_HEADERS, ("Cache-Control", "no-store"))
+    if is_look_path(path):
+        return (*LOOK_HEADERS, ("Cache-Control", "no-store"))
     return (*SECURITY_HEADERS, ("Cache-Control", "no-store" if is_api_path(path) else "no-cache"))
 
 

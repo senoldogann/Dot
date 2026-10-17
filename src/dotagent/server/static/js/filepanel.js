@@ -2,7 +2,9 @@
 // names by its path. The daemon reads the file (server/routes_files.py) and this draws what it read with text nodes only:
 // the pages of a PDF as pictures the daemon draws, an image, a workbook or a CSV table as a grid with a tab for each
 // sheet, a document's headings, paragraphs, lists and tables, a presentation's slides, a Markdown file formatted with
-// its source a click away (item 269), and any other text as text. A page without the panel shows a file in a dialog.
+// its source a click away (item 269), and any other text as text. A Word, Excel or PowerPoint file shows first as
+// Quick Look draws it (item 268), in a sandboxed frame, with what the panel reads of it a click away. A page without
+// the panel shows a file in a dialog.
 
 import { api, blobUrl, query } from "./api.js";
 import { sizeLabel } from "./attachments.js";
@@ -273,6 +275,99 @@ function presentationView(preview) {
   );
 }
 
+/** What the panel reads of an Office file: a workbook's sheets, a document's text, a presentation's slides. */
+function contentsView(preview, toolbar, body) {
+  switch (preview.kind) {
+    case "workbook":
+      workbookView(preview, toolbar, body);
+      return;
+    case "document":
+      fill(toolbar);
+      body.replaceChildren(documentView(preview));
+      return;
+    default:
+      fill(toolbar);
+      body.replaceChildren(presentationView(preview));
+  }
+}
+
+/**
+ * An Office file as Quick Look draws it (item 268): its fonts, fills and pictures, a workbook's sheets one tab each, in
+ * a frame that runs Quick Look's scripts sandboxed. `lookAddress` is where the daemon draws it, once; what the panel
+ * reads of the file is a click away (`views`), and is what shows when Quick Look cannot draw it.
+ */
+function officeView(file, lookAddress, views, toolbar, body) {
+  let drawing = null;
+  let chosen = "drawn";
+  let turns = 0;
+  const failed = (error) => {
+    switcher.set("contents");
+    chosen = "contents";
+    contentsView(file.preview, toolbar, body);
+    toolbar.prepend(note("warn", `Quick Look could not draw this file (${error.message}); this is what Dot reads of it.`));
+  };
+  const show = (id) => {
+    chosen = id;
+    body.dataset.view = id;
+    if (id === "contents") {
+      contentsView(file.preview, toolbar, body);
+      return;
+    }
+    fill(toolbar);
+    fill(body, hint("Quick Look is drawing the file…"));
+    drawing ??= api.get(lookAddress);
+    turns += 1;
+    const turn = turns;
+    drawing.then(
+      (look) => {
+        if (chosen === "drawn" && turn === turns) {
+          drawnPages(look.pages);
+        }
+      },
+      (error) => {
+        if (chosen === "drawn" && turn === turns) {
+          failed(error);
+        }
+      },
+    );
+  };
+  // A drawing's pages: one frame, and a workbook's sheets as tabs over it, each sheet framed as it is (a frame inside
+  // the sandboxed page of Quick Look's own tabs would be refused by its parts).
+  const drawnPages = (pages) => {
+    const frame = el("iframe", { class: "file-look", sandbox: "allow-scripts", referrerpolicy: "no-referrer" });
+    const open = (page) => {
+      frame.src = page.url;
+      frame.title = page.name === "" ? `${file.name} as Quick Look draws it` : `${page.name}, a sheet of ${file.name}, as Quick Look draws it`;
+    };
+    fill(toolbar);
+    if (pages.length > 1) {
+      const sheets = segmented(
+        pages.map((page, index) => ({ id: String(index), label: page.name, hint: `The sheet ${page.name}` })),
+        "0",
+        (id) => open(pages[Number(id)]),
+      );
+      sheets.element.classList.add("file-tabs");
+      sheets.element.setAttribute("aria-label", "Sheets");
+      fill(toolbar, sheets.element);
+    }
+    open(pages[0]);
+    fill(body, frame);
+  };
+  const switcher = segmented(
+    [
+      { id: "drawn", label: "As drawn", hint: "Show the file as Quick Look draws it, as the Mac shows it" },
+      { id: "contents", label: "Contents", hint: "Show the text and values Dot reads of the file" },
+    ],
+    "drawn",
+    show,
+  );
+  switcher.element.classList.add("file-tabs");
+  switcher.element.setAttribute("aria-label", "View");
+  fill(views, switcher.element);
+  views.hidden = false;
+  show("drawn");
+}
+
 // ------------------------------------------------------------------------------------------------ text
 /** A text as text; a Markdown file formatted as an answer is, its HTML never drawn, with its source a click away. */
 function textView(file, toolbar, body) {
@@ -398,15 +493,18 @@ export function fileView(source, onClose) {
     el("span", null, "Open on the Mac"),
   );
   const closeButton = el("button", { class: "btn ghost sm icon-only", type: "button", title: "Close", "aria-label": "Close the file", onclick: onClose }, icon("x"));
+  const views = el("div", { class: "file-views", hidden: true });
   const toolbar = el("div", { class: "file-toolbar" });
   const body = el("div", { class: "file-body" }, hint("Loading…"));
   const element = el(
     "section",
     { class: "file-view", tabindex: "-1", "aria-label": label },
     el("div", { class: "file-head" }, icon("file"), el("div", { class: "file-heading" }, title, facts), openButton, closeButton),
+    views,
     toolbar,
     body,
   );
+  const lookAddress = source.attachment === undefined ? `/files/look${query({ path: source.path })}` : `/attachments/${encodeURIComponent(source.attachment)}/look`;
 
   function paint(file) {
     const kind = file.preview.kind;
@@ -425,16 +523,12 @@ export function fileView(source, onClose) {
         body.replaceChildren(imageView(file, keep));
         break;
       case "workbook":
-        workbookView(file.preview, toolbar, body);
+      case "document":
+      case "presentation":
+        officeView(file, lookAddress, views, toolbar, body);
         break;
       case "table":
         tableView(file.preview, toolbar, body);
-        break;
-      case "document":
-        body.replaceChildren(documentView(file.preview));
-        break;
-      case "presentation":
-        body.replaceChildren(presentationView(file.preview));
         break;
       case "text":
         textView(file, toolbar, body);

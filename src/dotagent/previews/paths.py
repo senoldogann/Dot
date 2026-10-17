@@ -20,6 +20,8 @@ from dotagent.office import OfficeKind, office_kind, unreadable_office_file
 from dotagent.web.text import document_kind
 
 type ShownKind = Literal["pdf", "image", "document", "workbook", "presentation", "table", "text"]
+# The kinds of the Office files the panel shows, which Quick Look draws too (item 268).
+OFFICE_KINDS: frozenset[ShownKind] = frozenset({"document", "workbook", "presentation"})
 
 # The first bytes a file is told by.
 HEAD_BYTES: int = 4096

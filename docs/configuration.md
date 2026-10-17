@@ -27,6 +27,7 @@ Anthropic one), a site under `[policy.spend]` that is not a bare host in lower c
 | `browser-profile/`                               | the Default profile of Dot's Chrome, the browser tools' own          |
 | `browser-incognito/`                             | the Incognito profile of Dot's Chrome, emptied as Chrome starts and closes |
 | `browser-profiles/`                              | the profiles of Dot's Chrome added in Settings › Browser, one folder each |
+| `looks/`                                         | Quick Look's drawings of the Office files the panel showed           |
 | `screenshots/`, `downloads/`                     | what the tools capture and download                                  |
 | `undo/`                                          | journals of the file changes of runs, for `dotx undo`                |
 | `daemon.pid`                                     | held while a daemon runs; a second daemon is refused                 |

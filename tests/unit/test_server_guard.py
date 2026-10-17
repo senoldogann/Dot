@@ -119,10 +119,11 @@ def test_a_navigation_a_page_of_another_site_started_is_refused(
         assert (refusal is not None and refusal.status == 403) is refused, (path, refusal)
 
 
-@pytest.mark.parametrize("path", ["/oauth/callback", "/pages/abc123"])
+@pytest.mark.parametrize("path", ["/oauth/callback", "/pages/abc123", f"/looks/{'a' * 32}/Attachment7.html"])
 def test_what_other_sites_send_a_browser_to_by_design_is_served_to_a_foreign_navigation(path: str) -> None:
-    """A sign-in comes back from the authorization server's site (item 279), and a page a run showed opens with an
-    opaque origin wherever it is opened from: neither is the UI, so neither is refused on Fetch Metadata."""
+    """A sign-in comes back from the authorization server's site (item 279), and a page a run showed or a drawing of an
+    Office file (item 268) opens with an opaque origin wherever it is opened from, which makes its own frames foreign
+    navigations: none is the UI, so none is refused on Fetch Metadata."""
     assert check_request(path, LOCAL_HOST, None, "cross-site", "navigate", None, TOKEN, PORT, frozenset()) is None
 
 
