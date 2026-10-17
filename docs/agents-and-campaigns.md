@@ -91,8 +91,9 @@ dotx campaign stop|resume|achieved ID
 ```
 
 A campaign is a task that Dot keeps working on until its outcome is verified or you stop it. Switch on **Keep going** in
-the composer (it is there for a task), or pass `--standing` to `dotx run`. The run you start is its first session, in
-your conversation; the daemon runs the sessions after it, each a run in a thread of its own, through restarts and days.
+the composer's **+** (it is there for a task of Dot's), or pass `--standing` to `dotx run`. The run you start is its
+first session, in your conversation; the daemon runs the sessions after it, each a run in a thread of its own, through
+restarts and days.
 A campaign whose first session cannot start is not kept.
 
 - **Targets.** The first session records the campaign's targets and how a session verifies them (`campaign_targets`). A

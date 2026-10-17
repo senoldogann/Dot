@@ -101,7 +101,7 @@ Chat or Research; its menu says what each does) at the left; at the right the ag
 (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's default or
 one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser per model)
 and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill always
-shows, and Keep going, see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
+shows, see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
 fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no
 ground until the pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the
 agent's name go and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273),
@@ -135,7 +135,8 @@ its server, as from the **+** (below), and the slash word goes; a command does i
 approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens **Add files**, in the box of a run **Save
-skill**, the **Goal mode** switch and **Plan first**, then **Plugins**, the MCP servers with tools (a connected app's
+skill**, the **Goal mode** switch, on the home for a task of Dot's **Keep going** (item 353), and **Plan first**, then
+**Plugins**, the MCP servers with tools (a connected app's
 among them), and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked, there or in the slash menu,
 is a chip under the box in a colour of its name, which its × takes away; Plan first is a chip too, and a chat has neither
 it nor goal mode. The picks go with the message (`plugins`, `skills` and `plan_first` of `POST /api/runs`, and of a

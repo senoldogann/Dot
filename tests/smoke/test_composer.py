@@ -266,13 +266,29 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await expect(mode_pill).to_contain_text("Chat")
                 await expect(mode_pill.locator("[data-icon='message']")).to_have_count(1)
                 await expect(goal).to_be_focused()
+                # A chat has neither goal mode nor Keep going in its "+" (item 353).
+                await page.get_by_role("button", name="Add", exact=True).click()
+                chat_plus = page.locator(".composer .composer-popover[aria-label='Add']")
+                await expect(chat_plus.get_by_role("switch", name="Keep going until done")).to_be_hidden()
+                await expect(chat_plus.get_by_role("switch", name="Goal mode")).to_be_hidden()
+                await page.keyboard.press("Escape")
                 await mode_pill.click()
                 await modes.get_by_role("option", name="Task").click()
                 await expect(mode_pill).to_contain_text("Task")
-                # The "+" holds goal mode (item 318); the Options pill carries the approvals as its value and opens the
-                # approvals and keep going.
+                # The "+" holds goal mode (item 318) and Keep going after it (item 353); the Options pill carries the
+                # approvals as its value and opens them alone.
                 await page.get_by_role("button", name="Add", exact=True).click()
                 plus = page.locator(".composer .composer-popover[aria-label='Add']")
+                await expect(plus.get_by_role("switch", name="Goal mode")).to_be_visible()
+                keep_going = plus.get_by_role("switch", name="Keep going until done")
+                await expect(keep_going).to_be_visible()
+                await page.screenshot(path=str(tmp_path / f"plus-menu-{width}.png"), animations="disabled")
+                # Switched on, it makes the task a campaign: goal mode steps aside and the line under the frame says so.
+                await keep_going.click()
+                await expect(keep_going).to_have_attribute("aria-checked", "true")
+                await expect(plus.get_by_role("switch", name="Goal mode")).to_be_hidden()
+                await expect(page.locator(".composer-stack > .composer-note")).to_be_visible()
+                await keep_going.click()
                 await expect(plus.get_by_role("switch", name="Goal mode")).to_be_visible()
                 await page.keyboard.press("Escape")
                 await expect(plus).to_be_hidden()
@@ -282,7 +298,7 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 popover = page.locator(".composer .composer-popover[aria-label='Options']")
                 await expect(popover.get_by_role("group", name="Approvals")).to_be_visible()
                 await expect(popover.get_by_role("switch", name="Goal mode")).to_have_count(0)
-                await expect(popover.get_by_role("switch", name="Keep going until done")).to_be_visible()
+                await expect(popover.get_by_role("switch", name="Keep going until done")).to_have_count(0)
                 await page.screenshot(path=str(tmp_path / f"options-menu-{width}.png"), animations="disabled")
                 await popover.get_by_role("button", name="YOLO").click()
                 await expect(options_pill).to_contain_text("YOLO")
