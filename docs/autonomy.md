@@ -81,7 +81,7 @@ you asked: it accepts a finish only when every part of the goal is done and the 
 progress is `continue`. A delegated run and a campaign's session keep their own setting, and a resumed run, one that an
 answer starts and a follow-up on the run's page keep the run's. Whatever the model, every task and research run outside
 a campaign is told to keep acting while the goal leaves work it can do, not to stop to report progress or to offer what
-the goal asks for, and to take an ask to keep going at its word. This is not **Keep going** in the composer's Options,
+the goal asks for, and to take an ask to keep going at its word. This is not **Keep going** in the composer's **+**,
 which makes the goal a campaign worked on in sessions (see [Campaigns](agents-and-campaigns.md#campaigns)). Every run, a chat's too, is told
 that when it hesitates to do what it was asked, or a part of it, it says so at once, with what holds it back and what
 it can do instead, and asks you or goes on with the part it can do, instead of looking into the matter on its own

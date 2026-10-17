@@ -62,19 +62,20 @@ function buildComposer(ctx, listener) {
     listener,
   });
   const { textarea: goal, attachments } = frame;
-  // The mode, the model with its reasoning and the Options (choices.js); Keep going waits in the Options too, since it
-  // is for the odd goal.
+  // The mode, the model with its reasoning and the Options (choices.js).
   const choices = runChoices({
     frame,
     kept: HOME_KEPT,
-    optionsTitle: "Approvals and keep going",
-    more: () => [standing.element],
+    optionsTitle: "Approvals",
+    more: () => [],
     onMode: modePicked,
     // HOME_KEPT keeps what it keeps as it is chosen.
     onChange: () => {},
   });
-  // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task.
+  // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task. It is a
+  // row of the "+" menu after Goal mode's (item 353).
   const standing = standingPicker((on) => choices.goalMode.setAvailable(!on));
+  frame.addMenuItems(() => [standing.element]);
   // Only a task of Dot's keeps going, and goal mode waits while it does.
   function modePicked(id) {
     standing.setAvailable(id === "task" && agentId === "");

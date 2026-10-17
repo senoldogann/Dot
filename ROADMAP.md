@@ -5282,7 +5282,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 349 | OpenRouter: the models of many labs on one key                                         | done        | 196ff64 |
 | 350 | The audit of 2026-10-17: what held in the paths a human merges                         | done        | 410af27 |
 | 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | done        | 2f94b84 |
-| 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | in progress |         |
+| 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | done        | b2e8090 |
+| 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14051,14 +14052,14 @@ the code before. Docs: `safety.md`, `models.md`, `autonomy.md`.
 
 ### 352. A calm chat: one set-up line, a live line over the composer, one screen on a phone
 
-**Status: in progress.** The owner's word of 2026-10-17, with two screenshots (Dot's chat on an iPhone, T3 Code's line
-over its composer): "Fotoğrafta gördüğün gibi çok fazla bilgi mesajı gösteriyoruz ayrıca ikinci fotoğrafta göreceğin
-gibi T3 Code arayüzünde mesela arka planda bir background task çalıştığı zaman bunu da gösteriyor alt tarafta böyle
-dinamik ve daha güzel hoş bir tasarım yapabiliriz ayrıca sohbette telefonda çalışırken sadece sohbet içi scroll olmalı
-mesela alttaki kompozer her zaman sabit olmalı" (we show too many info lines; T3 Code shows what runs in the background
-in a dynamic line at the bottom, a nicer design; on a phone only the chat should scroll, the composer always in place).
-**As built (2026-10-17).** The lines of how a run was set up (the notes and skills it was handed and how they were
-found, its context budget, its tool groups, a step sent to another model) are one quiet line (`timeline.js`
+**Status: done (`b2e8090`).** The owner's word of 2026-10-17, with two screenshots (Dot's chat on an iPhone, T3 Code's
+line over its composer): "Fotoğrafta gördüğün gibi çok fazla bilgi mesajı gösteriyoruz ayrıca ikinci fotoğrafta
+göreceğin gibi T3 Code arayüzünde mesela arka planda bir background task çalıştığı zaman bunu da gösteriyor alt tarafta
+böyle dinamik ve daha güzel hoş bir tasarım yapabiliriz ayrıca sohbette telefonda çalışırken sadece sohbet içi scroll
+olmalı mesela alttaki kompozer her zaman sabit olmalı" (we show too many info lines; T3 Code shows what runs in the
+background in a dynamic line at the bottom, a nicer design; on a phone only the chat should scroll, the composer always
+in place). **As built (2026-10-17).** The lines of how a run was set up (the notes and skills it was handed and how they
+were found, its context budget, its tool groups, a step sent to another model) are one quiet line (`timeline.js`
 `contextNote`, `details.context-line`) that names them in short ("notes found by their words alone · 1 memory"), amber
 or red when one of them warns, and opens to the lines themselves; they were a line each (the screenshot: three before
 the answer). The line over the composer (`capsule.js`, item 297) is every width's: the run's time and what it does now
@@ -14071,6 +14072,18 @@ move nothing else; `run.js` scrolls, follows and jumps through the box that scro
 context line, wide and on an iPhone, light and dark, the embedding service an address where nothing listens; on an
 iPhone only the conversation scrolls; both fail on `main`), `test_phone_t3.py` (the line counts what is queued, on a
 wide window too). Docs: `docs/daemon.md`, `docs/phone.md`.
+
+### 353. Keep going is chosen from the composer's "+", beside Goal mode
+
+**Status: in progress.** The owner's word of 2026-10-17: "daha önce keep going modu vardı ama şimdi + işaretine
+tıklandığında plan gibi bir şey var plan ben eklediğimi hatırlamıyorum" (there was a Keep going mode before, but the "+"
+now shows something like a plan, which I don't remember adding); asked, the owner chose to bring Keep going into the "+"
+beside Goal mode and to keep Plan first. **As built (2026-10-17).** `views/runs.js`: the home's Keep going switch
+(`standingPicker`) is a row of the composer's "+" menu after Goal mode's (`frame.addMenuItems`), and the Options pill
+holds the approvals alone. As before it shows only for a task of Dot's, goal mode steps aside while it is on, and a
+chat's page has none. Test: `tests/smoke/test_composer.py` (the "+" holds Goal mode and Keep going; switching it on
+hides goal mode and shows the line under the frame; the Options no longer hold it), which failed on the code before.
+Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
 
 ## Log
 
@@ -14834,3 +14847,4 @@ wide window too). Docs: `docs/daemon.md`, `docs/phone.md`.
 - 2026-10-17 (Opus 5.5): PR #333 (items 346 and 347) merged as `a2f619b` after CI and the local gate (651 passed; the 6 tests that save a memory note failed while the local Ollama was not running, the same 6 as on `main` then); main's checkout moved to it and the daemon restarted at 16:14:49 while no run worked. Item 349 (OpenRouter) on `item-349-openrouter`, with a fresh-context review's findings fixed: only OpenRouter's codec keeps reasoning details, an answer of the wrong shape is a protocol error, the doctor checks a model against its list first, a variant id has its model's traits.
 - 2026-10-17 (Opus 5.5): PR #334 (item 349, OpenRouter) merged as `196ff64` after CI and a second fresh-context review whose findings it fixes (a variant id the doctor did not know, lines over 120 columns, the lists of providers). Item 351 on `items-351-audit-fixes` as PR #335; its review's findings fixed (a failing one-time schedule waits between tries, the answer check reads only the word after a folder, a known address may gain a query or a closing slash); `test_browser_sign_in`'s stand-in no longer writes its pid before its arguments (300 of 300 probes failed before, none after).
 - 2026-10-17 (Opus 5.5): PR #335 (item 351, the audit's fixes) merged as `2f94b84` after CI; main's checkout moved to it and the daemon restarted at 17:36:46 while no run worked. Item 352 on the owner's word of the same day (fewer info lines, a live line over the composer, a phone's chat as one screen), on `items-352-chat-calm`.
+- 2026-10-17 (Opus 5.5): item 353 on the owner's answer of the same day (Keep going into the "+" beside Goal mode, Plan first kept), on `item-353-keep-going`: the home's Keep going switch is a row of the composer's "+" after Goal mode's, the Options pill holds the approvals alone; `test_composer.py` failed on the code before.
