@@ -7,6 +7,7 @@ writes down what it is asked to serve.
 """
 
 import asyncio
+import os
 import stat
 import time
 from collections.abc import AsyncIterator, Iterator
@@ -198,6 +199,36 @@ async def test_what_tailscale_serves_unread_is_said_and_the_switch_still_answers
         )
         on = await client.post("/phone/awake", json={"on": True})
         assert on.status_code == 200 and on.json()["keep_awake"] is True and runtime.awake.on
+
+
+async def test_a_serve_that_waits_is_ended_in_time_and_says_what_it_waits_for(
+    stand_ins: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Tailscale's serve as it waits for HTTPS to be turned on for the tailnet: it says where, then waits.
+    _executable(
+        stand_ins / "tailscale",
+        "#!/bin/sh\n"
+        'case "$*" in\n'
+        f'  "status --json") cat "{stand_ins}/status.json" ;;\n'
+        '  "serve status --json") echo "{}" ;;\n'
+        '  "serve --bg "*)\n'
+        f'    echo $$ > "{stand_ins}/waiting"\n'
+        "    printf 'Serve is not enabled on your tailnet.\\nTo enable, visit:\\n\\n' >&2\n"
+        "    printf '    https://login.example/f/serve\\n' >&2\n"
+        "    exec sleep 30 ;;\n"
+        "esac\n",
+    )
+    monkeypatch.setattr("dotagent.tailnet._SERVE_TIMEOUT_S", 1.0)
+    async with _daemon() as (_runtime, address), _client(address) as client:
+        refused = await client.post("/phone/tailnet")
+        assert refused.status_code == 422, refused.text
+        assert (
+            "Tailscale did not answer in 1 s: Serve is not enabled on your tailnet. To enable, visit: "
+            "https://login.example/f/serve"
+        ) in refused.text
+        # The serve that waited is ended.
+        with pytest.raises(ProcessLookupError):
+            os.kill(int((stand_ins / "waiting").read_text(encoding="utf-8")), 0)
 
 
 async def _card_gap(page: Page) -> float:

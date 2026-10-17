@@ -14,7 +14,7 @@ from dotagent.core.errors import PhoneSetupError
 from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
 
-# The command line Tailscale's app for the Mac carries, when no tailscale is on the PATH.
+# The command line Tailscale's app for the Mac carries, used before a tailscale on the PATH.
 _APP_CLI: Path = Path("/Applications/Tailscale.app/Contents/MacOS/Tailscale")
 _STATUS_TIMEOUT_S: float = 10.0
 _SERVE_TIMEOUT_S: float = 30.0
@@ -101,18 +101,21 @@ def serves(serve_status: str, name: str, port: int) -> bool:
     return handler is not None and handler.Proxy in (f"http://127.0.0.1:{port}", f"http://localhost:{port}")
 
 
-def _with_said(message: str, *printed: bytes) -> str:
-    """``message`` with the first line Tailscale printed, its error output first, which says what it wants."""
+def with_said(message: str, *printed: bytes) -> str:
+    """``message`` with what Tailscale printed, its error output first, its lines joined: it says what it wants, such
+    as a link to turn a feature on, on a line of its own."""
     for text in printed:
-        for line in text.decode("utf-8", errors="replace").splitlines():
-            if line.strip():
-                return f"{message}: {truncate_middle(line.strip(), _ERROR_CHARS)}"
+        said: str = " ".join(
+            line.strip() for line in text.decode("utf-8", errors="replace").splitlines() if line.strip()
+        )
+        if said:
+            return f"{message}: {truncate_middle(said, _ERROR_CHARS)}"
     return message
 
 
 async def _tailscale(program: str, arguments: tuple[str, ...], timeout_s: float) -> str:
-    """What ``tailscale <arguments>`` prints; :class:`PhoneSetupError`, with the first line it printed, when it cannot
-    start, fails or takes too long, its process ended either way."""
+    """What ``tailscale <arguments>`` prints; :class:`PhoneSetupError`, with what it printed, when it cannot start,
+    fails or takes too long, its process ended either way."""
     try:
         process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
             program,
@@ -134,7 +137,7 @@ async def _tailscale(program: str, arguments: tuple[str, ...], timeout_s: float)
         # What it printed before it was ended, which may say what it was waiting for.
         out, err = await reading
         raise PhoneSetupError(
-            _with_said(f"Tailscale did not answer in {timeout_s:g} s", err, out),
+            with_said(f"Tailscale did not answer in {timeout_s:g} s", err, out),
             {"arguments": list(arguments), "timeout_s": timeout_s},
         ) from error
     finally:
@@ -144,7 +147,7 @@ async def _tailscale(program: str, arguments: tuple[str, ...], timeout_s: float)
         reading.cancel()
     if process.returncode != 0:
         raise PhoneSetupError(
-            _with_said("Tailscale refused", err, out),
+            with_said("Tailscale refused", err, out),
             {
                 "arguments": list(arguments),
                 "returncode": process.returncode,

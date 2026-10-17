@@ -271,7 +271,10 @@ def _edit(
     ``keys`` (nothing there for ``None``) and every other setting unchanged; else nothing is written and the error says
     to do ``by_hand`` by hand."""
     with _EDITING:
-        before: str = path.read_text(encoding="utf-8") if path.exists() else ""
+        try:
+            before: str = path.read_text(encoding="utf-8") if path.exists() else ""
+        except UnicodeDecodeError as error:
+            raise _by_hand(by_hand, path, f"the file is not UTF-8 text: {error}") from error
         old_settings: JsonObject = _parse(before, path)
         after: str = change(before)
         try:

@@ -112,6 +112,14 @@ def test_a_file_that_is_not_toml_is_refused_and_left_as_it_was(tmp_path: Path) -
     assert path.read_text(encoding="utf-8") == "[browser\nmode = \n"
 
 
+def test_a_file_that_is_not_utf8_is_refused_as_a_config_error_and_left_as_it_was(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_bytes(b'[browser]\nmode = "\xff"\n')
+    with pytest.raises(ConfigError, match="could not be changed automatically"):
+        set_browser_mode(path, "attach")
+    assert path.read_bytes() == b'[browser]\nmode = "\xff"\n'
+
+
 def test_a_browser_table_written_as_an_inline_table_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
     original: str = "browser = { headless = true }\n"
     path: Path = tmp_path / "config.toml"

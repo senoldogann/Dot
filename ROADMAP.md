@@ -12019,8 +12019,9 @@ signed-in address, which would put the token on the screen; the pairing code sig
 `tests/unit/test_tailnet.py`, `test_config_edit.py`, `tests/smoke/test_phone_reach.py` (a stand-in `tailscale` and
 `caffeinate` that `DOT_TAILSCALE` and `DOT_CAFFEINATE` name, every other smoke test naming ones that do not exist: the
 state, Set up pressed twice at once and again, the switch on and off, a config file that cannot be changed, a Mac
-without Tailscale, a Tailscale whose app is closed or whose answer cannot be read; the card wide in Chrome and on a
-phone in WebKit, light and dark). Docs: `docs/phone.md`, `docs/daemon.md`.
+without Tailscale, a Tailscale whose app is closed, whose answer cannot be read or whose command line cannot start, a
+serve that waits ended in time with what it said; the card wide in Chrome and on a phone in WebKit, light and dark).
+Docs: `docs/phone.md`, `docs/daemon.md`.
 
 **What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
 `[server] reach` names it, sets up what is missing with one button (reach taken up without a restart), shows the
