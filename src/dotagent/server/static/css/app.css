@@ -1531,8 +1531,11 @@ a.pill:hover {
 .plugin-page-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
+}
+
+.plugin-page-bar > .btn {
+  margin-left: auto;
 }
 
 .plugin-section-title {
@@ -3141,6 +3144,14 @@ a.pill:hover {
   gap: 8px;
   color: var(--muted);
   margin-bottom: 12px;
+}
+
+/* On a phone the bar's button at the top left is the one way back (item 338): a page's own link back is for a wider
+   window. */
+@media (max-width: 720px) {
+  .back {
+    display: none;
+  }
 }
 
 /* The run page's name in the top bar (item 78): the face, Dot's name, the run's state and its start on one line. */

@@ -340,20 +340,10 @@
   white-space: nowrap;
 }
 
-.back.settings-back {
-  display: none;
-}
-
 /* A tab's page: its cards' names stand over them (app.css, items 330 and 332). */
 @media (max-width: 720px) {
   .settings-side {
     display: none;
-  }
-
-  .back.settings-back {
-    display: inline-flex;
-    justify-self: start;
-    margin-bottom: 0;
   }
 }
 

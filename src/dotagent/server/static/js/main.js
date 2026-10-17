@@ -13,7 +13,7 @@ import { buildShell } from "./shell.js";
 import { requestCompose } from "./shortcuts.js";
 import { clearStage } from "./stage.js";
 import { getSnapshot, onChange, refresh, runLifecycle } from "./state.js";
-import { applyStoredDensity } from "./layout.js";
+import { applyStoredDensity, PHONE } from "./layout.js";
 import { readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
 import { attempt, toast } from "./ui.js";
@@ -44,17 +44,48 @@ const MOVED = new Map([
   ["/settings/skills", "/customize/skills"],
 ]);
 // `layout` is put on the page element as `data-layout`, so the style sheets can give each kind of page its own width.
+// `parent(params)` is the page a phone's Back leads to when nothing was opened before this page (item 338), or null
+// for a page whose way back is the list of chats.
 const ROUTES = [
-  { tab: "runs", layout: "home", title: "New chat", pattern: /^\/runs$/, view: runs },
-  { tab: "runs", layout: "run", title: "Run", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run },
-  { tab: "activity", layout: "page", title: "Activity", pattern: /^\/activity$/, view: activity },
-  { tab: "campaigns", layout: "page", title: "Campaigns", pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/, view: campaigns },
-  { tab: "agents", layout: "page", title: "Agents", pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/, view: agents },
-  { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, view: team },
-  { tab: "customize", layout: "page", title: "Customize", pattern: /^\/customize(?:\/(plugins|skills))?(?:\/([a-z0-9-]+))?$/, view: customize },
-  { tab: "settings", layout: "page", title: "Settings", pattern: /^\/settings(?:\/([a-z]+))?$/, view: settings },
+  { tab: "runs", layout: "home", title: "New chat", pattern: /^\/runs$/, view: runs, parent: () => null },
+  { tab: "runs", layout: "run", title: "Run", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
+  { tab: "activity", layout: "page", title: "Activity", pattern: /^\/activity$/, view: activity, parent: () => null },
+  {
+    tab: "campaigns",
+    layout: "page",
+    title: "Campaigns",
+    pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/,
+    view: campaigns,
+    parent: ([id]) => (id === undefined ? null : "/campaigns"),
+  },
+  {
+    tab: "agents",
+    layout: "page",
+    title: "Agents",
+    pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/,
+    view: agents,
+    parent: ([id]) => (id === undefined ? null : "/agents"),
+  },
+  { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, view: team, parent: () => "/agents" },
+  {
+    tab: "customize",
+    layout: "page",
+    title: "Customize",
+    pattern: /^\/customize(?:\/(plugins|skills))?(?:\/([a-z0-9-]+))?$/,
+    view: customize,
+    parent: ([, id]) => (id === undefined ? null : "/customize/plugins"),
+  },
+  {
+    tab: "settings",
+    layout: "page",
+    title: "Settings",
+    pattern: /^\/settings(?:\/([a-z]+))?$/,
+    view: settings,
+    // On a phone a tab is a page of the list of the settings (item 330); in a wider window the tabs are the page.
+    parent: ([tab]) => (tab === undefined || !PHONE.matches ? null : "/settings"),
+  },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
-  { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls },
+  { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls, parent: () => null },
 ];
 
 // The build a tab loaded again for as it opened, its pages being of another build than the daemon's (the service worker
@@ -333,6 +364,37 @@ function beginSession() {
     root.prepend(shell.element);
   }
 
+  // The pages this tab went through by their own links, the one on screen last (item 338): a phone's Back goes back
+  // along it. A page opened any other way (the sidebar, an address, a page's own move) starts it anew, and the browser's
+  // own Back takes a page off it.
+  let trail = [];
+  let byLink = false;
+  shell.main.addEventListener("click", (event) => {
+    const link = event.target instanceof Element ? event.target.closest("a[href^='#/']") : null;
+    if (link !== null && link.target === "") {
+      byLink = true;
+    }
+  });
+
+  function followTrail(path) {
+    const linked = byLink;
+    byLink = false;
+    if (!linked && trail.length >= 2 && trail[trail.length - 2] === path) {
+      trail.pop();
+    } else if (trail[trail.length - 1] !== path) {
+      trail = linked ? [...trail, path] : [path];
+    }
+  }
+
+  /** Where a phone's Back leads from `path`: back along the trail, else to the page's parent, else nowhere (null). */
+  function backFrom(found) {
+    if (trail.length >= 2) {
+      return { to: "history" };
+    }
+    const parent = found.route.parent(found.params);
+    return parent === null ? null : { to: `#${parent}` };
+  }
+
   function show() {
     disposeView();
     disposeView = () => undefined;
@@ -353,10 +415,12 @@ function beginSession() {
     if (found.route.tab === "runs") {
       writePref(LAST_CHAT_KEY, path);
     }
+    followTrail(path);
     shell.setRoute({
       tab: found.route.tab,
       runId: found.route.layout === "run" ? found.params[0] : null,
       layout: found.route.layout,
+      back: backFrom(found),
     });
     setPageTitle(`${found.route.title} · Dot`);
     window.scrollTo(0, 0);

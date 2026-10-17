@@ -5,8 +5,8 @@ On a phone:
 
 - `#/settings` is four groups of rows, ten in all (Skills is a tab of Customize, item 317): Appearance tells the theme on screen, Models the main model, Memory
   how many notes Dot keeps and Schedules how many schedules there are;
-- a row opens its tab as a page of its own: the bar names the tab, the way back to the list is at its top and no rail or
-  row of tabs shows; the way back leads to the list;
+- a row opens its tab as a page of its own: the bar names the tab, its Back at the top left (item 338) is the one
+  way back and no rail or row of tabs shows; Back leads to the list;
 - a card's name stands over the card, out of its surface;
 - neither the list nor any tab runs wider than the screen.
 
@@ -189,8 +189,10 @@ async def test_a_phone_opens_the_settings_on_a_list_whose_rows_open_each_tab_as_
                     await page.get_by_role("navigation", name="Settings").get_by_role("link", name=name).click()
                     await expect(page).to_have_url(f"{address}/#/settings/{tab}")
                     await expect(page.locator("h1.stage-h1")).to_have_text(name)
-                    back: Locator = page.get_by_role("link", name="All settings")
+                    # The one way back is the bar's button at the top left (item 338).
+                    back: Locator = page.get_by_role("button", name="Back")
                     await expect(back).to_be_visible()
+                    await expect(page.locator("main .back")).to_have_count(0)
                     await expect(page.locator(".settings-side")).to_be_hidden()
                     await expect(page.locator(".settings-pane")).not_to_be_empty()
                     faults += await _fits(page, f"{device} {tab}")
@@ -228,7 +230,7 @@ async def test_a_macs_window_opens_the_settings_on_general_with_the_rail(own_hom
             await expect(rail.get_by_role("link")).to_have_count(len(_TABS))
             await expect(rail.locator("[aria-current='page']")).to_have_text("General")
             await expect(page.locator("h1.stage-h1")).to_have_text("Settings")
-            await expect(page.get_by_role("link", name="All settings")).to_be_hidden()
+            await expect(page.get_by_role("button", name="Back")).to_have_count(0)
             await expect(page.locator(".settings-list")).to_have_count(0)
             card: dict[str, object] = await page.locator(".settings-pane .card:has(> .card-head)").first.evaluate(_CARD)
             assert card["card"] != _CLEAR, card

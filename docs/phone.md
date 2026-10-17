@@ -56,12 +56,11 @@ sizes. Where a page names a setting of the config file, it says what it is in wo
 
 On a phone the settings open on a list of their pages in groups, as T3 Code's do (item 330): Interface, Models, How Dot
 works and This Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and
-schedules there are). A row opens its page on its own, the bar naming it and "All settings" at its top to go back, and
-a card's name stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone
-Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's
-16 px (item 331). Activity, a service's page of Customize › Plugins and an agent's editor name their cards the same way, a row of Activity keeps
-its facts to one line that fades where it runs out of room, and Team's empty page says what brings messages there
-(item 332).
+schedules there are). A row opens its page on its own, the bar naming it, and a card's name stands over the card. In a
+Mac's window the settings keep their tabs down the left side. On a phone Appearance draws the colour schemes as phones
+and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). Activity, a service's page of
+Customize › Plugins and an agent's editor name their cards the same way, a row of Activity keeps its facts to one line
+that fades where it runs out of room, and Team's empty page says what brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
@@ -72,6 +71,12 @@ it tells of; the queue's banner under it says what waits. The details rise from 
 a drag of its head down closes it; its Agents tab says of each helper its state, its model and what it does now (on a wide window
 too). Dot's computer opens over the whole screen, with the page's address and who has control (Take over), and goes back
 to the side panel when it closes.
+
+The round button at the top left is the one way back (item 338). On a page opened by a link of another page (a run from
+Activity, a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on a page opened
+directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;
+on a page opened from the sidebar it is the way back to the list of chats. The pages' own links back show in a wider
+window only.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
 that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›

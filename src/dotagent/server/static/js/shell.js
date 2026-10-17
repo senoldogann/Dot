@@ -63,7 +63,7 @@ function buildIndicators() {
 
 /**
  * Build the frame. `homeRoute` is where "New chat" leads. Returns the element, the `main` element the pages draw into,
- * `setRoute({ tab, runId, layout })`, `paint(snapshot)` and `dispose()`.
+ * `setRoute({ tab, runId, layout, back })`, `paint(snapshot)` and `dispose()`.
  */
 export function buildShell({ homeRoute }) {
   const homeHref = `#${homeRoute}`;
@@ -78,21 +78,41 @@ export function buildShell({ homeRoute }) {
     onNavigate: closeAfterNavigation,
   });
   const indicators = buildIndicators();
+  // Where the page's Back leads on a phone (item 338): `{ to: "history" }`, `{ to: "#/…" }`, or null on a page whose
+  // way back is the list of chats.
+  let back = null;
   const menu = el("button", {
     class: "icon-btn",
     type: "button",
-    title: "Show sidebar",
-    "aria-label": "Show sidebar",
     "aria-controls": "sidebar",
     "aria-expanded": "false",
     onclick: () => {
+      if (backs()) {
+        goBack();
+        return;
+      }
       setOpen(true);
       sidebar.focusClose();
     },
   });
-  // On a phone the opener is the way back to the chats, a chevron as in T3 Code's phone app (item 295).
+  function backs() {
+    return PHONE.matches && back !== null;
+  }
+  function goBack() {
+    if (back.to === "history") {
+      history.back();
+    } else {
+      location.hash = back.to;
+    }
+  }
+  // On a phone the button at the top left is the one way back, a chevron as in T3 Code's phone app (item 295): to the
+  // page before, or to the page's parent (item 338), and on a page opened from the sidebar to the list of chats. The
+  // pages' own links back are for a wider window.
   function paintOpener() {
     menu.replaceChildren(icon(PHONE.matches ? "chevronLeft" : "panelLeft"));
+    const label = backs() ? "Back" : "Show sidebar";
+    menu.title = label;
+    menu.setAttribute("aria-label", label);
   }
   paintOpener();
   // While the sidebar is closed the bar holds its opener alone (item 273).
@@ -197,6 +217,8 @@ export function buildShell({ homeRoute }) {
     setRoute(route) {
       sidebar.setRoute(route);
       main.dataset.layout = route.layout;
+      back = route.back;
+      paintOpener();
       if (narrow && drawer) {
         setOpen(false);
       }
