@@ -6465,6 +6465,11 @@ button.attach-chip:hover {
   display: none;
 }
 
+/* The commands stand right under the line: their part counts them and leads nowhere. */
+.capsule-commands {
+  cursor: default;
+}
+
 .capsule-part:not([hidden]) ~ .capsule-part:not([hidden])::before {
   content: "";
   position: absolute;

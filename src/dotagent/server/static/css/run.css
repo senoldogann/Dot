@@ -203,10 +203,17 @@
     top: var(--space-2);
   }
 
+  /* The dock keeps a position of its own: the way down (`.jump`) stands just above it. */
   html.chat-shell .dock {
-    position: static;
+    position: relative;
     translate: none;
     margin-top: 0;
+  }
+
+  /* No bar covers the conversation's top: what the column goes to stands right there. */
+  html.chat-shell .run-thread .answer,
+  html.chat-shell .run-thread .bubble.user {
+    scroll-margin-top: var(--space-2);
   }
 }
 

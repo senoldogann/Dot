@@ -195,8 +195,8 @@ notes and skills it was handed and how they were found, its context budget, its 
 model) are one quiet line that names them in short, amber when one of them warns (the embedding service failed, so the
 notes were found by their words alone), and opens on a click to the lines themselves (item 352). What the model thought
 in a step is a line of its own there, before the step's calls (item 246, after T3 Code), or out of the fold before the
-message the
-step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the model thinks
+message the step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the
+model thinks
 and "Thought" once it is done, the start of the thought beside it; opened, the whole thought: up to 12,000 characters
 of it, of a longer one its start and its end, its secrets masked; it is there when the page is loaded again. A step
 asked again from its start drops what its failed try streamed. A message streams as it will stay (item 274): formatted
@@ -232,8 +232,9 @@ holds, past the queue, or with the queue's next message when the box is empty. S
 message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the
 queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why, with **Read
 again**. A line over the box (item 352, after T3 Code's) says how long the run has worked and what it does now, or that
-it waits for you, how its helpers stand, how many messages are queued and how many commands run in the chat; each part
-opens what it tells of, and the line comes while one of them has something to say and goes when none has. When the run
+it waits for you, how its helpers stand, how many messages are queued and how many commands run in the chat (they stand
+right under it); the run's part, the helpers' and the queue's open what they tell of, and the line comes while one of
+its parts has something to say and goes when none has. When the run
 ends done, the next message starts and the page follows it; every open page shows the queue as it
 changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3 Code's
 composer: the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up

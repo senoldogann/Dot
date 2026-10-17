@@ -265,6 +265,8 @@ async def test_a_phones_run_page_and_list_of_chats_follow_t3_codes_phone_app(own
                 await expect(wide.locator(".stage-heading")).to_be_hidden()
                 await expect(wide.locator(".stage-tools button:visible")).to_have_count(1)
                 await expect(wide.locator(".capsule")).to_contain_text("Working")
+                # What the run does now: it waits on the call that started its helpers.
+                await expect(wide.locator(".capsule-activity")).to_contain_text("delegate")
                 await expect(wide.locator(".capsule").get_by_role("button", name="1 queued")).to_be_visible()
                 # The curtain of a page opened on a chat (item 328) lifts once the chat shows.
                 await expect(wide.locator(".waiting")).to_have_count(0)

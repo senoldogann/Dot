@@ -519,6 +519,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       context = buildContext();
       scope.context = context;
       place(scope, context.node, ts);
+    } else {
+      // The work after it starts when it came, as after any line the scope ends with.
+      scope.boundary = ts;
     }
     context.body.append(el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text)));
     context.items.push({ kind, text: short });

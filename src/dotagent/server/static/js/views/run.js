@@ -613,7 +613,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
   const background = backgroundWork({ threadId: run.thread_id, onCount: () => paintCapsule() });
   // The line over the composer (items 297 and 352): the run's time and what it does now, its helpers, the messages
-  // queued and the commands at work, each the way to where it is told of.
+  // queued and the commands at work; the first three are the way to where they are told of.
   const capsule = createCapsule({
     onWork: () => inspector.openTab("run"),
     onHelpers: () => inspector.openTab("agents"),
@@ -621,7 +621,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       queue.expand();
       queue.element.scrollIntoView({ block: "nearest" });
     },
-    onCommands: () => background.element.scrollIntoView({ block: "nearest" }),
   });
   const dock = el("div", { class: "dock" }, capsule.element, resumeLine, queue.element, background.element, frame.element, foot);
 

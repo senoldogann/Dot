@@ -38,6 +38,8 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 # What scrolls the conversation: on a phone the conversation itself, between the top bar and the composer (item 352);
 # on a wider window the window.
 _SCROLLER: str = "(window.innerWidth <= 720 ? document.querySelector('.run-thread') : document.scrollingElement)"
+# How far above the pill the arrow down may end: it stands on the dock's top edge, over the dock's own padding.
+_ARROW_GAP_PX: float = 40.0
 
 TOKEN: str = "helper-pill-test-token"
 WAIT_S: float = 60.0
@@ -176,10 +178,11 @@ async def test_the_pill_of_a_helpers_page_stays_in_the_window_as_its_conversatio
                     await page.evaluate(f"{_SCROLLER}.scrollTo(0, 0)")
                     await expect(page.get_by_text("Shelf 1 next.")).to_be_in_viewport()
                     assert await _in_window(pill), "scrolled to the top, the pill is out of the window"
-                    # The arrow down stands above the pill, not over it.
+                    # The arrow down stands just above the pill, not over it, nor away under the bar (item 352).
                     arrow: Locator = page.locator(".jump")
                     await expect(arrow).to_be_visible()
-                    assert await _bottom(arrow) <= await _top(pill)
+                    gap: float = await _top(pill) - await _bottom(arrow)
+                    assert 0 <= gap <= _ARROW_GAP_PX, gap
                     await page.screenshot(path=str(tmp_path / f"pill-top-{width}-{scheme}.png"))
 
                     await page.evaluate(f"{_SCROLLER}.scrollTo(0, {_SCROLLER}.scrollHeight)")
