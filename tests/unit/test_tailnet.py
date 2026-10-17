@@ -1,5 +1,5 @@
-"""What Tailscale's command line says of the Mac (item 271), as Settings › Phone reads it: whether it runs signed in, the
-Mac's name on the tailnet, and whether it serves this daemon's port over HTTPS."""
+"""What Tailscale's command line says of the Mac (item 271), as Settings › Phone reads it: whether it runs signed in,
+the Mac's name on the tailnet, and whether it serves this daemon's port over HTTPS."""
 
 import pytest
 

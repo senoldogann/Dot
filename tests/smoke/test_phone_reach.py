@@ -45,8 +45,8 @@ def _executable(path: Path, text: str) -> None:
 @pytest.fixture
 def stand_ins(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
     """A folder with a ``tailscale``, which ``DOT_TAILSCALE`` names, that runs signed in and serves nothing until it is
-    asked, and a ``caffeinate``, first on the PATH, that only waits. Yields the folder, where the stand-in writes what it
-    was asked to serve."""
+    asked, and a ``caffeinate``, first on the PATH, that only waits. Yields the folder, where the stand-in writes what
+    it was asked to serve."""
     folder: Path = tmp_path / "bin"
     folder.mkdir()
     (folder / "status.json").write_text(
