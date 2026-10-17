@@ -1,7 +1,9 @@
 """The profiles of Dot's own Chrome (item 355): Default and Incognito are always there, the ones added are listed by
 name and can be deleted, a name is a folder's and nothing else, and clearing a profile deletes its cookies and caches
-while its settings stay."""
+while its settings stay. The zoom Dot's own Chrome draws pages at (item 358) is written into a profile's preferences,
+the others kept."""
 
+import json
 from pathlib import Path
 
 import pytest
@@ -17,9 +19,10 @@ from dotagent.browser.profiles import (
     empty_incognito,
     listed_profiles,
     profile_dir,
+    write_default_zoom,
 )
 from dotagent.config import BrowserProfileName
-from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.core.errors import BrowserError, InvalidValueError, NotFoundError
 
 _NAMES: TypeAdapter[str] = TypeAdapter(BrowserProfileName)
 
@@ -95,3 +98,29 @@ def test_incognito_is_emptied(home: Path) -> None:
     assert not profile_dir(INCOGNITO_PROFILE).exists()
     # Nothing there is nothing to empty.
     empty_incognito()
+
+
+def test_the_zoom_is_written_into_the_profile_and_its_other_preferences_stay(tmp_path: Path) -> None:
+    preferences: Path = tmp_path / "Default" / "Preferences"
+    write_default_zoom(tmp_path, 125)
+    assert json.loads(preferences.read_text(encoding="utf-8"))["partition"]["default_zoom_level"]["x"] == pytest.approx(
+        1.2239, abs=1e-4
+    )
+    preferences.write_text(
+        json.dumps(
+            {"profile": {"name": "Dot"}, "partition": {"default_zoom_level": {"x": 1.0}, "per_host_zoom_levels": {}}}
+        ),
+        encoding="utf-8",
+    )
+    write_default_zoom(tmp_path, 100)
+    kept = json.loads(preferences.read_text(encoding="utf-8"))
+    assert kept["profile"] == {"name": "Dot"} and kept["partition"]["per_host_zoom_levels"] == {}
+    assert kept["partition"]["default_zoom_level"] == {"x": 0.0}
+
+
+def test_preferences_that_are_not_a_json_object_are_refused_and_left_as_they_were(tmp_path: Path) -> None:
+    (tmp_path / "Default").mkdir()
+    (tmp_path / "Default" / "Preferences").write_text("[]", encoding="utf-8")
+    with pytest.raises(BrowserError):
+        write_default_zoom(tmp_path, 125)
+    assert (tmp_path / "Default" / "Preferences").read_text(encoding="utf-8") == "[]"

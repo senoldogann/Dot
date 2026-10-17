@@ -44,6 +44,7 @@ type BrowserSetting = Literal[
     "viewport_width",
     "viewport_height",
     "appearance",
+    "zoom",
 ]
 type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]

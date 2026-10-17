@@ -64,7 +64,7 @@ from dotagent.browser.keychain import KeychainMode, keychain_switches, playwrigh
 from dotagent.browser.look import PageLook, color_scheme
 from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
 from dotagent.browser.profile_lock import profile_holder_pid
-from dotagent.browser.profiles import INCOGNITO_PROFILE, empty_incognito, profile_dir
+from dotagent.browser.profiles import INCOGNITO_PROFILE, empty_incognito, profile_dir, write_default_zoom
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
@@ -509,6 +509,8 @@ class BrowserSession:
         # Incognito starts with nothing, however its last Chrome ended (item 355).
         if config.profile == INCOGNITO_PROFILE:
             await asyncio.to_thread(empty_incognito)
+        # Chrome reads the zoom it draws pages at from the profile when it starts (item 358).
+        await asyncio.to_thread(write_default_zoom, self._profile, config.zoom)
         keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, self._profile)
         playwright: Playwright = await self._driver()
         # With the window kept in the background (item 97), whoever has the focus now gets it back after the launch.
@@ -741,10 +743,10 @@ class BrowserSession:
         _log.info("browser_enabled", mode=self._config.mode, enabled=enabled)
 
     async def set_look(self, look: PageLook) -> None:
-        """How pages look from the next call on (item 354). Dot's own Chrome is let go of first, as for a switch, so
-        that it starts again with the size and the colour scheme, which is refused while a chat's run is at work in it;
-        in the Chrome of the user the connection stays, and the tabs Dot opens from now on are told the colour
-        scheme."""
+        """How pages look from the next call on (items 354 and 358). Dot's own Chrome is let go of first, as for a
+        switch, so that it starts again with the size, the colour scheme and the zoom, which is refused while a chat's
+        run is at work in it; in the Chrome of the user the connection stays, and the tabs Dot opens from now on are
+        told the colour scheme."""
         if self._config.mode == "own":
             await self.switch(self._config.model_copy(update=look.model_dump()), self._profile)
             return

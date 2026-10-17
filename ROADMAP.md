@@ -5288,6 +5288,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | done        | 3dedca5 |
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 | 357 | Lines of at most 120 characters, held by `ruff check`                                  | done        | 4ebf951 |
+| 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14210,6 +14211,19 @@ names in `evals/scoring.py`, the pages and scripts of tests, and the words of on
 taken out. `pyproject.toml` no longer ignores E501, so `ruff check` holds every line of Python to 120 characters. Docs:
 `CONTRIBUTING.md`.
 
+### 358. Settings › Browser: the zoom Dot's own Chrome draws pages at
+
+**Status: in progress.** The owner's choice of 2026-10-18, among the rows of T3 Code's Settings › Browser that item 354
+left out: the default zoom. **As built (2026-10-18).** `[browser] zoom` (percent, 25 to 500, 100 by default) is how
+large Dot's own Chrome draws pages: `browser/profiles.py` writes it as Chrome's default zoom
+(`partition.default_zoom_level`, the level whose power of 1.2 is the factor, as Chrome's own settings page writes it)
+into the preferences of the profile in use before Chrome starts on it, the other preferences kept. Settings › Browser ›
+**Zoom of pages** offers Chrome's steps from 50 to 200 and sends it with the look (`POST /api/browser/look`); Dot's own
+Chrome starts again with it at the next call that needs it, and your Chrome keeps its own. Measured in Chrome: a page of
+1280 × 860 at 125 has the room of 1024 × 688 and a `devicePixelRatio` of 1.25, with a size of its own and filling its
+window alike. Tests: `tests/unit/test_browser_profiles.py`, `tests/smoke/test_browser_settings.py`. Docs:
+`docs/browser-and-computer-use.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -14983,3 +14997,4 @@ taken out. `pyproject.toml` no longer ignores E501, so `ruff check` holds every 
 - 2026-10-17 (Opus 5.5): item 357 on the owner's word of the same day ("Tüm bu açık problemleri düzelt", fix all these open problems), on `item-357-long-lines`: the 391 long lines wrapped with every value kept, and `ruff check` holds every line of Python to 120 characters.
 - 2026-10-17 (Opus 5.5): item 357 done (`4ebf951`); item 280 left for the owner's word on spending a hosted model's quota on its evals, with how to run them.
 - 2026-10-17 (Opus 5.5): item 271, after its merge: the live daemon could not read Tailscale's status, because the app's program answers as its command line only with `TAILSCALE_BE_CLI=true` when no terminal runs it; fixed on `item-271-tailscale-cli`.
+- 2026-10-18 (Opus 5.5): item 358 on the owner's choice of the same day (of the rows T3 Code's Settings › Browser has that item 354 left out, the default zoom), on `item-358-browser-zoom`.

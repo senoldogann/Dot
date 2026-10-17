@@ -53,10 +53,10 @@ _SCRIPT_WAIT_S: float = 5.0
 _FINISH: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
 )
-# What a page sees of itself: the size of its window and the colour scheme it is told to prefer.
+# What a page sees of itself: the size of its window, the colour scheme it is told to prefer and how large it is drawn.
 _SEEN: str = (
     "({width: innerWidth, height: innerHeight, dark: matchMedia('(prefers-color-scheme: dark)').matches,"
-    " light: matchMedia('(prefers-color-scheme: light)').matches})"
+    " light: matchMedia('(prefers-color-scheme: light)').matches, zoom: devicePixelRatio})"
 )
 
 
@@ -171,14 +171,26 @@ async def test_a_page_has_the_size_and_the_colour_scheme_chosen(
         headless, server, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work
     )
     try:
-        await session.set_look(PageLook(fit_window=False, viewport_width=1024, viewport_height=768, appearance="dark"))
+        await session.set_look(
+            PageLook(fit_window=False, viewport_width=1024, viewport_height=768, appearance="dark", zoom=100)
+        )
         dark: dict[str, object] = await _seen(session, site)
         assert (dark["width"], dark["height"], dark["dark"]) == (1024, 768, True), dark
-        await session.set_look(PageLook(fit_window=False, viewport_width=390, viewport_height=844, appearance="light"))
+        await session.set_look(
+            PageLook(fit_window=False, viewport_width=390, viewport_height=844, appearance="light", zoom=100)
+        )
         light: dict[str, object] = await _seen(session, site)
         assert (light["width"], light["height"], light["light"]) == (390, 844, True), light
+        # Drawn at 125 %, a page of 1280 by 860 has the room of 1024 by 688 (item 358).
+        await session.set_look(
+            PageLook(fit_window=False, viewport_width=1280, viewport_height=860, appearance="light", zoom=125)
+        )
+        zoomed: dict[str, object] = await _seen(session, site)
+        assert (zoomed["width"], zoomed["height"], zoomed["zoom"]) == (1024, 688, 1.25), zoomed
         # Filling its window, a page has the window's size, and the model is told that size.
-        await session.set_look(PageLook(fit_window=True, viewport_width=390, viewport_height=844, appearance="light"))
+        await session.set_look(
+            PageLook(fit_window=True, viewport_width=390, viewport_height=844, appearance="light", zoom=100)
+        )
         filled: dict[str, object] = await _seen(session, site)
         assert filled["width"] != 390, filled
         shot = await session.screenshot("look")
@@ -284,10 +296,15 @@ async def test_settings_browser_sets_what_t3_codes_sets_and_keeps_it(tmp_path: P
                 await _changed(page, "/api/browser/look", looks.get_by_role("button", name="Dark").click)
                 await expect(looks.get_by_role("button", name="Dark")).to_have_attribute("aria-pressed", "true")
                 assert 'appearance = "dark"\n' in _kept()
+                zoom: Locator = page.get_by_role("combobox", name="Zoom of pages")
+                await expect(zoom).to_have_value("100")
+                await _changed(page, "/api/browser/look", partial(zoom.select_option, "125"))
+                await expect(zoom).to_have_value("125")
+                assert "zoom = 125\n" in _kept()
                 shown: Locator = page.get_by_role("switch", name="Show Dot's computer when a run opens the browser")
                 await expect(shown).to_have_attribute("aria-checked", "true")
                 # Each row stays inside the window, on a phone too.
-                for row in (allowed, size, shown):
+                for row in (allowed, size, zoom, shown):
                     assert await page.locator(".setting", has=row).evaluate(
                         "(row) => row.getBoundingClientRect().right <= window.innerWidth"
                     )
@@ -296,6 +313,7 @@ async def test_settings_browser_sets_what_t3_codes_sets_and_keeps_it(tmp_path: P
                 await _changed(page, "/api/browser/enabled", allowed.click)
                 await _changed(page, "/api/browser/look", partial(size.select_option, "1280x860"))
                 await _changed(page, "/api/browser/look", looks.get_by_role("button", name="System").click)
+                await _changed(page, "/api/browser/look", partial(zoom.select_option, "100"))
                 await page.close()
         finally:
             await browser.close()

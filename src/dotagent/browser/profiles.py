@@ -2,16 +2,22 @@
 in use at a time (``[browser] profile``). Default is the profile Dot always had (``browser-profile`` in its home);
 Incognito keeps nothing, as its folder is emptied before Chrome starts on it and after it closes; the ones the owner
 adds live under ``browser-profiles``, a folder each, named as the profile. The Chrome of the user has its own profiles,
-so these apply to Dot's own Chrome only.
+so these apply to Dot's own Chrome only. The zoom Dot's own Chrome draws pages at (item 358) is written into the
+preferences of the profile in use before Chrome starts on it.
 """
 
+import os
 import shutil
+import tempfile
 from pathlib import Path
 from typing import Literal
 
-from dotagent.core.errors import InvalidValueError, NotFoundError
+from pydantic import JsonValue, TypeAdapter, ValidationError
+
+from dotagent.browser.look import zoom_level
+from dotagent.core.errors import BrowserError, InvalidValueError, NotFoundError
 from dotagent.core.paths import browser_incognito_dir, browser_profile_dir, browser_profiles_dir
-from dotagent.core.types import FrozenModel
+from dotagent.core.types import FrozenModel, JsonObject
 
 DEFAULT_PROFILE: str = "default"
 INCOGNITO_PROFILE: str = "incognito"
@@ -20,6 +26,12 @@ MAX_ADDED_PROFILES: int = 24
 # What Chrome keeps of the sites in a profile's folder (its first profile, "Default"): the cookies with the files SQLite
 # keeps beside them, and the caches. Read on Chrome 155 on macOS (2026-10-17); chrome_import.py copies the same cookies.
 _PROFILE_DIR: str = "Default"
+# The file Chrome keeps a profile's settings in, and the key of its default storage partition, under which its default
+# zoom level is kept (``partition.default_zoom_level.x``, as Chrome's own settings page writes it).
+_PREFERENCES: str = "Preferences"
+_DEFAULT_PARTITION: str = "x"
+_PREFERENCES_MODE: int = 0o600
+_JSON_OBJECT: TypeAdapter[JsonObject] = TypeAdapter(JsonObject)
 _COOKIES: tuple[str, ...] = ("Cookies", "Cookies-journal", "Cookies-wal", "Cookies-shm")
 _CACHES: tuple[str, ...] = ("Cache", "Code Cache", "GPUCache", "DawnGraphiteCache", "DawnWebGPUCache")
 
@@ -102,3 +114,46 @@ def empty_incognito() -> None:
     folder: Path = browser_incognito_dir()
     if folder.exists():
         shutil.rmtree(folder)
+
+
+def write_default_zoom(folder: Path, percent: int) -> None:
+    """Have the Chrome that starts on the profile in ``folder`` draw pages at ``percent`` of their size (item 358):
+    Chrome's default zoom, kept in the profile's preferences, which Chrome reads when it starts. Blocking, and while no
+    Chrome holds the profile; the other preferences stay as they are."""
+    preferences: Path = folder / _PROFILE_DIR / _PREFERENCES
+    kept: JsonObject = _preferences(preferences)
+    partition: JsonValue = kept.get("partition", {})
+    zooms: JsonValue = partition.get("default_zoom_level", {}) if isinstance(partition, dict) else None
+    if not isinstance(partition, dict) or not isinstance(zooms, dict):
+        raise BrowserError(
+            "Chrome's preferences of the profile keep the zoom in a way Dot does not know", {"path": str(preferences)}
+        )
+    changed: JsonObject = {
+        **kept,
+        "partition": {**partition, "default_zoom_level": {**zooms, _DEFAULT_PARTITION: zoom_level(percent)}},
+    }
+    preferences.parent.mkdir(parents=True, exist_ok=True)
+    mode: int = preferences.stat().st_mode & 0o777 if preferences.exists() else _PREFERENCES_MODE
+    descriptor, temporary = tempfile.mkstemp(dir=preferences.parent, prefix=f".{_PREFERENCES}.", suffix=".tmp")
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(_JSON_OBJECT.dump_json(changed).decode("utf-8"))
+        os.chmod(temporary, mode)
+        os.replace(temporary, preferences)
+    except OSError:
+        Path(temporary).unlink(missing_ok=True)
+        raise
+
+
+def _preferences(path: Path) -> JsonObject:
+    """The preferences Chrome keeps in ``path``, none when it has not written them yet."""
+    try:
+        text: str = path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return {}
+    try:
+        return _JSON_OBJECT.validate_json(text)
+    except ValidationError as error:
+        raise BrowserError(
+            "Chrome's preferences of the profile are not a JSON object", {"path": str(path), "error": str(error)[:400]}
+        ) from error

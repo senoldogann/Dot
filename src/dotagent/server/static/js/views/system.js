@@ -892,6 +892,8 @@ const APPEARANCES = [
   { id: "light", label: "Light", hint: "Light, whatever the Mac shows" },
   { id: "dark", label: "Dark", hint: "Dark, whatever the Mac shows" },
 ];
+// The zoom Dot's own Chrome draws pages at (item 358), in percent, as Chrome's own settings offer it.
+const ZOOMS = [50, 67, 75, 80, 90, 100, 110, 125, 150, 175, 200];
 
 /**
  * Which Chrome the agent browses with. Switching to "My Chrome" needs Chrome to allow remote debugging, which only the
@@ -989,6 +991,14 @@ function buildBrowser(isDisposed) {
     selected: "system",
     onSelect: (id) => attempt(() => chooseLook({ ...view.look, appearance: id })),
   });
+  const zooms = el("select", { class: "select sm", "aria-label": "Zoom of pages" });
+  zooms.addEventListener("change", () => attempt(() => chooseLook({ ...view.look, zoom: Number(zooms.value) })));
+  const zoomSetting = el(
+    "div",
+    { class: "setting" },
+    el("div", { class: "row" }, el("span", { class: "grow" }, "Zoom of pages"), zooms),
+    el("div", { class: "hint" }, "How large Dot's own Chrome draws pages; ⌘+ and ⌘− still change one site there. Your Chrome keeps its own."),
+  );
   const autoComputer = switchSetting({
     label: "Show Dot's computer when a run opens the browser",
     hint: "On a wide window the details panel opens on the page the run works in, beside the chat; a phone keeps its button. Kept in this browser.",
@@ -1263,6 +1273,15 @@ function buildBrowser(isDisposed) {
     sizes.disabled = view.mode !== "own";
   }
 
+  function paintZooms() {
+    const chosen = view.look.zoom;
+    // A zoom set by hand in the config file is shown as it is, among the others.
+    const options = ZOOMS.includes(chosen) ? ZOOMS : [...ZOOMS, chosen].sort((a, b) => a - b);
+    zooms.replaceChildren(...options.map((zoom) => el("option", { value: String(zoom) }, `${zoom}%`)));
+    zooms.value = String(chosen);
+    zooms.disabled = view.mode !== "own";
+  }
+
   async function chooseSize(id) {
     const size = PAGE_SIZES.find((candidate) => candidate.id === id);
     if (size === undefined) {
@@ -1295,6 +1314,7 @@ function buildBrowser(isDisposed) {
     paintProfiles();
     paintSizes();
     appearance.choice.set(view.look.appearance);
+    paintZooms();
     autoComputer.paint();
     raise.paint();
     paintPort();
@@ -1448,6 +1468,7 @@ function buildBrowser(isDisposed) {
       profileSetting,
       sizeSetting,
       appearance.element,
+      zoomSetting,
       raise.element,
       autoComputer.element,
       el(
