@@ -369,7 +369,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
   // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns.
-  const customizeLink = el("a", { class: "side-link", href: "#/customize", onclick: onNavigate }, icon("plug"), el("span", null, "Customize"));
+  const customizeLink = el("a", { class: "side-link", href: "#/customize/plugins", onclick: onNavigate }, icon("plug"), el("span", null, "Customize"));
 
   // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
   // under a chat among them; while chats are being chosen, their boxes. A row folded away is left out.

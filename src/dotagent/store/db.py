@@ -2692,6 +2692,18 @@ class Store:
         rows = await self._all("SELECT DISTINCT memory_id FROM memory_uses WHERE run_id = ?", (run_id,))
         return {str(row["memory_id"]) for row in rows}
 
+    async def handed_in_thread(self, thread_id: str, run_id: str) -> set[str]:
+        """The notes the runs of thread ``thread_id`` other than ``run_id`` were handed, however they were handed them:
+        what a chat has recalled before one of its runs (item 335). A run a rewind took out of the chat (item 282) is no
+        longer the chat's, and neither are its notes."""
+        rows = await self._all(
+            "SELECT DISTINCT memory_uses.memory_id AS memory_id FROM memory_uses"
+            " JOIN runs ON runs.id = memory_uses.run_id"
+            " WHERE runs.thread_id = ? AND memory_uses.run_id != ? AND runs.rewound_at IS NULL",
+            (thread_id, run_id),
+        )
+        return {str(row["memory_id"]) for row in rows}
+
     @_writing
     async def mark_memories_used(self, run_id: str, memory_ids: Sequence[str], when: float, how: MemoryUseHow) -> None:
         """Count one more use of each note, at ``when``, and record that run ``run_id`` was handed it (``how``: at its

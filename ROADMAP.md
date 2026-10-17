@@ -5254,8 +5254,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 313 | A note a run saves, corrects or forgets is a quiet line in the chat                    | done        | 5655e6f |
 | 314 | A run drafts an email or a message; the owner sends, edits or discards it              | done        | 5655e6f |
 | 315 | An agent starts from one of eight templates and goes to another home as a file         | done        | 5655e6f |
-| 316 | Customize › Plugins: every service Dot works with, its way to connect and its own page | in progress |         |
-| 317 | Customize › Skills: the skills Dot reads as cards, personal and system                 | in progress |         |
+| 316 | Customize › Plugins: every service Dot works with, its way to connect and its own page | done        | 9e04983 |
+| 317 | Customize › Skills: the skills Dot reads as cards, personal and system                 | done        | 9e04983 |
 | 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | done        | 1334b9f |
 | 327 | A run that hesitates over what it was asked says so at once                            | done        | 5655e6f |
 | 328 | A phone that comes back to Dot finds it calm                                           | done        | 34ad323 |
@@ -5265,6 +5265,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | done        | 34ad323 |
 | 333 | `dotx setup` leads to a working model, and the home says when none answers             | done        | 34ad323 |
 | 334 | The repository opens with a short README, its details under docs/                      | done        | 34ad323 |
+| 335 | A chat says it recalled notes only when one of them is new                             | in progress |         |
+| 336 | A message's foot follows it closely                                                    | in progress |         |
+| 337 | On a phone a switch is smaller                                                         | in progress |         |
+| 338 | On a phone the button at the top left is the one way back                              | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13293,8 +13297,7 @@ agent holding one is exported.
 
 ### 316. Customize › Plugins: every service Dot works with, its way to connect and its own page
 
-**Status: in progress.** On the branch `items-316-317-customize`, after `items-328-phone`; not merged. The plan is
-`reports/grok-bot-ve-codex-plani-2026-10-16.md` (B group), with the owner's answers of 2026-10-17.
+**Status: done.** Merged as `9e04983` (PR #329; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The owner's word of 2026-10-16, with screenshots of Codex's desktop app: a Plugins page and a Skills
 page as Codex has them, more settled and with more variety. Connect apps listed the Mac's applications, the web's and
@@ -13331,7 +13334,7 @@ such ("Not tried yet"), which is how the page reaches the plan's 25 and more.
 
 ### 317. Customize › Skills: the skills Dot reads as cards, personal and system
 
-**Status: in progress.** On the branch `items-316-317-customize`, with item 316; not merged.
+**Status: done.** Merged as `9e04983` (PR #329; no Linear issue, the Linear connector was signed out).
 
 **What was found.** The same word of the owner's. The skills were a tab of the settings that listed the learned ones
 and what the Mac's other agents set up, but neither the owner's own skills, nor those that come with Dot or its
@@ -13704,6 +13707,64 @@ had no links or classifiers, and nothing said plainly that Dot runs on macOS alo
   what they named in the README.
 - Left as they are, for the owner to decide: ROADMAP.md in the repository, the item numbers in comments and in the
   pages, and a release on PyPI.
+
+## Part 54: the owner's four fixes of 2026-10-17
+
+The owner's word of 2026-10-17, in the chat: "Her zaman recalled .. memoires textini göstermesin sohbette, ajanin ve
+bizim mesajimzia mesajin altindaki koplyama , saat ve kac saniyede bittigi alani cok uzak aradaki üstten boslugu biraz
+azalt, ve mobilde on off butonlari cok büyük lütfen bunlarinda boyutunu düzelt ve mobilde bir sayfaya gittigimizde geri
+butonuna tikladigimizda en bas sayfaya atiyor. 2 farkli geri butonu olmamamli tek bir tane sol üstte olmali, en sonki
+sayfaya döndürmeli." (the chat should not always show the recalled memories; the copy, time and duration under a
+message stand too far from it; on a phone the on/off switches are too big; on a phone Back leads to the first page, and
+there should be one way back, at the top left, to the page before.) Built on `items-335-338-phone-fixes`, after
+`items-316-317-customize`; not merged.
+
+### 335. A chat says it recalled notes only when one of them is new
+
+**Status: in progress.** **As built (2026-10-17).** A run's `memories` event counts the notes its chat had not been
+handed before (`fresh`; `Store.handed_in_thread` reads `memory_uses`). The chat's page draws "Recalled N memories" only
+when one is fresh, with "(M new)" when some are not; notes learned on a site and those picked up while the run works
+still show, and an event stored before this item shows as before. Test: `tests/smoke/test_recalled_line.py` (three chat
+runs of one thread through the real loop: fresh 2, 0 and 1 of 3; on the pages a line, none, and "Recalled 3 memories
+(1 new)"). After the review: a run a rewind took out of the chat (item 282) no longer counts its notes
+(`rewound_at IS NULL`; the test rewinds a stored run).
+
+### 336. A message's foot follows it closely
+
+**Status: in progress.** **As built (2026-10-17).** The answer's foot (the copy button, the time, how long the run took)
+drops its 12 px margin and rises 4 px into the last line's own spacing; on a phone your message's foot rises by the band
+its finger-sized buttons add above their marks. Measured from the bubble and from the answer's last line to the first
+thing of the foot that shows: 8 and 26 px in a Mac's window before, 4 and 10 after; 13 and 23 px on an iPhone before, 5
+and 7 after. After the review the feet rise only right under a bubble or under a text's last line: under a sent file or
+pick, under a code block, table or picture, and in a foot with no copy button, they keep clear (8 px); and a ghost
+button's hover ground shows only where a pointer hovers, so a tap does not leave it drawn over the bubble. Test:
+`tests/smoke/test_message_foot.py` (Chrome as a Mac's window, WebKit as an iPhone; the file, the block and the foot
+without a button are put on the page by the test).
+
+### 337. On a phone a switch is smaller
+
+**Status: in progress.** **As built (2026-10-17).** On a phone a switch draws a 40 by 24 px track with a 20 px knob,
+not iOS's 52 by 32 px (item 329), in a 48 by 44 px box whose band is clear, so it still takes a finger and a tap on its
+row still turns it; a Mac's window keeps 34 by 20 px. After the review the track is the switch's ::before, a pill in
+either state, and the box's ground stays clear (before, on painted the whole 48 by 44 px box and the corners were
+ellipses). Test: `test_phone_type.py` (the box, the track's size and shape and the box's ground, on and off, on an
+iPhone).
+
+### 338. On a phone the button at the top left is the one way back
+
+**Status: in progress.** **As built (2026-10-17).** The router keeps the trail of the pages opened by the pages' own
+links (`main.js` `followTrail`). On a phone a page reached that way says Back and returns along it (`history.back`); a
+page opened directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team:
+`ROUTES`' `parent`) leads there; any other page keeps the button that opens the list of chats. The sidebar, an address
+and the browser's own Back start the trail anew or step back on it. On a phone the pages' own links back are hidden,
+and the settings' "All settings" is gone. Docs: `docs/phone.md`. Test: `tests/smoke/test_phone_back.py` (the settings,
+a service's page by its address and from its tile, a run from Activity and a chat from the sidebar in WebKit as an
+iPhone, then a Mac's window); `test_phone_settings.py` goes back with Back. After the review each history entry
+keeps whether its page was opened by a link (`history.state.dotLinked`), so the browser's Forward and a reload keep
+Back; a link is told by a capture-phase click anywhere but the sidebar (a helper's row stops its clicks; a modified
+click opens another tab), a link to an old address counts for the page it leads to, the page above replaces the page
+Back leaves in the history, `#/customize` is `#/customize/plugins`, Back is reckoned again when a phone turns, and as
+Back the button names no panel (no `aria-controls` or `aria-expanded`). The test walks each of them.
 
 ## Log
 
@@ -14457,3 +14518,5 @@ had no links or classifiers, and nothing said plainly that Dot runs on macOS alo
 - 2026-10-16 (Opus 5.5): item 318, the first of the plan's B group as the owner chose: a "+" in the composer picks plugins (MCP servers), skills and Plan first for a message, as chips; the run starts with the picked servers' tools on and the skills' instructions after the owner's words; Save skill writes a learned skill at the owner's word. Built on `item-318-composer-picks`, after PR #326.
 - 2026-10-17 (Opus 5.5): items 316 and 317 on the owner's word ("Bunların hepsini onaylıyorum yap"): Customize, with Plugins (34 services in six sections, 26 tried, the marks of Simple Icons, a page for each service, the steps of Connect apps) and Skills (cards two a row, Personal and System, Save from a chat); on `items-316-317-customize`.
 - 2026-10-17 (Opus 5.5): on the owner's word ("Bunların hepsini onaylıyorum yap"): PR #326 merged as `5655e6f`, after its one failing test was made to hold on any Mac (`cp $(echo case x)` now writes over /etc/hosts, which every machine has, instead of a ~/.zshrc the CI runner lacks); PR #327 (item 318) merged as `1334b9f`, with the event loop's heartbeat tests given limits between the runner's own pauses and the faults they guard against (0.25 s and 0.5 s) and a check that the notes are compared off the loop's thread; PR #328 (items 328 to 334) merged as `34ad323`. Main's checkout moved to it (its 181 uncommitted entries were the copy of PR #326 and were kept in a backup first) and the daemon restarted at 06:21:27 while no run worked.
+- 2026-10-17 (Opus 5.5): items 335 to 338 on the owner's word of the same day (the recalled line, the foot of a message, a phone's switches and its one way back), on `items-335-338-phone-fixes`.
+- 2026-10-17 (Opus 5.5): PR #329 (items 316 and 317) merged as `9e04983`, after a deep review (`/code-review`, an independent reviewer and a security pass) whose findings A1 to A9 and S1 it fixes (PLAN.md); items 335 to 338 rebased on it, with the review's B1 to B10 and the history race the full gate found (test_controls).

@@ -274,7 +274,7 @@
 
 /* On a phone the settings open on a list of their tabs in groups, after T3 Code's (item 330): each group's name over a
    card of rows, a row the tab's mark, its name, what it holds and an arrow. A row opens its tab as a page of its own,
-   the way back to the list at its top in the rail's place. */
+   whose way back to the list is the bar's Back at the top left (item 338). */
 .settings-list {
   display: flex;
   flex-direction: column;
@@ -340,20 +340,10 @@
   white-space: nowrap;
 }
 
-.back.settings-back {
-  display: none;
-}
-
 /* A tab's page: its cards' names stand over them (app.css, items 330 and 332). */
 @media (max-width: 720px) {
   .settings-side {
     display: none;
-  }
-
-  .back.settings-back {
-    display: inline-flex;
-    justify-self: start;
-    margin-bottom: 0;
   }
 }
 

@@ -69,8 +69,21 @@ _SETTLE_S: float = 10.0
 _MAC_SIZES: list[str] = ["12px", "13px", "14px", "15px", "17px", "20px", "24px"]
 _MAC_BODY: str = "14px"
 _MAC_SWITCH: list[int] = [34, 20]
-# On a phone the switch's box is a finger's height around iOS's 52 by 32 px track.
-_PHONE_SWITCH: list[int] = [64, 44]
+# On a phone the switch's box is a finger's height around a 40 by 24 px track (item 337; iOS's 52 by 32 px before).
+_PHONE_SWITCH: list[int] = [48, 44]
+_PHONE_TRACK: list[int] = [40, 24]
+_CLEAR: str = "rgba(0, 0, 0, 0)"
+# A switch's track (its ::before) by its size, whether its corners are half its height (a pill), and the box's ground.
+_TRACK: str = """(s) => {
+  const track = getComputedStyle(s, "::before");
+  const height = parseFloat(track.height);
+  const radius = parseFloat(track.borderTopLeftRadius);
+  return {
+    track: [Math.round(parseFloat(track.width)), Math.round(height)],
+    round: Math.min(radius, height / 2) === height / 2,
+    box: getComputedStyle(s).backgroundColor,
+  };
+}"""
 _DURATION: re.Pattern[str] = re.compile(r"\d")
 _ANSWER: str = (
     "## Lisbon, two nights under 400 EUR\n\n"
@@ -347,6 +360,12 @@ async def test_a_steps_duration_shows_and_a_settings_row_turns_its_switch_on_a_p
             await toggle.tap()
             await expect(toggle).to_have_attribute("aria-checked", str(was))
             assert await toggle.evaluate("(s) => [s.offsetWidth, s.offsetHeight]") == _PHONE_SWITCH
+            # The track is drawn by ::before, a pill in either state, and the box around it stays clear (review B2:
+            # on, the box's own ground filled all of it).
+            for _ in range(2):
+                drawn: object = await toggle.evaluate(_TRACK)
+                assert drawn == {"track": _PHONE_TRACK, "round": True, "box": _CLEAR}, drawn
+                await toggle.tap()
             await context.close()
         finally:
             await browser.close()

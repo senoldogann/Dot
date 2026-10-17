@@ -788,8 +788,11 @@ a.pill:hover {
   color: var(--text-2);
 }
 
-.btn.ghost:hover:not(:disabled) {
-  background: var(--surface-2);
+/* A touch screen keeps :hover after a tap: a ghost button's ground shows on hover where a pointer hovers alone. */
+@media (hover: hover) {
+  .btn.ghost:hover:not(:disabled) {
+    background: var(--surface-2);
+  }
 }
 
 .btn.sm {
@@ -1091,22 +1094,39 @@ a.pill:hover {
   cursor: pointer;
 }
 
-/* On a phone the switch is iOS's size, 52 by 32 px, in a box a finger's height: the band around the track is clear. */
+/* On a phone the switch's track is 40 by 24 px, a little larger than in a Mac's window (iOS's own, 52 by 32 px, read too
+   big beside Dot's settings, item 337), in a box a finger's size whose ground stays clear: the track is drawn by
+   ::before, a pill in either state, and the knob rides in it. */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
-  .switch {
-    width: 64px;
+  .switch,
+  .switch[aria-checked="true"] {
+    width: 48px;
     height: 44px;
-    border: 6px solid transparent;
-    background-clip: padding-box;
+    background: transparent;
+  }
+
+  .switch::before {
+    content: "";
+    position: absolute;
+    inset: 10px 4px;
+    border-radius: var(--radius-pill);
+    background: var(--control);
+    transition: background var(--motion-quick) var(--ease);
+  }
+
+  .switch[aria-checked="true"]::before {
+    background: var(--accent);
   }
 
   .switch::after {
-    width: 28px;
-    height: 28px;
+    top: 12px;
+    left: 6px;
+    width: 20px;
+    height: 20px;
   }
 
   .switch[aria-checked="true"]::after {
-    transform: translateX(20px);
+    transform: translateX(16px);
   }
 }
 
@@ -1528,8 +1548,11 @@ a.pill:hover {
 .plugin-page-bar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
+}
+
+.plugin-page-bar > .btn {
+  margin-left: auto;
 }
 
 .plugin-section-title {
@@ -3134,6 +3157,14 @@ a.pill:hover {
   margin-bottom: 12px;
 }
 
+/* On a phone the bar's button at the top left is the one way back (item 338): a page's own link back is for a wider
+   window. */
+@media (max-width: 720px) {
+  .back {
+    display: none;
+  }
+}
+
 /* The run page's name in the top bar (item 78): the face, Dot's name, the run's state and its start on one line. */
 .stage-title {
   display: flex;
@@ -3400,6 +3431,18 @@ a.pill:hover {
   gap: var(--space-half);
   color: var(--muted);
   font-size: var(--text-sm);
+}
+
+/* Right under the bubble the foot rises into the band its buttons add above their marks (item 336); under a file or a
+   pick it does not, as it would cover them. A phone's finger-sized buttons add a wider band. */
+.bubble.user + .message-foot {
+  margin-top: -4px;
+}
+
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .bubble.user + .message-foot {
+    margin-top: -8px;
+  }
 }
 
 .message-foot .btn:last-child {
@@ -4597,14 +4640,23 @@ a.memory-line:hover .memory-change {
   color: var(--bad);
 }
 
+/* The answer's foot follows its last line closely (item 336): its row is the copy button's height, whose band above the
+   button's mark stands for the space under the line, and it rises into the line's own spacing below its letters. */
 .answer-foot {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 4px 12px;
-  margin-top: 12px;
+  margin-top: -4px;
   color: var(--muted);
   font-size: var(--text-sm);
+}
+
+/* Under a block (code, a table, a picture) or with no copy button to stand for the space under the line, the foot
+   keeps clear of what is above it. */
+.answer > .prose:has(> :is(pre, table, .table-scroll, figure, img, hr):last-child) + .answer-foot,
+.answer-foot:not(:has(.btn)) {
+  margin-top: var(--space-2);
 }
 
 .answer-foot .btn {
