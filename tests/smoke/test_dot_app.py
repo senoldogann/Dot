@@ -89,10 +89,13 @@ def test_dot_app_is_built_once_and_macos_holds_it_responsible_for_the_daemon(tmp
     assert Path(responsible).resolve() == app.resolve(), asked.stdout
     assert name == "Dot"
 
-    # It ends as its child ended, and hands SIGTERM on to it.
+    # It ends as its child ended, and hands SIGTERM on to it. The child sleeps in short steps in the foreground: the
+    # shell runs its trap after each, while its `wait` for a sleep in the background (bash 3.2, macOS's /bin/sh) misses a
+    # signal that comes just before it starts to wait, and so ran into WAIT_S on CI (measured through this launcher: 1
+    # run in 500 did not end within 2 s; with the short steps none did, the slowest in 135 ms).
     assert subprocess.run([str(program), "/bin/sh", "-c", "exit 3"], check=False).returncode == 3
     waiting: subprocess.Popen[str] = subprocess.Popen(
-        [str(program), "/bin/sh", "-c", 'trap "exit 7" TERM; echo ready; sleep 30 & wait'],
+        [str(program), "/bin/sh", "-c", 'trap "exit 7" TERM; echo ready; while :; do sleep 0.1; done'],
         stdout=subprocess.PIPE,
         text=True,
     )

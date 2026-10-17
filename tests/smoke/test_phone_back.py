@@ -6,13 +6,15 @@ served daemon with one finished chat of the scripted model:
 - a run opened from Activity says Back and returns to Activity;
 - a chat opened from the sidebar has the button that opens the list of chats;
 - no page draws a link back of its own on a phone; in a Mac's window no Back shows, and a page's own link back shows
-  while the sidebar is hidden.
+  while the sidebar is hidden;
+- a follow-up sent in a run opened from Activity goes on in the same chat, whose page keeps Back to Activity (item 345).
 
 Before, the button opened the list of chats on every page, so Back from a tab, a service or a run left the page it came
 from, and a tab had its own "All settings" besides.
 """
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -158,6 +160,22 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(page.locator(".sidebar")).to_be_in_viewport()
 
 
+async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
+    """A follow-up goes on in the same chat (item 345): before, its run's page was a new entry of the history that no
+    link had opened, so the button opened the chats and Activity was two steps of the browser's Back away."""
+    button: Locator = page.locator(".stagebar-left button")
+    await page.goto(f"{address}/#/activity")
+    await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
+    await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
+    await expect(button).to_have_attribute("aria-label", "Back")
+    await page.locator(".dock textarea").fill("And the totals, please")
+    await page.locator(".dock .btn.send").click()
+    await expect(page).to_have_url(re.compile(rf"#/runs/(?!{run.id}$)[^/]+$"))
+    await expect(button).to_have_attribute("aria-label", "Back")
+    await button.click()
+    await expect(page).to_have_url(f"{address}/#/activity")
+
+
 async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_path: Path) -> None:
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [ScriptedTurn(text="Done.", calls=())] * 4))
     manager: RunManager = RunManager(runtime)
@@ -213,6 +231,9 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await phone.goto(ui_url("127.0.0.1", port, TOKEN))
                     await _phone_walk(phone, address, ended)
                     await phone.screenshot(path=str(tmp_path / "back-phone.png"))
+                    follow_up: Page = await phone_context.new_page()
+                    await _follow_up_walk(follow_up, address, ended)
+                    await follow_up.close()
                     # A settings tab opened with the phone on its side, wider than a phone's layout, has its page
                     # above it once the phone stands up (review B5).
                     standing: dict[str, int] = dict(phone.viewport_size or {})
