@@ -225,7 +225,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         attempt(async () => {
           const next = await api.post(`/runs/${runId}/resume`, null);
           toast("ok", "Resuming the run…");
-          ctx.navigate(`/runs/${next.id}`);
+          ctx.goOnAt(`/runs/${next.id}`);
         }),
     },
     icon("arrowRight"),
@@ -437,7 +437,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     if (lastAnswered && !active) {
       const [newest] = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=1`);
       if (newest !== undefined && newest.id !== runId) {
-        ctx.navigate(`/runs/${newest.id}`);
+        ctx.goOnAt(`/runs/${newest.id}`);
         return;
       }
     }
@@ -532,7 +532,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onSteered: (text) => holdMessage(text),
     onStarted: (startedRunId, afterRunId) => {
       if (afterRunId === runId) {
-        ctx.navigate(`/runs/${startedRunId}`);
+        ctx.goOnAt(`/runs/${startedRunId}`);
       }
     },
     onEdit: () => syncControls(),
@@ -727,7 +727,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         const next = await deliver(text, files, other);
         frame.clear();
         if (next !== null) {
-          ctx.navigate(`/runs/${next}`);
+          ctx.goOnAt(`/runs/${next}`);
         }
       });
     } finally {
@@ -829,7 +829,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       const cut = await api.post(`/runs/${past.id}/rewind`, { files });
       keepDraft(cut.back_to ?? NEW_CHAT_DRAFT, { text: cut.text, files: cut.files });
       tellRewound(cut);
-      ctx.navigate(cut.back_to === null ? "/runs" : `/runs/${cut.back_to}`);
+      // A chat the rewind emptied leaves for a new one; one that keeps a run goes on at it.
+      if (cut.back_to === null) {
+        ctx.navigate("/runs");
+      } else {
+        ctx.goOnAt(`/runs/${cut.back_to}`);
+      }
     });
   }
 

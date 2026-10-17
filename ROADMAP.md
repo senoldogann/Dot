@@ -5269,12 +5269,13 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 336 | A message's foot follows it closely                                                    | done        | d3cdf18 |
 | 337 | On a phone a switch is smaller                                                         | done        | d3cdf18 |
 | 338 | On a phone the button at the top left is the one way back                              | done        | d3cdf18 |
-| 339 | Back in the owner's Chrome takes a navigation, not 30 s                                | in progress |         |
-| 340 | A tab of Dot's in the owner's Chrome opens in a window of its own                      | in progress |         |
-| 341 | A restarted Chrome is said in one line, and the card follows Chrome                    | in progress |         |
-| 342 | A browser step waits for what it set off, not for a fixed 40 ms                        | in progress |         |
-| 343 | Computer use checks only what it needs, and "Google Chrome" is the Chrome Dot works in | in progress |         |
-| 344 | Settings › Browser opens Dot's own Chrome to sign in to sites                          | in progress |         |
+| 339 | Back in the owner's Chrome takes a navigation, not 30 s                                | done        | 1bf81a1 |
+| 340 | A tab of Dot's in the owner's Chrome opens in a window of its own                      | done        | 1bf81a1 |
+| 341 | A restarted Chrome is said in one line, and the card follows Chrome                    | done        | 1bf81a1 |
+| 342 | A browser step waits for what it set off, not for a fixed 40 ms                        | done        | 1bf81a1 |
+| 343 | Computer use checks only what it needs, and "Google Chrome" is the Chrome Dot works in | done        | 1bf81a1 |
+| 344 | Settings › Browser opens Dot's own Chrome to sign in to sites                          | done        | 1bf81a1 |
+| 345 | A chat that goes on at another of its runs keeps its way back                          | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13785,7 +13786,7 @@ Dot's tabs open in a window of their own, the app in front stays in front and th
 browser_open to its first view, (b) a browser_act of three actions, (c) a computer-use loop and (d) a ten-step task are
 measured before and after on the same Mac, none slower, the three slowest better or shown to be the model's or the
 network's time; and the checks pass. Tests never touch the owner's Chrome (a scratch Chrome through `DOT_CHROME_DIR`);
-the last real try is the owner's. Built on `items-339-chrome`.
+the last real try is the owner's. Built on `items-339-chrome`; merged as #331 (`1bf81a1`).
 
 **Measured** (ms; `tests/smoke/test_chrome_speed.py` against a hidden scratch Chrome in attach mode: five runs each
 side, alternating with `main`, each the median of five calls, shown as the median of the five runs and their range;
@@ -13816,7 +13817,7 @@ slowest of Dot's own steps above are the ten-step task, the computer-use loop an
 
 ### 339. Back in the owner's Chrome takes a navigation, not 30 s
 
-**Status: in progress.** **As built (2026-10-17).** A Chrome that keeps its back-forward cache (the owner's;
+**Status: done (`1bf81a1`).** **As built (2026-10-17).** A Chrome that keeps its back-forward cache (the owner's;
 Playwright's own Chrome turns it off) brings the page Back from the cache with no DOMContentLoaded and no load event:
 `go_back(wait_until="domcontentloaded")` waited the whole navigation timeout, 30 s, and then failed though the tab had
 gone back, and the settle after a click that went back waited the same in `_wait_quiet`. `go_back` now waits for the
@@ -13826,7 +13827,7 @@ reads `document.readyState` in the page. Measured: browser_back in the ten-step 
 
 ### 340. A tab of Dot's in the owner's Chrome opens in a window of its own
 
-**Status: in progress.** **As built (2026-10-17).** In attach mode `_background_tab` makes the tab with
+**Status: done (`1bf81a1`).** **As built (2026-10-17).** In attach mode `_background_tab` makes the tab with
 `Target.createTarget` and `newWindow` besides `background`: the window opens behind the window the owner works in, the
 app in front stays in front (measured: Finder before and after), and the owner's windows and tabs are not touched. With
 Chrome itself in front, as when the owner works in it, the window opens below the owner's and Chrome stays the app in
@@ -13841,7 +13842,7 @@ windows, which criterion 3 asks, at the cost in the table above. One window per 
 
 ### 341. A restarted Chrome is said in one line, and the card follows Chrome
 
-**Status: in progress.** **As built (2026-10-17).** The connection stays across runs (only a switch, closing the session
+**Status: done (`1bf81a1`).** **As built (2026-10-17).** The connection stays across runs (only a switch, closing the session
 or a new DevTools port of Dot's own Chrome drops it), so later runs need no click. When Chrome quits or restarts the
 session marks itself lost; the next call connects again by itself, the owner gets a notification ("Chrome asks to allow
 Dot"), the connection's error starts with "Chrome was closed or restarted", and a step under way when Chrome went fails
@@ -13857,7 +13858,7 @@ call, as the session stayed lost; and a connection whose wait ran out says so ("
 
 ### 342. A browser step waits for what it set off, not for a fixed 40 ms
 
-**Status: in progress.** **As built (2026-10-17).** After a step that can open a tab or a dialog, `_let_events_land`
+**Status: done (`1bf81a1`).** **As built (2026-10-17).** After a step that can open a tab or a dialog, `_let_events_land`
 slept `side_effect_grace_ms` (40 ms) and then waited for the popups Playwright had reported. Probes showed that one turn
 of the page's event loop is enough for Chrome to have told of a dialog, a file chooser, a navigation in the document and
 a tab it made, thirty times in thirty in both modes, and that Playwright reports a new tab only once its page has
@@ -13879,7 +13880,7 @@ on), `test_browser_attach.py::test_a_click_that_asks_for_two_tabs_stops_at_the_o
 
 ### 343. Computer use checks only what it needs, and "Google Chrome" is the Chrome Dot works in
 
-**Status: in progress.** **As built (2026-10-17).** Measured on the act's path: each preparation read all three
+**Status: done (`1bf81a1`).** **As built (2026-10-17).** Measured on the act's path: each preparation read all three
 permissions, 13 ms, where Screen Recording and input events take 6.4 ms each and Accessibility nothing; listing the
 applications (`lsappinfo`) takes 25 ms and ran for the preview and again for the act. Now an act reads Accessibility and
 input events, a screenshot Screen Recording only, and the act uses the preview's listing when it follows within a second
@@ -13899,7 +13900,7 @@ tests, and `tests/smoke/test_desktop_speed.py` for the loop's numbers.
 
 ### 344. Settings › Browser opens Dot's own Chrome to sign in to sites
 
-**Status: in progress.** **As built (2026-10-17).** With Dot's own Chrome, the Browser card has "Sign in to sites in
+**Status: done (`1bf81a1`).** **As built (2026-10-17).** With Dot's own Chrome, the Browser card has "Sign in to sites in
 Dot's Chrome": `POST /api/browser/sign-in` opens Dot's profile in a plain Chrome window, as `dotx browser login` does
 (`start_login_chrome`, which the command now uses too). When Dot's Chrome is open the card asks first, and the route
 closes it (`BrowserSession.let_go_of_chrome`; refused with 409 while runs are active, as a switch is); the card says the
@@ -13908,6 +13909,24 @@ The sessions stay in that profile. After the review the window runs in a session
 the daemon restarts (launchd ends the daemon's process group), one request at a time opens it, and a window that ends
 with an error is logged. Test: `tests/smoke/test_browser_sign_in.py` (a program stands in for Chrome, so no window
 opens; Dot's own Chrome is real and hidden; Chrome wide and on a phone, light and dark, and WebKit as an iPhone).
+
+## Part 56: the next steps of 2026-10-17
+
+The owner's word of 2026-10-17, after the report of Part 55: "Allow demeden de çalışabilmesi mümkün mü? Ayrıca daha
+hızlı browser kullanımı için Chrome içi extension geliştirmeli miyiz? Ardından sıradaki adımları uygula onaylıyorum."
+(can it work without Allow; should we build a Chrome extension for faster browser use; then carry out the next steps,
+approved.) The two questions were answered in the chat from a researcher's sourced findings (PLAN.md). Built on
+`items-345-back-follows`.
+
+### 345. A chat that goes on at another of its runs keeps its way back
+
+**Status: in progress.** **As built (2026-10-17).** A run's page went on to the chat's next run with a new entry of the
+history (a follow-up, the queue's next message, Continue, an answer that starts a run, a rewind that keeps a run): no
+link had opened it, so on a phone the button at the top left opened the chats instead of going back, and Activity was
+two steps of the browser's Back away. The page now goes on with `ctx.goOnAt`, which takes the page's place in the
+history and keeps how the page was reached (`history.state.dotLinked`, item 338); a rewind that empties the chat still
+leaves for a new one. Docs: `docs/phone.md`. Test: `test_phone_back.py` sends a follow-up in a run opened from
+Activity on a WebKit iPhone and goes back to Activity (fails on `main`: "Show sidebar").
 
 ## Log
 
@@ -14665,3 +14684,5 @@ opens; Dot's own Chrome is real and hidden; Chrome wide and on a phone, light an
 - 2026-10-17 (Opus 5.5): PR #329 (items 316 and 317) merged as `9e04983`, after a deep review (`/code-review`, an independent reviewer and a security pass) whose findings A1 to A9 and S1 it fixes (PLAN.md); items 335 to 338 rebased on it, with the review's B1 to B10 and the history race the full gate found (test_controls).
 - 2026-10-17 (Opus 5.5): PR #330 (items 335 to 338) merged as `d3cdf18` after the full gate (658 passed, 1 skipped) and CI; main's checkout moved to it and the daemon restarted while no run worked.
 - 2026-10-17 (Opus 5.5): items 339 to 344 on the owner's word of the same day (smooth, fast browser use and computer use in the owner's Chrome), on `items-339-chrome` as PR #331, with an independent review's fixes (the reconnect notice beside the connection, Chrome's remote debugging refused to desktop steps). The full gate passes (670 smoke, 1739 unit). Not merged: the first browser_open of a chat is slower for the window of its own (criterion 3 against 4), the owner's call.
+- 2026-10-17 (Opus 5.5): PR #331 (items 339 to 344) merged as `1bf81a1` on the owner's go-ahead, the window of item 340 kept; main's checkout moved to it and the daemon restarted at 14:05:43 while no run worked.
+- 2026-10-17 (Opus 5.5): `test_dot_app`'s intermittent timeout on CI traced to its own shell, not the launcher: bash 3.2's `wait` misses a trapped SIGTERM that comes just before it waits (through the launcher, 1 run in 500 did not end within 2 s); the child now sleeps in short foreground steps (500 in 500, the slowest 135 ms). Item 345 on `items-345-back-follows`.

@@ -453,6 +453,16 @@ function beginSession() {
       navigate: (target) => {
         location.hash = `#${target}`;
       },
+      // The chat goes on at the address of another of its runs (a follow-up, the queue's next message, Continue, an
+      // answer, a rewind; item 345): it is the same page, so it takes this page's place in the history and keeps how
+      // the page was reached. A phone's Back still leads where it led (to Activity, for a run opened there), and the
+      // browser's Back skips the run the chat went on from.
+      goOnAt: (target) => {
+        const linked = current !== null && current.linked;
+        history.replaceState(linked ? { dotPath: target, dotLinked: true } : null, "", `${location.pathname}${location.search}#${target}`);
+        // Once the caller's own work is done, as the event of a new address would come.
+        setTimeout(show, 0);
+      },
       setTitle: (text) => {
         setPageTitle(`${text} · Dot`);
       },

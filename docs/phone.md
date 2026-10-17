@@ -76,8 +76,9 @@ The round button at the top left is the one way back (item 338). On a page opene
 Activity, a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on a page opened
 directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;
 on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and Forward and a
-reload keep it as it was, and it is reckoned again when the phone turns. The pages' own links back show in a wider
-window only.
+reload keep it as it was, and it is reckoned again when the phone turns. A chat that goes on at another of its runs (a
+follow-up, the queue's next message, Continue, an answer, a rewind) stays the same page: it keeps its Back, and the
+browser's Back skips the run it went on from (item 345). The pages' own links back show in a wider window only.
 
 An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
 that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›
