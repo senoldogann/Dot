@@ -6,6 +6,7 @@
 // moment it ended, so the groups of a run add up to the time the run took; the part of that time the model's turns took is
 // in brackets, "Worked for 12 s (model 8 s)".
 
+import { AUTO_LINES, valueOf } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
 import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
@@ -982,6 +983,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const data = record.data;
       const yolo = data.decided_by === "yolo";
       const denied = data.status === "denied";
+      // Settings › General may keep such lines out of the chat (item 346); a refusal stays, as its action did not run.
+      if (!denied && valueOf(AUTO_LINES) === "hidden") {
+        return;
+      }
       const verdict = yolo ? "YOLO, not asked" : denied ? "Reviewer denied" : "Reviewer approved";
       const said = data.note === "" || data.summary.endsWith(data.note);
       const reason = said ? "" : ` — ${clip(data.note, 240)}`;

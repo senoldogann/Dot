@@ -2,7 +2,7 @@
 
 import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
-import { BUSY_SEND, SEND_KEY, setValue, valueOf } from "../appearance/settings.js";
+import { AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, valueOf } from "../appearance/settings.js";
 import {
   notificationsAvailable,
   notificationsBlocked,
@@ -153,6 +153,19 @@ function buildComposerCard() {
     onSelect: (id) => setValue(BUSY_SEND, id),
   });
   return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
+}
+
+/** What a chat shows of the actions that ran without asking you (item 346), kept in this browser. */
+function buildChatCard() {
+  const lines = switchSetting({
+    label: "Show what ran without asking",
+    hint: "A line under the step for each action YOLO let through without asking you, or the reviewer approved. Off, the chat leaves them out; a refusal still shows. Kept in this browser.",
+    read: () => valueOf(AUTO_LINES) === "shown",
+    write: async (on) => setValue(AUTO_LINES, on ? "shown" : "hidden"),
+    onToggled: () => lines.paint(),
+  });
+  lines.paint();
+  return section("Chat", null, el("div", { class: "card-pad stack" }, lines.element));
 }
 
 function buildDaemon() {
@@ -1320,11 +1333,12 @@ function buildDotLookCard() {
 export function mountGeneral(root, ctx) {
   const look = buildDotLookCard();
   root.append(
-    paneHead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, and the token this browser is signed in with.", null),
+    paneHead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, what a chat shows of what ran without asking, and the token this browser is signed in with.", null),
     buildNameCard(),
     look.element,
     buildNotifications(),
     buildComposerCard(),
+    buildChatCard(),
     buildTokenCard(),
   );
   return look.dispose;

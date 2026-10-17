@@ -303,7 +303,9 @@ that one change back once the run has ended (`POST /api/runs/{id}/undo`); the se
 `GET /api/runs/{id}/actions`.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
-notifications and the token this browser is signed in with), **Appearance** (the look of this browser, below),
+notifications, the composer's keys, the Chat card's "Show what ran without asking", whose off leaves out of a chat the
+lines of the actions YOLO let through and of those the reviewer approved while a refusal still shows (item 346, kept in
+this browser), and the token this browser is signed in with), **Appearance** (the look of this browser, below),
 **Models** (the **Default model** first, a menu of the models that can call tools: the runs that name no model, a new
 chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`, as when it is changed
 from the composer's model menu; then one fold per provider, with the reasoning levels of each model and a menu to choose
@@ -349,9 +351,9 @@ two switches that follow the theme picked for light until you set them yourself:
 Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how long the sidebar and the details panel
 take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never slide), and "Faces that move"
 (below). **Text** (item 331): one **Text size** under a line of an answer, the size of the body on this device, every
-text size scaled with it: on a phone 14 to 20 px around 16, as iOS's own, and elsewhere 13 to 17 px around 14; each
-device keeps its own. **Type**: the interface's font (Inter, the system's, or families typed, which go before Inter so
-that no glyph goes missing); the answers' font (the theme's,
+text size scaled with it: on a phone 12 to 20 px around 16 (item 347), as iOS's own, and elsewhere 13 to 17 px around
+14; each device keeps its own. **Type**: the interface's font (Inter, the system's, or families typed, which go before
+Inter so that no glyph goes missing); the answers' font (the theme's,
 which is a serif in Paper, the interface's, or a serif); the composer's font (the interface's, a serif, the code's, or
 families typed) and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed)
 and the size of an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on)

@@ -150,8 +150,8 @@
 }
 
 /* A phone (item 329): a touch screen of a phone's width, or of a phone's height on its side. Its text is a phone's, the
-   body 16 px as iOS's own and nothing under 13 px, and the interface's size (Settings › Appearance) still scales the
-   seven sizes; an iPad and a Mac keep the sizes above. */
+   body 16 px as iOS's own and nothing under 13 px at that size, and the interface's size (Settings › Appearance, 12 to
+   20 px, item 347) still scales the seven sizes; an iPad and a Mac keep the sizes above. */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   :root {
     --text-xs: calc(13px * var(--type-scale));

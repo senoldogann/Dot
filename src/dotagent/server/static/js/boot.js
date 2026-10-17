@@ -73,13 +73,13 @@
   if (panelMotion !== null && panelMotion !== 200) {
     root.style.setProperty("--motion-panel", panelMotion + "ms");
   }
-  // The body's size on this device, as appearance/settings.js keeps it (item 331): on a phone (app.css, item 329) 14 to
-  // 20 px, 16 its own; elsewhere 13 to 17 px, 14 its own.
+  // The body's size on this device, as appearance/settings.js keeps it (item 331): on a phone (app.css, item 329) 12 to
+  // 20 px (item 347), 16 its own; elsewhere 13 to 17 px, 14 its own.
   var phoneType = window.matchMedia(
     "(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)"
   ).matches;
   var ownBody = phoneType ? 16 : 14;
-  var interfaceSize = phoneType ? whole("dot.sizeInterface", 14, 20, 1) : whole("dot.sizeInterface", 13, 17, 1);
+  var interfaceSize = phoneType ? whole("dot.sizeInterface", 12, 20, 1) : whole("dot.sizeInterface", 13, 17, 1);
   if (interfaceSize !== null && interfaceSize !== ownBody) {
     root.style.setProperty("--type-scale", String(interfaceSize / ownBody));
   }

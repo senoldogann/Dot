@@ -1,6 +1,7 @@
 """The line of an action a yolo run did without asking (item 253), on a run's page in Chrome: the action and the policy's
 reason read once each, for a record the gate keeps now and for one kept before, whose summary ended with its note. Wide
-and on a phone, light and dark. Before, the line said the reason twice.
+and on a phone, light and dark. Before, the line said the reason twice. Settings › General keeps such lines out of the
+chat and brings them back (item 346).
 
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server.
 """
@@ -14,7 +15,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.manager import RunManager
@@ -160,6 +161,45 @@ async def test_the_line_of_an_action_done_without_asking_says_the_reason_once(
                         f"YOLO, not asked: {record.summary} — {record.note}",
                     ]
                     await page.screenshot(path=tmp_path / f"yolo-line-{width}-{scheme}.png")
+                    await page.close()
+            finally:
+                await browser.close()
+
+
+@pytest.mark.browser
+async def test_settings_keep_the_lines_of_what_ran_without_asking_out_of_the_chat(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """Item 346: the switch of Settings › General leaves the lines out of a chat and brings them back; before, they
+    always showed."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width, scheme in ((1280, "light"), (390, "dark")):
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                    )
+                    await page.goto(ui_url(host, port, TOKEN))
+                    run, _ = await _waived(runtime, manager, f"Touch the shelf again ({width}, {scheme})")
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    assert len(await _lines(page, 2)) == 2
+                    shown: Locator = page.get_by_role("switch", name="Show what ran without asking")
+                    await page.goto(f"{address}/#/settings/general")
+                    await shown.scroll_into_view_if_needed()
+                    await expect(shown).to_have_attribute("aria-checked", "true")
+                    await page.screenshot(path=tmp_path / f"chat-card-{width}-{scheme}.png")
+                    await shown.click()
+                    await expect(shown).to_have_attribute("aria-checked", "false")
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    await expect(page.locator(".answer").last).to_be_visible()
+                    await expect(page.locator(".auto-decision")).to_have_count(0)
+                    await page.goto(f"{address}/#/settings/general")
+                    await shown.click()
+                    await expect(shown).to_have_attribute("aria-checked", "true")
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    assert len(await _lines(page, 2)) == 2
                     await page.close()
             finally:
                 await browser.close()
