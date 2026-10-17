@@ -500,6 +500,10 @@ viewport_height = 860
 # The colour scheme pages are told to prefer: "system" (the Mac's), "light" or "dark", in Dot's own Chrome and in the tabs
 # Dot opens in your Chrome. Settings › Browser sets it (item 354).
 appearance = "system"
+# How large Dot's own Chrome draws pages, in percent of their size: Chrome's default zoom, which ⌘+ and ⌘− still change
+# for one site. Settings › Browser sets it (item 358); Chrome starts again with the next call that needs it. Your Chrome
+# keeps its own.
+zoom = 100
 navigation_timeout_s = 30.0
 action_timeout_s = 8.0
 # Largest page observation handed to the model (the agent's tool_output_chars caps it further).

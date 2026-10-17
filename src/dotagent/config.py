@@ -339,6 +339,8 @@ class BrowserConfig(FrozenModel):
     viewport_width: int = Field(ge=320, le=3840)
     viewport_height: int = Field(ge=240, le=2160)
     appearance: PageAppearance
+    # How large Dot's own Chrome draws pages, in percent of their size (item 358): Chrome's default zoom.
+    zoom: int = Field(ge=25, le=500)
     navigation_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     action_timeout_s: float = Field(gt=0, allow_inf_nan=False)
     snapshot_max_chars: int

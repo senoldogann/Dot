@@ -85,7 +85,6 @@ _CHECKED_PAGE_CHARS: int = 6000
 _EXPECT_CHARS: int = 300
 _DEFAULT_LINKS_LIMIT: int = 40
 _DEFAULT_WAIT_S: float = 10.0
-_VIEWPORT_SCROLL_RATIO: float = 0.8
 _QUICK_TIMEOUT_S: float = 45.0
 _SLOW_TIMEOUT_S: float = 120.0
 # browser_eval (item 263): the wait for a script's value, by default and at most, the longest script it takes, and how
@@ -513,9 +512,8 @@ def _scroll_tool() -> RegisteredTool:
         return _observe_action("browser_scroll", f"Scroll {args.direction}", ctx)
 
     async def run(args: ScrollArgs, ctx: ToolContext) -> ToolResult:
-        config: BrowserConfig = ctx.runtime.config.browser
-        pixels: int = args.pixels or round(config.viewport_height * _VIEWPORT_SCROLL_RATIO)
-        return _page_result(await ctx.browser.scroll(ctx.thread_id, args.direction, pixels, args.ref), ctx)
+        # With no distance the session scrolls by most of the page area the model sees, as it is now.
+        return _page_result(await ctx.browser.scroll(ctx.thread_id, args.direction, args.pixels, args.ref), ctx)
 
     return make_tool(
         name="browser_scroll",

@@ -325,7 +325,9 @@ async def test_the_colour_scheme_chosen_reaches_new_tabs_and_the_connection_stay
     )
     try:
         await session.open_url("before", f"{site}/")
-        await session.set_look(PageLook(fit_window=False, viewport_width=1280, viewport_height=860, appearance="dark"))
+        await session.set_look(
+            PageLook(fit_window=False, viewport_width=1280, viewport_height=860, appearance="dark", zoom=100)
+        )
         assert session.connected
         await session.open_url("after", f"{site}/other")
         dark: ScriptRun = await session.run_script("after", "matchMedia('(prefers-color-scheme: dark)').matches", 5.0)

@@ -6,6 +6,7 @@ drives a real headless Chrome on a throw-away profile against a page served on t
 """
 
 import asyncio
+import io
 import json
 import threading
 import time
@@ -17,6 +18,7 @@ from pathlib import Path
 from typing import Literal
 
 import pytest
+from PIL import Image
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -53,10 +55,10 @@ _SCRIPT_WAIT_S: float = 5.0
 _FINISH: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
 )
-# What a page sees of itself: the size of its window and the colour scheme it is told to prefer.
+# What a page sees of itself: the size of its window, the colour scheme it is told to prefer and how large it is drawn.
 _SEEN: str = (
     "({width: innerWidth, height: innerHeight, dark: matchMedia('(prefers-color-scheme: dark)').matches,"
-    " light: matchMedia('(prefers-color-scheme: light)').matches})"
+    " light: matchMedia('(prefers-color-scheme: light)').matches, zoom: devicePixelRatio})"
 )
 
 
@@ -171,14 +173,30 @@ async def test_a_page_has_the_size_and_the_colour_scheme_chosen(
         headless, server, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work
     )
     try:
-        await session.set_look(PageLook(fit_window=False, viewport_width=1024, viewport_height=768, appearance="dark"))
+        await session.set_look(
+            PageLook(fit_window=False, viewport_width=1024, viewport_height=768, appearance="dark", zoom=100)
+        )
         dark: dict[str, object] = await _seen(session, site)
         assert (dark["width"], dark["height"], dark["dark"]) == (1024, 768, True), dark
-        await session.set_look(PageLook(fit_window=False, viewport_width=390, viewport_height=844, appearance="light"))
+        await session.set_look(
+            PageLook(fit_window=False, viewport_width=390, viewport_height=844, appearance="light", zoom=100)
+        )
         light: dict[str, object] = await _seen(session, site)
         assert (light["width"], light["height"], light["light"]) == (390, 844, True), light
+        # Drawn at 125 %, a page of 1280 by 860 has the room of 1024 by 688 (item 358).
+        await session.set_look(
+            PageLook(fit_window=False, viewport_width=1280, viewport_height=860, appearance="light", zoom=125)
+        )
+        zoomed: dict[str, object] = await _seen(session, site)
+        assert (zoomed["width"], zoomed["height"], zoomed["zoom"]) == (1024, 688, 1.25), zoomed
+        # The model is told that size, and a pixel of its screenshot is one of the page's, for click_at.
+        drawn = await session.screenshot("look")
+        with Image.open(io.BytesIO(drawn.data)) as picture:
+            assert (drawn.width, drawn.height, *picture.size) == (1024, 688, 1024, 688)
         # Filling its window, a page has the window's size, and the model is told that size.
-        await session.set_look(PageLook(fit_window=True, viewport_width=390, viewport_height=844, appearance="light"))
+        await session.set_look(
+            PageLook(fit_window=True, viewport_width=390, viewport_height=844, appearance="light", zoom=100)
+        )
         filled: dict[str, object] = await _seen(session, site)
         assert filled["width"] != 390, filled
         shot = await session.screenshot("look")
@@ -284,10 +302,15 @@ async def test_settings_browser_sets_what_t3_codes_sets_and_keeps_it(tmp_path: P
                 await _changed(page, "/api/browser/look", looks.get_by_role("button", name="Dark").click)
                 await expect(looks.get_by_role("button", name="Dark")).to_have_attribute("aria-pressed", "true")
                 assert 'appearance = "dark"\n' in _kept()
+                zoom: Locator = page.get_by_role("combobox", name="Zoom of pages")
+                await expect(zoom).to_have_value("100")
+                await _changed(page, "/api/browser/look", partial(zoom.select_option, "125"))
+                await expect(zoom).to_have_value("125")
+                assert "zoom = 125\n" in _kept()
                 shown: Locator = page.get_by_role("switch", name="Show Dot's computer when a run opens the browser")
                 await expect(shown).to_have_attribute("aria-checked", "true")
                 # Each row stays inside the window, on a phone too.
-                for row in (allowed, size, shown):
+                for row in (allowed, size, zoom, shown):
                     assert await page.locator(".setting", has=row).evaluate(
                         "(row) => row.getBoundingClientRect().right <= window.innerWidth"
                     )
@@ -296,6 +319,7 @@ async def test_settings_browser_sets_what_t3_codes_sets_and_keeps_it(tmp_path: P
                 await _changed(page, "/api/browser/enabled", allowed.click)
                 await _changed(page, "/api/browser/look", partial(size.select_option, "1280x860"))
                 await _changed(page, "/api/browser/look", looks.get_by_role("button", name="System").click)
+                await _changed(page, "/api/browser/look", partial(zoom.select_option, "100"))
                 await page.close()
         finally:
             await browser.close()
@@ -347,8 +371,10 @@ async def test_a_run_that_opens_its_browser_shows_its_page_beside_the_chat(site:
             await browser.close()
 
 
-async def _has_folder(path: Path) -> bool:
-    return await asyncio.to_thread(path.is_dir)
+async def _chrome_worked_in(folder: Path) -> bool:
+    """Whether a Chrome worked on the profile in ``folder``: its Local State, which only Chrome writes (Dot writes the
+    zoom into the profile's preferences before Chrome starts, item 358)."""
+    return await asyncio.to_thread((folder / "Local State").is_file)
 
 
 @pytest.mark.browser
@@ -362,20 +388,20 @@ async def test_dots_chrome_works_on_the_profile_in_use_and_incognito_keeps_nothi
         )
         try:
             await session.open_url("profiles", site)
-            assert await _has_folder(profile_dir(DEFAULT_PROFILE) / "Default")
+            assert await _chrome_worked_in(profile_dir(DEFAULT_PROFILE))
             # An added profile is a folder of its own, which Chrome fills when it works on it.
             await asyncio.to_thread(add_profile, "Work")
             await session.use_profile("Work")
             assert session.profile_dir == profile_dir("Work")
             await session.open_url("profiles", site)
-            assert await _has_folder(profile_dir("Work") / "Default")
+            assert await _chrome_worked_in(profile_dir("Work"))
             await session.use_profile(INCOGNITO_PROFILE)
             await session.open_url("profiles", site)
-            assert await _has_folder(profile_dir(INCOGNITO_PROFILE) / "Default")
+            assert await _chrome_worked_in(profile_dir(INCOGNITO_PROFILE))
             # Its Chrome closed, Incognito keeps nothing; the other profiles keep their folders.
             await session.use_profile(DEFAULT_PROFILE)
             assert not await asyncio.to_thread(profile_dir(INCOGNITO_PROFILE).exists)
-            assert await _has_folder(profile_dir("Work") / "Default")
+            assert await _chrome_worked_in(profile_dir("Work"))
         finally:
             await session.aclose()
 

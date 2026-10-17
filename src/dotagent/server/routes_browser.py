@@ -72,6 +72,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
                 viewport_width=session.config.viewport_width,
                 viewport_height=session.config.viewport_height,
                 appearance=session.config.appearance,
+                zoom=session.config.zoom,
             ),
             profile=session.config.profile,
             profiles=await asyncio.to_thread(listed_profiles),
@@ -151,8 +152,9 @@ def browser_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/browser/look")
     async def set_look(request: PageLook) -> BrowserView:
-        """How pages look (item 354): the size of a page of Dot's own Chrome and the colour scheme, kept in the config
-        file. Chrome is let go of so that it starts again with them, so the change is refused while runs are active."""
+        """How pages look (items 354 and 358): the size of a page of Dot's own Chrome, the colour scheme and the zoom of
+        Dot's own Chrome, kept in the config file. Chrome is let go of so that it starts again with them, so the change
+        is refused while runs are active."""
         active: list[JsonValue] = list(ctx.manager.active_run_ids())
         if active:
             raise RunConflict("how pages look cannot be changed while runs are active", {"active_runs": active})
@@ -162,6 +164,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
             ("viewport_width", request.viewport_width),
             ("viewport_height", request.viewport_height),
             ("appearance", request.appearance),
+            ("zoom", request.zoom),
         )
         for key, value in settings:
             await asyncio.to_thread(set_browser_setting, config_path(), key, value)
