@@ -18,7 +18,7 @@ _WAIT_S: float = 0.3
 def test_a_value_with_a_line_break_is_refused_and_the_file_is_left_as_it_was(tmp_path: Path) -> None:
     path: Path = tmp_path / ".env"
     write_env_value(path, "OPENAI_API_KEY", "sk-first")
-    for value in ("sk-abc\nTYPESAFE_API_KEY=other", "sk-abc\rTYPESAFE_API_KEY=other", "sk-abc x"):
+    for value in ("sk-abc\nTYPESAFE_API_KEY=other", "sk-abc\rTYPESAFE_API_KEY=other", "sk-abc\u2028x"):
         with pytest.raises(ConfigError) as refused:
             write_env_value(path, "OPENAI_API_KEY", value)
         assert "sk-abc" not in str(refused.value.context)

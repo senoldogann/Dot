@@ -213,3 +213,19 @@ def test_a_link_that_came_above_a_changed_file_is_not_followed(tmp_path: Path) -
     with pytest.raises(UndoError, match="link"):
         apply_undo([plan[0].model_copy(update={"state": "ready"})], root)
     assert (elsewhere / "config").read_text(encoding="utf-8") == "made by the run\n"
+
+
+def test_a_folder_the_run_made_below_a_link_that_came_since_is_not_removed(tmp_path: Path) -> None:
+    """Item 350: the empty folders a run made are removed when its changes are taken back, but not one that a link
+    above it now puts in another folder."""
+    root: Path = tmp_path / "undo"
+    work: Path = tmp_path / "work"
+    elsewhere: Path = tmp_path / "elsewhere"
+    work.mkdir()
+    (elsewhere / "b").mkdir(parents=True)
+    atomic_write(work / "a" / "b" / "new.txt", "new\n", _target(root, RUN_ID, MIB, MIB))
+    changes: list[RunChange] = _changes(root, (RUN_ID,))
+    shutil.rmtree(work / "a")
+    (work / "a").symlink_to(elsewhere, target_is_directory=True)
+    assert remove_empty_dirs(created_dirs(changes)) == []
+    assert (elsewhere / "b").is_dir()

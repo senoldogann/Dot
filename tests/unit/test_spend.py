@@ -46,6 +46,9 @@ def _payment(amount: Amount | None, flags: tuple[str, ...] = ("financial",)) -> 
         ("Pay $1000.50", Amount(value=1000.5, currency="$")),
         ("Pay 2500 TL", Amount(value=2500.0, currency="TL")),
         ("Save $5 — Pay $500", Amount(value=500.0, currency="$")),
+        ("Pay CHF 1'234.50", Amount(value=1234.5, currency="CHF")),
+        ("Payer 1\u202f234,56 €", Amount(value=1234.56, currency="€")),
+        ("Betala 1 299,00 SEK", Amount(value=1299.0, currency="SEK")),
     ],
 )
 def test_the_amount_of_a_label_is_the_number_next_to_a_currency(label: str, amount: Amount | None) -> None:

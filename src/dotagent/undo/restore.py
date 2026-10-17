@@ -197,12 +197,12 @@ def _carry_out(step: UndoStep, root: Path) -> None:
 
 
 def remove_empty_dirs(folders: Sequence[Path]) -> list[Path]:
-    """Remove each of ``folders`` that is an empty folder (not a link to one), in their order; returns the ones
-    removed. Blocking."""
+    """Remove each of ``folders`` that is an empty folder (not a link to one, nor below a folder that is a link now),
+    in their order; returns the ones removed. Blocking."""
     removed: list[Path] = []
     for folder in folders:
         try:
-            if folder.is_dir() and not folder.is_symlink() and not any(folder.iterdir()):
+            if folder.is_dir() and not folder.is_symlink() and not _linked_above(folder) and not any(folder.iterdir()):
                 folder.rmdir()
                 removed.append(folder)
         except OSError as exc:
