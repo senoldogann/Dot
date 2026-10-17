@@ -6,9 +6,9 @@ screen, mouse and keyboard (computer use), AppleScript, a memory that lasts betw
 and sub-agents.
 
 It runs on models from **Ollama** (local models, and cloud models through the local Ollama server), the **OpenAI** API,
-**OpenCode Go**, the **Anthropic** API (the Claude models) or **OpenCode Zen**'s free models. A daemon on the Mac serves
-a web UI and a REST API and runs the schedules, and `dotx run` and `dotx chat` work in the terminal. Dot runs on macOS
-only.
+**OpenCode Go**, the **Anthropic** API (the Claude models), **OpenRouter** (the models of many labs on one key) or
+**OpenCode Zen**'s free models. A daemon on the Mac serves a web UI and a REST API and runs the schedules, and `dotx run`
+and `dotx chat` work in the terminal. Dot runs on macOS only.
 
 By default Dot acts without asking. It stops for what it must not decide alone (money, credentials, public posts,
 messages sent for you, privilege, system settings), everything it does is recorded, and it can be stopped at once. Read
@@ -33,7 +33,7 @@ The pictures show a run of Dot's scripted test model, under the name of a real o
   - [Ollama](https://ollama.com), running. Cloud models (their tag is `cloud` or ends in `-cloud`) need `ollama signin`
     once.
     Searching the memory by meaning needs an embedding model: `ollama pull bge-m3`
-  - an API key for OpenAI, OpenCode Go or Anthropic
+  - an API key for OpenAI, OpenCode Go, Anthropic or OpenRouter
   - [OpenCode](https://opencode.ai), for Zen's free models (no key)
 
 ## Install

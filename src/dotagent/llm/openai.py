@@ -44,7 +44,12 @@ _NOT_CHAT: tuple[str, ...] = (
 
 _RESPONSES_OPTIONS: ResponsesOptions = ResponsesOptions(image_detail="original", tool_output_images=True)
 _CHAT_OPTIONS: ChatOptions = ChatOptions(
-    max_tokens_field="max_completion_tokens", request_usage=True, replay_reasoning=False, cache_key_in_body=True
+    max_tokens_field="max_completion_tokens",
+    request_usage=True,
+    replay_reasoning=False,
+    cache_key_in_body=True,
+    reasoning_object=False,
+    replay_details=False,
 )
 
 
@@ -199,7 +204,7 @@ class OpenAIProvider:
             return await self._stream(
                 "/responses", body, responses_codec(classify_openai), request.model, sink, "openai.responses"
             )
-        chat_body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS)
+        chat_body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS, f"openai:{request.model}")
         return await self._stream(
             "/chat/completions", chat_body, chat_codec(classify_openai), request.model, sink, "openai.chat"
         )

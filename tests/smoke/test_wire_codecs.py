@@ -383,7 +383,15 @@ def test_request_bodies_end_with_stream_and_follow_each_gateway_flavour() -> Non
     gateway_chat: JsonObject = build_chat_body(
         request,
         traits,
-        ChatOptions(max_tokens_field="max_tokens", request_usage=False, replay_reasoning=True, cache_key_in_body=False),
+        ChatOptions(
+            max_tokens_field="max_tokens",
+            request_usage=False,
+            replay_reasoning=True,
+            cache_key_in_body=False,
+            reasoning_object=False,
+            replay_details=False,
+        ),
+        "opencode_go:glm-5.2",
     )
     assert list(gateway_chat)[-1] == "stream"
     assert "stream_options" not in gateway_chat and "prompt_cache_key" not in gateway_chat
@@ -392,8 +400,14 @@ def test_request_bodies_end_with_stream_and_follow_each_gateway_flavour() -> Non
         request.model_copy(update={"max_output_tokens": 500}),
         openai_traits("gpt-6.1-sol"),
         ChatOptions(
-            max_tokens_field="max_completion_tokens", request_usage=True, replay_reasoning=False, cache_key_in_body=True
+            max_tokens_field="max_completion_tokens",
+            request_usage=True,
+            replay_reasoning=False,
+            cache_key_in_body=True,
+            reasoning_object=False,
+            replay_details=False,
         ),
+        "openai:gpt-6.1-sol",
     )
     assert openai_chat["stream_options"] == {"include_usage": True}
     assert openai_chat["max_completion_tokens"] == 500 and openai_chat["prompt_cache_key"] == "smoke-session"

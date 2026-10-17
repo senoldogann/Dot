@@ -9,7 +9,7 @@ import sys
 from pathlib import Path
 
 CLOSED: str = "http://127.0.0.1:9"
-PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic")
+PROVIDERS: tuple[str, ...] = ("ollama", "openai", "opencode_go", "anthropic", "openrouter")
 KEYS: tuple[str, ...] = (
     "OLLAMA_API_KEY",
     "OPENAI_API_KEY",
@@ -17,6 +17,7 @@ KEYS: tuple[str, ...] = (
     "OPENAI_PROJECT_ID",
     "OPENCODE_API_KEY",
     "ANTHROPIC_API_KEY",
+    "OPENROUTER_API_KEY",
 )
 _TIME_LIMIT_S: float = 90.0
 

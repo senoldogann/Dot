@@ -61,6 +61,9 @@ _OLLAMA_RUNNER_LOST: re.Pattern[str] = re.compile(
 # How Anthropic words a spent prepaid balance, which it answers with HTTP 400 and the type invalid_request_error.
 _ANTHROPIC_NO_CREDIT: str = "credit balance is too low"
 
+# The statuses of an error that a stream's error code may be itself.
+_LEAST_STATUS: int = 400
+_MOST_STATUS: int = 599
 # HTTP-equivalent status of an error that arrived inside an already-open stream, by error code or type.
 _STREAM_STATUS: dict[str, int] = {
     "server_error": 500,
@@ -208,7 +211,10 @@ def classify_anthropic(
 
 
 def status_for_stream_error(wire: WireError) -> int:
-    """Map an in-stream error to the HTTP status it corresponds to (500 when nothing is known)."""
+    """Map an in-stream error to the HTTP status it corresponds to (500 when nothing is known). A code that is a status
+    itself, as OpenRouter's are (``402`` for credits that ran out), is that status."""
+    if wire.code.isdecimal() and _LEAST_STATUS <= int(wire.code) <= _MOST_STATUS:
+        return int(wire.code)
     for key in (wire.code, wire.kind):
         if key in _STREAM_STATUS:
             return _STREAM_STATUS[key]
