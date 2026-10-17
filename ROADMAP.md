@@ -12014,8 +12014,9 @@ the daemon answers to it from its next start: taking a name up without a restart
 (`server/guard.py`), which is left as it is. **Keep this Mac awake while it charges** (`[server] keep_awake`) starts and
 stops the hold at once and with the daemon. Left out: the QR code of the signed-in address, which would put the token on
 the screen; the pairing code signs a phone in. Tests: `tests/unit/test_tailnet.py`, `tests/smoke/test_phone_reach.py`
-(stand-ins of `tailscale` and `caffeinate` first on the PATH: the state, Set up once and twice, the switch on and off, a
-Mac without Tailscale; the card wide and on a phone). Docs: `docs/phone.md`.
+(a stand-in `tailscale` that `DOT_TAILSCALE` names, every other smoke test naming one that does not exist, and a
+stand-in `caffeinate` first on the PATH: the state, Set up once and twice, the switch on and off, a Mac without
+Tailscale, a Tailscale whose app is closed; the card wide and on a phone). Docs: `docs/phone.md`.
 
 **What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
 `[server] reach` names it, sets up what is missing with one button (reach taken up without a restart), shows the
