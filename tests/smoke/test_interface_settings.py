@@ -216,7 +216,7 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await typed.press("Tab")
     await expect(typed).to_have_attribute("aria-invalid", "true")
     assert (await _kept(page))["dot.fontInterface"] == "IBM Plex Sans"
-    await page.get_by_role("slider", name="Interface size").fill("16")
+    await page.get_by_role("slider", name="Text size").fill("16")
     assert await _style(page, "body", "font-size") == "16px"
 
     # The answers, the composer and the code.
@@ -284,7 +284,7 @@ async def test_each_setting_lands_on_the_page_and_is_there_before_the_first_pain
     await page.get_by_role("group", name="Chat width").get_by_role("button", name="Comfortable").click()
     await page.get_by_role("slider", name="Panel animation").fill("200")
     await page.get_by_role("combobox", name="Interface font").select_option("")
-    await page.get_by_role("slider", name="Interface size").fill("14")
+    await page.get_by_role("slider", name="Text size").fill("14")
     await page.get_by_role("group", name="Answers").get_by_role("button", name="Theme").click()
     await page.get_by_role("combobox", name="Composer font").select_option("")
     await page.get_by_role("slider", name="Composer size").fill("15")

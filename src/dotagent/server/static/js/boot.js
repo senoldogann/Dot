@@ -73,9 +73,15 @@
   if (panelMotion !== null && panelMotion !== 200) {
     root.style.setProperty("--motion-panel", panelMotion + "ms");
   }
-  var interfaceSize = whole("dot.sizeInterface", 13, 17, 1);
-  if (interfaceSize !== null && interfaceSize !== 14) {
-    root.style.setProperty("--type-scale", String(interfaceSize / 14));
+  // The body's size on this device, as appearance/settings.js keeps it (item 331): on a phone (app.css, item 329) 14 to
+  // 20 px, 16 its own; elsewhere 13 to 17 px, 14 its own.
+  var phoneType = window.matchMedia(
+    "(pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px)"
+  ).matches;
+  var ownBody = phoneType ? 16 : 14;
+  var interfaceSize = phoneType ? whole("dot.sizeInterface", 14, 20, 1) : whole("dot.sizeInterface", 13, 17, 1);
+  if (interfaceSize !== null && interfaceSize !== ownBody) {
+    root.style.setProperty("--type-scale", String(interfaceSize / ownBody));
   }
   var answers = read("dot.fontAnswers");
   if (answers === "interface" || answers === "serif") {

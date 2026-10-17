@@ -91,6 +91,68 @@
   gap: 8px;
 }
 
+/* A page that Dot's update left out of date (item 328): the banner floats under the bar, over the page, so that what is
+   read never moves as it comes; the page loads again by itself once it is out of sight (main.js). */
+.stagebar > .banner.update {
+  position: absolute;
+  top: calc(100% + var(--space-2));
+  inset-inline: var(--space-3);
+  width: fit-content;
+  margin-inline: auto;
+  border: 1px solid var(--warn-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-float);
+}
+
+/* The curtain while Dot opens (item 328, waiting.js): the page's ground over the page being made and, on a phone that
+   opens a chat it showed before, the chat's bar and composer in the page's own classes, laid out in the window instead
+   of a scroll, so that each stands where the page will have it. A wider window has the sidebar beside them, which the
+   curtain does not draw: it shows the ground alone there. */
+.waiting {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.waiting > .stage {
+  flex: 1;
+  min-height: 0;
+}
+
+.waiting .page {
+  display: flex;
+  flex-direction: column;
+  animation: none;
+}
+
+.waiting .run-layout,
+.waiting .run-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+/* That Dot connects, once it has taken longer than a phone's network takes to wake. */
+.waiting-note {
+  margin: auto;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--muted);
+  visibility: visible;
+}
+
+@media (min-width: 860px) {
+  .waiting > .stage {
+    visibility: hidden;
+  }
+}
+
 /* ---------- sidebar ---------- */
 
 .sidebar {
@@ -807,5 +869,39 @@
   .side-foot .icon {
     width: 20px;
     height: 20px;
+  }
+}
+
+/* On a phone the bar's and the sidebar's buttons and the sidebar's rows are a finger's size (item 329): a chat's menu
+   button takes the row's right end. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .icon-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .side-btn,
+  .side-link,
+  .side-run,
+  .side-fold,
+  .side-search-input {
+    min-height: 44px;
+  }
+
+  .side-more {
+    right: 0;
+    width: 44px;
+    height: 44px;
+  }
+
+  .side-chat > .side-run {
+    padding-right: 44px;
+  }
+
+  /* What a run does now and how many runs it delegated read at a hint's size; the ages and times stay the smallest. */
+  .side-activity-detail,
+  .side-children-fold {
+    font-size: var(--text-sm);
+    line-height: var(--leading-sm);
   }
 }

@@ -1,0 +1,192 @@
+# Browser and computer use
+
+## Browser use
+
+Dot works in Chrome in one of two ways, set by `[browser] mode`: in a Chrome of its own (`own`, the default) or in new
+tabs of the Chrome you already have open (`attach`, see below).
+
+**`own`** starts a Chrome of Dot's own on its own profile (`<home>/browser-profile`). It cannot drive your daily profile
+that way: since version 136 Chrome refuses remote debugging on its default data directory, and it locks a profile while
+it runs. There are two ways to open the sites Dot should use with your accounts:
+
+- `dotx browser login [url]` opens Dot's profile as a normal Chrome window. Sign in, then quit Chrome (Cmd+Q); the
+  cookies stay.
+- `dotx browser import-chrome [--profile "Profile 1"] [--replace]` copies the cookies and the local storage of a profile
+  of your Chrome into Dot's profile, so the accounts that are open in your Chrome are open for Dot too. Quit Chrome
+  first. If the Dot service has its browser open, stop it for the import (`dotx service uninstall`, import,
+  `dotx service install`). Your Chrome profile is only read and nothing is decrypted; the cookie values stay encrypted
+  with the key that Chrome keeps in the Keychain, which Chrome itself reads when Dot's browser starts (macOS may ask
+  once; choose Always Allow). The command ends by counting the cookies Chrome can read. The copy is a snapshot: a
+  sign-in that expires or rotates needs a new import, and a site that keeps its sign-in in IndexedDB asks again.
+
+Cookies are encrypted with a key, and a profile cannot be read with another key than the one it was written with. A
+profile that Dot made uses Playwright's mock keychain in the sign-in window and in the automated sessions alike, so no
+Keychain item is involved; the profile of an import uses the system keychain in both (`dotx doctor` shows which). A
+sign-in made with an older version of `dotx browser login`, which used the real key, has to be made again.
+
+Dot's own Chrome loads the extensions installed in its profile: Playwright starts Chrome with `--disable-extensions`,
+which Dot leaves out (item 264). Install one from the Chrome Web Store in the window of `dotx browser login`; it stays
+in the profile and loads at every start of Dot's Chrome.
+
+**`attach`** works in new tabs of the Chrome you already have open, signed in as you are, and starts no Chrome of its
+own. It needs Chrome 144 or later and its switch "Allow remote debugging for this browser instance" at
+`chrome://inspect/#remote-debugging`, which only you can turn on.
+
+```bash
+dotx browser attach     # check Chrome, work in one blank test tab, save mode = "attach"
+dotx service install    # restart the service, so that it uses your Chrome
+dotx browser detach     # go back to Dot's own Chrome (restart the service again)
+```
+
+While `dotx browser attach` runs, Chrome asks whether to allow the connection: click Allow within `attach_timeout_s` (60
+seconds). The check opens one blank tab, works in it and closes it again; your other tabs are not touched. The sign-ins
+Dot works with are the ones of your Chrome, so nothing is copied and nothing goes stale. What to expect:
+
+- Chrome may ask for the click again whenever Dot makes a new connection, after a restart of the service for example. A
+  schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails.
+- A tab that Dot opens is opened behind the tab you work in (with `raise_window` on it becomes the active tab of your
+  window), and Chrome may throttle a tab in the background.
+- Downloads go to the download folder of Chrome, not to Dot's `downloads/`.
+- Dot closes the tabs it opened when they have been idle for `tab_idle_s`. If Dot itself crashes they stay open.
+- Calls that arrive while Dot waits for the click queue behind it, and each may in turn wait up to `attach_timeout_s` if
+  you do not click.
+- Only the stable Google Chrome on its default data directory is supported. `channel`, `headless` and `raise_window`
+  apply to `own` only.
+
+The mode can also switch without a restart: Settings › Browser in the web UI, or `POST /api/browser/mode` with
+`{"mode": "own"}` or `{"mode": "attach"}`. The live switch runs the same one-blank-tab proof; it is refused with 409
+while runs are active, and a failed proof leaves the session in the Chrome it had (422). When your Chrome is closed,
+the live switch opens it first, as a click on its icon does, and waits up to 30 seconds for it to start and 10 more for
+it to listen; with remote debugging off, the switch then says how to turn it on (item 261). While the switch is under
+way, Settings says what it waits for, and after a failed one it shows how Chrome stands. Runs, campaigns and
+`dotx browser attach` never open Chrome; `dotx browser attach` and `dotx browser detach` only write the mode, which the
+service takes up on its next start. The same tab's switch "Bring
+Chrome to the front while working" is `POST /api/browser/raise` with `{"raise_window": true}` or `false`: it takes
+effect at the next browser call, Chrome is not restarted, and the value is written to `config.toml` the same way.
+
+`[browser] debug_port` (0, none, by default; else from 1024 to 65535) is a port of this Mac on which Dot's own Chrome
+also takes DevTools connections, besides Playwright's pipe (item 265): Chrome listens on `127.0.0.1:<port>`, and a run
+whose browser is Dot's own and that has a tool to run scripts (`shell`, `terminal_send`) is told the address in its
+instructions, so a script it writes can drive Chrome with the Chrome DevTools Protocol in tabs of its own once one of
+the run's browser calls has started Chrome. The run is told to connect with Playwright's `connect_over_cdp` and
+`no_defaults=True` (`noDefaults` in Node), which leaves Dot's downloads as they are, or with Puppeteer's `connect` and
+`defaultViewport: null`. Dot's Chrome does not start while another program holds the port, with an error that names
+the port; a script reaches whatever listens on the port, which is Dot's Chrome while it runs. Settings › Browser sets it
+(`POST /api/browser/debug-port`, refused while runs are active and when the port is taken): every browser session is
+checked before any changes, Dot's Chrome, open on another port, is closed and starts on the new one with the next call
+that needs it, and the value is written to `config.toml`. The port asks for no token: while Dot's Chrome runs, any
+program on this Mac can connect to it and drive Chrome with the sign-ins of Dot's profile.
+
+Both modes share what follows.
+
+- The page is observed as an accessibility snapshot in which every element has a ref (`e12`). It covers the viewport
+  plus `viewport_margin_px`, and `browser_find`, `browser_links` and `browser_read_text` reach what is outside.
+- A collapsed dropdown lists its options on its own line, for example
+  `combobox "Shipping" [ref=e3]: options "Standard (3-5 days)" [selected], "Express (next day)"`. `select` takes the
+  label or the value of one of them, written as listed; a choice that is not there is refused at once with the options
+  that are, the closest first, instead of waiting for the timeout. An option that a script adds within a second of the
+  call is still found. A very long list is cut with the number of options left out and the current choice.
+- `browser_act` runs up to `max_batch_steps` steps in one call (5 by default; a longer batch is cut to the first ones
+  and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
+  `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a
+  step Dot waits until the page has settled (no DOM change for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and
+  reports popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of
+  the last snapshot still valid; a page that did not change comes back as one line that says so. A tab that closes under
+  a batch (a sign-in callback that did its job, a tab the user closed) stops the batch without a failed step: the result
+  says the page closed it and shows the tab that is now current. A popup that opens and closes itself before the model
+  could see it is a note on the page that opened it.
+- `fill` replaces a form field's value, `type` presses a key per character (autocomplete sees them), `insert` puts the
+  text in at once at the caret without key events (long text, post composers, code editors) and `drag` moves an
+  element onto the element `to_ref` (HTML5 drag and drop or a library driven by the mouse). `insert` goes only into a
+  text field or an editor; at any other element it fails, so the text never lands in whatever field has the focus.
+  `type` and `insert` need a text that is not empty. A drop onto a password, card or one-time-code field is refused
+  like typing into it, and a drag that fails releases the mouse button.
+- In a rich editor (a contenteditable area such as X's composer) `fill`, `type` and `insert` give the editor the focus
+  when it does not have it and wait until it has settled, check the field that has the focus for a secret, write, and
+  fail when the editor's text did not change, instead of reporting done; a `fill` that leaves the editor holding its
+  text, such as the text it held already, is done. A write that makes the page open another one, such as Enter in a
+  search box, is done.
+- `browser_eval` runs JavaScript in the page of the run's own tab, in either mode, and gives back its value as JSON: an
+  expression (`document.title`), a function, or a promise it awaits (`timeout_s`, 30 seconds by default, at most 600).
+  It reads what the snapshot shortens (a whole list, a table, the data behind a page) and does in one call what would
+  take many steps. A script that throws fails the call with its message; one still running when the wait ends goes on in
+  the page, and the call says so. The page is settled after every script as after a step, so a script that leads the tab
+  elsewhere lets it land, also when the page answers after the script's value came back (item 270), and says where, and
+  the URL rules hold after it as after a step: a forbidden address resets the tab and fails the call. The value is
+  fenced as the page's text and makes the run untrusted. As an action it is a click of medium risk on the tab's page:
+  the aggressive and balanced presets allow it, the cautious preset asks, a research run does not have it and a `yolo`
+  run does it without asking. What the script does inside the page is not checked or paced action by action, as
+  `browser_act`'s steps are. It takes the place of AppleScript's `execute javascript`, which lands in the front window
+  of whichever Chrome macOS picks when several run (item 263).
+- `browser_wait_text` waits until a text is visible and says after how long. When the text does not come in time the
+  call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide.
+- A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
+  and the line above the page says how many are open. A click that another element takes fails with the name of that
+  element and what to do about it (close or answer the box, or press Escape).
+- Password, one-time-code and card fields are filled only by a `yolo` run (see [Safety](safety.md#safety)). Cookie banners are
+  declined (`decline_cookie_banners`).
+- A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
+- `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
+  matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
+  cloud-metadata hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any
+  spelling (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be
+  signed in there. A server of this Mac on another port opens as any site. In Dot's own Chrome every request is
+  checked as Chrome sends it, not only the address a tool opens: a page (in a tab or a popup, and each hop of a
+  redirect) must pass both lists, and anything a page loads (a script, a picture, a fetch, a worker) must be neither a
+  blocked host nor Dot's interface, so a page of an allowed site still loads its parts from wherever it keeps them; what
+  a page makes itself (`blob:` and `data:` addresses) reaches no server and passes. In your Chrome (`mode = "attach"`)
+  Dot holds none of its requests, so as not to slow or stall your own tabs; a tab of Dot's that lands on a refused
+  address is reset. Whatever the browser, the daemon itself refuses a navigation to its interface that a page of
+  another site started (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs
+  showed. A host is read the way Chrome reads it (international names, the numeric spellings of an IPv4 address, a
+  trailing dot), and an address with a backslash before its query is refused. A new tab's first page waits until
+  Dot checks each hop of its redirects.
+- `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
+  run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
+  the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
+  Chrome takes the front itself when a page opens a tab of its own (a link to a new tab, `window.open`): the app that
+  had the focus is brought back right after, as long as the program that runs Dot has Accessibility. Switching tabs
+  does not raise the window. With `true` the window comes to the front at the start, with each new tab and on each tab
+  switch. Take over brings the tab to the front either way.
+- `headless = true` hides the window. Starting Chrome and loading the first page took about 2 seconds with it on an
+  Apple-silicon Mac; later calls take well under a second. When Chrome crashes or the connection to it is lost, the
+  next call starts it again.
+- Chrome runs with its sandbox on. Playwright would start it with `--no-sandbox` unless told otherwise, which makes
+  Chrome show a warning bar and weakens the browser that opens untrusted pages.
+- Dot's Chrome is the same application as yours, only with another profile. To give it an application of its own, run
+  `uv run playwright install chromium` and set `channel = "chromium"`.
+
+## Computer use
+
+The desktop tools see and drive any application through the accessibility tree and, where an application has none,
+through screenshots and coordinates. macOS must grant the app that runs Dot three permissions: **Accessibility**,
+**Input events** and **Screen Recording**. `dotx desktop check` shows which it has and `dotx desktop setup` asks macOS
+for the missing ones and opens their Settings panes.
+
+- `desktop_apps` lists the running applications and `desktop_open_app` brings one to the front, starting it when it is
+not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path to
+anything else (a binary) is refused at once with those three forms, instead of being retried against Launch Services.
+- `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a
+  ref (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and
+  `scope = menu_bar` lists the menu bar. `desktop_read` reads one element's full text.
+- `desktop_act` runs up to `max_batch_steps` steps in one call (25 by default; a longer batch is cut the same way):
+  `click`, `double_click`, `right_click`, `hover`, `press`,
+  `focus`, `set_value`, `type`, `paste`, `key`, `scroll`, `drag`, `menu`, `wait` and `activate`. A step names an element
+  by its ref or a point by its coordinates. `press`, `focus` and `set_value` work through accessibility without moving
+  the pointer; `click`, `hover`, `scroll` and `drag` are real pointer events; `type`, `paste` and `key` are keyboard
+  events. A `type` text longer than `paste_threshold_chars` (40) without a line break or a tab goes in through the
+  clipboard, which is put back afterwards, unless the field is secure, is for a credential or a payment, or cannot be
+  read, or the text looks like a key. After steps that changed something, the window is read once the application has
+  announced no change for `settle_quiet_ms` (120 ms), at most after `settle_ms` (350 ms); a change it makes later
+  without announcing anything in between shows in the next view.
+- In a terminal application (Terminal, iTerm2, Ghostty and the like) text and keys are shell input. Dot keeps the
+  command line it typed there since the line was last empty and judges it whole, as a `shell` command, when Return or
+  a Ctrl- key that may run it goes in, so a command typed in parts is judged as one, from the home folder. After a
+  click, a focus, a menu, a drag, a Cmd shortcut or an arrow key the line cannot be told, and the next Return asks, as
+  the first one in a terminal Dot has not typed into does; Ctrl-C starts a line Dot knows again.
+- `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
+  (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920).
+- `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
+  are secure fields except in a `yolo` run (see [Safety](safety.md#safety)).
+- `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show
+  what the agent would see.

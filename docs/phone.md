@@ -1,0 +1,96 @@
+# Dot on the phone
+
+The web UI is a progressive web app: open it on the phone, add it to the home screen, and it opens on the chat you
+were in last (New chat the first time; item 286), with the sidebar's sections, the chats and the run pages at a phone
+width. Back from the background, it follows the daemon again at once, and says it is reconnecting only when that takes
+more than two seconds. Its colours follow the light or dark appearance
+through CSS `light-dark()`, so it needs iOS 17.5 or later (Safari 17.5; Chrome 123 and Firefox 120 on a computer). It
+needs to reach the Mac, and a push needs a secure address, so the way there is your own network:
+
+1. The daemon stays on the loopback address. With Tailscale on the Mac and the phone, `tailscale serve --bg 8765`
+   presents it as `https://<mac>.<tailnet>.ts.net`, with a certificate of its own, to your tailnet only.
+2. Put that name in `[server] reach = ["<mac>.<tailnet>.ts.net"]` and restart the daemon: a request with that `Host`,
+   and a page from `https://` that name, is served like a local one. `dotx url` then prints the signed-in address for
+   the phone too (the token stays in the fragment). Settings › Phone lists the address (item 267).
+3. On the phone, Settings › General › Notifications on: the browser subscribes to the daemon's web push, and from then
+   on the daemon tells the phone what the desktop notifications say, in the same words, page open or closed, and while
+   you look at that run on the phone too: the rule that keeps a notification quiet while you look at its run holds for
+   the notifications of a page, not for a push; a tap opens what it tells of. The phone also hears what no page can, as
+   it happens before a page is back: the daemon started again after it did not stop cleanly (it was killed, crashed or
+   ended with an error; it leaves `<home>/daemon.running` while it runs), with how many runs that cut off. The daemon
+   signs the pushes with a key pair it makes on first start (`<home>/vapid-key.pem`); subscriptions live in the store
+   and go when their push service says they are gone. A subscription whose keys cannot encrypt a message is refused
+   (422), and one stored before that check is dropped with a warning while the others still get theirs. Settings ›
+   General › Notifications off drops the subscription.
+
+On a phone the page holds still (item 275). Every page fits the screen's width: a long link, path or word breaks, and
+code and tables scroll in their own frame. No page lets the phone zoom into the field that gets the focus: on an iPhone
+and an iPad the viewport allows no scale past the first, so a field has the size it has on the Mac (item 311), and on
+another touch screen no text field is under 16 px. A double tap does not zoom, and the page does not stretch past its
+ends. The app added to the home screen runs to the screen's edges, and
+the bar, the sidebar, the composer and the side panel keep out of the rounded corners, the notch and the home
+indicator. The bar stays at the top of what is seen, also while the keyboard is up, and the composer, the drawers and
+the dialogs stand on what is seen too: iOS 26 can leave the page panned once the keyboard has gone, which left a band
+under the composer and the tops of the drawers under the status bar (item 293). On a touch screen a page leaves the
+caret for a tap as it opens, so the keyboard comes only when you ask for it.
+
+A phone that comes back to Dot finds it as it left it (item 328). Back from the background, the page makes its
+connections again without a word for 8 seconds, as long as a phone's network (a VPN such as Tailscale) takes to wake;
+only a connection still not there then shows the bar's pill and, on a chat's page, a note that floats under the bar
+over the conversation, so that nothing read moves as it comes and goes. What changed meanwhile is read again, and only
+what changed is drawn again: the sidebar and the helpers keep the rows that did not. Opened again after iOS let it go,
+Dot does not wait for the network either: the service worker answers from its copy (below), and while the page waits
+for the daemon a curtain shows the chat it opens on, its bar and its composer with the draft, where the chat's page has
+them. The curtain lifts once the chat is there, and says that Dot connects only after those 8 seconds. The browser's bar
+(the status bar of an app on the home screen, Safari's tab bar) takes the colour of the page's ground, in the theme and
+the scheme on screen.
+
+On a phone Dot reads at a phone's size and takes a finger (item 329). On a touch screen of a phone's width (720 px and
+under, or under 500 px high on its side) the body is 16 px, as iOS's own text, a hint 15 px, and only the times, badges
+and the like are 13 px; Settings › Appearance's Text size still scales them all, and code keeps the size chosen
+for it. Everything that is tapped is 44 px each way at least, as Apple asks, but a link inside a line of text: the
+buttons and fields, the bar's and the sidebar's buttons and rows, the menus, the tabs and the heads of the steps. The
+composer's round buttons keep their look in a clear ring that makes them so, and the switch is iOS's size; a tap
+anywhere on a setting's row turns its switch, and a step's duration shows without a hover. An iPad and a Mac keep their
+sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
+
+On a phone the settings open on a list of their pages in groups, as T3 Code's do (item 330): Interface, Models, How Dot
+works and This Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and
+schedules there are). A row opens its page on its own, the bar naming it and "All settings" at its top to go back, and
+a card's name stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone
+Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's
+16 px (item 331). Activity, Connect apps and an agent's editor name their cards the same way, a row of Activity keeps
+its facts to one line that fades where it runs out of room, and Team's empty page says what brings messages there
+(item 332).
+
+At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
+list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
+the thumb. A chat's bar has a round way back to that list, the chat's title over the agent and the model, and its tools
+in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. A line over the
+composer says how long the run has worked (or that it waits for you) and how its helpers stand, and each part opens what
+it tells of; the queue's banner under it says what waits. The details rise from the foot as a sheet with a grabber, and
+a drag of its head down closes it; its Agents tab says of each helper its state, its model and what it does now (on a wide window
+too). Dot's computer opens over the whole screen, with the page's address and who has control (Take over), and goes back
+to the side panel when it closes.
+
+An app added to the home screen keeps storage of its own, apart from Safari's (iOS does so), so it has none of the token
+that the signed-in address gave Safari, and its sign-in screen asks for a pairing code instead (item 267): Settings ›
+Phone, on the Mac or in Safari where Dot is open, shows one with **Pair a phone**, eight characters in two groups
+(Crockford's base32, typed in any case, with or without the dash), good for ten minutes and for one use; a new code
+takes the place of the one before, and five wrong tries use a code up. The app trades it for the token (`POST
+/api/phone/pair`, the one route besides the health check and the proof that takes no token; the Host and Origin checks
+hold for it as for any other) and proves the daemon with it as with any token. The daemon is not proven before a code
+goes, so the screen sends nothing that cannot be a code: a token pasted into the code's field stays on the phone. A code
+is as good as the token while it lasts: whoever reads it and reaches the port first is let in, so it is asked for when
+the phone is at hand, and a phone that the code then refuses means that someone else used it. `POST /api/phone/pairing`
+gives a code, `GET /api/phone` the addresses. Neither the code nor the token is logged. The phone reaches Dot while the
+Mac is on and awake.
+
+The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
+under `/api`. It keeps them by the build of the pages they are of, which the daemon names in the `X-Dot-Pages` header of
+every file, one build at a time (item 328): a page opened while the network has not answered within 200 ms is answered
+from that copy, every file of it from the same copy, and a page of another build than the daemon's loads again before it
+shows anything, so that it never meets an API it does not know. A page loaded from them while the daemon is out of reach says so and tries again by itself (item 200):
+after 2 seconds, then twice as long each time up to 30, and at once when the browser is back on the network or the page
+back in view, until the daemon answers. Without Tailscale, the same works on the Mac itself (`localhost` counts as
+secure) and on nothing else.

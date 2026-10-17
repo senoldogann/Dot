@@ -3,7 +3,7 @@
 // taken away by its ×, and Plan first, by which the run writes its plan and asks before it changes anything. They go
 // with the message that starts a run and are put away once it went (`sent()`); a steer leaves them for the next one.
 
-import { el } from "./dom.js";
+import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
 import { toast } from "./ui.js";
 
@@ -95,7 +95,7 @@ export function createPicks({ onChange }) {
   let planAvailable = true;
   const list = el("div", { class: "pick-list", role: "list", "aria-label": "Picked for this message", hidden: true });
   const planSwitch = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": PLAN_FIRST });
-  const planRow = el("div", { class: "composer-pick", role: "group", "aria-label": PLAN_FIRST, title: PLAN_FIRST_HINT }, el("span", { class: "composer-pick-label" }, PLAN_FIRST), planSwitch);
+  const planRow = switchRow(el("div", { class: "composer-pick", role: "group", "aria-label": PLAN_FIRST, title: PLAN_FIRST_HINT }, el("span", { class: "composer-pick-label" }, PLAN_FIRST), planSwitch), planSwitch);
 
   function paint() {
     planSwitch.setAttribute("aria-checked", String(planFirst));

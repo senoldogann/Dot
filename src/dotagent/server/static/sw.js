@@ -1,35 +1,113 @@
 // The service worker of the phone (and of any browser that installs Dot): the shell files are fetched from the
 // network and kept as the fallback for when the Mac is out of reach, nothing under /api or /pages (the pages runs
 // showed) is ever cached, and a push from the daemon becomes a notification whose tap opens the run.
+//
+// A page opened while the phone's network wakes (item 328) does not wait for it: when the network has not answered
+// within NETWORK_WAIT_MS, the kept copy answers, and every file of that page comes from the same copy. The copies are
+// kept by the build of the pages they are of (the daemon names it in BUILD_HEADER, kept_pages.py), one build at a time,
+// so a page is never half one build and half another; the page then compares its build with the daemon's (state.js).
 
-const SHELL_CACHE = "dot-shell-v1";
+const PAGES_CACHE = "dot-pages-";
+const BUILD_HEADER = "X-Dot-Pages";
+const NETWORK_WAIT_MS = 200;
 const API_PREFIX = "/api";
 const PAGES_PREFIX = "/pages/";
+
+// The pages answered from a kept copy, by their client's id: the cache whose files they take.
+const keptClients = new Map();
 
 self.addEventListener("install", () => {
   self.skipWaiting();
 });
 
+// The caches of an earlier service worker go (`dot-shell-v1` kept files of every build in one).
 self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((names) => Promise.all(names.filter((name) => name !== SHELL_CACHE).map((name) => caches.delete(name))))
+      .then((names) => Promise.all(names.filter((name) => !name.startsWith(PAGES_CACHE)).map((name) => caches.delete(name))))
       .then(() => self.clients.claim()),
   );
 });
 
-/** Shell files: the network first, a copy kept for later; the copy when the network fails. */
-async function shellFirst(request) {
-  const cache = await caches.open(SHELL_CACHE);
-  try {
-    const fresh = await fetch(request);
-    if (fresh.ok) {
-      cache.put(request, fresh.clone());
+/** Keep a copy of a file the network answered, with the files of its build. */
+async function keep(request, response) {
+  const build = response.headers.get(BUILD_HEADER);
+  if (!response.ok || build === null) {
+    return;
+  }
+  const cache = await caches.open(`${PAGES_CACHE}${build}`);
+  await cache.put(request, response);
+}
+
+/** Keep a copy of a page the network answered; the copies of every other build go, so the page's build is the one kept. */
+async function keepPage(request, response) {
+  const build = response.headers.get(BUILD_HEADER);
+  await keep(request, response);
+  if (build === null) {
+    return;
+  }
+  const names = await caches.keys();
+  await Promise.all(names.filter((name) => name !== `${PAGES_CACHE}${build}`).map((name) => caches.delete(name)));
+}
+
+/** The kept copy of `request` and the name of its cache, or null when none is kept. */
+async function keptCopy(request) {
+  for (const name of await caches.keys()) {
+    const response = await (await caches.open(name)).match(request);
+    if (response !== undefined) {
+      return { name, response };
     }
+  }
+  return null;
+}
+
+/** A promise that resolves with `value` after `ms`. */
+function after(ms, value) {
+  return new Promise((resolve) => setTimeout(() => resolve(value), ms));
+}
+
+/**
+ * A page opened: the network's answer when it comes within NETWORK_WAIT_MS, else the kept copy, whose files the page
+ * then takes too; the kept copy also when the network fails, and the network's late answer when nothing is kept.
+ */
+async function openPage(event) {
+  const answer = fetch(event.request).then(
+    (response) => ({ response }),
+    (error) => ({ error }),
+  );
+  const early = await Promise.race([answer, after(NETWORK_WAIT_MS, null)]);
+  if (early !== null && early.response !== undefined) {
+    keepPage(event.request, early.response.clone());
+    return early.response;
+  }
+  const kept = await keptCopy(event.request);
+  if (kept !== null) {
+    keptClients.set(event.resultingClientId, kept.name);
+    return kept.response;
+  }
+  const late = await answer;
+  if (late.error !== undefined) {
+    throw late.error;
+  }
+  keepPage(event.request, late.response.clone());
+  return late.response;
+}
+
+/** A file of a page: from the copy the page was answered from, else the network first and a copy kept, the copy when the
+ * network fails. */
+async function shellFile(event) {
+  const name = keptClients.get(event.clientId);
+  if (name !== undefined) {
+    const kept = await (await caches.open(name)).match(event.request);
+    return kept ?? fetch(event.request);
+  }
+  try {
+    const fresh = await fetch(event.request);
+    keep(event.request, fresh.clone());
     return fresh;
   } catch (error) {
-    const kept = await cache.match(request);
+    const kept = await caches.match(event.request);
     if (kept !== undefined) {
       return kept;
     }
@@ -47,7 +125,7 @@ self.addEventListener("fetch", (event) => {
   ) {
     return;
   }
-  event.respondWith(shellFirst(event.request));
+  event.respondWith(event.request.mode === "navigate" ? openPage(event) : shellFile(event));
 });
 
 self.addEventListener("push", (event) => {

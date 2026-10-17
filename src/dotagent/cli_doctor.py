@@ -11,11 +11,16 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.doctor import CheckResult, run_checks
 
 
+def check_line(result: CheckResult) -> str:
+    """A check as a line: ``ok``, ``FAIL`` (one that is required) or ``warn``, its name and what it found."""
+    mark: str = "ok  " if result.ok else ("FAIL" if result.required else "warn")
+    return f"{mark}  {result.name:<22} {result.detail}\n"
+
+
 async def cmd_doctor(command: DoctorCommand) -> int:
     results: list[CheckResult] = await run_checks(load_user_config())
     for result in results:
-        mark: str = "ok  " if result.ok else ("FAIL" if result.required else "warn")
-        sys.stdout.write(f"{mark}  {result.name:<22} {result.detail}\n")
+        sys.stdout.write(check_line(result))
     return 1 if any(not result.ok and result.required for result in results) else 0
 
 

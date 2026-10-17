@@ -21,6 +21,8 @@ import { filterGroups, paletteGroups, replaceSlashWord, slashWord } from "./slas
 const DRAFT_PREFIX = "dot.draft.";
 // The draft key of a new chat's composer.
 export const NEW_CHAT_DRAFT = "home";
+// The tallest box of a chat's composer, on its page (views/run.js) and on the curtain while Dot opens (waiting.js).
+export const CHAT_BOX_PX = 160;
 
 /** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
  * there is none or it is not one. */

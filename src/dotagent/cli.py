@@ -39,6 +39,7 @@ _FAMILIES: dict[str, str] = {
     "auth-status": "dotagent.cli_models",
     "models-profile": "dotagent.cli_profile",
     "doctor": "dotagent.cli_doctor",
+    "setup": "dotagent.cli_setup",
     "reflect": "dotagent.cli_reflect",
     "browser-login": "dotagent.cli_browser",
     "browser-import-chrome": "dotagent.cli_browser",
@@ -169,6 +170,18 @@ def build_parser() -> argparse.ArgumentParser:
     auth_commands.add_parser("status", help="show which API keys are present")
 
     commands.add_parser("doctor", help="check the setup")
+    setup = commands.add_parser(
+        "setup", help="check this Mac, choose the model Dot runs on and store its key, and install the service"
+    )
+    setup.add_argument(
+        "--model", default=None, help="provider:model, e.g. openai:gpt-5.5; a terminal asks for it when left out"
+    )
+    setup.add_argument(
+        "--key-stdin",
+        action="store_true",
+        help="read the provider's API key from standard input and store it; without it a key already set is kept",
+    )
+    setup.add_argument("--no-service", action="store_true", help="leave the launchd service as it is")
     commands.add_parser(
         "reflect",
         help="reflect now on the runs that ended since the last reflection: lessons, merged and rested lesson notes, "

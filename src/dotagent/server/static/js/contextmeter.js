@@ -60,8 +60,8 @@ export function createContextMeter({ frame }) {
             "p",
             { class: "context-meter-text" },
             "Each step sends the model the whole run again, so a run kept within its budget is answered sooner and costs less. ",
-            el("code", null, "[agent] context_tokens"),
-            " in config.toml sets the budget, and Settings › Models one model's own, up to three quarters of the model's window.",
+            "Dot's default size sets the budget, and Settings › Models one model's own, up to three quarters of the model's window. ",
+            el("span", { class: "faint" }, "In the config file: [agent] context_tokens."),
           )
         : el(
             "p",

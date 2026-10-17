@@ -1,6 +1,6 @@
 // What every page shares: the daemon status, the approvals that wait for an answer, and the live event stream.
 
-import { api, eventNotShown, follow, tellOutOfDate, unreachable } from "./api.js";
+import { api, eventNotShown, follow, QUIET_BREAK_MS, tellOutOfDate, unreachable } from "./api.js";
 import { debounce } from "./dom.js";
 
 const REFRESH_EVERY_MS = 15000;
@@ -9,17 +9,31 @@ const REFRESH_EVERY_MS = 15000;
 // fails after that (item 286).
 const SETTLE_MS = 10000;
 const READ_AGAIN_AFTER_MS = 2500;
+// A phone's network can take seconds to wake once the page is back in view or on the network (a VPN such as
+// Tailscale): for this long after the return the connection is made again without a word, and a break is told only if
+// the connection is still not there then (item 328). A page opened while the network wakes waits as long before it says
+// that it connects (main.js).
+export const RETURN_GRACE_MS = 8000;
+// When the page last came back into view or onto the network.
+let returnedAt = -Infinity;
+
+/** How long a break of a stream lasts before the page tells it (`showAfter`): a short break (item 286), or until the
+ * grace after the page's return is over, whichever ends later (item 328). */
+export function quietBreak() {
+  return Math.max(QUIET_BREAK_MS, returnedAt + RETURN_GRACE_MS - Date.now());
+}
 
 const snapshot = {
   status: null,
   approvals: [],
   stream: "connecting",
-  // The daemon serves other pages than this one was loaded from (Dot was updated meanwhile): it is loaded again to
-  // match them.
+  // The daemon serves other pages than this one was loaded from (Dot was updated meanwhile, or the service worker
+  // answered from a copy of an earlier build): it is loaded again to match them.
   outdated: false,
 };
-// What the pages were when this page read the daemon's status first (`pages` of `GET /status`).
-let loadedPages = null;
+// The build of the pages this page was loaded from, which the daemon wrote in it as it served it (kept_pages.py): the
+// one the daemon's status names (`pages` of `GET /status`) unless the page is out of date (item 328).
+const OWN_PAGES = document.querySelector('meta[name="dot-pages"]').content;
 
 const changeListeners = new Set();
 const lifecycleListeners = new Set();
@@ -61,8 +75,7 @@ export async function refresh() {
   const [status, approvals] = await Promise.all([api.get("/status"), api.get("/approvals?status=pending&limit=100")]);
   snapshot.status = status;
   snapshot.approvals = approvals;
-  loadedPages ??= status.pages;
-  snapshot.outdated = status.pages !== loadedPages;
+  snapshot.outdated = status.pages !== OWN_PAGES;
   announce();
 }
 
@@ -153,11 +166,20 @@ export async function runLifecycle(signal, onAuthRejected) {
   signal.addEventListener("abort", () => window.removeEventListener("focus", onFocus), { once: true });
   const onBack = () => {
     if (document.visibilityState === "visible") {
+      returnedAt = Date.now();
       settle();
     }
   };
   document.addEventListener("visibilitychange", onBack);
-  signal.addEventListener("abort", () => document.removeEventListener("visibilitychange", onBack), { once: true });
+  window.addEventListener("online", onBack);
+  signal.addEventListener(
+    "abort",
+    () => {
+      document.removeEventListener("visibilitychange", onBack);
+      window.removeEventListener("online", onBack);
+    },
+    { once: true },
+  );
   try {
     await follow({
       path: "/stream",

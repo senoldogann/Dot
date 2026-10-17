@@ -65,6 +65,13 @@ class DoctorCommand(FrozenModel):
     name: Literal["doctor"]
 
 
+class SetupCommand(FrozenModel):
+    name: Literal["setup"]
+    model: str | None
+    key_stdin: bool
+    no_service: bool
+
+
 class ReflectCommand(FrozenModel):
     name: Literal["reflect"]
 
@@ -298,6 +305,7 @@ type Command = Annotated[
     | AuthSetCommand
     | AuthStatusCommand
     | DoctorCommand
+    | SetupCommand
     | ReflectCommand
     | BrowserLoginCommand
     | BrowserImportChromeCommand

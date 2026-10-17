@@ -5256,6 +5256,13 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 315 | An agent starts from one of eight templates and goes to another home as a file         | in progress |         |
 | 318 | A "+" in the composer picks plugins, skills and Plan first, as chips                   | in progress |         |
 | 327 | A run that hesitates over what it was asked says so at once                            | in progress |         |
+| 328 | A phone that comes back to Dot finds it calm                                           | in progress |         |
+| 329 | On a phone Dot reads at a phone's size and takes a finger                              | in progress |         |
+| 330 | On a phone the settings are a list of their tabs in groups                             | in progress |         |
+| 331 | On a phone Appearance draws phones, two themes a row and one Text size                 | in progress |         |
+| 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | in progress |         |
+| 333 | `dotx setup` leads to a working model, and the home says when none answers             | in progress |         |
+| 334 | The repository opens with a short README, its details under docs/                      | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13357,6 +13364,292 @@ instead; then ask the user with ask_user, or go on with the part you can do." Ev
 every approval mode. README: Autonomy. Test: `tests/unit/test_run_modes.py` (the rule in chat, task and research runs
 and under ask, auto and yolo); on the prompt of before it fails. Not tested: what a real model does with it, which only
 use shows, since the tests call no model.
+
+### 328. A phone that comes back to Dot finds it calm
+
+**Status: in progress.** On the branch `items-328-phone`, after `item-318-composer-picks`; not merged. The plan of this
+item and the ones after it (329 to 334) is `reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The owner's word of 2026-10-16, with five screenshots of T3 Code's phone app: "Web tarafinda mobilde
+hala istedigim sabiyeti ve netligi hisswdemiyorum. Uygulamayi arka plana atip baska seylere ugrasip tekrar dondugumde
+daha sakin gelen bir UI istiyorum" (on the phone they still miss the steadiness and clarity they want; coming back to
+the app from other things, they want it to come back calmer). Measured in WebKit as their iPhone 17 Pro Max, with a
+proxy acting out a phone's network: back from the background on a network that woke in 4 s, a chat's page said
+"Reconnecting" and put "Connection lost. Reconnecting…" into the conversation at about 2 s, which pushed it down 36 px
+until about 4 s, and then drew the page again (about 118 elements added and 92 taken out, every row of the sidebar made
+anew). Opened again after the page was let go, the page waited for the network for its own files, since the service
+worker asked the network first, then showed Dot's card with "Connecting to the daemon…", a blank page, a spinner's card
+for 3 s, and the chat at 5 s. The browser's bar was Dot's amber in both schemes, and the banner of a page that an
+update left out of date sat in the bar and pushed the page down.
+
+**As built (2026-10-16).**
+
+- **Back from the background.** `state.js` `quietBreak`: for 8 s after the page comes back into view or onto the
+  network (`RETURN_GRACE_MS`) a break of a stream says nothing; then the bar's pill shows, and on a chat's page a note
+  that floats under the bar in a slot of no height (`.connection-slot`), so nothing read moves. `dom.js` `keepChildren`
+  moves only the children that are out of place, and the sidebar keeps a chat's row while the chat and its family read
+  the same, so a read after the return draws again only what changed.
+- **Opened again.** `kept_pages.py` names the build of the pages in the `X-Dot-Pages` header of every file it serves,
+  a 304 too, and writes it in `index.html`'s `dot-pages` meta. `sw.js` keeps its copies by build (`dot-pages-<build>`,
+  one build at a time): a page whose network has not answered within 200 ms is answered from the copy, every file of it
+  from the same copy, and such a page writes nothing to the copies. `state.js` compares the page's own build with the
+  daemon's; at its start a page of another build loads again, once per build and tab, before it shows anything
+  (`main.js`). `waiting.js`: while Dot waits for the daemon, a curtain shows the chat it opens on, its bar and its
+  composer (the real `composerFrame`, with the draft) in the page's own classes. The run page keeps its title, the line
+  under it and its placeholder for it (`keepChatLook`) and says when it shows its chat (`dot:page-ready`); the curtain
+  lifts then, or after 3 s, and says that Dot connects only after 8 s. A wider window's curtain is the ground alone.
+  The reads at the start go together.
+- **The browser's bar.** `theme.js` `followBarColour` keeps one `theme-color` the colour of the page's ground as the
+  theme, the scheme and the system's scheme change; `index.html` names the default theme's two grounds for the first
+  paint.
+- **Out of date.** The banner floats under the bar, and the page loads again once it is out of sight.
+- **The row of Settings' tabs.** `views/settings.js` centres the open tab again once the fonts are in, unless the row
+  was moved meanwhile. A page opened on Settings has the curtain's bare ground, with no words that ask for the webfont
+  as "Connecting to the daemon…" did, so the font came in after the row was measured in the narrower fallback face,
+  and the open tab ended 17 px past the row's edge (found by `test_phone_pages`). With the font held back 0.8 s, the
+  file before this item left the open tab at 297–395 px in a row of 12–378 px, and this one puts it at 280–378 px.
+- README: the web UI's update banner and service worker, and the phone.
+- Tests: `tests/smoke/test_phone_return.py` (WebKit as the owner's iPhone, a proxy as its network). Back after 30 s
+  away on a network that wakes in 4 s: nothing at three heights of the screen moves, nothing says that the page
+  reconnects, the missed steps show within 2 s of the network, and the rows of the sidebar and of the helpers that did
+  not change are the same nodes; with the network away for 15 s the pill shows from 8 s and not before. Opened again
+  on a network that wakes in 4 s: at 500 ms the chat's title and composer stand where the page has them once it is
+  there (the composer to the pixel, the title within one), nothing says that Dot connects, no script or style sheet is
+  asked of the daemon (`/` and `/sw.js` are, against every file of the shell before), and the chat opens at its foot.
+  The bar is the ground's colour, light and dark. An outdated page's banner moves nothing, and the page loads again
+  once put away. `tests/unit/test_pages_build.py`: the build in the header, also of a 304, and in the meta.
+  Changed: `test_reconnect` gives the pill 10 s after a stop soon after a return, for the 8 s of quiet;
+  `test_pages_tell`'s pages run without the service worker, which once it controlled the page took the queue's read
+  past the test's route (6/6 with it blocked; why the pages before this item did not was not found).
+  `test_run_chrome` (two tests), `test_chat_choices` and `test_takeover` wait for the curtain to lift after a reload
+  on a chat: while it is up it carries the chat's bar, composer and layout in the page's classes, and a bare class
+  finds two. Found by holding the curtain its full 3 s over the 26 files that reload or open a second page: those four
+  failed, and pass with the wait, held and not. `test_phone_return`'s proxy closes on waking also a connection it
+  took while the network slept and that was still on its way to the daemon, which the page's timers make while it is
+  put away: through it the stream came back at once (3 of 7 runs failed before, 5 of 5 passed after).
+- Not verified on a device: the status bar of an app on the home screen with `theme-color`, and how often iOS lets the
+  page go.
+
+### 329. On a phone Dot reads at a phone's size and takes a finger
+
+**Status: in progress.** On the branch `items-328-phone`, after item 328; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The same word of the owner (item 328): every page should read and be understood better on the
+phone. Measured in WebKit as the owner's iPhone 17 Pro Max and as an iPhone SE, light and dark, on 21 pages and the open
+sidebar of a home with chats, agents, schedules and notes: the body was 14 px as on the Mac and most text 13 or 14 px.
+On the iPhone 17 Pro Max in the light scheme, on 16 of the 22 views fewer than one character in ten was 15 px or more
+(Agents 0.3 %), 1,296 characters were under 13 px, and 333 controls were under 44 px each way, the radios drawn for a
+screen reader alone left out (15 on General, where the plan's first count, which took 36 such radios in, said 51). The
+switch was 34 by 20 px and only the switch itself turned it, a step's duration showed only under a hovering pointer,
+and some hints named the config file's keys (`[agent] context_tokens in config.toml`, `[judge] provider = "typesafe"`,
+`[server] reach`).
+
+**As built (2026-10-17).**
+
+- **A phone** is a touch screen (`pointer: coarse`) 720 px wide or less, or under 500 px high on its side; an iPad and a
+  Mac keep their sizes.
+- **Text.** `app.css` gives a phone its own seven sizes: 13, 15, 16, 17, 19, 22 and 26 px for xs to 2xl (a Mac's are 12,
+  13, 14, 15, 17, 20 and 24), still scaled by Settings › Appearance's interface size, whose hint says so. The names of
+  the looks, the labels of a list of facts (`.kv dt`), the line about a turn's latest step and the sidebar's lines of
+  what a run does and how many it delegated read at a hint's size there. Code keeps the size chosen for it (13 px).
+- **Touch.** Everything tapped is 44 px each way at least: the buttons, the fields, a segmented control's choices
+  (their sides 8 px, so Activity's four filters fit an iPhone SE), the menus' rows, the steps' heads, the bar's and the
+  sidebar's buttons and rows, the settings' tabs, the folds, the home's titles, the capsule, the range (its knob 28 px)
+  and the context meter. The composer's round buttons keep their 36 px in a clear ring. The switch is iOS's, a 52 by 32
+  px track in a 64 by 44 px box, and `dom.js` `switchRow` lets a tap anywhere on a setting's row, a pick of the
+  composer's menu or the schedule's "Switched on" turn its switch. The bar's tool pill draws its hairline inside its
+  edge, so it is as tall as the way back, and the curtain's title (item 328) now stands to the pixel where the page's
+  does.
+- **Hover.** A step's duration shows on a screen with no pointer to hover.
+- **Words.** The context budget's two hints, TypeSafe's key and the phone's address name the setting in words, the key
+  after it in faint type ("In the config file: [agent] context_tokens."); a repeating schedule fires "on a schedule".
+  "YOLO", "Typed judge (Jev)", "DevTools port" and "Cron expression" stay: names the people who use them know, each
+  with its plain hint beside it.
+- Measured again on the same 22 views, both iPhones, both schemes: no character under 13 px, no control under 44 px,
+  nothing wider than the screen, and on every view at least 90 % of the characters at 15 px or more (the least, 90.2 %,
+  on Schedules; code apart). In a 1280 px window every view uses the sizes it used before.
+- README: the phone's sizes, under "Dot on the phone".
+- Tests: `tests/smoke/test_phone_type.py` (WebKit as both iPhones): on 20 pages and the open sidebar no text under 13
+  px, at least nine characters in ten at 15 px or more (code apart), nothing tapped under 44 px but a link inside a line
+  of text; a step's duration without a hover; a tap on a setting's words turns its switch, and the switch is 64 by 44 px;
+  in a Mac's window the seven sizes, the body and the switch are as before. Against the pages before this item it fails
+  on every page, on the duration and on the row. `test_phone_fit`: on the owner's iPhone the fields are a phone's 15 and
+  16 px and the composer its own 15 px. `test_phone_return`: the curtain's title to the pixel. `test_context_sizes` and
+  `test_context_meter`: the hints' words.
+- Not verified on a device: how the sizes and the 44 px rows feel in the owner's hand.
+
+### 330. On a phone the settings are a list of their tabs in groups
+
+**Status: in progress.** On the branch `items-328-phone`, after item 329; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The same word of the owner (item 328), with T3 Code's phone app beside it: its settings open on a
+list of groups, each a card of rows with a mark, a name, what the page holds and an arrow, and a row opens its page with
+a way back. Dot's settings on a phone were the tabs in one row that scrolls sideways (item 272) over the open tab's pane,
+`#/settings` was General, and every card held its name inside its surface. On an iPhone SE, General squeezed "What Dot
+is called" a word a line beside its field.
+
+**As built (2026-10-17).**
+
+- **A phone** is a window 720 px wide or less, as for the rest of the phone's layout (`layout.js` `PHONE`, items 294 to
+  298). A phone on its side and a Mac keep the rail or the row of tabs.
+- **The list.** On a phone `#/settings` is four groups of rows, eleven in all: Interface (General, Appearance), Models
+  (Models, API keys), How Dot works (Rules, Memory, Skills, Schedules) and This Mac (Browser, Phone, System). A group's
+  name stands over its card; a row is the tab's mark, its name, what it holds and an arrow, 48 px high, a hairline
+  between rows. Appearance tells the theme on screen, Models the main model, Memory how many notes Dot keeps and
+  Schedules how many schedules there are; the two counts are read as the list opens.
+- **A tab's page.** A row opens its tab as a page of its own: the bar names the tab, "All settings" at its top leads back
+  to the list, and the rail is not drawn. A card's name stands over the card, out of its surface, as a group's name over
+  the list, and the card's ground is its body's; every card with a name has one body (a survey of the eleven tabs).
+- **A Mac.** `#/settings` leads to General in the place of the address it was opened at, so one step back is the page
+  before. The rail, the bar's "Settings" and the cards are as before.
+- **General's names.** Where a name's row has no room for its words whole and the field, as on an iPhone SE, the field
+  goes under the words.
+- README: the list, under "Dot on the phone".
+- Tests: `tests/smoke/test_phone_settings.py` (WebKit as the owner's iPhone 17 Pro Max and as an iPhone SE, 440 and 320
+  px): the list's groups, its rows and their four values; each of the eleven rows opens its tab, the bar naming it, the
+  way back shown and the rail hidden, and the way back leads to the list; Appearance's first card has its name over it;
+  no page is wider than the screen. In a Mac's window `#/settings` from the sidebar leads to General with the rail, and
+  one step back is the page before. Against the pages before this item both tests fail, and without the cards' rules
+  the phone's fails on the card. `test_phone_type` measures the list too (329's sizes and targets); `test_phone_pages`
+  checks the row of tabs in a laptop's window, where it still is.
+- Not verified on a device: how the list and the pages feel in the owner's hand.
+
+### 331. On a phone Appearance draws phones, two themes a row and one Text size
+
+**Status: in progress.** On the branch `items-328-phone`, after item 330; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** T3 Code's Appearance on the owner's phone: the colour schemes drawn as phones, the themes two a row,
+each with a light and a dark sphere and its name, and one Text card, a sample line over a "Text size" in points that
+messages, labels and headings follow, 16 by default. Dot's Type card had an "Interface size" of 13 to 17 px around 14,
+which already scaled every text of the interface, the answers too (a phone read 14 as its 16 since item 329); its
+schemes were drawn as Mac windows, and an iPhone SE had one theme a row.
+
+**As built (2026-10-17).**
+
+- **Text.** A Text card under Themes: a line of an answer over **Text size**, the size of the body on this device, every
+  text size scaled by it over the device's own. On a phone (item 329's: a touch screen 720 px wide or less, or under
+  500 px high on its side) it runs from 14 to 20 px around 16, as iOS's own; elsewhere from 13 to 17 px around 14, as
+  before. It is kept in the browser under the key it had (`dot.sizeInterface`), so each device has its own; on a phone
+  a value kept from before is read as the body's size, and one outside 14 to 20 gives way to 16. `boot.js` reckons it
+  the same way before the first paint. The unit stays px, Dot's for every size (a px on an iPhone is a point). The Type
+  card keeps the families, the composer's size and the code's.
+- **Schemes.** On a phone a scheme's card draws a phone, upright: no sidebar, the message and the answer across its
+  screen and the composer at its foot; a Mac's window draws a window, as before.
+- **Themes.** On a phone the gallery is two a row, an iPhone SE's too: the orbs are 40 px (36 under 360 px), each still
+  a 44 px button with its ring.
+- README: the Text card, under Settings › Appearance.
+- Tests: `tests/smoke/test_phone_text.py` (WebKit as the owner's iPhone 17 Pro Max and an iPhone SE): a fresh phone's
+  Text size reads 16 in 14 to 20 and the body is 16 px; at 18 the answer, a row of the sidebar and a label of the
+  settings grow by 18/16 together; after a reload it is 18, and with main.js held back boot.js alone puts 18/16 on the
+  page; the schemes' drawings are upright, the first two themes stand on one line and nothing is wider than the
+  screen; a Mac's window draws a window. Against the pages before this item both fail. `test_interface_settings`
+  moves the slider by its new name; a Mac's 13 to 17 around 14 is as before.
+- Not verified on a device.
+
+### 332. On a phone Activity, Connect apps and an agent's editor name their cards over them
+
+**Status: in progress.** On the branch `items-328-phone`, after item 331; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** After item 329 the pages of a phone already read at its sizes and take a finger. Against T3 Code's
+grouped lists: Activity's three sections and Connect apps' carried their names inside their cards, a delegated run's row
+on Activity ran to three lines of facts beside its time, and Team's empty page named a tool (`message_agent`). The
+sidebar, Agents, an agent's page and Campaigns already stood in named groups, with empty lines that say what to do.
+
+**As built (2026-10-17).**
+
+- On a phone (720 px wide or less) a card's name stands over the card, out of its surface, as in the settings' tabs
+  (item 330): on Activity, Connect apps and an agent's editor too. The rule moved from `settings.css` to `app.css`, by
+  the card's head, for the four kinds of cards; Connect apps' cards wrap their lines and rows in one body, so that the
+  surface is that body's. A Mac's window keeps the names inside.
+- A row of Activity, and of the home's Today, is its title over one line of facts on a phone, which fades where it runs
+  out of room; the whole row still says them all to a screen reader.
+- Team's empty page: "Ask Dot to bring one of your agents into a task, and what they say to each other shows here."
+- Measured on both iPhones, light and dark, on Activity (with a run at work and two it delegated), Agents, an agent,
+  Team, Campaigns and Connect apps: nothing under 13 px or 44 px, nothing wider than the screen, no error on the pages.
+- README: under "Dot on the phone".
+- Tests: `tests/smoke/test_phone_lists.py` (WebKit as both iPhones, a run at work and a run it delegated): a delegated
+  row's facts are one line; the first card of Activity and of Connect apps has its name over it and its ground on its
+  body; Team's empty line says what to do, without the tool's name; a Mac's window keeps the name inside. Against the
+  pages before this item the facts, the two cards and Team's line each fail; the Mac's check holds before and after.
+- Not verified on a device.
+
+### 333. `dotx setup` leads to a working model, and the home says when none answers
+
+**Status: in progress.** On the branch `items-328-phone`, after item 332; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The README's quick start ended at `uv sync` and `dotx doctor`; nothing set Dot up. Every default
+model is an Ollama cloud model, so a new person without an Ollama account got no answer, and a missing key showed only
+in Settings. Xcode's Command Line Tools, which `dotx service install` builds Dot.app with, were not among the
+requirements.
+
+**As built (2026-10-17).**
+
+- `dotx setup` (`cli_setup.py`):
+  - **This Mac.** It checks the macOS version, ripgrep, Chrome and Xcode's Command Line Tools (`xcode-select -p`, which
+    opens no dialog), in `dotx doctor`'s rows. A row that fails stops it before anything is written. The Command Line
+    Tools are needed only when the service is installed.
+  - **Provider.** It asks for one: Ollama, OpenAI, Anthropic, OpenCode Go or OpenCode Zen's free models.
+  - **Key.** The provider's API key goes to Dot's `.env` file with mode 0600, as `dotx auth set` stores it. A key that is
+    set is kept. Dot reads the Keychain but never writes it.
+  - **Model.** It offers the provider's models that can call tools, the configured main model first when it is one of
+    them. The model becomes `[models] main`, `fast` and `review`, and `vision` when it sees images.
+  - **Service.** It installs the service, as `dotx service install` does.
+  - **Flags.** `--model provider:model` and `--key-stdin` answer without a terminal; `--no-service` leaves the service
+    as it is. A model its provider does not list, or one that cannot call tools, is refused, with what to do (`ollama
+    pull`, `dotx models`), and no model is written.
+- The home's **Set up a model** card. While the default model is not in its provider's list, the card says why: no key,
+  a refused key, or the provider's own error, such as an Ollama out of reach or an OpenCode not installed. It leads to
+  Settings › Models, Settings › API keys and `dotx setup`. It reads the list the composer reads (no other request),
+  stands over the greeting in the block the page keeps in the middle, and goes once the model is listed.
+- README: the requirements (the Command Line Tools, one provider at least) and the quick start.
+- Tests (no model, no network; the service is left alone):
+  - `tests/smoke/test_cli_setup.py`. The real command, in a home where nothing is chosen, against a stand-in OpenAI
+    service on this Mac that lists its models to one key alone. A model it does not list is refused and nothing is
+    written; then the key read from standard input is kept, and `openai:gpt-5.5` becomes the main, fast, review and
+    vision model.
+  - `tests/smoke/test_setup_card.py` (WebKit as an iPhone 17 Pro Max). With OpenAI's model as the default and no key,
+    the card shows. A key saved in Settings › API keys makes the card go; with the key removed it is back. The scripted
+    model, made the default in Settings › Models, answers a message from the home.
+  - Against the code and pages before this item both fail.
+- Not verified on a device, and not with a real provider: the interactive path ran in a pseudo-terminal against the
+  stand-in.
+
+### 334. The repository opens with a short README, its details under docs/
+
+**Status: in progress.** On the branch `items-328-phone`, after item 333; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The README had 2,900 lines in 26 sections, most of them details for someone who already runs Dot,
+with no picture, no guide for contributors and no changelog. `pyproject.toml` named three of the five providers and
+had no links or classifiers, and nothing said plainly that Dot runs on macOS alone.
+
+**As built (2026-10-17).**
+
+- **README** (about 120 lines). It says what Dot is, on macOS only, with two pictures (a finished task on a Mac and on a
+  phone; a run of the scripted model on a throwaway home, as the README says). Then the requirements, five steps to
+  install with `dotx setup`, the first steps, the phone through Tailscale, the safety in short, the documentation and
+  the licences.
+- **docs/.** Fourteen pages take the README's sections word for word: the command line, models, runs and tools,
+  autonomy, safety and privacy, the daemon, the phone, browser and computer use, memory and schedules, agents and
+  campaigns, apps, MCP servers, skills and plugins, configuration, development and the known limits. Only their headings
+  and links changed. A script checked that every relative link of the Markdown files reaches a file and a heading (87
+  links in 23 files), and that every line of the old README is in the new files; the four that are not changed on
+  purpose (the providers of the first lines, the Quick start's heading and commands).
+- **New files.** `CONTRIBUTING.md` covers setting up, the gate's commands, the rules of the tests, the code and pull
+  requests. `CODE_OF_CONDUCT.md` follows the Contributor Covenant 2.1, with reports through GitHub's Report content.
+  `CHANGELOG.md` sums up the first public version under Unreleased. There are issue templates for a bug and a feature
+  (a security problem goes to SECURITY.md's private reporting) and a pull request template.
+- **pyproject.toml.** It names the five providers, and has keywords, classifiers (macOS only, Python 3.13, Alpha) and
+  the project's links. The package's metadata was built with them offline; the lock is unchanged.
+- SECURITY.md, the gate's workflow and a comment of `opencode/server.py` point at the pages under docs/ that now hold
+  what they named in the README.
+- Left as they are, for the owner to decide: ROADMAP.md in the repository, the item numbers in comments and in the
+  pages, and a release on PyPI.
 
 ## Log
 

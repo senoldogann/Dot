@@ -149,6 +149,28 @@
   --gap-stack: var(--space-2);
 }
 
+/* A phone (item 329): a touch screen of a phone's width, or of a phone's height on its side. Its text is a phone's, the
+   body 16 px as iOS's own and nothing under 13 px, and the interface's size (Settings › Appearance) still scales the
+   seven sizes; an iPad and a Mac keep the sizes above. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  :root {
+    --text-xs: calc(13px * var(--type-scale));
+    --leading-xs: calc(18px * var(--type-scale));
+    --text-sm: calc(15px * var(--type-scale));
+    --leading-sm: calc(20px * var(--type-scale));
+    --text-ui: calc(16px * var(--type-scale));
+    --leading-ui: calc(22px * var(--type-scale));
+    --text-md: calc(17px * var(--type-scale));
+    --leading-md: calc(26px * var(--type-scale));
+    --text-lg: calc(19px * var(--type-scale));
+    --leading-lg: calc(26px * var(--type-scale));
+    --text-xl: calc(22px * var(--type-scale));
+    --leading-xl: calc(30px * var(--type-scale));
+    --text-2xl: calc(26px * var(--type-scale));
+    --leading-2xl: calc(34px * var(--type-scale));
+  }
+}
+
 *,
 *::before,
 *::after {
@@ -1063,6 +1085,31 @@ a.pill:hover {
   cursor: not-allowed;
 }
 
+/* A row that a switch is the whole of (a setting, a pick of the composer's menu) turns it wherever it is tapped, as a
+   row of iOS's settings does (item 329, dom.js switchRow). */
+.switch-row {
+  cursor: pointer;
+}
+
+/* On a phone the switch is iOS's size, 52 by 32 px, in a box a finger's height: the band around the track is clear. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .switch {
+    width: 64px;
+    height: 44px;
+    border: 6px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .switch::after {
+    width: 28px;
+    height: 28px;
+  }
+
+  .switch[aria-checked="true"]::after {
+    transform: translateX(20px);
+  }
+}
+
 /* A range (item 127): a hairline track filled with the accent up to the value (--range-fill, which panels.js
    rangeSetting keeps) and the switch's knob, ringed so that it shows on any surface. */
 .range {
@@ -1150,6 +1197,34 @@ a.pill:hover {
   border-bottom: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   color: var(--text-2);
   font-weight: var(--weight-label);
+}
+
+/* On a phone a card's name stands over the card, out of its surface, as a group's name over T3 Code's rows: in the
+   settings' tabs (item 330), on Activity, Connect apps and the agent's editor (item 332). Each such card has one body,
+   whose ground the card's is. */
+@media (max-width: 720px) {
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor):has(> .card-head) {
+    border: 0;
+    background: none;
+  }
+
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head {
+    padding: 0 16px 8px;
+    border-bottom: 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-text);
+  }
+
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head > .fold-toggle {
+    font-weight: var(--weight-text);
+  }
+
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head + * {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
 }
 
 /* Cards and groups whose body folds away. The head is a button; its actions sit beside it and never fold the card. */
@@ -1596,6 +1671,21 @@ a.pill:hover {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+/* The card that leads to a model while the default one cannot answer (item 333), over the greeting. */
+.home-setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-setup-body > p {
+  margin: 0;
+}
+
+.home-setup-ways {
+  flex-wrap: wrap;
 }
 
 /* Dot greets above the composer, as at the head of a conversation. */
@@ -3160,7 +3250,8 @@ a.pill:hover {
   color: var(--bad);
 }
 
-/* The duration of a step shows on hover and while the step is open, so a folded row is one quiet line (item 74). */
+/* The duration of a step shows on hover and while the step is open, so a folded row is one quiet line (item 74); on a
+   screen with no pointer to hover, always (item 329). */
 .tool-time {
   color: var(--faint);
   font-size: var(--text-xs);
@@ -3174,6 +3265,12 @@ a.pill:hover {
 .tool-head:focus-visible .tool-time,
 .tool[open] > .tool-head .tool-time {
   opacity: 1;
+}
+
+@media (hover: none) {
+  .tool-time {
+    opacity: 1;
+  }
 }
 
 .chev {
@@ -5593,6 +5690,20 @@ button.attach-chip:hover {
   }
 }
 
+/* On a phone a row is its title over one line of facts, which fades where it runs out of room (item 332). */
+@media (max-width: 720px) {
+  .activity-main .meta-facts {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    mask-image: linear-gradient(to right, var(--bg) calc(100% - 24px), transparent);
+  }
+
+  .activity-main .meta-facts > span {
+    flex: none;
+    white-space: nowrap;
+  }
+}
+
 /* ---------- delegated runs (item 68) ---------- */
 
 .activity-children {
@@ -5872,11 +5983,13 @@ button.attach-chip:hover {
     font-weight: var(--weight-text);
   }
 
-  /* The page's tools in one pill: Dot's computer, the helpers with their count, the panel's switch. */
+  /* The page's tools in one pill: Dot's computer, the helpers with their count, the panel's switch. Its hairline is drawn
+     inside its edge, so the pill is as tall as its buttons and as the bar's way back, and the bar as tall as the
+     curtain's, which has the way back alone (items 328 and 329). */
   .stage-pill {
     flex: none;
-    padding: var(--space-half);
-    border: 1px solid var(--border);
+    outline: 1px solid var(--border);
+    outline-offset: -1px;
     border-radius: var(--radius-pill);
     background: var(--surface);
   }
@@ -5975,5 +6088,101 @@ button.attach-chip:hover {
 @media (max-width: 720px) and (prefers-reduced-motion: reduce) {
   .capsule-work[data-state="working"] .capsule-mark .icon {
     animation: none;
+  }
+}
+
+/* On a phone everything that is tapped is a finger's size, 44 px each way at least (item 329, Apple's 44 pt): the
+   buttons, the fields, the choices of a segmented control, the rows of a menu and the heads of the steps. A link inside a
+   line of text is no target of its own (WCAG 2.5.8). */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .btn,
+  .btn.sm,
+  .input,
+  .select,
+  .segmented button,
+  .menu-item,
+  .tool-head,
+  .steps-head,
+  .helpers-head {
+    min-height: 44px;
+  }
+
+  .btn.icon-only,
+  .btn.sm.icon-only {
+    width: 44px;
+  }
+
+  /* The composer's round buttons keep the 36 px they show in a clear ring that makes them a finger's size. */
+  .composer .plus-button,
+  .composer .btn.send {
+    width: 44px;
+    height: 44px;
+    min-height: 44px;
+    border: 4px solid transparent;
+    background-clip: padding-box;
+  }
+
+  .composer-pill {
+    height: 44px;
+  }
+
+  .btn,
+  .segmented button,
+  .composer-pill {
+    min-width: 44px;
+  }
+
+  /* Four choices of a phone's size fit the smallest phone's width (Activity's filters on an iPhone SE). */
+  .segmented button {
+    padding-inline: 8px;
+  }
+
+  .composer .textarea,
+  .dock .composer .textarea,
+  .fold-toggle,
+  .home-today-title,
+  .home-today-more,
+  .back,
+  .capsule-part {
+    min-height: 44px;
+  }
+
+  .context-meter {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  .child > summary .child-open,
+  :is(.answer-foot, .note) > a.small {
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  :is(.answer-foot, .note) > a.small {
+    display: inline-flex;
+  }
+
+  /* What a page is read for is no smaller than a hint: the names of the looks and the labels of a list of facts. */
+  .look-name,
+  .kv dt {
+    font-size: var(--text-sm);
+  }
+
+  /* A range's track keeps its hairline in a box a finger's height, under a knob as large as iOS's. */
+  .range {
+    height: 44px;
+  }
+
+  .range::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+    margin-top: calc((4px - 28px) / 2);
+  }
+
+  .range::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
   }
 }

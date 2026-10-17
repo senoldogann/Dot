@@ -272,6 +272,91 @@
   }
 }
 
+/* On a phone the settings open on a list of their tabs in groups, after T3 Code's (item 330): each group's name over a
+   card of rows, a row the tab's mark, its name, what it holds and an arrow. A row opens its tab as a page of its own,
+   the way back to the list at its top in the rail's place. */
+.settings-list {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.settings-group-title {
+  margin: 0 0 8px;
+  padding-inline: 16px;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-text);
+  line-height: var(--leading-sm);
+}
+
+.settings-group > .card {
+  overflow: hidden;
+}
+
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 12px 16px;
+  color: var(--text);
+}
+
+.settings-row + .settings-row {
+  border-top: 1px solid var(--border);
+}
+
+.settings-row:hover {
+  background: color-mix(in srgb, var(--text) 4%, transparent);
+  text-decoration: none;
+}
+
+/* The card clips what lies past its rounded edge, so a row's ring of focus is drawn inside it. */
+.settings-row:focus-visible {
+  outline-offset: -2px;
+}
+
+.settings-row > .icon {
+  flex: none;
+  color: var(--text-2);
+}
+
+.settings-row > .icon:last-child {
+  color: var(--faint);
+}
+
+.settings-row-label {
+  flex: none;
+}
+
+.settings-row-value {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.back.settings-back {
+  display: none;
+}
+
+/* A tab's page: its cards' names stand over them (app.css, items 330 and 332). */
+@media (max-width: 720px) {
+  .settings-side {
+    display: none;
+  }
+
+  .back.settings-back {
+    display: inline-flex;
+    justify-self: start;
+    margin-bottom: 0;
+  }
+}
+
 /* Rules read as sentences: "When Dot would use shell, matching ^git push: ask me first." The four answers sit in a
    segmented control that wraps on a phone. */
 .rule-sentence {
@@ -381,9 +466,19 @@
   font-weight: var(--weight-label);
 }
 
-/* The name field of Settings › General sits at the end of its row, like a switch would. */
+/* The name field of Settings › General sits at the end of its row, like a switch would; where the row has no room for
+   its words whole and the field, as on an iPhone SE, the field goes under the words instead of squeezing them a word a
+   line (item 330). */
 .name-input {
-  max-width: 220px;
+  flex: 0 1 220px;
+}
+
+.row:has(> .name-input) {
+  flex-wrap: wrap;
+}
+
+.row:has(> .name-input) > .grow {
+  flex-basis: auto;
 }
 
 /* The DevTools port of Dot's Chrome (item 265): five digits. */
@@ -986,4 +1081,77 @@
 :root[data-wrap-code] .type-preview[data-preview="code"] {
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* On a phone a tab of the row, a key's page and a rule's example are a finger's height (item 329). */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .settings-tab,
+  .key-page,
+  .rule-example {
+    min-height: 44px;
+  }
+}
+
+/* On a phone (item 331) a colour scheme's card draws a phone, upright: no sidebar, the message and the answer across its
+   screen and the composer at its foot. The themes stand two a row, their orbs a finger's size, so that a 320 px screen
+   holds two too. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  .wire {
+    width: 60%;
+    margin-inline: auto;
+    aspect-ratio: 9 / 16;
+    border-radius: var(--radius);
+  }
+
+  .wire-side {
+    display: none;
+  }
+
+  .wire-bubble {
+    top: 10%;
+    right: 12%;
+    width: 50%;
+    height: 6%;
+  }
+
+  .wire-line {
+    left: 12%;
+    height: 3%;
+  }
+
+  .wire-line:nth-child(3) {
+    top: 22%;
+    width: 64%;
+  }
+
+  .wire-line:nth-child(4) {
+    top: 28%;
+    width: 44%;
+  }
+
+  .wire-composer {
+    inset: auto 10% 6%;
+    height: 10%;
+  }
+
+  .theme-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .theme-orbs {
+    gap: var(--space-1);
+  }
+
+  .orb {
+    width: 40px;
+    height: 40px;
+  }
+}
+
+/* Under 360 px the orbs are 36 px, each still a 44 px button with its ring, two to a card a little over 90 px wide. */
+@media (pointer: coarse) and (max-width: 359.98px) {
+  .orb {
+    width: 36px;
+    height: 36px;
+  }
 }

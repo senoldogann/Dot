@@ -266,6 +266,26 @@ export function applyStoredScheme() {
   setScheme(isScheme(stored) ? stored : DEFAULT_SCHEME);
 }
 
+/**
+ * Keep the browser's bar (`theme-color`: a phone's status bar, Safari's tab bar) the colour of the page's ground, so
+ * that it follows the theme and the scheme on screen (item 328). index.html names the default theme's light and dark
+ * grounds for the first paint; from here one meta follows the page.
+ */
+export function followBarColour() {
+  for (const first of document.querySelectorAll('meta[name="theme-color"]')) {
+    first.remove();
+  }
+  const meta = document.createElement("meta");
+  meta.name = "theme-color";
+  document.head.append(meta);
+  const paintBar = () => {
+    meta.content = getComputedStyle(document.body).backgroundColor;
+  };
+  paintBar();
+  new MutationObserver(paintBar).observe(document.documentElement, { attributeFilter: ["data-scheme", "data-theme", "data-contrast", "style"] });
+  SYSTEM_DARK.addEventListener("change", paintBar);
+}
+
 /** Run `listener(id)` after every choice of a colour scheme. Returns the function that stops it. */
 export function onSchemeChange(listener) {
   schemeListeners.add(listener);

@@ -1,11 +1,26 @@
 [project]
 name = "dotagent"
 version = "0.1.0"
-description = "Dot: an always-on autonomous agent for macOS with browser and computer use, running on Ollama, OpenAI or OpenCode Go models."
+description = "Dot: an always-on autonomous agent for macOS with browser and computer use, on models from Ollama, OpenAI, OpenCode Go, Anthropic or OpenCode Zen."
 readme = "README.md"
 license = "MIT"
 license-files = ["LICENSE"]
 requires-python = ">=3.13"
+keywords = ["agent", "autonomous agent", "macos", "llm", "browser automation", "computer use", "mcp", "ollama"]
+# Dot runs on macOS alone: it depends on PyObjC and drives macOS's own applications.
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: Console",
+    "Environment :: MacOS X",
+    "Environment :: Web Environment",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "Operating System :: MacOS :: MacOS X",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "aiosqlite>=0.22.1",
     "croniter>=6.2.4",
@@ -27,6 +42,12 @@ dependencies = [
     "structlog>=26.1.0",
     "uvicorn>=0.54.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/senoldogann/Dot"
+Documentation = "https://github.com/senoldogann/Dot/tree/main/docs"
+Issues = "https://github.com/senoldogann/Dot/issues"
+Changelog = "https://github.com/senoldogann/Dot/blob/main/CHANGELOG.md"
 
 [project.scripts]
 dotx = "dotagent.cli:main"

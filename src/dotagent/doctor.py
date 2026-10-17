@@ -6,6 +6,7 @@ import os
 import platform
 import shutil
 import sqlite3
+import subprocess
 import time
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -67,6 +68,7 @@ from dotagent.web.search import AnthropicRung, SearchChoice, search_ladder, sear
 from dotagent.web.types import SearchHit
 
 _PROBE_TIMEOUT_S: float = 5.0
+_XCODE_SELECT: str = "/usr/bin/xcode-select"
 _ERROR_CHARS: int = 300
 _PROBLEMS_SHOWN: int = 3
 # Embedding models trained mostly on English text: they match English notes by meaning, other languages by words only.
@@ -489,21 +491,29 @@ def _codes_row(config: AppConfig) -> CheckResult:
     return _result("one-time codes", True, False, detail)
 
 
+def _ripgrep_row() -> CheckResult:
+    ripgrep: str | None = shutil.which("rg")
+    return _result("ripgrep", ripgrep is not None, True, ripgrep or "install with: brew install ripgrep")
+
+
+def _chrome_row() -> CheckResult:
+    chrome_present: bool = CHROME_APP.exists()
+    return _result(
+        "google chrome",
+        chrome_present,
+        False,
+        str(CHROME_APP) if chrome_present else "the browser tools use Chrome; install it",
+    )
+
+
 def _local_checks() -> list[CheckResult]:
     """Checks that only touch the local filesystem and PATH."""
-    chrome_present: bool = CHROME_APP.exists()
-    ripgrep: str | None = shutil.which("rg")
     env_state: str = "present" if env_file_path().exists() else "absent"
     return [
         _result("home directory", dot_home().is_dir(), True, str(dot_home())),
         _result("env file", True, False, f"{env_file_path()} ({env_state})"),
-        _result("ripgrep", ripgrep is not None, True, ripgrep or "install with: brew install ripgrep"),
-        _result(
-            "google chrome",
-            chrome_present,
-            False,
-            str(CHROME_APP) if chrome_present else "the browser tools use Chrome; install it",
-        ),
+        _ripgrep_row(),
+        _chrome_row(),
     ]
 
 
@@ -518,6 +528,31 @@ def _check_screen_capture_support() -> CheckResult:
         False,
         f"macOS {version} cannot capture the screen: the desktop tools need macOS 15.2 or later; update macOS",
     )
+
+
+def _xcode_tools_row(required: bool) -> CheckResult:
+    """Xcode's Command Line Tools, with which the service builds Dot.app on this Mac (:mod:`dotagent.dot_app`):
+    ``xcode-select -p`` names their folder, and fails without them, without the dialog that installs them."""
+    try:
+        completed: subprocess.CompletedProcess[str] = subprocess.run(
+            [_XCODE_SELECT, "-p"], capture_output=True, text=True, timeout=_PROBE_TIMEOUT_S, check=False
+        )
+    except subprocess.TimeoutExpired:
+        return _result("xcode tools", False, required, f"xcode-select did not answer within {_PROBE_TIMEOUT_S:g}s")
+    if completed.returncode != 0:
+        return _result(
+            "xcode tools",
+            False,
+            required,
+            "the service builds Dot.app with them: install them with xcode-select --install",
+        )
+    return _result("xcode tools", True, required, completed.stdout.strip())
+
+
+def setup_checks(service: bool) -> list[CheckResult]:
+    """What ``dotx setup`` checks of this Mac before it chooses a model: the macOS version, ripgrep, Chrome, and Xcode's
+    Command Line Tools, which the service needs (``service``: it is installed after)."""
+    return [_check_screen_capture_support(), _ripgrep_row(), _chrome_row(), _xcode_tools_row(service)]
 
 
 _DESKTOP_FIX: str = (

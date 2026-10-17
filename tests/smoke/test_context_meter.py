@@ -200,8 +200,8 @@ async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_fill
                         "summarizes its older part.",
                         "The model holds 1,000,000 tokens.",
                         "Each step sends the model the whole run again, so a run kept within its budget is answered "
-                        "sooner and costs less. [agent] context_tokens in config.toml sets the budget, and Settings › "
-                        "Models one model's own, up to three quarters of the model's window.",
+                        "sooner and costs less. Dot's default size sets the budget, and Settings › Models one model's "
+                        "own, up to three quarters of the model's window. In the config file: [agent] context_tokens.",
                     ]
                 )
                 await page.screenshot(path=str(tmp_path / f"meter-{width}-{scheme}.png"), animations="disabled")

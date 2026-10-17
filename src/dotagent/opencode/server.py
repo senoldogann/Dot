@@ -62,7 +62,7 @@ _REQUEST_TIMEOUT_S: float = 60.0
 _CONNECT_TIMEOUT_S: float = 10.0
 # The free models whose providers may use what is sent to them to improve or train their models, by the start of their
 # ids (opencode.ai/docs/zen, read 2026-10-15: Big Pickle, Exo and MiMo "collected data may be used to improve the
-# model", Muse Spark Contributor for training); the README names them.
+# model", Muse Spark Contributor for training); docs/models.md names them.
 LEARNING_MODELS: tuple[str, ...] = ("big-pickle", "exo-", "mimo-", "muse-spark-")
 # What OpenCode's agent may do (``OPENCODE_PERMISSION``, which OpenCode applies over every config): each of its tools that
 # acts or reads asks Dot first, and so does a subagent, which Dot refuses (its session would not be the run's). No tool
