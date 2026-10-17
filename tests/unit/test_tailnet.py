@@ -86,7 +86,7 @@ def _like_the_app(path: Path) -> Path:
     the message of a window that could not start."""
     path.write_text(
         "#!/bin/sh\n"
-        'if [ "$TAILSCALE_BE_CLI" = "1" ]; then\n'
+        'if [ "$TAILSCALE_BE_CLI" = "true" ]; then\n'
         '  echo \'{"BackendState": "Running", "Self": {"DNSName": "mac.tail1234.ts.net."}}\'\n'
         "else\n"
         "  echo 'The Tailscale GUI failed to start: The operation could not be completed.'\n"
@@ -98,6 +98,7 @@ def _like_the_app(path: Path) -> Path:
 
 
 async def test_the_apps_program_is_asked_as_the_command_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TAILSCALE_BE_CLI", raising=False)
     monkeypatch.setenv("DOT_TAILSCALE", str(_like_the_app(tmp_path / "Tailscale")))
     state = await tailnet_state(8765, (), ())
     assert (state.running, state.name, state.problem) == (True, "mac.tail1234.ts.net", None)

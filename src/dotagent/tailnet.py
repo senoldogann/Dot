@@ -15,10 +15,10 @@ from dotagent.core.text import truncate_middle
 from dotagent.core.types import FrozenModel
 
 # The command line Tailscale's app for the Mac carries, used before a tailscale on the PATH. Run by a process with no
-# terminal, as the daemon is, the app's program starts its window unless _AS_COMMAND_LINE says to answer as the command
-# line (Homebrew's tailscale ignores it).
+# terminal, as the daemon is, the app's program tries to start its window and says it could not, unless
+# _AS_COMMAND_LINE tells it to answer as the command line; a tailscale that is only the command line answers so anyway.
 _APP_CLI: Path = Path("/Applications/Tailscale.app/Contents/MacOS/Tailscale")
-_AS_COMMAND_LINE: dict[str, str] = {"TAILSCALE_BE_CLI": "1"}
+_AS_COMMAND_LINE: dict[str, str] = {"TAILSCALE_BE_CLI": "true"}
 _STATUS_TIMEOUT_S: float = 10.0
 _SERVE_TIMEOUT_S: float = 30.0
 _RUNNING: str = "Running"
