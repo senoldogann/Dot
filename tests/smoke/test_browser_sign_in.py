@@ -30,10 +30,14 @@ from dotagent.server.links import ui_url
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 
 TOKEN: str = "sign-in-token"
-# What stands in for Chrome: it writes its pid and its arguments beside itself, then waits to be stopped.
+# What stands in for Chrome: it writes its arguments and then its pid beside itself, the pid whole in one rename, so a
+# pid that is there says the arguments are too; then it waits to be stopped. (It wrote the pid first, and a test that
+# read the arguments as soon as the pid was there now and then found none.)
 _STAND_IN: str = """#!/bin/sh
-echo "$$" > "$(dirname "$0")/pid"
-printf '%s\\n' "$@" > "$(dirname "$0")/args"
+here="$(dirname "$0")"
+printf '%s\\n' "$@" > "$here/args"
+echo "$$" > "$here/pid.part"
+mv "$here/pid.part" "$here/pid"
 exec sleep 600
 """
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
