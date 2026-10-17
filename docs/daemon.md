@@ -352,8 +352,8 @@ Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how 
 take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never slide), and "Faces that move"
 (below). **Text** (item 331): one **Text size** under a line of an answer, the size of the body on this device, every
 text size scaled with it: on a phone 12 to 20 px around 16 (item 347), as iOS's own, and elsewhere 13 to 17 px around
-14; each device keeps its own. **Type**: the interface's font (Inter, the system's, or families typed, which go before Inter so
-that no glyph goes missing); the answers' font (the theme's,
+14; each device keeps its own. **Type**: the interface's font (Inter, the system's, or families typed, which go before
+Inter so that no glyph goes missing); the answers' font (the theme's,
 which is a serif in Paper, the interface's, or a serif); the composer's font (the interface's, a serif, the code's, or
 families typed) and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed)
 and the size of an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on)
