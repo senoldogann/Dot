@@ -1,5 +1,6 @@
 /* The frame of the interface: a sidebar on the left (a drawer on narrow windows) and the stage with the page. The window
-   keeps the scroll, so the sticky bars and the follow-the-bottom behaviour of the run page work as they always did. */
+   keeps the scroll, so the sticky bars and the follow-the-bottom behaviour of the run page work as they always did, but
+   in a chat on a phone, which is one screen whose conversation alone scrolls (item 352, run.css). */
 
 :root {
   --sidebar-w: 272px;

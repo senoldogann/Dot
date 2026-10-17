@@ -147,6 +147,76 @@
   }
 }
 
+/* On a phone a chat is one screen (item 352), as a phone's chat apps and T3 Code's are: the top bar and the composer
+   stay where they are and only the conversation scrolls between them, so a scroll, its bounce at either end and the
+   keyboard move nothing else. The stage fills what is seen of the window (layout.js's followSeen: the keyboard pans
+   the page and leaves less of it seen), the window itself does not scroll, and the dock is the column's foot. */
+@media (max-width: 720px) {
+  html.chat-shell,
+  html.chat-shell body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+
+  html.chat-shell .shell {
+    min-height: 0;
+  }
+
+  html.chat-shell .stage {
+    position: fixed;
+    top: var(--seen-top);
+    right: 0;
+    bottom: var(--seen-bottom);
+    left: 0;
+    min-height: 0;
+  }
+
+  html.chat-shell .stagebar {
+    translate: none;
+  }
+
+  html.chat-shell .page[data-layout="run"],
+  html.chat-shell .run-layout {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  html.chat-shell .run-layout,
+  html.chat-shell .run-main {
+    flex: 1 1 auto;
+  }
+
+  html.chat-shell .run-main {
+    min-height: 0;
+  }
+
+  html.chat-shell .run-thread {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  html.chat-shell .connection-slot {
+    top: var(--space-2);
+  }
+
+  /* The dock keeps a position of its own: the way down (`.jump`) stands just above it. */
+  html.chat-shell .dock {
+    position: relative;
+    translate: none;
+    margin-top: 0;
+  }
+
+  /* No bar covers the conversation's top: what the column goes to stands right there. */
+  html.chat-shell .run-thread .answer,
+  html.chat-shell .run-thread .bubble.user {
+    scroll-margin-top: var(--space-2);
+  }
+}
+
 /* ---------- the marks of the conversation's messages (item 201) ---------- */
 
 /* A column of marks, one for each message you wrote, at the left edge of the run's layout and in the middle of what the

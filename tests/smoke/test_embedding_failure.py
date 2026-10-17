@@ -144,8 +144,10 @@ async def _served(runtime: Runtime, manager: RunManager) -> AsyncIterator[str]:
 
 
 async def _lines(page: Page) -> list[str]:
-    """The texts of the timeline's warning lines, with every folded group of steps opened."""
-    folded: Locator = page.locator("details.steps:not([open]) > summary.steps-head")
+    """The texts of the timeline's warning lines, with every folded group of steps and the context line opened."""
+    folded: Locator = page.locator(
+        "details.steps:not([open]) > summary.steps-head, details.context-line:not([open]) > summary"
+    )
     while await folded.count() > 0:
         await folded.first.click()
     return [text.strip() for text in await page.locator(".timeline .note.warn").all_inner_texts()]
@@ -203,6 +205,12 @@ async def test_a_run_whose_embeddings_fail_finds_its_notes_and_skills_by_their_w
                             await page.goto(ui_url(host, port, TOKEN))
                             await page.goto(f"{address}/#/runs/{run.id}")
                             await expect(page.locator(".timeline")).to_contain_text("report.md is written.")
+                            # Both are one compact line, said once, whose details open on a tap (item 352).
+                            context: Locator = page.locator(".timeline details.context-line.warn")
+                            await expect(context).to_have_count(1)
+                            await expect(context.locator(".context-summary")).to_contain_text(
+                                "notes and skills found by their words alone"
+                            )
                             lines: list[str] = await _lines(page)
                             assert [line.split(" — ")[0] for line in lines] == [
                                 "Notes recalled by their words alone: the embedding service failed",

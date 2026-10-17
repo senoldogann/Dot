@@ -33,6 +33,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFaile
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, confirmDialog, toast } from "../ui.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
+import { PHONE } from "../layout.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -536,6 +537,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       }
     },
     onEdit: () => syncControls(),
+    onCount: () => paintCapsule(),
   });
   // ⌘⇧Enter sends what the box holds the other way than the send does (`steers`): to the run now, past the queue, or
   // into the queue where a message steers; with the box empty, it sends the queue's next message to the run (T3
@@ -609,12 +611,16 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   frame.options.append(choices.pills.mode, choices.pills.model, choices.pills.reasoning, choices.pills.options);
   const stopStatus = onChange(choices.sync);
   // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
-  const background = backgroundWork({ threadId: run.thread_id });
-  // The line over a phone's composer (item 297): the run's time and its helpers, each the way to where it is told of.
-  // The queue's own banner, right under it, tells what waits.
+  const background = backgroundWork({ threadId: run.thread_id, onCount: () => paintCapsule() });
+  // The line over the composer (items 297 and 352): the run's time and what it does now, its helpers, the messages
+  // queued and the commands at work; the first three are the way to where they are told of.
   const capsule = createCapsule({
     onWork: () => inspector.openTab("run"),
     onHelpers: () => inspector.openTab("agents"),
+    onQueued: () => {
+      queue.expand();
+      queue.element.scrollIntoView({ block: "nearest" });
+    },
   });
   const dock = el("div", { class: "dock" }, capsule.element, resumeLine, queue.element, background.element, frame.element, foot);
 
@@ -881,7 +887,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   function paintCapsule() {
-    capsule.paint({ status: active ? status : null, since: run.created_at, now: Date.now() / 1000, helpers: timeline.helperStatuses() });
+    capsule.paint({
+      status: active ? status : null,
+      since: run.created_at,
+      now: Date.now() / 1000,
+      helpers: timeline.helperStatuses(),
+      activity: timeline.activity(),
+      queued: queue.count(),
+      commands: background.count(),
+    });
   }
 
   // ------------------------------------------------------------------------------------------------ scroll
@@ -901,20 +915,40 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
           return;
         }
         following = true;
-        window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+        toEnd("smooth");
       },
     },
     icon("arrowDown"),
   );
   dock.prepend(jump);
 
+  // What scrolls the conversation (item 352): on a phone the conversation itself, between the top bar and the composer,
+  // which stay put (`html.chat-shell`, run.css); on a wider window the window, as before. The conversation's box is
+  // known once it is built.
+  let threadBox = null;
+
+  function scroller() {
+    return PHONE.matches && threadBox !== null ? threadBox : document.scrollingElement;
+  }
+
+  /** Where what shows of the conversation ends, in the window's coordinates. */
+  function seenEnd() {
+    return PHONE.matches && threadBox !== null ? threadBox.getBoundingClientRect().bottom : window.innerHeight;
+  }
+
+  function toEnd(behavior) {
+    const box = scroller();
+    box.scrollTo({ top: box.scrollHeight, behavior });
+  }
+
   function nearBottom() {
-    return window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - NEAR_BOTTOM_PX;
+    const box = scroller();
+    return box.clientHeight + box.scrollTop >= box.scrollHeight - NEAR_BOTTOM_PX;
   }
 
   /** The button leads to the answer once there is one that is still below the window, else to the end of a live run. */
   function paintJump() {
-    const below = answerNode !== null ? answerNode.getBoundingClientRect().top > window.innerHeight : active && !following;
+    const below = answerNode !== null ? answerNode.getBoundingClientRect().top > seenEnd() : active && !following;
     const unseen = below && !landing;
     jump.hidden = !unseen;
     const words = answerNode !== null ? "Jump to the answer" : "Jump to latest";
@@ -925,10 +959,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The reader leaves the end by scrolling up, not because the end moved on while a scroll of the page's own was on its
   // way: a scroll event that comes after the conversation grew reads as far from the end without the reader having
   // moved (item 274).
-  let lastScrollY = window.scrollY;
+  let lastScrollY = scroller().scrollTop;
 
   function onScroll() {
-    const y = window.scrollY;
+    const y = scroller().scrollTop;
     following = y < lastScrollY ? nearBottom() : following || nearBottom();
     lastScrollY = y;
     paintJump();
@@ -946,7 +980,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     requestAnimationFrame(() => {
       scrollQueued = false;
       if (!signal.aborted) {
-        window.scrollTo({ top: document.documentElement.scrollHeight });
+        toEnd("auto");
       }
     });
   }
@@ -1340,6 +1374,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     lessonsCard,
     continuedIn(history.later),
   );
+  threadBox = thread;
   paintWorking();
   const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
   filesWatch.observe(thread, { childList: true, subtree: true });
@@ -1359,6 +1394,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   loadActions();
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
+  thread.addEventListener("scroll", onScroll, { passive: true });
+  // On a phone the chat is one screen while the page is open (item 352, run.css).
+  document.documentElement.classList.add("chat-shell");
   // Lessons change after the run, and a question may be answered or skipped in another tab, as a draft may be sent or
   // discarded on another screen (item 314). A helper that starts or ends is read from the store too.
   const helpersChanged = debounce(() => reconcile(), HELPERS_SETTLE_MS);
@@ -1419,6 +1457,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   return () => {
     window.removeEventListener("scroll", onScroll);
+    thread.removeEventListener("scroll", onScroll);
+    document.documentElement.classList.remove("chat-shell");
     filesWatch.disconnect();
     outline.dispose();
     stopLifecycle();
