@@ -239,25 +239,33 @@ export function mount(root, ctx) {
     return [
       el(
         "section",
-        { class: "card", dataset: { kind: "mcp" } },
+        { class: "card connect-section", dataset: { kind: "mcp" } },
         el("div", { class: "card-head" }, icon("plug"), el("span", { class: "grow" }, "Tools of other services")),
         el(
-          "p",
-          { class: "hint connect-hint" },
-          "MCP servers hand their tools to Dot. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after.",
+          "div",
+          null,
+          el(
+            "p",
+            { class: "hint connect-hint" },
+            "MCP servers hand their tools to Dot. Dot tries one before it keeps it, signs in to it in this browser when it asks, and offers its tools to the runs that start after.",
+          ),
+          servers.servers.length === 0 ? el("p", { class: "hint connect-hint connect-note" }, "Dot has no MCP server yet.") : null,
+          servers.servers.map(serverRow),
+          form,
         ),
-        servers.servers.length === 0 ? el("p", { class: "hint connect-hint connect-note" }, "Dot has no MCP server yet.") : null,
-        servers.servers.map(serverRow),
-        form,
       ),
       toAdd.length === 0
         ? null
         : el(
             "section",
-            { class: "card", dataset: { kind: "services" } },
+            { class: "card connect-section", dataset: { kind: "services" } },
             el("div", { class: "card-head" }, icon("plus"), el("span", { class: "grow" }, "Services to add")),
-            el("p", { class: "hint connect-hint" }, "Each runs its own MCP server. One that signs in opens its sign-in page here; you sign in with your own account."),
-            toAdd.map(serviceRow),
+            el(
+              "div",
+              null,
+              el("p", { class: "hint connect-hint" }, "Each runs its own MCP server. One that signs in opens its sign-in page here; you sign in with your own account."),
+              toAdd.map(serviceRow),
+            ),
           ),
     ];
   }
@@ -322,11 +330,16 @@ export function mount(root, ctx) {
       ...SECTIONS.map(({ kind, title, mark, hint }) =>
         el(
           "section",
-          { class: "card", dataset: { kind } },
+          { class: "card connect-section", dataset: { kind } },
           el("div", { class: "card-head" }, icon(mark), el("span", { class: "grow" }, title)),
-          el("p", { class: "hint connect-hint" }, hint),
-          kind === "web" ? el("p", { class: "hint connect-hint connect-note" }, webNote(listing)) : null,
-          listing.apps.filter((app) => app.kind === kind).map(row),
+          // The body in one block, whose surface the card's is on a phone (item 332).
+          el(
+            "div",
+            null,
+            el("p", { class: "hint connect-hint" }, hint),
+            kind === "web" ? el("p", { class: "hint connect-hint connect-note" }, webNote(listing)) : null,
+            listing.apps.filter((app) => app.kind === kind).map(row),
+          ),
         ),
       ),
       ...mcpSections(),

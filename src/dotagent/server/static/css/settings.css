@@ -344,8 +344,7 @@
   display: none;
 }
 
-/* In a tab's page a card's name stands over the card, as a group's name over the list's rows, and the card's ground is
-   its body's. */
+/* A tab's page: its cards' names stand over them (app.css, items 330 and 332). */
 @media (max-width: 720px) {
   .settings-side {
     display: none;
@@ -355,29 +354,6 @@
     display: inline-flex;
     justify-self: start;
     margin-bottom: 0;
-  }
-
-  .settings-pane .card:has(> .card-head) {
-    border: 0;
-    background: none;
-  }
-
-  .settings-pane .card > .card-head {
-    padding: 0 16px 8px;
-    border-bottom: 0;
-    color: var(--muted);
-    font-size: var(--text-sm);
-    font-weight: var(--weight-text);
-  }
-
-  .settings-pane .card > .card-head > .fold-toggle {
-    font-weight: var(--weight-text);
-  }
-
-  .settings-pane .card > .card-head + * {
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    background: var(--surface);
   }
 }
 

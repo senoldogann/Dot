@@ -5260,6 +5260,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 329 | On a phone Dot reads at a phone's size and takes a finger                              | in progress |         |
 | 330 | On a phone the settings are a list of their tabs in groups                             | in progress |         |
 | 331 | On a phone Appearance draws phones, two themes a row and one Text size                 | in progress |         |
+| 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13544,6 +13545,34 @@ schemes were drawn as Mac windows, and an iPhone SE had one theme a row.
   page; the schemes' drawings are upright, the first two themes stand on one line and nothing is wider than the
   screen; a Mac's window draws a window. Against the pages before this item both fail. `test_interface_settings`
   moves the slider by its new name; a Mac's 13 to 17 around 14 is as before.
+- Not verified on a device.
+
+### 332. On a phone Activity, Connect apps and an agent's editor name their cards over them
+
+**Status: in progress.** On the branch `items-328-phone`, after item 331; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** After item 329 the pages of a phone already read at its sizes and take a finger. Against T3 Code's
+grouped lists: Activity's three sections and Connect apps' carried their names inside their cards, a delegated run's row
+on Activity ran to three lines of facts beside its time, and Team's empty page named a tool (`message_agent`). The
+sidebar, Agents, an agent's page and Campaigns already stood in named groups, with empty lines that say what to do.
+
+**As built (2026-10-17).**
+
+- On a phone (720 px wide or less) a card's name stands over the card, out of its surface, as in the settings' tabs
+  (item 330): on Activity, Connect apps and an agent's editor too. The rule moved from `settings.css` to `app.css`, by
+  the card's head, for the four kinds of cards; Connect apps' cards wrap their lines and rows in one body, so that the
+  surface is that body's. A Mac's window keeps the names inside.
+- A row of Activity, and of the home's Today, is its title over one line of facts on a phone, which fades where it runs
+  out of room; the whole row still says them all to a screen reader.
+- Team's empty page: "Ask Dot to bring one of your agents into a task, and what they say to each other shows here."
+- Measured on both iPhones, light and dark, on Activity (with a run at work and two it delegated), Agents, an agent,
+  Team, Campaigns and Connect apps: nothing under 13 px or 44 px, nothing wider than the screen, no error on the pages.
+- README: under "Dot on the phone".
+- Tests: `tests/smoke/test_phone_lists.py` (WebKit as both iPhones, a run at work and a run it delegated): a delegated
+  row's facts are one line; the first card of Activity and of Connect apps has its name over it and its ground on its
+  body; Team's empty line says what to do, without the tool's name; a Mac's window keeps the name inside. Against the
+  pages before this item the facts, the two cards and Team's line each fail; the Mac's check holds before and after.
 - Not verified on a device.
 
 ## Log

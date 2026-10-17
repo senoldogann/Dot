@@ -1199,6 +1199,34 @@ a.pill:hover {
   font-weight: var(--weight-label);
 }
 
+/* On a phone a card's name stands over the card, out of its surface, as a group's name over T3 Code's rows: in the
+   settings' tabs (item 330), on Activity, Connect apps and the agent's editor (item 332). Each such card has one body,
+   whose ground the card's is. */
+@media (max-width: 720px) {
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor):has(> .card-head) {
+    border: 0;
+    background: none;
+  }
+
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head {
+    padding: 0 16px 8px;
+    border-bottom: 0;
+    color: var(--muted);
+    font-size: var(--text-sm);
+    font-weight: var(--weight-text);
+  }
+
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head > .fold-toggle {
+    font-weight: var(--weight-text);
+  }
+
+  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head + * {
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    background: var(--surface);
+  }
+}
+
 /* Cards and groups whose body folds away. The head is a button; its actions sit beside it and never fold the card. */
 
 .fold-toggle {
@@ -5644,6 +5672,20 @@ button.attach-chip:hover {
 @media (max-width: 600px) {
   .activity-side .badge {
     display: none;
+  }
+}
+
+/* On a phone a row is its title over one line of facts, which fades where it runs out of room (item 332). */
+@media (max-width: 720px) {
+  .activity-main .meta-facts {
+    flex-wrap: nowrap;
+    overflow: hidden;
+    mask-image: linear-gradient(to right, var(--bg) calc(100% - 24px), transparent);
+  }
+
+  .activity-main .meta-facts > span {
+    flex: none;
+    white-space: nowrap;
   }
 }
 

@@ -1945,7 +1945,9 @@ works and This Mac, each row a page's name and what it holds (the theme on scree
 schedules there are). A row opens its page on its own, the bar naming it and "All settings" at its top to go back, and
 a card's name stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone
 Appearance draws the colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's
-16 px (item 331).
+16 px (item 331). Activity, Connect apps and an agent's editor name their cards the same way, a row of Activity keeps
+its facts to one line that fades where it runs out of room, and Team's empty page says what brings messages there
+(item 332).
 
 At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
