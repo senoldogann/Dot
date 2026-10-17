@@ -5287,7 +5287,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| done        | 3dedca5 |
 | 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | done        | 3dedca5 |
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
-| 357 | Lines of at most 120 characters, held by `ruff check`                                  | in progress |         |
+| 357 | Lines of at most 120 characters, held by `ruff check`                                  | done        | 4ebf951 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12397,7 +12397,13 @@ opens, one removed, nothing wider than the phone).
 
 ### 280. Dot starts lean: the fewest words and tools, the rest found when needed
 
-**Status: planned.**
+**Status: planned; it waits for the owner's word on the evals (2026-10-17).** The owner chose it for this round on
+2026-10-17, and it was not built: its default is decided by `dotx eval run` of both ways on one model, which spends a
+hosted model's quota (Ollama's cloud answered 429 earlier in the month) or money, and that is the owner's to decide. The
+size is measured (part 9: a task run's first step carries a system prompt of 25,591 characters and 57 tool schemas of
+45,348, about 22 k tokens). To decide: `dotx eval run --repeat 2` with `[agent] tool_surface = "grouped"`, then with
+`"full"`, and `dotx eval report` of the two files; the lean prompt is written when the evals can say whether it does as
+well.
 
 **What.** A run starts with a short system prompt and the core tools; the other groups of tools are named in a line and
 come when the run asks for them (`use_tools`), as `tool_surface = "grouped"` does. Evals of both ways on the same tasks
@@ -14190,15 +14196,15 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 
 ### 357. Lines of at most 120 characters, held by `ruff check`
 
-**Status: in progress.** The owner's word of 2026-10-17: "Tüm bu açık problemleri düzelt" (fix all these open problems).
-Lines over 120 characters came back in the review of nearly every pull request, so the rule that finds them is on: a
-finding that recurs is fixed at its source. **As built (2026-10-17).** The 391 lines over 120 characters in `src` and
-`tests` are wrapped: comments and docstrings reflowed, a string's pieces regrouped up to the end of a line of its text
-and a value over several lines put in parentheses, the prompt's backslash-continued lines reflowed, and JavaScript, HTML
-and SQL inside strings broken where their language ignores the break. Every changed file but 15 parses to the same tree
-as before, docstrings compared by their words; the 15 are two SQL queries, the pages' script, two local names in
-`evals/scoring.py`, the pages and scripts of tests, and the words of one test's docstring, a stray fragment taken out.
-`pyproject.toml` no longer ignores E501, so `ruff check` holds every line of Python to 120 characters. Docs:
+**Status: done (`4ebf951`).** The owner's word of 2026-10-17: "Tüm bu açık problemleri düzelt" (fix all these open
+problems). Lines over 120 characters came back in the review of nearly every pull request, so the rule that finds them
+is on: a finding that recurs is fixed at its source. **As built (2026-10-17).** The 391 lines over 120 characters in
+`src` and `tests` are wrapped: comments and docstrings reflowed, a string's pieces regrouped up to the end of a line of
+its text and a value over several lines put in parentheses, the prompt's backslash-continued lines reflowed, and
+JavaScript, HTML and SQL inside strings broken where their language ignores the break. Every changed file but 15 parses
+to the same tree as before, docstrings compared by their words; the 15 are two SQL queries, the pages' script, two local
+names in `evals/scoring.py`, the pages and scripts of tests, and the words of one test's docstring, a stray fragment
+taken out. `pyproject.toml` no longer ignores E501, so `ruff check` holds every line of Python to 120 characters. Docs:
 `CONTRIBUTING.md`.
 
 ## Log
@@ -14972,3 +14978,4 @@ as before, docstrings compared by their words; the 15 are two SQL queries, the p
 - 2026-10-17 (Opus 5.5): item 268 on the owner's choice of the same day, carried from the uncommitted work of 2026-10-16 onto `item-268-quick-look`: Office files drawn by Quick Look in a sandboxed frame, a workbook's sheets framed one at a time under the panel's own tabs.
 - 2026-10-17 (Opus 5.5): item 271 on the owner's choice of the same day, on `item-271-phone-setup`: Settings › Phone says what a phone needs to reach Dot through Tailscale, sets it up with one button, and keeps the Mac awake while it charges.
 - 2026-10-17 (Opus 5.5): item 357 on the owner's word of the same day ("Tüm bu açık problemleri düzelt", fix all these open problems), on `item-357-long-lines`: the 391 long lines wrapped with every value kept, and `ruff check` holds every line of Python to 120 characters.
+- 2026-10-17 (Opus 5.5): item 357 done (`4ebf951`); item 280 left for the owner's word on spending a hosted model's quota on its evals, with how to run them.
