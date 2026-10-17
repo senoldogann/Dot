@@ -17,7 +17,7 @@ use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
-use hmac::{Hmac, Mac};
+use hmac::{Hmac, KeyInit, Mac};
 use serde::Deserialize;
 use sha2::Sha256;
 use tauri::image::Image;
@@ -335,27 +335,33 @@ fn proven(daemon: &Daemon, token: &str) -> Option<bool> {
     let nonce = hex::encode(bytes);
     match ureq::get(&format!("{}/api/proof", daemon.base))
         .query("nonce", &nonce)
-        .timeout(REQUEST_TIMEOUT)
+        .config()
+        .timeout_global(Some(REQUEST_TIMEOUT))
+        .build()
         .call()
     {
         Ok(response) => Some(
             response
-                .into_json::<Proof>()
+                .into_body()
+                .read_json::<Proof>()
                 .is_ok_and(|answer| proves(token, &nonce, &answer.proof)),
         ),
-        Err(ureq::Error::Status(..)) => Some(false),
-        Err(ureq::Error::Transport(_)) => None,
+        Err(ureq::Error::StatusCode(_)) => Some(false),
+        Err(_) => None,
     }
 }
 
 /// The numbers of the menu bar item, or `None` while the daemon does not answer.
 fn count(daemon: &Daemon, token: &str) -> Option<Count> {
     ureq::get(&format!("{}/api/activity/count", daemon.base))
-        .set("Authorization", &format!("Bearer {token}"))
-        .timeout(REQUEST_TIMEOUT)
+        .header("Authorization", &format!("Bearer {token}"))
+        .config()
+        .timeout_global(Some(REQUEST_TIMEOUT))
+        .build()
         .call()
         .ok()?
-        .into_json()
+        .into_body()
+        .read_json()
         .ok()
 }
 
