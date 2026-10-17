@@ -10,7 +10,9 @@ that way: since version 136 Chrome refuses remote debugging on its default data 
 it runs. There are two ways to open the sites Dot should use with your accounts:
 
 - `dotx browser login [url]` opens Dot's profile as a normal Chrome window. Sign in, then quit Chrome (Cmd+Q); the
-  cookies stay.
+  cookies stay. Settings › Browser does the same with "Sign in…" (`POST /api/browser/sign-in`, item 344): Dot's own
+  Chrome, when it is open, is closed first once you say so (refused with 409 while runs are active), the card says the
+  window is open until you quit it, and runs cannot use Dot's Chrome meanwhile.
 - `dotx browser import-chrome [--profile "Profile 1"] [--replace]` copies the cookies and the local storage of a profile
   of your Chrome into Dot's profile, so the accounts that are open in your Chrome are open for Dot too. Quit Chrome
   first. If the Dot service has its browser open, stop it for the import (`dotx service uninstall`, import,
@@ -42,10 +44,19 @@ While `dotx browser attach` runs, Chrome asks whether to allow the connection: c
 seconds). The check opens one blank tab, works in it and closes it again; your other tabs are not touched. The sign-ins
 Dot works with are the ones of your Chrome, so nothing is copied and nothing goes stale. What to expect:
 
-- Chrome may ask for the click again whenever Dot makes a new connection, after a restart of the service for example. A
+- Dot connects once and keeps the connection for later runs, which need no click. Chrome asks again whenever Dot makes
+  a new connection: after a restart of the service, or after Chrome itself was closed or restarted. Then the next
+  browser call connects again by itself, a notification says "Chrome asks to allow Dot", and a step that waits for
+  the click, or that was under way when Chrome went, says in one line that Chrome was closed or restarted and that
+  Allow is to be clicked (item 341). Settings › Browser reads how Chrome stands every 3 seconds while it is open:
+  connected, waiting for Allow, Chrome closed, remote debugging off, or Chrome restarted, each with what to do. A
   schedule that fires with nobody there waits `attach_timeout_s` for the click and then fails.
-- A tab that Dot opens is opened behind the tab you work in (with `raise_window` on it becomes the active tab of your
-  window), and Chrome may throttle a tab in the background.
+- A tab that Dot opens is opened in a window of its own, made behind the window you work in (item 340): the app in
+  front stays in front, your windows and tabs are not touched, and the page runs at full speed, where a tab in the
+  background of your window would get no frames and its timers cut to 8 a second. Each of Dot's tabs has its window,
+  so that runs working side by side each have a visible tab; the window closes with the tab. Making a window takes
+  about 30 ms more than a tab, once per chat. Dot never minimizes it (a minimized window is throttled); a window
+  covered by others runs at full speed.
 - Downloads go to the download folder of Chrome, not to Dot's `downloads/`.
 - Dot closes the tabs it opened when they have been idle for `tab_idle_s`. If Dot itself crashes they stay open.
 - Calls that arrive while Dot waits for the click queue behind it, and each may in turn wait up to `attach_timeout_s` if
@@ -89,8 +100,11 @@ Both modes share what follows.
 - `browser_act` runs up to `max_batch_steps` steps in one call (5 by default; a longer batch is cut to the first ones
   and the result says how many remain, so the call is not lost): `click`, `double_click`, `right_click`, `hover`,
   `fill`, `type`, `insert`, `select`, `press`, `check`, `uncheck`, `scroll_into_view`, `drag` and `click_at`. After a
-  step Dot waits until the page has settled (no DOM change for `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and
-  reports popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of
+  step that can open a tab or a dialog (a click, `select`, `press`, `check`, `drag`) Dot lets the page take one turn of
+  its event loop, by which Chrome has told of a dialog, a file chooser, a navigation or a tab the step set off, and
+  waits for such a tab until it is the run's, at most a second (item 342): a tab whose page answers later stops the
+  batch with a line that it is opening. Then Dot waits until the page has settled (no DOM change for
+  `settle_quiet_ms`, 60 ms, at most `settle_max_ms`) and reports popups, dialogs and downloads that appeared. The result is the part of the page that changed, with the refs of
   the last snapshot still valid; a page that did not change comes back as one line that says so. A tab that closes under
   a batch (a sign-in callback that did its job, a tab the user closed) stops the batch without a failed step: the result
   says the page closed it and shows the tab that is now current. A popup that opens and closes itself before the model
@@ -166,6 +180,11 @@ for the missing ones and opens their Settings panes.
 - `desktop_apps` lists the running applications and `desktop_open_app` brings one to the front, starting it when it is
 not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path to
 anything else (a binary) is refused at once with those three forms, instead of being retried against Launch Services.
+A name that fits several running copies of one application, "Google Chrome" while your Chrome and Dot's own both run,
+means the Chrome Dot's browser works in (item 343); a pid names any one of them.
+- Work inside a web page goes through the browser tools, which act in the run's own tab whatever other Chromes run;
+  the desktop tools are for what lies outside the page: a native dialog, a file picker, an extension's window. A script
+  sent to Chrome with AppleScript reaches whichever Chrome window macOS picks; `browser_eval` runs in the run's tab.
 - `desktop_snapshot` lists an application's window as elements with a role, a name, a value, a state, a position and a
   ref (`a12`). A second view lists only what changed; `query` finds elements anywhere in the application and
   `scope = menu_bar` lists the menu bar. `desktop_read` reads one element's full text.

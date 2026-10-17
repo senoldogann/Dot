@@ -37,10 +37,14 @@ _LIBSYSTEM: str = "/usr/lib/libSystem.B.dylib"
 _PID_PATH_BYTES: int = 4096
 
 
+def _accessibility_granted() -> bool:
+    return bool(AS.AXIsProcessTrustedWithOptions({AS.kAXTrustedCheckOptionPrompt: False}))
+
+
 def check_permissions() -> Permissions:
     """The permissions granted to the responsible process (the app that launched Dot); never prompts."""
     return Permissions(
-        accessibility=bool(AS.AXIsProcessTrustedWithOptions({AS.kAXTrustedCheckOptionPrompt: False})),
+        accessibility=_accessibility_granted(),
         screen_recording=bool(Quartz.CGPreflightScreenCaptureAccess()),
         post_event=bool(Quartz.CGPreflightPostEventAccess()),
     )
@@ -130,19 +134,25 @@ def grant_hint(pane: Pane) -> str:
     )
 
 
-def require_accessibility(permissions: Permissions) -> None:
-    if not (permissions.accessibility and permissions.post_event):
+def require_accessibility() -> None:
+    """Raise unless Accessibility and input events are granted. Only these two are read (item 343): the check of
+    Screen Recording takes as long again, 6 ms, and reading or controlling an application needs no screenshot."""
+    accessibility: bool = _accessibility_granted()
+    post_event: bool = bool(Quartz.CGPreflightPostEventAccess())
+    if not (accessibility and post_event):
         raise DesktopPermissionError(
             "macOS has not granted Accessibility to the app that runs Dot, so it can neither read nor control "
             "other applications. " + grant_hint("accessibility"),
-            {"accessibility": permissions.accessibility, "post_event": permissions.post_event},
+            {"accessibility": accessibility, "post_event": post_event},
         )
 
 
-def require_screen_recording(permissions: Permissions) -> None:
-    if not permissions.screen_recording:
+def require_screen_recording() -> None:
+    """Raise unless Screen Recording is granted; only that is read."""
+    screen_recording: bool = bool(Quartz.CGPreflightScreenCaptureAccess())
+    if not screen_recording:
         raise DesktopPermissionError(
             "macOS has not granted Screen Recording to the app that runs Dot, so it cannot take screenshots. "
             + grant_hint("screen_recording"),
-            {"screen_recording": permissions.screen_recording},
+            {"screen_recording": screen_recording},
         )

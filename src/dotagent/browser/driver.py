@@ -45,12 +45,14 @@ _TRANSIENT_NAVIGATION: tuple[str, ...] = (
     "ERR_SOCKET_NOT_CONNECTED",
 )
 
-# Resolves once the DOM has been quiet for quietMs, or after maxMs at the latest.
 # DOMContentLoaded as the document itself tells it: a page the back-forward cache brings back fires it no more, and
 # Playwright's own wait for it then lasted the whole navigation timeout (item 339).
 _PARSED_SCRIPT: str = """() => document.readyState !== 'loading' || new Promise((resolve) => {
   document.addEventListener('DOMContentLoaded', () => resolve(true), { once: true });
 })"""
+# One turn of the page's event loop (item 342): a task queued now runs after those a step queued for right after it.
+_TURN_SCRIPT: str = "() => new Promise((resolve) => setTimeout(resolve, 0))"
+# Resolves once the DOM has been quiet for quietMs, or after maxMs at the latest.
 _QUIET_SCRIPT: str = """([quietMs, maxMs]) => new Promise((resolve) => {
   let quietTimer = 0;
   const finish = () => { observer.disconnect(); clearTimeout(quietTimer); clearTimeout(hardTimer); resolve(null); };
@@ -279,6 +281,23 @@ async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int
         "waiting for the page to settle failed",
         lambda: _wait_quiet(page, quiet_ms, max_ms, timeout_ms),
     )
+
+
+async def let_page_turn(page: Page, timeout_ms: int) -> None:
+    """Let ``page`` take one turn of its event loop (item 342). When it has, Chrome has told what a step set off at once
+    or for right after it: a dialog, a file chooser, a navigation in the document, a tab it made for the page. A
+    navigation the step started has committed too, as Playwright holds a call into a page with a navigation under way
+    until it commits (measured: a link that answers in 300 ms holds the turn about as long). A page that navigates or
+    closes under the turn has moved on, which is what the turn waits for; one still busy after ``timeout_ms`` is let
+    be, and the next step meets it as it is."""
+    try:
+        async with asyncio.timeout(timeout_ms / 1000):
+            await page.evaluate(_TURN_SCRIPT)
+    except TimeoutError:
+        _log.warning("browser_page_turn_slow", url=truncate_middle(page.url, _ERROR_CHARS), waited_ms=timeout_ms)
+    except PlaywrightError as error:
+        if not page.is_closed() and _CONTEXT_DESTROYED not in str(error):
+            raise _failure("waiting for the page to take its turn failed", page, {}, error) from error
 
 
 async def navigate(page: Page, url: str, timeout_ms: int, attempts: int, backoff_ms: int) -> int | None:

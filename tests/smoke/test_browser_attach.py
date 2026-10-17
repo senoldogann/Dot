@@ -25,6 +25,7 @@ import pytest_asyncio
 from PIL import Image
 from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 from pydantic import BaseModel, TypeAdapter
+from structlog.testing import capture_logs
 
 from dotagent.agent.manager import RunManager
 from dotagent.browser.attach import DebugEndpoint, parse_port_file
@@ -74,6 +75,9 @@ _PAGES: dict[str, str] = {
     "/mine": "<!doctype html><title>Mine</title><h1>A page of the user</h1>",
     "/other": "<!doctype html><title>Other</title><h1>Another page of the user</h1>",
     "/popup": "<!doctype html><title>Popup</title><h1>Popup page</h1>",
+    # Two tabs from one click: the Chrome of the user opens the first and blocks the second (item 342).
+    "/two": """<!doctype html><title>Two</title>
+<button onclick="window.open('/popup'); window.open('/popup?second')">Open two</button><button>Stay</button>""",
 }
 
 
@@ -423,6 +427,30 @@ async def test_a_tab_that_a_tab_of_the_agent_opens_is_the_agents_and_closes_with
     await wait_for_tabs(chrome.port, [f"{site}/mine"])
 
 
+async def test_a_click_that_asks_for_two_tabs_stops_at_the_one_chrome_opened(
+    chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """The batch waits for the tabs Chrome made, not for those the page asked for (item 342): the blocked second popup
+    holds no step."""
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        view: PageView = await session.open_url("two", f"{site}/two")
+        steps: list[Step] = [
+            Step(action="click", ref=ref_of(view.body, 'button "Open two"')),
+            Step(action="click", ref=ref_of(view.body, 'button "Stay"')),
+        ]
+        with capture_logs() as logs:
+            outcome: ActOutcome = await session.act("two", steps, False, refuse_secret_field)
+        assert [report.outcome for report in outcome.steps] == ["done", "skipped"]
+        assert outcome.stopped is not None and "new tab" in outcome.stopped
+        assert [tab.url for tab in outcome.view.tabs] == [f"{site}/two", f"{site}/popup"]
+        assert not [entry for entry in logs if entry["event"] == "browser_new_tab_not_taken_in"]
+    finally:
+        await session.aclose()
+
+
 async def test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrome_is_back(
     data_dir: Path, attach_config: BrowserConfig, site: str, tmp_path: Path
 ) -> None:
@@ -498,6 +526,38 @@ async def test_a_connection_that_chrome_refuses_is_reported_without_the_secret_p
         await session.aclose()
     assert wrong not in str(raised.value)
     assert raised.value.context["port"] == chrome.port
+
+
+async def test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_run(
+    chrome: ScratchChrome,
+    attach_config: BrowserConfig,
+    own_config: BrowserConfig,
+    own_home: Path,
+    site: str,
+    tmp_path: Path,
+) -> None:
+    """Part 46 found AppleScript reaching whichever Chrome macOS picked, about four calls in ten while three Chromes ran
+    (item 343 proves its answer, item 263): browser_eval runs in the run's own tab, in the Chrome of the user beside
+    Dot's own Chrome and a third one, ten times in ten."""
+    third_dir: Path = tmp_path / "third"
+    await asyncio.to_thread(third_dir.mkdir, mode=0o700)
+    third: ScratchChrome = await start_chrome(third_dir, f"{site}/other")
+    own: BrowserSession = BrowserSession(
+        own_config, SERVER, browser_data_dir("own"), own_home / "downloads", no_runs_at_work
+    )
+    attached: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        await own.open_url("own", f"{site}/other")
+        await attached.open_url("run", f"{site}/")
+        titles: list[str] = [(await attached.run_script("run", "document.title", 5.0)).text for _ in range(10)]
+        assert titles == ['"Home"'] * 10
+        await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/"])
+    finally:
+        await attached.aclose()
+        await own.aclose()
+        await stop_chrome(third)
 
 
 async def test_a_session_moves_between_dots_own_chrome_and_the_chrome_of_the_user(

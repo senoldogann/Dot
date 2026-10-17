@@ -102,6 +102,8 @@ class StepEnv:
     failsafe_file: Path
     expected_front: int | None
     expected_pointer: Point | None
+    # The Chromes Dot's browser works in, which a name that fits several applications means (item 343).
+    preferred: frozenset[int]
     secure_field: SecureFieldCheck
 
 
@@ -420,7 +422,7 @@ def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspecti
                 Target(ref=None, state=None, owner=env.app, point=None, window=_app_window_title(env, env.app)),
             )
         case "activate":
-            named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running)
+            named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running, env.preferred)
             owner: AppInfo = named or env.app
             return _inspection(
                 env, lines, Target(ref=None, state=None, owner=owner, point=None, window=_app_window_title(env, owner))
@@ -672,7 +674,7 @@ def _menu(env: StepEnv, step: Step) -> Effect:
 
 
 def _activate(env: StepEnv, step: Step) -> Effect:
-    app: AppInfo = apps.require_app(_required(step.text, "application"), apps.list_apps())
+    app: AppInfo = apps.require_app(_required(step.text, "application"), apps.list_apps(), env.preferred)
     apps.activate(app, env.config.activate_timeout_s)
     return Effect(detail=f"{app.name} is in front", pointer=None, opens_ui=True, switched_to=app)
 

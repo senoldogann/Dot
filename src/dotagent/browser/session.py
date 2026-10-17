@@ -46,6 +46,7 @@ from dotagent.browser.driver import (
     go_back,
     install_consent_handler,
     keep_focused,
+    let_page_turn,
     measure_viewport,
     navigate,
     page_title,
@@ -59,7 +60,7 @@ from dotagent.browser.driver import (
     wait_for_text,
 )
 from dotagent.browser.keychain import KeychainMode, keychain_switches, playwright_defaults_to_drop, read_keychain_mode
-from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers
+from dotagent.browser.pages import Tab, ThreadTabs, add_note, attach_handlers, taken_in, watch_births
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
@@ -110,12 +111,18 @@ _REAP_INTERVAL_S: float = 60.0
 _CAST_QUALITY: int = 50
 _CAST_MAX_EDGE: int = 1280
 _CAST_POLL_S: float = 1.0
+# The longest a step waits for the tabs Chrome made for its page to be taken in by its thread (item 342).
 _POPUP_WAIT_S: float = 1.0
 # A page that shows fewer elements than this right after loading is probably still rendering.
 _MIN_REFS_AFTER_LOAD: int = 3
 _LATE_QUIET_MS: int = 300
 _LATE_MAX_MS: int = 2500
 _STILL_LOADING: str = "the page is still loading; what is shown may be incomplete"
+# Why a batch stops after a step that made a tab whose page has not answered within _POPUP_WAIT_S (item 342).
+_TAB_OPENING: str = (
+    "a new tab is opening and its page has not answered yet; look again with browser_snapshot, then use "
+    "browser_switch_tab to work in it"
+)
 _BLANK_URLS: frozenset[str] = frozenset({"about:blank", "chrome://newtab/", "chrome://new-tab-page/"})
 _TAB_MARK_BYTES: int = 6
 _LAUNCH_ARGS: list[str] = [
@@ -673,6 +680,12 @@ class BrowserSession:
     def profile_dir(self) -> Path:
         return self._profile
 
+    def chrome_pid(self) -> int | None:
+        """The pid of the Chrome that holds this session's profile now (blocking: it reads the profile's lock), or
+        ``None`` when none does: Dot's own Chrome while it runs (or a window opened on its profile to sign in), the
+        Chrome of the user while it is open."""
+        return profile_holder_pid(self._profile)
+
     @property
     def connected(self) -> bool:
         """Whether a Chrome is started or connected at the moment (one starts on the first call that needs it)."""
@@ -728,6 +741,21 @@ class BrowserSession:
             self._config = config
             self._profile = profile_dir
             _log.info("browser_switched", mode=config.mode, profile=str(profile_dir))
+
+    async def let_go_of_chrome(self) -> None:
+        """Close Dot's own Chrome now, so that its profile can open in a plain window where the owner signs in to sites
+        (item 344); the next call that needs it starts it again. Refused while a chat's run works in it, as a switch is,
+        and for the Chrome of the user, which is the owner's to close."""
+        async with self._launch_lock:
+            if self._closed:
+                raise BrowserError("the browser session was closed", {})
+            if self._config.mode != "own":
+                raise BrowserError("only Dot's own Chrome is closed for signing in", {"mode": self._config.mode})
+            busy: list[JsonValue] = [*threads_in_use(self._threads, self._kept())]
+            if busy:
+                raise BrowserError("the browser is in use; wait for the running work to finish", {"threads": busy})
+            await self._let_go()
+            _log.info("browser_let_go_for_sign_in", profile=str(self._profile))
 
     async def aclose(self) -> None:
         """Let go of Chrome and stop the Playwright driver. Dot's own Chrome is closed; the Chrome of the user stays
@@ -873,10 +901,12 @@ class BrowserSession:
             return
         if page.is_closed():
             add_note(opener_tab, closed_popup_note(page.url))
+            taken_in(opener_tab, tab)
             return
         thread.tabs.append(tab)
         add_note(opener_tab, f"a new tab opened as tab {len(thread.tabs)}")
         await self._enforce_cap(thread)
+        taken_in(opener_tab, tab)
 
     def _keeps_front(self) -> bool:
         """Whether Dot gives the front of the Mac back when its own Chrome takes it (item 118): a visible window that may
@@ -926,6 +956,7 @@ class BrowserSession:
         tab: Tab = Tab(page=page)
         attach_handlers(tab, self._downloads)
         page.on("close", partial(self._on_page_closed, tab))
+        await watch_births(tab)
         if self._config.mode == "attach":
             await keep_focused(page)
         else:
@@ -1047,8 +1078,11 @@ class BrowserSession:
 
     async def _capture(self, tab: Tab) -> _Capture:
         config: BrowserConfig = self._config
-        viewport: Viewport = await self._viewport(tab)
-        lines: tuple[SnapshotLine, ...] = await capture_lines(tab.page, _ms(config.action_timeout_s))
+        # The window's size is read alongside the snapshot, not before it (item 342): in the Chrome of the user it is
+        # one more round trip to the page on every capture, and the two reads do not depend on each other.
+        viewport, lines = await asyncio.gather(
+            self._viewport(tab), capture_lines(tab.page, _ms(config.action_timeout_s))
+        )
         kept: tuple[SnapshotLine, ...] = viewport_filter(
             lines, viewport.width, viewport.height, config.viewport_margin_px
         )
@@ -1614,21 +1648,48 @@ class BrowserSession:
                 reports.append(StepReport(index=index, description=description, outcome="done", detail=detail))
                 stopped = "the user took over this step; look at the page before going on"
                 continue
+            opening: bool = False
             if step.has_side_effects():
-                await self._let_events_land()
+                opening = await self._let_events_land(tab)
             reports.append(StepReport(index=index, description=description, outcome="done", detail=""))
             stopped = describe_surprise(before, self._watch(thread, tab))
+            if stopped is None and opening:
+                stopped = _TAB_OPENING
         return reports, stopped
 
     def _watch(self, thread: ThreadTabs, tab: Tab) -> _Watch:
         return _Watch(url=tab.page.url, tabs=len(thread.tabs), events=tab.events, closed=tab.page.is_closed())
 
-    async def _let_events_land(self) -> None:
-        """Popups, dialogs and navigations are announced a few milliseconds after the action that caused them."""
-        await asyncio.sleep(self._config.side_effect_grace_ms / 1000)
-        pending: list[asyncio.Task[None]] = list(self._adopting)
-        if pending:
-            await asyncio.wait(pending, timeout=_POPUP_WAIT_S)
+    async def _let_events_land(self, tab: Tab) -> bool:
+        """Let what a step on ``tab`` set off land before the batch goes on (item 342), and return whether a tab Chrome
+        made for it is still on its way. The page takes one turn of its event loop (:func:`let_page_turn`), and a tab
+        Chrome made meanwhile is waited for until its thread has it (:meth:`_let_births_land`). No fixed wait: a step
+        that sets off nothing costs the turn alone, a frame of the page (measured: 13 ms after a click, against the 40 ms
+        grace before), and a tab whose page answers late stops the batch all the same, where the grace let the batch go
+        on: Playwright reports a tab only once its page has answered (411 ms after the click for a page that answers in
+        400 ms), while Chrome tells of it before the click returns."""
+        await let_page_turn(tab.page, _ms(self._config.action_timeout_s))
+        return await self._let_births_land(tab)
+
+    async def _let_births_land(self, tab: Tab) -> bool:
+        """Wait until each tab Chrome made for ``tab`` has been taken in by its thread or has closed, ``_POPUP_WAIT_S``
+        at most, and return whether one was still on its way then. That one is let go of, so that it holds no later
+        step; it joins the thread when Playwright reports it, with its note on ``tab``."""
+        try:
+            async with asyncio.timeout(_POPUP_WAIT_S):
+                while tab.born:
+                    tab.born_changed.clear()
+                    await tab.born_changed.wait()
+        except TimeoutError:
+            _log.warning(
+                "browser_new_tab_not_taken_in",
+                url=truncate_middle(tab.page.url, _LAUNCH_ERROR_CHARS),
+                tabs=len(tab.born),
+                waited_s=_POPUP_WAIT_S,
+            )
+            tab.born.clear()
+            return True
+        return False
 
     async def act(
         self, thread_id: str, steps: Sequence[Step], accept_confirms: bool, secret_field: SecretFieldCheck
@@ -1701,19 +1762,24 @@ class BrowserSession:
             started: float = time.monotonic()
             end, text = await run_script(tab.page, script, timeout_s)
             seconds: float = time.monotonic() - started
-            await self._let_events_land()
-            current: Tab = await self._current_tab(thread)
+            current: Tab
+            opening: bool
             if end == "timeout":
+                # The script holds the page still: it takes no turn, and the tabs it opened are what can land.
+                opening = await self._let_births_land(tab)
+                current = await self._current_tab(thread)
                 await self._let_commit(current)
             else:
+                opening = await self._let_events_land(tab)
+                current = await self._current_tab(thread)
                 await self._settle(current)
-            after: _Watch = self._watch(thread, tab)
+            surprise: str | None = describe_surprise(before, self._watch(thread, tab))
             await self._enforce_landing(current)
             return ScriptRun(
                 end=end,
                 text=text,
                 url=current.page.url,
-                surprise=describe_surprise(before, after),
+                surprise=_TAB_OPENING if surprise is None and opening else surprise,
                 seconds=seconds,
             )
 

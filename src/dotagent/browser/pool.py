@@ -45,6 +45,12 @@ class BrowserPool:
             self._others[mode] = found
         return found
 
+    def chrome_pids(self) -> frozenset[int]:
+        """The Chromes the sessions work in, by the pid that holds each one's profile: Dot's own Chrome while it runs,
+        and the Chrome of the user. A name that fits several Chromes means one of these on the desktop (item 343)."""
+        sessions: tuple[BrowserSession, ...] = (self.main, *self._others.values())
+        return frozenset(pid for session in sessions if (pid := session.chrome_pid()) is not None)
+
     async def set_debug_port(self, port: int) -> None:
         """The port Dot's own Chrome takes DevTools connections on (item 265), for every session: the own Chrome of a
         campaign takes it as well. Every session is checked before any changes, so a session that refuses the port

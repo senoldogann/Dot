@@ -112,6 +112,7 @@ def _notes_env(tmp_path: Path, expected_front: int | None) -> StepEnv:
         failsafe_file=tmp_path / "STOP",
         expected_front=expected_front,
         expected_pointer=None,
+        preferred=frozenset(),
         secure_field=lambda inspection, what: None,
     )
 

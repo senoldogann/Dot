@@ -881,12 +881,15 @@ class BrowserView(FrozenModel):
     of the user say: whether it runs and
     allows remote debugging, and on which port. ``inspect_page`` is where the user switches that on. ``debug_port``
     is the port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), and ``devtools_address`` where
-    a run's scripts reach it: set while the main session is Dot's own Chrome and a port is."""
+    a run's scripts reach it: set while the main session is Dot's own Chrome and a port is. ``signing_in`` is true
+    while Dot's own profile is open in a plain Chrome window that Settings › Browser opened for the owner to sign in to
+    sites (item 344), until the owner quits it."""
 
     mode: BrowserMode
     connected: bool
     lost: bool
     waiting_allow: bool
+    signing_in: bool
     chrome_running: bool
     remote_debugging: bool
     port: int | None

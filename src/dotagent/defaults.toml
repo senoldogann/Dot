@@ -483,8 +483,6 @@ viewport_margin_px = 300
 # still waited for up to settle_max_ms.
 settle_quiet_ms = 60
 settle_max_ms = 1500
-# Popups and dialogs are reported a few ms after a click returns; side-effect steps wait this long before checking.
-side_effect_grace_ms = 40
 navigation_attempts = 3
 navigation_backoff_ms = 80
 # Tabs one conversation thread may keep open; the oldest background tab is closed beyond that.

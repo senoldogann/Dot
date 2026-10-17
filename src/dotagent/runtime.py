@@ -358,7 +358,7 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
             typesafe=typesafe,
             browser=browsers.main,
             browsers=browsers,
-            desktop=DesktopSession(config.desktop, failsafe_path()),
+            desktop=DesktopSession(config.desktop, failsafe_path(), browsers.chrome_pids),
             terminals=Terminals(config.shell.terminal_sessions, config.shell.terminal_idle_s, shell_env),
             web=WebClient(config.web, config.browser.allowed_hosts, config.browser.blocked_hosts),
             search_key_present=ollama_key is not None,
