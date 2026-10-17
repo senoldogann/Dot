@@ -1,5 +1,5 @@
-"""A Word document, an Excel workbook or a presentation as macOS's Quick Look draws it (item 268), for the panel beside a
-chat to show it as Finder would: its fonts, fills and pictures, a workbook's sheets one tab each.
+"""A Word document, an Excel workbook or a presentation as macOS's Quick Look draws it (item 268), for the panel beside
+a chat to show it as Finder would: its fonts, fills and pictures, a workbook's sheets one tab each.
 
 ``qlmanage -p -o`` writes the drawing as a page, ``Preview.html``, with its parts beside it (styles, scripts, pictures,
 a page per sheet). Dot keeps each drawing in a folder of its home (``looks/``) named by an id nobody can guess, and

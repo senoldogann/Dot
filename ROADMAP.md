@@ -5219,7 +5219,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | done        | 4f21322 |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | done        | 8aa45dd |
 | 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | planned     |         |
-| 281 | A chat can be a loop that asks Dot again until it is done                             | in progress |         |
+| 281 | A chat can be a loop that asks Dot again until it is done                             | done        | 48e7219 |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | done        | 427c51e |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
 | 284 | OpenCode's agent uses Dot's own tools over MCP                                        | done        | 5655e6f |
@@ -12393,7 +12393,7 @@ parts, `dotx eval check`.
 
 ### 281. A chat can be a loop that asks Dot again until it is done
 
-**Status: in progress.** The owner chose it on 2026-10-17, with 268, 271 and 280, for this round. **As built
+**Status: done (`48e7219`).** The owner chose it on 2026-10-17, with 268, 271 and 280, for this round. **As built
 (2026-10-17).** `/loop <rhythm> <message>` in the box of a run (the slash menu offers it) sends the message at once and
 makes a schedule of the chat (`POST /api/runs/{id}/loop`, `scheduler/loops.py`): a cron expression that keeps the rhythm
 exactly (every 5, 10, 15, 20 or 30 minutes, or every 1, 2, 3, 4, 6, 8 or 12 hours; others are refused), the message as
