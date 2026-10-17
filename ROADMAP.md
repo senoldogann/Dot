@@ -13825,11 +13825,13 @@ reads `document.readyState` in the page. Measured: browser_back in the ten-step 
 
 **Status: in progress.** **As built (2026-10-17).** In attach mode `_background_tab` makes the tab with
 `Target.createTarget` and `newWindow` besides `background`: the window opens behind the window the owner works in, the
-app in front stays in front (measured: Finder before and after), and the owner's windows and tabs are not touched.
-Measured first in a scratch Chrome on screen (one second of frames and timer ticks): a background tab in the owner's
-window is hidden, 0 frames and 8 ticks; a window of its own 61 and 208, also when another window covers it whole; a
-minimized one is hidden again, so Dot never minimizes. One window per tab, so that each run's tab is its window's
-visible tab while runs work side by side; the window goes with its tab. Its cost is in the table above. Test:
+app in front stays in front (measured: Finder before and after), and the owner's windows and tabs are not touched. With
+Chrome itself in front, as when the owner works in it, the window opens below the owner's and Chrome stays the app in
+front (measured after the review with the window order Quartz gives). Measured first in a scratch Chrome on screen (one
+second of frames and timer ticks): a background tab in the owner's window is hidden, 0 frames and 8 ticks; a window of
+its own 61 and 208, also when another window covers it whole; a minimized one is hidden again, so Dot never minimizes.
+One window per tab, so that each run's tab is its window's visible tab while runs work side by side; the window goes
+with its tab. Its cost is in the table above. Test:
 `test_browser_attach.py::test_a_tab_of_dot_opens_in_a_window_of_its_own` (Chrome's own `Browser.getWindowForTarget`).
 
 ### 341. A restarted Chrome is said in one line, and the card follows Chrome
