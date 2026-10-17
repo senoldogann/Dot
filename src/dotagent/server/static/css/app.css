@@ -1673,6 +1673,21 @@ a.pill:hover {
   gap: 24px;
 }
 
+/* The card that leads to a model while the default one cannot answer (item 333), over the greeting. */
+.home-setup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-setup-body > p {
+  margin: 0;
+}
+
+.home-setup-ways {
+  flex-wrap: wrap;
+}
+
 /* Dot greets above the composer, as at the head of a conversation. */
 .home-who {
   display: flex;

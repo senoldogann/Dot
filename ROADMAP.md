@@ -5261,6 +5261,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 330 | On a phone the settings are a list of their tabs in groups                             | in progress |         |
 | 331 | On a phone Appearance draws phones, two themes a row and one Text size                 | in progress |         |
 | 332 | On a phone Activity, Connect apps and an agent's editor name their cards over them     | in progress |         |
+| 333 | `dotx setup` leads to a working model, and the home says when none answers             | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13574,6 +13575,48 @@ sidebar, Agents, an agent's page and Campaigns already stood in named groups, wi
   body; Team's empty line says what to do, without the tool's name; a Mac's window keeps the name inside. Against the
   pages before this item the facts, the two cards and Team's line each fail; the Mac's check holds before and after.
 - Not verified on a device.
+
+### 333. `dotx setup` leads to a working model, and the home says when none answers
+
+**Status: in progress.** On the branch `items-328-phone`, after item 332; not merged. The plan is
+`reports/telefon-ve-acik-kaynak-2026-10-16.md`.
+
+**What was found.** The README's quick start ended at `uv sync` and `dotx doctor`; nothing set Dot up. Every default
+model is an Ollama cloud model, so a new person without an Ollama account got no answer, and a missing key showed only
+in Settings. Xcode's Command Line Tools, which `dotx service install` builds Dot.app with, were not among the
+requirements.
+
+**As built (2026-10-17).**
+
+- `dotx setup` (`cli_setup.py`):
+  - **This Mac.** It checks the macOS version, ripgrep, Chrome and Xcode's Command Line Tools (`xcode-select -p`, which
+    opens no dialog), in `dotx doctor`'s rows. A row that fails stops it before anything is written. The Command Line
+    Tools are needed only when the service is installed.
+  - **Provider.** It asks for one: Ollama, OpenAI, Anthropic, OpenCode Go or OpenCode Zen's free models.
+  - **Key.** The provider's API key goes to Dot's `.env` file with mode 0600, as `dotx auth set` stores it. A key that is
+    set is kept. Dot reads the Keychain but never writes it.
+  - **Model.** It offers the provider's models that can call tools, the configured main model first when it is one of
+    them. The model becomes `[models] main`, `fast` and `review`, and `vision` when it sees images.
+  - **Service.** It installs the service, as `dotx service install` does.
+  - **Flags.** `--model provider:model` and `--key-stdin` answer without a terminal; `--no-service` leaves the service
+    as it is. A model its provider does not list, or one that cannot call tools, is refused, with what to do (`ollama
+    pull`, `dotx models`), and no model is written.
+- The home's **Set up a model** card. While the default model is not in its provider's list, the card says why: no key,
+  a refused key, or the provider's own error, such as an Ollama out of reach or an OpenCode not installed. It leads to
+  Settings › Models, Settings › API keys and `dotx setup`. It reads the list the composer reads (no other request),
+  stands over the greeting in the block the page keeps in the middle, and goes once the model is listed.
+- README: the requirements (the Command Line Tools, one provider at least) and the quick start.
+- Tests (no model, no network; the service is left alone):
+  - `tests/smoke/test_cli_setup.py`. The real command, in a home where nothing is chosen, against a stand-in OpenAI
+    service on this Mac that lists its models to one key alone. A model it does not list is refused and nothing is
+    written; then the key read from standard input is kept, and `openai:gpt-5.5` becomes the main, fast, review and
+    vision model.
+  - `tests/smoke/test_setup_card.py` (WebKit as an iPhone 17 Pro Max). With OpenAI's model as the default and no key,
+    the card shows. A key saved in Settings › API keys makes the card go; with the key removed it is back. The scripted
+    model, made the default in Settings › Models, answers a message from the home.
+  - Against the code and pages before this item both fail.
+- Not verified on a device, and not with a real provider: the interactive path ran in a pseudo-terminal against the
+  stand-in.
 
 ## Log
 

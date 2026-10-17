@@ -8,15 +8,17 @@ import { api } from "../api.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
-import { el } from "../dom.js";
+import { el, modelName } from "../dom.js";
 import { forgetLevel, KEPT_SPEED, savedLevel, saveLevel } from "../efforts.js";
+import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
 import { anchoredPopover } from "../popover.js";
 import { buildPresence } from "../presence.js";
+import { providerLabel, providerOf } from "../providers.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { onCompose } from "../shortcuts.js";
-import { getSnapshot, onChange, refresh } from "../state.js";
+import { getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, toast } from "../ui.js";
 
 const MAX_GOAL_PX = 320;
@@ -237,11 +239,83 @@ function buildApprovals() {
   return { element: section, sync };
 }
 
+/** Why the default model `main` cannot answer, as the providers' lists say (`loadModels`), or null when its provider
+ * lists it. */
+function mainProblem(providers, main) {
+  const provider = providers.find((candidate) => candidate.provider === providerOf(main));
+  const label = providerLabel(provider.provider);
+  if (provider.problem === "no_key") {
+    return `No ${label} key is set.`;
+  }
+  if (provider.problem === "key_refused") {
+    return `${label} refused the key.`;
+  }
+  if (provider.error !== null) {
+    return provider.error;
+  }
+  return provider.models.some((model) => model.ref === main) ? null : `${label} does not offer it.`;
+}
+
+/**
+ * The card that leads to a model while the default one cannot answer (item 333): its provider listed no models, or not
+ * this one. Its ways are Settings › Models, Settings › API keys and `dotx setup`. It reads the list the composer reads,
+ * and goes once the default model is one its provider lists; `data-state` says what it found (`ready` or `needed`).
+ */
+function buildSetup() {
+  const what = el("p", null);
+  const why = el("p", { class: "hint" });
+  const element = el(
+    "section",
+    { class: "card home-setup", hidden: true, "aria-labelledby": "home-setup-title" },
+    el("div", { class: "card-head" }, icon("alert"), el("span", { id: "home-setup-title", class: "grow" }, "Set up a model")),
+    el(
+      "div",
+      { class: "card-pad home-setup-body" },
+      what,
+      why,
+      el(
+        "div",
+        { class: "row home-setup-ways" },
+        el("a", { class: "btn primary", href: "#/settings/models" }, "Choose a model"),
+        el("a", { class: "btn", href: "#/settings/keys" }, "Add a key"),
+      ),
+      el("p", { class: "hint" }, "Or run ", el("code", null, "dotx setup"), " in Terminal: it checks this Mac, stores a key and chooses the model."),
+    ),
+  );
+  let providers = null;
+
+  function sync(snapshot) {
+    if (providers === null || snapshot.status === null) {
+      return;
+    }
+    const main = snapshot.status.models.main;
+    const problem = mainProblem(providers, main);
+    element.dataset.state = problem === null ? "ready" : "needed";
+    element.hidden = problem === null;
+    if (problem !== null) {
+      what.textContent = `New chats start on ${modelName(main)} from ${providerLabel(providerOf(main))}, which cannot answer now.`;
+      why.textContent = problem;
+    }
+  }
+
+  loadModels()
+    .then((found) => {
+      providers = found;
+      sync(getSnapshot());
+    })
+    .catch((error) => {
+      console.warn("the model list is unavailable", error);
+    });
+  return { element, sync };
+}
+
 export function mount(root, ctx) {
   const presence = buildPresence();
   const composer = buildComposer(ctx, presence.listen);
   const approvals = buildApprovals();
-  const start = el("div", { class: "home-start" }, presence.element, composer.element);
+  const setup = buildSetup();
+  // The setup card stands over the greeting, in the block the page keeps in the middle.
+  const start = el("div", { class: "home-start" }, setup.element, presence.element, composer.element);
   const home = el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), approvals.element, start, presence.strip);
   root.append(home);
   // The greeting and the composer stand in the middle of the space under the top bar (item 124): the row above them
@@ -249,6 +323,7 @@ export function mount(root, ctx) {
   const stopCentring = trackHeight(start, home, "--home-start-h");
   approvals.sync(getSnapshot());
   const stopApprovals = onChange(approvals.sync);
+  const stopSetup = onChange(setup.sync);
   // On a touch screen the caret waits for a tap: a box that takes the focus opens the keyboard over the page (item 293).
   function offerCaret() {
     if (!touchFirst()) {
@@ -260,6 +335,7 @@ export function mount(root, ctx) {
   return () => {
     stopCentring();
     stopApprovals();
+    stopSetup();
     stopCompose();
     composer.dispose();
     presence.dispose();

@@ -20,17 +20,35 @@ messages sent for you, privilege, system settings), everything it does is record
 - Python 3.13 and [uv](https://docs.astral.sh/uv/)
 - [ripgrep](https://github.com/BurntSushi/ripgrep): `brew install ripgrep`
 - Google Chrome, which the browser tools drive through Playwright
-- [Ollama](https://ollama.com), running. Cloud models (names that end in `:cloud`) need `ollama signin` once. Searching
-  the memory by meaning needs an embedding model: `ollama pull bge-m3`
-- An API key for OpenAI, OpenCode Go or Anthropic, only if you use those providers
+- Xcode's Command Line Tools (`xcode-select --install`), with which the service builds the small app that runs Dot
+- The models of one provider at least:
+  - [Ollama](https://ollama.com), running. Cloud models (names that end in `:cloud`) need `ollama signin` once.
+    Searching the memory by meaning needs an embedding model: `ollama pull bge-m3`
+  - an API key for OpenAI, OpenCode Go or Anthropic
+  - [OpenCode](https://opencode.ai), for Zen's free models (no key)
 
 ## Quick start
 
 ```bash
 cd Dot
 uv sync
-uv run dotx doctor
+uv run dotx setup
 ```
+
+`dotx setup` does the following, then installs the service and gives the address of the web UI:
+
+- It checks this Mac: the macOS version, ripgrep, Chrome and Xcode's Command Line Tools.
+- It asks which provider's models Dot runs on, and stores the provider's API key in Dot's `.env` file (mode 0600) when
+  it needs one.
+- It offers the provider's models that can call tools. The one you pick becomes the model new chats start on, and the
+  model of Dot's own work: the fast and review models, and the vision model when it sees images.
+
+Without a terminal, flags give each answer: `--model provider:model`, `--key-stdin` (the key on standard input) and
+`--no-service` (the service is left as it is).
+
+The web UI says the same on its home. While the default model cannot answer, a **Set up a model** card says why: no
+key, a refused key, or a provider that is out of reach or does not offer the model. It leads to Settings › Models,
+Settings › API keys or `dotx setup`.
 
 `dotx doctor` checks the home directory, ripgrep, Chrome (with a throwaway start of it), the macOS version and the
 permissions the desktop tools need, the Office applications and the OneDrive folders of the skills that come with Dot
