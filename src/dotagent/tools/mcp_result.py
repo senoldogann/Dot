@@ -19,7 +19,7 @@ from mcp.types import (
 from dotagent.core.errors import McpError, ToolExecutionError
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.jsonutil import dumps_compact
-from dotagent.core.text import truncate_tail
+from dotagent.core.text import truncate_tail, unclosing
 from dotagent.llm.types import ImageData
 from dotagent.tools.base import ToolResult
 
@@ -34,7 +34,7 @@ def _quote(value: str) -> str:
 
 def fence_mcp(server: str, tool: str, body: str, nonce: str) -> str:
     """Wrap what a server returned so the prompt can state that everything inside is data and only ``nonce`` closes it."""
-    safe: str = body.replace("</mcp_content", "<\\/mcp_content")
+    safe: str = unclosing(body, "mcp_content")
     opening: str = f'<mcp_content nonce="{nonce}" server={_quote(server)} tool={_quote(tool)}>'
     return f'{opening}\n{safe}\n</mcp_content nonce="{nonce}">'
 

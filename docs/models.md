@@ -86,19 +86,33 @@ and the result names the wait and the error. A refused request ends the run at o
 error or a missing key moves it to a standby model or ends it at once. An error a model service reports inside its
 answer keeps its words, Ollama's too.
 
-| Provider    | Reference             | Protocol                                                                                   | Key                                                       |
-| ----------- | --------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------- |
-| Ollama      | `ollama:<model>`      | native `/api/chat`                                                                         | none for the local server                                 |
-| OpenAI      | `openai:<model>`      | Responses API; `wire = "chat"` selects Chat Completions                                    | `OPENAI_API_KEY`, optional `OPENAI_ORG_ID`/`OPENAI_PROJECT_ID` |
-| OpenCode Go | `opencode_go:<model>` | each model is served on exactly one of Chat Completions, Responses and Messages            | `OPENCODE_API_KEY`                                        |
-| Anthropic   | `anthropic:<model>`   | Messages API                                                                               | `ANTHROPIC_API_KEY`                                       |
-| OpenCode    | `opencode:<model>`    | OpenCode's own agent, in the `opencode serve` Dot starts (Zen's free models)               | none; the `opencode` program                              |
+| Provider    | Reference                  | Protocol                                                                        | Key                                                            |
+| ----------- | -------------------------- | ------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Ollama      | `ollama:<model>`           | native `/api/chat`                                                              | none for the local server                                      |
+| OpenAI      | `openai:<model>`           | Responses API; `wire = "chat"` selects Chat Completions                         | `OPENAI_API_KEY`, optional `OPENAI_ORG_ID`/`OPENAI_PROJECT_ID` |
+| OpenCode Go | `opencode_go:<model>`      | each model is served on exactly one of Chat Completions, Responses and Messages | `OPENCODE_API_KEY`                                             |
+| Anthropic   | `anthropic:<model>`        | Messages API                                                                    | `ANTHROPIC_API_KEY`                                            |
+| OpenRouter  | `openrouter:<lab>/<model>` | Chat Completions, the models of many labs                                       | `OPENROUTER_API_KEY`                                           |
+| OpenCode    | `opencode:<model>`         | OpenCode's own agent, in the `opencode serve` Dot starts (Zen's free models)    | none; the `opencode` program                                   |
 
 - **Ollama**: `[providers.ollama] base_url` is `http://localhost:11434` by default. Cloud models go through the local
   server, so nothing else is needed once you are signed in. `OLLAMA_API_KEY` is only for the hosted web search and for
   talking to ollama.com directly.
 - **OpenAI**: on the Responses wire Dot sends the whole conversation on every call (`store: false`) and carries the
   encrypted reasoning items from step to step, so no state lives on the server.
+- **OpenRouter** (item 349): one key and one balance for the models of many labs,
+  `openrouter:anthropic/claude-sonnet-5.5` or `openrouter:openai/gpt-5.6-luna` for example. What each model can do comes
+  from OpenRouter's own list of its models, read when a model is first asked about and kept for `[providers.openrouter]
+  models_ttl_s` (an hour): whether it reads images and calls tools (the model picker offers only those that do), its
+  context and output limits, whether it takes a temperature, and its reasoning levels, the ones OpenRouter lists for it.
+  A variant OpenRouter does not list (`:nitro`, `:floor` or `:online` after the id) can do what its model can.
+  A model whose reasoning is a switch offers On and Off, and one that always reasons and names no levels offers none.
+  The level goes as OpenRouter's `reasoning` object; a step's reasoning details go back to the same model on its next
+  step, unchanged, as OpenRouter asks beside tool calls, so a model that thinks keeps its thread across a run's tool
+  calls. A model whose id ends in `:free`, or whose prices are both zero, says Free; OpenRouter limits the free ones to
+  a few requests a minute and a day. Dot sends no `HTTP-Referer` or `X-OpenRouter-Title`, so its requests do not count
+  Dot in OpenRouter's rankings. The prompt caching OpenRouter does by itself (OpenAI, DeepSeek, Gemini and others)
+  applies; the cache marks Claude would need through OpenRouter are not sent.
 - **OpenCode Go**: Dot knows the route of the models in its catalog, and of a new Claude, Qwen, MiniMax, Grok, GPT or
   Muse model by the start of its name; any other new model goes to Chat Completions. `route_overrides = { "<model-id>" =
   "chat" }` in `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`). The Messages route
@@ -155,12 +169,12 @@ answer keeps its words, Ollama's too.
   2026-10-15), and it is reported to refuse OpenCode with one of its tools switched off, so Dot switches none off and
   has them ask instead; a run it turns down fails with words that say so.
 
-`dotx models [ollama|openai|opencode_go|anthropic|opencode]` lists what a provider offers, including the reasoning
-levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server on this
-Mac is asked for its list once, so one that is not running is reported at once, here, in the model menu and by
+`dotx models [ollama|openai|opencode_go|anthropic|openrouter|opencode]` lists what a provider offers, including the
+reasoning levels of each model, and ends with 1 when no provider answered (the one named, when one is). An Ollama server
+on this Mac is asked for its list once, so one that is not running is reported at once, here, in the model menu and by
 `dotx doctor`, not after the retries a network needs (item 212). `dotx models profile [provider:model]` shows how
-reliably a model worked in its newest runs and the help its next run gets (see [How a run works](runs.md#how-a-run-works));
-without a model it shows `[models] main`.
+reliably a model worked in its newest runs and the help its next run gets (see [How a run
+works](runs.md#how-a-run-works)); without a model it shows `[models] main`.
 
 **Reasoning level.** A model that can think offers a ladder of levels, lowest first, in the words of its provider mapped
 to one neutral scale: `off`, `on` (a plain thinking switch), `minimal`, `low`, `medium`, `high`, `xhigh`, `max`. A model
@@ -207,17 +221,18 @@ prompt nobody answers) is an error that says so. `dotx auth set OPENAI_API_KEY` 
 without echoing it and writes the file with mode 0600; `dotx auth status` shows which keys are present. `.env.example`
 is a template for the file. An OpenAI key is created on platform.openai.com under API keys (`OPENAI_API_KEY`); the
 OpenCode Go key (`OPENCODE_API_KEY`) is the one the OpenCode Console at opencode.ai/auth shows once you have subscribed
-to Go; an Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys. The
+to Go; an Anthropic key (`ANTHROPIC_API_KEY`) is created in the Claude Console at platform.claude.com/settings/keys; an
+OpenRouter key (`OPENROUTER_API_KEY`) at openrouter.ai/settings/keys. The
 Ollama models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added
 later when a run first uses that provider, without a restart.
 
-Settings › API keys in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows
-where the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16
-characters or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider
-whether it takes the key in use: the model listing of OpenAI and Anthropic and the subscription of OpenCode Go cost
-nothing, the Ollama key is tried with one search of its hosted web search. **Add key** or **Replace** saves a key in
-`<home>/.env` and then runs **Check**; the trash button removes the key saved there (a key from the environment or the
-Keychain is left alone). The page warns when the daemon was started with the variable in its environment, which comes
-before a key saved in Dot. A saved or removed key is used from the next request of a run on, even in a run under way.
-The memory search (an OpenAI or ollama.com key) and the MCP servers read their keys when the daemon starts: after
-changing a key they use, restart the daemon (`dotx service install`).
+Settings › API keys in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows where
+the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16 characters
+or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider whether it
+takes the key in use: the model listing of OpenAI and Anthropic, the subscription of OpenCode Go and the key's own page
+at OpenRouter (what it has spent and may spend) cost nothing, the Ollama key is tried with one search of its hosted web
+search. **Add key** or **Replace** saves a key in `<home>/.env` and then runs **Check**; the trash button removes the
+key saved there (a key from the environment or the Keychain is left alone). The page warns when the daemon was started
+with the variable in its environment, which comes before a key saved in Dot. A saved or removed key is used from the
+next request of a run on, even in a run under way. The memory search (an OpenAI or ollama.com key) and the MCP servers
+read their keys when the daemon starts: after changing a key they use, restart the daemon (`dotx service install`).

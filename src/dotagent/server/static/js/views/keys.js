@@ -30,6 +30,12 @@ const PROVIDERS = {
     site: "opencode.ai",
     needed: true,
   },
+  openrouter: {
+    use: "The models of many labs, on one key and one balance.",
+    page: "https://openrouter.ai/settings/keys",
+    site: "openrouter.ai",
+    needed: true,
+  },
   ollama: {
     use: "Optional: the hosted web search, and ollama.com without the Ollama app. The models the app runs need no key.",
     page: "https://ollama.com/settings/keys",

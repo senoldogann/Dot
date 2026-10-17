@@ -1182,10 +1182,12 @@ class Store:
         size: list[aiosqlite.Row] = await self._all("PRAGMA page_size", ())
         return int(free[0][0]) * int(size[0][0])
 
+    @_writing
     async def compact(self) -> None:
         """Give the free pages of the database file back to the disk, and let later deletes do so by themselves. Needs
-        the connection to have no transaction open. The rewritten file reaches the disk through the write-ahead log, so
-        the log is emptied too; a connection that is reading at that moment leaves the rest of it for a later
+        the connection to have no transaction open, so it waits for the write under way (item 351), and a lock held by
+        another process is waited out as for any write. The rewritten file reaches the disk through the write-ahead
+        log, so the log is emptied too; a connection that is reading at that moment leaves the rest of it for a later
         checkpoint."""
         await self._db.execute("PRAGMA auto_vacuum=INCREMENTAL")
         await self._db.execute("VACUUM")
@@ -1801,6 +1803,13 @@ class Store:
             (run_id, CALL_EVENT, purpose),
         )
         return 0 if row is None else int(row[0])
+
+    async def events_of_kind_after(self, run_id: str, kind: str, after: int) -> list[EventRecord]:
+        """The events of ``kind`` of a run whose id is after ``after``, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM events WHERE run_id = ? AND kind = ? AND id > ? ORDER BY id", (run_id, kind, after)
+        )
+        return [_event(row) for row in rows]
 
     async def events_of_kind(self, run_id: str, kind: str, limit: int) -> list[EventRecord]:
         """The newest ``limit`` events of ``kind`` of a run, oldest first."""
@@ -2471,20 +2480,17 @@ class Store:
     ) -> tuple[MemoryRecord, bool]:
         """Add a note unless one that a run of ``agent_id`` is handed has this text already (saved meanwhile, in this
         process or another; :meth:`find_memory_by_content`): the look and the add are one transaction. Returns the note
-        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never."""
-        outcome: list[tuple[MemoryRecord, bool]] = []
+        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never. A unit
+        tried again after a lock returns what its last try stored (item 351: the first try's note, rolled back, came
+        back)."""
 
-        async def statements() -> None:
+        async def statements() -> tuple[MemoryRecord, bool]:
             row: aiosqlite.Row | None = await self._one(_SAME_TEXT, (content, agent_id))
             if row is not None:
-                outcome.append((_memory(row), False))
-            else:
-                outcome.append(
-                    (await self._insert_memory(content, tags, source_run, agent_id, vector, expires_at), True)
-                )
+                return _memory(row), False
+            return await self._insert_memory(content, tags, source_run, agent_id, vector, expires_at), True
 
-        await self._unit(statements)
-        return outcome[0]
+        return await self._unit(statements)
 
     async def _insert_memory(
         self,
@@ -2921,6 +2927,18 @@ class Store:
             (schedule_id, source, limit),
         )
         return [_run(row) for row in rows]
+
+    @_writing
+    async def keep_schedule_due(self, schedule_id: str, next_run_at: float, fired_at: float) -> None:
+        """A one-time firing at ``fired_at`` whose run did not start: due again at ``next_run_at`` and switched on, as
+        it was before :meth:`record_schedule_fire` gave it no next time (item 351). A schedule changed since that
+        firing (given a time, switched on, fired again) is left as it is."""
+        await self._db.execute(
+            "UPDATE schedules SET next_run_at = ?, enabled = 1"
+            " WHERE id = ? AND last_run_at = ? AND next_run_at IS NULL AND enabled = 0",
+            (next_run_at, schedule_id, fired_at),
+        )
+        await self._db.commit()
 
     @_writing
     async def record_schedule_skip(self, schedule_id: str, next_run_at: float | None, status: str) -> None:

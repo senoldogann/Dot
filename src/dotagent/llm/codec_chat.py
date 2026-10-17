@@ -38,15 +38,25 @@ from dotagent.llm.wire import (
 )
 
 _EFFORT_NONE: str = "none"
+# The parts of a streamed reasoning detail that arrive in pieces and are joined; its other fields are replaced.
+_DETAIL_TEXTS: frozenset[str] = frozenset({"text", "summary", "data"})
+# The details whose words are shown as the model's thinking, by type, and the field that holds them.
+_DETAIL_WORDS: dict[str, str] = {"reasoning.text": "text", "reasoning.summary": "summary"}
 
 
 class ChatOptions(FrozenModel):
-    """How a server differs in filling in the Chat Completions format."""
+    """How a server differs in filling in the Chat Completions format. ``reasoning_object``: the reasoning level goes as
+    a ``reasoning`` object (OpenRouter's: ``{"effort": label}``, or ``{"enabled": ...}`` for a model whose reasoning is
+    a switch) instead of ``reasoning_effort``. ``replay_details``: a reply keeps the ``reasoning_details`` the server
+    sent (and takes the words of its thinking from them when no string carries them), and an assistant turn of the
+    same model carries them back, unchanged, as OpenRouter asks beside tool calls; without it they are not read."""
 
     max_tokens_field: str
     request_usage: bool
     replay_reasoning: bool
     cache_key_in_body: bool
+    reasoning_object: bool
+    replay_details: bool
 
 
 # --------------------------------------------------------------------------------------------- request
@@ -62,7 +72,7 @@ def _user_message(message: Message) -> JsonObject:
     return {"role": "user", "content": parts}
 
 
-def _assistant_message(message: Message, options: ChatOptions) -> JsonObject:
+def _assistant_message(message: Message, options: ChatOptions, origin: str) -> JsonObject:
     entry: JsonObject = {"role": "assistant"}
     if message.tool_calls and not message.content.strip():
         entry["content"] = None
@@ -70,6 +80,8 @@ def _assistant_message(message: Message, options: ChatOptions) -> JsonObject:
         entry["content"] = non_blank(message.content, "(no text)")
     if options.replay_reasoning:
         entry["reasoning_content"] = message.thinking or ""
+    if options.replay_details and message.raw and message.raw_origin == origin:
+        entry["reasoning_details"] = list(message.raw)
     if message.tool_calls:
         entry["tool_calls"] = [
             {
@@ -82,7 +94,9 @@ def _assistant_message(message: Message, options: ChatOptions) -> JsonObject:
     return entry
 
 
-def encode_messages(messages: Sequence[Message], options: ChatOptions) -> list[JsonObject]:
+def encode_messages(messages: Sequence[Message], options: ChatOptions, origin: str) -> list[JsonObject]:
+    """The conversation in the wire format; ``origin`` (``provider:model``) names the model whose own assistant turns
+    may carry their replay state back."""
     wire: list[JsonObject] = []
     for message in hoist_tool_images(messages):
         if message.role == "system":
@@ -90,7 +104,7 @@ def encode_messages(messages: Sequence[Message], options: ChatOptions) -> list[J
         elif message.role == "user":
             wire.append(_user_message(message))
         elif message.role == "assistant":
-            wire.append(_assistant_message(message, options))
+            wire.append(_assistant_message(message, options, origin))
         else:
             wire.append(
                 {
@@ -102,18 +116,31 @@ def encode_messages(messages: Sequence[Message], options: ChatOptions) -> list[J
     return wire
 
 
-def build_chat_body(request: ChatRequest, traits: ModelTraits, options: ChatOptions) -> JsonObject:
+def _reasoning_object(traits: ModelTraits, label: str | None, request: ChatRequest) -> JsonObject | None:
+    """OpenRouter's ``reasoning`` object: the level's label, the switch of a model that offers no levels, or none."""
+    if label is not None:
+        return {"effort": label}
+    if traits.thinking_toggle:
+        return {"enabled": request.effort != "off"}
+    return None
+
+
+def build_chat_body(request: ChatRequest, traits: ModelTraits, options: ChatOptions, origin: str) -> JsonObject:
     """The JSON object to POST. ``stream`` is the last key, which OpenCode's gateway relies on."""
     instructions, conversation = split_instructions(request.messages)
     label: str | None = choose_effort(traits.efforts, request.effort) if traits.reasoning else None
     messages: list[JsonValue] = []
     if instructions:
         messages.append({"role": "system", "content": instructions})
-    messages.extend(encode_messages(conversation, options))
+    messages.extend(encode_messages(conversation, options, origin))
     body: JsonObject = {"model": request.model, "messages": messages}
     if request.tools:
         body["tools"] = list(function_tools(request.tools))
-    if label is not None:
+    if options.reasoning_object:
+        reasoning: JsonObject | None = _reasoning_object(traits, label, request)
+        if reasoning is not None:
+            body["reasoning"] = reasoning
+    elif label is not None:
         body["reasoning_effort"] = label
     if request.max_output_tokens is not None:
         body[options.max_tokens_field] = request.max_output_tokens
@@ -140,19 +167,63 @@ class PartialCall(FrozenModel):
 
 
 class ChatState(FrozenModel):
-    """Everything accumulated from the event stream so far. ``done`` becomes true at ``[DONE]``."""
+    """Everything accumulated from the event stream so far. ``done`` becomes true at ``[DONE]``; ``details`` are the
+    reasoning details the server sent (OpenRouter's), joined into whole ones (:func:`merge_details`), when the codec
+    sends them back (``ChatOptions.replay_details``)."""
 
     model: str
     text: str
     thinking: str
     calls: tuple[PartialCall, ...]
+    details: tuple[JsonObject, ...]
     usage: Usage
     finish: str
     done: bool
 
 
 def initial_chat_state(model: str) -> ChatState:
-    return ChatState(model=model, text="", thinking="", calls=(), usage=empty_usage(), finish="", done=False)
+    return ChatState(
+        model=model, text="", thinking="", calls=(), details=(), usage=empty_usage(), finish="", done=False
+    )
+
+
+def _continues(last: JsonObject, piece: JsonObject) -> bool:
+    """Whether a streamed piece goes on with the last detail: the same type and index, and not another detail's id."""
+    ids: tuple[JsonValue, JsonValue] = (last.get("id"), piece.get("id"))
+    same_id: bool = not (ids[0] and ids[1]) or ids[0] == ids[1]
+    return last.get("type") == piece.get("type") and last.get("index") == piece.get("index") and same_id
+
+
+def merge_details(kept: tuple[JsonObject, ...], pieces: Sequence[JsonObject]) -> tuple[JsonObject, ...]:
+    """Streamed reasoning details joined into whole ones, as a reply that is not streamed holds them: a piece that goes
+    on with the last detail (the same type and index, no other id) adds its text (``text``, ``summary``, ``data``) to
+    it, and its other fields that say something (a signature, an id) replace the last one's; any other piece starts a
+    new detail."""
+    merged: list[JsonObject] = list(kept)
+    for piece in pieces:
+        last: JsonObject | None = merged[-1] if merged else None
+        if last is None or not _continues(last, piece):
+            merged.append(dict(piece))
+            continue
+        joined: JsonObject = dict(last)
+        for key, value in piece.items():
+            before: JsonValue = joined.get(key)
+            if key in _DETAIL_TEXTS and isinstance(value, str) and isinstance(before, str):
+                joined[key] = before + value
+            elif value is not None and value != "":
+                joined[key] = value
+        merged[-1] = joined
+    return tuple(merged)
+
+
+def _detail_words(pieces: Sequence[JsonObject]) -> str:
+    """The readable words of reasoning details: the text of a thought or of its summary; an encrypted one has none."""
+    words: list[str] = []
+    for piece in pieces:
+        field: str | None = _DETAIL_WORDS.get(get_str(piece, "type"))
+        if field is not None:
+            words.append(get_str(piece, field))
+    return "".join(words)
 
 
 def _usage_of(usage: JsonObject) -> Usage:
@@ -205,7 +276,7 @@ def _fold_call(calls: tuple[PartialCall, ...], entry: JsonObject) -> tuple[Parti
 
 
 def fold_chat_event(
-    state: ChatState, event: SseEvent, context: JsonObject, classify: StatusClassifier
+    state: ChatState, event: SseEvent, context: JsonObject, classify: StatusClassifier, options: ChatOptions
 ) -> tuple[ChatState, tuple[StreamDelta, ...]]:
     """Fold one SSE chunk into the state; zero-choice chunks (usage only) are normal."""
     if event.data.strip() == "[DONE]":
@@ -220,7 +291,9 @@ def fold_chat_event(
     deltas: list[StreamDelta] = []
     text: str = state.text
     thinking: str = state.thinking
-    reasoning: str = get_str(delta, "reasoning_content") or get_str(delta, "reasoning")
+    pieces: list[JsonObject] = get_objects(delta, "reasoning_details") if options.replay_details else []
+    # The words of the thinking come once: as a string where the server sends one, else from the details.
+    reasoning: str = get_str(delta, "reasoning_content") or get_str(delta, "reasoning") or _detail_words(pieces)
     if reasoning:
         thinking += reasoning
         deltas.append(StreamDelta(kind="thinking", text=reasoning))
@@ -237,6 +310,7 @@ def fold_chat_event(
             "text": text,
             "thinking": thinking,
             "calls": calls,
+            "details": merge_details(state.details, pieces) if pieces else state.details,
             "usage": _usage_of(usage_object) if usage_object else state.usage,
             "finish": get_str(choice, "finish_reason") or state.finish,
         }
@@ -279,14 +353,15 @@ def chat_reply(state: ChatState) -> ModelReply:
         usage=state.usage,
         finish=_finish_of(state, bool(calls)),
         raw_finish=state.finish,
-        raw=(),
+        raw=state.details,
     )
 
 
-def chat_codec(classify: StatusClassifier) -> StreamCodec[ChatState]:
+def chat_codec(classify: StatusClassifier, options: ChatOptions) -> StreamCodec[ChatState]:
+    """The stream codec of a server that fills in the format as ``options`` say (the body's options)."""
     return StreamCodec(
         initial=initial_chat_state,
-        fold=lambda state, event, context: fold_chat_event(state, event, context, classify),
+        fold=lambda state, event, context: fold_chat_event(state, event, context, classify, options),
         is_final=lambda state: state.done,
         accepts_eof=lambda state: state.finish != "",
         to_reply=chat_reply,

@@ -2,8 +2,9 @@
 neither read nor change Dot's own files, nor change what it loads and runs (its own code among it), nor move the folders
 above them, whatever program does it, while those of a yolo run do as the user's account may; a search of a run reads
 neither Dot's own files nor the user's protected locations, and shows what it found elsewhere with a note of what it did
-not read; the login shell Dot reads at its start runs in the sandbox too. Each tool runs as it does once the gate has let
-it through, so the sandbox is what stands in its way. The processes are real; no model is called.
+not read; the login shell Dot reads at its start runs in the sandbox too, the one sandbox of that start, checked once.
+Each tool runs as it does once the gate has let it through, so the sandbox is what stands in its way. The processes are
+real; no model is called.
 """
 
 import asyncio
@@ -13,13 +14,14 @@ import re
 import shlex
 import sys
 import sysconfig
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
 
 import pytest
 import pytest_asyncio
 
 import dotagent
+import dotagent.runtime
 from dotagent.agent.gate import RunGate
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
@@ -28,6 +30,7 @@ from dotagent.core.errors import DesktopError, ToolExecutionError, ToolInputErro
 from dotagent.core.paths import config_path, dot_home, failsafe_path, skills_dir, token_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.launchd import launch_agent_path
+from dotagent.policy.sandbox import Sandbox
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import RunRecord, ThreadRecord
@@ -259,3 +262,21 @@ async def test_the_login_shell_dot_reads_at_its_start_is_kept_out_of_dots_own_fi
     finally:
         await close_runtime(started)
     assert _refused(read) and TOKEN not in read, read
+
+
+async def test_a_start_checks_its_sandbox_once(runtime: Runtime, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Item 351: the login shell and the services of a start take the same sandbox, so ``sandbox-exec`` is tried once
+    a start; it was built and tried again for the services."""
+    checked: list[Sandbox] = []
+    check: Callable[[Sandbox], Awaitable[None]] = dotagent.runtime.check_sandbox
+
+    async def counted(sandbox: Sandbox) -> None:
+        checked.append(sandbox)
+        await check(sandbox)
+
+    monkeypatch.setattr(dotagent.runtime, "check_sandbox", counted)
+    started: Runtime = await build_runtime(runtime.config)
+    try:
+        assert started.sandbox.on and len(checked) == 1, checked
+    finally:
+        await close_runtime(started)

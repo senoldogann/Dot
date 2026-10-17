@@ -45,7 +45,8 @@ def render_list(entries: tuple[PlaybookEntry, ...], root: Path) -> list[str]:
     if any(origin(entry.meta) is not None for entry in entries):
         lines.append(
             "Runs are offered a playbook marked as learned from third-party content, or of unknown origin, with the "
-            "steps that name an address, run a command or reach the home folder withheld; 'dotx playbooks trust "
+            "steps that name an address, run a command or reach the home folder or the Mac's own folders withheld; "
+            "'dotx playbooks trust "
             "<name>' offers one with all its steps."
         )
     return lines

@@ -13,6 +13,12 @@ from dotagent.store.db import Store
 
 SCHEDULE_FAILURES_KEY: str = "schedule_failures"
 _ERROR_CHARS: int = 300
+# A one-time schedule stays due when its run does not start (item 351), and is tried again after a wait that doubles
+# with each failure in a row, from a minute up to an hour; at every tick it made and dropped a chat and wrote the store
+# again, some 5,760 times a day. The doubling stops at the cap.
+_RETRY_FIRST_S: float = 60.0
+_RETRY_MOST_S: float = 3600.0
+_RETRY_DOUBLINGS: int = 6
 
 
 class FiringFailure(FrozenModel):
@@ -43,6 +49,14 @@ def with_failure(failures: FiringFailures, schedule_id: str, at: float, error: s
     return FiringFailures(schedules={**failures.schedules, schedule_id: after})
 
 
+def retry_after(failure: FiringFailure) -> float:
+    """When a one-time schedule whose firings failed ``failure.failures_in_row`` times in a row is tried again: a
+    minute after the first failure, twice as long after each next one, an hour at the most."""
+    doublings: int = min(failure.failures_in_row - 1, _RETRY_DOUBLINGS)
+    wait: float = min(_RETRY_FIRST_S * 2.0**doublings, _RETRY_MOST_S)
+    return failure.last_failure_at + wait
+
+
 def without_failure(failures: FiringFailures, schedule_id: str) -> FiringFailures:
     """``failures`` once a firing of ``schedule_id`` started its run."""
     return FiringFailures(schedules={key: value for key, value in failures.schedules.items() if key != schedule_id})
@@ -67,6 +81,11 @@ async def record_firing_failure(store: Store, schedule_id: str, at: float, error
         lambda raw: with_failure(parse_failures(raw), schedule_id, at, error).model_dump_json(),
     )
     return parse_failures(written).schedules[schedule_id]
+
+
+async def firing_failure(store: Store, schedule_id: str) -> FiringFailure | None:
+    """The firings of ``schedule_id`` that failed in a row, ``None`` when its last firing started its run."""
+    return parse_failures(await store.kv_get(SCHEDULE_FAILURES_KEY)).schedules.get(schedule_id)
 
 
 async def record_firing_started(store: Store, schedule_id: str) -> None:

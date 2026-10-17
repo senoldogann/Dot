@@ -239,6 +239,25 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
     return SwitchedSandbox(built, config.shell.sandbox)
 
 
+@dataclass(frozen=True)
+class _Confinement:
+    """What keeps the processes of a run in, made once a start: the locations a run may not read, what Dot loads and
+    runs, and the sandbox they start in."""
+
+    protected: tuple[Path, ...]
+    dot_paths: tuple[Path, ...]
+    sandbox: SwitchedSandbox
+
+
+async def _confinement(config: AppConfig) -> _Confinement:
+    """The on-disk layout made, then :func:`_confined_paths` resolved and :func:`_run_sandbox` built (and checked to
+    start when it is on)."""
+    await asyncio.to_thread(ensure_layout)
+    protected, dot_paths = await _confined_paths(config)
+    sandbox: SwitchedSandbox = await _run_sandbox(config, protected, dot_paths)
+    return _Confinement(protected=protected, dot_paths=dot_paths, sandbox=sandbox)
+
+
 def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
     """What becomes of a measured model call: its tokens join the totals of its run, which gets a ``model_call`` event;
     a call outside any run is logged."""
@@ -267,12 +286,13 @@ def _call_recorder(store: Store, bus: EventBus) -> CallRecorder:
 async def build_runtime(config: AppConfig) -> Runtime:
     """Read the environment of the login shell, then open every service (:func:`open_runtime`). The login shell runs
     its startup files, which a run's commands may change, so it starts in the sandbox of a run's commands: what a run
-    put there reaches no further at Dot's start than the run could."""
-    await asyncio.to_thread(ensure_layout)
-    protected, dot_paths = await _confined_paths(config)
-    sandbox: SwitchedSandbox = await _run_sandbox(config, protected, dot_paths)
-    login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, sandbox.current().commands)
-    return await open_runtime(config, login_env)
+    put there reaches no further at Dot's start than the run could. The services take the same sandbox, so it is
+    built and checked once."""
+    confinement: _Confinement = await _confinement(config)
+    login_env: dict[str, str] = await read_login_env(
+        config.shell.login_env_timeout_s, confinement.sandbox.current().commands
+    )
+    return await _open_services(config, login_env, confinement)
 
 
 def _added_servers(config: AppConfig, plugins: PluginCatalog) -> tuple[McpServerConfig, ...]:
@@ -312,9 +332,12 @@ async def open_runtime(config: AppConfig, login_env: dict[str, str]) -> Runtime:
 
     When a service fails to open, the ones opened before it are closed again before the error is raised.
     """
-    await asyncio.to_thread(ensure_layout)
-    protected, dot_paths = await _confined_paths(config)
-    sandbox: SwitchedSandbox = await _run_sandbox(config, protected, dot_paths)
+    return await _open_services(config, login_env, await _confinement(config))
+
+
+async def _open_services(config: AppConfig, login_env: dict[str, str], confinement: _Confinement) -> Runtime:
+    """Every service of :func:`open_runtime`, in the confinement already made."""
+    protected, dot_paths, sandbox = confinement.protected, confinement.dot_paths, confinement.sandbox
     schedule_zone: ZoneInfo = await asyncio.to_thread(resolve_zone, config.scheduler.timezone)
     shell_env: dict[str, str] = child_env(login_env, config.shell.pass_env)
     ollama_key: str | None = await asyncio.to_thread(resolve_secret, config.providers.ollama.api_key_env)

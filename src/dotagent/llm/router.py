@@ -21,6 +21,7 @@ from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.openai import OpenAIProvider
 from dotagent.llm.opencode import OpenCodeProvider
 from dotagent.llm.opencode_go import OpenCodeGoProvider
+from dotagent.llm.openrouter import OpenRouterProvider
 from dotagent.llm.types import (
     KNOWN_PROVIDERS,
     ChatProvider,
@@ -178,6 +179,10 @@ class ModelRouter:
                 claude = self._config.providers.anthropic
                 claude_key: str = await asyncio.to_thread(require_secret, claude.api_key_env, "the anthropic provider")
                 return AnthropicProvider(claude, claude_key)
+            case "openrouter":
+                many = self._config.providers.openrouter
+                many_key: str = await asyncio.to_thread(require_secret, many.api_key_env, "the openrouter provider")
+                return OpenRouterProvider(many, many_key)
             case "opencode":
                 return OpenCodeProvider(OpenCodeServer(self._config.providers.opencode, self._login_env), ToolBridge())
             case _:

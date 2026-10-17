@@ -21,6 +21,7 @@ from dotagent.agent.campaign import session_number
 from dotagent.agent.compact import (
     drop_old_images,
     estimate_tokens,
+    kept_as,
     last_settled,
     render_transcript,
     repair_history,
@@ -947,9 +948,10 @@ async def _stored_note(agent: AgentRun, text: str) -> Message:
 
 def _since_goal(history: Sequence[Message], goal: Message) -> Sequence[Message]:
     """The part of the conversation that belongs to this run: from its goal on, or all of it once summarising has
-    folded the start of the run into a summary."""
+    folded the start of the run into a summary. The goal is found also once its images were dropped into a note
+    (item 351: the whole conversation of the chat's earlier runs went to the goal check then)."""
     for index in range(len(history) - 1, -1, -1):
-        if history[index] == goal:
+        if kept_as(history[index], goal):
             return history[index:]
     return history
 

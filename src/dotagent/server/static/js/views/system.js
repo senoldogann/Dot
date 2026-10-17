@@ -831,16 +831,21 @@ function buildModels(isDisposed) {
     }
   }
 
-  // On a phone the tables scroll sideways: a cue on each says while more lies to the right.
+  // On a phone the tables scroll sideways: a cue on each says while more lies to the right. Leaving the page stops
+  // them all, and starts none.
   let cues = [];
-  function cueTables() {
+  function stopCues() {
     for (const stop of cues) {
       stop();
     }
+    cues = [];
+  }
+  function cueTables() {
+    stopCues();
     cues = [...list.querySelectorAll(".table-scroll")].map(scrollCue);
   }
 
-  return { element: card.element, load, paint, dispose: cueTables };
+  return { element: card.element, load, paint, dispose: stopCues };
 }
 
 function buildTokenCard() {

@@ -34,7 +34,7 @@ import httpx
 from pydantic import JsonValue
 
 from dotagent.config import OpenCodeConfig
-from dotagent.core.errors import OpenCodeError, OpenCodeMissing
+from dotagent.core.errors import JsonParseError, OpenCodeError, OpenCodeMissing
 from dotagent.core.jsonutil import parse_json_object, parse_json_value
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import log_dir, opencode_command, opencode_dir
@@ -43,6 +43,8 @@ from dotagent.llm.types import Effort
 from dotagent.llm.wire import get_int, get_obj, get_str
 
 log = get_logger(__name__)
+# How much of an event line that cannot be read its error keeps.
+_EVENT_LINE_CHARS: int = 300
 
 # The provider of OpenCode's own catalog that serves Zen's models, free ones among them.
 ZEN_PROVIDER: str = "opencode"
@@ -543,10 +545,19 @@ class OpenCodeServer:
 
 
 async def _events(response: httpx.Response) -> AsyncIterator[JsonObject]:
+    """The events of OpenCode's stream. Whatever ends it early is an ``OpenCodeError``, a line that is not a JSON object
+    too (item 351: that one ended the reader of the stream without a word, and the run waited for it for good)."""
     try:
         async for line in response.aiter_lines():
             if line.startswith("data:"):
-                yield parse_json_object(line.removeprefix("data:").strip(), "opencode event")
+                data: str = line.removeprefix("data:").strip()
+                try:
+                    yield parse_json_object(data, "opencode event")
+                except JsonParseError as error:
+                    raise OpenCodeError(
+                        "OpenCode's event stream sent a line that is not a JSON object",
+                        {"line": data[:_EVENT_LINE_CHARS], "error": error.message},
+                    ) from error
     except httpx.HTTPError as error:
         raise OpenCodeError("OpenCode's event stream broke", {"error": f"{type(error).__name__}: {error}"}) from error
 

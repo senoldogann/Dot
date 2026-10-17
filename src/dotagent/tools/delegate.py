@@ -9,7 +9,7 @@ from pydantic import Field, JsonValue
 from dotagent.agent.helpers import Roster, current_roster, roster_text
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, PlanItem, PlanPayload, checked_step_number, plan_from_event
 from dotagent.core.errors import ToolExecutionError, ToolInputError
-from dotagent.core.text import truncate_tail
+from dotagent.core.text import truncate_tail, unclosing
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import EventRecord, RunMode, RunRecord
 from dotagent.tools.base import ALL_MODES, RegisteredTool, ToolArgs, ToolResult, fail, make_tool, mark_untrusted, ok
@@ -126,7 +126,7 @@ def delegated_evidence(result: ToolResult) -> str:
 
 def _fence(run: RunRecord, body: str, nonce: str) -> str:
     """Wrap a report that may carry third-party text so the prompt can state that only ``nonce`` closes it."""
-    safe: str = body.replace("</delegate_content", "<\\/delegate_content")
+    safe: str = unclosing(body, "delegate_content")
     return f'<delegate_content nonce="{nonce}" run="{run.id}">\n{safe}\n</delegate_content nonce="{nonce}">'
 
 

@@ -346,7 +346,14 @@ async def test_a_malformed_request_is_answered_with_what_is_wrong(client: httpx.
     assert len(body["context"]["errors"]) == 2
     unknown_model: httpx.Response = await client.post("/api/runs", json={"goal": "x", "model": "gpt-5"})
     assert unknown_model.status_code == 422
-    assert unknown_model.json()["context"]["providers"] == ["ollama", "openai", "opencode_go", "anthropic", "opencode"]
+    assert unknown_model.json()["context"]["providers"] == [
+        "ollama",
+        "openai",
+        "opencode_go",
+        "anthropic",
+        "openrouter",
+        "opencode",
+    ]
     unknown_thread: httpx.Response = await client.post("/api/runs", json={"goal": "x", "thread_id": "thr_nope"})
     assert unknown_thread.status_code == 404
     assert (await client.get("/api/runs/run_nope")).status_code == 404
@@ -625,6 +632,7 @@ async def test_the_status_the_models_and_the_checks_describe_this_installation(c
         "openai",
         "opencode_go",
         "anthropic",
+        "openrouter",
         "opencode",
     ]
     checks: httpx.Response = await client.get("/api/doctor")
@@ -713,6 +721,7 @@ async def test_a_key_is_saved_shown_by_its_end_only_used_at_once_and_removed(
         "openai",
         "anthropic",
         "opencode_go",
+        "openrouter",
         "ollama",
         "typesafe",
     ]

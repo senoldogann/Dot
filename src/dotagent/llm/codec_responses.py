@@ -112,7 +112,9 @@ def _is_message_item(item: JsonObject) -> bool:
 
 
 def prune_unpaired(items: Sequence[JsonObject]) -> list[JsonObject]:
-    """Drop calls without results, results without calls, and reasoning that no longer precedes its item."""
+    """Drop calls without results, results without calls, and reasoning that no longer precedes its item: reasoning
+    is kept when the first item after it that is not reasoning is a message or a call, so a run of reasoning items
+    before one is kept whole."""
     called: set[str] = {get_str(item, "call_id") for item in items if get_str(item, "type") == "function_call"}
     answered: set[str] = {get_str(item, "call_id") for item in items if get_str(item, "type") == "function_call_output"}
     paired: set[str] = called & answered
@@ -121,14 +123,18 @@ def prune_unpaired(items: Sequence[JsonObject]) -> list[JsonObject]:
         for item in items
         if get_str(item, "type") not in ("function_call", "function_call_output") or get_str(item, "call_id") in paired
     ]
-    result: list[JsonObject] = []
-    for index, item in enumerate(kept):
-        if get_str(item, "type") == "reasoning":
-            following: JsonObject | None = kept[index + 1] if index + 1 < len(kept) else None
-            if following is None or not (_is_message_item(following) or get_str(following, "type") == "function_call"):
-                continue
-        result.append(item)
-    return result
+    # Read from the end: whether the next item that is not reasoning is a message or a call.
+    reversed_result: list[JsonObject] = []
+    leads_on: bool = False
+    for item in reversed(kept):
+        kind: str = get_str(item, "type")
+        if kind == "reasoning":
+            if leads_on:
+                reversed_result.append(item)
+            continue
+        leads_on = _is_message_item(item) or kind == "function_call"
+        reversed_result.append(item)
+    return reversed_result[::-1]
 
 
 def encode_input(messages: Sequence[Message], origin: str, options: ResponsesOptions) -> list[JsonObject]:

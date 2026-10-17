@@ -45,7 +45,7 @@ planned and tracked in [ROADMAP.md](../ROADMAP.md); read it before continuing th
 src/dotagent/
   cli*.py     the command line: the parser and the command models (light), one module per command family loaded by name
   agent/      run loop, run manager, approvals, context trimming, vision relay
-  llm/        providers (Ollama, OpenAI, OpenCode Go, Anthropic) and their wire codecs
+  llm/        providers (Ollama, OpenAI, OpenCode Go, Anthropic, OpenRouter) and their wire codecs
   policy/     action descriptions, shell analysis, the decision engine
   tools/      the tools the model can call
   browser/    Playwright session, snapshots, safety

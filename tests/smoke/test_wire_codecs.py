@@ -67,6 +67,15 @@ GO_MESSAGES: MessagesOptions = MessagesOptions(
 CLAUDE_MESSAGES: MessagesOptions = MessagesOptions(
     adaptive_thinking=True, prompt_cache=True, settled_mark=True, default_max_tokens=None
 )
+# What OpenCode Go's chat route sends: ``max_tokens``, the thinking of a turn carried back as ``reasoning_content``.
+GO_CHAT: ChatOptions = ChatOptions(
+    max_tokens_field="max_tokens",
+    request_usage=False,
+    replay_reasoning=True,
+    cache_key_in_body=False,
+    reasoning_object=False,
+    replay_details=False,
+)
 
 TEMPERATURE_TOOL: ToolSpec = ToolSpec(
     name="get_temperature",
@@ -158,7 +167,7 @@ def test_chat_stream_assembles_tool_call_and_usage_chunk_without_choices() -> No
         ),
         SseEvent(event=None, data="[DONE]"),
     ]
-    reply, deltas = replay(chat_codec(classify_opencode), "m", events)
+    reply, deltas = replay(chat_codec(classify_opencode, GO_CHAT), "m", events)
     assert reply.text == "Checking."
     assert reply.thinking == "weigh "
     assert [(call.id, call.name, call.arguments) for call in reply.tool_calls] == [
@@ -304,7 +313,7 @@ def test_messages_stream_with_thinking_signature_and_tool_use() -> None:
 
 
 def test_stream_error_frame_without_http_error_is_raised() -> None:
-    codec = chat_codec(classify_opencode)
+    codec = chat_codec(classify_opencode, GO_CHAT)
     frame = sse(
         {
             "type": "error",
@@ -383,7 +392,15 @@ def test_request_bodies_end_with_stream_and_follow_each_gateway_flavour() -> Non
     gateway_chat: JsonObject = build_chat_body(
         request,
         traits,
-        ChatOptions(max_tokens_field="max_tokens", request_usage=False, replay_reasoning=True, cache_key_in_body=False),
+        ChatOptions(
+            max_tokens_field="max_tokens",
+            request_usage=False,
+            replay_reasoning=True,
+            cache_key_in_body=False,
+            reasoning_object=False,
+            replay_details=False,
+        ),
+        "opencode_go:glm-5.2",
     )
     assert list(gateway_chat)[-1] == "stream"
     assert "stream_options" not in gateway_chat and "prompt_cache_key" not in gateway_chat
@@ -392,8 +409,14 @@ def test_request_bodies_end_with_stream_and_follow_each_gateway_flavour() -> Non
         request.model_copy(update={"max_output_tokens": 500}),
         openai_traits("gpt-6.1-sol"),
         ChatOptions(
-            max_tokens_field="max_completion_tokens", request_usage=True, replay_reasoning=False, cache_key_in_body=True
+            max_tokens_field="max_completion_tokens",
+            request_usage=True,
+            replay_reasoning=False,
+            cache_key_in_body=True,
+            reasoning_object=False,
+            replay_details=False,
         ),
+        "openai:gpt-6.1-sol",
     )
     assert openai_chat["stream_options"] == {"include_usage": True}
     assert openai_chat["max_completion_tokens"] == 500 and openai_chat["prompt_cache_key"] == "smoke-session"

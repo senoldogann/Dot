@@ -30,7 +30,12 @@ _ANTHROPIC_VERSION: str = "2023-06-01"
 _USAGE_WINDOWS: tuple[str, ...] = ("rolling", "weekly", "monthly")
 
 _CHAT_OPTIONS: ChatOptions = ChatOptions(
-    max_tokens_field="max_tokens", request_usage=False, replay_reasoning=True, cache_key_in_body=False
+    max_tokens_field="max_tokens",
+    request_usage=False,
+    replay_reasoning=True,
+    cache_key_in_body=False,
+    reasoning_object=False,
+    replay_details=False,
 )
 # OpenAI models behind the gateway take full-size screenshots inline; the other Responses models get them hoisted.
 _OPENAI_RESPONSES: ResponsesOptions = ResponsesOptions(image_detail="original", tool_output_images=True)
@@ -304,8 +309,8 @@ class OpenCodeGoProvider:
         origin: str = f"opencode_go:{request.model}"
         match route:
             case "chat":
-                chat_body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS)
-                return await self._stream(route, chat_body, chat_codec(classify_opencode), request, sink)
+                chat_body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS, origin)
+                return await self._stream(route, chat_body, chat_codec(classify_opencode, _CHAT_OPTIONS), request, sink)
             case "responses":
                 options: ResponsesOptions = _OPENAI_RESPONSES if request.model.startswith("gpt-") else _OTHER_RESPONSES
                 responses_body: JsonObject = build_responses_body(request, traits, origin, options)

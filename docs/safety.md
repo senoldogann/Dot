@@ -10,7 +10,8 @@ leaves the Mac is what a run needs, sent where the configuration points:
   every role (`main`, `vision`, `fast`, `review`) is a cloud model of Ollama: the Ollama server on this Mac passes each
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
-  OpenCode Go and Anthropic get it only when a role, a helper or a standby model names one of their models (see
+  OpenCode Go, Anthropic and OpenRouter get it only when a role, a helper or a standby model names one of their models;
+  OpenRouter passes each call on to the lab whose model it is (see
   [Models and providers](models.md#models-and-providers)).
 - **To the embedding model: each note and each search of the memory.** It is Ollama's `bge-m3` on this Mac by default;
   with `[memory] embed_provider = "openai"` the texts go to OpenAI (see [Memory](memory-and-schedules.md#memory)).
@@ -109,7 +110,9 @@ Who answers what the policy asks depends on the approval mode of the run: you, a
 
 **Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
 with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,
-never instructions. What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`, a line
+never instructions; only the end that carries the marker closes a fence, and a closing tag inside, in any case, is
+broken. The reply of a teammate that read such content and the files you attach to a message are fenced the same way.
+What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`, a line
 the guard cannot read), what a terminal program prints, and a find_help answer that lists skills or MCP servers that
 other agents of the Mac set up count the same way, unfenced. A run that has seen such content is marked untrusted, and
 from then on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a

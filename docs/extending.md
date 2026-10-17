@@ -244,7 +244,10 @@ where it comes from (`read_outside` in its record). The skill never takes an ins
 never holds a secret, a one-time code, an e-mail address or a home path. Customize › Skills lists the learned skills
 under Learned (kind, where, the runs, how they fared, Retired on a retired one, an agent's with its name and Share)
 with Drop; `dotx playbooks list` shows them with
-their use, `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired.
+their use, `dotx playbooks show NAME` prints one and `dotx playbooks drop NAME` removes one, active or retired. A run is
+offered a skill learned from third-party content, or of unknown origin, with its lines that name an address, run a
+command or reach a path in the home folder or the Mac's own folders withheld; `dotx playbooks trust NAME` offers one
+with all its steps, until a run that reads third-party content rewrites them.
 Delegated runs, chats and evals (which always run without learned skills) write none. `dotx stats` counts the skills
 written, retired and read, and compares, per host, the runs that read a skill with the runs on that host that did not
 (act calls and seconds a run).

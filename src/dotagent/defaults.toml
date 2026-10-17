@@ -37,8 +37,8 @@ reach = []
 retention_days = 90
 
 [models]
-# "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic and opencode (Zen's free models, which
-# run as OpenCode's own agent: [providers.opencode]).
+# "<provider>:<model>"; providers are ollama, openai, opencode_go, anthropic, openrouter and opencode (Zen's free
+# models, which run as OpenCode's own agent: [providers.opencode]).
 # A run uses the model it was started with (main unless one is chosen) for every step, until it moves to a standby
 # model (below); the roles below are only used for what their comments say.
 main = "ollama:minimax-m2.7:cloud"
@@ -116,6 +116,19 @@ max_concurrent = 4
 [providers.anthropic]
 base_url = "https://api.anthropic.com/v1"
 api_key_env = "ANTHROPIC_API_KEY"
+connect_timeout_s = 10.0
+read_timeout_s = 600.0
+attempts = 6
+max_concurrent = 4
+
+# The models of many labs through OpenRouter, on one key and one balance: "openrouter:<lab>/<model>", for example
+# "openrouter:anthropic/claude-sonnet-5.5", or one it serves at no cost, whose id ends in ":free".
+[providers.openrouter]
+base_url = "https://openrouter.ai/api/v1"
+api_key_env = "OPENROUTER_API_KEY"
+# How long OpenRouter's list of its models (what each can do: images, tools, reasoning levels, limits) is kept before
+# it is read again.
+models_ttl_s = 3600.0
 connect_timeout_s = 10.0
 read_timeout_s = 600.0
 attempts = 6

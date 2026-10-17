@@ -561,7 +561,8 @@ run works, a blue pastille while something waits for you) with the count of what
 `GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the
 window keeps the shell in the menu bar.
 - **⌘⇧Space** anywhere brings the window up on New chat, with the cursor in the box. When another app holds the
-  shortcut, the shell starts without it and its menu says so; New chat stays in the menu.
+  shortcut, the shell starts without it and its menu says so; New chat stays in the menu. While the window shows the
+  page of a daemon that is down, New chat brings it up as it is, and what the page says stays.
 - **Links** that a page opens in a new window, such as the links of a model's answer, open in the default browser;
   the shell opens no window of its own for them, and only web addresses (`http`, `https`).
 - **Notifications** are the system's: the web UI sends them through the shell (Settings › General › Notifications,

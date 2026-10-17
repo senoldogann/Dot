@@ -44,6 +44,7 @@ from dotagent.help.apps import APP_ROOTS
 from dotagent.llm.calls import log_model_call
 from dotagent.llm.ollama import OllamaProvider
 from dotagent.llm.opencode_go import GoUsage, OpenCodeGoProvider
+from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider, listed_id
 from dotagent.llm.router import ModelRef, ModelRouter, parse_model_ref
 from dotagent.llm.types import ChatProvider, ModelInfo
 from dotagent.llm.typesafe import NoulQuestion, TypeSafeClient
@@ -133,21 +134,29 @@ async def _served(router: ModelRouter, provider: str) -> Served:
     return Served(names=frozenset(model.id for model in models), problem="")
 
 
+def _served_by(ref: ModelRef, listing: Served) -> bool:
+    """Whether the list a provider serves holds the model ``ref`` names: OpenRouter's holds a variant of a model it
+    lists (``:nitro``, ``:floor``, ``:online``), which its connector knows by the listed model (item 349)."""
+    if ref.provider == "openrouter":
+        return listed_id(listing.names, ref.model) is not None
+    return ref.model in listing.names
+
+
 async def _check_model(
     router: ModelRouter, role: str, reference: str, served: Mapping[str, Served], down: Mapping[str, str]
 ) -> CheckResult:
     """A configured model, which its provider must serve to its key: Ollama and Anthropic answer for the model itself,
-    OpenAI and OpenCode Go through the list of the models they serve (``served``, by provider). When that list could
-    not be read, the model is a warning: the provider's own row fails for it. So is a model of a provider whose server
-    could not be reached (``down``: what its row says, by provider), which is not asked, as the call would only wait
-    out its retries (item 212)."""
+    OpenAI, OpenCode Go and OpenRouter through the list of the models they serve (``served``, by provider). When that
+    list could not be read, the model is a warning, and is not asked about (OpenRouter's connector would read the same
+    list again): the provider's own row fails for it. So is a model of a provider whose server could not be reached
+    (``down``: what its row says, by provider), which is not asked, as the call would only wait out its retries (item
+    212)."""
     try:
         ref: ModelRef = parse_model_ref(reference)
-        if ref.provider in down:
-            return _result(f"model {role}", False, False, f"{reference}: not checked, as {down[ref.provider]}")
-        info = await router.model_info(ref)
-    except (ConfigError, ProviderError) as exc:
+    except ConfigError as exc:
         return _result(f"model {role}", False, True, f"{reference}: {exc.message}")
+    if ref.provider in down:
+        return _result(f"model {role}", False, False, f"{reference}: not checked, as {down[ref.provider]}")
     listing: Served | None = served.get(ref.provider)
     if listing is not None and listing.problem:
         return _result(
@@ -157,7 +166,7 @@ async def _check_model(
             f"{reference}: not checked, as the list of the models {ref.provider} serves could not be read "
             f"({listing.problem})",
         )
-    if listing is not None and ref.model not in listing.names:
+    if listing is not None and not _served_by(ref, listing):
         return _result(
             f"model {role}",
             False,
@@ -165,6 +174,10 @@ async def _check_model(
             f"{reference}: not among the {len(listing.names)} models {ref.provider} serves to this key "
             f"(dotx models {ref.provider} lists them)",
         )
+    try:
+        info = await router.model_info(ref)
+    except (ConfigError, ProviderError) as exc:
+        return _result(f"model {role}", False, True, f"{reference}: {exc.message}")
     capabilities: str = ", ".join(
         name
         for name, present in (("tools", info.tools), ("vision", info.vision), ("thinking", info.thinking))
@@ -269,6 +282,21 @@ async def _check_opencode_go_api(router: ModelRouter, required: bool) -> CheckRe
     return _result("opencode go api", True, required, windows or "subscription active")
 
 
+async def _check_openrouter_api(router: ModelRouter, required: bool) -> CheckResult:
+    """With a key present, ask OpenRouter about the key (a free call): it proves the key, and says what it has spent and
+    may spend."""
+    try:
+        provider: ChatProvider = await router.provider("openrouter")
+        if not isinstance(provider, OpenRouterProvider):
+            raise ConfigError("the openrouter connector has an unexpected type", {"type": type(provider).__name__})
+        status: KeyStatus = await provider.key_status()
+    except (ConfigError, ProviderError) as exc:
+        return _result("openrouter api", False, required, exc.message)
+    limit: str = "no limit" if status.limit is None else f"a limit of {status.limit:g}"
+    tier: str = ", on the free tier" if status.free_tier else ""
+    return _result("openrouter api", True, required, f"{status.usage:g} credits spent, {limit}{tier}")
+
+
 async def _check_anthropic_api(router: ModelRouter, required: bool) -> CheckResult:
     """With a key present, list the models the key can use (a free call): proves the key and the network path."""
     try:
@@ -335,8 +363,8 @@ def _judge_row(config: JudgeConfig, present: bool) -> CheckResult:
 
 async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
     """Ask ``provider`` whether it takes the key in use now, through connectors made for this check alone. The calls
-    for OpenAI, OpenCode Go and Anthropic cost nothing; Ollama's key is for its hosted web search, so it is checked with
-    one search, and TypeSafe's, the typed judge's, with one small judgment."""
+    for OpenAI, OpenCode Go, Anthropic and OpenRouter cost nothing; Ollama's key is for its hosted web search, so it is
+    checked with one search, and TypeSafe's, the typed judge's, with one small judgment."""
     if provider == "ollama":
         return await _check_ollama_search(config)
     if provider == "typesafe":
@@ -350,6 +378,8 @@ async def check_provider_key(config: AppConfig, provider: str) -> CheckResult:
                 return await _check_opencode_go_api(router, True)
             case "anthropic":
                 return await _check_anthropic_api(router, True)
+            case "openrouter":
+                return await _check_openrouter_api(router, True)
             case _:
                 raise ConfigError("no key check exists for this provider", {"provider": provider})
     finally:
@@ -740,6 +770,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
     openai_present: bool = await asyncio.to_thread(_has_secret, config.providers.openai.api_key_env)
     go_present: bool = await asyncio.to_thread(_has_secret, config.providers.opencode_go.api_key_env)
     anthropic_present: bool = await asyncio.to_thread(_has_secret, config.providers.anthropic.api_key_env)
+    openrouter_present: bool = await asyncio.to_thread(_has_secret, config.providers.openrouter.api_key_env)
     ollama_present: bool = await asyncio.to_thread(_has_secret, config.providers.ollama.api_key_env)
     server: ServerCheck = await _check_ollama_server(config, "ollama" in used)
     down: dict[str, str] = {} if server.reached else {"ollama": server.row.detail}
@@ -748,14 +779,19 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         _check_key("openai", config.providers.openai.api_key_env, openai_present, "openai" in used),
         _check_key("opencode go", config.providers.opencode_go.api_key_env, go_present, "opencode_go" in used),
         _check_key("anthropic", config.providers.anthropic.api_key_env, anthropic_present, "anthropic" in used),
+        _check_key("openrouter", config.providers.openrouter.api_key_env, openrouter_present, "openrouter" in used),
         _search_row(config, ollama_present, anthropic_present),
     ]
     try:
-        # The connectors of OpenAI and OpenCode Go know a model by its name alone until it is called, so the list of
-        # the models each serves to its key is read once, and each configured model of theirs is checked against it.
+        # The connectors of OpenAI, OpenCode Go and OpenRouter know a model by its name alone until it is called, so the
+        # list of the models each serves is read once, and each configured model of theirs is checked against it.
         served: dict[str, Served] = {
             provider: await _served(router, provider)
-            for provider, present in (("openai", openai_present), ("opencode_go", go_present))
+            for provider, present in (
+                ("openai", openai_present),
+                ("opencode_go", go_present),
+                ("openrouter", openrouter_present),
+            )
             if present
         }
         if openai_present:
@@ -764,6 +800,8 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
             results.append(await _check_opencode_go_api(router, "opencode_go" in used))
         if anthropic_present:
             results.append(await _check_anthropic_api(router, "anthropic" in used))
+        if openrouter_present:
+            results.append(await _check_openrouter_api(router, "openrouter" in used))
         results.append(await _check_memory(router, config, down))
         for role, reference in configured:
             results.append(await _check_model(router, role, reference, served, down))
