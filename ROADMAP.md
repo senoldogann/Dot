@@ -5278,10 +5278,11 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 345 | A chat that goes on at another of its runs keeps its way back                          | done        | aa6093b |
 | 346 | A chat may leave out the lines of what ran without asking                              | done        | a2f619b |
 | 347 | On a phone the text can be as small as 12 px                                           | done        | a2f619b |
-| 348 | Dot can be published to PyPI as dotagent-macos, by a tag                               | in progress |         |
+| 348 | Dot can be published to PyPI as dotagent-macos, by a tag                               | done        | 5e2476f |
 | 349 | OpenRouter: the models of many labs on one key                                         | done        | 196ff64 |
-| 350 | The audit of 2026-10-17: what held in the paths a human merges                         | in progress |         |
-| 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | in progress |         |
+| 350 | The audit of 2026-10-17: what held in the paths a human merges                         | done        | 410af27 |
+| 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | done        | 2f94b84 |
+| 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -13957,7 +13958,7 @@ and at 12 px the answer, a row of the sidebar and a label of the settings shrink
 
 ### 348. Dot can be published to PyPI as dotagent-macos, by a tag
 
-**Status: in progress, for the owner (it touches `.github/workflows/`).** The owner's word of 2026-10-17: "PyPI olayı
+**Status: done (`5e2476f`); the first upload waits for the owner's pending publisher on pypi.org.** The owner's word of 2026-10-17: "PyPI olayı
 ne, kayıt oldum ama ne yapacağız?" (what about PyPI: I signed up, what do we do), after approving publication on
 2026-10-17 ("Paket PyPI'ye yayımlansın mı?", approved). **As built (2026-10-17).** `dotagent` and `dotx` are taken on
 PyPI (its JSON API answered 200; `dotagent-macos` 404); the distribution is `dotagent-macos`, the package it installs
@@ -13999,13 +14000,13 @@ refused key) and `tests/smoke/test_doctor.py` (a model whose list could not be r
 
 ### 351. The audit of 2026-10-17: what held, fixed outside the human-only paths
 
-**Status: in progress.** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler gerçekten var ise lütfen düzelt.
-NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum. Özgür bir ajan olmalı." (verify this report, fix the problems that
-are real; YOLO's freedom must not break, the agent must stay free), and "Güvenli bir şekilde" (safely). Every claim of
-the report was checked against the code and, where it could be, a real run; what held is fixed here, each with a test
-that fails on the code before it, and none adds a refusal a yolo run would meet. **As built (2026-10-17).** A one-time
-schedule whose run could not start stays due (`store.keep_schedule_due`), where the firing recorded before the start had
-switched it off for good; it is tried again after a minute, then twice as long each time up to an hour
+**Status: done (`2f94b84`).** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler gerçekten var ise lütfen
+düzelt. NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum. Özgür bir ajan olmalı." (verify this report, fix the
+problems that are real; YOLO's freedom must not break, the agent must stay free), and "Güvenli bir şekilde" (safely).
+Every claim of the report was checked against the code and, where it could be, a real run; what held is fixed here, each
+with a test that fails on the code before it, and none adds a refusal a yolo run would meet. **As built (2026-10-17).**
+A one-time schedule whose run could not start stays due (`store.keep_schedule_due`), where the firing recorded before
+the start had switched it off for good; it is tried again after a minute, then twice as long each time up to an hour
 (`failures.retry_after`), and a schedule changed meanwhile is left as it is. A learned skill's kind and When are one
 line each, only the last Evidence heading ends what a tainted skill withholds, and a path in the Mac's own folders
 (`/tmp`, `/private`, `/var` and the like) is withheld too. The calls of a step cut by a stop are told as started from
@@ -14030,10 +14031,10 @@ undo through a linked folder) are item 350, in a pull request for the owner.
 
 ### 350. The audit of 2026-10-17: what held in the paths a human merges
 
-**Status: in progress, for the owner's review.** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler
+**Status: done (`410af27`).** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler
 gerçekten var ise lütfen düzelt. NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum." (verify the report, fix what is
 real; YOLO's freedom must not break). These touch `policy/`, `secrets.py`, `agent/review.py` and `undo/`, which
-REVIEW.md leaves to a human, so the pull request waits for the owner. None adds anything a yolo run meets. **As built
+REVIEW.md leaves to a human; the owner's word was to merge them once a fresh review is clean and CI is green. None adds anything a yolo run meets. **As built
 (2026-10-17).** The amount of a payment step is read whole (`$1500.00` was 150, `$150000` 150, `$2500` 250, `CHF
 1'234.50` 1; a point, a comma, an apostrophe or a space groups thousands), and of several in a label or after the total
 cues of a page the largest counts, so a misread errs towards the hand-off; a yolo run waives that hand-off as before,
@@ -14047,6 +14048,29 @@ folder that is a link now (the tools note paths with their links resolved, `writ
 looks again when it carries a step out, and removes no empty folder below such a link. Tests: `test_spend.py`,
 `test_env_file.py`, `test_review_target.py`, `test_lessons.py`, `test_verdict_numbers.py`, `test_undo.py`; each fails on
 the code before. Docs: `safety.md`, `models.md`, `autonomy.md`.
+
+### 352. A calm chat: one set-up line, a live line over the composer, one screen on a phone
+
+**Status: in progress.** The owner's word of 2026-10-17, with two screenshots (Dot's chat on an iPhone, T3 Code's line
+over its composer): "Fotoğrafta gördüğün gibi çok fazla bilgi mesajı gösteriyoruz ayrıca ikinci fotoğrafta göreceğin
+gibi T3 Code arayüzünde mesela arka planda bir background task çalıştığı zaman bunu da gösteriyor alt tarafta böyle
+dinamik ve daha güzel hoş bir tasarım yapabiliriz ayrıca sohbette telefonda çalışırken sadece sohbet içi scroll olmalı
+mesela alttaki kompozer her zaman sabit olmalı" (we show too many info lines; T3 Code shows what runs in the background
+in a dynamic line at the bottom, a nicer design; on a phone only the chat should scroll, the composer always in place).
+**As built (2026-10-17).** The lines of how a run was set up (the notes and skills it was handed and how they were
+found, its context budget, its tool groups, a step sent to another model) are one quiet line (`timeline.js`
+`contextNote`, `details.context-line`) that names them in short ("notes found by their words alone · 1 memory"), amber
+or red when one of them warns, and opens to the lines themselves; they were a line each (the screenshot: three before
+the answer). The line over the composer (`capsule.js`, item 297) is every width's: the run's time and what it does now
+(the head of its latest step at work), or that it waits for you; its helpers; how many messages wait in the queue (its
+part opens the queue) and how many commands run in the chat (its part shows them). It rises into place and comes and
+goes as its parts do; on a phone what the run does now shows while no other part stands beside the time. On a phone a
+chat is one screen (`html.chat-shell`, `run.css`): the stage fills what is seen of the window, the window does not
+scroll, and only the conversation scrolls between the bar and the composer, so a scroll, its bounce and the keyboard
+move nothing else; `run.js` scrolls, follows and jumps through the box that scrolls. Tests: `test_chat_calm.py` (the
+context line, wide and on an iPhone, light and dark, the embedding service an address where nothing listens; on an
+iPhone only the conversation scrolls; both fail on `main`), `test_phone_t3.py` (the line counts what is queued, on a
+wide window too). Docs: `docs/daemon.md`, `docs/phone.md`.
 
 ## Log
 
@@ -14809,3 +14833,4 @@ the code before. Docs: `safety.md`, `models.md`, `autonomy.md`.
 - 2026-10-17 (Opus 5.5): PR #332 (item 345 and `test_dot_app`'s shell) merged as `aa6093b`. Items 346 and 347 on the owner's word of the same day, on `items-346-348`; item 348 (PyPI) on a branch of its own, as it touches `.github/workflows/`.
 - 2026-10-17 (Opus 5.5): PR #333 (items 346 and 347) merged as `a2f619b` after CI and the local gate (651 passed; the 6 tests that save a memory note failed while the local Ollama was not running, the same 6 as on `main` then); main's checkout moved to it and the daemon restarted at 16:14:49 while no run worked. Item 349 (OpenRouter) on `item-349-openrouter`, with a fresh-context review's findings fixed: only OpenRouter's codec keeps reasoning details, an answer of the wrong shape is a protocol error, the doctor checks a model against its list first, a variant id has its model's traits.
 - 2026-10-17 (Opus 5.5): PR #334 (item 349, OpenRouter) merged as `196ff64` after CI and a second fresh-context review whose findings it fixes (a variant id the doctor did not know, lines over 120 columns, the lists of providers). Item 351 on `items-351-audit-fixes` as PR #335; its review's findings fixed (a failing one-time schedule waits between tries, the answer check reads only the word after a folder, a known address may gain a query or a closing slash); `test_browser_sign_in`'s stand-in no longer writes its pid before its arguments (300 of 300 probes failed before, none after).
+- 2026-10-17 (Opus 5.5): PR #335 (item 351, the audit's fixes) merged as `2f94b84` after CI; main's checkout moved to it and the daemon restarted at 17:36:46 while no run worked. Item 352 on the owner's word of the same day (fewer info lines, a live line over the composer, a phone's chat as one screen), on `items-352-chat-calm`.
