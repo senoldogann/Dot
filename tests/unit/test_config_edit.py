@@ -1,7 +1,7 @@
 """Switching ``[browser] mode``, ``raise_window`` and ``debug_port`` (item 265), the default model (``[models] main``,
 item 199), the models of Dot's own work (``[models] fast``, ``review`` and ``vision``, item 232) and whether the daemon
-resumes the runs it cut off (``[agent] resume``, item 231), in the user's config.toml: the comments and the other
-settings stay as written."""
+resumes the runs it cut off (``[agent] resume``, item 231), and the names of ``[server] reach`` (item 271), in the
+user's config.toml: the comments and the other settings stay as written."""
 
 import stat
 import tomllib
@@ -17,6 +17,7 @@ from dotagent.config_edit import (
     set_judge_provider,
     set_resume,
     set_role_model,
+    set_setting,
     set_shell_sandbox,
     with_browser_mode,
     with_browser_setting,
@@ -109,6 +110,14 @@ def test_a_file_that_is_not_toml_is_refused_and_left_as_it_was(tmp_path: Path) -
     with pytest.raises(ConfigError, match="not valid TOML"):
         set_browser_mode(path, "attach")
     assert path.read_text(encoding="utf-8") == "[browser\nmode = \n"
+
+
+def test_a_file_that_is_not_utf8_is_refused_as_a_config_error_and_left_as_it_was(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_bytes(b'[browser]\nmode = "\xff"\n')
+    with pytest.raises(ConfigError, match="could not be changed automatically"):
+        set_browser_mode(path, "attach")
+    assert path.read_bytes() == b'[browser]\nmode = "\xff"\n'
 
 
 def test_a_browser_table_written_as_an_inline_table_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
@@ -222,3 +231,19 @@ def test_the_sandbox_is_written_under_shell_as_a_boolean_and_the_rest_stays(tmp_
     path.write_text("[shell]\npass_env = []  # mine\nsandbox = false\n\n[web]\nsandbox = 1\n", encoding="utf-8")
     set_shell_sandbox(path, True)
     assert path.read_text(encoding="utf-8") == "[shell]\npass_env = []  # mine\nsandbox = true\n\n[web]\nsandbox = 1\n"
+
+
+def test_a_list_of_names_is_written_and_replaced_with_the_comment_after_it_kept(tmp_path: Path) -> None:
+    path: Path = tmp_path / "config.toml"
+    path.write_text("[server]\nport = 8765\n", encoding="utf-8")
+    set_setting(path, "server", "reach", ["a.example.ts.net"])
+    assert path.read_text(encoding="utf-8") == '[server]\nreach = ["a.example.ts.net"]\nport = 8765\n'
+    path.write_text('[server]\n  reach = ["a.example.ts.net"]  # the tailnet\n', encoding="utf-8")
+    set_setting(path, "server", "reach", ["a.example.ts.net", "b.example.ts.net"])
+    assert path.read_text(encoding="utf-8") == (
+        '[server]\n  reach = ["a.example.ts.net", "b.example.ts.net"]  # the tailnet\n'
+    )
+    assert tomllib.loads(path.read_text(encoding="utf-8"))["server"]["reach"] == [
+        "a.example.ts.net",
+        "b.example.ts.net",
+    ]

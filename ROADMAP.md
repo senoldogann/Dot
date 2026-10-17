@@ -5206,10 +5206,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 265 | Dot's own Chrome can take DevTools connections from a run's scripts                   | done        | dbb21d5 |
 | 266 | A batch carries several public or social actions while no pace is set                 | done        | ab56000 |
 | 267 | The phone reaches Dot from anywhere, and its home-screen app signs in with a code     | done        | a8c5cb0 |
-| 268 | Office files show in the side panel as Quick Look draws them                          | in progress |         |
+| 268 | Office files show in the side panel as Quick Look draws them                          | done        | 53b8333 |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
-| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
+| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | in progress |         |
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
@@ -11926,7 +11926,7 @@ awake, is item 271.
 
 ### 268. Office files show in the side panel as Quick Look draws them
 
-**Status: in progress.** The owner chose it on 2026-10-17 for this round, with 271, 280 and 281; it was built on
+**Status: done (`53b8333`).** The owner chose it on 2026-10-17 for this round, with 271, 280 and 281; it was built on
 2026-10-16 on `item-268-looks-loops-lean` and left uncommitted when the owner turned to the design, and is carried here
 onto `main`. **As built (2026-10-17).** `previews/quicklook.py`: a Word document, an Excel workbook and a presentation
 are drawn by `qlmanage -p -o` once per version of the file (its path, size and time of change, keyed with a secret the
@@ -12004,7 +12004,24 @@ a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; b
 
 ### 271. Settings › Phone sets up Tailscale and keeps the Mac awake
 
-**Status: planned.**
+**Status: in progress.** The owner chose it on 2026-10-17 for this round, with 268, 280 and 281. **As built
+(2026-10-17).** `tailnet.py` reads Tailscale's command line, the app's own before one on the PATH (`tailscale status
+--json`, `tailscale serve status --json`, its JSON validated), and `awake.py` holds macOS's `/usr/bin/caffeinate -s -w
+<daemon pid>`. Settings › Phone › Reach Dot from anywhere says whether Tailscale runs signed in and the Mac's name,
+whether it serves this daemon's port at `https://<name>/`, whether Dot answers to the name, the config file naming it
+already when the daemon has not taken it up, and what Tailscale said when it could not be asked (its app closed, a call
+that failed); **Set up** runs `tailscale serve --bg <port>` and writes the name into `[server] reach` (`config_edit`
+writes a list now), one press at a time, and says that the daemon answers to it from its next start (`dotx service
+install`): taking a name up without a restart would change the guard (`server/guard.py`), which is left as it is. **Keep
+this Mac awake while it charges** (`[server] keep_awake`) starts and stops the hold at once and with the daemon, and a
+config file that cannot be changed leaves it as it was. The tailnet name is never logged. Left out: the QR code of the
+signed-in address, which would put the token on the screen; the pairing code signs a phone in. Tests:
+`tests/unit/test_tailnet.py`, `test_config_edit.py`, `tests/smoke/test_phone_reach.py` (a stand-in `tailscale` and
+`caffeinate` that `DOT_TAILSCALE` and `DOT_CAFFEINATE` name, every other smoke test naming ones that do not exist: the
+state, Set up pressed twice at once and again, the switch on and off, a config file that cannot be changed, a Mac
+without Tailscale, a Tailscale whose app is closed, whose answer cannot be read or whose command line cannot start, a
+serve that waits ended in time with what it said; the card wide in Chrome and on a phone in WebKit, light and dark).
+Docs: `docs/phone.md`, `docs/daemon.md`.
 
 **What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
 `[server] reach` names it, sets up what is missing with one button (reach taken up without a restart), shows the
@@ -14939,3 +14956,4 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 - 2026-10-17 (Opus 5.5): item 356 on the owner's word of the same day (a second outside report: fix what is real), on `item-356-audit-runtime`: two read-only verifiers checked every claim; the shell guard's findings stay reported for the owner, the six that held elsewhere are fixed, each with a test that fails on the code before.
 - 2026-10-17 (Opus 5.5): item 281 on the owner's choice of the same day, on `item-281-loop`: `/loop 30m <message>` makes a schedule of the chat that asks it again until a run deletes it or the owner stops it, with a line over the composer.
 - 2026-10-17 (Opus 5.5): item 268 on the owner's choice of the same day, carried from the uncommitted work of 2026-10-16 onto `item-268-quick-look`: Office files drawn by Quick Look in a sandboxed frame, a workbook's sheets framed one at a time under the panel's own tabs.
+- 2026-10-17 (Opus 5.5): item 271 on the owner's choice of the same day, on `item-271-phone-setup`: Settings › Phone says what a phone needs to reach Dot through Tailscale, sets it up with one button, and keeps the Mac awake while it charges.

@@ -2,8 +2,9 @@
 raised), the default model, ``[models] main`` (item 199), a model of Dot's own work, ``[models] fast``, ``review`` or
 ``vision`` (item 232), whether the daemon resumes on its own the runs it cut off, ``[agent] resume`` (item 231), or the
 context size of a model, a key of ``[models.context]`` (item 250), whether the typed judge answers, ``[judge] provider``
-(item 255), or whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), so the comments and
-the other settings stay as written."""
+(item 255), whether a run's processes start in the macOS sandbox, ``[shell] sandbox`` (item 262), or the names the
+daemon answers to and whether it keeps the Mac awake, ``[server] reach`` and ``keep_awake`` (item 271), so the comments
+and the other settings stay as written."""
 
 import os
 import re
@@ -31,7 +32,7 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["agent", "browser", "judge", "models", "shell"]
+type ConfigTable = Literal["agent", "browser", "judge", "models", "server", "shell"]
 type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal[
     "mode",
@@ -46,14 +47,18 @@ type BrowserSetting = Literal[
 ]
 type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]
+type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
-type SettingKey = AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting | ShellSetting
-type SettingValue = str | bool | int
+type SettingKey = AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting | ServerSetting | ShellSetting
+# A list of names is ``[server] reach`` (item 271).
+type SettingValue = str | bool | int | list[str]
 
 
 def _literal(value: SettingValue) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, list):
+        return "[" + ", ".join(_literal(item) for item in value) + "]"
     return str(value) if isinstance(value, int) else f'"{value}"'
 
 
@@ -79,7 +84,9 @@ def _key_line(key: str) -> re.Pattern[str]:
 
 
 def _key_value(key: str) -> re.Pattern[str]:
-    return re.compile(rf"""^(\s*{_key_pattern(key)}\s*=\s*)("[^"]*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*)(.*)$""")
+    return re.compile(
+        rf"""^(\s*{_key_pattern(key)}\s*=\s*)("[^"]*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*|\[[^\]]*\])(.*)$"""
+    )
 
 
 def _replaced_line(line: str, key: str, setting: str) -> str:
@@ -264,7 +271,10 @@ def _edit(
     ``keys`` (nothing there for ``None``) and every other setting unchanged; else nothing is written and the error says
     to do ``by_hand`` by hand."""
     with _EDITING:
-        before: str = path.read_text(encoding="utf-8") if path.exists() else ""
+        try:
+            before: str = path.read_text(encoding="utf-8") if path.exists() else ""
+        except UnicodeDecodeError as error:
+            raise _by_hand(by_hand, path, f"the file is not UTF-8 text: {error}") from error
         old_settings: JsonObject = _parse(before, path)
         after: str = change(before)
         try:
