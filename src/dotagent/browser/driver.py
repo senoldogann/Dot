@@ -46,6 +46,11 @@ _TRANSIENT_NAVIGATION: tuple[str, ...] = (
 )
 
 # Resolves once the DOM has been quiet for quietMs, or after maxMs at the latest.
+# DOMContentLoaded as the document itself tells it: a page the back-forward cache brings back fires it no more, and
+# Playwright's own wait for it then lasted the whole navigation timeout (item 339).
+_PARSED_SCRIPT: str = """() => document.readyState !== 'loading' || new Promise((resolve) => {
+  document.addEventListener('DOMContentLoaded', () => resolve(true), { once: true });
+})"""
 _QUIET_SCRIPT: str = """([quietMs, maxMs]) => new Promise((resolve) => {
   let quietTimer = 0;
   const finish = () => { observer.disconnect(); clearTimeout(quietTimer); clearTimeout(hardTimer); resolve(null); };
@@ -259,7 +264,11 @@ async def page_title(page: Page) -> str:
 
 
 async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
-    await page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+    try:
+        async with asyncio.timeout(timeout_ms / 1000):
+            await page.evaluate(_PARSED_SCRIPT)
+    except TimeoutError as error:
+        raise PlaywrightTimeoutError(f"the document was not parsed within {timeout_ms} ms") from error
     await page.evaluate(_QUIET_SCRIPT, [quiet_ms, max_ms])
 
 
@@ -299,14 +308,39 @@ async def navigate(page: Page, url: str, timeout_ms: int, attempts: int, backoff
     raise BrowserError("navigation failed", {"target": url, "attempts": attempts, "error": str(last)}) from last
 
 
-async def go_back(page: Page, timeout_ms: int) -> int | None:
+async def _page_before(page: Page) -> str | None:
+    """The address of the page before the one on screen in the tab's history, as Chrome keeps it; ``None`` when there
+    is none, or when it is a blank page: a tab of Dot's starts blank before its first page."""
+    cdp: CDPSession = await page.context.new_cdp_session(page)
     try:
-        response = await page.go_back(wait_until="domcontentloaded", timeout=timeout_ms)
+        history: dict[str, object] = await cdp.send("Page.getNavigationHistory")
+    finally:
+        await cdp.detach()
+    index: object = history.get("currentIndex")
+    entries: object = history.get("entries")
+    if not isinstance(index, int) or not isinstance(entries, list):
+        raise BrowserError("Chrome did not say where the tab stands in its history", {"url": page.url})
+    if index == 0:
+        return None
+    before: object = entries[index - 1]
+    url: object = before.get("url") if isinstance(before, dict) else None
+    if not isinstance(url, str) or url.startswith("about:blank"):
+        return None
+    return url
+
+
+async def go_back(page: Page, timeout_ms: int) -> int | None:
+    """Go back one page in the tab and return the status of the page gone back to; ``None`` when Chrome brought it back
+    from its back-forward cache, with no response of its own. Done once the page is committed, as the caller settles it:
+    a page the cache brings back fires no load and no DOMContentLoaded again, so waiting for one held each Back for the
+    whole navigation timeout in a Chrome that keeps the cache (the owner's, item 339), and then failed it."""
+    try:
+        if await _page_before(page) is None:
+            raise BrowserError("there is no earlier page in this tab's history", {"url": page.url})
+        response = await page.go_back(wait_until="commit", timeout=timeout_ms)
     except PlaywrightError as error:
         raise _failure("going back failed", page, {}, error) from error
-    if response is None:
-        raise BrowserError("there is no earlier page in this tab's history", {"url": page.url})
-    return response.status
+    return None if response is None else response.status
 
 
 async def live_locator(page: Page, ref: str, action: str) -> Locator:

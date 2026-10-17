@@ -58,6 +58,8 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
 _PORT_FILE: str = "DevToolsActivePort"
 _READY_TIMEOUT_S: float = 30.0
 _EXIT_TIMEOUT_S: float = 20.0
+# The longest a Back may take on a page of this Mac: a navigation, not the navigation timeout.
+_BACK_MOST_S: float = 5.0
 _TABS_TIMEOUT_S: float = 10.0
 _POLL_S: float = 0.1
 # Events that Chrome sends when a tab opens or when it quits arrive a few milliseconds after the fact.
@@ -268,6 +270,29 @@ async def chrome(data_dir: Path, site: str) -> AsyncIterator[ScratchChrome]:
         yield running
     finally:
         await stop_chrome(running)
+
+
+async def test_back_in_the_chrome_of_the_user_takes_no_longer_than_a_page(
+    chrome: ScratchChrome, attach_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """A Chrome that keeps its back-forward cache (the owner's does; Dot's own does not) brings the page before back
+    from the cache, with no load or DOMContentLoaded: Back is done once the page is committed, not after the whole
+    navigation timeout (item 339: each Back took 30 s, then failed). On the tab's first page there is no page before."""
+    session: BrowserSession = BrowserSession(
+        attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
+    )
+    try:
+        first: PageView = await session.open_url("back", f"{site}/mine")
+        with pytest.raises(BrowserError, match="there is no earlier page"):
+            await session.back("back")
+        await session.open_url("back", f"{site}/")
+        started: float = time.monotonic()
+        view: PageView = await session.back("back")
+        took: float = time.monotonic() - started
+        assert view.url == first.url and view.title == "Mine", view
+        assert took < _BACK_MOST_S, took
+    finally:
+        await session.aclose()
 
 
 async def test_the_agent_works_in_tabs_of_its_own_and_the_tabs_of_the_user_stay(
