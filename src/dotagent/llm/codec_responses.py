@@ -277,13 +277,14 @@ def fold_responses_event(
         return state, ()
     data: JsonObject = parse_event_object(event, context)
     kind: str = get_str(data, "type") or (event.event or "")
-    if kind in ("", "error"):
+    errored: bool = kind == "error" or event.event == "error"
+    if kind == "" or errored:
         wire: WireError | None = wire_error_from_object(data)
         if wire is not None:
             raise error_from_stream(wire, context, classify)
         # An error event that names no error still ends the answer, as in codec_messages (the outside audit of
         # 2026-10-17, R10): taken for nothing, the stream would end as if the model had stopped.
-        if kind == "error":
+        if errored:
             raise ProviderProtocolError("error event carries no error description", context)
         return state, ()
     if kind in ("response.output_text.delta", "response.refusal.delta"):

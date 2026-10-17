@@ -331,8 +331,9 @@ def test_an_error_event_of_the_responses_stream_that_names_no_error_is_raised() 
     # An "event: error" line whose data says nothing was taken for nothing, and the stream went on as if the model had
     # stopped (the outside audit of 2026-10-17, R10).
     codec = responses_codec(classify_openai)
-    with pytest.raises(ProviderProtocolError):
-        codec.fold(codec.initial("m"), sse({}, "error"), {})
+    for frame in (sse({}, "error"), sse({"type": "keepalive"}, "error")):
+        with pytest.raises(ProviderProtocolError):
+            codec.fold(codec.initial("m"), frame, {})
 
 
 # ------------------------------------------------------------------------------------ error classes

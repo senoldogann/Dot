@@ -91,6 +91,12 @@ def _flat(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
+def shown_target(target: str) -> str:
+    """How a call's target is shown to a model (the goal check, the lessons): on one line, its secrets masked, cut at
+    :data:`_TARGET_CHARS`."""
+    return _flat(target, _TARGET_CHARS)
+
+
 def _whole(text: str) -> str:
     """``text`` on one line, its secrets masked."""
     return " ".join(redact_secrets(text).split())
@@ -265,12 +271,12 @@ def render_facts(facts: RunFacts, missing: Sequence[str], unopened: Sequence[str
         ("Files the file tools wrote or edited", _listed(facts.written)),
         (
             "Failed calls that no later success of the same tool and target followed",
-            [f"- {fact.tool} {_flat(fact.target, _TARGET_CHARS)}: {fact.result}" for fact in facts.failures],
+            [f"- {fact.tool} {shown_target(fact.target)}: {fact.result}" for fact in facts.failures],
         ),
         (
             "Commands that test, build or lint, with their results",
             [
-                f"- {_flat(fact.target, _TARGET_CHARS)}: {'succeeded' if fact.ok else 'failed'}, {fact.result}"
+                f"- {shown_target(fact.target)}: {'succeeded' if fact.ok else 'failed'}, {fact.result}"
                 for fact in facts.checks
             ],
         ),
