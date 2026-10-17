@@ -79,3 +79,26 @@ async def test_a_command_line_that_cannot_start_is_a_problem_of_the_state(
         False,
         "Tailscale's command line could not be started: Permission denied",
     )
+
+
+def _like_the_app(path: Path) -> Path:
+    """A program that answers as the Tailscale app's own does: as the command line only when it is told to, else with
+    the message of a window that could not start."""
+    path.write_text(
+        "#!/bin/sh\n"
+        'if [ "$TAILSCALE_BE_CLI" = "true" ]; then\n'
+        '  echo \'{"BackendState": "Running", "Self": {"DNSName": "mac.tail1234.ts.net."}}\'\n'
+        "else\n"
+        "  echo 'The Tailscale GUI failed to start: The operation could not be completed.'\n"
+        "fi\n",
+        encoding="utf-8",
+    )
+    path.chmod(path.stat().st_mode | stat.S_IXUSR)
+    return path
+
+
+async def test_the_apps_program_is_asked_as_the_command_line(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("TAILSCALE_BE_CLI", raising=False)
+    monkeypatch.setenv("DOT_TAILSCALE", str(_like_the_app(tmp_path / "Tailscale")))
+    state = await tailnet_state(8765, (), ())
+    assert (state.running, state.name, state.problem) == (True, "mac.tail1234.ts.net", None)

@@ -12022,7 +12022,10 @@ signed-in address, which would put the token on the screen; the pairing code sig
 state, Set up pressed twice at once and again, the switch on and off, a config file that cannot be changed, a Mac
 without Tailscale, a Tailscale whose app is closed, whose answer cannot be read or whose command line cannot start, a
 serve that waits ended in time with what it said; the card wide in Chrome and on a phone in WebKit, light and dark).
-Docs: `docs/phone.md`, `docs/daemon.md`.
+Docs: `docs/phone.md`, `docs/daemon.md`. On the owner's Mac after the merge, the daemon read Tailscale's status as
+unreadable: run by a process with no terminal, as under launchd, the app's own program tries to start its window and
+says it could not instead of answering, so it is run with `TAILSCALE_BE_CLI=true` (a unit test runs a program that acts
+so).
 
 **What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
 `[server] reach` names it, sets up what is missing with one button (reach taken up without a restart), shows the
@@ -14979,3 +14982,4 @@ taken out. `pyproject.toml` no longer ignores E501, so `ruff check` holds every 
 - 2026-10-17 (Opus 5.5): item 271 on the owner's choice of the same day, on `item-271-phone-setup`: Settings › Phone says what a phone needs to reach Dot through Tailscale, sets it up with one button, and keeps the Mac awake while it charges.
 - 2026-10-17 (Opus 5.5): item 357 on the owner's word of the same day ("Tüm bu açık problemleri düzelt", fix all these open problems), on `item-357-long-lines`: the 391 long lines wrapped with every value kept, and `ruff check` holds every line of Python to 120 characters.
 - 2026-10-17 (Opus 5.5): item 357 done (`4ebf951`); item 280 left for the owner's word on spending a hosted model's quota on its evals, with how to run them.
+- 2026-10-17 (Opus 5.5): item 271, after its merge: the live daemon could not read Tailscale's status, because the app's program answers as its command line only with `TAILSCALE_BE_CLI=true` when no terminal runs it; fixed on `item-271-tailscale-cli`.
