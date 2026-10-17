@@ -13,6 +13,7 @@ from dotagent.agent.gate import SiteLocks
 from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
 from dotagent.agent.peers import Peers
 from dotagent.agent.sizes import ContextSizes
+from dotagent.awake import KeepAwake
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import RECONNECT_NOTICE, BrowserSession
 from dotagent.config import AppConfig, McpServerConfig
@@ -114,6 +115,8 @@ class Runtime:
     browser: BrowserSession
     browsers: BrowserPool
     desktop: DesktopSession
+    # The daemon's hold on the Mac's sleep while it charges (item 271); off until the daemon starts it.
+    awake: KeepAwake
     terminals: Terminals
     web: WebClient
     # Whether the key of Ollama's hosted search was found when the runtime was built: the first rung of web_search's
@@ -386,6 +389,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             bus=bus,
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
             site_locks=SiteLocks(),
+            awake=KeepAwake(),
             router=ModelRouter(config, _call_recorder(store, bus), login_env),
             roles=ModelRoles(config.models),
             context_sizes=ContextSizes(config.models.context),
@@ -438,4 +442,5 @@ async def close_runtime(runtime: Runtime) -> None:
         closing.push_async_callback(runtime.mcp.close)
         closing.push_async_callback(runtime.browsers.aclose)
         closing.push_async_callback(runtime.desktop.close)
+        closing.push_async_callback(runtime.awake.stop)
         closing.push_async_callback(runtime.terminals.aclose)

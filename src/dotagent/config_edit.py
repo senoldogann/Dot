@@ -31,7 +31,7 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["agent", "browser", "judge", "models", "shell"]
+type ConfigTable = Literal["agent", "browser", "judge", "models", "server", "shell"]
 type AgentSetting = Literal["resume"]
 type BrowserSetting = Literal[
     "mode",
@@ -46,14 +46,18 @@ type BrowserSetting = Literal[
 ]
 type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]
+type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
-type SettingKey = AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting | ShellSetting
-type SettingValue = str | bool | int
+type SettingKey = AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting | ServerSetting | ShellSetting
+# A list of names is ``[server] reach`` (item 271).
+type SettingValue = str | bool | int | list[str]
 
 
 def _literal(value: SettingValue) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
+    if isinstance(value, list):
+        return "[" + ", ".join(_literal(item) for item in value) + "]"
     return str(value) if isinstance(value, int) else f'"{value}"'
 
 

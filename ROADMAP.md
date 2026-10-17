@@ -5209,7 +5209,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 268 | Office files show in the side panel as Quick Look draws them                          | in progress |         |
 | 269 | A long paste goes as a file, and a Markdown file shows clean in the side panel        | done        | c4da0ed |
 | 270 | A script's navigation is settled after it, also one that commits after its value      | done        | a27c018 |
-| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | planned     |         |
+| 271 | Settings › Phone sets up Tailscale and keeps the Mac awake                            | in progress |         |
 | 272 | The Settings tabs are one row on a phone, and it stays under the bar                  | done        | 2aa0600 |
 | 273 | On a phone the stop stays in the sidebar, the switches match, the level reads         | done        | 0eb267f |
 | 274 | A streamed message is drawn as it will stay                                           | done        | 428ad94 |
@@ -12004,7 +12004,18 @@ a script that keeps the page busy for 4 s, given 1 s, comes back in under 3 s; b
 
 ### 271. Settings › Phone sets up Tailscale and keeps the Mac awake
 
-**Status: planned.**
+**Status: in progress.** The owner chose it on 2026-10-17 for this round, with 268, 280 and 281. **As built
+(2026-10-17).** `tailnet.py` reads Tailscale's command line (`tailscale status --json`, `tailscale serve status --json`,
+its JSON validated) and `awake.py` holds `caffeinate -s -w <daemon pid>`. Settings › Phone › Reach Dot from anywhere
+says whether Tailscale runs signed in and the Mac's name, whether it serves this daemon's port at `https://<name>/`, and
+whether Dot answers to the name, the config file naming it already when the daemon has not taken it up; **Set up** runs
+`tailscale serve --bg <port>` and writes the name into `[server] reach` (`config_edit` writes a list now), and says that
+the daemon answers to it from its next start: taking a name up without a restart would change the guard
+(`server/guard.py`), which is left as it is. **Keep this Mac awake while it charges** (`[server] keep_awake`) starts and
+stops the hold at once and with the daemon. Left out: the QR code of the signed-in address, which would put the token on
+the screen; the pairing code signs a phone in. Tests: `tests/unit/test_tailnet.py`, `tests/smoke/test_phone_reach.py`
+(stand-ins of `tailscale` and `caffeinate` first on the PATH: the state, Set up once and twice, the switch on and off, a
+Mac without Tailscale; the card wide and on a phone). Docs: `docs/phone.md`.
 
 **What.** Settings › Phone shows whether Tailscale runs, whether the daemon is served on the tailnet and whether
 `[server] reach` names it, sets up what is missing with one button (reach taken up without a restart), shows the
@@ -14939,3 +14950,4 @@ Dot's own Chrome (a fix would add refusals a yolo run meets). Tests: `tests/unit
 - 2026-10-17 (Opus 5.5): item 356 on the owner's word of the same day (a second outside report: fix what is real), on `item-356-audit-runtime`: two read-only verifiers checked every claim; the shell guard's findings stay reported for the owner, the six that held elsewhere are fixed, each with a test that fails on the code before.
 - 2026-10-17 (Opus 5.5): item 281 on the owner's choice of the same day, on `item-281-loop`: `/loop 30m <message>` makes a schedule of the chat that asks it again until a run deletes it or the owner stops it, with a line over the composer.
 - 2026-10-17 (Opus 5.5): item 268 on the owner's choice of the same day, carried from the uncommitted work of 2026-10-16 onto `item-268-quick-look`: Office files drawn by Quick Look in a sandboxed frame, a workbook's sheets framed one at a time under the panel's own tabs.
+- 2026-10-17 (Opus 5.5): item 271 on the owner's choice of the same day, on `item-271-phone-setup`: Settings › Phone says what a phone needs to reach Dot through Tailscale, sets it up with one button, and keeps the Mac awake while it charges.

@@ -19,6 +19,7 @@ from dotagent.core.errors import (
     InvalidValueError,
     NotFoundError,
     PairingRefused,
+    PhoneSetupError,
     PreviewError,
     ProviderError,
     RunConflict,
@@ -74,6 +75,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (ToolExecutionError, 422),
     (BrowserError, 422),
     (PreviewError, 422),
+    (PhoneSetupError, 422),
     (ProviderError, 502),
 )
 

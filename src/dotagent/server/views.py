@@ -43,6 +43,7 @@ from dotagent.store.models import (
     RunStatus,
     ScheduleRecord,
 )
+from dotagent.tailnet import TailnetState
 from dotagent.undo.restore import UndoAction, UndoState
 
 _GOAL_CHARS: int = 50_000
@@ -75,9 +76,18 @@ class ProofView(FrozenModel):
 
 class PhoneView(FrozenModel):
     """How a phone reaches Dot (item 267): the addresses a reverse proxy on the owner's network serves it at, one for
-    each name of ``[server] reach``."""
+    each name of ``[server] reach``; how it reaches the Mac through Tailscale, and whether the daemon keeps the Mac
+    awake while it charges (item 271)."""
 
     addresses: list[str]
+    tailnet: TailnetState
+    keep_awake: bool
+
+
+class AwakeRequest(FrozenModel):
+    """Whether the daemon keeps the Mac awake while it charges (item 271)."""
+
+    on: bool
 
 
 class PairingView(FrozenModel):

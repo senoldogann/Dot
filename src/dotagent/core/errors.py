@@ -221,3 +221,8 @@ class EvalError(DotError):
 
 class ServiceError(DotError):
     """The daemon does not answer, or its launchd job cannot be installed, removed or inspected."""
+
+
+class PhoneSetupError(DotError):
+    """What a phone needs to reach Dot away from home could not be set up (item 271): Tailscale is missing, not running
+    or refused to serve, or the Mac cannot be kept awake."""

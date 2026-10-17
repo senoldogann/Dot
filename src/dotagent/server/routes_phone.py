@@ -1,15 +1,21 @@
 """Routes for a phone (item 267): the addresses it reaches Dot at, and pairing an app added to its home screen, which
-trades a short code for the access token (:mod:`dotagent.server.pairing`). The code and the token are never logged."""
+trades a short code for the access token (:mod:`dotagent.server.pairing`). The code and the token are never logged.
+Setting up Tailscale for it, and keeping the Mac awake while it charges (item 271)."""
 
+import asyncio
 import time
 
 from fastapi import APIRouter
 
-from dotagent.core.errors import PairingRefused
+from dotagent.config import load_user_config
+from dotagent.config_edit import set_setting
+from dotagent.core.errors import PairingRefused, PhoneSetupError
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import config_path
 from dotagent.server.context import ServerContext
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
-from dotagent.server.views import PairedView, PairingView, PairRequest, PhoneView
+from dotagent.server.views import AwakeRequest, PairedView, PairingView, PairRequest, PhoneView
+from dotagent.tailnet import TailnetState, serve_daemon, tailnet_state
 
 log = get_logger(__name__)
 
@@ -19,9 +25,51 @@ def phone_router(ctx: ServerContext) -> APIRouter:
     # The code that is good now; one at a time, held only in memory.
     current: PairingCode | None = None
 
+    async def written_reach() -> tuple[str, ...]:
+        """``[server] reach`` as the config file has it now, which the daemon takes up at its next start."""
+        return tuple((await asyncio.to_thread(load_user_config)).server.reach)
+
+    async def view() -> PhoneView:
+        running: tuple[str, ...] = tuple(ctx.runtime.config.server.reach)
+        return PhoneView(
+            addresses=[f"https://{name}/" for name in running],
+            tailnet=await tailnet_state(ctx.port, running, await written_reach()),
+            keep_awake=ctx.runtime.awake.on,
+        )
+
     @router.get("/phone")
     async def phone() -> PhoneView:
-        return PhoneView(addresses=[f"https://{name}/" for name in ctx.runtime.config.server.reach])
+        return await view()
+
+    @router.post("/phone/tailnet")
+    async def set_up_tailnet() -> PhoneView:
+        """Set up what a phone needs to reach Dot through Tailscale (item 271): ``tailscale serve`` for this daemon's
+        port, and the Mac's name in ``[server] reach``, which the daemon takes up at its next start."""
+        state: TailnetState = (await view()).tailnet
+        if not state.installed:
+            raise PhoneSetupError(
+                "Tailscale is not on this Mac: install it from tailscale.com, open it and sign in", {}
+            )
+        if not state.running or state.name is None:
+            raise PhoneSetupError("Tailscale is not running signed in: open it on this Mac and sign in", {})
+        if not state.served:
+            await serve_daemon(ctx.port)
+            log.info("phone_tailnet_served", name=state.name, port=ctx.port)
+        if not state.written:
+            reach: list[str] = [*await written_reach(), state.name]
+            await asyncio.to_thread(set_setting, config_path(), "server", "reach", reach)
+            log.info("phone_tailnet_reach_written", name=state.name)
+        return await view()
+
+    @router.post("/phone/awake")
+    async def keep_awake(request: AwakeRequest) -> PhoneView:
+        """Whether the daemon keeps the Mac awake while it charges (item 271): at once, and kept in the config file."""
+        if request.on:
+            await ctx.runtime.awake.start()
+        else:
+            await ctx.runtime.awake.stop()
+        await asyncio.to_thread(set_setting, config_path(), "server", "keep_awake", request.on)
+        return await view()
 
     @router.post("/phone/pairing")
     async def pairing() -> PairingView:

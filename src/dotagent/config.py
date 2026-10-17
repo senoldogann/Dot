@@ -98,6 +98,8 @@ class ServerConfig(FrozenModel):
     host: str
     port: int = Field(ge=1, le=65535)
     reach: list[str]
+    # Whether the daemon keeps the Mac awake while it charges (item 271), for a phone that reaches it from away.
+    keep_awake: bool
 
 
 class StoreConfig(FrozenModel):

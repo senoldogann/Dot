@@ -4,7 +4,7 @@
 import { api } from "../api.js";
 import { copyText, el } from "../dom.js";
 import { icon } from "../icons.js";
-import { errorPanel, loadingPanel, paneHead } from "../panels.js";
+import { errorPanel, loadingPanel, paneHead, switchSetting } from "../panels.js";
 import { attempt, toast } from "../ui.js";
 
 function clockTime(seconds) {
@@ -33,6 +33,30 @@ function addressRow(address) {
   );
 }
 
+// What a phone needs to reach Dot away from home through Tailscale (item 271), a line each: whether it holds, and what
+// to do when it does not.
+function tailnetLines(tailnet) {
+  const line = (ok, text) => el("li", { class: ok ? "tailnet-ok" : "tailnet-missing" }, icon(ok ? "check" : "alert"), el("span", null, text));
+  if (!tailnet.installed) {
+    return [line(false, "Tailscale is not on this Mac: install it from tailscale.com, open it and sign in, on the phone too.")];
+  }
+  if (!tailnet.running || tailnet.name === null) {
+    return [line(false, "Tailscale is not running signed in: open it on this Mac and sign in.")];
+  }
+  return [
+    line(true, `Tailscale runs: this Mac is ${tailnet.name} on your tailnet.`),
+    line(tailnet.served, tailnet.served ? "Tailscale serves Dot to your tailnet over HTTPS." : "Tailscale does not serve Dot yet."),
+    line(
+      tailnet.reached,
+      tailnet.reached
+        ? "Dot answers to that name."
+        : tailnet.written
+          ? "Dot's config file names it: Dot answers to it from its next start (quit Dot and open it again)."
+          : "Dot's config file does not name it yet.",
+    ),
+  ];
+}
+
 export function mount(root, ctx) {
   let disposed = false;
   const holder = el("div", null, loadingPanel());
@@ -57,6 +81,50 @@ export function mount(root, ctx) {
     codeHint.hidden = false;
   }
 
+  function reachCard(phone) {
+    const tailnet = phone.tailnet;
+    const missing = tailnet.installed && tailnet.running && tailnet.name !== null && (!tailnet.served || !tailnet.written);
+    const setUp = el(
+      "button",
+      { class: "btn sm", type: "button", hidden: !missing, onclick: () => attempt(() => change(api.post("/phone/tailnet", {}), "Set up for your tailnet.")) },
+      icon("plug"),
+      el("span", { class: "label" }, "Set up"),
+    );
+    const awake = switchSetting({
+      label: "Keep this Mac awake while it charges",
+      hint: "So that the phone reaches Dot away from home. A closed lid still puts a MacBook to sleep.",
+      read: () => phone.keep_awake,
+      write: async (on) => {
+        phone = await api.post("/phone/awake", { on });
+      },
+      onToggled: () => {
+        if (!disposed) {
+          awake.paint();
+          toast("ok", phone.keep_awake ? "This Mac stays awake while it charges." : "This Mac sleeps as it would.");
+        }
+      },
+    });
+    awake.paint();
+    return el(
+      "section",
+      { class: "card" },
+      el("div", { class: "card-head" }, el("span", { class: "grow" }, "Reach Dot from anywhere"), setUp),
+      el("div", { class: "card-pad stack" }, el("ul", { class: "tailnet-lines", "aria-label": "Tailscale" }, tailnetLines(tailnet)), awake.element),
+    );
+  }
+
+  async function change(request, done) {
+    const phone = await request;
+    if (!disposed) {
+      paint(phone);
+      toast("ok", done);
+    }
+  }
+
+  function paint(phone) {
+    holder.replaceChildren(reachCard(phone), card(phone));
+  }
+
   function card(phone) {
     const addresses =
       phone.addresses.length > 0
@@ -68,7 +136,7 @@ export function mount(root, ctx) {
             el(
               "span",
               null,
-              "No address yet. A phone reaches Dot through Tailscale: serve Dot on your tailnet and write the Mac's name on it in Dot's config file, as “Dot on the phone” in Dot's documentation (docs/phone.md) says. ",
+              "No address yet: Set up, above, serves Dot on your tailnet and names the Mac in Dot's config file; then quit Dot and open it again. ",
               el("span", { class: "faint" }, "In the config file: [server] reach."),
             ),
           );
@@ -109,7 +177,7 @@ export function mount(root, ctx) {
       return;
     }
     if (!disposed) {
-      holder.replaceChildren(card(phone));
+      paint(phone);
     }
   }
 

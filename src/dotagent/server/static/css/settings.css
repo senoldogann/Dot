@@ -1173,3 +1173,27 @@
     height: 36px;
   }
 }
+
+/* Settings › Phone (item 271): what a phone needs to reach Dot through Tailscale, a line each. */
+.tailnet-lines {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tailnet-lines li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.tailnet-lines li > svg {
+  flex: none;
+  margin-top: 2px;
+}
+
+.tailnet-missing > svg {
+  color: var(--warn);
+}

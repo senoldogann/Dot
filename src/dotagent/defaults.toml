@@ -29,6 +29,9 @@ port = 8765
 # `tailscale serve --bg 8765` gives https://<mac>.<tailnet>.ts.net, and that name goes here. The daemon itself stays on
 # the loopback address.
 reach = []
+# Whether the daemon keeps the Mac awake while it charges (caffeinate -s, item 271), so that a phone reaches it from
+# away; Settings › Phone switches it. A closed lid still puts a MacBook to sleep.
+keep_awake = false
 
 [store]
 # Nothing in the database is deleted by itself. `dotx prune` reports, and `dotx prune --apply` deletes, the events (the

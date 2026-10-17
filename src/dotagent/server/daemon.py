@@ -186,6 +186,9 @@ async def run_daemon(config: AppConfig) -> None:
             port: int = listener.getsockname()[1]
             runtime: Runtime = await build_runtime(config)
             cleanup.push_async_callback(close_runtime, runtime)
+            # A phone reaches the Mac away from home while it is kept awake on power (item 271).
+            if config.server.keep_awake:
+                await runtime.awake.start()
             manager: RunManager = RunManager(runtime)
             scheduler: Scheduler = Scheduler(runtime, manager)
             cleanup.push_async_callback(scheduler.drain)
