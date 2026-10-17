@@ -18,7 +18,7 @@ from dotagent.desktop import apps, ax, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
 from dotagent.desktop.input import EventSource, parse_chord
-from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, enters_text, window_role
+from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, enters_text, step_role
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
     AppInfo,
@@ -102,6 +102,8 @@ class StepEnv:
     failsafe_file: Path
     expected_front: int | None
     expected_pointer: Point | None
+    # The Chromes Dot's browser works in, which a name that fits several applications means (item 343).
+    preferred: frozenset[int]
     secure_field: SecureFieldCheck
 
 
@@ -338,7 +340,9 @@ def _peek(env: StepEnv, ref: str | None, x: float | None, y: float | None) -> Ta
 
 def _context(target: Target, lines: Mapping[str, str]) -> StepContext:
     state: ElementState | None = target.state
-    role: AppRole = window_role(target.owner.name, target.owner.bundle_id, target.window)
+    role: AppRole = step_role(
+        target.owner.name, target.owner.bundle_id, target.window, None if state is None else state.label
+    )
     return StepContext(
         role=role,
         app=target.owner.name,
@@ -420,7 +424,7 @@ def inspect_step(env: StepEnv, step: Step, lines: Mapping[str, str]) -> Inspecti
                 Target(ref=None, state=None, owner=env.app, point=None, window=_app_window_title(env, env.app)),
             )
         case "activate":
-            named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running)
+            named: AppInfo | None = apps.find_app(_required(step.text, "application"), env.running, env.preferred)
             owner: AppInfo = named or env.app
             return _inspection(
                 env, lines, Target(ref=None, state=None, owner=owner, point=None, window=_app_window_title(env, owner))
@@ -672,7 +676,7 @@ def _menu(env: StepEnv, step: Step) -> Effect:
 
 
 def _activate(env: StepEnv, step: Step) -> Effect:
-    app: AppInfo = apps.require_app(_required(step.text, "application"), apps.list_apps())
+    app: AppInfo = apps.require_app(_required(step.text, "application"), apps.list_apps(), env.preferred)
     apps.activate(app, env.config.activate_timeout_s)
     return Effect(detail=f"{app.name} is in front", pointer=None, opens_ui=True, switched_to=app)
 

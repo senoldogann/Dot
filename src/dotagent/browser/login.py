@@ -29,6 +29,30 @@ def chrome_arguments(profile: Path, url: str | None, keychain: KeychainMode) -> 
 
 async def open_profile_for_login(profile: Path, url: str | None) -> int:
     """Open the profile in a normal Chrome window and wait until Chrome quits; returns its exit code."""
+    keychain: KeychainMode = await _ready_profile(profile)
+    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+        *chrome_arguments(profile, url, keychain)
+    )
+    return await process.wait()
+
+
+async def open_sign_in_window(profile: Path) -> asyncio.subprocess.Process:
+    """Open the profile in a normal Chrome window for Settings › Browser (item 344), which runs until the owner quits
+    it. It runs in a session of its own, so that it stays open while the daemon stops or restarts (launchd ends the
+    daemon's process group with it, and a Chrome killed so may lose the sign-ins it had not written yet); what Chrome
+    writes goes nowhere."""
+    keychain: KeychainMode = await _ready_profile(profile)
+    return await asyncio.create_subprocess_exec(
+        *chrome_arguments(profile, None, keychain),
+        stdin=asyncio.subprocess.DEVNULL,
+        stdout=asyncio.subprocess.DEVNULL,
+        stderr=asyncio.subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
+async def _ready_profile(profile: Path) -> KeychainMode:
+    """The keychain mode of ``profile``, made when missing, once Chrome is known to be there and nothing holds it."""
     if not await asyncio.to_thread(_CHROME_BINARY.exists):
         raise BrowserError("Google Chrome is not installed", {"expected": str(_CHROME_BINARY)})
     holder: int | None = await asyncio.to_thread(profile_holder_pid, profile)
@@ -39,8 +63,4 @@ async def open_profile_for_login(profile: Path, url: str | None) -> int:
             {"profile": str(profile), "pid": holder},
         )
     await asyncio.to_thread(lambda: profile.mkdir(mode=0o700, parents=True, exist_ok=True))
-    keychain: KeychainMode = await asyncio.to_thread(read_keychain_mode, profile)
-    process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
-        *chrome_arguments(profile, url, keychain)
-    )
-    return await process.wait()
+    return await asyncio.to_thread(read_keychain_mode, profile)

@@ -5,15 +5,17 @@ structured fields and shown to the model as a note.
 """
 
 import asyncio
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from functools import partial
 from pathlib import Path
 
-from playwright.async_api import Dialog, Download, FileChooser, Page, Request, Response
+from playwright.async_api import CDPSession, Dialog, Download, FileChooser, Page, Request, Response
 from playwright.async_api import Error as PlaywrightError
 
 from dotagent.browser.safety import dialog_is_financial, safe_download_name
 from dotagent.browser.snapshot import SnapshotLine
+from dotagent.core.errors import BrowserError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
 
@@ -44,6 +46,11 @@ class Tab:
     lines: tuple[SnapshotLine, ...] = ()
     rendered: str = ""
     rendered_url: str = ""
+    # Chrome's id of the page, which a tab the page opens names as its opener, and the ids of the tabs Chrome made for
+    # the page that its thread has not taken in yet (item 342; see :func:`watch_births`).
+    target_id: str = ""
+    born: set[str] = field(default_factory=set)
+    born_changed: asyncio.Event = field(default_factory=asyncio.Event)
 
 
 @dataclass(slots=True)
@@ -160,6 +167,62 @@ def _on_request_end(tab: Tab, request: Request) -> None:
 def _on_response(tab: Tab, response: Response) -> None:
     if _is_main_navigation(tab, response.request):
         tab.status = response.status
+
+
+def _text(payload: object, key: str) -> str | None:
+    value: object = payload.get(key) if isinstance(payload, Mapping) else None
+    return value if isinstance(value, str) and value else None
+
+
+def _on_target_created(tab: Tab, event: object) -> None:
+    info: object = event.get("targetInfo") if isinstance(event, Mapping) else None
+    target: str | None = _text(info, "targetId")
+    if target is not None and _text(info, "openerId") == tab.target_id:
+        tab.born.add(target)
+        tab.born_changed.set()
+
+
+def _on_target_destroyed(tab: Tab, event: object) -> None:
+    target: str | None = _text(event, "targetId")
+    if target in tab.born:
+        tab.born.discard(target)
+        tab.born_changed.set()
+
+
+def taken_in(opener: Tab, tab: Tab) -> None:
+    """``tab``, which Chrome made for the page of ``opener``, is in its thread now, or closed before it got there."""
+    opener.born.discard(tab.target_id)
+    opener.born_changed.set()
+
+
+async def watch_births(tab: Tab) -> None:
+    """Have ``tab`` told of every tab Chrome makes for its page (a popup, a link or a form that opens a new tab) the
+    moment Chrome makes it, through a CDP session of the tab's own (item 342): Playwright reports such a tab only once
+    its page has answered (411 ms after the click for a page that answers in 400 ms, measured), while Chrome tells of
+    it before the click that made it returns, and of none it refused (a second popup of one click, which the Chrome of
+    the user blocks)."""
+    try:
+        session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
+        own: dict[str, object] = await session.send("Target.getTargetInfo")
+    except PlaywrightError as error:
+        raise _watch_failure(tab, error) from error
+    target: str | None = _text(own.get("targetInfo"), "targetId")
+    if target is None:
+        raise BrowserError("Chrome did not tell the id of the tab", {"url": tab.page.url, "answer": repr(own)[:200]})
+    tab.target_id = target
+    session.on("Target.targetCreated", partial(_on_target_created, tab))
+    session.on("Target.targetDestroyed", partial(_on_target_destroyed, tab))
+    try:
+        await session.send("Target.setDiscoverTargets", {"discover": True, "filter": [{"type": "page"}]})
+    except PlaywrightError as error:
+        raise _watch_failure(tab, error) from error
+
+
+def _watch_failure(tab: Tab, error: PlaywrightError) -> BrowserError:
+    return BrowserError(
+        "watching the tab for the tabs it opens failed",
+        {"url": tab.page.url, "error": truncate_middle(str(error), _NOTE_LOG_CHARS)},
+    )
 
 
 def attach_handlers(tab: Tab, downloads: Path) -> None:

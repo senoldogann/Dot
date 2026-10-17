@@ -24,7 +24,7 @@ from dotagent.policy.elements import (
 from dotagent.policy.shell import ShellAssessment, assess_typed, typed_lines
 from dotagent.policy.types import Flag, Risk
 
-type AppRole = Literal["terminal", "system_settings", "secrets", "dot", "messaging", "finder", "other"]
+type AppRole = Literal["terminal", "system_settings", "secrets", "dot", "chrome_grant", "messaging", "finder", "other"]
 
 DESKTOP_CLICKABLE_ROLES: frozenset[str] = frozenset(
     {
@@ -101,6 +101,11 @@ _DOT_NAME: str = "dot"
 # The title Dot's web UI gives its page ("Dot", "<page> · Dot", "(2) Dot" while two things wait for the user), as a
 # window shows it: a browser may put its own name or the profile's after a dash.
 _DOT_TITLE: re.Pattern[str] = re.compile(r"(?:\(\d+\) )?(?:.* · )?Dot(?: [-–—] .*)?")
+# Where Chrome lets a program take control of it (item 343): the remote-debugging switch of chrome://inspect ("Allow
+# remote debugging for this browser instance", on the page "Inspect with Chrome Developer Tools") and the Allow Chrome
+# asks before a connection. Both are the owner's to give, so a run never works there, in any mode.
+_CHROME_BUNDLE: str = "com.google.chrome"
+_CHROME_GRANT: re.Pattern[str] = re.compile(r"remote debugging|inspect with chrome developer tools", re.IGNORECASE)
 _MESSAGING_BUNDLES: frozenset[str] = frozenset(
     {
         "com.apple.mobilesms",
@@ -137,6 +142,11 @@ _SECRETS_ASSESSMENT: StepAssessment = StepAssessment(
 )
 _SETTINGS_ASSESSMENT: StepAssessment = StepAssessment(
     risk="high", flags=("system_settings",), reasons=("changes system settings",)
+)
+_CHROME_GRANT_ASSESSMENT: StepAssessment = StepAssessment(
+    risk="high",
+    flags=("secret_access",),
+    reasons=("works on Chrome's remote debugging, which only the owner switches on and allows",),
 )
 _DOT_ASSESSMENT: StepAssessment = StepAssessment(
     risk="high",
@@ -198,6 +208,17 @@ def window_role(name: str, bundle_id: str | None, title: str | None) -> AppRole:
     if role == "other" and title is not None and _DOT_TITLE.fullmatch(title) is not None:
         return "dot"
     return role
+
+
+def step_role(name: str, bundle_id: str | None, title: str | None, label: str | None) -> AppRole:
+    """The kind of window a step acts in (:func:`window_role`), or Chrome's grant of remote debugging when the step is
+    on a Chrome window or control that is about it (item 343): what an error tells the owner to do there ("click
+    Allow", "switch it on") is not the run's to do."""
+    if _key(bundle_id or "").startswith(_CHROME_BUNDLE) and any(
+        text is not None and _CHROME_GRANT.search(text) is not None for text in (title, label)
+    ):
+        return "chrome_grant"
+    return window_role(name, bundle_id, title)
 
 
 def hidden_regions(windows: Sequence[WindowInfo]) -> tuple[Rect, ...]:
@@ -344,6 +365,8 @@ def assess_step(
         return _SECRETS_ASSESSMENT
     if context.role == "dot" and step.action != "wait":
         return _DOT_ASSESSMENT
+    if context.role == "chrome_grant" and step.action != "wait":
+        return _CHROME_GRANT_ASSESSMENT
     parts: list[StepAssessment] = [quiet_assessment() if step.action in _QUIET_ACTIONS else assessment_for([])]
     if context.role == "system_settings" and step.has_side_effects():
         parts.append(_SETTINGS_ASSESSMENT)

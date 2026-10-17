@@ -39,7 +39,7 @@ def _pointer_units(scale: float) -> Point:
 
 def _picture_of(config: DesktopConfig, area: Rect, windows: Sequence[WindowInfo]) -> tuple[Image.Image, int]:
     """The pixels of ``area`` (points) with password manager windows blacked out, and how many were."""
-    perms.require_screen_recording(perms.check_permissions())
+    perms.require_screen_recording()
     picture: Image.Image = capture.capture_native(area, config.capture_timeout_s)
     return capture.black_out(picture, area, safety.hidden_regions(windows))
 

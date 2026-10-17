@@ -45,6 +45,13 @@ _TRANSIENT_NAVIGATION: tuple[str, ...] = (
     "ERR_SOCKET_NOT_CONNECTED",
 )
 
+# DOMContentLoaded as the document itself tells it: a page the back-forward cache brings back fires it no more, and
+# Playwright's own wait for it then lasted the whole navigation timeout (item 339).
+_PARSED_SCRIPT: str = """() => document.readyState !== 'loading' || new Promise((resolve) => {
+  document.addEventListener('DOMContentLoaded', () => resolve(true), { once: true });
+})"""
+# One turn of the page's event loop (item 342): a task queued now runs after those a step queued for right after it.
+_TURN_SCRIPT: str = "() => new Promise((resolve) => setTimeout(resolve, 0))"
 # Resolves once the DOM has been quiet for quietMs, or after maxMs at the latest.
 _QUIET_SCRIPT: str = """([quietMs, maxMs]) => new Promise((resolve) => {
   let quietTimer = 0;
@@ -259,7 +266,11 @@ async def page_title(page: Page) -> str:
 
 
 async def _wait_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int) -> None:
-    await page.wait_for_load_state("domcontentloaded", timeout=timeout_ms)
+    try:
+        async with asyncio.timeout(timeout_ms / 1000):
+            await page.evaluate(_PARSED_SCRIPT)
+    except TimeoutError as error:
+        raise PlaywrightTimeoutError(f"the document was not parsed within {timeout_ms} ms") from error
     await page.evaluate(_QUIET_SCRIPT, [quiet_ms, max_ms])
 
 
@@ -270,6 +281,23 @@ async def wait_dom_quiet(page: Page, quiet_ms: int, max_ms: int, timeout_ms: int
         "waiting for the page to settle failed",
         lambda: _wait_quiet(page, quiet_ms, max_ms, timeout_ms),
     )
+
+
+async def let_page_turn(page: Page, timeout_ms: int) -> None:
+    """Let ``page`` take one turn of its event loop (item 342). When it has, Chrome has told what a step set off at once
+    or for right after it: a dialog, a file chooser, a navigation in the document, a tab it made for the page. A
+    navigation the step started has committed too, as Playwright holds a call into a page with a navigation under way
+    until it commits (measured: a link that answers in 300 ms holds the turn about as long). A page that navigates or
+    closes under the turn has moved on, which is what the turn waits for; one still busy after ``timeout_ms`` is let
+    be, and the next step meets it as it is."""
+    try:
+        async with asyncio.timeout(timeout_ms / 1000):
+            await page.evaluate(_TURN_SCRIPT)
+    except TimeoutError:
+        _log.warning("browser_page_turn_slow", url=truncate_middle(page.url, _ERROR_CHARS), waited_ms=timeout_ms)
+    except PlaywrightError as error:
+        if not page.is_closed() and _CONTEXT_DESTROYED not in str(error):
+            raise _failure("waiting for the page to take its turn failed", page, {}, error) from error
 
 
 async def navigate(page: Page, url: str, timeout_ms: int, attempts: int, backoff_ms: int) -> int | None:
@@ -299,14 +327,39 @@ async def navigate(page: Page, url: str, timeout_ms: int, attempts: int, backoff
     raise BrowserError("navigation failed", {"target": url, "attempts": attempts, "error": str(last)}) from last
 
 
-async def go_back(page: Page, timeout_ms: int) -> int | None:
+async def _page_before(page: Page) -> str | None:
+    """The address of the page before the one on screen in the tab's history, as Chrome keeps it; ``None`` when there
+    is none, or when it is a blank page: a tab of Dot's starts blank before its first page."""
+    cdp: CDPSession = await page.context.new_cdp_session(page)
     try:
-        response = await page.go_back(wait_until="domcontentloaded", timeout=timeout_ms)
+        history: dict[str, object] = await cdp.send("Page.getNavigationHistory")
+    finally:
+        await cdp.detach()
+    index: object = history.get("currentIndex")
+    entries: object = history.get("entries")
+    if not isinstance(index, int) or not isinstance(entries, list):
+        raise BrowserError("Chrome did not say where the tab stands in its history", {"url": page.url})
+    if index == 0:
+        return None
+    before: object = entries[index - 1]
+    url: object = before.get("url") if isinstance(before, dict) else None
+    if not isinstance(url, str) or url.startswith("about:blank"):
+        return None
+    return url
+
+
+async def go_back(page: Page, timeout_ms: int) -> int | None:
+    """Go back one page in the tab and return the status of the page gone back to; ``None`` when Chrome brought it back
+    from its back-forward cache, with no response of its own. Done once the page is committed, as the caller settles it:
+    a page the cache brings back fires no load and no DOMContentLoaded again, so waiting for one held each Back for the
+    whole navigation timeout in a Chrome that keeps the cache (the owner's, item 339), and then failed it."""
+    try:
+        if await _page_before(page) is None:
+            raise BrowserError("there is no earlier page in this tab's history", {"url": page.url})
+        response = await page.go_back(wait_until="commit", timeout=timeout_ms)
     except PlaywrightError as error:
         raise _failure("going back failed", page, {}, error) from error
-    if response is None:
-        raise BrowserError("there is no earlier page in this tab's history", {"url": page.url})
-    return response.status
+    return None if response is None else response.status
 
 
 async def live_locator(page: Page, ref: str, action: str) -> Locator:

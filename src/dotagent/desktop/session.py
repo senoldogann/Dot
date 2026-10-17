@@ -59,6 +59,9 @@ _WAKE_THRESHOLD: int = 8
 _WAKE_WAIT_S: float = 4.0
 _WAKE_POLL_S: float = 0.15
 _STEP_GAP_S: float = 0.06
+# How long the applications the preview of a batch listed stand for its act (item 343): the act follows at once unless
+# the owner was asked about the batch, which takes longer.
+_LISTING_KEPT_S: float = 1.0
 _WINDOW_WAIT_S: float = 3.0
 _WINDOW_POLL_S: float = 0.1
 _AWAKE_MARGIN_S: float = 120.0
@@ -114,10 +117,16 @@ def _window_view(max_chars: int) -> ViewRequest:
     return ViewRequest(scope="window", ref=None, query=None, full=False, max_chars=max_chars)
 
 
-def _pick_app(state: ThreadDesktop, name: str | None, running: Sequence[AppInfo]) -> AppInfo:
-    """The application a call is about: the one named, else the one the thread works in, else the one in front."""
+def no_browser_chrome() -> frozenset[int]:
+    """The Chromes Dot's browser works in, for a desktop session with no browser beside it (``dotx desktop``): none."""
+    return frozenset()
+
+
+def _pick_app(state: ThreadDesktop, name: str | None, running: Sequence[AppInfo], preferred: frozenset[int]) -> AppInfo:
+    """The application a call is about: the one named, else the one the thread works in, else the one in front. A name
+    that fits several applications means the ``preferred`` one, the Chrome Dot's browser works in."""
     if name is not None:
-        return apps.require_app(name, running)
+        return apps.require_app(name, running, preferred)
     if state.pid is not None:
         for app in running:
             if app.pid == state.pid:
@@ -195,12 +204,12 @@ def _app_view_job(config: DesktopConfig, app: AppInfo) -> AppView:
     return views.app_view(app, screen.windows_everywhere(), scale)
 
 
-def _open_job(config: DesktopConfig, query: str) -> tuple[AppInfo, bool]:
+def _open_job(config: DesktopConfig, query: str, preferred: frozenset[int]) -> tuple[AppInfo, bool]:
     """Open an application (worker thread): the application and whether this call started it. An application that
     runs without a window is asked to reopen one, as a click on its Dock icon would."""
-    running: AppInfo | None = apps.find_app(query, apps.list_apps())
+    running: AppInfo | None = apps.find_app(query, apps.list_apps(), preferred)
     if running is None:
-        return apps.open_app(query, config.launch_timeout_s), True
+        return apps.open_app(query, config.launch_timeout_s, preferred), True
     if not views.has_window(running.pid, screen.windows_everywhere()):
         apps.launch(running.bundle_id or running.bundle_path or running.name)
     apps.activate(running, config.activate_timeout_s)
@@ -229,18 +238,22 @@ def _node_for(known: Mapping[int, Node], raw_ref: str | None) -> Node | None:
 
 
 def _preview_job(
-    state: ThreadDesktop, name: str | None, steps: Sequence[Step], lines: Mapping[str, str]
+    state: ThreadDesktop,
+    name: str | None,
+    steps: Sequence[Step],
+    lines: Mapping[str, str],
+    running: tuple[AppInfo, ...],
+    preferred: frozenset[int],
 ) -> tuple[StepContext, ...]:
     """The context of each step as far as it can be told without touching the screen (worker thread), each with the
     terminal lines the steps before it typed."""
-    running: tuple[AppInfo, ...] = apps.list_apps()
-    current: AppInfo = _pick_app(state, name, running)
+    current: AppInfo = _pick_app(state, name, running, preferred)
     known: Mapping[int, Node] = memory.known_nodes(memory.memory_of(state, current.pid))
     contexts: list[StepContext] = []
     typed: Mapping[str, str] = lines
     for step in steps:
         if step.action == "activate":
-            named: AppInfo | None = apps.find_app(step.text or "", running)
+            named: AppInfo | None = apps.find_app(step.text or "", running, preferred)
             if named is not None:
                 current = named
                 known = memory.known_nodes(memory.memory_of(state, current.pid))
@@ -293,9 +306,16 @@ def _switch_job(config: DesktopConfig, env: StepEnv, state: ThreadDesktop, app: 
 class DesktopSession:
     """Looks at and controls the Mac's desktop for the conversation threads of one run."""
 
-    def __init__(self, config: DesktopConfig, failsafe_file: Path) -> None:
+    def __init__(
+        self, config: DesktopConfig, failsafe_file: Path, browser_chrome: Callable[[], frozenset[int]]
+    ) -> None:
         self._config: DesktopConfig = config
         self._failsafe_file: Path = failsafe_file
+        # The pids of the Chromes Dot's browser works in (item 343), asked on the worker thread when a name is resolved.
+        self._browser_chrome: Callable[[], frozenset[int]] = browser_chrome
+        # The applications as the preview of a batch listed them, and when: the act that follows at once uses them
+        # rather than listing them again (item 343).
+        self._listed: tuple[float, tuple[AppInfo, ...]] | None = None
         self._pool: ThreadPoolExecutor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="dot-desktop")
         self._lock: asyncio.Lock = asyncio.Lock()
         self._threads: OrderedDict[str, ThreadDesktop] = OrderedDict()
@@ -308,6 +328,31 @@ class DesktopSession:
 
     async def _call[T](self, work: Callable[[], T]) -> T:
         return await asyncio.get_running_loop().run_in_executor(self._pool, work)
+
+    def _running(self) -> tuple[tuple[AppInfo, ...], frozenset[int]]:
+        """The applications running now and the Chromes Dot's browser works in (worker thread)."""
+        return apps.list_apps(), self._browser_chrome()
+
+    def _listing_for_preview(self) -> tuple[AppInfo, ...]:
+        """The applications for the preview of a batch, kept for the act that follows (worker thread)."""
+        running: tuple[AppInfo, ...] = apps.list_apps()
+        self._listed = (time.monotonic(), running)
+        return running
+
+    def _listing_for_act(self) -> tuple[AppInfo, ...]:
+        """The applications for an act: the preview's when it listed them less than ``_LISTING_KEPT_S`` ago, as when the
+        act follows its preview with no question to the owner between them, else listed now (worker thread). Each
+        listing takes 25 ms (``lsappinfo``)."""
+        listed: tuple[float, tuple[AppInfo, ...]] | None = self._listed
+        self._listed = None
+        if listed is not None and time.monotonic() - listed[0] < _LISTING_KEPT_S:
+            return listed[1]
+        return apps.list_apps()
+
+    def _preview_in_worker(
+        self, state: ThreadDesktop, name: str | None, steps: Sequence[Step], lines: Mapping[str, str]
+    ) -> tuple[StepContext, ...]:
+        return _preview_job(state, name, steps, lines, self._listing_for_preview(), self._browser_chrome())
 
     def _thread(self, thread_id: str) -> ThreadDesktop:
         found: ThreadDesktop | None = self._threads.get(thread_id)
@@ -363,19 +408,19 @@ class DesktopSession:
     # -- what must hold before an operation ------------------------------------------------------------------------
 
     def _prepare_listing(self) -> None:
-        perms.require_accessibility(perms.check_permissions())
+        perms.require_accessibility()
 
     def _prepare_looking(self) -> None:
-        perms.require_accessibility(perms.check_permissions())
+        perms.require_accessibility()
         self._check_screen()
 
     def _prepare_acting(self) -> None:
-        perms.require_accessibility(perms.check_permissions())
+        perms.require_accessibility()
         actions.check_stop(self._config, self._failsafe_file)
         self._check_screen()
 
     def _prepare_screenshot(self) -> None:
-        perms.require_screen_recording(perms.check_permissions())
+        perms.require_screen_recording()
         self._check_screen()
 
     async def _prepare(self, job: Callable[[], None]) -> None:
@@ -476,8 +521,8 @@ class DesktopSession:
         async with self._lock:
             await self._prepare(self._prepare_looking)
             state: ThreadDesktop = self._thread(thread_id)
-            running: tuple[AppInfo, ...] = await self._call(apps.list_apps)
-            target: AppInfo = _pick_app(state, app, running)
+            running, preferred = await self._call(self._running)
+            target: AppInfo = _pick_app(state, app, running, preferred)
             view, updated = await self._look(memory.targeting(state, target.pid), target, request)
             self._remember(thread_id, updated)
             return view
@@ -498,8 +543,8 @@ class DesktopSession:
         async with self._lock:
             await self._prepare(self._prepare_looking)
             state: ThreadDesktop = self._thread(thread_id)
-            running: tuple[AppInfo, ...] = await self._call(apps.list_apps)
-            target: AppInfo = _pick_app(state, app, running)
+            running, preferred = await self._call(self._running)
+            target: AppInfo = _pick_app(state, app, running, preferred)
             _refuse_secrets(target)
             element: AXElement | None = memory.known_elements(memory.memory_of(state, target.pid)).get(ref)
             if element is None:
@@ -537,7 +582,7 @@ class DesktopSession:
         ``max_chars`` of its text."""
         async with self._lock:
             await self._prepare(self._prepare_acting)
-            opened, fresh = await self._call(partial(_open_job, self._config, query))
+            opened, fresh = await self._call(lambda: _open_job(self._config, query, self._browser_chrome()))
             _refuse_secrets(opened)
             _log.info("app_opened", app=opened.name, pid=opened.pid, fresh=fresh)
             state: ThreadDesktop = memory.targeting(self._thread(thread_id), opened.pid)
@@ -561,8 +606,9 @@ class DesktopSession:
         self, state: ThreadDesktop, name: str | None, steps: Sequence[Step], secure_field: SecureFieldCheck
     ) -> StepEnv:
         """The environment of a batch (worker thread); the target comes to the front when the steps need it."""
-        running: tuple[AppInfo, ...] = apps.list_apps()
-        app: AppInfo = _pick_app(state, name, running)
+        running: tuple[AppInfo, ...] = self._listing_for_act()
+        preferred: frozenset[int] = self._browser_chrome()
+        app: AppInfo = _pick_app(state, name, running, preferred)
         _refuse_secrets(app)
         env: StepEnv = StepEnv(
             app=app,
@@ -576,6 +622,7 @@ class DesktopSession:
             failsafe_file=self._failsafe_file,
             expected_front=None,
             expected_pointer=None,
+            preferred=preferred,
             secure_field=secure_field,
         )
         actions.check_failsafe(env)
@@ -682,7 +729,7 @@ class DesktopSession:
         """The context of each step as far as it is known before anything runs: used to judge a batch up front."""
         async with self._lock:
             await self._prepare(self._prepare_listing)
-            return await self._call(partial(_preview_job, self._thread(thread_id), app, steps, self._lines))
+            return await self._call(partial(self._preview_in_worker, self._thread(thread_id), app, steps, self._lines))
 
     # -- closing ---------------------------------------------------------------------------------------------------
 

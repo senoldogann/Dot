@@ -302,7 +302,6 @@ class BrowserConfig(FrozenModel):
     viewport_margin_px: int = Field(ge=0)
     settle_quiet_ms: int
     settle_max_ms: int
-    side_effect_grace_ms: int
     navigation_attempts: int
     navigation_backoff_ms: int
     max_tabs: int = Field(ge=1)

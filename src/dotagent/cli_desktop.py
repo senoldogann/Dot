@@ -29,7 +29,7 @@ from dotagent.desktop.perms import (
     settings_url,
 )
 from dotagent.desktop.render import render_apps, render_snapshot
-from dotagent.desktop.session import DesktopSession
+from dotagent.desktop.session import DesktopSession, no_browser_chrome
 from dotagent.desktop.types import AppView, Permissions, ScreenshotView, SnapshotView
 from dotagent.desktop.views import ViewRequest
 from dotagent.tools.desktop import snapshot_budget
@@ -49,7 +49,7 @@ _CLI_THREAD: str = "cli"
 @contextlib.asynccontextmanager
 async def _desktop_session(config: AppConfig) -> AsyncIterator[DesktopSession]:
     """A desktop session, closed again afterwards."""
-    session: DesktopSession = DesktopSession(config.desktop, failsafe_path())
+    session: DesktopSession = DesktopSession(config.desktop, failsafe_path(), no_browser_chrome)
     try:
         yield session
     finally:

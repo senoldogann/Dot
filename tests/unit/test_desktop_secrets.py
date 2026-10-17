@@ -13,7 +13,15 @@ from dotagent.desktop import actions, apps
 from dotagent.desktop import input as hid
 from dotagent.desktop.actions import Inspection, StepEnv, _pastes, refuse_secrets
 from dotagent.desktop.input import parse_chord
-from dotagent.desktop.safety import AppRole, StepContext, app_role, assess_step, enters_text, window_role
+from dotagent.desktop.safety import (
+    AppRole,
+    StepContext,
+    app_role,
+    assess_step,
+    enters_text,
+    step_role,
+    window_role,
+)
 from dotagent.desktop.types import AppInfo, Step
 from dotagent.help.apps import app_identities
 from dotagent.policy.elements import Element, StepAssessment
@@ -92,6 +100,43 @@ def test_a_window_that_shows_dots_web_ui_is_dots_own(name: str, bundle: str, tit
     assert window_role(name, bundle, title) == role
 
 
+@pytest.mark.parametrize(
+    ("title", "label", "refused"),
+    [
+        (
+            "Inspect with Chrome Developer Tools - Google Chrome",
+            "Allow remote debugging for this browser instance",
+            True,
+        ),
+        ("Inspect with Chrome Developer Tools - Google Chrome - Work", None, True),
+        ("Allow remote debugging?", "Allow", True),
+        ("The weekly report - Google Chrome", "Allow remote debugging for this browser instance", True),
+        ("The weekly report - Google Chrome", "Allow", False),
+        (None, "Save", False),
+    ],
+)
+def test_a_step_on_chromes_remote_debugging_is_refused_in_every_mode(
+    title: str | None, label: str | None, refused: bool, tmp_path: Path
+) -> None:
+    """Item 343: the switch of chrome://inspect and the Allow Chrome asks are the owner's, whatever an error tells."""
+    role: AppRole = step_role("Google Chrome", "com.google.Chrome", title, label)
+    context: StepContext = StepContext(
+        role=role, app="Google Chrome", element=Element(role="AXButton", name=label or ""), secure=False, line=None
+    )
+    assessment: StepAssessment = assess_step(Step(action="click", x=10, y=10), context, tmp_path, (), ())
+    info: ActionInfo = ActionInfo(
+        tool="desktop_act",
+        kind="desktop_input",
+        risk=assessment.risk,
+        summary="click",
+        target="Google Chrome",
+        flags=assessment.flags,
+    )
+    assert (role == "chrome_grant") is refused
+    assert (auto_review(info) is not None) is refused, assessment
+    assert step_role("Safari", "com.apple.Safari", "Inspect with Chrome Developer Tools", None) == "other"
+
+
 def _notes_env(tmp_path: Path, expected_front: int | None) -> StepEnv:
     """A batch on Notes (pid 101) with Terminal (pid 202) running; only what typing reads is real."""
     notes: AppInfo = AppInfo(
@@ -112,6 +157,7 @@ def _notes_env(tmp_path: Path, expected_front: int | None) -> StepEnv:
         failsafe_file=tmp_path / "STOP",
         expected_front=expected_front,
         expected_pointer=None,
+        preferred=frozenset(),
         secure_field=lambda inspection, what: None,
     )
 

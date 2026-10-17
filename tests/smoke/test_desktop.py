@@ -28,7 +28,7 @@ from dotagent.core.errors import FailSafeTriggered
 from dotagent.desktop.actions import refuse_secure_field
 from dotagent.desktop.input import PasteboardLike, PasteboardSnapshot, _restore_pasteboard, _snapshot_pasteboard
 from dotagent.desktop.perms import check_permissions
-from dotagent.desktop.session import DesktopSession, StepReview
+from dotagent.desktop.session import DesktopSession, StepReview, no_browser_chrome
 from dotagent.desktop.types import ActOutcome, AppView, Permissions, SnapshotView, Step, TextRead
 from dotagent.desktop.views import ViewRequest
 
@@ -179,7 +179,7 @@ def owner_clipboard() -> Iterator[None]:
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def session(app: FixtureApp, failsafe_file: Path, settings_file: Path) -> AsyncIterator[DesktopSession]:
     config: DesktopConfig = load_config(settings_file).desktop
-    desktop: DesktopSession = DesktopSession(config, failsafe_file)
+    desktop: DesktopSession = DesktopSession(config, failsafe_file, no_browser_chrome)
     await desktop.open_app(_THREAD, str(app.pid), _MAX_CHARS)
     yield desktop
     await desktop.close()

@@ -862,11 +862,43 @@ const BROWSER_MODES = [
  * Which Chrome the agent browses with. Switching to "My Chrome" needs Chrome to allow remote debugging, which only the
  * user can switch on; the card shows what Chrome allows right now and how to change it. A Chrome that is closed is
  * opened by the switch (item 261), and while the switch is under way the card says what it waits for. The DevTools
- * port (item 265) has Dot's own Chrome take connections from a run's scripts too.
+ * port (item 265) has Dot's own Chrome take connections from a run's scripts too. With Dot's own Chrome the card opens
+ * its profile in a plain Chrome window, where the owner signs in to sites (item 344).
  */
+// How often the browser card reads again how the Chrome of the user stands, while it is open (item 341).
+const BROWSER_POLL_MS = 3000;
+
+/** How Dot stands with the Chrome of the user (item 341): what the card's connection says, and the one line that says
+ * what to do, with its tone; null in Dot's own Chrome. */
+function attachStanding(view) {
+  if (view.mode !== "attach") {
+    return null;
+  }
+  if (view.connected) {
+    return { word: "connected", line: "Dot is connected to your Chrome; later runs connect with no click.", tone: "ok" };
+  }
+  if (view.waiting_allow) {
+    return { word: "waiting for Allow", line: "Chrome asks whether Dot may connect: choose Allow in Chrome.", tone: "warn" };
+  }
+  if (!view.chrome_running) {
+    return { word: "not connected", line: "Chrome is closed: open it, and Dot connects on its next step.", tone: "warn" };
+  }
+  if (!view.remote_debugging) {
+    return { word: "not connected", line: `Remote debugging is off in Chrome: switch it on at ${view.inspect_page}.`, tone: "warn" };
+  }
+  if (view.lost) {
+    return { word: "Chrome restarted", line: "Chrome was closed or restarted: the next step connects again, and Chrome asks you to Allow.", tone: "warn" };
+  }
+  return { word: "not connected", line: "Dot connects on the next step that needs Chrome; Chrome asks you to Allow once.", tone: "" };
+}
+
 function buildBrowser(isDisposed) {
   let view = null;
+  let polling = null;
+  // Whether the card last saw the sign-in window open, so that its closing is told once.
+  let signing = false;
   const facts = el("dl", { class: "kv kv-pairs" }, inlineLoading());
+  const standing = el("div", { class: "note attach-standing", "aria-live": "polite", hidden: true }, icon("plug"), el("span"));
   const problem = el("div", { class: "note bad", hidden: true }, icon("alert"), el("span"));
   const waiting = el(
     "div",
@@ -910,6 +942,34 @@ function buildBrowser(isDisposed) {
     }
   });
   const portHint = el("div", { class: "hint" });
+  const signIn = el(
+    "button",
+    {
+      class: "btn sm",
+      type: "button",
+      title: "Sign in to sites in Dot's Chrome",
+      "aria-label": "Sign in…",
+      onclick: () => attempt(openSignIn),
+    },
+    icon("key"),
+    el("span", { class: "label" }, "Sign in…"),
+  );
+  const signInSetting = el(
+    "div",
+    { class: "setting", hidden: true },
+    el("div", { class: "row" }, el("span", { class: "grow" }, "Sign in to sites in Dot's Chrome"), signIn),
+    el(
+      "div",
+      { class: "hint" },
+      "Opens Dot's own profile in a plain Chrome window: sign in there to the sites Dot should use, then quit that Chrome (⌘Q). Dot keeps the cookies and never sees your passwords.",
+    ),
+  );
+  const signingIn = el(
+    "div",
+    { class: "note signing-in", "aria-live": "polite", hidden: true },
+    icon("key"),
+    el("span", null, "Chrome is open on Dot's profile: sign in there, then quit that Chrome (⌘Q). Until then runs cannot use Dot's Chrome."),
+  );
   const reload = el(
     "button",
     { class: "btn ghost sm", type: "button", title: "Look at Chrome again", "aria-label": "Look again", onclick: () => attempt(load) },
@@ -1004,13 +1064,26 @@ function buildBrowser(isDisposed) {
     modes.set(view.mode);
     raise.paint();
     paintPort();
+    signInSetting.hidden = view.mode !== "own";
+    signIn.disabled = view.signing_in;
+    signingIn.hidden = !view.signing_in;
+    if (signing && !view.signing_in) {
+      toast("ok", "Chrome closed; the sign-ins are kept in Dot's profile.");
+    }
+    signing = view.signing_in;
     const port = view.port === null ? "" : `, port ${view.port}`;
+    const stands = attachStanding(view);
     facts.replaceChildren(
       entry("Chrome", view.chrome_running ? "running" : "not running"),
       entry("Remote debugging", view.remote_debugging ? `on${port}` : "off"),
-      entry("Agent connection", view.connected ? "connected" : "not connected"),
+      entry("Agent connection", stands === null ? (view.connected ? "connected" : "not connected") : stands.word),
       entry("Attach timeout", `${view.attach_timeout_s} s`),
     );
+    standing.hidden = stands === null;
+    if (stands !== null) {
+      standing.className = stands.tone === "" ? "note attach-standing" : `note attach-standing ${stands.tone}`;
+      standing.lastChild.textContent = stands.line;
+    }
     steps.replaceChildren(
       copyStep(),
       el("li", null, "Chrome asks once whether Dot may connect; choose Allow."),
@@ -1040,6 +1113,56 @@ function buildBrowser(isDisposed) {
     if (await read()) {
       problem.hidden = true;
     }
+    keepReading();
+  }
+
+  // With My Chrome the card reads again how Chrome stands while it is open, so a restart of Chrome, its Allow and the
+  // connection show as they happen; so it does while the sign-in window is open, which the owner quits.
+  function keepReading() {
+    clearTimeout(polling);
+    polling = setTimeout(async () => {
+      if (isDisposed()) {
+        return;
+      }
+      if (view !== null && (view.mode === "attach" || view.signing_in)) {
+        await read();
+      }
+      keepReading();
+    }, BROWSER_POLL_MS);
+  }
+
+  // Dot's own Chrome closes for the window the owner signs in in; when it is open the owner is asked first.
+  async function openSignIn() {
+    if (view === null || view.signing_in) {
+      return;
+    }
+    if (view.connected) {
+      const sure = await confirmDialog({
+        title: "Close Dot's Chrome?",
+        message:
+          "Dot's Chrome is open. It closes so that its profile can open in a plain window for you to sign in; Dot opens it again on the next step that needs it.",
+        confirmLabel: "Close and open",
+      });
+      if (!sure || isDisposed()) {
+        return;
+      }
+    }
+    signIn.disabled = true;
+    let changed;
+    try {
+      changed = await api.post("/browser/sign-in", {});
+    } catch (error) {
+      if (!isDisposed()) {
+        signIn.disabled = false;
+      }
+      throw error;
+    }
+    if (isDisposed()) {
+      return;
+    }
+    view = changed;
+    paint();
+    keepReading();
   }
 
   async function choose(id) {
@@ -1086,6 +1209,7 @@ function buildBrowser(isDisposed) {
           "My Chrome opens tabs in the Chrome you already use, signed in as you are. Own Chrome keeps a profile apart from yours.",
         ),
       ),
+      signInSetting,
       raise.element,
       el(
         "div",
@@ -1094,6 +1218,8 @@ function buildBrowser(isDisposed) {
         portHint,
       ),
       facts,
+      standing,
+      signingIn,
       waiting,
       problem,
       el("div", { class: "stack tight" }, el("div", { class: "section-label" }, "To let Dot join your Chrome"), steps),

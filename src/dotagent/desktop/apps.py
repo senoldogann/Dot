@@ -122,8 +122,10 @@ def _names_of(app: AppInfo) -> tuple[str, ...]:
     return tuple(fold_search(name) for name in (app.name, stem, app.bundle_id or "") if name)
 
 
-def find_app(query: str, apps: Sequence[AppInfo]) -> AppInfo | None:
-    """The one application ``query`` names (pid, bundle id, name or file name), or ``None``; several candidates raise."""
+def find_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int]) -> AppInfo | None:
+    """The one application ``query`` names (pid, bundle id, name or file name), or ``None``. Several candidates raise,
+    unless exactly one of them is ``preferred``: the Chromes Dot's browser works in (item 343), one of which "Google
+    Chrome" means while the owner's Chrome and Dot's own both run."""
     wanted: str = query.strip()
     if wanted.isdigit():
         return next((app for app in apps if app.pid == int(wanted)), None)
@@ -140,6 +142,9 @@ def find_app(query: str, apps: Sequence[AppInfo]) -> AppInfo | None:
             return matches[0]
         if len(regular) == 1:
             return regular[0]
+        chosen: list[AppInfo] = [app for app in regular or matches if app.pid in preferred]
+        if len(chosen) == 1:
+            return chosen[0]
         if matches:
             raise DesktopError(
                 f"{query!r} names several applications; use the pid or the bundle id",
@@ -148,8 +153,8 @@ def find_app(query: str, apps: Sequence[AppInfo]) -> AppInfo | None:
     return None
 
 
-def require_app(query: str, apps: Sequence[AppInfo]) -> AppInfo:
-    app: AppInfo | None = find_app(query, apps)
+def require_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int]) -> AppInfo:
+    app: AppInfo | None = find_app(query, apps, preferred)
     if app is None:
         running: str = ", ".join(sorted({a.name for a in apps if a.kind == "regular"}))
         raise DesktopError(
@@ -208,15 +213,15 @@ def open_document(path: Path) -> None:
         )
 
 
-def open_app(query: str, timeout_s: float) -> AppInfo:
+def open_app(query: str, timeout_s: float, preferred: frozenset[int]) -> AppInfo:
     """The running application ``query`` names, started first when it is not running yet."""
-    running: AppInfo | None = find_app(query, list_apps())
+    running: AppInfo | None = find_app(query, list_apps(), preferred)
     if running is not None:
         return running
     launch(query)
     deadline: float = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
-        started: AppInfo | None = find_app(query, list_apps())
+        started: AppInfo | None = find_app(query, list_apps(), preferred)
         if started is not None:
             return started
         time.sleep(_POLL_S)

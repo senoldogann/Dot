@@ -40,6 +40,9 @@ SERVER: ServerConfig = load_default_config().server
 _SLOW_REST_S: float = 8.0
 _LATE_HEADERS_S: float = 3.0
 
+# How late the pages of /opens-late answer: within the wait for a new tab (one second), and after it.
+_LATE_TAB_S: float = 0.4
+_LATER_TAB_S: float = 1.6
 _ITEMS: str = "".join(f"<li><button>Item {n}</button></li>" for n in range(300))
 _NUMBERS: str = "".join(f"<option{' selected' if n == 250 else ''}>Number {n}</option>" for n in range(300))
 # The states arrive 600 ms after the click, the way a script fills a dropdown from a request.
@@ -74,6 +77,13 @@ _PAGES: dict[str, str] = {
 <script>document.getElementById('q').textContent = decodeURIComponent(location.search)</script>""",
     "/popup": """<!doctype html><title>Popup</title><h1>Popup page</h1><button>Close me</button>
 <button onclick="window.close()">Close now</button>""",
+    # Tabs whose page answers late (item 342): Playwright reports a tab only once its page has answered, long after the
+    # click returns, and the later one after the batch has stopped waiting for it.
+    "/opens-late": """<!doctype html><title>Opens late</title>
+<a href="/late-tab" target="_blank">Open late tab</a><a href="/later-tab" target="_blank">Open later tab</a>
+<button>Stay</button>""",
+    "/late-tab": "<!doctype html><title>Late tab</title><h1>Late tab</h1>",
+    "/later-tab": "<!doctype html><title>Later tab</title><h1>Later tab</h1>",
     # A popup that does its job and closes at once, the way a sign-in callback does (item 57).
     "/opener": '<!doctype html><title>Opener</title><a href="/selfclose" target="_blank">Sign in</a><button>Stay</button>',
     "/selfclose": "<!doctype html><title>Callback</title><script>window.close()</script>",
@@ -183,6 +193,10 @@ class _Handler(BaseHTTPRequestHandler):
         path: str = self.path.split("?", 1)[0]
         if path == "/late-headers":
             time.sleep(_LATE_HEADERS_S)
+        if path == "/late-tab":
+            time.sleep(_LATE_TAB_S)
+        if path == "/later-tab":
+            time.sleep(_LATER_TAB_S)
         if path == "/half-page":
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -320,6 +334,38 @@ async def test_batch_stops_when_the_page_opens_a_tab_and_the_tab_can_be_used(
     assert 'button "Close me"' in switched.body
     back: PageView = await browser.close_tab("popup", 2)
     assert back.title == "Home"
+
+
+async def test_a_tab_whose_page_answers_late_still_stops_the_batch(browser: BrowserSession, site: str) -> None:
+    """Chrome tells of the tab before the click returns; Playwright reports it only once its page has answered. The
+    batch waited 40 ms for it before (item 342) and went on with its next step on the page it was on."""
+    view: PageView = await browser.open_url("late-tab", f"{site}/opens-late")
+    steps: list[Step] = [
+        Step(action="click", ref=ref_of(view.body, 'link "Open late tab"')),
+        Step(action="click", ref=ref_of(view.body, 'button "Stay"')),
+    ]
+    outcome: ActOutcome = await act(browser, "late-tab", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "skipped"]
+    assert outcome.stopped == "a new tab opened; use browser_switch_tab to work in it"
+    assert [tab.title for tab in outcome.view.tabs] == ["Opens late", "Late tab"]
+
+
+async def test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_later(
+    browser: BrowserSession, site: str
+) -> None:
+    view: PageView = await browser.open_url("later-tab", f"{site}/opens-late")
+    steps: list[Step] = [
+        Step(action="click", ref=ref_of(view.body, 'link "Open later tab"')),
+        Step(action="click", ref=ref_of(view.body, 'button "Stay"')),
+    ]
+    outcome: ActOutcome = await act(browser, "later-tab", steps, False)
+    assert [report.outcome for report in outcome.steps] == ["done", "skipped"]
+    assert outcome.stopped is not None and outcome.stopped.startswith("a new tab is opening")
+    assert len(outcome.view.tabs) == 1
+    await asyncio.sleep(_LATER_TAB_S)
+    again: PageView = await browser.snapshot("later-tab")
+    assert [tab.title for tab in again.tabs] == ["Opens late", "Later tab"]
+    assert "a new tab opened as tab 2" in again.notes
 
 
 async def test_a_popup_that_closes_itself_is_a_note_not_an_error(browser: BrowserSession, site: str) -> None:
