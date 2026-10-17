@@ -4,9 +4,13 @@ Keychain items are read from service ``dot-agent`` (account = variable name); ad
 ``security add-generic-password -s dot-agent -a OPENAI_API_KEY -w`` (the command prompts for the value).
 """
 
+import fcntl
 import os
+import re
 import subprocess
 import tempfile
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
 
@@ -21,6 +25,9 @@ _SECURITY: str = "/usr/bin/security"
 _KEYCHAIN_TIMEOUT_S: float = 15.0
 _TAIL_CHARS: int = 4
 _TAIL_MIN_CHARS: int = 16
+# The name of an entry of the env file, as a shell names a variable.
+_ENTRY_NAME: re.Pattern[str] = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
+_LOCK_FILE_MODE: int = 0o600
 
 type SecretSource = Literal["environment", "env_file", "keychain"]
 
@@ -57,8 +64,41 @@ def parse_env_file(text: str) -> dict[str, str]:
     return values
 
 
+def _one_line(text: str) -> bool:
+    """Whether ``text`` stays on one line of the env file as :func:`parse_env_file` reads it, which breaks lines where
+    :meth:`str.splitlines` does (a line feed, a carriage return and the other line boundaries of Unicode)."""
+    return text.splitlines() == ([text] if text else [])
+
+
 def render_env_file(values: dict[str, str]) -> str:
+    """The env file's text: a ``KEY="value"`` line for each entry, sorted. A name that is not a variable's, or a value
+    that would not stay on its line, is refused with :class:`ConfigError` (item 350: a value with a line break in it
+    wrote a second entry of its own); the error names the entry, never its value."""
+    for key, value in values.items():
+        if _ENTRY_NAME.fullmatch(key) is None:
+            raise ConfigError("the name of a key must be a variable name (letters, digits and _)", {"name": repr(key)})
+        if not _one_line(value):
+            raise ConfigError("the value of a key may not hold a line break", {"name": key})
     return "".join(f'{key}="{value}"\n' for key, value in sorted(values.items()))
+
+
+def env_lock_path(path: Path) -> Path:
+    """The lock that the processes changing the env file at ``path`` hold in turn."""
+    return path.with_name(f"{path.name}.lock")
+
+
+@contextmanager
+def _changing(path: Path) -> Iterator[None]:
+    """Hold the lock of the env file at ``path`` until the block ends: a change reads the file and writes it whole, so
+    two processes changing it at once (the daemon and ``dotx auth``) take turns and both keep their change (item 350:
+    the later write had been read before the earlier one landed, and undid it)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor: int = os.open(env_lock_path(path), os.O_RDWR | os.O_CREAT, _LOCK_FILE_MODE)
+    try:
+        fcntl.flock(descriptor, fcntl.LOCK_EX)
+        yield
+    finally:
+        os.close(descriptor)
 
 
 def _write_env_file(path: Path, text: str) -> None:
@@ -76,18 +116,21 @@ def _write_env_file(path: Path, text: str) -> None:
 
 
 def write_env_value(path: Path, name: str, value: str) -> None:
-    """Set ``name`` in the env file (mode 0600) keeping every other entry."""
-    current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
-    _write_env_file(path, render_env_file({**current, name: value}))
+    """Set ``name`` in the env file (mode 0600) keeping every other entry, under the file's lock."""
+    with _changing(path):
+        current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
+        _write_env_file(path, render_env_file({**current, name: value}))
 
 
 def remove_env_value(path: Path, name: str) -> bool:
-    """Drop ``name`` from the env file keeping every other entry; ``False`` when the file has no entry of that name."""
-    current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
-    if name not in current:
-        return False
-    _write_env_file(path, render_env_file({key: value for key, value in current.items() if key != name}))
-    return True
+    """Drop ``name`` from the env file keeping every other entry, under the file's lock; ``False`` when the file has no
+    entry of that name."""
+    with _changing(path):
+        current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
+        if name not in current:
+            return False
+        _write_env_file(path, render_env_file({key: value for key, value in current.items() if key != name}))
+        return True
 
 
 def _from_env_file(path: Path, name: str) -> str | None:

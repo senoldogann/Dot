@@ -53,6 +53,7 @@ from dotagent.agent.review import (
     OutdatedJudge,
     OutdatedJudgement,
     OutdatedRequest,
+    OutdatedVerdict,
     OwnerDraft,
     OwnerRequest,
     OwnerWriter,
@@ -566,9 +567,11 @@ async def _put_aside_outdated(
         )
     )
     put_aside: int = 0
-    # A verdict the judge left out keeps its older note.
-    for (older, newer), verdict in zip(pairs, judgement.verdicts, strict=False):
-        if not verdict.outdated:
+    # Each verdict names its pair (item 350); a pair the judge gave no verdict on keeps its older note.
+    by_pair: dict[int, OutdatedVerdict] = {verdict.pair: verdict for verdict in judgement.verdicts}
+    for number, (older, newer) in enumerate(pairs, start=1):
+        verdict: OutdatedVerdict | None = by_pair.get(number)
+        if verdict is None or not verdict.outdated:
             continue
         await runtime.store.retire_memory(older.id, normalize_tags([*older.tags, REST_TAG]), newer.id)
         log.info("note_outdated", memory_id=older.id, replaced_by=newer.id, reason=verdict.reason)

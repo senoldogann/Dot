@@ -40,16 +40,24 @@ def _payment(amount: Amount | None, flags: tuple[str, ...] = ("financial",)) -> 
         ("USD 5", Amount(value=5.0, currency="USD")),
         ("Pay now", None),
         ("Order 20261010", None),
+        # Item 350: a number is read whole, and of several amounts the largest counts.
+        ("Pay $1500.00", Amount(value=1500.0, currency="$")),
+        ("Pay $150000", Amount(value=150000.0, currency="$")),
+        ("Pay $1000.50", Amount(value=1000.5, currency="$")),
+        ("Pay 2500 TL", Amount(value=2500.0, currency="TL")),
+        ("Save $5 — Pay $500", Amount(value=500.0, currency="$")),
     ],
 )
 def test_the_amount_of_a_label_is_the_number_next_to_a_currency(label: str, amount: Amount | None) -> None:
     assert amount_in_label(label) == amount
 
 
-def test_the_total_of_a_page_is_the_amount_after_its_last_total_cue() -> None:
+def test_the_total_of_a_page_is_the_largest_amount_after_a_total_cue() -> None:
     page: str = "Lamp €9.90\nShipping €4.00\nSubtotal €9.90\nOrder total: €13.90\nPay now"
     assert total_on_page(page) == Amount(value=13.9, currency="€")
     assert total_on_page("Nothing to pay here") is None
+    # A total of savings after the order's own total does not stand for it (item 350).
+    assert total_on_page("Order total: $999.00\nTotal savings: $2.00") == Amount(value=999.0, currency="$")
     assert find_amounts("from $5 to $10") == (Amount(value=5.0, currency="$"), Amount(value=10.0, currency="$"))
 
 

@@ -57,7 +57,7 @@ from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
 from dotagent.policy.sandbox import Sandbox, SwitchedSandbox, build_sandbox, check_sandbox
 from dotagent.scheduler.timing import resolve_zone
-from dotagent.secrets import resolve_secret
+from dotagent.secrets import env_lock_path, resolve_secret
 from dotagent.store.db import Store
 from dotagent.terminal.session import Terminals
 from dotagent.tools.apple import build_apple_tool
@@ -170,12 +170,14 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
 
 
 def _guarded_files() -> tuple[Path, ...]:
-    """What the agent must neither read nor change: secrets, the browser profiles (Dot's own and the Chrome of the
-    user), the settings that decide what it may do (policy, rules, MCP servers), its own database, the journals of
-    file changes (``dotx undo`` writes back what a journal says) and the locks that tell which process drives a run."""
+    """What the agent must neither read nor change: secrets and the lock of their file, the browser profiles (Dot's own
+    and the Chrome of the user), the settings that decide what it may do (policy, rules, MCP servers), its own database,
+    the journals of file changes (``dotx undo`` writes back what a journal says) and the locks that tell which process
+    drives a run."""
     database: Path = db_path()
     return (
         env_file_path(),
+        env_lock_path(env_file_path()),
         token_path(),
         vapid_path(),
         browser_profile_dir(),

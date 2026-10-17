@@ -60,8 +60,9 @@ into the field is still what the approval mode allows (only `yolo` types one-tim
 
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
 per_day = 50 }`. Dot reads the amount of a payment step from the control's label ("Pay €19.90") or from the total on the
-page; under both caps the step is a question instead of a hand-off (a `yolo` run goes on, `auto` lets the review model
-answer, `ask` asks you once), it is recorded with its amount, shown in the timeline, and counts against the site's day.
+page, the largest where several stand, so that a misread errs towards the hand-off; under both caps the step is a
+question instead of a hand-off (a `yolo` run goes on, `auto` lets the review model answer, `ask` asks you once), it
+is recorded with its amount, shown in the timeline, and counts against the site's day.
 The payments of a site are decided one at a time, each from what the ones before it spent, so two runs paying at once
 cannot both take what is left of the day. Over a cap, on a site not listed, or when the page does not show the amount,
 the money hand-off holds as before. The caps are plain numbers compared with the number on the page, whatever its

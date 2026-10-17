@@ -29,7 +29,7 @@ not asked twice.
 
 import asyncio
 import re
-from collections.abc import Iterator, Sequence
+from collections.abc import Sequence
 from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
@@ -376,14 +376,17 @@ async def _agent_of(store: Store, run_id: str) -> str | None:
 def vetted(lessons: Sequence[str], checked: Sequence[str | None], vetting: LessonVetting) -> tuple[str | None, ...]:
     """Why each of ``lessons`` is left out, ``None`` for the ones kept: ``checked`` holds what
     :func:`outside_problem` found in each (``None`` for the ones the vetter was asked about), ``vetting`` the vetter's
-    verdicts on those, in order. A lesson the vetter gave no verdict on is left out."""
-    verdicts: Iterator[LessonVerdict] = iter(vetting.verdicts)
+    verdicts on those, each naming the number the vetter saw the lesson under (item 350). A lesson the vetter gave no
+    verdict on is left out."""
+    by_number: dict[int, LessonVerdict] = {verdict.lesson: verdict for verdict in vetting.verdicts}
     kept: list[str | None] = []
+    asked: int = 0
     for _, problem in zip(lessons, checked, strict=True):
         if problem is not None:
             kept.append(problem)
             continue
-        verdict: LessonVerdict | None = next(verdicts, None)
+        asked += 1
+        verdict: LessonVerdict | None = by_number.get(asked)
         kept.append("no verdict was given on it" if verdict is None else None if verdict.keep else verdict.reason)
     return tuple(kept)
 

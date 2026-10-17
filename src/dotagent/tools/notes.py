@@ -6,6 +6,7 @@ in the undo journal like a file write.
 """
 
 import asyncio
+import os
 from pathlib import Path
 
 from pydantic import Field
@@ -61,7 +62,9 @@ def _notes_tool() -> RegisteredTool:
         )
 
     async def run(args: WriteNotesArgs, ctx: ToolContext) -> ToolResult:
-        path: Path = notes_path(ctx.workspace, ctx.run_id)
+        # Noted with every link resolved, as the file tools note their paths, so that ``dotx undo`` sees a link that
+        # comes above it later for what it is.
+        path: Path = Path(await asyncio.to_thread(os.path.realpath, notes_path(ctx.workspace, ctx.run_id)))
         journal: JournalTarget = journal_for(ctx, NOTES_TOOL)
         size: int
         if args.append:

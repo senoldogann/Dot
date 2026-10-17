@@ -3,7 +3,8 @@ delegated to and from what is at the path now, then carried out.
 
 The first change to a path tells what was there before the runs, the last one what they left. A path still as they left
 it is put back; a path changed or deleted since is a conflict, put back only on request; a path whose content before was
-not copied cannot be put back.
+not copied cannot be put back, nor can one below a folder that is a link now (the tools note a path with every link
+resolved, so a link above it came since, and taking the change back through it would write or delete elsewhere).
 """
 
 import hashlib
@@ -18,9 +19,11 @@ from dotagent.core.errors import UndoError
 from dotagent.core.types import FrozenModel
 from dotagent.undo.journal import JournalEntry, backup_path, digest, run_journal
 
-type FileKind = Literal["absent", "file", "folder", "other"]
+type FileKind = Literal["absent", "file", "folder", "other", "linked"]
 type UndoState = Literal["ready", "conflict", "cannot", "as_before"]
 type UndoAction = Literal["restore", "delete"]
+
+_LINKED_REASON: str = "a folder above it is a link now, so taking the change back would write or delete elsewhere"
 
 
 class RunChange(FrozenModel):
@@ -31,7 +34,8 @@ class RunChange(FrozenModel):
 
 
 class FileState(FrozenModel):
-    """What is at a path now (a link is ``other``); ``digest`` is the SHA-256 of a regular file."""
+    """What is at a path now (a link is ``other``; ``linked``: a folder above it is a link); ``digest`` is the SHA-256
+    of a regular file."""
 
     kind: FileKind
     digest: str | None
@@ -82,6 +86,8 @@ def _verdict(first: JournalEntry, left: str, now: FileState) -> tuple[UndoState,
     """Where a path stands, from the first change to it, the SHA-256 of what the last one left and what is there now."""
     if now.kind == "folder":
         return "cannot", "a folder is there now"
+    if now.kind == "linked":
+        return "cannot", _LINKED_REASON
     if not first.existed:
         if now.kind == "absent":
             return "as_before", None
@@ -115,8 +121,15 @@ def created_dirs(changes: Sequence[RunChange]) -> list[Path]:
     return sorted((Path(folder) for folder in folders), key=lambda folder: (-len(folder.parts), str(folder)))
 
 
+def _linked_above(path: Path) -> bool:
+    """Whether a folder above ``path`` is a link: the folder it names is not the folder its words name."""
+    return os.path.realpath(path.parent) != str(path.parent)
+
+
 def file_state(path: Path) -> FileState:
-    """What is at ``path`` now; a link is not followed. Blocking."""
+    """What is at ``path`` now; a link is not followed, and one above it makes it ``linked``. Blocking."""
+    if _linked_above(path):
+        return FileState(kind="linked", digest=None)
     try:
         status: os.stat_result = os.lstat(path)
     except (FileNotFoundError, NotADirectoryError):
@@ -159,6 +172,9 @@ def apply_undo(steps: Sequence[UndoStep], root: Path) -> None:
 
 def _carry_out(step: UndoStep, root: Path) -> None:
     path: Path = Path(step.path)
+    # Looked at again: a link may have come above the path since the plan was made.
+    if _linked_above(path):
+        raise UndoError(_LINKED_REASON, {"folder": str(path.parent), "resolves_to": os.path.realpath(path.parent)})
     if step.action == "delete":
         path.unlink(missing_ok=True)
         return

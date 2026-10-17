@@ -5279,6 +5279,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 346 | A chat may leave out the lines of what ran without asking                              | done        | a2f619b |
 | 347 | On a phone the text can be as small as 12 px                                           | done        | a2f619b |
 | 349 | OpenRouter: the models of many labs on one key                                         | done        | 196ff64 |
+| 350 | The audit of 2026-10-17: what held in the paths a human merges                         | in progress |         |
 | 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
@@ -14009,6 +14010,25 @@ drag (a new refusal a yolo run would meet), Messages' recent rows in its write-a
 the database), standby's dropped images not being stored, and the reads that see an open unit's rows. The confirmed
 problems in the human-only paths (spend amounts, the key file's values, the review prompts, the pairing of verdicts,
 undo through a linked folder) are item 350, in a pull request for the owner.
+
+### 350. The audit of 2026-10-17: what held in the paths a human merges
+
+**Status: in progress, for the owner's review.** The owner's word of 2026-10-17: "Bu raporu doğrula, problemler
+gerçekten var ise lütfen düzelt. NOT- YOLO MOD serbestliğinin bozulmasını istemiyorum." (verify the report, fix what is
+real; YOLO's freedom must not break). These touch `policy/`, `secrets.py`, `agent/review.py` and `undo/`, which
+REVIEW.md leaves to a human, so the pull request waits for the owner. None adds anything a yolo run meets. **As built
+(2026-10-17).** The amount of a payment step is read whole (`$1500.00` was 150, `$150000` 150, `$2500` 250), and of
+several in a label or after the total cues of a page the largest counts, so a misread errs towards the hand-off; a
+yolo run waives that hand-off as before, while an `auto` run no longer lets its review model approve a $1500 payment
+read as $150 under a $200 cap. A key whose value holds a line break is refused (it wrote an entry of its own into the key file), its name must be
+a variable's, and the processes that change the file take turns on its lock (`.env.lock`, guarded like the file). What
+the review model is asked has the secrets Dot holds and the ones it recognises masked, not only a run's digest. The
+verdicts on outdated notes and on lessons name the pair or the lesson each is about, and one that names another is
+asked for again; they were matched in turn, so a verdict left out put the next one on the wrong note. `dotx undo`
+takes no change back below a folder that is a link now (the tools note paths with their links resolved, `write_notes`
+too now), even with `--force`, and looks again when it carries a step out. Tests: `test_spend.py`, `test_env_file.py`,
+`test_review_target.py`, `test_lessons.py`, `test_verdict_numbers.py`, `test_undo.py`; each fails on the code before.
+Docs: `safety.md`, `models.md`, `autonomy.md`.
 
 ## Log
 
