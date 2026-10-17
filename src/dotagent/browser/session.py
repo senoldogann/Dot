@@ -36,6 +36,7 @@ from playwright.async_api import (
 )
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import Frame as PlaywrightFrame
+from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 from pydantic import JsonValue
 
 from dotagent.browser.attach import INSPECT_PAGE, DebugEndpoint, endpoint_url, read_debug_endpoint, redact_endpoint
@@ -436,8 +437,10 @@ class BrowserSession:
         # Dot waits now for its Allow (item 341): what the browser card and a call that meets the loss say.
         self._lost: bool = False
         self._waiting_allow: bool = False
-        # Told when Dot connects again to a Chrome of the user that went away, before Chrome asks for its Allow.
+        # Told when Dot connects again to a Chrome of the user that went away, before Chrome asks for its Allow, and the
+        # tellings under way: the connection does not wait for them.
         self._on_reconnect: Callable[[], Awaitable[None]] | None = None
+        self._telling: set[asyncio.Task[None]] = set()
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -570,7 +573,7 @@ class BrowserSession:
         playwright: Playwright = await self._driver()
         again: bool = self._lost
         if again and self._on_reconnect is not None:
-            await self._on_reconnect()
+            self._tell(self._on_reconnect)
         self._waiting_allow = True
         try:
             browser: Browser = await playwright.chromium.connect_over_cdp(
@@ -581,8 +584,15 @@ class BrowserSession:
                 no_defaults=True,
             )
         except PlaywrightError as error:
+            # A wait that ran out says so: Chrome's Allow was not clicked in time, or Chrome did not answer.
+            waited: str = (
+                f" (no answer within {config.attach_timeout_s:g} s)"
+                if isinstance(error, PlaywrightTimeoutError)
+                else ""
+            )
             raise BrowserError(
                 (CHROME_RESTARTED if again else "Chrome did not accept the connection")
+                + waited
                 + f"; keep a Chrome window open, click Allow when Chrome asks, and check that remote debugging is on "
                 f"({INSPECT_PAGE})",
                 {
@@ -605,6 +615,25 @@ class BrowserSession:
         self._browser = browser
         _log.info("browser_attached", port=endpoint.port, version=browser.version, tabs=len(context.pages))
         return _Opened(context=context, spare_pages=())
+
+    def _tell(self, notice: Callable[[], Awaitable[None]]) -> None:
+        """Have ``notice`` told beside the connection, which does not wait for it (item 341): Chrome asks for its Allow
+        meanwhile, and a notice that fails (a notification macOS did not show) is logged, never in the connection's way."""
+
+        async def telling() -> None:
+            await notice()
+
+        task: asyncio.Task[None] = asyncio.create_task(telling())
+        self._telling.add(task)
+        task.add_done_callback(self._told)
+
+    def _told(self, task: asyncio.Task[None]) -> None:
+        self._telling.discard(task)
+        if task.cancelled():
+            return
+        error: BaseException | None = task.exception()
+        if error is not None:
+            _log.warning("browser_reconnect_notice_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
 
     def _arm(self, opened: _Opened) -> BrowserContext:
         config: BrowserConfig = self._config
@@ -772,7 +801,7 @@ class BrowserSession:
         """Close Dot's own Chrome, or close the tabs Dot opened in the Chrome of the user and drop the connection; then
         stop the Playwright driver, also when the close failed, so no driver (and no Chrome it started) is left running.
         The tabs of every thread are gone with it."""
-        for task in [*self._adopting, *self._front_returns, *self._answering]:
+        for task in [*self._adopting, *self._front_returns, *self._answering, *self._telling]:
             task.cancel()
         context: BrowserContext | None = self._context
         browser: Browser | None = self._browser
@@ -894,19 +923,23 @@ class BrowserSession:
             return
         self._return_front()
         thread, opener_tab = owner
+        tab: Tab = Tab(page=page)
+        # Whatever becomes of it, the tab is no longer on its way to the opener's thread: a step that waits for it ends
+        # (the review's S1), also when registering it failed once Chrome had told its id.
         try:
-            tab: Tab = await self._register(page)
-        except Exception as error:
-            self._popup_lost(error, page, opener_tab)
-            return
-        if page.is_closed():
-            add_note(opener_tab, closed_popup_note(page.url))
+            try:
+                await self._register(tab)
+            except Exception as error:
+                self._popup_lost(error, page, opener_tab)
+                return
+            if page.is_closed():
+                add_note(opener_tab, closed_popup_note(page.url))
+                return
+            thread.tabs.append(tab)
+            add_note(opener_tab, f"a new tab opened as tab {len(thread.tabs)}")
+            await self._enforce_cap(thread)
+        finally:
             taken_in(opener_tab, tab)
-            return
-        thread.tabs.append(tab)
-        add_note(opener_tab, f"a new tab opened as tab {len(thread.tabs)}")
-        await self._enforce_cap(thread)
-        taken_in(opener_tab, tab)
 
     def _keeps_front(self) -> bool:
         """Whether Dot gives the front of the Mac back when its own Chrome takes it (item 118): a visible window that may
@@ -952,8 +985,8 @@ class BrowserSession:
                     return thread, tab
         return None
 
-    async def _register(self, page: Page) -> Tab:
-        tab: Tab = Tab(page=page)
+    async def _register(self, tab: Tab) -> None:
+        page: Page = tab.page
         attach_handlers(tab, self._downloads)
         page.on("close", partial(self._on_page_closed, tab))
         await watch_births(tab)
@@ -963,7 +996,6 @@ class BrowserSession:
             await self._guard_hops(page)
         if self._config.decline_cookie_banners:
             await install_consent_handler(page)
-        return tab
 
     def _on_page_closed(self, tab: Tab, _page: Page) -> None:
         self._refusals.pop(tab.page, None)
@@ -991,7 +1023,8 @@ class BrowserSession:
                     raise BrowserError(
                         "opening a tab failed", {"error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)}
                     ) from error
-            tab: Tab = await self._register(page)
+            tab: Tab = Tab(page=page)
+            await self._register(tab)
             thread.tabs.append(tab)
             thread.active = len(thread.tabs) - 1
         await self._enforce_cap(thread)
@@ -1419,8 +1452,9 @@ class BrowserSession:
 
     @property
     def quiet_reads(self) -> bool:
-        """Whether a page may be read in a tab the user does not work in: a scratch tab of Dot's own Chrome, or a tab
-        opened behind the user's in the user's Chrome and closed after the read (item 98). True in both modes."""
+        """Whether a page may be read in a tab the user does not work in: a scratch tab of Dot's own Chrome, or in the
+        user's Chrome a tab in a window of its own behind the user's (items 98 and 340), closed after the read. True in
+        both modes."""
         return True
 
     @property
@@ -1434,7 +1468,8 @@ class BrowserSession:
         """Read ``url`` in a tab of its own, one no thread owns and that closes when the read is over: the address the
         page ended on, the status of its last main response and its HTML after JavaScript ran and the page settled. A
         page that answered with a bot wall gets a few seconds to pass its own check first. For the web tools, when a
-        plain request was turned away. In the user's Chrome the tab opens behind the user's (item 98)."""
+        plain request was turned away. In the user's Chrome the tab opens in a window of its own behind the user's
+        (items 98 and 340), which costs about 30 ms more to make than a tab."""
         self._require_allowed(url)
         config: BrowserConfig = self._config
         context: BrowserContext = await self._ensure_context()

@@ -181,7 +181,8 @@ for the missing ones and opens their Settings panes.
 not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path to
 anything else (a binary) is refused at once with those three forms, instead of being retried against Launch Services.
 A name that fits several running copies of one application, "Google Chrome" while your Chrome and Dot's own both run,
-means the Chrome Dot's browser works in (item 343); a pid names any one of them.
+means the Chrome Dot's browser works in (item 343); a pid names any one of them. Chrome's remote debugging is the
+owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks is refused in every mode.
 - Work inside a web page goes through the browser tools, which act in the run's own tab whatever other Chromes run;
   the desktop tools are for what lies outside the page: a native dialog, a file picker, an extension's window. A script
   sent to Chrome with AppleScript reaches whichever Chrome window macOS picks; `browser_eval` runs in the run's tab.

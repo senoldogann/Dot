@@ -37,7 +37,7 @@ from dotagent.browser.safety import refuse_secret_field
 from dotagent.browser.session import BrowserSession, RenderedDocument, no_runs_at_work
 from dotagent.browser.types import ActOutcome, Attachment, PageView, Screenshot, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
-from dotagent.core.errors import BrowserError
+from dotagent.core.errors import BrowserError, ToolExecutionError
 from dotagent.core.paths import ensure_layout
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -479,6 +479,36 @@ async def test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrom
             assert view.title == "Home"
             assert await open_tabs(second.port) == sorted([f"{site}/mine", f"{site}/"])
             assert told == ["told"] and not session.lost and not session.waiting_allow
+        finally:
+            await stop_chrome(second)
+    finally:
+        await session.aclose()
+
+
+async def test_a_reconnection_whose_notice_fails_connects_all_the_same(
+    data_dir: Path, attach_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """The notice of a reconnection is told beside it (the review's B1): one that fails, a notification macOS did not
+    show, is logged, and the step connects all the same. Before, its error was the step's, and every later step's, as
+    the session stayed lost."""
+    first: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
+    session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
+
+    async def failing() -> None:
+        raise ToolExecutionError("the notification could not be shown", {"code": 1})
+
+    session.tell_reconnects(failing)
+    try:
+        await session.open_url("agent", f"{site}/")
+        await stop_chrome(first)
+        await asyncio.sleep(_EVENT_GRACE_S)
+        assert session.lost
+        second: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
+        try:
+            with capture_logs() as logs:
+                view: PageView = await session.open_url("agent", f"{site}/")
+            assert view.title == "Home" and not session.lost
+            assert [entry for entry in logs if entry["event"] == "browser_reconnect_notice_failed"]
         finally:
             await stop_chrome(second)
     finally:

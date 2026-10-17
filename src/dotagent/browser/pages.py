@@ -201,15 +201,28 @@ async def watch_births(tab: Tab) -> None:
     its page has answered (411 ms after the click for a page that answers in 400 ms, measured), while Chrome tells of
     it before the click that made it returns, and of none it refused (a second popup of one click, which the Chrome of
     the user blocks)."""
-    session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
-    own: dict[str, object] = await session.send("Target.getTargetInfo")
+    try:
+        session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
+        own: dict[str, object] = await session.send("Target.getTargetInfo")
+    except PlaywrightError as error:
+        raise _watch_failure(tab, error) from error
     target: str | None = _text(own.get("targetInfo"), "targetId")
     if target is None:
         raise BrowserError("Chrome did not tell the id of the tab", {"url": tab.page.url, "answer": repr(own)[:200]})
     tab.target_id = target
     session.on("Target.targetCreated", partial(_on_target_created, tab))
     session.on("Target.targetDestroyed", partial(_on_target_destroyed, tab))
-    await session.send("Target.setDiscoverTargets", {"discover": True, "filter": [{"type": "page"}]})
+    try:
+        await session.send("Target.setDiscoverTargets", {"discover": True, "filter": [{"type": "page"}]})
+    except PlaywrightError as error:
+        raise _watch_failure(tab, error) from error
+
+
+def _watch_failure(tab: Tab, error: PlaywrightError) -> BrowserError:
+    return BrowserError(
+        "watching the tab for the tabs it opens failed",
+        {"url": tab.page.url, "error": truncate_middle(str(error), _NOTE_LOG_CHARS)},
+    )
 
 
 def attach_handlers(tab: Tab, downloads: Path) -> None:

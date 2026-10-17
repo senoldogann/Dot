@@ -7,22 +7,31 @@ from pydantic import JsonValue
 
 from dotagent.browser.attach import INSPECT_PAGE, ChromeState, inspect_chrome
 from dotagent.browser.devtools import devtools_address
-from dotagent.browser.login import start_login_chrome
+from dotagent.browser.login import open_sign_in_window
 from dotagent.browser.modes import adopt_mode, open_users_chrome
 from dotagent.browser.session import BrowserSession
 from dotagent.config_edit import set_browser_mode, set_browser_setting
 from dotagent.core.errors import RunConflict
+from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, config_path
 from dotagent.server.context import ServerContext
 from dotagent.server.views import BrowserDebugPortRequest, BrowserModeRequest, BrowserRaiseRequest, BrowserView
+
+_log = get_logger("dotagent.server.routes_browser")
 
 
 def browser_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter(prefix="/api")
     session: BrowserSession = ctx.runtime.browser
     # The plain Chrome window on Dot's own profile that Settings › Browser opened for signing in (item 344): the wait
-    # for it to quit, while it is open.
+    # for it to quit, while it is open; one request at a time opens it.
     signing: set[asyncio.Task[int]] = set()
+    opening: asyncio.Lock = asyncio.Lock()
+
+    def closed(window: asyncio.Task[int]) -> None:
+        signing.discard(window)
+        if not window.cancelled() and window.exception() is None and window.result() != 0:
+            _log.warning("browser_sign_in_window_failed", exit_code=window.result())
 
     async def state() -> BrowserView:
         chrome: ChromeState = await asyncio.to_thread(inspect_chrome, chrome_data_dir())
@@ -60,19 +69,19 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         """Open Dot's own profile in a plain Chrome window, where the owner signs in to the sites Dot should use, as
         ``dotx browser login`` does (item 344): Dot's own Chrome is closed first, which is refused while runs are active,
         and the window stays until the owner quits it. While one is open, another is not opened."""
-        if signing:
-            return await state()
-        active: list[JsonValue] = list(ctx.manager.active_run_ids())
-        if active:
-            raise RunConflict(
-                "Dot's Chrome cannot be closed for signing in while runs are active", {"active_runs": active}
-            )
-        own: BrowserSession = ctx.runtime.browsers.session_for("own")
-        await own.let_go_of_chrome()
-        window: asyncio.subprocess.Process = await start_login_chrome(own.profile_dir, None, asyncio.subprocess.DEVNULL)
-        waiting: asyncio.Task[int] = asyncio.create_task(window.wait())
-        signing.add(waiting)
-        waiting.add_done_callback(signing.discard)
+        async with opening:
+            if not signing:
+                active: list[JsonValue] = list(ctx.manager.active_run_ids())
+                if active:
+                    raise RunConflict(
+                        "Dot's Chrome cannot be closed for signing in while runs are active", {"active_runs": active}
+                    )
+                own: BrowserSession = ctx.runtime.browsers.session_for("own")
+                await own.let_go_of_chrome()
+                window: asyncio.subprocess.Process = await open_sign_in_window(own.profile_dir)
+                waiting: asyncio.Task[int] = asyncio.create_task(window.wait())
+                signing.add(waiting)
+                waiting.add_done_callback(closed)
         return await state()
 
     @router.post("/browser/raise")

@@ -18,7 +18,7 @@ from dotagent.desktop import apps, ax, screen
 from dotagent.desktop import input as hid
 from dotagent.desktop.ax import ElementState
 from dotagent.desktop.input import EventSource, parse_chord
-from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, enters_text, window_role
+from dotagent.desktop.safety import DESKTOP_CLICKABLE_ROLES, AppRole, StepContext, enters_text, step_role
 from dotagent.desktop.types import (
     DEFAULT_SCROLL_PX,
     AppInfo,
@@ -340,7 +340,9 @@ def _peek(env: StepEnv, ref: str | None, x: float | None, y: float | None) -> Ta
 
 def _context(target: Target, lines: Mapping[str, str]) -> StepContext:
     state: ElementState | None = target.state
-    role: AppRole = window_role(target.owner.name, target.owner.bundle_id, target.window)
+    role: AppRole = step_role(
+        target.owner.name, target.owner.bundle_id, target.window, None if state is None else state.label
+    )
     return StepContext(
         role=role,
         app=target.owner.name,

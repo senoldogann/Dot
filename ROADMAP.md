@@ -13806,9 +13806,10 @@ side, alternating with `main`, each the median of five calls, shown as the media
 The one slower step is the first browser_open of a chat, which makes its tab in a window of its own (item 340): the
 window takes about 30 ms more to make than a tab in the owner's (44.5 against 14.1 ms with Chrome on screen; 56-73
 against 17-19 ms hidden, where the harness also meets the new window's renderer cold), paid once a chat, as its tabs
-stay until `tab_idle_s`. In the owner's runs of the last 30 days (`dotx stats`) a step's model call takes 5 to 7 s and
-the median browser_open 1.2 s, most of it the network; the three slowest of Dot's own steps above are the ten-step task,
-the computer-use loop and the three-action act, all faster.
+stay until `tab_idle_s`, and for each quiet read (`read_page`, the web tools' way through a page that needs JavaScript)
+and browser_new_tab. In the owner's runs of the last 30 days (`dotx stats`) a step's model call takes 5 to 7 s and the
+median browser_open 1.2 s, most of it the network; the three slowest of Dot's own steps above are the ten-step task, the
+computer-use loop and the three-action act, all faster.
 
 ### 339. Back in the owner's Chrome takes a navigation, not 30 s
 
@@ -13839,9 +13840,12 @@ session marks itself lost; the next call connects again by itself, the owner get
 Dot"), the connection's error starts with "Chrome was closed or restarted", and a step under way when Chrome went fails
 with that line and that the next step connects again. Settings › Browser reads the session's `lost` and `waiting_allow`
 every 3 s while the card is open in attach mode: connected, waiting for Allow, Chrome closed, remote debugging off,
-Chrome restarted or not connected, each with one line of what to do. Tests in `test_browser_attach.py`:
-`test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrome_is_back`,
-`test_a_chrome_that_restarted_and_refuses_says_so_in_one_line` and
+Chrome restarted or not connected, each with one line of what to do. After the review the notice is told beside the
+connection, never in its way: one that fails (osascript, a notification macOS did not show) was the error of every later
+call, as the session stayed lost; and a connection whose wait ran out says so ("no answer within 60 s"). Tests in
+`test_browser_attach.py`: `test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrome_is_back`,
+`test_a_chrome_that_restarted_and_refuses_says_so_in_one_line`,
+`test_a_reconnection_whose_notice_fails_connects_all_the_same` (fails on `main`'s 341) and
 `test_the_settings_card_follows_chrome_as_it_quits_and_comes_back`.
 
 ### 342. A browser step waits for what it set off, not for a fixed 40 ms
@@ -13857,10 +13861,12 @@ until it commits), and each tab keeps the tabs Chrome made for it (`watch_births
 `Target.setDiscoverTargets`; births whose opener is the tab, gone when the thread takes them in or Chrome closes them).
 The step waits until each is taken in, a second at most; one still opening then stops the batch with "a new tab is
 opening and its page has not answered yet". A popup Chrome blocks (the second of one click, in the owner's Chrome) is no
-birth and holds nothing, where `Page.windowOpen` would have counted it. The window's size is read alongside the snapshot
-instead of before it: no round trip of its own, and never stale, where a size kept until the window is resized would
-need a listener in the page or a poll of Chrome to tell that the owner resized Dot's window. `[browser]
-side_effect_grace_ms` is gone. Tests: `test_browser.py::test_a_tab_whose_page_answers_late_still_stops_the_batch` and
+birth and holds nothing, where `Page.windowOpen` would have counted it. After the review a popup that could not be
+registered no longer holds its opener's next step (`_adopt_popup` lets go of its birth on every way out), and the CDP
+session's errors are `BrowserError`s as `keep_focused`'s are. The window's size is read alongside the snapshot instead
+of before it: no round trip of its own, and never stale, where a size kept until the window is resized would need a
+listener in the page or a poll of Chrome to tell that the owner resized Dot's window. `[browser] side_effect_grace_ms`
+is gone. Tests: `test_browser.py::test_a_tab_whose_page_answers_late_still_stops_the_batch` and
 `::test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_later` (both fail on `main`: the batch went
 on), `test_browser_attach.py::test_a_click_that_asks_for_two_tabs_stops_at_the_one_chrome_opened`.
 
@@ -13873,11 +13879,14 @@ input events, a screenshot Screen Recording only, and the act uses the preview's
 (an act after a question to the owner lists again). A name that fits several running copies of one application means the
 Chrome Dot's browser works in (`BrowserPool.chrome_pids`: the pid that holds each session's profile), where it was
 refused as ambiguous. Part 46's misses were AppleScript reaching whichever Chrome macOS picked; their answer is
-browser_eval in the run's own tab (item 263), now proven while three Chromes run. Kept as they were, and why: the
-click's pacing (110 ms; item 13, no acknowledgement exists between posted events), the 120 ms quiet window of the
-accessibility tree, the whole screen as the screenshot (the model's frame of coordinates; `desktop_screenshot` with a
-region zooms) and its LANCZOS resize (a box reduce first saves 17 ms a screenshot but moves text edges by up to 41 of
-255 levels, and the model reads text from it). Tests: `tests/unit/test_desktop_apps.py`,
+browser_eval in the run's own tab (item 263), now proven while three Chromes run. After the review: a desktop step on
+Chrome's remote debugging is refused in every mode, as one in Dot's own window is (`step_role`: a Chrome window or
+control that names remote debugging or chrome://inspect's page), since the errors of item 341 tell the owner to click
+Allow and "Google Chrome" now names that Chrome; and a lock that cannot be read names no Chrome rather than failing the
+call. Kept as they were, and why: the click's pacing (110 ms; item 13, no acknowledgement exists between posted events),
+the 120 ms quiet window of the accessibility tree, the whole screen as the screenshot (the model's frame of coordinates;
+`desktop_screenshot` with a region zooms) and its LANCZOS resize (a box reduce first saves 17 ms a screenshot but moves
+text edges by up to 41 of 255 levels, and the model reads text from it). Tests: `tests/unit/test_desktop_apps.py`,
 `test_browser_attach.py::test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_run`, the desktop smoke
 tests, and `tests/smoke/test_desktop_speed.py` for the loop's numbers.
 
@@ -13888,8 +13897,10 @@ Dot's Chrome": `POST /api/browser/sign-in` opens Dot's profile in a plain Chrome
 (`start_login_chrome`, which the command now uses too). When Dot's Chrome is open the card asks first, and the route
 closes it (`BrowserSession.let_go_of_chrome`; refused with 409 while runs are active, as a switch is); the card says the
 window is open, reads again every 3 s, and says when the owner has quit it that the sign-ins are kept in Dot's profile.
-The sessions stay in that profile. Test: `tests/smoke/test_browser_sign_in.py` (a program stands in for Chrome, so no
-window opens; Dot's own Chrome is real and hidden; Chrome wide and on a phone, light and dark, and WebKit as an iPhone).
+The sessions stay in that profile. After the review the window runs in a session of its own, so that it stays open while
+the daemon restarts (launchd ends the daemon's process group), one request at a time opens it, and a window that ends
+with an error is logged. Test: `tests/smoke/test_browser_sign_in.py` (a program stands in for Chrome, so no window
+opens; Dot's own Chrome is real and hidden; Chrome wide and on a phone, light and dark, and WebKit as an iPhone).
 
 ## Log
 

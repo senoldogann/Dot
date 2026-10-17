@@ -13,7 +13,11 @@ from pathlib import Path
 from dotagent.browser.modes import browser_data_dir
 from dotagent.browser.session import BrowserSession
 from dotagent.config import BrowserConfig, ServerConfig
+from dotagent.core.errors import BrowserError
+from dotagent.core.logs import get_logger
 from dotagent.store.models import BrowserMode
+
+_log = get_logger("dotagent.browser.pool")
 
 
 class BrowserPool:
@@ -49,7 +53,17 @@ class BrowserPool:
         """The Chromes the sessions work in, by the pid that holds each one's profile: Dot's own Chrome while it runs,
         and the Chrome of the user. A name that fits several Chromes means one of these on the desktop (item 343)."""
         sessions: tuple[BrowserSession, ...] = (self.main, *self._others.values())
-        return frozenset(pid for session in sessions if (pid := session.chrome_pid()) is not None)
+        pids: set[int] = set()
+        for session in sessions:
+            try:
+                pid: int | None = session.chrome_pid()
+            except BrowserError as error:
+                # A lock that cannot be read names no Chrome: the name is resolved as if none were Dot's.
+                _log.warning("browser_profile_lock_unreadable", profile=str(session.profile_dir), error=error.message)
+                continue
+            if pid is not None:
+                pids.add(pid)
+        return frozenset(pids)
 
     async def set_debug_port(self, port: int) -> None:
         """The port Dot's own Chrome takes DevTools connections on (item 265), for every session: the own Chrome of a
