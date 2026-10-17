@@ -309,6 +309,7 @@ def _prompt(tool_names: tuple[str, ...]) -> str:
             (),
             (),
             None,
+            "full",
         )
     )
 

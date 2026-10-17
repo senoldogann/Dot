@@ -35,6 +35,7 @@ def _prompt(split: bool, tool_names: list[str]) -> str:
             (),
             (),
             None,
+            "full",
         )
     )
 

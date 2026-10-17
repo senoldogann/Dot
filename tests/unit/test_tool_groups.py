@@ -158,6 +158,7 @@ def _inputs(tool_names: list[str]) -> PromptInputs:
         (),
         (),
         None,
+        "full",
     )
 
 

@@ -137,6 +137,7 @@ def _report_of(config: AppConfig, model: str, started_at: float, outcomes: Seque
             tier=config.agent.tiers.get(parse_model_ref(model).label, "standard"),
             tool_surface=config.agent.tool_surface,
             verify_answer_paths=config.agent.verify_answer_paths,
+            prompt=config.agent.prompt,
         ),
         outcomes=tuple(outcomes),
     )
