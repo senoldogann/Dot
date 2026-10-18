@@ -269,7 +269,10 @@ def _write_file_tool() -> RegisteredTool:
 
     return make_path_tool(
         name="write_file",
-        description="Create or overwrite a file with the given content. Prefer edit_file for small changes.",
+        description=(
+            "Create or overwrite a file with the given content. Prefer edit_file for small changes. The change goes "
+            "into the undo journal: it shows in Changes and can be undone."
+        ),
         args_model=WriteFileArgs,
         modes=ACTING_MODES,
         parallel_safe=False,
@@ -352,7 +355,10 @@ def _edit_file_tool() -> RegisteredTool:
 
     return make_path_tool(
         name="edit_file",
-        description="Replace exact text in a file. Fails if the text is missing or ambiguous, so copy it verbatim.",
+        description=(
+            "Replace exact text in a file. Fails if the text is missing or ambiguous, so copy it verbatim. The change "
+            "goes into the undo journal: it shows in Changes and can be undone."
+        ),
         args_model=EditFileArgs,
         modes=ACTING_MODES,
         parallel_safe=False,
