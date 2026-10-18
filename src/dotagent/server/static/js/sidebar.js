@@ -1141,12 +1141,40 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   }
   placeForWidth();
   PHONE.addEventListener("change", placeForWidth);
+  // The rail (item 386): the pages of the sidebar as icons down its left edge, the way t3 does it, so the chats list
+  // keeps the width it needs and the page links stay one click away. A phone keeps them in the drawer's own list.
+  const railItem = (href, name, glyph, onclick) =>
+    el(
+      "a",
+      { class: "side-rail-item", href, title: name, "aria-label": name, onclick },
+      icon(glyph),
+    );
+  const rail = el(
+    "div",
+    { class: "side-rail" },
+    el("div", { class: "side-rail-top" },
+      railItem(homeHref, "New chat", "squarePen", (event) => {
+        event.preventDefault();
+        requestCompose();
+        onNavigate();
+      }),
+      railItem("#/agents", "Agents", "users", onNavigate),
+      railItem("#/campaigns", "Campaigns", "target", onNavigate),
+      railItem("#/customize/plugins", "Customize", "plug", onNavigate),
+    ),
+    el("div", { class: "side-rail-foot" },
+      el("a", { class: "side-rail-item", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate }, icon("sliders")),
+    ),
+  );
   const element = el(
     "aside",
     { class: "sidebar", id: "sidebar", "aria-label": "Sidebar" },
-    el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName())),
-    body,
-    foot,
+    rail,
+    el("div", { class: "side-column" },
+      el("div", { class: "side-head", "data-tauri-drag-region": "" }, close, el("span", { class: "side-title" }, dotName())),
+      body,
+      foot,
+    ),
   );
   const workTicker = setInterval(() => {
     for (const node of element.querySelectorAll(".side-working-time")) {

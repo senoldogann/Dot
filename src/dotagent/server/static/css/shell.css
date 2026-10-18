@@ -914,3 +914,65 @@
     line-height: var(--leading-sm);
   }
 }
+
+/* The sidebar in two columns (item 386): the pages as icons down a narrow rail, the chats list taking the rest.
+   A phone keeps one column in its drawer, where a rail would cost the width the list needs. */
+.sidebar {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+}
+
+.side-rail {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-inline-end: 1px solid var(--border);
+}
+
+.side-rail-top,
+.side-rail-foot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.side-rail-item {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  color: var(--muted);
+}
+
+.side-rail-item:hover,
+.side-rail-item:focus-visible {
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.side-column {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+@media (max-width: 720px) {
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .side-rail {
+    display: none;
+  }
+
+  .side-column {
+    flex: 1;
+    min-height: 0;
+  }
+}
