@@ -35,7 +35,7 @@ request templates alone skips it): the format check, the lint, mypy, the unit te
 test that needs no service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not
 hosted"`). The tests run spread over the cores with `-n auto` (pytest-xdist). When something under `desktop/` changes,
 `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop shell. Each action the
-workflow uses is pinned by the commit its tag named, so a tag moved later cannot change what runs. The tests marked
+workflows use is pinned by the commit its tag named, so a tag moved later cannot change what runs. The tests marked
 above stay on your Mac. Once a week, and when asked, `.github/workflows/audit.yml` checks the dependencies as locked
 against the public advisories (pip-audit for `uv.lock`, cargo audit for the desktop shell's `Cargo.lock`) and fails on a
 known vulnerability (item 217).
