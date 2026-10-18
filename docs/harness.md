@@ -51,6 +51,20 @@ adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manag
 `diff`, `adopt` and `retire`, or `GET /api/harness`, `GET /api/harness/{id}`, `POST /api/harness/{id}/adopt` and
 `POST /api/harness/{id}/retire`. The daemon reads the adopted version as each run starts: no restart.
 
+## The scoring set is the owner's
+
+What a candidate is judged on is never shown to the model that writes it. The proposer reads one run; the probe runs
+the candidate on a *scoring set* it has not seen: the eval tasks that are safe to repeat, and the runs of yours you
+mark as tests. A second, smaller *final set* is never used to choose between candidates: it is run once, after a
+version is adopted, and reported as it comes out, so that the score you read was not optimized against. The owner
+writes the questions, never the program; that, and adopting, is the human's part (Wei et al., "The End of Harness
+Engineering", 2026, make the same cut: an execution report the run writes, candidates a small model writes, a scoring
+set the operator writes and the proposer never sees, and a final set used once).
+
+Selection is by score first: a candidate that does better on every task of the scoring set survives, one that does
+worse on any is dropped. The composer merges edits only when candidates do not conflict and each earns its place, or
+explains why the base is kept.
+
 ## How a change comes about
 
 The improvement loop (the items after 387 build it in layers) works one *step* at a time, with a budget `k`:
@@ -81,8 +95,23 @@ Its provenance (version ← probe ← run, experience → version, the decisions
 that what Dot changed about itself, when, and on what evidence, can always be read (the command line and the API read
 it; drawing it on the page is left for later).
 
+## The roles
+
+Four roles play the step, each a model asked one question that it answers with one tool call (as the review model
+answers Dot's other questions), each shown digests and texts inside fences it reads as data and never follows, with
+the secrets Dot holds masked: the **proposer** (`propose_harness`: a candidate's whole texts within the bounds, the
+moments of the run behind each change, or keep), the **composer** (`compose_harness`: one version of the candidates,
+a decision with its evidence for each change, or the base kept), the **selector** (`select_answer`: the best of
+anonymous answers to one goal, judged on delivery, conformance, fidelity, consistency, fitness and finish, never on
+length) and the **experience writer** (`write_experience`: what each edit did, and an experience only when an edit
+helped or hurt with evidence). An answer that breaks its rules (a text past the bounds, a change with no moment, an
+experience with no effect behind it) is asked once more with what was wrong, then the step fails and says so.
+`[harness] proposer`, `composer`, `selector` and `experience` name a model for each; "" is `[models] review`.
+`dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
+candidate, whose notes keep the scope and the moments; `keep` writes nothing.
+
 ## What is built so far
 
-Item 389 builds the versions, their components, the prompt's reading of the adopted one, the command line and the API
-above. The roles, the probe, the nightly step, the provenance graph and the page follow, one item each; this page
-grows with them.
+Item 389 built the versions, their components, the prompt's reading of the adopted one, the command line and the API.
+Item 390 built the roles and `dotx harness propose`. The probe and the nightly step, the provenance graph and the page
+follow, one item each; this page grows with them.

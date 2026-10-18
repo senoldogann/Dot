@@ -13,6 +13,7 @@ from dotagent.cli_commands import (
     HarnessAdoptCommand,
     HarnessDiffCommand,
     HarnessListCommand,
+    HarnessProposeCommand,
     HarnessRetireCommand,
     HarnessSetCommand,
     HarnessShowCommand,
@@ -21,7 +22,9 @@ from dotagent.config import load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path, screenshots_dir
 from dotagent.harness.components import COMPONENTS, NO_HARNESS, HarnessText
+from dotagent.harness.propose import propose_from_run
 from dotagent.harness.service import OWNER, adopt, adopted, create_version, diff_text, retire, text_of
+from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
 from dotagent.store.models import HarnessVersion
@@ -148,6 +151,23 @@ async def cmd_harness_retire(command: HarnessRetireCommand) -> int:
     return 0
 
 
+async def cmd_harness_propose(command: HarnessProposeCommand) -> int:
+    """One question to the proposer about a run; its candidate waits for 'dotx harness adopt'."""
+    runtime: Runtime = await build_runtime(load_user_config())
+    try:
+        version: HarnessVersion | None = await propose_from_run(runtime, command.run_id, command.scope)
+    finally:
+        await close_runtime(runtime)
+    if version is None:
+        sys.stdout.write(f"The proposer keeps the harness as it is: nothing in {command.run_id} argues for a change.\n")
+        return 0
+    sys.stdout.write("\n".join(render_version(version)) + "\n")
+    sys.stdout.write(
+        f"Adopt it with 'dotx harness adopt {version.id}', or see what it changes with 'dotx harness diff'.\n"
+    )
+    return 0
+
+
 async def dispatch(command: Command) -> int:
     """Carry out one of this module's commands."""
     match command:
@@ -163,5 +183,7 @@ async def dispatch(command: Command) -> int:
             return await cmd_harness_adopt(command)
         case HarnessRetireCommand():
             return await cmd_harness_retire(command)
+        case HarnessProposeCommand():
+            return await cmd_harness_propose(command)
         case _:
             raise InvalidValueError("not a command of this module", {"name": command.name})

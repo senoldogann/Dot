@@ -167,6 +167,15 @@ class HarnessRetireCommand(FrozenModel):
     version_id: str
 
 
+class HarnessProposeCommand(FrozenModel):
+    """A candidate from what one run did (item 390): ``scope`` is the proposer's, how the agent works or what a
+    practitioner knows."""
+
+    name: Literal["harness-propose"]
+    run_id: str
+    scope: Literal["invariant", "domain"]
+
+
 class BrowserImportChromeCommand(FrozenModel):
     name: Literal["browser-import-chrome"]
     profile: str
@@ -349,6 +358,7 @@ type Command = Annotated[
     | HarnessSetCommand
     | HarnessAdoptCommand
     | HarnessRetireCommand
+    | HarnessProposeCommand
     | BrowserLoginCommand
     | BrowserImportChromeCommand
     | BrowserAttachCommand

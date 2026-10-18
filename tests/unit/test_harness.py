@@ -16,7 +16,9 @@ from dotagent.store.models import HarnessVersion
 
 HABITS: str = "- Read the file before you change it.\n- Say what you skipped and why."
 GUIDANCE: str = "- rg wants --glob for a file pattern, not a bare path."
-LIMITS: HarnessConfig = HarnessConfig(habits_chars=200, tool_guidance_chars=200, component_lines=4)
+LIMITS: HarnessConfig = HarnessConfig(
+    habits_chars=200, tool_guidance_chars=200, component_lines=4, proposer="", composer="", selector="", experience=""
+)
 
 
 def _prompt(style: PromptStyle, harness: HarnessText) -> str:
