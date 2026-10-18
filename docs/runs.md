@@ -5,6 +5,14 @@
 A run is a loop. The model answers with tool calls; Dot checks each call against the [policy](safety.md#safety), runs the ones
 that pass (up to `parallel_tools` at once) and hands the results back, until the model calls `finish`.
 
+A chat keeps its turns on one page (item 374): each earlier turn reads as its question, what it did and its answer,
+with no "open run" to hop through. What it did is what its run said, in the order it said it, and each stretch of its
+tool calls as one line that says what they did ("Ran 2 commands and read 1 file"), which opens to every call and its
+result, as on the run's own page. Appearance › *Fold tool steps* says whether those lines start folded (Neutral and
+the palettes fold them, Paper does not). The short marks at the left of the conversation stand for its messages, and a
+click on one goes to it — the last of them to the newest question and the work under it. A very long conversation
+keeps its last forty turns on the page and says how many it leaves out.
+
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
 figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI
 shows it as the last message of the conversation, `dotx run` prints it. A `chat` turn has no `finish`: its plain reply

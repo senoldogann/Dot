@@ -133,7 +133,9 @@ export function messageOutline({ layout, main, thread, dock }) {
   let active = null;
   let painting = false;
 
-  /** The messages in sight between the stage bar and the dock: the first of them (else the last one above), and all. */
+  /** The messages in sight between the stage bar and the dock: the first of them (else the last one above), and all.
+   * The dock sits at the end of the column now (item 374), so when it is below the window the window's own foot is the
+   * bottom of what is read. */
   function sight() {
     const top = stagebarBottom();
     const bottom = dock.getBoundingClientRect().top;

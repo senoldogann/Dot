@@ -411,7 +411,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       ...pickLists(),
     ],
   });
-  element.append(wired.menu, wired.field, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, options, sendButton));
+  element.append(wired.menu, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, wired.field, options, sendButton));
   sendButton.addEventListener("click", () => (stopping() ? stop() : send()));
 
   function onInput() {

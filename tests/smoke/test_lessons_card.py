@@ -37,7 +37,6 @@ _LEFT: str = "Reading a file back right after writing it confirms that the write
 _WHY: str = "says nothing a later run needs"
 _RUN_WAIT_S: float = 30.0
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "dark"), (390, "light"))
-_SHOT_DIR: Path = Path("/tmp/dot-plan21/lessons-card")
 
 
 def _turn(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
@@ -137,7 +136,7 @@ async def _page(
 
 
 async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with_save_anyway(
-    runtime: Runtime, served: tuple[RunManager, str]
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
     manager, address = served
     run: RunRecord = await manager.start(
@@ -147,7 +146,6 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
         assert (await manager.wait(run.id)).status == "done"
         await manager.learned(run.id)
     assert await runtime.store.count_memories() == 1
-    await asyncio.to_thread(_SHOT_DIR.mkdir, parents=True, exist_ok=True)
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch()
         try:
@@ -155,25 +153,32 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
                 page, errors = await _page(browser, address, run.id, width, scheme)
                 card: Locator = page.get_by_role("region", name="Lessons from this run")
                 await expect(card).to_be_visible()
+                assert not await card.locator(".lesson").first.is_visible(), "the lessons arrive folded"
+                assert await card.get_attribute("open") is None
+                await card.scroll_into_view_if_needed()
+                await card.screenshot(path=str(tmp_path / f"card-folded-{width}-{scheme}.png"))
+                await card.locator(".lessons-head").click()
+                await expect(card.locator(".lesson").first).to_be_visible()
+                assert await card.get_attribute("open") is not None
                 kept: Locator = card.locator(".lesson").nth(0)
                 left: Locator = card.locator(".lesson").nth(1)
                 await expect(kept.locator(".lesson-text")).to_have_text(_KEPT)
-                await expect(kept.locator(".chip")).to_have_text("Saved on its own")
+                await expect(kept.locator(".lesson-state")).to_have_text("Saved on its own")
                 await expect(kept.get_by_role("button", name="Undo")).to_be_visible()
                 await expect(left.locator(".lesson-why")).to_have_text(f"Left out: {_WHY}")
                 await expect(left.get_by_role("button", name="Save anyway")).to_be_visible()
                 await card.scroll_into_view_if_needed()
-                await card.screenshot(path=str(_SHOT_DIR / f"card-{width}-{scheme}.png"))
+                await card.screenshot(path=str(tmp_path / f"card-{width}-{scheme}.png"))
                 assert errors == []
                 if width == _SHOTS[-1][0]:
                     # On the phone: Undo forgets the note, and Save anyway keeps the lesson that was left out.
                     await kept.get_by_role("button", name="Undo").click()
-                    await expect(kept.locator(".chip")).to_have_text("Dismissed")
+                    await expect(kept.locator(".lesson-state")).to_have_text("Dismissed")
                     await expect(page.get_by_text("Undone: the lesson is no longer in memory.")).to_be_visible()
                     await left.get_by_role("button", name="Save anyway").click()
-                    await expect(left.locator(".chip")).to_have_text("Saved to memory")
+                    await expect(left.locator(".lesson-state")).to_have_text("Saved to memory")
                     await expect(left.get_by_role("button", name="Undo")).to_be_visible()
-                    await card.screenshot(path=str(_SHOT_DIR / f"card-{width}-{scheme}-decided.png"))
+                    await card.screenshot(path=str(tmp_path / f"card-{width}-{scheme}-decided.png"))
                     assert errors == []
                 await page.context.close()
         finally:

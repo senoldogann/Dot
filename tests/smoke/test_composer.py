@@ -328,16 +328,24 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
             await browser.close()
 
 
-# The bar's own box, and the middle and the right edge of every control on it that shows (item 115).
+# The composer's box, and the middle, the top, the bottom and the right edge of every control and of the box's field
+# that shows (item 115, item 374).
 _BAR: str = """(() => {
-  const bar = document.querySelector('.composer-bar').getBoundingClientRect();
-  const parts = [...document.querySelectorAll('.composer-bar > button, .composer-options > :not([hidden])')]
+  const composer = document.querySelector('.composer').getBoundingClientRect();
+  const name = (node) => node.dataset.pill
+    ?? (node.classList.contains('send') ? 'send'
+      : node.classList.contains('plus-button') ? 'plus'
+      : node.classList.contains('composer-field') ? 'field'
+      : node.className);
+  const parts = [...document.querySelectorAll(
+    '.composer-bar > button, .composer-bar > .composer-field, .composer-options > :not([hidden])'
+  )]
     .filter((node) => node.getClientRects().length > 0)
     .map((node) => {
       const box = node.getBoundingClientRect();
-      return [node.dataset.pill ?? node.className, box.top + box.height / 2, box.right];
+      return [name(node), box.top + box.height / 2, box.right, box.top, box.bottom, box.height];
     });
-  return { top: bar.top, bottom: bar.bottom, right: bar.right, parts };
+  return { right: composer.right, bottom: composer.bottom, parts };
 })()"""
 # The bar is as tall as its pills; on a phone they are sized for a finger (item 273).
 _BAR_PX: int = 32
@@ -387,15 +395,28 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 await expect(page.locator(".composer-popover[aria-label='Options']")).to_be_hidden()
                 await page.mouse.move(0, 0)
                 bar: dict[str, float | list[list[str | float]]] = await page.evaluate(_BAR)
-                top, bottom, right, parts = bar["top"], bar["bottom"], bar["right"], bar["parts"]
-                assert (
-                    isinstance(top, float | int) and isinstance(bottom, float | int) and isinstance(right, float | int)
-                )
-                assert isinstance(parts, list) and len(parts) == 7, (width, bar)
-                assert round(bottom - top) == (_PHONE_BAR_PX if width <= _PHONE_PX else _BAR_PX), (width, bar)
-                middles: list[float] = [float(part[1]) for part in parts]
-                assert max(middles) - min(middles) <= 1, (width, bar)
+                right, parts = bar["right"], bar["parts"]
+                assert isinstance(right, float | int)
+                assert isinstance(parts, list) and len(parts) == 8, (width, bar)
+                by_name: dict[str, list[float]] = {str(part[0]): [float(value) for value in part[1:]] for part in parts}
+                assert set(by_name) == {"plus", "send", "field", "mode", "agent", "model", "reasoning", "options"}, bar
+                # The pills keep one line at every width, and their height is the bar's (item 273).
+                pills = [by_name[name] for name in ("mode", "agent", "model", "reasoning", "options")]
+                assert max(float(pill[0]) for pill in pills) - min(float(pill[0]) for pill in pills) <= 1, (width, bar)
+                height_px = _BAR_PX if width > _PHONE_PX else _PHONE_BAR_PX
+                assert all(round(float(pill[4])) == height_px for pill in pills), (width, bar)
                 assert all(float(part[2]) <= right + 0.5 for part in parts), (width, bar)
+                plus, send, field = by_name["plus"], by_name["send"], by_name["field"]
+                if width > _PHONE_PX:
+                    # The desk keeps the box above its controls: one line of pills, the field over it.
+                    assert max(abs(float(plus[0]) - float(pill[0])) for pill in pills) <= 1, (width, bar)
+                    assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
+                    assert float(field[3]) < float(pills[0][2]) - 1, (width, bar)
+                else:
+                    # The phone puts the "+" and the send beside the box, and the pills on the line under it (item 374).
+                    assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
+                    assert float(pills[0][2]) > float(plus[3]) - 1, (width, bar)
+                    assert abs(float(field[3]) - float(plus[3])) <= 2, (width, bar)
                 mode_name = page.locator(".composer-pill[data-pill='mode'] .composer-pill-value")
                 if width <= 560:
                     await expect(mode_name).to_be_hidden()

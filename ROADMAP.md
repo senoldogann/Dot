@@ -14434,7 +14434,7 @@ whose engines refused, and an instance on the loopback address that answers, lim
 
 ### 373. Settings › Providers, and the settings pages list first
 
-**Status: in progress.** The owner's words of 2026-10-18 to Dot runs: "Bizde provider ekranını [başka bir uygulama]'daki
+**Status: done (`010580c`).** The owner's words of 2026-10-18 to Dot runs: "Bizde provider ekranını [başka bir uygulama]'daki
 gibi bir tasarımda yapsak? Şu an API keys sayfası olarak var ve providerların gerçek logosu vs. yok." (could our
 providers screen be designed like [another app]'s? It is an API keys page now, without the providers' real logos), and
 "Provider ekranında bir sağlayıcı seçtiğimizde sol üstteki < işaretinin arka plan rengini kaldır, o işarete düzgün bir
@@ -14458,6 +14458,38 @@ not show; the notes' box, which no longer scrolled inside (item 218); the tab's 
 `tests/smoke/test_providers.py` (new); `test_judge_switch.py`, `test_setup_card.py`, `test_rules.py`,
 `test_schedule_memory.py`, `test_phone_settings.py` and `test_phone_fit.py` follow the pages. Docs: `README.md`,
 `docs/daemon.md`, `docs/models.md`, `docs/memory-and-schedules.md`, `docs/phone.md`, `docs/safety.md`.
+
+### 374. The chat reads as one flow: open turns, folded work, a composer of glass
+
+**Status: in progress.** The owner's words of 2026-10-18 to Dot runs: "Lessons from this run alanını daha minimal ve hoş
+yapabilir miyiz? … Çalışan komutlar ve thinking texti üzerinden ayrıca sunshine animasyon aksın, ayrıca sohbet ve
+composer aynı scroll içinde olsun" (could the lessons be more minimal and nicer? A sunshine should run over the commands
+at work and the thinking text, and the chat and the composer should scroll as one); "Lessons from this run default
+collapse gelsin … sohbet içinde yukarı scroll yaparken composer da fix gelmeli" (the lessons come folded; the composer
+stays put while the chat scrolls); "mobilde … composer arkasında bir alan var, o rengi kaldırsak composer sanki liquid
+glass'mış gibi olsa? Ayrıca composer çok kalabalık" (on a phone, take away the band behind the composer so that it reads
+as glass; the composer is crowded too); "aynı session içerisinde open run olayı var. Bu böyle olmamalı, her şey
+uncollapse olmalı, sadece sol tarafta küçük - işaretleriyle istediğimiz yere tıklayarak en son gönderdiğimiz promptun
+işlemlerine gidebilmeliyiz" (no "Open run" inside a chat: everything open, and the small marks at the left lead
+anywhere, to the newest prompt's work too); and a flow like [başka bir uygulama]'s, the agent's words between the lines
+of the commands it ran; then, of the runs' work, to this session: "Koşu bitince hepsini ekle". **As built
+(2026-10-18).** The lessons card arrives folded, its head with their number; a lesson reads as a line of the
+conversation, More past four lines, what became of it a quiet word and its actions the only buttons (`views/run.js`,
+`run.css`). A warm light slides through the words of a tool call at work and of a live thought, and stands still under
+reduced motion (`app.css`; `tools.js` marks a running row). On a phone the "+" and the send stand beside the box and the
+choices on the line under it; the dock draws no ground and floats over the conversation as glass, the conversation's
+padding keeping its last line clear of it, while the conversation scrolls under it (`composer.js`, `run.css`). An
+earlier turn of a chat shows what its run said and ran, read from its events (the last six with the page, older ones as
+they come near), with no "Open run" (`history.js`). A stretch of work reads as what it ran, "Ran 2 commands and read 1
+file", with the time it took beside it; while it runs, "Working…" and what is behind it; the model's share of the time
+is no longer in the line (`timeline.js`, `tools.js`); the agent's words inside a flow wear no face, the answer does. The
+review changed: the themes' defaults, which the run had switched for Paper while its tests assumed open steps for
+Neutral (they stay as they were: Neutral and the palettes fold, Paper does not, and the switch keeps its name, Fold tool
+steps); on a phone, the composer's line of choices, which took no room before its pills came, so the opening curtain's
+composer stood lower than the chat's (item 359), and the arrow down, which stood over the floating dock; an earlier turn
+whose events could not be read, which said nothing and now says why, with the way to its run; the other app's name in
+comments. Tests: `tests/smoke/test_thread_turns.py`, `test_sunshine.py`, `test_chat_scroll.py` (new); `test_composer.py`
+and `test_lessons_card.py` follow. Docs: `docs/runs.md`, `docs/daemon.md`.
 
 ## Log
 
@@ -15244,3 +15276,4 @@ not show; the notes' box, which no longer scrolled inside (item 218); the tab's 
 - 2026-10-18 (Opus 5.5): item 364 merged as `6d476e6` (PR #360). Items 370 and 371 on the owner's word of the same day, on `item-370-diagnostics-licences`: Settings › System's Diagnostics and Open source licences, read from what is there.
 - 2026-10-18 (Opus 5.5): items 370 and 371 merged as `4390262` (PR #361). Items 372 to 374 on the owner's words of the same day, the work Dot runs of theirs had left in the main checkout, reviewed and added in three pull requests; item 372 on `item-372-searxng`: the SearXNG rung.
 - 2026-10-18 (Opus 5.5): item 372 merged as `8c7971e` (PR #362). Item 373 on `item-373-providers`: Settings › Providers, and the settings pages that list first.
+- 2026-10-18 (Opus 5.5): item 373 merged as `010580c` (PR #363). Item 374 on `item-374-chat-flow`: the chat reads as one flow.
