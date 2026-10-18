@@ -29,7 +29,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent import manager as manager_module
 from dotagent.agent.attachments import (
@@ -482,7 +482,8 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     """The box puts the files of the queued message it edits back (item 376): small, the photo's own picture and the
-    text file's icon, no words, each with its ×; they leave with the edit, saved or not."""
+    text file's icon, no words, each with its ×; a file added to the edit goes with it once uploaded, Save waiting for
+    it as a send does; the message the box holds is not kept as the chat's draft; and the files leave with the edit."""
     model: _GatedModel = _GatedModel()
     async with _served(login_env, model) as (runtime, manager, address):
         first, message, photo, note = await _queued_with_photo(runtime, manager)
@@ -508,10 +509,36 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 await expect(chips.first.locator(".attach-remove")).to_be_visible()
                 assert (await chips.first.text_content() or "").strip() == ""
                 await page.locator(".dock").screenshot(path=str(tmp_path / "queue-edit-files.png"))
-                await page.locator(".dock textarea").fill(SUMMARY)
+                # A file added while its upload is held: Save says to wait, and the edit and its files stay.
+                uploaded: asyncio.Event = asyncio.Event()
+
+                async def held(route: Route) -> None:
+                    await uploaded.wait()
+                    await route.continue_()
+
+                await page.route("**/api/attachments", held)
+                await page.locator(".dock input[type=file]").set_input_files(
+                    {"name": "more.txt", "mimeType": "text/plain", "buffer": b"one more line\n"}
+                )
+                await page.locator(".dock textarea").fill(SHORT_SUMMARY)
+                every_chip: Locator = page.locator(".dock .attach-chip")
+                await expect(every_chip).to_have_count(3)
                 await page.locator(".dock .btn.send").click()
-                await expect(chips).to_have_count(0)
+                await expect(page.get_by_text("Wait until the files are uploaded")).to_be_visible()
+                await expect(every_chip).to_have_count(3)
+                kept: list[str] = await page.evaluate(
+                    "Object.keys(localStorage).filter((key) => key.startsWith('dot.draft.'))"
+                    ".map((key) => localStorage.getItem(key))"
+                )
+                assert not any(SHORT_SUMMARY in draft or "notes.txt" in draft for draft in kept), kept
+                uploaded.set()
+                await expect(page.locator(".dock .attach-chip.ready")).to_have_count(3)
+                await page.unroute_all(behavior="ignoreErrors")
+                await page.locator(".dock .btn.send").click()
+                await expect(every_chip).to_have_count(0)
                 await expect(row).to_have_count(1)
+                saved: QueuedMessage = (await runtime.store.list_queued(first.thread_id))[0]
+                assert (saved.text, len(saved.attachments)) == (SHORT_SUMMARY, 3)
             finally:
                 await browser.close()
         await model.release()

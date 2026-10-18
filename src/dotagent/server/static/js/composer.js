@@ -272,15 +272,18 @@ function pickRow(kind, name, hint, selected, onPick) {
  * closes it), `options`,
  * `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs `watcher()` after
  * every change of the text, a clear among them, and returns what stops it; item 259), `clear()` (the text and the
- * files; the picks wait for `picks.sent()`) and `dispose()`.
+ * files; the picks wait for `picks.sent()`), `pauseDraft()` and `resumeDraft()` (while the box holds what is not the
+ * draft, a queued message being edited, item 376, the draft stays as it was) and `dispose()`.
  */
 export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener }) {
   const textarea = el("textarea", { class: "textarea", rows: "1", placeholder, "aria-label": boxLabel });
   const element = el("section", { class: "card composer", "aria-label": label });
   const key = draftKey === null ? null : `${DRAFT_PREFIX}${draftKey}`;
 
+  let drafting = true;
+
   function keep() {
-    if (key === null) {
+    if (key === null || !drafting) {
       return;
     }
     const files = attachments.ready();
@@ -470,6 +473,12 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       attachments.clear();
       // What the draft keeps now: nothing, or the picks a steer left for the next message.
       keep();
+    },
+    pauseDraft: () => {
+      drafting = false;
+    },
+    resumeDraft: () => {
+      drafting = true;
     },
     dispose: () => {
       plusMenu.dispose();

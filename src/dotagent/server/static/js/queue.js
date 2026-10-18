@@ -6,6 +6,7 @@
 // open, and every open page shows it as it changes; a queue the page could not read says so, with Read again.
 
 import { api } from "./api.js";
+import { readyToSend } from "./attachments.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { onLifecycle, onStreamBack } from "./state.js";
@@ -141,8 +142,15 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
 
   function startEdit(message) {
     if (editingId === null) {
+      // The box takes the draft's files out for the edit and puts back those it kept: one still uploading, or one that
+      // failed, would be lost, so the edit waits for them as a send does.
+      if (!readyToSend(frame.attachments)) {
+        return;
+      }
       draft = frame.textarea.value;
       draftFiles = frame.attachments.ready();
+      // The message the box holds while the edit lasts is not the draft: the draft the composer keeps stays as it was.
+      frame.pauseDraft();
     }
     editingId = message.id;
     frame.textarea.value = message.text;
@@ -169,6 +177,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     }
     draftFiles = [];
     // The draft the composer keeps follows the box again.
+    frame.resumeDraft();
     frame.textarea.dispatchEvent(new Event("input"));
     frame.autosize();
     onEdit();

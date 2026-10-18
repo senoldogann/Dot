@@ -723,6 +723,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       return;
     }
     if (queue.editing() !== null) {
+      // The edit's files go as a new message's do: once uploaded, and none that failed (item 376).
+      if (!readyToSend(attachments)) {
+        return;
+      }
       sending = true;
       send.disabled = true;
       try {
