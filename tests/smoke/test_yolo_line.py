@@ -1,7 +1,7 @@
 """The line of an action a yolo run did without asking (item 253), on a run's page in Chrome: the action and the
 policy's reason read once each, for a record the gate keeps now and for one kept before, whose summary ended with its
-note. Wide and on a phone, light and dark. Before, the line said the reason twice. Settings › General keeps such lines
-out of the chat and brings them back (item 346).
+note. Wide and on a phone, light and dark. Before, the line said the reason twice. Such lines are out of the chat until
+Settings › General brings them in, and it takes them out again (items 346 and 362).
 
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server.
 """
@@ -150,6 +150,8 @@ async def test_the_line_of_an_action_done_without_asking_says_the_reason_once(
                         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                     )
                     await page.goto(ui_url(host, port, TOKEN))
+                    # The lines show only once they are turned on (item 362).
+                    await page.evaluate("localStorage.setItem('dot.autoLines', 'shown')")
                     run, record = await _waived(runtime, manager, f"Touch the shelf ({width}, {scheme})")
                     # The record keeps the action and the reason apart, each once.
                     assert record.summary.startswith(f"Run: {COMMAND}") and record.note != ""
@@ -170,8 +172,8 @@ async def test_the_line_of_an_action_done_without_asking_says_the_reason_once(
 async def test_settings_keep_the_lines_of_what_ran_without_asking_out_of_the_chat(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
-    """Item 346: the switch of Settings › General leaves the lines out of a chat and brings them back; before, they
-    always showed."""
+    """Items 346 and 362: the lines are out of a chat until the switch of Settings › General brings them in, and it
+    takes them out again. Before item 346 they always showed, and before item 362 until the switch was turned off."""
     with scratch_home() as home, eval_environment(home, {}):
         async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
@@ -183,23 +185,25 @@ async def test_settings_keep_the_lines_of_what_ran_without_asking_out_of_the_cha
                     )
                     await page.goto(ui_url(host, port, TOKEN))
                     run, _ = await _waived(runtime, manager, f"Touch the shelf again ({width}, {scheme})")
+                    # Off as it starts: the chat leaves the lines out.
                     await page.goto(f"{address}/#/runs/{run.id}")
-                    assert len(await _lines(page, 2)) == 2
+                    await expect(page.locator(".answer").last).to_be_visible()
+                    await expect(page.locator(".auto-decision")).to_have_count(0)
                     shown: Locator = page.get_by_role("switch", name="Show what ran without asking")
                     await page.goto(f"{address}/#/settings/general")
                     await shown.scroll_into_view_if_needed()
-                    await expect(shown).to_have_attribute("aria-checked", "true")
+                    await expect(shown).to_have_attribute("aria-checked", "false")
                     await page.screenshot(path=tmp_path / f"chat-card-{width}-{scheme}.png")
+                    await shown.click()
+                    await expect(shown).to_have_attribute("aria-checked", "true")
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    assert len(await _lines(page, 2)) == 2
+                    await page.goto(f"{address}/#/settings/general")
                     await shown.click()
                     await expect(shown).to_have_attribute("aria-checked", "false")
                     await page.goto(f"{address}/#/runs/{run.id}")
                     await expect(page.locator(".answer").last).to_be_visible()
                     await expect(page.locator(".auto-decision")).to_have_count(0)
-                    await page.goto(f"{address}/#/settings/general")
-                    await shown.click()
-                    await expect(shown).to_have_attribute("aria-checked", "true")
-                    await page.goto(f"{address}/#/runs/{run.id}")
-                    assert len(await _lines(page, 2)) == 2
                     await page.close()
             finally:
                 await browser.close()

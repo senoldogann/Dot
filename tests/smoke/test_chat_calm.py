@@ -277,6 +277,9 @@ async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dic
                     )
                     page: Page = await context.new_page()
                     await page.goto(ui_url(host, port, TOKEN))
+                    # The yolo line shows only once such lines are turned on (item 362); here it is one of what must
+                    # not widen the chat.
+                    await page.evaluate("localStorage.setItem('dot.autoLines', 'shown')")
                     started: RunRecord = await manager.start(
                         f"{_GOAL} in a table ({scheme})",
                         "task",
