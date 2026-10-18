@@ -1,7 +1,7 @@
 // What a conversation holds outside one run: the runs before it in the thread, each as the question and its answer, so a
 // follow-up reads as the next turn of one chat, and the way on to the run that continued it.
 
-import { api } from "./api.js";
+import { api, query } from "./api.js";
 import { clip, el, plural } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
@@ -13,6 +13,8 @@ const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read with the page; older ones read them as they come near it (item 374).
 const EAGER_TURNS = 6;
 const OPS_MARGIN = "800px";
+// The events of a run are read this many at a time (the most `GET /runs/{id}/events` gives).
+const EVENTS_PAGE = 2000;
 const FINISH_TOOL = "finish";
 // A long conversation shows its latest turns and says how many it leaves out.
 const SHOWN_TURNS = 40;
@@ -65,12 +67,31 @@ function stepsBlock(tools, rows) {
   return el("details", { class: "steps", open: !foldSteps() }, head, el("div", { class: "steps-body" }, rows));
 }
 
+/** Every event of the run `runId`, a page at a time after the last one read; null once `signal` aborted (the page
+ * went), when what is read is not wanted any more. */
+async function allEvents(runId, signal) {
+  const events = [];
+  let after = 0;
+  for (;;) {
+    if (signal.aborted) {
+      return null;
+    }
+    const page = await api.get(`/runs/${runId}/events${query({ after, limit: EVENTS_PAGE })}`);
+    events.push(...page);
+    if (page.length < EVENTS_PAGE) {
+      return events;
+    }
+    after = page[page.length - 1].id;
+  }
+}
+
 /** What a run said and ran, in the order it happened (item 374): its words, the calls of the stretch that followed,
- * its words again — the answer itself is the turn's message, so a line that only repeats it is left out. */
-async function fillFlow(past, flow) {
+ * its words again — the answer itself is the turn's message, so a line that only repeats it is left out. All its
+ * events are read, so a call without a result was cut off; nothing is drawn once `signal` aborted. */
+async function fillFlow(past, flow, signal) {
   let events;
   try {
-    events = await api.get(`/runs/${past.id}/events?limit=2000`);
+    events = await allEvents(past.id, signal);
   } catch (error) {
     // The turn keeps its question and its answer; what it did is on its own page.
     flow.replaceChildren(
@@ -83,6 +104,9 @@ async function fillFlow(past, flow) {
       ),
     );
     flow.hidden = false;
+    return;
+  }
+  if (events === null || signal.aborted) {
     return;
   }
   const answer = (past.result ?? "").trim();
@@ -123,22 +147,23 @@ async function fillFlow(past, flow) {
   flow.hidden = nodes.length === 0;
 }
 
-/** Fills a turn's operations once it comes near the window, once. */
-function whenNear(element, ops, run) {
+/** Fills a turn's operations once it comes near the window, once; the watch ends with the page (`signal`). */
+function whenNear(element, ops, run, signal) {
   const watch = new IntersectionObserver(
     (entries) => {
       if (entries.some((entry) => entry.isIntersecting)) {
         watch.disconnect();
-        void fillFlow(run, ops);
+        void fillFlow(run, ops, signal);
       }
     },
     { rootMargin: OPS_MARGIN },
   );
   watch.observe(element);
+  signal.addEventListener("abort", () => watch.disconnect(), { once: true });
 }
 
 /** One earlier run as what was asked, what it did and how it ended; a run still going keeps the foot of its message back. */
-function turn(past, editFromHereOf, eager) {
+function turn(past, editFromHereOf, eager, signal) {
   const href = `#/runs/${past.id}`;
   const ended = FINISHED.has(past.status);
   const ops = el("div", { class: "turn-ops", hidden: true });
@@ -154,9 +179,9 @@ function turn(past, editFromHereOf, eager) {
   const element = el("section", { class: ended ? "turn" : "turn turn-working" }, asked, ops, answer);
   if (ended) {
     if (eager) {
-      void fillFlow(past, ops);
+      void fillFlow(past, ops, signal);
     } else {
-      whenNear(element, ops, past);
+      whenNear(element, ops, past, signal);
     }
   }
   return element;
@@ -164,9 +189,10 @@ function turn(past, editFromHereOf, eager) {
 
 /**
  * The earlier turns of the conversation as one block, or null when there are none. `editFromHereOf(run)` gives what
- * rewinds the chat to before the message of an earlier run (item 282), or null where it cannot be.
+ * rewinds the chat to before the message of an earlier run (item 282), or null where it cannot be; `signal` ends with
+ * the page, and what the turns read with it.
  */
-export function earlierTurns(earlier, editFromHereOf) {
+export function earlierTurns(earlier, editFromHereOf, signal) {
   if (earlier.length === 0) {
     return null;
   }
@@ -184,7 +210,7 @@ export function earlierTurns(earlier, editFromHereOf) {
           el("span", null, `${plural(left, "earlier run is", "earlier runs are")} not shown.`),
           el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first run"),
         ),
-    shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS)),
+    shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS, signal)),
   );
 }
 

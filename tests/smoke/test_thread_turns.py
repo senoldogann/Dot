@@ -184,3 +184,47 @@ async def test_a_chat_shows_every_turn_open_and_the_marks_go_anywhere(
             await page.context.close()
         finally:
             await browser.close()
+
+
+# More events than one read of `GET /runs/{id}/events` gives (2000), before the earlier run's last stretch of work.
+_FILLER_EVENTS: int = 2100
+
+
+async def test_an_earlier_turn_reads_all_of_its_events_past_one_page_of_them(
+    runtime: Runtime, thread: tuple[str, list[RunRecord]], tmp_path: Path
+) -> None:
+    """A run with more events than one read gives shows what it did after them too (item 374): its last words, and its
+    last call finished, not cut off. Its events are seeded: the run's own, then fillers, then a copy of its words and
+    of its call."""
+    address, runs = thread
+    first: RunRecord = runs[0]
+    events = await runtime.store.list_events(first.id, 0, 2000)
+    call = next(event for event in events if event.kind == "tool_call" and event.data["tool"] == "shell")
+    result = next(
+        event for event in events if event.kind == "tool_result" and event.data["call_id"] == call.data["call_id"]
+    )
+    said = next(event for event in events if event.kind == "assistant")
+    for number in range(_FILLER_EVENTS):
+        await runtime.store.add_event(first.id, "model_call", {"purpose": "filler", "number": number})
+    await runtime.store.add_event(first.id, "assistant", {**said.data, "text": "One more look at the shore."})
+    await runtime.store.add_event(first.id, "tool_call", {**call.data, "call_id": "late-call"})
+    await runtime.store.add_event(first.id, "tool_result", {**result.data, "call_id": "late-call"})
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script(
+                "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.foldSteps', 'off')"
+            )
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"{address}/#/runs/{runs[-1].id}")
+            turn = page.locator(".history .turn").first
+            await expect(turn.locator(".turn-say")).to_contain_text("One more look at the shore.", timeout=15000)
+            await expect(turn.locator(".turn-ops details.steps")).to_have_count(2)
+            await expect(turn.locator(".tool-state.ok")).to_have_count(2)
+            await expect(turn.get_by_text("cut off")).to_have_count(0)
+            await page.screenshot(path=str(tmp_path / "chat-long-turn.png"))
+            await page.context.close()
+        finally:
+            await browser.close()

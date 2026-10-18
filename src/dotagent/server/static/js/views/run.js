@@ -306,6 +306,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // --------------------------------------------------------------------------------------------- lessons
   // What a run that reached its goal the hard way can tell the runs after it, drawn once it ended (see agent.lessons).
   const lessonsBody = el("div", { class: "lessons" });
+  // More shows when the four lines cut a lesson's text, measured where it stands: a phone's column cuts a shorter text
+  // than a wide one does, and a card still folded is measured once it opens. One watch for the rows drawn last.
+  const lessonCuts = new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      if (!target.classList.contains("open")) {
+        target.nextElementSibling.hidden = target.scrollHeight <= target.clientHeight + 1;
+      }
+    }
+  });
   const lessonsCount = el("span", { class: "lessons-count" });
   // Folded on arrival (item 374): the lessons of a run are a note to open when it is wanted, not a wall over the answer.
   const lessonsCard = el(
@@ -355,13 +364,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       more.textContent = open ? "Less" : "More";
       more.setAttribute("aria-expanded", open ? "true" : "false");
     });
-    // More shows when the four lines cut the text, measured where it stands: a phone's column cuts a shorter text
-    // than a wide one does, and a card still folded is measured once it opens.
-    new ResizeObserver(() => {
-      if (!text.classList.contains("open")) {
-        more.hidden = text.scrollHeight <= text.clientHeight + 1;
-      }
-    }).observe(text);
+    lessonCuts.observe(text);
     const body = el("div", { class: "lesson-body" }, text, more);
     if (lesson.state === "saved") {
       // Saved on its own or by you, a lesson can be taken back: Undo forgets the note it wrote.
@@ -403,6 +406,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
     const proposed = lessons.lessons.some((lesson) => lesson.state === "proposed");
     lessonsCount.textContent = String(lessons.lessons.length);
+    lessonCuts.disconnect();
     lessonsBody.replaceChildren(
       ...lessons.lessons.map(lessonRow),
       ...[
@@ -1296,7 +1300,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el("h1", { class: "visually-hidden" }, run.goal),
     connectionSlot,
     problem,
-    earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null)),
+    earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null), signal),
     goalMessage,
     timeline.element,
     waitingList,
@@ -1392,6 +1396,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     thread.removeEventListener("scroll", onScroll);
     document.documentElement.classList.remove("chat-shell");
     filesWatch.disconnect();
+    lessonCuts.disconnect();
     stopDockHeight();
     outline.dispose();
     stopLifecycle();
