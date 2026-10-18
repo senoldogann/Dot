@@ -14253,12 +14253,14 @@ still do not see the new composer, item 352). **As built (2026-10-18).** The pho
 its kept copy when the network has not answered within 200 ms (item 328), and dropped the network's answer that came
 later: the copy was renewed only by an answer within 200 ms. A phone that reaches the Mac through Tailscale, slower than
 that on every request, kept opening the build it first kept, and the one reload a page of another build makes was
-answered from the same copy. `sw.js` keeps the late answer as the copy for the next opening. Tests:
-`tests/smoke/test_phone_return.py`, after an update on a network always slower than the wait (the test proxy's `slow`):
-the copy answers, and once the network answers its pages are the copy kept, which fails on the code before. The waits on
-a page's caches are made real: Playwright's `wait_for_function` takes the promise of an async function for true at once,
-so the two helpers that waited for the service worker's copy (`test_phone_return.py`, `test_reconnect.py`) waited for
-nothing. Docs: `docs/phone.md`.
+answered from the same copy. `sw.js` now notes a late answer that names another build than the copy's, as the name of an
+empty cache, which outlives the service worker iOS stops between openings; the next opening waits for the network, so
+that the page and its files come from that build and are kept whole, and the copy answers until then and when the
+network fails, still whole for when the Mac is out of reach. Tests: `tests/smoke/test_phone_return.py`, after an update
+on a network always slower than the wait (the test proxy's `slow`): the copy answers and stays whole, the newer build is
+noted, and the next opening keeps it whole, which fails on the code before. The waits on a page's caches are made real:
+Playwright's `wait_for_function` takes the promise of an async function for true at once, so the two helpers that waited
+for the service worker's copy (`test_phone_return.py`, `test_reconnect.py`) waited for nothing. Docs: `docs/phone.md`.
 
 ## Log
 
@@ -15035,4 +15037,4 @@ nothing. Docs: `docs/phone.md`.
 - 2026-10-17 (Opus 5.5): item 271, after its merge: the live daemon could not read Tailscale's status, because the app's program answers as its command line only with `TAILSCALE_BE_CLI=true` when no terminal runs it; fixed on `item-271-tailscale-cli`.
 - 2026-10-18 (Opus 5.5): item 358 on the owner's choice of the same day (of the rows T3 Code's Settings › Browser has that item 354 left out, the default zoom), on `item-358-browser-zoom`.
 - 2026-10-18 (Opus 5.5): item 280 on the owner's word of the same day, on `item-280-lean`: a lean system prompt behind `[agent] prompt`, and three eval runs of the same 41 tasks that keep both defaults full.
-- 2026-10-18 (Opus 5.5): item 359 on the owner's word of the same day (the new composer not on the phone), on `item-359-phone-pages`: over a slow network the phone's service worker kept the build it first kept; it keeps the network's late answer now.
+- 2026-10-18 (Opus 5.5): item 359 on the owner's word of the same day (the new composer not on the phone), on `item-359-phone-pages`: over a slow network the phone's service worker kept the build it first kept; a late answer of another build now has the next opening wait for the network.

@@ -8,6 +8,10 @@
 // so a page is never half one build and half another; the page then compares its build with the daemon's (state.js).
 
 const PAGES_CACHE = "dot-pages-";
+// A cache named for a build the network named after a copy of another build had answered (item 359). It holds nothing:
+// its name outlives this service worker, which iOS stops between openings, and tells the next opening to wait for the
+// network, so that the page and its files come from that build and are kept whole. Until then the copy stays as it is.
+const NEWER_CACHE = "dot-newer-";
 const BUILD_HEADER = "X-Dot-Pages";
 const NETWORK_WAIT_MS = 200;
 const API_PREFIX = "/api";
@@ -25,7 +29,11 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((names) => Promise.all(names.filter((name) => !name.startsWith(PAGES_CACHE)).map((name) => caches.delete(name))))
+      .then((names) =>
+        Promise.all(
+          names.filter((name) => !name.startsWith(PAGES_CACHE) && !name.startsWith(NEWER_CACHE)).map((name) => caches.delete(name)),
+        ),
+      )
       .then(() => self.clients.claim()),
   );
 });
@@ -40,7 +48,8 @@ async function keep(request, response) {
   await cache.put(request, response);
 }
 
-/** Keep a copy of a page the network answered; the copies of every other build go, so the page's build is the one kept. */
+/** Keep a copy of a page the network answered; the copies of every other build go, so the page's build is the one kept,
+ * and so does the note of a newer build (NEWER_CACHE). */
 async function keepPage(request, response) {
   const build = response.headers.get(BUILD_HEADER);
   await keep(request, response);
@@ -62,6 +71,19 @@ async function keptCopy(request) {
   return null;
 }
 
+/** Whether the network named a build after a copy of another had answered, which the next opening waits for (item 359). */
+async function newerNamed() {
+  return (await caches.keys()).some((name) => name.startsWith(NEWER_CACHE));
+}
+
+/** Note the build `response` names when it is not the one of the copy `name`, which answered while the network woke. */
+async function noteNewer(name, response) {
+  const build = response === undefined ? null : response.headers.get(BUILD_HEADER);
+  if (build !== null && `${PAGES_CACHE}${build}` !== name) {
+    await caches.open(`${NEWER_CACHE}${build}`);
+  }
+}
+
 /** A promise that resolves with `value` after `ms`. */
 function after(ms, value) {
   return new Promise((resolve) => setTimeout(() => resolve(value), ms));
@@ -70,15 +92,15 @@ function after(ms, value) {
 /**
  * A page opened: the network's answer when it comes within NETWORK_WAIT_MS, else the kept copy, whose files the page
  * then takes too; the kept copy also when the network fails, and the network's late answer when nothing is kept. A late
- * answer becomes the kept copy all the same (item 359): a phone whose network is always slower than NETWORK_WAIT_MS
- * would otherwise open the build it first kept for ever, and reload into it again when the daemon names another.
+ * answer that names another build than the copy's is noted, and the next opening waits for the network (item 359):
+ * otherwise a phone whose network is always slower than NETWORK_WAIT_MS would open the build it first kept for ever.
  */
 async function openPage(event) {
   const answer = fetch(event.request).then(
     (response) => ({ response }),
     (error) => ({ error }),
   );
-  const early = await Promise.race([answer, after(NETWORK_WAIT_MS, null)]);
+  const early = (await newerNamed()) ? await answer : await Promise.race([answer, after(NETWORK_WAIT_MS, null)]);
   if (early !== null && early.response !== undefined) {
     keepPage(event.request, early.response.clone());
     return early.response;
@@ -86,7 +108,7 @@ async function openPage(event) {
   const kept = await keptCopy(event.request);
   if (kept !== null) {
     keptClients.set(event.resultingClientId, kept.name);
-    event.waitUntil(answer.then((late) => (late.response === undefined ? undefined : keepPage(event.request, late.response))));
+    event.waitUntil(answer.then((late) => noteNewer(kept.name, late.response)));
     return kept.response;
   }
   const late = await answer;

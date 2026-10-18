@@ -543,10 +543,18 @@ async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pa
             await browser.close()
 
 
-# Whether the copies kept are of the build named alone.
-_KEPT_IS: str = """async (build) => {
+# Whether the build named is noted as newer while the copy kept still holds the shell, for when the Mac is out of reach.
+_NOTED_AND_WHOLE: str = """async (build) => {
   const names = await caches.keys();
-  return names.length === 1 && names[0] === `dot-pages-${build}`;
+  const copy = names.find((name) => name.startsWith("dot-pages-"));
+  return names.includes(`dot-newer-${build}`) && copy !== undefined
+    && (await (await caches.open(copy)).match("/js/main.js")) !== undefined;
+}"""
+# Whether the copy kept is of the build named alone, the shell with it.
+_KEPT_WHOLE: str = """async (build) => {
+  const names = await caches.keys();
+  return names.length === 1 && names[0] === `dot-pages-${build}`
+    && (await (await caches.open(names[0])).match("/js/main.js")) !== undefined;
 }"""
 
 
@@ -564,16 +572,21 @@ async def test_a_copy_of_an_earlier_build_opened_on_a_slow_network_gives_way_to_
             await _keep_pages_copy(page)
             await page.close()
             # Dot is updated: the daemon answers as another build than the copy the phone keeps, over a network that
-            # is always slower than the service worker waits, so that the copy answers every opening.
+            # is always slower than the service worker waits.
             named.append("later")
             proxy.slow(_SLOW_S)
-            again: Page = await context.new_page()
+            first: Page = await context.new_page()
             started: float = time.monotonic()
-            await again.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
+            await first.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
             opened_ms: float = (time.monotonic() - started) * 1000
             assert opened_ms < _IN_PLACE_MS, f"the copy did not answer: the page took {opened_ms:.0f} ms to open"
-            # Once the network answers, its pages are the copy the next opening takes.
-            await _until_true(again, _KEPT_IS, "later")
+            # The network's answer, once it comes, is noted, and the copy stays whole, for when the Mac is out of reach.
+            await _until_true(first, _NOTED_AND_WHOLE, "later")
+            await first.close()
+            # The next opening waits for the network, and keeps the daemon's build whole.
+            second: Page = await context.new_page()
+            await second.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
+            await _until_true(second, _KEPT_WHOLE, "later")
             await context.close()
         finally:
             await browser.close()
