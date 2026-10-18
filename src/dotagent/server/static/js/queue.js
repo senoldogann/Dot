@@ -42,6 +42,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
   // The message the composer edits, and the draft it held before.
   let editingId = null;
   let draft = "";
+  let draftFiles = [];
   // The row whose handle was pressed, which alone may be dragged; the row dragged and where it would land.
   let armedId = null;
   let draggedId = null;
@@ -140,10 +141,17 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
 
   function startEdit(message) {
     if (editingId === null) {
+      // The message the box holds while the edit lasts is not the draft: the draft the composer keeps stays as it was,
+      // and the draft's files wait aside as they stand, one still uploading among them, until the edit ends.
+      frame.pauseDraft();
       draft = frame.textarea.value;
+      draftFiles = frame.attachments.setAside();
     }
     editingId = message.id;
     frame.textarea.value = message.text;
+    // The files the message carries come back into the box with its text (item 376), small and each with its ×.
+    frame.attachments.clear();
+    frame.attachments.restoreSmall(message.files);
     frame.autosize();
     frame.textarea.focus();
     onEdit();
@@ -157,7 +165,12 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     editingId = null;
     frame.textarea.value = draft;
     draft = "";
+    // The files the edit put in the box leave with it; the ones the draft had come back.
+    frame.attachments.clear();
+    frame.attachments.putBack(draftFiles);
+    draftFiles = [];
     // The draft the composer keeps follows the box again.
+    frame.resumeDraft();
     frame.textarea.dispatchEvent(new Event("input"));
     frame.autosize();
     onEdit();
@@ -192,7 +205,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
 
     const words = oneLine(message.text);
     const text = el("span", { class: "queue-text", title: message.text }, words);
-    const files = message.attachments.length;
+    const files = message.files.length;
     const clip = files === 0 ? null : el("span", { class: "queue-files", title: `${files} file${files === 1 ? "" : "s"}` }, icon("paperclip"), String(files));
     let actions;
     if (editing) {
@@ -349,7 +362,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     },
     editing: () => editingId,
     saveEdit: async (text) => {
-      const view = await api.patch(`/queue/${editingId}`, { text });
+      const view = await api.patch(`/queue/${editingId}`, { text, attachments: frame.attachments.ids() });
       endEdit();
       show(view);
     },

@@ -115,6 +115,13 @@ def files_router(ctx: ServerContext, looks: QuickLook) -> APIRouter:
             raise InvalidValueError("the file is no image the panel shows", {"path": path})
         return FileResponse(found, media_type=media_type)
 
+    @router.get("/attachments/{attachment_id}/image")
+    async def attachment_image(attachment_id: str) -> FileResponse:
+        """The picture of an image attached to a message: its thumbnail in the box that edits a queued message
+        (item 376)."""
+        stored: StoredAttachment = await asyncio.to_thread(load_attachment, workspace, attachment_id)
+        return await file_image(str(stored.path))
+
     @router.post("/files/open", status_code=204)
     async def open_file(request: OpenRequest) -> None:
         """Open the document at ``path`` in its application on the Mac."""

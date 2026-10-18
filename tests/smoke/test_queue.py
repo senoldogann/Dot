@@ -15,7 +15,10 @@ No network and no model service is used: the scripted model ends each run with i
 """
 
 import asyncio
+import re
+import shutil
 import time
+from base64 import b64decode
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
@@ -23,12 +26,19 @@ from pathlib import Path
 from secrets import token_hex
 from typing import Literal
 
+import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent import manager as manager_module
-from dotagent.agent.attachments import StoredAttachment, UserInput, load_attachments
+from dotagent.agent.attachments import (
+    StoredAttachment,
+    UserInput,
+    attachments_root,
+    load_attachments,
+    store_attachment,
+)
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, RunManager
 from dotagent.config import load_default_config
 from dotagent.core.errors import InvalidValueError, ProviderProtocolError, RunConflict, StoreError
@@ -58,6 +68,7 @@ CLOSE: str = "Then close the notes."
 FILE: str = "Then file them."
 NOW: str = "Use the short form."
 WAIT_S: float = 30.0
+_PIXEL_PNG: str = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
 TOKEN: str = "queue-test-token"
 # The longest transition of a button (320 ms) and a breath: a shot shows where the colours settle.
 _SETTLE_MS: int = 400
@@ -403,6 +414,143 @@ async def test_the_queue_keeps_the_owners_order_and_text_and_the_start_of_the_da
         assert len(await runtime.store.list_runs(10, first.thread_id)) == 2
         await model.release()
         assert (await _ended(manager, second.id)).status == "done"
+
+
+async def _queued_with_photo(
+    runtime: Runtime, manager: RunManager
+) -> tuple[RunRecord, QueuedMessage, StoredAttachment, StoredAttachment]:
+    """A run at work, and a message queued behind it with a photo; a text file uploaded beside it."""
+    first: RunRecord = await _start(manager)
+    photo: StoredAttachment = store_attachment(runtime.workspace, "IMG_1.png", "image/png", b64decode(_PIXEL_PNG))
+    note: StoredAttachment = store_attachment(runtime.workspace, "notes.txt", "text/plain", b"two lines\n")
+    message: QueuedMessage = await manager.queue(
+        first.thread_id,
+        SUMMARY,
+        (photo,),
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "standard",
+        None,
+        NO_PICKS,
+        "yolo",
+        False,
+        None,
+        UI_SOURCE,
+    )
+    return first, message, photo, note
+
+
+async def test_editing_a_queued_message_names_its_files_and_changes_them(login_env: dict[str, str]) -> None:
+    """A message edited in the composer carries its files with its text (item 376): the view names them, so the box can
+    put them back; an edit that lists other files leaves those on the message, checked as a new message's are; one
+    that lists none leaves them as they were; and a file gone from the workspace leaves the queue readable."""
+    model: _GatedModel = _GatedModel()
+    async with _served(login_env, model) as (runtime, manager, address):
+        first, message, photo, note = await _queued_with_photo(runtime, manager)
+        async with httpx.AsyncClient(
+            base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30
+        ) as client:
+            view = (await client.get(f"/api/threads/{first.thread_id}/queue")).json()
+            shown = next(row for row in view["messages"] if row["id"] == message.id)
+            assert [(file["name"], file["kind"]) for file in shown["files"]] == [("IMG_1.png", "image")]
+            edited = await client.patch(
+                f"/api/queue/{message.id}", json={"text": SHORT_SUMMARY, "attachments": [note.id, photo.id]}
+            )
+            assert edited.status_code == 200, edited.text
+            row = next(row for row in edited.json()["messages"] if row["id"] == message.id)
+            assert (row["text"], [file["name"] for file in row["files"]]) == (SHORT_SUMMARY, ["notes.txt", "IMG_1.png"])
+            # Left out, the files stay as they were.
+            await client.patch(f"/api/queue/{message.id}", json={"text": SUMMARY})
+            # A file no upload made is refused, and the message is as it was.
+            refused = await client.patch(
+                f"/api/queue/{message.id}", json={"text": SHORT_SUMMARY, "attachments": ["att_nothing_here"]}
+            )
+            assert refused.status_code == 404, refused.text
+            stored: QueuedMessage = (await runtime.store.list_queued(first.thread_id))[0]
+            assert (stored.text, stored.attachments) == (SUMMARY, (note.id, photo.id))
+            # A file gone from the workspace is left out of the view, which still answers.
+            await asyncio.to_thread(shutil.rmtree, attachments_root(runtime.workspace) / note.id)
+            view = (await client.get(f"/api/threads/{first.thread_id}/queue")).json()
+            shown = next(row for row in view["messages"] if row["id"] == message.id)
+            assert [file["name"] for file in shown["files"]] == ["IMG_1.png"]
+        await model.release()
+
+
+@pytest.mark.browser
+async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_they_leave_with_the_edit(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """The box puts the files of the queued message it edits back (item 376): small, the photo's own picture and the
+    text file's icon, no words, each with its ×; a file added to the edit goes with it once uploaded, Save waiting for
+    it as a send does; the message the box holds is not kept as the chat's draft; and the files leave with the edit,
+    the draft's own photo coming back as it was."""
+    model: _GatedModel = _GatedModel()
+    async with _served(login_env, model) as (runtime, manager, address):
+        first, message, photo, note = await _queued_with_photo(runtime, manager)
+        await manager.edit_queued_with_files(message.id, SUMMARY, (note, photo))
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900})
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{first.id}")
+                # The chat's draft holds a photo of its own, which waits aside while the edit lasts.
+                await page.locator(".dock input[type=file]").set_input_files(
+                    {"name": "draft.png", "mimeType": "image/png", "buffer": b64decode(_PIXEL_PNG)}
+                )
+                await expect(page.locator(".dock .attach-chip.ready")).to_have_count(1)
+                row: Locator = page.locator(".dock .queue .queue-row").first
+                await row.get_by_role("button", name="Edit queued message").click()
+                chips: Locator = page.locator(".dock .attach-chip.small")
+                await expect(chips).to_have_count(2)
+                await expect(chips.first).to_have_attribute("title", "notes.txt")
+                await expect(chips.nth(1)).to_have_attribute("title", "IMG_1.png")
+                # The photo shows its own picture, read from the daemon.
+                picture: Locator = chips.nth(1).locator("img.attach-thumb")
+                await expect(picture).to_have_attribute("src", re.compile(r"^blob:"))
+                assert await picture.evaluate("(image) => image.complete && image.naturalWidth > 0")
+                # No words on a chip: its name is the tooltip, its × removes it.
+                await expect(chips.first.locator(".attach-remove")).to_be_visible()
+                assert (await chips.first.text_content() or "").strip() == ""
+                await page.locator(".dock").screenshot(path=str(tmp_path / "queue-edit-files.png"))
+                # A file added while its upload is held: Save says to wait, and the edit and its files stay.
+                uploaded: asyncio.Event = asyncio.Event()
+
+                async def held(route: Route) -> None:
+                    await uploaded.wait()
+                    await route.continue_()
+
+                await page.route("**/api/attachments", held)
+                await page.locator(".dock input[type=file]").set_input_files(
+                    {"name": "more.txt", "mimeType": "text/plain", "buffer": b"one more line\n"}
+                )
+                await page.locator(".dock textarea").fill(SHORT_SUMMARY)
+                every_chip: Locator = page.locator(".dock .attach-chip")
+                await expect(every_chip).to_have_count(3)
+                await page.locator(".dock .btn.send").click()
+                await expect(page.get_by_text("Wait until the files are uploaded")).to_be_visible()
+                await expect(every_chip).to_have_count(3)
+                kept: list[str] = await page.evaluate(
+                    "Object.keys(localStorage).filter((key) => key.startsWith('dot.draft.'))"
+                    ".map((key) => localStorage.getItem(key))"
+                )
+                assert not any(SHORT_SUMMARY in draft or "notes.txt" in draft for draft in kept), kept
+                uploaded.set()
+                await expect(page.locator(".dock .attach-chip.ready")).to_have_count(3)
+                await page.unroute_all(behavior="ignoreErrors")
+                await page.locator(".dock .btn.send").click()
+                await expect(chips).to_have_count(0)
+                await expect(row).to_have_count(1)
+                # The draft's photo is back as it was, its own picture on its chip.
+                await expect(every_chip).to_have_count(1)
+                await expect(every_chip.locator("img.attach-thumb")).to_have_attribute("src", re.compile(r"^blob:"))
+                saved: QueuedMessage = (await runtime.store.list_queued(first.thread_id))[0]
+                assert (saved.text, len(saved.attachments)) == (SHORT_SUMMARY, 3)
+            finally:
+                await browser.close()
+        await model.release()
 
 
 async def test_a_queue_the_daemons_stop_left_goes_on_once_the_chats_run_continued_ends_done(

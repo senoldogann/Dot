@@ -5,7 +5,7 @@ from typing import Annotated, Literal, Self
 
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
-from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile
+from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
@@ -279,6 +279,8 @@ class SavedSkill(FrozenModel):
 
 class QueueEditRequest(FrozenModel):
     text: str = Field(min_length=1, max_length=_GOAL_CHARS)
+    # The files the message carries after the edit (item 376); left out, they stay as they were.
+    attachments: list[str] | None = Field(default=None, max_length=MAX_ATTACHMENTS)
 
 
 class QueueOrderRequest(FrozenModel):
@@ -287,11 +289,26 @@ class QueueOrderRequest(FrozenModel):
     ids: list[str] = Field(min_length=1, max_length=500)
 
 
+class QueuedFile(FrozenModel):
+    """A file of a queued message, as the composer lists it when the message is edited."""
+
+    id: str
+    name: str
+    size: int
+    kind: AttachmentKind
+
+
+class QueuedMessageView(QueuedMessage):
+    """A queued message with the files it carries named, so editing it puts them back in the box (item 376)."""
+
+    files: list[QueuedFile]
+
+
 class QueueView(FrozenModel):
     """A chat's queue: its messages, the next one first, and whether it waits for the owner to resume it."""
 
     held: bool
-    messages: list[QueuedMessage]
+    messages: list[QueuedMessageView]
 
 
 class AttachmentUpload(FrozenModel):
