@@ -22,7 +22,8 @@ dirs = ["/absolute/path/to/Dot/integrations/rea"]
 
 Dot reads plugins when it starts: restart it (`dotx service restart`, or quit and open Dot.app). Requirements: Node.js
 22.19+, 24.11+ or 26+ with npm, from which `npx` fetches `rea-agents` 6.5.0, the release `.mcp.json` names, and for
-native analysis one of Hopper, Ghidra or IDA. Static JavaScript, Electron, .NET, plist and artifact analysis need no engine.
+native analysis one of Hopper, Ghidra or IDA. Static JavaScript, Electron, .NET, plist and artifact analysis need no
+engine.
 
 ## What Dot gets
 
