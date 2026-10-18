@@ -313,10 +313,10 @@ that one change back once the run has ended (`POST /api/runs/{id}/undo`); the se
 `GET /api/runs/{id}/actions`.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
-notifications, the composer's keys, the Chat card's "Show what ran without asking", off until turned on, whose off
-leaves out of a chat the lines of the actions YOLO let through and of those the reviewer approved while a refusal still
-shows (items 346 and 362, kept in this browser), and the token this browser is signed in with), **Appearance** (the look
-of this browser, below),
+notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on:
+off, a chat leaves out the lines of the actions YOLO let through and of those the reviewer approved, while a refusal
+still shows (items 346 and 362, kept in this browser), and the token this browser is signed in with), **Appearance**
+(the look of this browser, below),
 **Models** (the **Default model** first, a menu of the models that can call tools: the runs that name no model, a new
 chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`, as when it is changed
 from the composer's model menu; then one fold per provider, with the reasoning levels of each model and a menu to choose
