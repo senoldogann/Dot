@@ -192,9 +192,13 @@
     min-height: 0;
   }
 
+  /* The conversation scrolls up and down only (item 360): what is wider than the phone, a table or a block of code,
+     scrolls in a box of its own. A box that scrolls up and down would otherwise scroll sideways too, as soon as
+     anything in it is wider. */
   html.chat-shell .run-thread {
     flex: 1 1 auto;
     min-height: 0;
+    overflow-x: hidden;
     overflow-y: auto;
     overscroll-behavior: contain;
   }

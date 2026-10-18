@@ -95,6 +95,12 @@ function section(title, content, copyable) {
   );
 }
 
+/** A tool's name, with a place to break after each `__` (an MCP tool's is `mcp__server__tool`) for a row too narrow for
+ * it (item 360). */
+function nameParts(tool) {
+  return tool.split(/(?<=__)/).flatMap((part, index) => (index === 0 ? [part] : [el("wbr", null), part]));
+}
+
 /** A row for a tool call. `finish(result)` fills in the outcome once the `tool_result` event arrives. */
 export function toolRow({ tool, args }) {
   const state = el("span", { class: "tool-state" }, el("span", { class: "spinner" }));
@@ -106,7 +112,7 @@ export function toolRow({ tool, args }) {
     { class: "tool-head" },
     state,
     el("span", { class: "tool-kind" }, icon(toolIconName(tool))),
-    el("span", { class: "tool-name" }, tool),
+    el("span", { class: "tool-name" }, ...nameParts(tool)),
     summary,
     badges,
     time,

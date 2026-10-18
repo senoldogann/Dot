@@ -5,6 +5,9 @@
   on a tap to the lines themselves. Before, each was a line of its own between the goal and the answer.
 - On a phone a chat is one screen: the top bar and the composer stay where they are and only the conversation scrolls
   between them. Before, the window scrolled, and the composer stuck to its foot.
+- **On a phone the conversation scrolls up and down only (item 360)**, whatever it holds: a message's foot, a yolo line
+  with a long command, a call of a long MCP tool's name; a table or a block of code wider than the phone scrolls in its
+  own box. Before, each of these but the last two made the whole conversation scroll sideways.
 
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server, and
 the embedding service is an address of this Mac where nothing listens, as Ollama's is when it is not running.
@@ -22,6 +25,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
+from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -48,6 +52,26 @@ _GOAL: str = "Find the invoices and list them"
 # An answer longer than a phone's screen, so that the conversation has somewhere to scroll.
 _LONG_ANSWER: str = "\n\n".join(f"Invoice {number}: paid in full, filed under March." for number in range(1, 61))
 _SCHEMES: tuple[Literal["light", "dark"], ...] = ("light", "dark")
+# What is wider than a phone (item 360): a command and a tool's name with nowhere to break, a table and a block of code.
+_LONG_COMMAND: str = (
+    "Run: ls /Users/owner/Library/Mobile_Documents/com~apple~CloudDocs/Invoices/2026/March/Paid_in_full"
+)
+_LONG_REASON: str = "the cautious preset asks before any command"
+_LONG_TOOL: str = "mcp__microsoft-learn__microsoft_docs_search"
+_WIDE_ANSWER: str = "\n".join(
+    (
+        "Three invoices:",
+        "",
+        "| Invoice | Supplier | Filed under | Paid | Note |",
+        "|---|---|---|---|---|",
+        "| 2026-0311 | Northwind Traders International | Shared › Invoices › March › Paid in full | 18 March | Twice |",
+        "| 2026-0412 | Contoso Pharmaceuticals | Shared › Invoices › April › Paid in full | 16 April | Paid by card |",
+        "",
+        "```",
+        "ls -la '/Users/owner/Library/Mobile Documents/com~apple~CloudDocs/Invoices/2026/March/Paid in full/'",
+        "```",
+    )
+)
 
 
 def _closed_port() -> int:
@@ -120,6 +144,11 @@ async def _ended(runtime: Runtime, manager: RunManager, goal: str) -> RunRecord:
     run: RunRecord = await manager.start(
         goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
     )
+    return await _done(runtime, run)
+
+
+async def _done(runtime: Runtime, run: RunRecord) -> RunRecord:
+    """``run`` once it has ended done."""
     deadline: float = time.monotonic() + WAIT_S
     while (await runtime.store.get_run(run.id)).status not in ("done", "failed"):
         assert time.monotonic() < deadline, f"the run {run.id} did not end in {WAIT_S} s"
@@ -227,6 +256,62 @@ async def test_on_a_phone_only_the_conversation_scrolls(login_env: dict[str, str
                     # Leaving the chat gives the window its scroll back.
                     await page.goto(f"{address}/#/settings/general")
                     await expect(page.locator("html")).not_to_have_class("chat-shell")
+                    await context.close()
+            finally:
+                await webkit.close()
+
+
+async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dict[str, str], tmp_path: Path) -> None:
+    turns: list[ScriptedTurn] = [
+        ScriptedTurn(text="", calls=(ScriptedCall(tool=_LONG_TOOL, arguments={"question": "invoices"}),)),
+        _finish(_WIDE_ANSWER),
+    ] * len(_SCHEMES)
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env, turns) as (runtime, manager, address), async_playwright() as playwright:
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            webkit: Browser = await playwright.webkit.launch(headless=True)
+            try:
+                for scheme in _SCHEMES:
+                    context = await webkit.new_context(
+                        **playwright.devices[_OWNERS_PHONE], color_scheme=scheme, reduced_motion="reduce"
+                    )
+                    page: Page = await context.new_page()
+                    await page.goto(ui_url(host, port, TOKEN))
+                    started: RunRecord = await manager.start(
+                        f"{_GOAL} in a table ({scheme})",
+                        "task",
+                        SCRIPTED_MODEL,
+                        None,
+                        "test",
+                        None,
+                        None,
+                        "standard",
+                        None,
+                        "yolo",
+                        False,
+                        (),
+                    )
+                    await runtime.approvals.record_automatic(
+                        started.id, "shell", _LONG_COMMAND, "medium", {}, "approved", YOLO_DECIDER, _LONG_REASON
+                    )
+                    run: RunRecord = await _done(runtime, started)
+                    await page.goto(f"{address}/#/runs/{run.id}")
+                    await expect(page.locator(".answer").last).to_contain_text("Three invoices")
+                    for head in await page.locator("details.steps:not([open]) > summary.steps-head").all():
+                        await head.click()
+                    await expect(page.locator(".auto-decision.yolo")).to_contain_text("Paid_in_full")
+                    await expect(page.locator(".tool-name").filter(has_text=_LONG_TOOL)).to_be_visible()
+                    await expect(page.locator(".user-message .message-foot")).to_be_visible()
+                    # Nothing reaches past the conversation's box, and the box scrolls up and down only.
+                    thread: Locator = page.locator(".run-thread")
+                    assert await thread.evaluate("(box) => getComputedStyle(box).overflowX") == "hidden"
+                    wide, seen = await thread.evaluate("(box) => [box.scrollWidth, box.clientWidth]")
+                    assert wide <= seen, f"the conversation is {wide - seen} px wider than its box"
+                    assert await thread.evaluate("(box) => { box.scrollLeft = 120; return box.scrollLeft; }") == 0
+                    # The table and the block of code are wider than the phone, and each scrolls in its own box.
+                    for own in (page.locator(".answer .prose table"), page.locator(".answer .prose pre")):
+                        assert await own.evaluate("(box) => box.scrollWidth > box.clientWidth + 40")
+                    await page.screenshot(path=tmp_path / f"phone-width-{scheme}.png")
                     await context.close()
             finally:
                 await webkit.close()

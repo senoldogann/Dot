@@ -77,11 +77,12 @@ At a phone's width (720 px and under) Dot is laid out after T3 Code's phone app 
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
 the thumb. A chat's bar has a round way back to that list, the chat's title over the agent and the model, and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. A line over the
-composer says how long the run has worked (or that it waits for you), how its helpers stand, how many messages wait in
-the queue and how many commands run in the chat, and the run's part, the helpers' and the queue's open what they tell of
-(item 352; a wider window has the line too, with what the run does now). A chat is one screen (item 352): the bar and
-the composer stay where they are and only the conversation scrolls between them, so a scroll, its bounce at either end
-and the keyboard move nothing else. The details rise from the foot as a sheet with a grabber, and
+composer says in a few quiet words how long the run has worked (or that it waits for you), how its helpers stand and how
+many messages wait in the queue, and each part opens what it tells of (items 352 and 360; a wider window has the same
+line). A chat is one screen (item 352): the bar and the composer stay where they are and only the conversation scrolls
+between them, so a scroll, its bounce at either end and the keyboard move nothing else. It scrolls up and down only
+(item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a long command or tool
+name breaks over lines. The details rise from the foot as a sheet with a grabber, and
 a drag of its head down closes it; its Agents tab says of each helper its state, its model and what it does now (on a wide window
 too). Dot's computer opens over the whole screen, with the page's address and who has control (Take over), and goes back
 to the side panel when it closes.

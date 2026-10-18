@@ -232,10 +232,10 @@ draft back), **Steer**, which sends it to the run now, and × to take it out. �
 holds, past the queue, or with the queue's next message when the box is empty. Settings › General › Composer can have a
 message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the
 queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why, with **Read
-again**. A line over the box (item 352, after T3 Code's) says how long the run has worked and what it does now, or that
-it waits for you, how its helpers stand, how many messages are queued and how many commands run in the chat (they stand
-right under it); the run's part, the helpers' and the queue's open what they tell of, and the line comes while one of
-its parts has something to say and goes when none has. When the run
+again**. A line over the box (items 352 and 360, after T3 Code's) says in a few quiet words how long the run has worked,
+or that it waits for you, how its helpers stand and how many messages are queued; each part opens what it tells of, and
+the line comes while one of its parts has something to say and goes when none has. It does not say what the run does
+now, which the conversation shows, nor count the commands at work in the chat, which stand right under it. When the run
 ends done, the next message starts and the page follows it; every open page shows the queue as it
 changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3 Code's
 composer: the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up
