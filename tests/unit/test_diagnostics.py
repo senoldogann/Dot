@@ -93,6 +93,9 @@ def test_the_end_of_a_log_masks_its_secrets_and_leaves_out_a_line_the_read_cut()
     inside: bytes = _PEM[_PEM.index(b"MIIEvQ") + 4 :]
     shown = "\n".join(tail_lines(b"cut line\n" + inside + b"done\n", True, 10, ()))
     assert "BKcwggSjAgEA" not in shown and "END PRIVATE KEY" not in shown and shown.endswith("done"), shown
+    # Read from its start, a log that names the end of a key alone masks nothing before it.
+    named: bytes = b"first\nthe marker -----END PRIVATE KEY----- was missing\n"
+    assert tail_lines(named, False, 10, ())[0] == "first"
 
 
 def test_a_log_is_read_by_its_name_and_any_other_name_is_refused(

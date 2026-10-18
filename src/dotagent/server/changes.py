@@ -1,7 +1,7 @@
 """The Changes of a chat (item 368): the files its runs wrote or created with ``write_file`` and ``edit_file``, read
 from their journals of file changes (``dotagent.undo``), each with the lines added and removed and the unified diff
 from what was there before the chat's first change to it to what is there now. A command's own writes are not in the
-journals.
+journals, and a run's own notes, which ``write_notes`` notes there too, are left out.
 
 A file shows its diff where the panel beside a chat shows files (``previews.paths.located_file``: the workspace and the
 home folder, not a hidden folder nor an application's files); elsewhere, and for a file that is gone, a binary file,
@@ -26,6 +26,9 @@ from dotagent.undo.runs import runs_with_children
 
 # The most a side of a diff may hold; past it the file is listed as too large, as the panel's text is (TEXT_BYTES).
 MAX_DIFF_BYTES: int = 512 * 1024
+# The tools whose changes Changes lists: a run's own notes (``write_notes``) are noted in the same journal, and are
+# not the files it was asked to make.
+_CHANGING_TOOLS: frozenset[str] = frozenset({"write_file", "edit_file"})
 # The lines of context around each change of a diff.
 _CONTEXT_LINES: int = 3
 
@@ -126,6 +129,7 @@ def chat_changes(root: Path, run_ids: Sequence[str], home: Path, workspace: Path
             RunChange(run_id=run_id, entry=entry)
             for run_id in run_ids
             for entry in read_journal(run_journal(root, run_id))
+            if entry.tool in _CHANGING_TOOLS
         ),
         key=lambda change: (change.entry.ts, change.entry.seq),
     )
@@ -143,8 +147,14 @@ def chat_changes(root: Path, run_ids: Sequence[str], home: Path, workspace: Path
             # Each side is masked whole before the diff, so a secret of many lines (a private key in PEM) is masked
             # whatever part of it a hunk shows.
             diff, added, removed = unified_diff(redact_known(sides.before, known), redact_known(sides.after, known))
-            if diff == "" and sides.before != sides.after:
-                note = "the change is inside a secret, which is masked"
+            if diff == "":
+                note = (
+                    "the change is inside a secret, which is masked"
+                    if sides.before != sides.after
+                    else "an empty file"
+                    if sides.after == ""
+                    else "the same as before"
+                )
         files.append(
             FileChange(
                 path=shown,

@@ -293,7 +293,7 @@ def tail_lines(data: bytes, cut: bool, count: int, known: Sequence[str]) -> tupl
     # all that comes before that end is the key's.
     end: re.Match[str] | None = _KEY_END.search(kept)
     begin: re.Match[str] | None = _KEY_BEGIN.search(kept)
-    if end is not None and (begin is None or begin.start() > end.start()):
+    if cut and end is not None and (begin is None or begin.start() > end.start()):
         kept = f"***{kept[end.end() :]}"
     return tuple(redact_known(kept, known).splitlines()[-count:])
 

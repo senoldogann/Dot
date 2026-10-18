@@ -243,7 +243,8 @@ else how many there are, and opened it shows why, or the lessons.
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
 the change cannot be noted (a full disk, say), the file is not changed and the model is told why; a note the disk cut
 short is left out of the journal, so the run's next change is noted after it and `dotx undo` still reads it. The side
-panel's **Changes** tab reads the same journals (item 368): each file a chat's runs changed, diffed from the copy the
+panel's **Changes** tab reads the same journals (item 368): each file a chat's runs changed with `write_file` and
+`edit_file` (a run's own notes are left out), diffed from the copy the
 chat's first change to it kept to what is there now. A file where the panel beside a chat shows no file (a hidden
 folder, an application's files, outside the home folder), a binary file, one past 512 KB, one that is gone and one
 whose first change kept no copy show why instead of a diff. Each side of a diff is masked whole, before it is diffed,

@@ -136,6 +136,23 @@ def test_a_file_that_cannot_be_read_says_so_and_the_others_keep_their_diffs(plac
     assert files["kept.md"].added == 1
 
 
+def test_a_runs_own_notes_are_left_out_and_an_empty_file_says_why_it_has_no_diff(
+    places: tuple[Path, Path, Path],
+) -> None:
+    root, home, workspace = places
+    notes = workspace / "notes" / "run-1.md"
+    target = JournalTarget(
+        directory=run_journal(root, "run-1"), tool="write_notes", max_file_bytes=1_000_000, max_run_bytes=10_000_000
+    )
+    note_change(target, notes, b"what I learned\n")
+    notes.parent.mkdir(parents=True)
+    notes.write_bytes(b"what I learned\n")
+    empty = workspace / "empty.txt"
+    _write(root, "run-1", empty, b"", 1_000_000)
+    [file] = chat_changes(root, ["run-1"], home, workspace, ()).files
+    assert (Path(file.path).name, file.created, file.diff, file.note) == ("empty.txt", True, "", "an empty file")
+
+
 def test_a_chat_without_journals_has_no_changes(places: tuple[Path, Path, Path]) -> None:
     root, home, workspace = places
     view = chat_changes(root, ["run-without-changes"], home, workspace, ())
