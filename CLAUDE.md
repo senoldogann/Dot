@@ -14,16 +14,18 @@ it lets a run do as much as by how it reads.
 
 ## Checks
 
-Run these before saying a change is done; they are the gate in `.github/workflows/gate.yml`. Point `DOT_HOME`,
-`DOT_LOG_DIR` and `DOT_CHROME_DIR` at throwaway folders first, so no test touches the owner's own Dot.
+Point `DOT_HOME`, `DOT_LOG_DIR` and `DOT_CHROME_DIR` at throwaway folders first, so no test touches the owner's own Dot.
+While working, run the tests of what changed (`uv run pytest tests/unit/test_x.py tests/smoke/test_y.py -q`), not the
+whole gate. Run the whole gate once, when the change is done; `.github/workflows/gate.yml` runs it again on the pull
+request. `-n auto` spreads the tests over the Mac's cores.
 
 ```bash
 uv run ruff format --check src tests
 uv run ruff check src tests
 uv run mypy src
-uv run pytest tests/unit -q
+uv run pytest tests/unit -q -n auto
 uv run dotx eval check
-uv run pytest tests/smoke -q -m "not live and not browser and not internet and not desktop and not hosted"
+uv run pytest tests/smoke -q -n auto -m "not live and not browser and not internet and not desktop and not hosted"
 ```
 
 - A change to a tool, the policy or the loop: `dotx eval check` must pass.
@@ -43,4 +45,15 @@ uv run pytest tests/smoke -q -m "not live and not browser and not internet and n
 ## Review
 
 [REVIEW.md](REVIEW.md) says what the code review looks for here. `.claude/hooks/pre-push-review.sh` runs that review
-before every push, on the `claude` command's subscription; its header says how to install and skip it.
+before every push, on the `claude` command's subscription; its header says how to install and skip it. That hook is the
+one review a change gets: `/code-review` or a review subagent is not run on top of it. A finding is fixed or answered
+and pushed again, and the hook reads only the new commits. `/security-review` runs only when a change touches a path
+REVIEW.md lists under "Always needs a human".
+
+## How much process a change needs
+
+- Small: prose only (`docs/`, `ROADMAP.md`, `CHANGELOG.md`, comments), or under about 50 changed lines outside the
+  "Always needs a human" paths. No `PLAN.md`, no review but the pre-push hook, the checks of what changed; push it.
+- A roadmap or changelog entry goes in the pull request of the change it records, not in a pull request of its own.
+- Everything else: done criteria (in `PLAN.md` when it takes several steps), the tests of what changed while working,
+  the whole gate once at the end, the pre-push review, the pull request.

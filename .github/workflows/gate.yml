@@ -4,10 +4,15 @@
 # hosted stay on the developer's Mac; one that needs the local Ollama server's embedding model skips itself here.
 name: gate
 
+# A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing, as no
+# command below reads it; a skill's SKILL.md under src/ is read by Dot and does run the gate. The desktop shell has its
+# own workflow, desktop.yml.
 on:
   pull_request:
+    paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
   push:
     branches: [main]
+    paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
 permissions:
@@ -49,34 +54,10 @@ jobs:
       - name: Types
         run: uv run mypy src
       - name: Unit tests
-        run: uv run pytest tests/unit -q -p no:cacheprovider
+        run: uv run pytest tests/unit -q -n auto -p no:cacheprovider
       - name: Eval references
         run: uv run dotx eval check
       - name: Offline smoke tests
         run: >
-          uv run pytest tests/smoke -q -p no:cacheprovider
+          uv run pytest tests/smoke -q -n auto -p no:cacheprovider
           -m "not live and not browser and not internet and not desktop and not hosted"
-
-  # The desktop shell (desktop/): the Rust compiles, is clean and passes its tests; the bundle itself is built on the
-  # owner's Mac.
-  desktop:
-    runs-on: macos-latest
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
-        with:
-          toolchain: stable
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          workspaces: desktop/src-tauri
-      - name: Format
-        run: cargo fmt --check
-        working-directory: desktop/src-tauri
-      - name: Clippy
-        run: cargo clippy --all-targets -- -D warnings
-        working-directory: desktop/src-tauri
-      - name: Test
-        run: cargo test
-        working-directory: desktop/src-tauri

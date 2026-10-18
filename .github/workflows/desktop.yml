@@ -1,0 +1,44 @@
+# The desktop shell (desktop/): the Rust compiles, is clean and passes its tests; the bundle itself is built on the
+# owner's Mac. It runs only when something under desktop/ or this file changes.
+name: desktop
+
+on:
+  pull_request:
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+  push:
+    branches: [main]
+    paths: ["desktop/**", ".github/workflows/desktop.yml"]
+
+# The job only reads the code: the token GitHub hands it can do nothing more.
+permissions:
+  contents: read
+
+# Each action is pinned by the commit its tag (or branch) named when it was pinned, given in the comment: a tag moved
+# later cannot change what runs here.
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  desktop:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
+        with:
+          workspaces: desktop/src-tauri
+      - name: Format
+        run: cargo fmt --check
+        working-directory: desktop/src-tauri
+      - name: Clippy
+        run: cargo clippy --all-targets -- -D warnings
+        working-directory: desktop/src-tauri
+      - name: Test
+        run: cargo test
+        working-directory: desktop/src-tauri
