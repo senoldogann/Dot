@@ -9,6 +9,7 @@ import pytest
 from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
 from dotagent.config import load_default_config
 from dotagent.core.errors import ToolInputError
+from dotagent.harness.components import NO_HARNESS
 from dotagent.store.models import AgentRecord, RunRecord
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.team import (
@@ -63,6 +64,7 @@ def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 

@@ -34,6 +34,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     ChatChoices,
+    HarnessVersion,
     MemoryRecord,
     MemoryScore,
     QueuedMessage,
@@ -573,6 +574,27 @@ class LearningHealthView(FrozenModel):
 
     health: LearningHealth | None
     stalled: str | None
+
+
+class HarnessView(FrozenModel):
+    """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
+    own text alone, every version the newest first, and the bounds a component keeps to."""
+
+    adopted: HarnessVersion | None
+    versions: tuple[HarnessVersion, ...]
+    habits_chars: int
+    tool_guidance_chars: int
+    component_lines: int
+
+
+class HarnessRequest(FrozenModel):
+    """``POST /api/harness``: a version of the owner's. A component given replaces the adopted version's text, one left
+    out (``None``) keeps it; ``summary`` says in a line what the version is; ``adopt`` adopts it at once."""
+
+    habits: str | None
+    tool_guidance: str | None
+    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    adopt: bool
 
 
 class LearnedSkillsView(FrozenModel):

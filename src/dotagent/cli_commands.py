@@ -131,6 +131,42 @@ class MemoryReindexCommand(FrozenModel):
     name: Literal["memory-reindex"]
 
 
+class HarnessListCommand(FrozenModel):
+    name: Literal["harness-list"]
+
+
+class HarnessShowCommand(FrozenModel):
+    name: Literal["harness-show"]
+    version_id: str | None
+
+
+class HarnessDiffCommand(FrozenModel):
+    name: Literal["harness-diff"]
+    version_id: str
+    against: str | None
+
+
+class HarnessSetCommand(FrozenModel):
+    """A version of the owner's: ``habits`` and ``tool_guidance`` name files to read a component from (``-`` for
+    standard input), ``None`` keeps the adopted version's text."""
+
+    name: Literal["harness-set"]
+    summary: str
+    habits: str | None
+    tool_guidance: str | None
+    adopt: bool
+
+
+class HarnessAdoptCommand(FrozenModel):
+    name: Literal["harness-adopt"]
+    version_id: str
+
+
+class HarnessRetireCommand(FrozenModel):
+    name: Literal["harness-retire"]
+    version_id: str
+
+
 class BrowserImportChromeCommand(FrozenModel):
     name: Literal["browser-import-chrome"]
     profile: str
@@ -307,6 +343,12 @@ type Command = Annotated[
     | DoctorCommand
     | SetupCommand
     | ReflectCommand
+    | HarnessListCommand
+    | HarnessShowCommand
+    | HarnessDiffCommand
+    | HarnessSetCommand
+    | HarnessAdoptCommand
+    | HarnessRetireCommand
     | BrowserLoginCommand
     | BrowserImportChromeCommand
     | BrowserAttachCommand

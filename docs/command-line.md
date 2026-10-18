@@ -40,3 +40,8 @@ can be resumed too.
   holds when standard input is not a terminal
 - `--thinking` shows the model's reasoning stream, `--verbose` the tool output and the token use
 - a goal of `-` is read from standard input
+
+`dotx harness` manages the versions of what a run's prompt takes from the harness, which [The harness](harness.md)
+describes: `list`, `show [ID]`, `diff ID [--against ID]`, `set --summary TEXT [--habits FILE] [--tool-guidance FILE]
+[--adopt]` (a component from a file, `-` for standard input, the other kept from the adopted version), `adopt ID` and
+`retire ID`. The daemon reads the adopted version as each run starts, so none of them needs a restart.

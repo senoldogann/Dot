@@ -24,6 +24,7 @@ from dotagent.agent.verify import new_facts
 from dotagent.config import load_config
 from dotagent.core.paths import playbooks_dir, workspace_dir
 from dotagent.core.types import JsonObject
+from dotagent.harness.components import NO_HARNESS
 from dotagent.policy.engine import auto_review, preset_verdict
 from dotagent.policy.types import ActionInfo, Decision
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -237,6 +238,7 @@ async def test_the_prompt_lists_the_skills_and_tells_the_model_to_read_one_first
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
     assert "# Skills" in prompt
