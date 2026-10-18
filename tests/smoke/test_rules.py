@@ -180,6 +180,12 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             draft = page.get_by_role("button", name="Draft the rule", exact=True)
             await page.get_by_role("button", name="Ask me before Dot deletes anything with rm").click()
             await expect(words).to_have_value("Ask me before Dot deletes anything with rm")
+            # Closed and opened again, the forms keep what was written (item 373).
+            await page.locator(".rule-panel > .panel-head").get_by_role("button", name="Close").click()
+            await expect(words).to_be_hidden()
+            await page.get_by_role("button", name="New rule").click()
+            await expect(words).to_have_value("Ask me before Dot deletes anything with rm")
+            await expect(words).to_be_focused()
             await words.fill("What will the weather be tomorrow?")
             await draft.click()
             await expect(page.locator(".rule-outcome.bad")).to_have_text(_NO_RULE)

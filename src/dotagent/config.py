@@ -679,7 +679,7 @@ JUDGE_SERVICE: str = "typesafe"
 
 
 def providers_by_key(config: AppConfig) -> dict[str, str]:
-    """The provider of each key Dot manages (Settings › API keys, ``dotx auth``), by the name of its variable, in the
+    """The provider of each key Dot manages (Settings › Providers, ``dotx auth``), by the name of its variable, in the
     order they are listed: the providers whose models need a key first, Ollama (whose models the local server runs
     without one) next, and the typed judge's service last."""
     providers: ProvidersConfig = config.providers

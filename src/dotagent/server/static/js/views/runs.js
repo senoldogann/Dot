@@ -259,7 +259,7 @@ function mainProblem(providers, main) {
 
 /**
  * The card that leads to a model while the default one cannot answer (item 333): its provider listed no models, or not
- * this one. Its ways are Settings › Models, Settings › API keys and `dotx setup`. It reads the list the composer reads,
+ * this one. Its ways are Settings › Models, Settings › Providers and `dotx setup`. It reads the list the composer reads,
  * and goes once the default model is one its provider lists; `data-state` says what it found (`ready` or `needed`).
  */
 function buildSetup() {

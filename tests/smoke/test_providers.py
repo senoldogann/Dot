@@ -27,7 +27,6 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "providers-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
-_SHOT_DIR: Path = Path("/tmp/dot-plan21/providers")
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -95,8 +94,9 @@ async def _page(browser: Browser, address: str, width: int, scheme: Literal["lig
     return page, errors
 
 
-async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(runtime: Runtime, served: str) -> None:
-    await asyncio.to_thread(_SHOT_DIR.mkdir, parents=True, exist_ok=True)
+async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
+    runtime: Runtime, served: str, tmp_path: Path
+) -> None:
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch()
         try:
@@ -119,16 +119,16 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
             assert await wide.locator(".provider-section-title", has_text="Models").count() == 1
             sideways = await wide.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
             assert sideways <= 0
-            await wide.screenshot(path=str(_SHOT_DIR / "wide-dark.png"))
+            await wide.screenshot(path=str(tmp_path / "wide-dark.png"))
 
             await rows.filter(has_text="Anthropic").click()
             assert (await wide.locator(".provider-title").text_content()) == "Anthropic"
-            await wide.screenshot(path=str(_SHOT_DIR / "wide-dark-anthropic.png"))
+            await wide.screenshot(path=str(tmp_path / "wide-dark-anthropic.png"))
             assert wide_errors == []
             await wide.context.close()
 
             light, light_errors = await _page(browser, served, 1280, "light")
-            await light.screenshot(path=str(_SHOT_DIR / "wide-light.png"))
+            await light.screenshot(path=str(tmp_path / "wide-light.png"))
             assert light_errors == []
             await light.context.close()
 
@@ -136,14 +136,14 @@ async def test_the_providers_are_a_column_of_marks_and_a_page_of_the_one_chosen(
             layout = phone.locator(".providers-layout")
             assert await layout.get_attribute("data-open") == "false"
             assert not await phone.locator(".provider-panel").is_visible()
-            await phone.screenshot(path=str(_SHOT_DIR / "phone-list.png"))
+            await phone.screenshot(path=str(tmp_path / "phone-list.png"))
             await phone.locator(".provider-item").filter(has_text="TypeSafe").click()
             await phone.wait_for_timeout(300)
             assert await layout.get_attribute("data-open") == "true"
             assert (await phone.locator(".provider-title").text_content()) == "TypeSafe"
             sideways = await phone.evaluate("() => document.documentElement.scrollWidth - window.innerWidth")
             assert sideways <= 0
-            await phone.screenshot(path=str(_SHOT_DIR / "phone-detail.png"))
+            await phone.screenshot(path=str(tmp_path / "phone-detail.png"))
             await phone.locator(".provider-back").click()
             await phone.wait_for_timeout(300)
             assert await layout.get_attribute("data-open") == "false"

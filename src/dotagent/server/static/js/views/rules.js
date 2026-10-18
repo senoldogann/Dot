@@ -300,13 +300,19 @@ function buildWords(onDrafted, isDisposed) {
     examples,
     el("div", { class: "rule-words-foot" }, outcome, draft),
   );
+  // The box takes the focus with the caret after the words it has.
+  function focus() {
+    words.focus();
+    words.setSelectionRange(words.value.length, words.value.length);
+  }
+
   return {
     element,
     start: (text) => {
       words.value = text.slice(0, 500);
-      words.focus();
-      words.setSelectionRange(words.value.length, words.value.length);
+      focus();
     },
+    focus,
     reset: () => {
       words.value = "";
       outcome.hidden = true;
@@ -448,7 +454,8 @@ export function mount(root, ctx) {
     addButton.lastChild.textContent = forms.hidden ? "New rule" : "Close";
     if (!forms.hidden) {
       forms.scrollIntoView({ block: "nearest" });
-      words.start("");
+      // What was written before Close is still there.
+      words.focus();
     }
   });
   root.append(

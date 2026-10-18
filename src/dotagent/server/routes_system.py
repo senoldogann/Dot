@@ -156,7 +156,7 @@ def _option(
 
 
 def _problem(exc: DotError) -> ProviderProblem:
-    """The kind of failure of a provider: the page sends a missing or refused key to Settings › API keys, and says
+    """The kind of failure of a provider: the page sends a missing or refused key to Settings › Providers, and says
     that the provider refused access, which a key does not change."""
     if isinstance(exc, MissingSecretError):
         return "no_key"
