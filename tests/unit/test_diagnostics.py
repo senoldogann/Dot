@@ -11,6 +11,7 @@ from dotagent.core.errors import NotFoundError
 from dotagent.server.diagnostics import (
     DiagnosticsError,
     PsRow,
+    _unreadable,
     elapsed_seconds,
     list_logs,
     parse_ps,
@@ -105,3 +106,9 @@ def test_a_path_under_the_owners_home_shows_as_under_a_tilde() -> None:
     assert shown_path(Path.home()) == "~"
     assert shown_path(Path("/opt/homebrew/bin/node")) == "/opt/homebrew/bin/node"
     assert shown_path(Path(f"{Path.home()}-other/x")) == f"{Path.home()}-other/x"
+
+
+def test_a_folder_that_goes_while_it_is_counted_takes_nothing_and_one_that_cannot_be_read_fails() -> None:
+    _unreadable(FileNotFoundError(2, "No such file or directory", "/gone"))
+    with pytest.raises(DiagnosticsError):
+        _unreadable(PermissionError(13, "Permission denied", "/locked"))

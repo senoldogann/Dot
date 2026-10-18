@@ -210,7 +210,10 @@ def shown_path(path: Path) -> str:
 
 
 def _unreadable(error: OSError) -> None:
-    """A folder Dot keeps that it cannot read: its size would be short, so the measure fails and says where."""
+    """A folder Dot keeps that it cannot read: its size would be short, so the measure fails and says where. A folder
+    that went while it was counted (a cache of Chrome's, a run's own) takes nothing, as a file that went does."""
+    if isinstance(error, FileNotFoundError):
+        return
     raise DiagnosticsError(
         "a folder Dot keeps could not be read", {"path": str(error.filename), "error": error.strerror or str(error)}
     )
