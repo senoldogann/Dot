@@ -4,7 +4,13 @@ another 429 stays a rate limit to retry; and the pause of a model names which it
 runner broke off is retried as a broken connection is (item 256). OpenRouter's 404 for a model the account's privacy
 settings leave no provider of is a refused access that says why and where to change it (item 361)."""
 
-from dotagent.core.errors import ProviderAccessError, ProviderQuotaError, ProviderRateLimitError, ProviderRunnerError
+from dotagent.core.errors import (
+    ProviderAccessError,
+    ProviderHttpError,
+    ProviderQuotaError,
+    ProviderRateLimitError,
+    ProviderRunnerError,
+)
 from dotagent.llm.http import is_retryable_provider_error
 from dotagent.llm.provider_errors import (
     WireError,
@@ -84,7 +90,4 @@ def test_openrouters_404_for_its_privacy_settings_is_a_refused_access_that_says_
     unknown = classify_openrouter(
         404, WireError(kind="", code="404", message="Model not found", limit_name=""), None, {}
     )
-    assert (
-        type(unknown).__name__ == "ProviderHttpError"
-        and unknown.message == "provider answered HTTP 404: Model not found"
-    )
+    assert type(unknown) is ProviderHttpError and unknown.message == "provider answered HTTP 404: Model not found"
