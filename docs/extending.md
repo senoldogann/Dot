@@ -82,8 +82,8 @@ url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" 
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
 
-`dotx mcp list` starts every server Dot has, those of `[[mcp]]` tables and those of its plugins, and shows the tools
-each offers, or why one does not start. Only tools are used (no resources, prompts or sampling). A server at a URL may
+`dotx mcp list` starts the servers of `[[mcp]]` tables and those of plugins (not the ones added on the Plugins page),
+and shows the tools each offers, or why one does not start. Only tools are used (no resources, prompts or sampling). A server at a URL may
 sign in as MCP's authorization asks (OAuth): `oauth = true` has
 Dot send the token it keeps for it, which **Sign in again** on [Customize › Plugins](#customize--plugins) gets, and the servers added
 there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on the Plugins
