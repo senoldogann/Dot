@@ -376,8 +376,9 @@ def owner_prompt_lines(section: OwnerSection) -> tuple[str, ...]:
 
 
 class Remembered(FrozenModel):
-    """The notes a run starts with, the tokens they are estimated to take, and how many notes it would have been handed
-    that were left out as saved while reading outside content (``tainted_left_out``, item 384)."""
+    """The notes a run starts with, the tokens they are estimated to take, and how many of the notes that matched it
+    were left out as saved while reading outside content, whether or not they would have fit (``tainted_left_out``,
+    item 384)."""
 
     records: tuple[MemoryRecord, ...]
     tokens: int
