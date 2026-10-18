@@ -285,8 +285,7 @@ function buildFlock() {
  * The timeline of the run `rootRunId`, which was created at `startedAt` (seconds). `push(record)` takes events in order,
  * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it,
  * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
- * `helperStatuses()` the statuses of the delegated runs, `activity()` what the run does now (the latest step's head,
- * "" between steps), and `draft(record)` paints a draft's card as the draft now
+ * `helperStatuses()` the statuses of the delegated runs, and `draft(record)` paints a draft's card as the draft now
  * stands (item 314: one answered after the run's stream ended); the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
@@ -1423,13 +1422,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   const helper = (runId) => scopes.get(runId)?.panel?.helper ?? null;
   // The statuses of the run's delegated runs, in the order they started.
   const helperStatuses = () => [...scopes.values()].filter((scope) => scope.panel?.helper !== undefined).map((scope) => scope.panel.helper.status);
-  // What the run does now, as the head of its latest group of steps still at work says it ("Thinking…", the latest
-  // call: a call to its helpers stays at work while their rows follow it), "" when none is (item 352: the line over the
-  // composer says it).
-  function activity() {
-    const live = scopes.get(rootRunId).groups.findLast((group) => group.tail || group.pending > 0);
-    return live === undefined ? "" : live.last;
-  }
   return {
     element,
     push,
@@ -1438,7 +1430,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     knows: (runId) => scopes.has(runId),
     helper,
     helperStatuses,
-    activity,
     draft: (record) => drafts.get(record.id)?.update(record),
   };
 }

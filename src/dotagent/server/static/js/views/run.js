@@ -619,11 +619,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   frame.options.append(choices.pills.mode, choices.pills.model, choices.pills.reasoning, choices.pills.options);
   const stopStatus = onChange(choices.sync);
   // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
-  const background = backgroundWork({ threadId: run.thread_id, onCount: () => paintCapsule() });
+  const background = backgroundWork({ threadId: run.thread_id });
   // The chat's loops (item 281), beside its commands at work.
   const loops = chatLoops({ threadId: run.thread_id });
-  // The line over the composer (items 297 and 352): the run's time and what it does now, its helpers, the messages
-  // queued and the commands at work; the first three are the way to where they are told of.
+  // The line over the composer (items 297, 352 and 360): the run's time, its helpers and the messages queued, each the
+  // way to where it is told of.
   const capsule = createCapsule({
     onWork: () => inspector.openTab("run"),
     onHelpers: () => inspector.openTab("agents"),
@@ -938,9 +938,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       since: run.created_at,
       now: Date.now() / 1000,
       helpers: timeline.helperStatuses(),
-      activity: timeline.activity(),
       queued: queue.count(),
-      commands: background.count(),
     });
   }
 
