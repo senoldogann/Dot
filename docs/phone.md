@@ -112,6 +112,18 @@ the phone is at hand, and a phone that the code then refuses means that someone 
 gives a code, `GET /api/phone` the addresses. Neither the code nor the token is logged. The phone reaches Dot while the
 Mac is on and awake.
 
+Added to the home screen, the app carries its manifest: `id` `/`, so that a phone that adds it again keeps one app and
+not two, and the light scheme's own ground, `#f8f7f4`, as its `theme_color` and `background_color` (the bar and the
+screen between the tap and the first frame, the colour the page gives the browser in the light scheme), so that no white
+flash or strip of amber shows while it opens. Beside the plain icons it carries a 512 px `maskable` one, its artwork at
+four fifths of the square on that ground, which a launcher that rounds or crops an icon draws whole; a long press on it
+offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`).
+
+The daemon answers with gzip what a browser asks it for that way (item 381): the pages' scripts and sheets and the
+API's answers, past 1 KiB; the event streams go as they are written, and the fonts and the images, compressed
+already, as they are. The page names every module its script reaches (`modulepreload`), so a phone asks for them at
+once instead of one import after another.
+
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. It keeps them by the build of the pages they are of, which the daemon names in the `X-Dot-Pages` header of
 every file, one build at a time (item 328): a page opened while the network has not answered within 200 ms is answered
@@ -121,5 +133,8 @@ is always slower than 200 ms takes an update all the same; the copy answers unti
 does not answer within those 5 seconds. A page of another build than the daemon's loads again before it shows anything,
 so that it never meets an API it does not know. A page loaded from them while the daemon is out of reach says so and
 tries again by itself (item 200): after 2 seconds, then twice as long each time up to 30, and at once when the browser
-is back on the network or the page back in view, until the daemon answers. Without Tailscale, the same works on the Mac
-itself (`localhost` counts as secure) and on nothing else.
+is back on the network or the page back in view, until the daemon answers. A page opened when the network fails and no
+copy was kept of it (the first opening from the home screen after the app is added, say) is answered with
+`offline.html`, which the service worker keeps as it installs: it says that the Mac cannot be reached, and to check that
+it is on and that Dot runs on it, then to try again. A script or a font that cannot be had is still an error. Without
+Tailscale, the same works on the Mac itself (`localhost` counts as secure) and on nothing else.
