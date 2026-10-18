@@ -300,7 +300,11 @@ async def search_searxng(client: WebClient, base_url: str, query: str, max_resul
             "the SearXNG instance did not answer the search",
             {"status": response.status_code, "body": response.text[:_ERROR_BODY_CHARS]},
         )
-    return parse_searxng(response.content[:_SEARXNG_ANSWER_BYTES]).hits[:max_results]
+    page: ResultsPage = parse_searxng(response.content[:_SEARXNG_ANSWER_BYTES])
+    if not page.hits and not page.announced_no_results:
+        # Results came, and none of them names a page: the next rung answers instead of an empty one.
+        raise WebError("the SearXNG instance's results name no page", {"query": query, "url": base_url})
+    return page.hits[:max_results]
 
 
 def search_ladder(
@@ -518,7 +522,7 @@ class _SearxAnswer(BaseModel):
     model_config = ConfigDict(extra="ignore", frozen=True)
 
     results: list[_SearxResult] = Field(default_factory=list)
-    unresponsive_engines: list[list[str]] = Field(default_factory=list)
+    unresponsive_engines: list[tuple[str, str]] = Field(default_factory=list)
 
 
 class _OllamaResult(BaseModel):

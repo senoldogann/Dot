@@ -21,7 +21,8 @@ leaves the Mac is what a run needs, sent where the configuration points:
   Chrome; Anthropic's search (relayed by `[models] search`) joins when `ANTHROPIC_API_KEY` is saved, and
   `[web] anthropic_search = "off"` leaves it out.
 - **To the sites a run visits: its requests.** The web tools fetch public addresses only, unless
-  `[web] allow_private_hosts` allows more; Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
+  `[web] allow_private_hosts` allows more (the owner's SearXNG instance is configuration and is reached wherever it
+  is, a loopback one too); Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
   when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation
   loads its libraries from public CDNs (see [Tools](runs.md#tools)).
 - **From the shell: whatever a command sends.** The sandbox closes Dot's own files, not the network; a run that has read

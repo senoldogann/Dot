@@ -197,16 +197,26 @@ def test_a_searxng_answer_whose_engines_all_refused_is_an_error_not_an_empty_pag
     refused = b'{"query": "x", "results": [], "unresponsive_engines": [["brave", "Suspended: too many requests"]]}'
     with pytest.raises(WebError):
         parse_searxng(refused)
+    # An engine without its reason is not the shape SearXNG writes: the answer is refused as a whole.
+    with pytest.raises(WebError, match="without the JSON of a search"):
+        parse_searxng(b'{"query": "x", "results": [], "unresponsive_engines": [["brave"]]}')
 
 
 class _SearxHandler(BaseHTTPRequestHandler):
-    """Three instances under one address: ``/ok`` answers the search, ``/off`` has the JSON format off (SearXNG's 403
-    for a format its settings do not list) and ``/busy`` is limiting this machine (its limiter's 429)."""
+    """Four instances under one address: ``/ok`` answers the search, ``/blank`` answers with results that name no page,
+    ``/off`` has the JSON format off (SearXNG's 403 for a format its settings do not list) and ``/busy`` is limiting
+    this machine (its limiter's 429)."""
 
     def do_GET(self) -> None:
         instance: str = self.path.split("/")[1]
-        status: int = {"ok": 200, "off": 403, "busy": 429}[instance]
-        body: bytes = _SEARXNG_ANSWER if status == 200 else b"<!doctype html><title>Refused</title>"
+        status: int = {"ok": 200, "blank": 200, "off": 403, "busy": 429}[instance]
+        body: bytes = (
+            _SEARXNG_ANSWER
+            if instance == "ok"
+            else b'{"results": [{"url": "javascript:void(0)", "title": "Not a page"}]}'
+            if instance == "blank"
+            else b"<!doctype html><title>Refused</title>"
+        )
         self.send_response(status)
         self.send_header("Content-Type", "application/json" if status == 200 else "text/html")
         self.send_header("Content-Length", str(len(body)))
@@ -239,5 +249,9 @@ async def test_a_searxng_instance_answers_and_a_limit_is_told_from_a_format_turn
         with pytest.raises(WebError, match=r"list json in search\.formats") as refused:
             await search_searxng(client, f"{searx}/off", "reaktor", 5)
         assert not isinstance(refused.value, WebThrottledError)
+        # Results that name no page are no answer: the next rung is asked, and this one is not benched.
+        with pytest.raises(WebError, match="name no page") as blank:
+            await search_searxng(client, f"{searx}/blank", "reaktor", 5)
+        assert not isinstance(blank.value, WebThrottledError)
     finally:
         await client.aclose()
