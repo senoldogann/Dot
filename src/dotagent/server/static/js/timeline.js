@@ -24,6 +24,11 @@ import { callKind, describeArguments, flowWords, toolRow } from "./tools.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
+// The answer of a run that ends under the reader's eyes is written in (item 366): at least REVEAL_MIN_CHARS a frame,
+// and in REVEAL_MOST_FRAMES frames at most, about two seconds, however long it is.
+const REVEAL_MIN_CHARS = 4;
+const REVEAL_MOST_FRAMES = 120;
+const REDUCED_MOTION = window.matchMedia("(prefers-reduced-motion: reduce)");
 // The tool that ends a run. Its answer is shown as the answer, so the call itself stays out of the steps unless it failed.
 const FINISH_TOOL = "finish";
 const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "Blocked by policy" };
@@ -131,6 +136,51 @@ function drawLive(live) {
   live.body.append(...blocks.slice(kept).map((sourced) => blockNode(sourced.block)));
   live.drawn = blocks.map((sourced) => sourced.source);
   lastLine(live.body).append(live.caret);
+}
+
+/** Where the reveal of `text` stops after `at`: the end of the word it reaches, so that a word comes whole. */
+function revealStop(text, at) {
+  if (at >= text.length) {
+    return text.length;
+  }
+  const space = text.slice(at).search(/\s/);
+  return space === -1 ? text.length : at + space;
+}
+
+/**
+ * The answer `answer` of a run that ended under the reader's eyes, its words `text` written in as a live message is
+ * drawn (item 366): a few words a frame, formatted as they will stay, the caret at their end, and the answer's foot
+ * once they are all in. The words in, the answer is the one drawn at once, so their end moves nothing.
+ */
+function revealAnswer(answer, text) {
+  const body = answer.querySelector(":scope > .prose");
+  if (body === null) {
+    return;
+  }
+  const foot = answer.querySelector(":scope > .answer-foot");
+  const live = { body, text: "", drawn: [], caret: el("span", { class: "stream-caret", "aria-hidden": "true" }), queued: false, ended: false };
+  body.replaceChildren();
+  body.classList.add("stream");
+  if (foot !== null) {
+    foot.style.visibility = "hidden";
+  }
+  const step = Math.max(REVEAL_MIN_CHARS, Math.ceil(text.length / REVEAL_MOST_FRAMES));
+  let at = 0;
+  function frame() {
+    at = revealStop(text, at + step);
+    live.text = text.slice(0, at);
+    drawLive(live);
+    if (at < text.length) {
+      requestAnimationFrame(frame);
+      return;
+    }
+    live.ended = true;
+    body.replaceWith(prose(text));
+    if (foot !== null) {
+      foot.style.visibility = "";
+    }
+  }
+  requestAnimationFrame(frame);
 }
 
 // How a call of the step a resumed run was in ended (agent/resume.py).
@@ -253,7 +303,8 @@ function buildFlock() {
  * `settle(runs, now)` the records of its delegated runs, `knows(runId)` says whether a run has its place in it,
  * `helper(runId)` gives what its row keeps of a delegated run (see helperCard; null for a run without a row),
  * `helperStatuses()` the statuses of the delegated runs, and `draft(record)` paints a draft's card as the draft now
- * stands (item 314: one answered after the run's stream ended); the
+ * stands (item 314: one answered after the run's stream ended). `revealing()` says whether an answer that arrives now
+ * ends a run under the reader's eyes, to be written in (item 366), rather than one read again; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
  * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
@@ -268,7 +319,7 @@ function buildFlock() {
  * with the run's goal, to show them under it, and `onGoalPicks(picks)` what the owner picked for it in the composer
  * (item 318); null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks }) {
+export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -393,7 +444,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     scope.reply = null;
     if (reply !== null && sameText(reply.text, result) && scope.container.lastElementChild === reply.node) {
       reply.node.remove();
+      return true;
     }
+    return false;
   }
 
   /** The run is over: no group works any more, and a call that never reported back was cut off. */
@@ -774,7 +827,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const needs = typeof record.data.needs === "string" ? record.data.needs.trim() : "";
       const isRoot = scope.runId === rootRunId;
       settleGroups(scope, record.ts);
-      dropRepeatedReply(scope, result);
+      // A reply that streamed the same words was read as they came: its answer does not write them in again.
+      const readAlready = dropRepeatedReply(scope, result);
       const answer = answerMessage({
         actorId: scope.actorId,
         status,
@@ -789,6 +843,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         place(scope, el("div", { class: "needs", "aria-label": "What Dot needs from you" }, head, prose(needs)), record.ts);
       }
       if (isRoot) {
+        if (!readAlready && revealing() && !REDUCED_MOTION.matches) {
+          revealAnswer(answer, result);
+        }
         onAnswer(answer);
         onRunStatus({ status, model: null, endedAt: record.ts });
         return;

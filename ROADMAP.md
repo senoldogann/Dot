@@ -14493,7 +14493,7 @@ and `test_lessons_card.py` follow. Docs: `docs/runs.md`, `docs/daemon.md`.
 
 ### 365. A chat says nothing of how a run was set up
 
-**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca sohbet içinde budget 256k vs. bu gibi şeyler görünmesin
+**Status: done (`c3bfb97`).** The owner's word of 2026-10-18: "Ayrıca sohbet içinde budget 256k vs. bu gibi şeyler görünmesin
 … ekteki fotoğraftaki [başka bir uygulama] akışı gibi temiz ve fresh olsun" (in the chat, "budget 256k" and the like
 should not show; it should be clean and fresh, like the flow of [another app] in the screenshot). Item 374 made the
 flow; this item takes the last such lines out of it. **As built (2026-10-18).** The lines of how a run was set up (the
@@ -14506,6 +14506,20 @@ each line in short, and a kind a long run repeats (the goal repeated, a step sen
 Tests: `tests/smoke/test_chat_calm.py`, `test_context_meter.py`, `test_embedding_failure.py` and `test_memory_line.py`
 find them in the side panel and not in the conversation. Docs: `docs/daemon.md`, `docs/memory-and-schedules.md`,
 `docs/runs.md`, `docs/safety.md`.
+
+### 366. An answer that ends a run under the reader's eyes is written in
+
+**Status: in progress.** The owner's word of 2026-10-18: "Dot session bitiminde mesajları pat diye birden yazıyor, böyle
+olmasın, animasyonlu bir şekilde streaming olarak gelsin cevaplar" (at the end of a session Dot writes its messages all
+at once with a thud; it should not: the answers should come streaming, animated). **As built (2026-10-18).** An answer
+that ends a run while its page is open is written in (`timeline.js`): a few words a frame, at least four characters and
+in 120 frames at most, about two seconds however long it is, each word whole, formatted as it will stay and drawn as a
+live message is (item 274), the caret at its end and the answer's foot once it is all in; then the answer is the one
+drawn at once, so its end moves nothing. A run that had ended when its page opened shows its answer at once, as does an
+answer whose words a reply had streamed already, and any answer under reduced motion. The answer comes whole from the
+run, as the finish tool's argument, so the page writes it in; nothing changes in what the daemon sends. Tests:
+`tests/smoke/test_answer_streams.py` (the words grow frame by frame and the foot waits for them; under reduced motion
+and on a run opened after it ended, the answer is whole from its first frame). Docs: `docs/daemon.md`.
 
 ## Log
 
@@ -15294,3 +15308,4 @@ find them in the side panel and not in the conversation. Docs: `docs/daemon.md`,
 - 2026-10-18 (Opus 5.5): item 372 merged as `8c7971e` (PR #362). Item 373 on `item-373-providers`: Settings › Providers, and the settings pages that list first.
 - 2026-10-18 (Opus 5.5): item 373 merged as `010580c` (PR #363). Item 374 on `item-374-chat-flow`: the chat reads as one flow.
 - 2026-10-18 (Opus 5.5): item 374 merged as `cf7ad72` (PR #364); the pre-push review blocked four pushes, each on a finding of its own, and the owner chose to go on until it passed. Items 365 to 368 on the owner's word of the same day, stacked one on the other: item 365 on `item-365-quiet-setup`, a chat that says nothing of how a run was set up.
+- 2026-10-18 (Opus 5.5): item 365 merged as `c3bfb97` (PR #365). Item 366 on `item-366-answer-streams`: an answer that ends a run under the reader's eyes is written in.
