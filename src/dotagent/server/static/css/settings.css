@@ -1430,17 +1430,9 @@
    pane: what is yours and what to add at the left, the notes themselves at the right, each a hairline row. ---------- */
 
 .memory-layout {
-  display: grid;
-  grid-template-columns: minmax(0, 340px) minmax(0, 1fr);
-  gap: var(--space-3);
-  align-items: start;
-}
-
-.memory-side {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  min-width: 0;
+  gap: var(--space-4);
 }
 
 .memory-panel {
@@ -1448,9 +1440,9 @@
   flex-direction: column;
   gap: var(--space-3);
   min-width: 0;
-  padding: var(--space-3);
+  padding: var(--space-4);
   border: 1px solid var(--border);
-  border-radius: var(--radius-lg);
+  border-radius: var(--radius);
   background: var(--surface);
 }
 
@@ -1479,26 +1471,30 @@
   overflow: hidden;
 }
 
-.notes-panel > .panel-head {
-  padding: var(--space-3);
+.notes-panel > .panel-head,
+.notes-panel > .card-head {
+  padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--border);
 }
 
-.notes-panel > .panel-head .input[type="search"] {
+.notes-panel > .panel-head .input[type="search"],
+.notes-panel > .card-head .input[type="search"] {
   width: min(280px, 45%);
 }
 
 .notes-panel .list-row {
-  padding-inline: var(--space-3);
+  padding-inline: var(--space-4);
 }
 
-.notes-panel .card.list-box {
+.notes-panel .card.list-box,
+.notes-panel .list-box {
   border: 0;
   border-radius: 0;
   background: none;
 }
 
-.notes-panel > .panel-head .hint {
+.notes-panel > .panel-head .hint,
+.notes-panel > .card-head .hint {
   white-space: nowrap;
 }
 
@@ -1620,22 +1616,47 @@
 /* The memory list (Settings › Memory): a note is a row that reads as one card — the sentence first, then a quiet line of
    what it carries (who saved it, when, how it scored), and the actions at the end of that line where the eye can find
    them instead of a column of buttons down the page. */
+/* Standard list rows inside settings/pages: clean hairline separation without nested cards or double borders. */
 .page[data-layout="page"] .list-row {
   gap: var(--space-2) var(--space-3);
   align-items: center;
   padding: var(--space-3) var(--space-4);
+  border: 0;
+  border-top: 1px solid var(--border);
+  border-radius: 0;
+  background: transparent;
+}
+
+.page[data-layout="page"] .list-row:first-child {
   border-top: 0;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
 }
 
 .page[data-layout="page"] .list-box {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  background: var(--bg-subtle, var(--surface-2));
+  gap: 0;
+  padding: 0;
+  background: transparent;
+}
+
+/* Inside cards and panels, ensure no inner borders or double boxes on list rows */
+.card > .list-box,
+.card > .list,
+.memory-panel .list-box {
+  background: transparent;
+  padding: 0;
+}
+
+/* Key-value groups inside cards (e.g. System daemon specs): clean hairline dividers instead of inner boxes */
+.card .kv.kv-rows,
+.card .kv.kv-wide-rows {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.daemon-resume {
+  border-top: 1px solid var(--border);
 }
 
 .page[data-layout="page"] .row-main {
