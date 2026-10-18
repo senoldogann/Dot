@@ -1534,6 +1534,7 @@ function buildBrowser(isDisposed) {
         el("div", { class: "row" }, el("span", { class: "grow" }, "DevTools port of Dot's Chrome"), port),
         portHint,
       ),
+      el("h2", { class: "setting-group-name" }, "How Chrome stands"),
       facts,
       standing,
       signingIn,

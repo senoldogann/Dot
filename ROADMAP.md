@@ -14626,17 +14626,17 @@ a wide page and one under another on a phone: This Dot (the version, the process
 the home folder), How it acts (the safety preset, the approvals, goal mode), What it works with (the scheduler, desktop
 control, the MCP tools, the runs at work and those waiting) and Models; each is its name over a box of rows, a label at
 the left and its value at the right, as the settings list groups its tabs (item 330), and the MCP servers left out take
-a box of their own under them (`views/system.js` `statusGroups`, `app.css`). Settings › Browser's card names its four
+a box of their own under them (`views/system.js` `statusGroups`, `app.css`). Settings › Browser's card names its five
 groups over their settings in the same small muted line: Where it browses, The page it opens, While a run works,
-Developer. A Dot run of the owner's made the design; the review kept its groups and rows, and made its names sentence
-case as the section labels are (item 79, `docs/daemon.md`) rather than small capitals drawn with a title's tightened
-tracking, took the margins a list of facts has by default out of its boxes, set the groups two abreast so the models'
-names keep one line, put the home folder in This Dot, left out a group named Profiles over the setting named Profiles,
-named the second group for what it holds (the run had How it asks), and left the side panel's section titles in sentence
-case: the run took the review area for them and drew them in small capitals, and which part of the side panel the owner
-meant is asked. Tests: `tests/smoke/test_about_pages.py` (the four groups and the rows of This Dot, wide and light and
-on a phone and dark), `test_browser_settings.py` (the four names). Docs: `docs/daemon.md`,
-`docs/browser-and-computer-use.md`.
+Developer, How Chrome stands. A Dot run of the owner's made the design; the review kept its groups and rows, and made
+its names sentence case as the section labels are (item 79, `docs/daemon.md`) rather than small capitals drawn with a
+title's tightened tracking, took the margins a list of facts has by default out of its boxes, set the groups two abreast
+so the models' names keep one line, put the home folder in This Dot, left out a group named Profiles over the setting
+named Profiles, gave how Chrome stands a group of its own instead of Developer's, named the second group for what it
+holds (the run had How it asks), and left the side panel's section titles in sentence case: the run took the review area
+for them and drew them in small capitals, and which part of the side panel the owner meant is asked. Tests:
+`tests/smoke/test_about_pages.py` (the four groups and the rows of This Dot, wide and light and on a phone and dark),
+`test_browser_settings.py` (the five names). Docs: `docs/daemon.md`, `docs/browser-and-computer-use.md`.
 
 ## Log
 

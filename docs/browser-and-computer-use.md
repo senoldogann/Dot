@@ -90,8 +90,8 @@ that needs it, and the value is written to `config.toml`. The port asks for no t
 program on this Mac can connect to it and drive Chrome with the sign-ins of Dot's profile.
 
 
-Settings › Browser has these rows (item 354), in four groups each named over its settings (item 378): where it browses,
-the page it opens, while a run works, and Developer. **Runs may use the browser** (`[browser] enabled`, on by
+Settings › Browser has these rows (item 354), in five groups each named over its settings (item 378): where it browses,
+the page it opens, while a run works, Developer, and how Chrome stands. **Runs may use the browser** (`[browser] enabled`, on by
 default; `POST /api/browser/enabled` with `{"enabled": false}`) keeps the browser tools from every run that starts after
 it, an agent's and OpenCode's agent's too; a run at work keeps the tools it started with, and computer use still sees
 the screen. **Size of a page**, **Appearance of pages** and **Zoom of pages** (item 358) are `POST /api/browser/look`
