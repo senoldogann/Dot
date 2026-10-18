@@ -163,6 +163,16 @@ def _finish(answer: str) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}),))
 
 
+# The head of Set up for a long run's lines (item 365), from the page's own module.
+_LONG_RUN_SUMMARY: str = """import('/js/setup.js').then(({ setupSummary }) => setupSummary([
+  { kind: 'budget', short: 'budget 192k' },
+  { kind: 'reminder', short: 'goal at step 10' },
+  { kind: 'reminder', short: 'goal at step 20' },
+  { kind: 'route', short: 'step 3 on gpt-5.6' },
+  { kind: 'words', short: 'notes' },
+]))"""
+
+
 async def test_how_a_run_was_set_up_is_in_the_side_panel_not_the_conversation(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
@@ -211,6 +221,11 @@ async def test_how_a_run_was_set_up_is_in_the_side_panel_not_the_conversation(
                         summary: Locator = page.locator(".setup-summary")
                         await expect(summary).to_contain_text("1 memory")
                         await expect(summary).to_contain_text("notes found by their words alone")
+                        # A kind a long run repeats is said once, with its count.
+                        said: str = await page.evaluate(_LONG_RUN_SUMMARY)
+                        assert said == (
+                            "budget 192k · goal repeated 2 times · step 3 on gpt-5.6 · notes found by their words alone"
+                        ), said
                         await page.screenshot(path=tmp_path / f"setup-panel-{name}-{scheme}.png")
                         await context.close()
             finally:

@@ -14501,9 +14501,11 @@ notes and skills it was handed and how they were found, its context budget, its 
 a step sent to another model) are no longer in the conversation, not even as the one quiet line of item 352: the side
 panel's Run tab lists them under Set up, between Details and Cost, its head naming them in short and a warning keeping
 its amber (`setup.js`, `timeline.js`, `views/run.js`). A line that comes in the middle of a run, a step sent to another
-model, no longer splits a stretch of work in two. A delegated run's lines are on its own page. Tests:
-`tests/smoke/test_chat_calm.py`, `test_context_meter.py` and `test_embedding_failure.py` find them in the side panel and
-not in the conversation. Docs: `docs/daemon.md`.
+model, no longer splits a stretch of work in two. A delegated run's lines are on its own page. The head of Set up names
+each line in short, and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count.
+Tests: `tests/smoke/test_chat_calm.py`, `test_context_meter.py`, `test_embedding_failure.py` and `test_memory_line.py`
+find them in the side panel and not in the conversation. Docs: `docs/daemon.md`, `docs/memory-and-schedules.md`,
+`docs/runs.md`, `docs/safety.md`.
 
 ## Log
 

@@ -7,20 +7,39 @@ import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 
+// The kinds of line a long run gives again and again, said once with how many there are: the goal repeated to the
+// model, and the steps sent to another model.
+const REPEATED = {
+  reminder: (count) => `goal repeated ${count} times`,
+  route: (count) => `${count} steps on another model`,
+};
+
 /**
- * The head of the lines `lines` (each `{ kind, short }`): their short parts in the order they came, and the notes and
- * the skills found by their words alone said once ("notes and skills found by their words alone").
+ * The head of the lines `lines` (each `{ kind, short }`): their short parts in the order they came; the notes and the
+ * skills found by their words alone said once ("notes and skills found by their words alone"), and a kind that came
+ * more than once of those a long run repeats (`REPEATED`) said once, with its count.
  */
 export function setupSummary(lines) {
   const alone = lines.filter((line) => line.kind === "words").map((line) => line.short);
-  const parts = [];
-  let saidAlone = false;
+  const counts = new Map();
   for (const line of lines) {
-    if (line.kind !== "words") {
+    counts.set(line.kind, (counts.get(line.kind) ?? 0) + 1);
+  }
+  const parts = [];
+  const said = new Set();
+  for (const line of lines) {
+    if (line.kind === "words") {
+      if (!said.has("words")) {
+        said.add("words");
+        parts.push(`${alone.join(" and ")} found by their words alone`);
+      }
+    } else if (line.kind in REPEATED && counts.get(line.kind) > 1) {
+      if (!said.has(line.kind)) {
+        said.add(line.kind);
+        parts.push(REPEATED[line.kind](counts.get(line.kind)));
+      }
+    } else {
       parts.push(line.short);
-    } else if (!saidAlone) {
-      saidAlone = true;
-      parts.push(`${alone.join(" and ")} found by their words alone`);
     }
   }
   return parts.join(" · ");
