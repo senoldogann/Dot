@@ -16,7 +16,7 @@ import { lookTokens, paletteTokens } from "./tokens.js";
 import { isVsCodeTheme, vsCodeThemeFile } from "./vscode.js";
 
 /** The schemes a theme has a palette for, in order. */
-export const SCHEMES_OF_THEMES = ["light", "dark"];
+const SCHEMES_OF_THEMES = ["light", "dark"];
 const THEME_ID = /^[a-z0-9](?:[a-z0-9-]{0,47})$/;
 const ID_UNITS = 48;
 const NAME_UNITS = 48;
@@ -30,7 +30,7 @@ const ROLES = new Set(THEME_ROLES);
 const SCHEME_IDS = ["system", "light", "dark"];
 
 /** What is wrong with a theme file, said for the owner. */
-export class ThemeFileError extends Error {}
+class ThemeFileError extends Error {}
 
 // The folder the daemon keeps the themes in, and the files of it it left out, as the last read found them.
 let folder = { path: "", skipped: [] };
@@ -84,7 +84,7 @@ function checkedVariants(value, appearance) {
  * The theme of a file's JSON value: a theme file (version 1) or its short form, checked as the daemon checks it. Throws
  * ThemeFileError with what is wrong.
  */
-export function themeFileOf(value) {
+function themeFileOf(value) {
   if (!isRecord(value)) {
     throw new ThemeFileError("A theme file holds one JSON object.");
   }
@@ -145,7 +145,7 @@ export function themeFileOf(value) {
 }
 
 /** The schemes `file` has a palette for: its own, and the other when its variants hold one. */
-export function schemesOf(file) {
+function schemesOf(file) {
   return SCHEMES_OF_THEMES.filter((scheme) => scheme === file.appearance || file.variants?.[scheme] !== undefined);
 }
 
@@ -161,7 +161,7 @@ function opaque(roles) {
 }
 
 /** The roles of `file`'s palette for `scheme`, every role Dot reads among them, as `#rrggbb`; null when it has none. */
-export function rolesOf(file, scheme) {
+function rolesOf(file, scheme) {
   if (scheme === file.appearance) {
     const derived = file.canvas === undefined ? {} : vividPalette(file.canvas, file.accent);
     return opaque({ ...PALETTES.rose[scheme], ...derived, ...file.colors });

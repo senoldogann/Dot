@@ -14752,6 +14752,29 @@ pruned as unpaired; the pre-push review found the first version wrote the new id
 schedule whose firing a crash cut before its run was under way is due again at the time it fired as the scheduler
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
+### 388. The web interface has checks of its own, and its pages load on demand
+
+**Status: done (2026-10-19), on `js-gate`.** The owner's word of 2026-10-19, after the review of the interface of
+2026-10-18 ("eksik ne var ise hepsini düzelt", fix whatever is missing): the interface's scripts had no lint, no type
+check and no unit test of their own, the gate read them only as the browser would (`tests/unit/test_static_ui.py`), and
+every page's script was parsed at every opening. **As built.** `npm run check` (package.json, a development requirement
+on Node 22 or later; nothing of Dot needs Node to run) runs Biome's recommended lint rules (`biome.json`; `useTemplate`
+and `useArrowFunction` off, as matters of style, and the import sorting off, as the scripts order theirs by hand), `tsc`
+over the scripts' JSDoc with `checkJs` (`tsconfig.json`, loose: `strict` off, so a parameter without a type is no
+error; `tsconfig.sw.json` for the service worker, whose globals are a worker's; `types/interface.d.ts` for the desktop
+shell's bridge and Safari's `standalone`), and the unit tests of the pure modules under `tests/js` with `node --test`
+(the Markdown reader, the words of a flow, the formatting helpers, the reasoning levels). Biome's 67 findings and the
+49 type errors were fixed, among them a helper named `valueOf` (now `settingValue`), a call of `notePage` with an
+argument it does not take, and `callKind` reading a tool's kind with `in`, so that a tool named `constructor` was a
+function (the first unit test found it). `test_static_ui.py` also fails on an export nothing imports (the tests count as
+importers; 30 exports were dropped and two dead functions removed) and on an `import()` of a script that is not there.
+The pages that are not the chat or the home (campaigns, agents, team, customize, settings, diagnostics, licences,
+controls) are loaded when first asked for (`import()` in main.js's route table) and fetched once the browser is idle
+after the first page, so that the first paint parses 84 modules instead of 106 (the `modulepreload` list says which)
+and a page asked for while another's script is on its way opens the one asked for last. The gate runs the checks
+(`.github/workflows/gate.yml`, setup-node pinned); CLAUDE.md, CONTRIBUTING.md and docs/development.md say so. **Left
+for later:** `noImplicitAny` once the modules carry their JSDoc, and Biome's formatter (configured, off: 84 files would
+change at 120 columns), to be switched on in one commit of its own when no branch is in flight.
 
 ## Log
 
@@ -15553,3 +15576,4 @@ starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Fable 5.1): item 388 on `js-gate`, on the owner's word of the same day after the interface review of 2026-10-18: the web interface gets checks of its own (Biome, `tsc` over the JSDoc, `node --test`), an export nothing imports fails the gate, and the pages that are not the chat or the home load on demand. Done, awaiting the owner's push.

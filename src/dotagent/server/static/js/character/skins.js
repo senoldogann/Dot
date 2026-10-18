@@ -74,14 +74,3 @@ export const COLOUR_IDS = COLOURS.map((c) => c.id);
 export const COLOUR_BY_ID = new Map(COLOURS.map((c) => [c.id, c]));
 export const DEFAULT_COLOUR = "ink";
 
-// Mixes two hex colours; the depth haze of the particles.
-export function mixHex(from, to, t) {
-  const parse = (h) => {
-    const v = parseInt(h.slice(1), 16);
-    return [(v >> 16) & 255, (v >> 8) & 255, v & 255];
-  };
-  const a = parse(from);
-  const b = parse(to);
-  const c = a.map((x, i) => Math.round(x + (b[i] - x) * t));
-  return `#${c.map((x) => x.toString(16).padStart(2, "0")).join("")}`;
-}
