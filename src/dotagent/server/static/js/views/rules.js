@@ -6,7 +6,7 @@
 // the switch of the macOS sandbox of a run's commands (item 262).
 
 import { api } from "../api.js";
-import { clip, el } from "../dom.js";
+import { clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented, switchSetting } from "../panels.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
@@ -300,13 +300,19 @@ function buildWords(onDrafted, isDisposed) {
     examples,
     el("div", { class: "rule-words-foot" }, outcome, draft),
   );
+  // The box takes the focus with the caret after the words it has.
+  function focus() {
+    words.focus();
+    words.setSelectionRange(words.value.length, words.value.length);
+  }
+
   return {
     element,
     start: (text) => {
       words.value = text.slice(0, 500);
-      words.focus();
-      words.setSelectionRange(words.value.length, words.value.length);
+      focus();
     },
+    focus,
     reset: () => {
       words.value = "";
       outcome.hidden = true;
@@ -358,6 +364,7 @@ export function mount(root, ctx) {
   let disposed = false;
   let rules = null;
   const holder = el("div", null, loadingPanel());
+  const count = el("span", { class: "hint" });
 
   function paint() {
     if (rules === null) {
@@ -371,7 +378,8 @@ export function mount(root, ctx) {
       onToggle: (record) => attempt(() => toggle(record)),
       onDelete: (record) => attempt(() => remove(record)),
     };
-    holder.replaceChildren(el("div", { class: "card" }, rules.map((record, index) => ruleRow(record, index, handlers))));
+    holder.replaceChildren(el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, handlers))));
+    count.textContent = plural(rules.length, "rule", "rules");
   }
 
   async function reload() {
@@ -426,6 +434,30 @@ export function mount(root, ctx) {
   });
   const words = buildWords((drafted) => form.fill(drafted), () => disposed);
   const sandbox = buildSandbox(() => disposed);
+  const addButton = el("button", { class: "btn primary sm", type: "button" }, icon("plus"), "New rule");
+  // The two ways to write a rule stay away until Add rule asks for them: the list is what this page is for (item 373).
+  const forms = el("div", { class: "rule-forms", hidden: true }, words.element, form.element);
+  const closeForms = () => {
+    forms.hidden = true;
+    addButton.lastChild.textContent = "New rule";
+  };
+  forms.append(
+    el(
+      "div",
+      { class: "panel-foot rule-forms-foot" },
+      el("span", { class: "spacer" }),
+      el("button", { class: "btn sm", type: "button", onclick: closeForms }, "Close"),
+    ),
+  );
+  addButton.addEventListener("click", () => {
+    forms.hidden = !forms.hidden;
+    addButton.lastChild.textContent = forms.hidden ? "New rule" : "Close";
+    if (!forms.hidden) {
+      forms.scrollIntoView({ block: "nearest" });
+      // What was written before Close is still there.
+      words.focus();
+    }
+  });
   root.append(
     paneHead("Your own answers to “may Dot do this?”, applied before the safety preset.", null),
     el(
@@ -439,19 +471,28 @@ export function mount(root, ctx) {
       ),
     ),
     sandbox.element,
-    words.element,
-    form.element,
+    forms,
     el(
-      "div",
-      { class: "section-head rule-order" },
-      el("div", { class: "section-label" }, "Checked in this order"),
-      el("div", { class: "hint" }, "The first enabled rule that fits an action decides it; a new rule goes to the end."),
+      "section",
+      { class: "memory-panel notes-panel rule-panel" },
+      el(
+        "div",
+        { class: "panel-head" },
+        el("h2", { class: "panel-title" }, "Checked in this order"),
+        count,
+        el("span", { class: "spacer" }),
+        addButton,
+      ),
+      el("div", { class: "panel-note" }, "The first enabled rule that fits an action decides it; a new rule goes to the end."),
+      holder,
     ),
-    holder,
   );
   // The sentence an approval card sends ("Make a rule of this"), in the address after the tab's name.
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("sentence");
   if (asked !== null && asked.trim() !== "") {
+    // A card's "Make a rule of this" opens the ways to write one with its sentence already in the box (item 373).
+    forms.hidden = false;
+    addButton.lastChild.textContent = "Close";
     words.start(asked.trim());
   }
   // A rule added, switched or deleted on another page is read again here, as are the rules once the stream is back.

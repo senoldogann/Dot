@@ -70,7 +70,13 @@ function templateFact(label, text) {
 
 /** A template's card (item 315): its face, name and role, what it needs of the Mac and the schedule it suggests. */
 function templateCard(template, onUse) {
-  const use = el("button", { class: "btn sm", type: "button", "aria-label": `Use the template ${template.name}` }, icon("plus"), "Use template");
+  const use = el(
+    "button",
+    { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
+    icon("plus"),
+    el("span", { class: "use-long" }, "Use template"),
+    el("span", { class: "use-short" }, "Use"),
+  );
   use.addEventListener("click", async () => {
     use.disabled = true;
     try {

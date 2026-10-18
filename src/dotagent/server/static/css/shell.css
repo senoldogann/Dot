@@ -769,8 +769,15 @@
 }
 
 @media (max-width: 720px) {
-  /* The way back to the chats and the sidebar's close are round buttons on a surface. */
-  .stagebar-left > .icon-btn,
+  /* The way back to the chats is the chevron alone on the page's own ground, its box a finger's (item 373); the
+     sidebar's close keeps the round surface it opens and shuts on. */
+  .stagebar-left > .icon-btn {
+    border: 0;
+    border-radius: var(--radius-control);
+    background: none;
+    color: var(--text);
+  }
+
   .side-head > .icon-btn {
     border: 1px solid var(--border);
     border-radius: var(--radius-pill);

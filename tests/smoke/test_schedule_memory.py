@@ -292,6 +292,7 @@ async def test_settings_show_the_two_choices_and_the_chat_shows_the_goal_alone(
                 )
                 await page.goto(ui_url(host, port, TOKEN))
                 await page.goto(f"{served}/#/settings/schedules")
+                await page.get_by_role("button", name="New schedule").click()
                 form: Locator = page.locator("[data-schedule-form]").first
                 known: Locator = form.get_by_role("combobox", name="Earlier runs it knows")
                 await expect(known).to_have_value("")

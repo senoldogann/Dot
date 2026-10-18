@@ -1,5 +1,5 @@
 """Environment diagnostics for ``dotx doctor``: what works, what is missing and how to fix it. The check of one
-provider's key is the one the API keys page of the settings runs."""
+provider's key is the one the Providers page of the settings runs."""
 
 import asyncio
 import os

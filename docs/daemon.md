@@ -321,17 +321,18 @@ still shows (items 346 and 362, kept in this browser), and the token this browse
 **Models** (the **Default model** first, a menu of the models that can call tools: the runs that name no model, a new
 chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`, as when it is changed
 from the composer's model menu; then one fold per provider, with the reasoning levels of each model and a menu to choose
-one; a provider without a key, or whose key was refused (HTTP 401), says so and links to API keys, and one that refused
-access (HTTP 403) says that, with its words), **API keys** (the key of each provider; see [Models and
-providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow first; see
-[Browser use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches
-Dot at and a pairing code for its home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the
-daemon, the emergency stop and the health checks in a fold, closed, with the number of failures on its line, and the
-ways to **Diagnostics** and **Open source licences**, pages of their own). Which folds are open is kept in
-the browser. The tabs sit beside their content when the window has the room and above it otherwise, in one row that
-scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are
-a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)).
-The earlier addresses of the memory, schedules, rules and system pages lead to their tabs.
+one; a provider without a key, or whose key was refused (HTTP 401), says so and links to Providers, and one that refused
+access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in with, each with its key and the
+models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
+with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
+**Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches Dot at and a pairing code for its
+home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, the emergency stop and
+the health checks in a fold, closed, with the number of failures on its line, and the ways to **Diagnostics** and **Open
+source licences**, pages of their own). Which folds are open is kept in the browser. The tabs sit beside their content
+when the window has the room and above it otherwise, in one row that scrolls sideways with the open tab in sight and
+stays under the bar as the page scrolls (item 272); on a phone they are a list in groups whose rows open each tab as a
+page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory,
+schedules, rules and system pages lead to their tabs.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its

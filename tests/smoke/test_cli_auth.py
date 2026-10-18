@@ -1,4 +1,4 @@
-"""``dotx auth set`` stores every key that Settings › API keys manages, the typed judge's included, in Dot's ``.env``
+"""``dotx auth set`` stores every key that Settings › Providers manages, the typed judge's included, in Dot's ``.env``
 file with mode 0600, from what the terminal gives it. The real command runs in a child process with a throw-away home;
 the key is not a real one and no service is asked.
 """

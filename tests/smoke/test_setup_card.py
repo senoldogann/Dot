@@ -1,7 +1,7 @@
 """The home's Set up a model card (item 333), in WebKit as the owner's iPhone, on a served daemon whose default model is
 OpenAI's while no OpenAI key is set. The card says so, and each of its ways leads to a model:
 
-- **Add a key:** a key saved in Settings › API keys makes OpenAI list the model, and the card goes. A stand-in OpenAI
+- **Add a key:** a key saved in Settings › Providers makes OpenAI list the model, and the card goes. A stand-in OpenAI
   service on this Mac lists its models to that key alone.
 - **Removed key:** with the key removed the card comes back.
 - **Choose a model:** the scripted model, made the default in Settings › Models, answers a message from the home.
@@ -168,16 +168,22 @@ async def test_each_way_of_the_card_leads_to_a_model(own_home: Path) -> None:
 
                 await card.get_by_role("link", name="Add a key").click()
                 await expect(page).to_have_url(re.compile(r"#/settings/keys$"))
-                row: Locator = page.locator(".key-row").filter(has=page.locator(".row-title", has_text="OpenAI"))
-                await row.get_by_role("button", name="Add key").click()
-                await row.get_by_label("OpenAI API key").fill(KEY)
-                await row.get_by_role("button", name="Save").click()
+                row: Locator = page.locator(".provider-item").filter(
+                    has=page.locator(".provider-name", has_text="OpenAI")
+                )
+                await row.click()
+                await page.get_by_role("button", name="Add key").click()
+                await page.get_by_label("OpenAI API key").fill(KEY)
+                await page.get_by_role("button", name="Save").click()
                 await expect(row).to_have_attribute("data-state", "set")
                 card = await _home(page, address, "ready")
                 await expect(card).to_be_hidden()
 
                 await page.goto(f"{address}/#/settings/keys")
-                await row.get_by_role("button", name="Remove the OpenAI key saved in Dot").click()
+                await (
+                    page.locator(".provider-item").filter(has=page.locator(".provider-name", has_text="OpenAI")).click()
+                )
+                await page.get_by_role("button", name="Remove the OpenAI key saved in Dot").click()
                 await page.get_by_role("dialog").get_by_role("button", name="Remove").click()
                 await expect(row).to_have_attribute("data-state", "unset")
                 card = await _home(page, address, "needed")

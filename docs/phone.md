@@ -87,9 +87,9 @@ a drag of its head down closes it; its Agents tab says of each helper its state,
 too). Dot's computer opens over the whole screen, with the page's address and who has control (Take over), and goes back
 to the side panel when it closes.
 
-The round button at the top left is the one way back (item 338). On a page opened by a link of another page (a run from
-the home's Today strip, a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on
-a page opened
+The button at the top left is the one way back (item 338): a chevron on the page's own ground, no circle around it
+(item 373), in a finger's box. On a page opened by a link of another page (a run from the home's Today strip, a
+service from Plugins, a tab from the settings' list) it says Back and returns to that page; on a page opened
 directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;
 on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and Forward and a
 reload keep it as it was, and it is reckoned again when the phone turns. A chat that goes on at another of its runs (a

@@ -14416,7 +14416,7 @@ Tailscale, OpenCode), each with where it is on this Mac, looked for on the PATH 
 
 ### 372. SearXNG: a search rung of the owner's own, first on the ladder
 
-**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Sistemimizde web search şu an providerların
+**Status: done (`8c7971e`).** The owner's word of 2026-10-18 to a Dot run: "Sistemimizde web search şu an providerların
 ücretli web search aracılığı ile kullanılıyor. Web'de ya da GitHub'da açık kaynak, ücretsiz, Google kalitesinde web
 search, web fetch yeteneği kazandıracağımız bir yapı yok mu?" (web search goes through the providers' paid searches now;
 is there no free, open-source way, of Google's quality, to give Dot search and fetch?), then, of the run's work, to this
@@ -14431,6 +14431,33 @@ ladder with it. The review changed the 403, which the run had taken for a limit,
 (the defaults file gives it). Tests: `tests/unit/test_search_ladder.py` (the answer read in order, an empty one, one
 whose engines refused, and an instance on the loopback address that answers, limits and refuses its format),
 `tests/unit/test_research.py` (the ladder). Docs: `docs/runs.md`, `docs/limits.md`, `docs/safety.md`.
+
+### 373. Settings › Providers, and the settings pages list first
+
+**Status: in progress.** The owner's words of 2026-10-18 to Dot runs: "Bizde provider ekranını [başka bir uygulama]'daki
+gibi bir tasarımda yapsak? Şu an API keys sayfası olarak var ve providerların gerçek logosu vs. yok." (could our
+providers screen be designed like [another app]'s? It is an API keys page now, without the providers' real logos), and
+"Provider ekranında bir sağlayıcı seçtiğimizde sol üstteki < işaretinin arka plan rengini kaldır, o işarete düzgün bir
+SVG seç; ayrıca örneğin + Use template butonu çok büyük mobilde. Bu ve buna benzer problemleri araştır, varsa düzelt"
+(when a provider is chosen, take away the background of the < at the top left and give it a proper SVG; the + Use
+template button is too big on a phone; look for this and problems like it, and fix them); then, of the runs' work, to
+this session: "Koşu bitince hepsini ekle" (once the run is over, add all of it). **As built (2026-10-18).** Settings ›
+API keys is Settings › Providers (`views/keys.js`, `settings.css`): the providers down the left side, each with its
+mark, its name and where its key stands ("No key yet", "Optional · no key", "Authenticated · key ••••1234"); the one
+chosen beside them, with its key (the variable, its last characters, where it comes from; Add key, Replace, Remove,
+Check), the models it brings with the roles they hold, and, for TypeSafe, the typed judge's switch; a phone shows the
+list, then the page of the one tapped, with a chevron back. Memory keeps your lines and the box that adds a note in a
+column at the left and the notes at the right; Rules and Schedules are their lists, with New rule and New schedule
+opening the forms (an approval card's "Make a rule of this" opens the rule's, its sentence in the box). A schedule's row
+says only what it chose for itself. A template's Use sits at its card's top right on a phone; the way back at a phone's
+top left is a chevron with no circle. The review changed: the other app's name in comments; a failed Check, which left
+its spinner turning, and a model list that could not be read, which both say why now; TypeSafe's page, which waited
+forever for models it does not have; the protections note on Rules, which had lost that a yolo run goes past them, and
+the sandbox switch's hint, whose words on what Off does and where it is kept had gone into a tooltip that a phone does
+not show; the notes' box, which no longer scrolled inside (item 218); the tab's icon, which was Models' own. Tests:
+`tests/smoke/test_providers.py` (new); `test_judge_switch.py`, `test_setup_card.py`, `test_rules.py`,
+`test_schedule_memory.py`, `test_phone_settings.py` and `test_phone_fit.py` follow the pages. Docs: `README.md`,
+`docs/daemon.md`, `docs/models.md`, `docs/memory-and-schedules.md`, `docs/phone.md`, `docs/safety.md`.
 
 ## Log
 
@@ -15216,3 +15243,4 @@ whose engines refused, and an instance on the loopback address that answers, lim
 - 2026-10-18 (Opus 5.5): item 369 merged as `58d0425` (PR #359). Item 364 on the owner's word of the same day, on `item-364-fewer-places`: no Actions tab in the side panel and no Activity page; the home's Today strip shows the rest in place.
 - 2026-10-18 (Opus 5.5): item 364 merged as `6d476e6` (PR #360). Items 370 and 371 on the owner's word of the same day, on `item-370-diagnostics-licences`: Settings › System's Diagnostics and Open source licences, read from what is there.
 - 2026-10-18 (Opus 5.5): items 370 and 371 merged as `4390262` (PR #361). Items 372 to 374 on the owner's words of the same day, the work Dot runs of theirs had left in the main checkout, reviewed and added in three pull requests; item 372 on `item-372-searxng`: the SearXNG rung.
+- 2026-10-18 (Opus 5.5): item 372 merged as `8c7971e` (PR #362). Item 373 on `item-373-providers`: Settings › Providers, and the settings pages that list first.
