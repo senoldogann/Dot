@@ -15,10 +15,11 @@ leaves the Mac is what a run needs, sent where the configuration points:
   [Models and providers](models.md#models-and-providers)).
 - **To the embedding model: each note and each search of the memory.** It is Ollama's `bge-m3` on this Mac by default;
   with `[memory] embed_provider = "openai"` the texts go to OpenAI (see [Memory](memory-and-schedules.md#memory)).
-- **To the search engines: the query.** The `[web] search_backend` ladder asks Ollama's hosted search when
-  `OLLAMA_API_KEY` is saved, then DuckDuckGo and Brave Search, then DuckDuckGo in Dot's own Chrome; Anthropic's search
-  (relayed by `[models] search`) joins when `ANTHROPIC_API_KEY` is saved, and `[web] anthropic_search = "off"` leaves it
-  out.
+- **To the search engines: the query.** The `[web] search_backend` ladder asks the owner's SearXNG instance when
+  `[web] searxng_url` names one (the instance passes the query on to its own engines, Google and the others), then
+  Ollama's hosted search when `OLLAMA_API_KEY` is saved, then DuckDuckGo and Brave Search, then DuckDuckGo in Dot's own
+  Chrome; Anthropic's search (relayed by `[models] search`) joins when `ANTHROPIC_API_KEY` is saved, and
+  `[web] anthropic_search = "off"` leaves it out.
 - **To the sites a run visits: its requests.** The web tools fetch public addresses only, unless
   `[web] allow_private_hosts` allows more; Dot's browser carries the cookies of its profile (Dot's own, or your Chrome's
   when it is attached). `web_extract` sends what it read to the `fast` model, and a page a run shows in the conversation

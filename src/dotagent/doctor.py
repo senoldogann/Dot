@@ -249,7 +249,9 @@ def _search_row(config: AppConfig, ollama_key_present: bool, anthropic_key_prese
     choice: SearchChoice = config.web.search_backend
     visible_own: bool = config.browser.mode == "own" and not config.browser.headless
     anthropic: AnthropicRung | None = config.web.anthropic_search if anthropic_key_present else None
-    ladder: str = " -> ".join(search_ladder(choice, ollama_key_present, anthropic, visible_own))
+    ladder: str = " -> ".join(
+        search_ladder(choice, ollama_key_present, anthropic, visible_own, bool(config.web.searxng_url))
+    )
     if choice != "auto":
         return _result("web search", True, False, f"{ladder} ([web] search_backend)")
     keys: str = ", ".join(

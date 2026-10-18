@@ -434,13 +434,19 @@ terminal_idle_s = 1800.0
 sandbox = true
 
 [web]
-# "auto" climbs a ladder of engines until one answers: the hosted web_search API of Ollama when OLLAMA_API_KEY is set
-# (each search counts against the key's allowance; it has no bot check), then the HTML pages of DuckDuckGo and Brave
-# Search (no key), then DuckDuckGo opened in Dot's own Chrome when the run's browser is Dot's own (its bot check runs
-# there and passes). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds) and the
-# searches of that time skip it at once; the result names the engine that answered and the rungs skipped. A named engine
-# ("duckduckgo", "brave", "ollama") is that engine alone. dotx doctor shows the ladder.
+# "auto" climbs a ladder of engines until one answers: the owner's SearXNG instance when searxng_url is set (its own
+# engines, Google and the others, compose the answer; no key, no bot check on Dot's side), then the hosted web_search API
+# of Ollama when OLLAMA_API_KEY is set (each search counts against the key's allowance; it has no bot check), then the
+# HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Dot's own Chrome when the run's browser
+# is Dot's own (its bot check runs there and passes). An engine that limits this machine is benched (DuckDuckGo 10
+# minutes, Brave 90 seconds, SearXNG 2 minutes) and the searches of that time skip it at once; the result names the
+# engine that answered and the rungs skipped. A named engine ("searxng", "duckduckgo", "brave", "ollama") is that engine
+# alone. dotx doctor shows the ladder.
 search_backend = "auto"
+# A SearXNG instance of the owner's own (https://docs.searxng.org): its JSON API must be enabled (search.formats holds
+# "json"). Empty: no SearXNG rung. The usual case is a loopback instance such as http://127.0.0.1:8888; it is trusted
+# configuration, so allow_private_hosts does not apply to it.
+searxng_url = ""
 # The Anthropic rung (the API's own web search, relayed by [models] search; $10 per 1,000 searches plus the tokens,
 # documented 2026-10) joins the auto ladder when ANTHROPIC_API_KEY is set: "auto" puts it after Ollama's free search,
 # "first" before it, "off" leaves it out. A named search_backend = "anthropic" uses it alone.

@@ -1,12 +1,27 @@
 """The search ladder (item 59): Brave's result page, the climb past benched and failing engines, the bench and the
-answer memory, and the header's account of the rungs skipped."""
+answer memory, and the header's account of the rungs skipped. A SearXNG instance (item 372) is served on the loopback
+address."""
+
+import threading
+from collections.abc import Iterator
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
+from dotagent.config import load_default_config
 from dotagent.core.errors import WebError, WebThrottledError
 from dotagent.tools.web import skipped_note
+from dotagent.web.client import WebClient
 from dotagent.web.ladder import BENCH_S, MEMORY_S, AnswerMemory, EngineBench, SearchEngine, SearchOutcome, Skipped
-from dotagent.web.search import Attempt, brave_address, climb, parse_brave
+from dotagent.web.search import (
+    Attempt,
+    brave_address,
+    climb,
+    parse_brave,
+    parse_searxng,
+    search_searxng,
+    searxng_search_url,
+)
 from dotagent.web.types import SearchHit
 
 # The result markup of search.brave.com/search, cut to what the parser reads: a web snippet with its link, title and
@@ -141,3 +156,88 @@ def test_the_header_accounts_for_the_rungs_skipped_and_a_remembered_answer() -> 
     assert skipped_note(skipped) == (
         " (duckduckgo skipped: benched for 7 more min; the same query was answered 2 min ago; this is that answer)"
     )
+
+
+# The JSON answer of a SearXNG instance, cut to what the parser reads: two engines' results, one address twice, a
+# result whose link is no page, one without a title and one whose snippet carries the page's line breaks.
+_SEARXNG_ANSWER: bytes = rb"""{"query": "reaktor", "results": [
+  {"url": "https://www.reaktor.com/", "title": "Reaktor", "content": "A Finnish technology company.",
+   "engines": ["google cse", "duckduckgo"]},
+  {"url": "https://www.reaktor.com/", "title": "Reaktor again", "content": "The same page.", "engines": ["brave"]},
+  {"url": "javascript:void(0)", "title": "Not a page", "content": ""},
+  {"url": "https://example.org/no-title", "title": "", "content": "A result without a title."},
+  {"url": "https://example.org/careers", "title": "Careers", "content": "Open\nroles  in Helsinki."}
+]}"""
+
+
+def test_searxng_url_carries_the_json_format_and_an_escaped_query() -> None:
+    assert (
+        searxng_search_url("http://127.0.0.1:8888/", "a b&c")
+        == "http://127.0.0.1:8888/search?q=a+b%26c&format=json&safesearch=0"
+    )
+
+
+def test_the_searxng_answer_is_read_in_order_each_address_once() -> None:
+    page = parse_searxng(_SEARXNG_ANSWER)
+    assert [hit.url for hit in page.hits] == ["https://www.reaktor.com/", "https://example.org/careers"]
+    assert page.hits[0].title == "Reaktor"
+    assert page.hits[0].snippet == "A Finnish technology company."
+    assert page.hits[1].snippet == "Open roles in Helsinki."
+    assert not page.announced_no_results
+
+
+def test_a_searxng_answer_with_no_results_announces_it_and_another_body_is_an_error() -> None:
+    empty = parse_searxng(b'{"query": "nothing", "results": []}')
+    assert empty.hits == () and empty.announced_no_results
+    with pytest.raises(WebError):
+        parse_searxng(b"<html>not json</html>")
+
+
+def test_a_searxng_answer_whose_engines_all_refused_is_an_error_not_an_empty_page() -> None:
+    refused = b'{"query": "x", "results": [], "unresponsive_engines": [["brave", "Suspended: too many requests"]]}'
+    with pytest.raises(WebError):
+        parse_searxng(refused)
+
+
+class _SearxHandler(BaseHTTPRequestHandler):
+    """Three instances under one address: ``/ok`` answers the search, ``/off`` has the JSON format off (SearXNG's 403
+    for a format its settings do not list) and ``/busy`` is limiting this machine (its limiter's 429)."""
+
+    def do_GET(self) -> None:
+        instance: str = self.path.split("/")[1]
+        status: int = {"ok": 200, "off": 403, "busy": 429}[instance]
+        body: bytes = _SEARXNG_ANSWER if status == 200 else b"<!doctype html><title>Refused</title>"
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json" if status == 200 else "text/html")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def log_message(self, format: str, *args: object) -> None:
+        return
+
+
+@pytest.fixture
+def searx() -> Iterator[str]:
+    server: ThreadingHTTPServer = ThreadingHTTPServer(("127.0.0.1", 0), _SearxHandler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    try:
+        yield f"http://127.0.0.1:{server.server_address[1]}"
+    finally:
+        server.shutdown()
+        server.server_close()
+
+
+async def test_a_searxng_instance_answers_and_a_limit_is_told_from_a_format_turned_off(searx: str) -> None:
+    client: WebClient = WebClient(load_default_config().web, (), ())
+    try:
+        hits = await search_searxng(client, f"{searx}/ok", "reaktor", 1)
+        assert [hit.url for hit in hits] == ["https://www.reaktor.com/"]
+        # A limit benches the rung for a while; a format turned off is the instance's settings, so it says which.
+        with pytest.raises(WebThrottledError):
+            await search_searxng(client, f"{searx}/busy", "reaktor", 5)
+        with pytest.raises(WebError, match=r"list json in search\.formats") as refused:
+            await search_searxng(client, f"{searx}/off", "reaktor", 5)
+        assert not isinstance(refused.value, WebThrottledError)
+    finally:
+        await client.aclose()

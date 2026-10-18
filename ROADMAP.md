@@ -14383,7 +14383,7 @@ and the tests), whose results were checked against the repository. Tests: `tests
 
 ### 370. Settings › System › Diagnostics: Dot's processes, the room it takes, its logs
 
-**Status: in progress.** The owner's word of 2026-10-18, with the two rows of [başka bir uygulama]'s settings
+**Status: done (`4390262`).** The owner's word of 2026-10-18, with the two rows of [başka bir uygulama]'s settings
 ("Diagnostics: Inspect processes, resource use, and logs on this environment", "Open source licenses: Notices for
 dependencies, assets, and optional tools"): "Kendi sistemimizde de Ayarlarda bu 2 ayar dinamik gerçek olarak olsa?"
 (could our own settings have these two, dynamic and real?). **As built (2026-10-18).** Settings › System has a card,
@@ -14402,7 +14402,7 @@ page, wide and light, on a phone and dark). Docs: `docs/daemon.md`.
 
 ### 371. Settings › System › Open source licences: what Dot uses, read as it is
 
-**Status: in progress.** The owner's word of 2026-10-18, with the two rows of [başka bir uygulama]'s settings
+**Status: done (`4390262`).** The owner's word of 2026-10-18, with the two rows of [başka bir uygulama]'s settings
 ("Diagnostics: Inspect processes, resource use, and logs on this environment", "Open source licenses: Notices for
 dependencies, assets, and optional tools"): "Kendi sistemimizde de Ayarlarda bu 2 ayar dinamik gerçek olarak olsa?"
 (could our own settings have these two, dynamic and real?). **As built (2026-10-18).** Open source licences
@@ -14413,6 +14413,24 @@ with the licence each one's metadata names (its SPDX expression, else the first 
 classifiers) and the page it is known by, with a search; and the tools Dot uses (Google Chrome, Ollama, Node.js,
 Tailscale, OpenCode), each with where it is on this Mac, looked for on the PATH of the owner's shell, or that it is not
 (`GET /api/licences`). Tests: `tests/unit/test_licences.py`, `tests/smoke/test_about_pages.py`. Docs: `docs/daemon.md`.
+
+### 372. SearXNG: a search rung of the owner's own, first on the ladder
+
+**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Sistemimizde web search şu an providerların
+ücretli web search aracılığı ile kullanılıyor. Web'de ya da GitHub'da açık kaynak, ücretsiz, Google kalitesinde web
+search, web fetch yeteneği kazandıracağımız bir yapı yok mu?" (web search goes through the providers' paid searches now;
+is there no free, open-source way, of Google's quality, to give Dot search and fetch?), then, of the run's work, to this
+session: "İncele ve ekle" (review it and add it). **As built (2026-10-18).** `[web] searxng_url` names a SearXNG
+instance of the owner's (empty by default; an http or https address without credentials). With it the auto ladder starts
+with SearXNG, whose own engines (Google, Bing, DuckDuckGo, Brave and the others) compose the answer through its JSON
+API, and `search_backend = "searxng"` is that rung alone (`web/search.py`). The instance is trusted configuration, so a
+loopback one is reached without the address gate. A 429 benches the rung for two minutes; a 403 is the instance
+refusing its JSON format, and the search says to list `json` in `search.formats` (measured on the owner's instance: RSS
+and CSV answer 403, JSON 200); an empty answer whose engines all refused goes to the next rung. `dotx doctor` shows the
+ladder with it. The review changed the 403, which the run had taken for a limit, and the config field's Python default
+(the defaults file gives it). Tests: `tests/unit/test_search_ladder.py` (the answer read in order, an empty one, one
+whose engines refused, and an instance on the loopback address that answers, limits and refuses its format),
+`tests/unit/test_research.py` (the ladder). Docs: `docs/runs.md`, `docs/limits.md`, `docs/safety.md`.
 
 ## Log
 
@@ -15197,3 +15215,4 @@ Tailscale, OpenCode), each with where it is on this Mac, looked for on the PATH 
 - 2026-10-18 (Opus 5.5): item 363 merged as `d08dcd5` (PR #358). Item 369 on the owner's word of the same day, on `item-369-own-words`: the repository names no other product, and the licence notices keep their names.
 - 2026-10-18 (Opus 5.5): item 369 merged as `58d0425` (PR #359). Item 364 on the owner's word of the same day, on `item-364-fewer-places`: no Actions tab in the side panel and no Activity page; the home's Today strip shows the rest in place.
 - 2026-10-18 (Opus 5.5): item 364 merged as `6d476e6` (PR #360). Items 370 and 371 on the owner's word of the same day, on `item-370-diagnostics-licences`: Settings › System's Diagnostics and Open source licences, read from what is there.
+- 2026-10-18 (Opus 5.5): items 370 and 371 merged as `4390262` (PR #361). Items 372 to 374 on the owner's words of the same day, the work Dot runs of theirs had left in the main checkout, reviewed and added in three pull requests; item 372 on `item-372-searxng`: the SearXNG rung.
