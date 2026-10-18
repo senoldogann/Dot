@@ -17,7 +17,7 @@ import { CHAT_BOX_PX, composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../compos
 import { createContextMeter } from "../contextmeter.js";
 import { clip, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
-import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
+import { BACKGROUND_SOURCE, backgroundNote, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
@@ -130,8 +130,8 @@ function planStep(step) {
 }
 
 /**
- * Build the page of a loaded run and start following it. `history` is `{ earlier, later }`, the runs of the
- * conversation around this one; `historyProblem` is the error that kept them from loading, or null. Returns the
+ * Build the page of a loaded run and start following it. `history` is `{ earlier }`, the runs of the conversation
+ * before this one; `historyProblem` is the error that kept them from loading, or null. Returns the
  * function that stops everything the page started.
  */
 function showRun({ root, ctx, signal, detail, history, historyProblem, reload }) {
@@ -1334,7 +1334,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     waitingList,
     questionsList,
     lessonsCard,
-    continuedIn(history.later),
   );
   paintWorking();
   const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
@@ -1473,7 +1472,7 @@ export function mount(root, ctx) {
       shown();
       return;
     }
-    let history = { earlier: [], later: [] };
+    let history = { earlier: [] };
     let historyProblem = null;
     try {
       history = await loadHistory(detail.run);

@@ -253,7 +253,12 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     await wide.goto(f"{address}/#/customize/plugins/notion")
                     await expect(wide.locator(".plugin-hero")).to_be_visible()
                     await expect(wide.get_by_role("button", name="Back")).to_have_count(0)
-                    # With the sidebar beside the page the list is in sight; with it hidden the page's link back shows.
+                    # The page's link back shows with the sidebar beside it (item 380), and with the sidebar hidden.
+                    await expect(wide.locator("main .back")).to_be_visible()
+                    await wide.goto(f"{address}/#/diagnostics")
+                    await expect(wide.locator("main .back")).to_have_text("System")
+                    await expect(wide.locator("main .back")).to_be_visible()
+                    await wide.goto(f"{address}/#/customize/plugins/notion")
                     await wide.get_by_role("button", name="Hide sidebar").click()
                     await expect(wide.locator("main .back")).to_be_visible()
                     await expect(wide.locator(".stagebar-left button")).to_have_attribute("aria-label", "Show sidebar")

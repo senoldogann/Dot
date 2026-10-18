@@ -14640,14 +14640,14 @@ for them and drew them in small capitals, and which part of the side panel the o
 
 ### 379. The findings a Dot run checked, fixed as reviewed
 
-**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Ekteki bulgulari incele gercekten varsa düzelt,
-ardindan rapor ver ne yaptigine dair" (look into the findings attached, fix those that are real, then report what you
-did). **As built (2026-10-18).** The run found six real and nine no longer true on main, and fixed the six in the main
-checkout; this item reviews them and adds them. Settings › Providers: the list asks where a key comes from, as the
-provider's page does, so a key the daemon has from its environment or the Keychain no longer reads "No key yet" there
-(`views/keys.js` `keyLine`); closing a form that was not open no longer drops the focus to the page; a provider's models
-are drawn again only when what they show changed (the models, why they could not be read, the models of the roles their
-chips name) instead of at every event of the daemon's stream. The flow's words (`tools.js`) count the terminal's
+**Status: done (`b86a996`).** The owner's word of 2026-10-18 to a Dot run: "Ekteki bulgulari incele gercekten varsa
+düzelt, ardindan rapor ver ne yaptigine dair" (look into the findings attached, fix those that are real, then report
+what you did). **As built (2026-10-18).** The run found six real and nine no longer true on main, and fixed the six in
+the main checkout; this item reviews them and adds them. Settings › Providers: the list asks where a key comes from, as
+the provider's page does, so a key the daemon has from its environment or the Keychain no longer reads "No key yet"
+there (`views/keys.js` `keyLine`); closing a form that was not open no longer drops the focus to the page; a provider's
+models are drawn again only when what they show changed (the models, why they could not be read, the models of the roles
+their chips name) instead of at every event of the daemon's stream. The flow's words (`tools.js`) count the terminal's
 commands, `web_extract`, `memory_update` and `schedule_delete`, and the tool `terminal` that does not exist is gone.
 SearXNG's address that leads elsewhere, as a proxy's jump from http to https does, says to set `[web] searxng_url` to
 where it leads, instead of "did not answer the search" (`web/search.py`); the run followed the jump, which the review
@@ -14660,6 +14660,25 @@ happened (a search of the notes as a note kept, a terminal's reads as commands, 
 as one page), and gave the schedules' line its parts as the one list the shared helper takes, which the run's call did
 not, so no schedule's row was drawn. Tests: `tests/unit/test_search_ladder.py` (a 301 says where it leads),
 `tests/smoke/test_schedule_memory.py` (a schedule's line is drawn).
+
+### 380. A chat's page leads to no other, and a page under another keeps its link back
+
+**Status: in progress.** The owner's words of 2026-10-18 to a Dot run: "Bu olayida kaldirsak ? tüm yazismalar 1 sohbette
+olsa olmaz mi eger bunu kaldirirsak bir sey bozulmaz ise kaldiralim cok sacma birsey. Sürekli bas bas diger sohbete git
+fln." (shall we remove this too? can't all the messages be in one chat? if nothing breaks, remove it; always "go to the
+other chat"), and "diagnostic ve open source sayfalarina gittigimizde geri butonuda olsun. böyle sayfalar varsa hespine
+geri butonu ekle" (the Diagnostics and Open source pages should have a back button; give one to all such pages). **As
+built (2026-10-18).** The line "The conversation continues" under an earlier run's page, which sent the reader on to the
+run after it, is gone (`history.js`, `views/run.js`): a chat's page shows its turns as one flow (item 374), and the
+sidebar's chat opens its newest run; the history no longer reads the runs after the page's own. A page under another
+(Diagnostics and Open source licences under System, an agent's or a campaign's page, Team, a service's page) keeps its
+link back in a wide window with the sidebar beside it too, since the sidebar names the list it is under, not the page; a
+chat's page still shows none beside the sidebar (`shell.css`). A Dot run of the owner's made both; the review made the
+links back show on the pages that hold theirs inside a bar of their own (an agent's, a service's), which the run's rule
+left hidden, with one rule instead of a rule and its exception. The run's list of what a run changed in the Files card
+is not in this item: the side panel's Changes tab (item 368) lists the same files, with their diffs. Tests:
+`tests/smoke/test_phone_back.py` (a service's page and Diagnostics show their link back beside the sidebar and without
+it). Docs: `docs/daemon.md`.
 
 ## Log
 
@@ -15456,3 +15475,4 @@ not, so no schedule's row was drawn. Tests: `tests/unit/test_search_ladder.py` (
 - 2026-10-18 (Opus 5.5): item 376 merged as `f05ddc2` (PR #370); the pre-push review blocked its first push on an Important finding (Save left out a file still uploading) and passed the next two with Nits, the last one answered. Item 377 on `item-377-chat-spacing`: the lines of a chat sit closer, on the owner's word to a Dot run.
 - 2026-10-18 (Opus 5.5): item 377 merged as `8cf9f06` (PR #371); the pre-push review blocked its first push on an Important finding (the rule's weight beat the room of lists and code) and passed the next with a Nit, fixed. Item 378 on `item-378-system-design`: Settings › System and Browser read in groups, as a Dot run of the owner's designed them, reviewed.
 - 2026-10-18 (Opus 5.5): item 378 merged as `94ca713` (PR #372); the pre-push review passed its three pushes, the first two with Nits, fixed. Item 379 on `item-379-findings`: the findings a Dot run of the owner's checked, fixed as reviewed.
+- 2026-10-18 (Opus 5.5): item 379 merged as `b86a996` (PR #373); the pre-push review blocked its first push on two Important findings (no schedule's row was drawn, and following SearXNG's redirects went past the address gate) and passed the next with a Nit, answered. Item 380 on `item-380-one-chat-back`: a chat's page leads to no other, and a page under another keeps its link back, as a Dot run of the owner's made them, reviewed.

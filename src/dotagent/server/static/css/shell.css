@@ -588,8 +588,10 @@
   min-width: 0;
 }
 
-/* With the sidebar next to the page, the way back to the list is always in sight. */
-.shell[data-nav="docked"][data-sidebar="open"] .back {
+/* With the sidebar next to the page, the way back to the list of chats is in sight, so a chat's page shows no link back
+   of its own. A page under another (an agent's or a campaign's page, Team, a service's page, Diagnostics, Open source
+   licences) keeps its link back: the sidebar names the list it is under, not the page itself (item 380). */
+.shell[data-nav="docked"][data-sidebar="open"] .page:not([data-layout="page"]) .back {
   display: none;
 }
 

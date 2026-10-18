@@ -1,8 +1,8 @@
 // What a conversation holds outside one run: the runs before it in the thread, each as the question and its answer, so a
-// follow-up reads as the next turn of one chat, and the way on to the run that continued it.
+// follow-up reads as the next turn of one chat.
 
 import { api, query } from "./api.js";
-import { clip, el, plural } from "./dom.js";
+import { el, plural } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, userMessage } from "./messages.js";
@@ -20,7 +20,6 @@ const ANCHORS = CSS.supports("overflow-anchor", "auto");
 const FINISH_TOOL = "finish";
 // A long conversation shows its latest turns and says how many it leaves out.
 const SHOWN_TURNS = 40;
-const GOAL_CHARS = 90;
 const FINISHED = new Set(["done", "failed", "cancelled"]);
 // The source of a run that goes on from where the run before it was cut off (agent/resume.py): its goal is that run's
 // goal, so it is not shown as asked again.
@@ -34,17 +33,17 @@ function conversation(runs) {
 }
 
 /**
- * The runs before and after `run` in its thread, as `{ earlier, later }` (oldest first). A run the thread does not list, such
- * as a delegated one, stands alone: both lists are empty.
+ * The runs before `run` in its thread, as `{ earlier }` (oldest first). A run the thread does not list, such as a delegated
+ * one, stands alone: the list is empty.
  */
 export async function loadHistory(run) {
   const found = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${THREAD_LIMIT}`);
   const runs = conversation(found);
   const at = runs.findIndex((candidate) => candidate.id === run.id);
   if (at === -1) {
-    return { earlier: [], later: [] };
+    return { earlier: [] };
   }
-  return { earlier: runs.slice(0, at), later: runs.slice(at + 1) };
+  return { earlier: runs.slice(0, at) };
 }
 
 /**
@@ -283,21 +282,3 @@ export function earlierTurns(earlier, editFromHereOf, signal) {
   );
 }
 
-/** The line that leads on to the run that continued the conversation, or null when nothing came after. */
-export function continuedIn(later) {
-  if (later.length === 0) {
-    return null;
-  }
-  const next = later[0];
-  return el(
-    "nav",
-    { class: "continued", "aria-label": "Later in this conversation" },
-    el(
-      "a",
-      { href: `#/runs/${next.id}`, title: next.goal },
-      el("span", null, "The conversation continues"),
-      el("span", { class: "muted" }, later.length === 1 ? clip(next.goal, GOAL_CHARS) : `${clip(next.goal, GOAL_CHARS)} · ${later.length - 1} more`),
-      icon("arrowRight"),
-    ),
-  );
-}
