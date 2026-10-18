@@ -1,11 +1,12 @@
 """Activity end to end (item 47): a run waiting for an answer, a run working and a session of a campaign in flight,
 read as ``GET /activity`` and shown in the sidebar's sections, and what ended on the home's Today strip (item 364: the
 Activity page is gone), in a headless Chrome at a wide and at a phone width, in light and in dark. The runs are played
-by the scripted model, one after the other, so each takes the next turn of the shared script."""
+by the scripted model, each from a script of its own matched on its goal, so runs at work at once never take each
+other's turns."""
 
 import asyncio
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from pathlib import Path
 from typing import Literal
 
@@ -34,19 +35,38 @@ _PROVIDER: str = "ollama"
 TOKEN: str = "activity-test-token"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 90.0
-_WORK_S: int = 12
+# A run works until the test opens its gate, not for a number of seconds: a machine under load takes as long as it takes
+# to walk the pages, and a run that ends on a clock of its own leaves the Working section while the walk still reads it.
+_GATE_WAIT_S: int = 900
 
 
 class _Recorder:
+    """The scripted model, with a script per run instead of one queue they share: four runs at work at once each draw
+    their own turns, so a slow machine — one run reaching its second call while another is still on its first — cannot
+    spend another run's script and leave it to fail with no reply left."""
+
     def __init__(self) -> None:
         self.script: ScriptedProvider | None = None
+        self.scripts: dict[str, ScriptedProvider] = {}
+
+    def for_goal(self, goal: str, turns: Sequence[ScriptedTurn]) -> None:
+        self.scripts[goal] = ScriptedProvider(_PROVIDER, turns)
 
     @property
     def name(self) -> str:
         return _PROVIDER
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
-        assert self.script is not None, "the test did not set a script"
+        # The run's own goal opens its first message; the rest of the prompt names the other runs at work, so a goal
+        # matched there would give a run another run's script.
+        opening: str = next((message.content for message in request.messages if message.role == "user"), "")
+        matched: str | None = next(
+            (goal for goal in sorted(self.scripts, key=len, reverse=True) if goal in opening), None
+        )
+        if matched is not None:
+            return await self.scripts[matched].complete(request, sink)
+        if self.script is None:
+            return await ScriptedProvider(_PROVIDER, (_FINISH,)).complete(request, sink)
         return await self.script.complete(request, sink)
 
     async def model_info(self, model: str) -> ModelInfo:
@@ -122,7 +142,7 @@ async def client(runtime: Runtime, manager: RunManager) -> AsyncIterator[httpx.A
         await serving
 
 
-def _turn(tool: str, arguments: dict[str, str | bool]) -> ScriptedTurn:
+def _turn(tool: str, arguments: dict[str, str | bool | int]) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=tool, arguments=arguments),))
 
 
@@ -168,15 +188,12 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
     campaign: CampaignRecord = await runtime.store.create_campaign(
         "Find leads", "Find ten leads", thread.id, SCRIPTED_MODEL, "medium", "standard", None, "yolo", (), "own"
     )
-    MODEL.script = ScriptedProvider(
-        _PROVIDER,
-        [
-            _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
-            _turn("shell", {"command": f"sleep {_WORK_S}"}),
-            _turn("shell", {"command": f"sleep {_WORK_S}"}),
-            _turn("shell", {"command": f"sleep {_WORK_S}"}),
-        ],
-    )
+    gate: Path = tmp_path / "work-gate"
+    waiting: str = f"while [ ! -f '{gate}' ]; do sleep 0.2; done"
+    MODEL.scripts.clear()
+    MODEL.for_goal("Pick a colour", [_turn(ASK_USER_TOOL, {"question": "Which colour?"}), _FINISH])
+    for goal in ("Count to twelve", "Scan the catalogue", "Find ten leads"):
+        MODEL.for_goal(goal, [_turn("shell", {"command": waiting, "timeout_s": _GATE_WAIT_S}), _FINISH, _FINISH])
     asking: RunRecord = await manager.start(
         "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
     )
@@ -270,6 +287,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
             finally:
                 await browser.close()
     finally:
+        await asyncio.to_thread(gate.write_text, "go", encoding="utf-8")
         MODEL.script = ScriptedProvider(_PROVIDER, [_FINISH] * 8)
         await manager.decide(question.id, True, "test", "blue")
         async with asyncio.timeout(_RUN_WAIT_S):
