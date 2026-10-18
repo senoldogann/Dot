@@ -1,0 +1,5 @@
+{
+  "name": "rea",
+  "version": "6.5.0",
+  "description": "Reverse engineer shipped binaries, apps and runtime behavior with REA (github.com/morluto/rea): its MCP server and workflow skill, ready for Dot."
+}

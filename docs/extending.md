@@ -82,8 +82,9 @@ url = "https://mcp.example.com/mcp"       # a remote server; transport = "http" 
 headers = { Authorization = "Bearer ${DOCS_TOKEN}" }  # ${NAME} as above; headers are never logged
 ```
 
-`dotx mcp list` starts every configured server and shows its tools, or why it does not start. Only tools are used (no
-resources, prompts or sampling). A server at a URL may sign in as MCP's authorization asks (OAuth): `oauth = true` has
+`dotx mcp list` starts every server Dot has, those of `[[mcp]]` tables and those of its plugins, and shows the tools
+each offers, or why one does not start. Only tools are used (no resources, prompts or sampling). A server at a URL may
+sign in as MCP's authorization asks (OAuth): `oauth = true` has
 Dot send the token it keeps for it, which **Sign in again** on [Customize › Plugins](#customize--plugins) gets, and the servers added
 there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on the Plugins
 page, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
@@ -141,9 +142,11 @@ organization's.
 
 A plugin is a folder in the Claude Code layout: `.claude-plugin/plugin.json` (its name), `skills/<name>/SKILL.md` and
 `.mcp.json` (`{"mcpServers": {...}}`; `${CLAUDE_PLUGIN_ROOT}` is the plugin folder). Their skills and MCP servers are
-used; hooks, commands and agents are not. Dot always looks in `<home>/plugins`; `[plugins] dirs` lists more directories
-(each holds plugins, or is one plugin itself; `~` expands). Plugins are read when Dot starts, skills at the start of
-every run.
+used; hooks, commands and agents are not. A server of `.mcp.json` may also carry Dot's own `allow`, `startup_timeout_s`
+and `call_timeout_s`, as an `[[mcp]]` table does, so a plugin whose server offers many tools names the ones the model
+gets and how long it has to start and to answer. Dot always looks in `<home>/plugins`; `[plugins] dirs` lists more
+directories (each holds plugins, or is one plugin itself; `~` expands). Plugins are read when Dot starts, skills at the
+start of every run.
 
 `dotx skills list` shows every plugin and skill found, and anything left out and why; `dotx doctor` has a row for each.
 

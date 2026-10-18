@@ -1,16 +1,19 @@
 """``dotx mcp``: start the configured MCP servers once and show the tools each offers, or why one does not start."""
 
+import asyncio
 import sys
 
 from pydantic import JsonValue
 
 from dotagent.cli_commands import Command, McpListCommand
-from dotagent.config import AppConfig, load_user_config
+from dotagent.config import AppConfig, McpServerConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.paths import config_path
 from dotagent.mcp.hub import ServerReport, inspect_servers
 from dotagent.mcp.types import McpTool
+from dotagent.plugins.catalog import load_plugins
+from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.types import ActionInfo
 from dotagent.tools.mcp import classify_mcp_call
 from dotagent.tools.shell import read_login_env
@@ -63,13 +66,17 @@ def render_report(report: ServerReport) -> str:
 
 async def cmd_mcp_list(command: McpListCommand) -> int:
     config: AppConfig = load_user_config()
-    if not config.mcp:
-        sys.stdout.write(f"No MCP servers are configured. Add [[mcp]] tables to {config_path()}.\n")
+    plugins: PluginCatalog = await asyncio.to_thread(load_plugins, config.plugins, config.mcp)
+    servers: tuple[McpServerConfig, ...] = (*config.mcp, *plugins.servers())
+    if not servers:
+        sys.stdout.write(
+            f"No MCP servers are configured. Add [[mcp]] tables to {config_path()}, or install a plugin with one.\n"
+        )
         return 0
-    starting: int = sum(1 for server in config.mcp if server.enabled)
+    starting: int = sum(1 for server in servers if server.enabled)
     sys.stderr.write(f"Starting {starting} MCP server(s); the first start of a server can take a while...\n")
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
-    reports: tuple[ServerReport, ...] = await inspect_servers(config.mcp, login_env)
+    reports: tuple[ServerReport, ...] = await inspect_servers(servers, login_env)
     for report in reports:
         sys.stdout.write(f"{render_report(report)}\n")
     return 1 if any(report.error is not None for report in reports) else 0
