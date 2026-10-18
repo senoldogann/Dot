@@ -1481,7 +1481,7 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
         places: list[Path] = [
             _located(value, cwd, assigned)
             for raw in fetched
-            for value in _expansions(raw, assigned) or []
+            for value in _expansions(raw, assigned) or [raw]
             for cwd in assigned.cwds
         ]
         return replace(assigned, downloaded=(*assigned.downloaded, *places))
@@ -1871,14 +1871,30 @@ def _fetched_places(command: str, args: list[str]) -> list[str]:
 
 
 def _carried_download(command: str, args: list[str], scope: ShellScope) -> list[str]:
-    """Where ``cp`` or ``mv`` puts a file the line downloaded, which then still counts as downloaded (item 385)."""
-    if command not in ("cp", "mv") or not scope.downloaded:
+    """Where a copy or a move (``cp``, ``mv``, ``ditto``, ``install``, ``rsync``) puts a file the line downloaded, which
+    then still counts as downloaded (item 385)."""
+    if command not in ("cp", "mv", "ditto", "install", "rsync") or not scope.downloaded:
         return []
     words, folders = _target_folders(args)
     operands: list[str] = _positional(words)
     sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
     if any(_runs_download(source, scope) for source in sources):
         return destinations
+    return []
+
+
+def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
+    """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and a file
+    the line downloaded reaches its standard input: by ``<`` (``sh < y.sh``) or as an operand of a command before it in
+    the pipe (``cat y.sh | bash``). That runs the download as naming it does (item 385)."""
+    words, _, _, _ = _split_redirects(stages[-1], ())
+    plain: list[str] = _plain(words)
+    if not plain or Path(plain[0]).name not in (_SHELLS | _INTERPRETERS):
+        return []
+    redirected: list[str] = [stages[-1][index + 1] for index, token in enumerate(stages[-1][:-1]) if token == "<"]
+    piped: list[str] = [word for stage in stages[:-1] for word in _positional(_plain(stage)[1:])]
+    if any(_runs_download(word, scope) for word in (*redirected, *piped)):
+        return [_fetching("high", ("install",), "runs a script the line downloaded, from its standard input")]
     return []
 
 
@@ -2389,7 +2405,8 @@ def _open_operands(args: list[str]) -> tuple[list[str], list[str]]:
     while index < len(args):
         word: str = args[index]
         index += 1
-        if word in ("-a", "-b") and index < len(args):
+        if re.fullmatch(r"-[A-Za-z]*[ab]", word) and index < len(args):
+            # ``-a`` or ``-b`` alone, or last in a word of switches (``-na``), takes the next word as the app.
             apps.append(args[index].casefold())
             index += 1
         elif re.fullmatch(r"-[A-Za-z]*[ab].+", word) and not word.startswith("--"):
@@ -2764,6 +2781,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
         stages = [*stages, segment] if operator in ("|", "|&") else [segment]
         found, state = _assess_segment(segment, state, _piped(stages[:-1], reading.documents), reading.documents)
         findings.extend(found)
+        findings.extend(_fed_a_download(stages, state))
     for inner in reading.substituted:
         findings.extend(_assess_all(inner, state))
     return findings

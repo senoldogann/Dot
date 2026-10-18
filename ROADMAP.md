@@ -14767,15 +14767,17 @@ payment. B11: `docs/safety.md` says which steps of the order hold in every mode.
 (`curl --data-binary @~/…`) is judged as that file, so a protected one is refused however it is spelled
 (`policy/shell.py` `_protected_words`). B4: a script the line downloads and then runs (`curl -o`, `wget -O`, `git
 clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp` or an `mv`) is judged as
-piping the download into a shell (`ShellScope.downloaded`). B5: `mv` takes its sources from where they were, so a move
-out of a folder outside the workspace is destructive there, as `rm` is. B12: a script handed to a terminal app (`open -a
+piping the download into a shell (`ShellScope.downloaded`), and so is one fed to a shell or an interpreter on its
+standard input (`sh < y.sh`, `cat y.sh | bash`). B5: `mv` takes its sources from where they were, so a move out of a
+folder outside the workspace is destructive there, as `rm` is. B12: a script handed to a terminal app (`open -a
 Terminal`, `-b`, a variable app name, `open -f`) or a script type that runs as it opens (`.command`) is a step outside
 Dot's sandbox, which every preset asks about; `open -a Terminal` alone, and `open` of a document, stay as they were. B8,
 an owner's rule whose regular expression backtracks for long, is not fixed: matching in a thread does not spare the
 event loop, as `re` holds the interpreter's lock, so a fix needs the `regex` package with its timeout or a process of
 its own, which is the owner's to choose. A security review by a separate agent found the thread did not help, a file
-named as the terminal app slipped by, and interpreters other than the shells were missed; each is fixed or taken back.
-Tests: `tests/unit/test_spend.py`, `tests/unit/test_shell_policy.py`. Docs: `docs/safety.md`.
+named as the terminal app slipped by, and interpreters other than the shells were missed; the pre-push review found
+`open -na`, a download fed on standard input, a path given by a variable and the other copy commands; each is fixed or
+taken back. Tests: `tests/unit/test_spend.py`, `tests/unit/test_shell_policy.py`. Docs: `docs/safety.md`.
 
 ## Log
 
