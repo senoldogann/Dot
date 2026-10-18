@@ -35,6 +35,12 @@ _GOAL: str = "Keep the line hello in notes.txt and read it back."
 _KEPT: str = "read_file fails on a file that does not exist yet; create notes.txt with write_file first."
 _LEFT: str = "Reading a file back right after writing it confirms that the write worked."
 _WHY: str = "says nothing a later run needs"
+# A lesson of almost the most a lesson may hold: more than four lines in a phone's column, fewer in a wide one.
+_LONG: str = (
+    "A file a run writes and reads back in the same step should be written with write_file and read with read_file, "
+    "never echoed through the shell, because the shell guard asks about a redirect and the run then waits on the "
+    "owner for a write it could have made without a question."
+)
 _RUN_WAIT_S: float = 30.0
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "dark"), (390, "light"))
 
@@ -44,20 +50,21 @@ def _turn(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
 
 
 def _script() -> list[ScriptedTurn]:
-    """A run that reads notes.txt before it exists, writes and reads it, and finishes; then the lesson writer's two
-    lessons and the second look, which keeps the first and leaves the second out."""
+    """A run that reads notes.txt before it exists, writes and reads it, and finishes; then the lesson writer's three
+    lessons and the second look, which keeps the first and leaves the other two out."""
     return [
         _turn("read_file", {"path": "notes.txt"}),
         _turn("write_file", {"path": "notes.txt", "content": "hello\n"}),
         _turn("read_file", {"path": "notes.txt"}),
         _turn(FINISH_TOOL, {"answer": "The file holds hello.", "success": True}),
-        _turn(LESSONS_TOOL, {"lessons": [_KEPT, _LEFT]}),
+        _turn(LESSONS_TOOL, {"lessons": [_KEPT, _LEFT, _LONG]}),
         _turn(
             VET_TOOL,
             {
                 "verdicts": [
                     {"lesson": 1, "keep": True, "reason": "know-how about read_file"},
                     {"lesson": 2, "keep": False, "reason": _WHY},
+                    {"lesson": 3, "keep": False, "reason": _WHY},
                 ]
             },
         ),
@@ -167,6 +174,17 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
                 await expect(kept.get_by_role("button", name="Undo")).to_be_visible()
                 await expect(left.locator(".lesson-why")).to_have_text(f"Left out: {_WHY}")
                 await expect(left.get_by_role("button", name="Save anyway")).to_be_visible()
+                # More shows where the four lines cut a lesson: the long one on a phone, none on a wide window.
+                await expect(kept.locator(".lesson-more")).to_be_hidden()
+                long: Locator = card.locator(".lesson").nth(2)
+                more: Locator = long.get_by_role("button", name="More")
+                if width < 600:
+                    await expect(more).to_be_visible()
+                    await more.click()
+                    await expect(long.get_by_role("button", name="Less")).to_be_visible()
+                    await expect(long.locator(".lesson-text")).to_have_class("lesson-text open")
+                else:
+                    await expect(more).to_be_hidden()
                 await card.scroll_into_view_if_needed()
                 await card.screenshot(path=str(tmp_path / f"card-{width}-{scheme}.png"))
                 assert errors == []

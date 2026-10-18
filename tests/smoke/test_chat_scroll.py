@@ -135,6 +135,7 @@ _FACTS: str = """() => {
     glass: style(document.querySelector('.composer'))?.backdropFilter,
     threadPaddingBottom: thread ? Math.round(parseFloat(getComputedStyle(thread).paddingBottom)) : 0,
     dockHeight: box ? Math.round(box.height) : 0,
+    answerBottom: Math.round(document.querySelector('.answer')?.getBoundingClientRect().bottom ?? 0),
   };
 }"""
 
@@ -195,6 +196,20 @@ async def test_the_composer_stands_at_the_foot_of_what_is_seen_while_the_convers
             await phone.wait_for_timeout(300)
             assert (await phone.evaluate(_FACTS))["dockTop"] == facts["dockTop"]
             await phone.screenshot(path=str(tmp_path / "phone-bottom.png"))
+            # A draft of several lines makes the dock taller: the conversation's end still clears it.
+            await phone.locator(".dock textarea").fill(
+                "\n".join(f"Line {number} of a long draft" for number in range(1, 7))
+            )
+            await phone.wait_for_timeout(300)
+            await phone.evaluate(
+                "const thread = document.querySelector('.run-thread'); thread.scrollTop = thread.scrollHeight"
+            )
+            await phone.wait_for_timeout(300)
+            grown = await phone.evaluate(_FACTS)
+            assert grown["dockHeight"] > facts["dockHeight"] + 40, (grown, facts)
+            assert grown["threadPaddingBottom"] >= grown["dockHeight"], grown
+            assert grown["answerBottom"] <= grown["dockTop"], grown
+            await phone.screenshot(path=str(tmp_path / "phone-draft.png"))
             assert phone_errors == []
             await phone.context.close()
         finally:

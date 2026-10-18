@@ -34,7 +34,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFaile
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
-import { PHONE } from "../layout.js";
+import { PHONE, trackHeight } from "../layout.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -355,9 +355,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       more.textContent = open ? "Less" : "More";
       more.setAttribute("aria-expanded", open ? "true" : "false");
     });
-    if (lesson.text.length > 240) {
-      more.hidden = false;
-    }
+    // More shows when the four lines cut the text, measured where it stands: a phone's column cuts a shorter text
+    // than a wide one does, and a card still folded is measured once it opens.
+    new ResizeObserver(() => {
+      if (!text.classList.contains("open")) {
+        more.hidden = text.scrollHeight <= text.clientHeight + 1;
+      }
+    }).observe(text);
     const body = el("div", { class: "lesson-body" }, text, more);
     if (lesson.state === "saved") {
       // Saved on its own or by you, a lesson can be taken back: Undo forgets the note it wrote.
@@ -950,9 +954,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   );
   dock.prepend(jump);
 
-  // What scrolls the conversation (item 352, item 374): on a phone the column that holds the conversation and the
-  // composer, so both move together under the top bar (`html.chat-shell`, run.css); on a wider window the window, as
-  // before. The column's box is known once it is built.
+  // What scrolls the conversation (item 352): on a phone the conversation itself, between the top bar and the composer,
+  // which stay put (`html.chat-shell`, run.css); on a wider window the window, as before. The conversation's box is
+  // known once it is built.
   let threadBox = null;
 
   function scroller() {
@@ -1304,13 +1308,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
   filesWatch.observe(thread, { childList: true, subtree: true });
   const main = el("div", { class: "run-main" }, thread, dock);
-  // On a phone the conversation alone scrolls between the top bar and the composer; on a wider window the window
-  // does, the dock standing at its foot. The dock floats over the conversation there (item 374), a pane of glass with
-  // the messages going by under it, so its height is kept where the conversation's padding can read it.
+  // On a phone the dock floats over the conversation's foot (item 374), a pane of glass with the messages going by
+  // under it: its height is kept on the column that holds them both, where the conversation's padding reads it.
   threadBox = thread;
-  const dockHeight = new ResizeObserver(() => dock.style.setProperty("--dock-h", `${dock.offsetHeight}px`));
-  dockHeight.observe(dock);
-  dock.style.setProperty("--dock-h", `${dock.offsetHeight}px`);
+  const stopDockHeight = trackHeight(dock, main, "--dock-h");
   // The marks of the conversation's messages stand at the layout's left edge (item 201).
   const outline = messageOutline({ layout, main, thread, dock });
   layout.append(outline.element, main, stage.handle, inspector.element, inspector.scrim);
@@ -1391,7 +1392,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     thread.removeEventListener("scroll", onScroll);
     document.documentElement.classList.remove("chat-shell");
     filesWatch.disconnect();
-    dockHeight.disconnect();
+    stopDockHeight();
     outline.dispose();
     stopLifecycle();
     stopBack();

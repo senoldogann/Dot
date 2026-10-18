@@ -669,11 +669,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   }
 
   /**
-   * The seconds of a model turn join the group whose time they were spent in: the open group, which lasts at least until
-   * the turn's event, or, with none open, the group the turn's tool calls start when it wrote nothing before them (the
-   * finish call is not shown). A turn that wrote a message with no group open was spent before that message, in no group.
-   */
-  /**
    * A folded block for the thinking of step `step` (item 246): a line with the brain, "Thinking…"
    * while the model thinks and "Thought" once it is done, the start of the thought beside it; opened, the whole thought.
    * It goes into the open group of steps, else at the end of the scope, where the group that the step's calls start
