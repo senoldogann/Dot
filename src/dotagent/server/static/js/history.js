@@ -15,6 +15,8 @@ const EAGER_TURNS = 6;
 const OPS_MARGIN = "800px";
 // The events of a run are read this many at a time (the most `GET /runs/{id}/events` gives).
 const EVENTS_PAGE = 2000;
+// Whether the browser keeps the reader's place itself when something above it grows (CSS scroll anchoring).
+const ANCHORS = CSS.supports("overflow-anchor", "auto");
 const FINISH_TOOL = "finish";
 // A long conversation shows its latest turns and says how many it leaves out.
 const SHOWN_TURNS = 40;
@@ -143,23 +145,63 @@ async function fillFlow(past, flow, signal) {
   const nodes = blocks.map((block) =>
     block.say === undefined ? stepsBlock(block.tools, block.rows) : el("div", { class: "turn-say" }, prose(block.say)),
   );
-  flow.replaceChildren(...nodes);
-  flow.hidden = nodes.length === 0;
+  keepPlace(flow, () => {
+    flow.replaceChildren(...nodes);
+    flow.hidden = nodes.length === 0;
+  });
 }
 
-/** Fills a turn's operations once it comes near the window, once; the watch ends with the page (`signal`). */
+/** The box the conversation scrolls in: its own on a phone (`html.chat-shell`, run.css), else null for the window. */
+function scrollBox(node) {
+  return document.documentElement.classList.contains("chat-shell") ? node.closest(".run-thread") : null;
+}
+
+/** `change()` fills the turn's `flow`. A browser that keeps the reader's place by itself does (scroll anchoring);
+ * elsewhere, when the work goes in above what is seen, the conversation scrolls by as much as what follows it moved,
+ * the turn's answer, so what is read stays where it was. Work that goes in where it is seen grows in place. */
+function keepPlace(flow, change) {
+  if (ANCHORS) {
+    change();
+    return;
+  }
+  const box = scrollBox(flow);
+  const seenFrom = box === null ? 0 : box.getBoundingClientRect().top;
+  const follows = flow.nextElementSibling ?? flow.parentElement;
+  const before = follows.getBoundingClientRect().top;
+  change();
+  if (before > seenFrom) {
+    return;
+  }
+  const moved = follows.getBoundingClientRect().top - before;
+  if (moved === 0) {
+    return;
+  }
+  if (box === null) {
+    window.scrollBy(0, moved);
+  } else {
+    box.scrollTop += moved;
+  }
+}
+
+/** Fills a turn's operations once it comes near what is seen, once: near the window, or on a phone near the box the
+ * conversation scrolls in, which the turn is in once the page stands. The watch ends with the page (`signal`). */
 function whenNear(element, ops, run, signal) {
-  const watch = new IntersectionObserver(
-    (entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) {
-        watch.disconnect();
-        void fillFlow(run, ops, signal);
-      }
-    },
-    { rootMargin: OPS_MARGIN },
-  );
-  watch.observe(element);
-  signal.addEventListener("abort", () => watch.disconnect(), { once: true });
+  requestAnimationFrame(() => {
+    if (signal.aborted) {
+      return;
+    }
+    const watch = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          watch.disconnect();
+          void fillFlow(run, ops, signal);
+        }
+      },
+      { root: scrollBox(element), rootMargin: OPS_MARGIN },
+    );
+    watch.observe(element);
+    signal.addEventListener("abort", () => watch.disconnect(), { once: true });
+  });
 }
 
 /** One earlier run as what was asked, what it did and how it ended; a run still going keeps the foot of its message back. */

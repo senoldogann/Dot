@@ -10,7 +10,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -226,5 +226,60 @@ async def test_an_earlier_turn_reads_all_of_its_events_past_one_page_of_them(
             await expect(turn.get_by_text("cut off")).to_have_count(0)
             await page.screenshot(path=str(tmp_path / "chat-long-turn.png"))
             await page.context.close()
+        finally:
+            await browser.close()
+
+
+# A browser without scroll anchoring, as Safari is up to 26.4 (caniuse.com/css-overflow-anchor): the page keeps the
+# reader's place itself there.
+_NO_ANCHORING: str = """(() => {
+  const supports = CSS.supports.bind(CSS);
+  CSS.supports = (property, value) =>
+    property === 'overflow-anchor' ? false : value === undefined ? supports(property) : supports(property, value);
+  const sheet = new CSSStyleSheet();
+  sheet.replaceSync('* { overflow-anchor: none !important; }');
+  document.adoptedStyleSheets = [...document.adoptedStyleSheets, sheet];
+})()"""
+
+
+async def test_the_answer_stays_in_its_place_while_the_earlier_turns_fill_above_it(
+    thread: tuple[str, list[RunRecord]],
+) -> None:
+    """The earlier turns' events come after the page landed on the answer (item 374): what they add above it moves it
+    nowhere, with the browser's scroll anchoring and without it. On a phone, where the conversation scrolls in its
+    own box."""
+    address, runs = thread
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+
+    async def late(route: Route) -> None:
+        await asyncio.sleep(1.0)
+        await route.continue_()
+
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            for anchoring in (True, False):
+                context = await browser.new_context(
+                    viewport={"width": 390, "height": 420}, color_scheme="light", reduced_motion="reduce"
+                )
+                page: Page = await context.new_page()
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                if not anchoring:
+                    await page.add_init_script(_NO_ANCHORING)
+                for past in runs[:-1]:
+                    await page.route(f"**/api/runs/{past.id}/events*", late)
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{address}/#/runs/{runs[-1].id}")
+                answer: Locator = page.locator(".timeline .answer").last
+                await expect(answer).to_be_visible()
+                await page.wait_for_timeout(300)
+                landed = await answer.bounding_box()
+                assert landed is not None
+                await expect(page.locator(".history .turn-ops:not([hidden])")).to_have_count(_TURNS - 1, timeout=15000)
+                await page.wait_for_timeout(300)
+                after = await answer.bounding_box()
+                assert after is not None
+                assert abs(after["y"] - landed["y"]) <= 2, (anchoring, landed, after)
+                await context.close()
         finally:
             await browser.close()
