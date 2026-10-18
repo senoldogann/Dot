@@ -147,9 +147,9 @@ async def test_the_greeting_and_the_composer_stand_in_the_middle_and_the_strip_i
         async with asyncio.timeout(_RUN_WAIT_S):
             ended.append(await manager.wait(run.id))
     assert all(run.status == "done" for run in ended), ended
-    await runtime.store.add_memory("Worked on nine runs today.", (JOURNAL_TAG,), None, None, None)
+    await runtime.store.add_memory("Worked on nine runs today.", (JOURNAL_TAG,), None, None, None, False)
     await runtime.store.add_memory(
-        "pdftotext keeps a table's columns with -layout.", ("lesson",), ended[0].id, None, None
+        "pdftotext keeps a table's columns with -layout.", ("lesson",), ended[0].id, None, None, False
     )
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)

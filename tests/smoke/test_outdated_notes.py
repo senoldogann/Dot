@@ -75,10 +75,10 @@ async def test_the_note_a_newer_one_made_outdated_is_put_aside_and_names_what_re
         try:
             model: RecordingProvider = RecordingProvider(ScriptedProvider(_PROVIDER, [_outdated()]))
             await runtime.router.register(_PROVIDER, model)
-            owners: MemoryRecord = await runtime.store.add_memory(OWNERS, (), None, None, None)
-            old: MemoryRecord = await runtime.store.add_memory(OLD, (), "run_old", None, None)
-            other: MemoryRecord = await runtime.store.add_memory(OTHER, (), "run_other", None, None)
-            new: MemoryRecord = await runtime.store.add_memory(NEW, (), "run_new", None, None)
+            owners: MemoryRecord = await runtime.store.add_memory(OWNERS, (), None, None, None, False)
+            old: MemoryRecord = await runtime.store.add_memory(OLD, (), "run_old", None, None, False)
+            other: MemoryRecord = await runtime.store.add_memory(OTHER, (), "run_other", None, None, False)
+            new: MemoryRecord = await runtime.store.add_memory(NEW, (), "run_new", None, None, False)
             before: list[str] = [hit.record.id for hit in await recall(runtime.memory, "Documents", 10)]
             reflection: Reflection = await reflect(runtime, asyncio.Lock(), time.time())
             put_aside: MemoryRecord = await runtime.store.get_memory(old.id)

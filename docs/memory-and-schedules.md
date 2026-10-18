@@ -79,7 +79,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:
   the run is tainted, so its next save asks unless the approval mode answers that question itself, and the note it
   writes keeps the mark (`yolo` removes the approval, not the origin). Such a note is never among the notes a run
-  starts with or is handed while it works (item 384): those are handed as trusted data, with no reader in between, so
+  starts with, is handed while it works or is handed as a site's lessons when it reaches the site, nor among the notes
+  the model that writes lessons is shown (item 384): those are handed as trusted data, with no reader in between, so
   only `memory_search` finds it, and the start says in one sentence how many notes were left out so. A lesson drawn
   from such a run, and the reflection's journal that names it, carry the mark too; a lesson you save yourself does
   not. The same words saved again leave a note's mark as it was. Your own rewrite of a note, on the Memory page, takes

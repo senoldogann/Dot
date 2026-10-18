@@ -115,6 +115,9 @@ def test_a_run_is_handed_a_sites_lessons_it_was_not_handed_that_rest_not_and_are
     assert [note.id for note in handed] == [f"mem_{index}" for index in range(2, 2 + MOST_SITE_LESSONS)]
     # The agent's own lesson goes to its runs.
     assert site_lessons([theirs], set(), "agent_1", set()) == (theirs,)
+    # A lesson saved while reading outside content is left to memory_search (item 384).
+    marked: MemoryRecord = _note("mem_marked", None).model_copy(update={"tainted": True})
+    assert site_lessons([marked, notes[2]], set(), None, set()) == (notes[2],)
 
 
 def test_a_run_is_offered_the_learned_skills_of_the_site_its_instructions_do_not_list_the_most_used_first() -> None:

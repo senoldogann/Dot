@@ -520,8 +520,8 @@ async def update_memory_note(index: MemoryIndex, memory_id: str, content: str, t
     embedded again. The user vouches for the text they saved, so a note saved while reading outside content no longer
     counts as such, and goes back among the notes a run starts with (item 384)."""
     existing: MemoryRecord = await index.store.get_memory(memory_id)
-    await _rewritten(index, memory_id, content, tags, existing.source_run, False)
-    return await index.store.clear_memory_taint(memory_id)
+    text, vector = await _embedded(index, content)
+    return await index.store.update_memory_vouched(memory_id, text, normalize_tags(tags), vector, existing.source_run)
 
 
 async def rewrite_memory_note(
@@ -531,22 +531,16 @@ async def rewrite_memory_note(
     text is the model's now, so a note the user wrote no longer reads as theirs (item 157). A run that had read content
     third parties can author leaves the note tainted, and a clean one leaves the mark a note had."""
     await index.store.get_memory(memory_id)
-    return await _rewritten(index, memory_id, content, tags, run_id, tainted)
+    text, vector = await _embedded(index, content)
+    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, run_id, tainted)
 
 
-async def _rewritten(
-    index: MemoryIndex,
-    memory_id: str,
-    content: str,
-    tags: Sequence[str],
-    source_run: str | None,
-    tainted: bool,
-) -> MemoryRecord:
+async def _embedded(index: MemoryIndex, content: str) -> tuple[str, Vector | None]:
+    """A note's text, checked, and its embedding, or ``None`` when embeddings are off."""
     text: str = _checked_text(content, index.config.max_chars)
-    vector: Vector | None = None
-    if index.embedder is not None:
-        vector = (await index.embedder.embed([text]))[0]
-    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, source_run, tainted)
+    if index.embedder is None:
+        return text, None
+    return text, (await index.embedder.embed([text]))[0]
 
 
 async def forget_memory(index: MemoryIndex, memory_id: str) -> MemoryRecord:

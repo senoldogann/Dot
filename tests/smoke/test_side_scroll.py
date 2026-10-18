@@ -361,7 +361,7 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
 ) -> None:
     _, address = served
     for number in range(1, _NOTES + 1):
-        await runtime.store.add_memory(f"Note {number:02d} about the garden.", ("garden",), None, None, None)
+        await runtime.store.add_memory(f"Note {number:02d} about the garden.", ("garden",), None, None, None, False)
     # How learning fares (review O25): a lesson work that failed is shown with its error.
     await record_learning(runtime.store, runtime.bus, "lessons", time.time(), failed_with("the embedder is down"), None)
     async with async_playwright() as playwright:

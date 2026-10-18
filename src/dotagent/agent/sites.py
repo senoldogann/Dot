@@ -117,9 +117,12 @@ def site_lessons(
     notes: Sequence[MemoryRecord], taken: Set[str], agent_id: str | None, rested: Set[str]
 ) -> tuple[MemoryRecord, ...]:
     """The lessons of ``notes`` (a site's, the most recently changed first) a run of ``agent_id`` is handed: visible to
-    it, neither resting (``rested``) nor handed already (``taken``), at most :data:`MOST_SITE_LESSONS`."""
+    it, neither resting (``rested``) nor handed already (``taken``) nor saved while reading outside content (item 384:
+    only ``memory_search`` finds those), at most :data:`MOST_SITE_LESSONS`."""
     return tuple(
-        note for note in notes if note.id not in taken and note.id not in rested and visible_to(note, agent_id)
+        note
+        for note in notes
+        if note.id not in taken and note.id not in rested and visible_to(note, agent_id) and not note.tainted
     )[:MOST_SITE_LESSONS]
 
 

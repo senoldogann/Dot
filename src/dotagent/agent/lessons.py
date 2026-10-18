@@ -322,9 +322,12 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     agent is handed already says (another agent's lesson is not the run's to know). A review model or an embedding
     service that fails raises its error."""
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
+    # A note saved while reading outside content is not shown to the model that writes the lessons (item 384), so its
+    # words cannot pass into a lesson of a clean run, which would be saved unmarked.
     known: tuple[str, ...] = tuple(
         redact_secrets(hit.record.content)
         for hit in await recall_for(runtime.memory, case.goal, _KNOWN_NOTES, agent_id)
+        if not hit.record.tainted
     )
     writer: LessonWriter = lesson_writer_for(
         runtime.router,

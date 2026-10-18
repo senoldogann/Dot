@@ -181,7 +181,7 @@ async def test_how_a_run_was_set_up_is_in_the_side_panel_not_the_conversation(
     turns: list[ScriptedTurn] = [_finish("Three invoices: March, April and May.") for _ in range(4)]
     with scratch_home() as home, eval_environment(home, {}):
         async with _daemon(login_env, turns) as (runtime, manager, address), async_playwright() as playwright:
-            await runtime.store.add_memory(_NOTE, (), None, None, None)
+            await runtime.store.add_memory(_NOTE, (), None, None, None, False)
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
             chromium: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             webkit: Browser = await playwright.webkit.launch(headless=True)

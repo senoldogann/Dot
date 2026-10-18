@@ -88,7 +88,7 @@ async def test_five_hundred_lesson_notes_merge_without_holding_the_event_loop(
             tags: tuple[str, ...] = (LESSON_TAG, _TOPIC_TAG) if index in _TWINS.values() else (LESSON_TAG,)
             content: str = f"Keep weekly report {older} in the reports folder."
             saved: MemoryRecord = await store.add_memory(
-                content if older == index else f"{content} Learnt again.", tags, "run_0", None, direction
+                content if older == index else f"{content} Learnt again.", tags, "run_0", None, direction, False
             )
             ids.append(saved.id)
 

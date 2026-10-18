@@ -2494,7 +2494,7 @@ class Store:
         source_run: str | None,
         agent_id: str | None,
         vector: Sequence[float] | None,
-        tainted: bool = False,
+        tainted: bool,
     ) -> MemoryRecord:
         """Add a note that holds until it is changed; ``tainted`` says its run had read content third parties can
         author."""
@@ -2582,14 +2582,39 @@ class Store:
         source_run: str | None,
         tainted: bool,
     ) -> MemoryRecord:
-        """Rewrite a memory's text and tags, written now by ``source_run`` (``None`` for the user). A tainted run's
-        rewrite marks the note tainted; a clean one leaves the mark a note had (:meth:`clear_memory_taint` takes it
-        off)."""
+        """Rewrite a memory's text and tags, written now by ``source_run``. A tainted run's rewrite marks the note
+        tainted; a clean one leaves the mark a note had."""
+        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted))
+
+    @_writing
+    async def update_memory_vouched(
+        self,
+        memory_id: str,
+        content: str,
+        tags: Sequence[str],
+        vector: Sequence[float] | None,
+        source_run: str | None,
+    ) -> MemoryRecord:
+        """The user's rewrite of a memory's text and tags, as :meth:`update_memory`; in the same write the mark of
+        having been saved while reading outside content comes off, as the user vouches for the text they save (item
+        384)."""
+        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0)
+
+    async def _rewrite_memory(
+        self,
+        memory_id: str,
+        content: str,
+        tags: Sequence[str],
+        vector: Sequence[float] | None,
+        source_run: str | None,
+        mark: Literal["MAX(tainted, ?)", "?"],
+        tainted: int,
+    ) -> MemoryRecord:
+        """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``."""
         tag_text: str = ",".join(tags)
         await self._db.execute(
-            "UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = MAX(tainted, ?)"
-            " WHERE id = ?",
-            (content, tag_text, time.time(), source_run, int(tainted), memory_id),
+            f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark} WHERE id = ?",
+            (content, tag_text, time.time(), source_run, tainted, memory_id),
         )
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
         await self._db.execute(
@@ -2602,14 +2627,6 @@ class Store:
                 "INSERT INTO memory_vectors(id, dim, vec) VALUES(?, ?, ?)",
                 (memory_id, len(vector), pack_vector(vector)),
             )
-        await self._db.commit()
-        return await self.get_memory(memory_id)
-
-    @_writing
-    async def clear_memory_taint(self, memory_id: str) -> MemoryRecord:
-        """Take off a note's mark of having been saved while reading outside content, as the user vouches for its text
-        by saving it themselves (item 384)."""
-        await self._db.execute("UPDATE memories SET tainted = 0 WHERE id = ?", (memory_id,))
         await self._db.commit()
         return await self.get_memory(memory_id)
 

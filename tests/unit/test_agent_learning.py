@@ -124,8 +124,8 @@ async def test_the_store_keeps_an_agents_lessons_and_scores_them_by_its_own_runs
     try:
         scout: AgentRecord = await store.create_agent("Scout", "Finds sources", "", "", None, None, [], None, None)
         thread: ThreadRecord = await store.create_thread("t", "test")
-        lesson: MemoryRecord = await store.add_memory("Log in first.", ["lesson"], "run_1", scout.id, None)
-        dots: MemoryRecord = await store.add_memory("Dot's note.", [], None, None, None)
+        lesson: MemoryRecord = await store.add_memory("Log in first.", ["lesson"], "run_1", scout.id, None, False)
+        dots: MemoryRecord = await store.add_memory("Dot's note.", [], None, None, None, False)
         assert lesson.agent_id == scout.id and dots.agent_id is None
         assert await store.agent_memories(scout.id, 10) == [lesson]
         assert (await store.get_memory(lesson.id)).agent_id == scout.id

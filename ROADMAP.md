@@ -14721,19 +14721,21 @@ saved while reading outside content never enters the notes a run starts with. **
 saves or rewrites while it has read content third parties can author is marked (`memories.tainted`, added to the store's
 columns), and keeps the mark; a lesson drawn from such a run and the reflection's journal that names it carry it too,
 while a lesson the owner saves and the notes the owner writes do not, and the owner's own rewrite of a note on the
-Memory page takes the mark off. A marked note is never among the notes a run starts with or is handed while it works
-(`prompt_memories`, `live_memories`): `memory_search` alone finds it, and what it returns counts as outside content, so
-the run's next save asks unless its approvals answer that themselves; the start says in one sentence how many notes were
-left out so. The memory tools refuse a note that holds a key-like string or one of the secrets Dot holds, and tell the
-model to record where the key lives (the secrets read off the event loop). The Memory page and `dotx memory list` name a
-marked note; the doctor warns when lessons are approved by the run's own model (`[models] review` the same as `main`
-with `agent.lessons = "auto"`). The review made the mark a required argument wherever a note is written, which brought
-in the lessons and the journal the agent's change had left unmarked; left an existing note's mark as it was when the
-same words are saved again, which the agent's change marked, so that a note of the owner's could have dropped out of the
-start; let the owner's rewrite take the mark off; read the secrets in a thread; and shortened the memory tools'
-descriptions, which the model reads at every call. Tests: `tests/unit/test_memory_taint.py`,
-`tests/smoke/test_memory_taint.py`, `tests/unit/test_doctor.py`. Docs: `docs/memory-and-schedules.md`, `docs/safety.md`,
-`docs/models.md`.
+Memory page takes the mark off. A marked note is never among the notes a run starts with, is handed while it works or is
+handed as a site's lessons when it reaches the site (`prompt_memories`, `live_memories`, `site_lessons`), nor among the
+notes the model that writes lessons is shown: `memory_search` alone finds it, and what it returns counts as outside
+content, so the run's next save asks unless its approvals answer that themselves; the start says in one sentence how
+many notes were left out so. The memory tools refuse a note that holds a key-like string or one of the secrets Dot
+holds, and tell the model to record where the key lives (the secrets read off the event loop). The Memory page and `dotx
+memory list` name a marked note; the doctor warns when lessons are approved by the run's own model (`[models] review`
+the same as `main` with `agent.lessons = "auto"`). The review made the mark a required argument wherever a note is
+written, which brought in the lessons and the journal the agent's change had left unmarked; left an existing note's mark
+as it was when the same words are saved again, which the agent's change marked, so that a note of the owner's could have
+dropped out of the start; let the owner's rewrite take the mark off, in the same write as the text; kept marked notes
+from a site's lessons and from the lesson writer, which the start and the live notes alone had left out; read the
+secrets in a thread; and shortened the memory tools' descriptions, which the model reads at every call. Tests:
+`tests/unit/test_memory_taint.py`, `tests/smoke/test_memory_taint.py`, `tests/unit/test_doctor.py`. Docs:
+`docs/memory-and-schedules.md`, `docs/safety.md`, `docs/models.md`.
 
 ## Log
 
