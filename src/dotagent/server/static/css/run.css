@@ -1337,6 +1337,110 @@
   grid-column: 2;
 }
 
+/* The Changes of the chat (item 368): a row a file, its path, what became of it and the lines added and removed;
+   opened, its unified diff in a box of its own that scrolls sideways, each line in the tone of what it does. */
+.changes {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.changes-total {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.change-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  list-style: none;
+}
+
+.change-head::-webkit-details-marker {
+  display: none;
+}
+
+.change-head:hover {
+  background: var(--surface-2);
+}
+
+.change-path {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.change-name,
+.change-where {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.change-where {
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.change-counts {
+  display: inline-flex;
+  gap: var(--space-1);
+  font: var(--code-size) / var(--code-leading) var(--mono);
+  white-space: nowrap;
+}
+
+.change-add {
+  color: var(--ok);
+}
+
+.change-del {
+  color: var(--bad);
+}
+
+.change .chev {
+  display: inline-flex;
+  transition: rotate var(--motion-quick);
+}
+
+.change[open] .chev {
+  rotate: 90deg;
+}
+
+.diff {
+  max-height: 420px;
+  margin: var(--space-1) 0 var(--space-2);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font: var(--code-size) / var(--code-leading) var(--mono);
+}
+
+.diff-line {
+  display: block;
+  min-width: max-content;
+  padding: 0 var(--space-2);
+  white-space: pre;
+}
+
+.diff-add {
+  background: var(--ok-weak);
+}
+
+.diff-del {
+  background: var(--bad-weak);
+}
+
+.diff-hunk {
+  color: var(--muted);
+}
+
 .inspector-scrim {
   position: fixed;
   inset: var(--seen-top) 0 var(--seen-bottom);

@@ -28,6 +28,7 @@ import { messageOutline } from "../outline.js";
 import { emptyPanel, errorPanel, loadingPanel, panelSection } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
+import { changesSection } from "../changes.js";
 import { setupSection } from "../setup.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
@@ -73,6 +74,9 @@ const LESSON_DONE = { save: "Saved to memory: later runs find it like any note."
 const QUESTIONS_SETTLE_MS = 120;
 // The conversation changes with every event of a run: the list of its files is drawn again once it settles.
 const FILES_SETTLE_MS = 250;
+// The tools whose results change a file the Changes tab lists (item 368), and how long its read waits for more.
+const CHANGING_TOOLS = new Set(["write_file", "edit_file"]);
+const CHANGES_SETTLE_MS = 400;
 // A helper that starts or ends reads the chat's agents again (item 227), once a burst of its events has settled.
 const AGENTS_SETTLE_MS = 250;
 // The events of a run that start or end it.
@@ -293,6 +297,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // How the run was set up (item 365): its notes and skills, its context budget, its tool groups, the model a step
   // went to. The conversation keeps none of these lines; the Run tab lists them.
   const setup = setupSection();
+  // The files the chat's runs wrote or created (item 368), in a tab of their own that counts them; read on arrival,
+  // after each write or edit a run reports, and once the run ends.
+  const changes = changesSection({ runId, onCount: (files) => inspector.setCount("changes", files === 0 ? "" : String(files)) });
+  const refreshChanges = debounce(() => attempt(changes.refresh), CHANGES_SETTLE_MS);
 
   // ------------------------------------------------------------------------------------------------ cost
   // What the run cost and where (see cost.js): read on arrival, every COST_REFRESH_MS while it works, once at its end.
@@ -1103,6 +1111,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       paintWorking();
       syncControls();
       reconcile();
+      refreshChanges();
     }
     paintStats();
     paintHeading();
@@ -1199,6 +1208,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     layout,
     tabs: [
       { id: "run", label: "Run", icon: "info", sections: [details.element, setup.element, cost.element, filesCard.element] },
+      { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
       { id: "screen", label: "Screen", icon: "monitor", sections: [computer.element] },
@@ -1341,6 +1351,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   paintFiles(thread);
   syncControls();
   paintLessons(detail.lessons);
+  attempt(changes.refresh);
   paintQuestions(detail.questions);
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
@@ -1375,6 +1386,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
         messageRead(message.data.data.text);
       }
       timeline.push(message.data);
+      if (message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
+        refreshChanges();
+      }
       if (message.data.run_id !== runId && RUN_ENDS.has(message.data.kind)) {
         agentsChanged();
         paintCapsule();

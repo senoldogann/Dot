@@ -242,7 +242,12 @@ else how many there are, and opened it shows why, or the lessons.
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
 the change cannot be noted (a full disk, say), the file is not changed and the model is told why; a note the disk cut
-short is left out of the journal, so the run's next change is noted after it and `dotx undo` still reads it.
+short is left out of the journal, so the run's next change is noted after it and `dotx undo` still reads it. The side
+panel's **Changes** tab reads the same journals (item 368): each file a chat's runs changed, diffed from the copy the
+chat's first change to it kept to what is there now. A file where the panel beside a chat shows no file (a hidden
+folder, an application's files, outside the home folder), a binary file, one past 512 KB, one that is gone and one
+whose first change kept no copy show why instead of a diff, and the lines of a diff are masked of the secrets Dot
+holds. A command's own writes are not in the journals, so they are not there.
 `dotx undo RUN_ID` shows what taking back the changes of that run and of the runs it delegated to would do: a file the
 run changed is put back as it was (`restore`), with its permissions, a file it created is deleted (`delete`), and the
 folders it created are removed once they are empty. Nothing is changed until `dotx undo RUN_ID --apply`, which exits
