@@ -3,7 +3,7 @@ stumble, which the loop asks about at its end), two lesson notes that say the sa
 memory, and the scheduler's tick at the reflection's time fires it. The reflection asks the review model about the
 failed and the stopped run only, saves their lessons once the second look keeps them (``auto``), folds the duplicates
 into one, rests the stale lesson
-(a search no longer finds it), writes the day's journal note and stands in the Activity list; the next tick does not
+(a search no longer finds it), writes the day's journal note and stands in the activity's list; the next tick does not
 fire it again.
 
 No model service is used: the scripted model plays the runs and answers for the review model too (see ``eval_config``).
@@ -361,7 +361,7 @@ async def test_the_reflection_learns_from_the_runs_the_loop_did_not_ask_tidies_t
         assert "Tidied the lessons: 1 merged, 2 retired." in journals[0].content
         assert LESSON_FAILED in journals[0].content
 
-        # Activity lists the reflection among what ended today; the next tick does not fire it again.
+        # The activity lists the reflection among what ended today; the next tick does not fire it again.
         async with _client(home) as client:
             view: httpx.Response = await client.get("/api/activity")
         assert view.status_code == 200, view.text

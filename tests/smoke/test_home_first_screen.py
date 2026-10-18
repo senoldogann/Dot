@@ -1,6 +1,6 @@
 """The home's first screen (item 124): Dot's greeting and the composer stand in the middle of the space under the top
-bar, across and down, however long the Today strip under them is; the strip shows the first two rows of each section
-with how many more the Activity page holds, the page scrolls to its end with the top bar and the sidebar in place, and
+bar, across and down, however long the Today strip under them is; the strip shows the first two rows of each section and
+a button for the others (item 364), the page scrolls to its end with the top bar and the sidebar in place, and
 a section folds at its title and stays folded on the next visit. Nine runs ended today, a journal note and a lesson,
 on the scripted model, served by a real server, at three sizes, light and dark."""
 

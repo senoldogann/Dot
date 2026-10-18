@@ -1220,7 +1220,7 @@ a.pill:hover {
 }
 
 /* On a phone a card's name stands over the card, out of its surface, as a group's name over its rows: in the
-   settings' tabs (item 330), on Activity, Customize › Plugins and the agent's editor (item 332). Each such card has one body,
+   settings' tabs (item 330), on Customize › Plugins and the agent's editor (item 332). Each such card has one body,
    whose ground the card's is. */
 @media (max-width: 720px) {
   :is(.settings-pane .card, .connect-section, .agent-editor):has(> .card-head) {
@@ -2147,7 +2147,7 @@ a.pill:hover {
   font-size: var(--text-sm);
 }
 
-/* The Today strip under the composer: a section per kind of thing that has rows, the rows as on the Activity page. */
+/* The Today strip under the composer: a section per kind of thing that has rows. */
 .home-today {
   grid-row: 3;
   align-self: start;
@@ -6660,7 +6660,7 @@ button.attach-chip:hover {
     min-width: 44px;
   }
 
-  /* Four choices of a phone's size fit the smallest phone's width (Activity's filters on an iPhone SE). */
+  /* Four choices of a phone's size fit the smallest phone's width (an iPhone SE). */
   .segmented button {
     padding-inline: 8px;
   }

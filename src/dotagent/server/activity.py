@@ -1,7 +1,7 @@
 """Activity: everything in motion in one list (item 47). Five sections, read from the live runs, the approvals, the
 schedules, the campaigns and the notes: what waits for the user, what works now, what ended today, what was learned
 today (the journal and the lessons, item 72) and what is due later today. The sidebar shows the first two above the
-chats; the Activity page shows the first three; the home's Today strip shows all five."""
+chats; the home's Today strip shows all five."""
 
 import time
 from datetime import datetime

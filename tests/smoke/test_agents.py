@@ -287,7 +287,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
     assert "fetch" not in offered, offered
     page = await client.get(f"/api/agents/{agent_id}")
     assert [run["id"] for run in page.json()["runs"]] == [run_id]
-    # The run's row on the Activity page wears the agent's face.
+    # The run's row in the activity wears the agent's face.
     activity = await client.get("/api/activity")
     recent = [row for row in activity.json()["recent"] if row["id"] == run_id]
     assert [row["actor_id"] for row in recent] == [agent_id], activity.text

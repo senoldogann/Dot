@@ -1,7 +1,7 @@
 """The side menu shows every agent of a run (item 198): under a run at work, every run it delegated, those at work with
 their time and those that ended with how they ended, behind a button that says how many work and folds them; the fold
-is kept. The Activity page shows them under the run too, and counts what works; the side menu counts the chats at
-work (item 202). Scripted runs, served by a real server, wide and on a phone, light and dark."""
+is kept. The side menu counts the chats at work (item 202). Scripted runs, served by a real server, wide and on a phone,
+light and dark."""
 
 import asyncio
 import time

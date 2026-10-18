@@ -407,8 +407,9 @@ async def test_the_shell_of_the_web_app_is_served_and_the_service_worker_registe
             await page.goto(ui_url(host, port, TOKEN))
             scope: str = await page.evaluate("navigator.serviceWorker.ready.then((registration) => registration.scope)")
             assert scope == f"http://{host}:{port}/"
-            # The app opens on the chat it was in last (item 286): at the address without a route, and as a home-screen
-            # app added when it started on Activity; in a browser's tab, Activity stays a page of its own.
+            # The app opens on the chat it was in last (item 286): at the address without a route, and as a
+            # home-screen app added when it started on Activity; in a browser's tab, that old address leads to the
+            # home (item 364).
             thread: ThreadRecord = await runtime.store.create_thread("Plan the garden", "test")
             run: RunRecord = await runtime.store.create_run(
                 thread.id,

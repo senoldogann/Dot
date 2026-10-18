@@ -39,7 +39,7 @@ from dotagent.store.models import RunRecord
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "phone-back-token"
-# Links the test puts on Activity: one to an old address, one inside a part that stops its clicks, in the page.
+# Links the test puts on the home: one to an old address, one inside a part that stops its clicks, in the page.
 _LINKS: str = """() => {
   const old = document.createElement("a");
   old.id = "old-address";

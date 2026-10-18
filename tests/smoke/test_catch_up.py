@@ -1,7 +1,8 @@
 """Pages catch up after a break of their connection to the daemon (item 160): the stream of the lifecycle replays
 nothing, so a page reads again what it shows once the stream is back. A real server of a runtime in a throw-away home
 is taken down and brought back up while the runtime works on, as when the network drops, and Chrome shows the pages:
-the Activity page lists a run that started and ended meanwhile, and a run's page shows a message queued meanwhile. No
+the home's Today strip lists a run that started and ended meanwhile, and a run's page shows a message queued meanwhile.
+No
 model is called: the scripted model plays the runs.
 """
 
