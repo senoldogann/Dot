@@ -99,7 +99,7 @@
   --shadow-float: 0 6px 18px var(--shadow-ink-deep);
   --shadow-overlay: 0 0 40px var(--shadow-ink-deep);
   --shadow-modal: 0 20px 60px var(--shadow-ink-deep);
-  /* The edge of a theme's orb (item 126, T3 Code's): a hairline of its own scheme and a breath of shadow, whatever the
+  /* The edge of a theme's orb (item 126): a hairline of its own scheme and a breath of shadow, whatever the
      page's scheme is. */
   --orb-edge-light: inset 0 0 0 1px rgb(0 0 0 / 10%), 0 1px 2px rgb(0 0 0 / 8%);
   --orb-edge-dark: inset 0 0 0 1px rgb(255 255 255 / 14%), 0 1px 2px rgb(0 0 0 / 18%);
@@ -157,7 +157,7 @@
   border-radius: 10px;
 }
 
-/* ---------- contrast (Settings › Appearance, item 127, after T3 Code's; see js/appearance/LICENSE) ---------- */
+/* ---------- contrast (Settings › Appearance, item 127; derived code, see js/appearance/LICENSE) ---------- */
 
 /* While the contrast is not 100 %, the text tiers and the lines are mixed again: below 100 toward the page
    (--contrast-base, the share of the tier that stays), above it toward black in light and white in dark

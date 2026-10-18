@@ -1,4 +1,4 @@
-// A menu of actions (item 130), after T3 Code's thread menu: opened at the pointer by a right-click, or at the button
+// A menu of actions (item 130): opened at the pointer by a right-click, or at the button
 // that opens it; its items are buttons that a click or Enter runs. The arrow keys, Home and End move between them;
 // Escape or Tab closes it and gives the focus back to where it came from; a click outside it, a scroll, a change of the
 // window's size or of the page closes it. One is open at a time.

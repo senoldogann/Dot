@@ -1,7 +1,7 @@
-"""Themes, after T3 Code (item 126): Settings › Appearance holds the colour scheme as three miniatures and the themes as
-a gallery of cards with a light and a dark orb; every theme, Dot's two looks and T3 Code's six palettes, holds Dot's
-contrast rule in both schemes as the browser paints it; a theme for light and another for dark ride on the page element
-and are there before the first paint after a reload; ⌥⌘A opens the tab and ⇧⌥⌘A steps through the schemes."""
+"""Themes (item 126): Settings › Appearance holds the colour scheme as three miniatures and the themes as a gallery of
+cards with a light and a dark orb; every theme, Dot's two looks and six palettes, holds Dot's contrast rule in both
+schemes as the browser paints it; a theme for light and another for dark ride on the page element and are there before
+the first paint after a reload; ⌥⌘A opens the tab and ⇧⌥⌘A steps through the schemes."""
 
 import asyncio
 import re

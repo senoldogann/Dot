@@ -1,7 +1,7 @@
 """Themes of one's own (item 128): a theme is made from a background, an accent and an action colour with the page
-drawn in it while it is made, kept by the daemon as T3 Code's theme file in its home's ``themes`` folder, picked, on the
-page before the first paint after a reload, held to Dot's contrast rule in both schemes, exported as a file, copied from
-a built-in theme and deleted; a VS Code colour theme and T3 Code's short form are added from files, a file Dot cannot
+drawn in it while it is made, kept by the daemon as a theme file in its home's ``themes`` folder, picked, on the page
+before the first paint after a reload, held to Dot's contrast rule in both schemes, exported as a file, copied from a
+built-in theme and deleted; a VS Code colour theme and a theme file's short form are added from files, a file Dot cannot
 read is refused with the reason, and a file put in the folder by hand shows in the gallery or says why it does not."""
 
 import asyncio
@@ -46,7 +46,7 @@ _VSCODE: dict[str, object] = {
     },
     "tokenColors": [],
 }
-# T3 Code's short form: a name, a scheme and the two colours the rest is derived from.
+# The short form of a theme file: a name, a scheme and the two colours the rest is derived from.
 _SHORT: dict[str, object] = {"name": "Moss", "appearance": "light", "canvas": "#f4f6f0", "accent": "#4f7a3a"}
 
 
@@ -217,7 +217,7 @@ async def test_a_theme_of_ones_own_is_made_kept_picked_exported_copied_and_delet
     await page.reload()
     await expect(harbour.locator(".theme-card-pick")).to_have_attribute("aria-pressed", "true")
 
-    # Export: T3 Code's theme file, version 1, as the daemon keeps it.
+    # Export: the theme file, version 1, as the daemon keeps it.
     await harbour.hover()
     async with page.expect_download() as downloading:
         await harbour.get_by_role("button", name="Export Harbour").click()
@@ -237,7 +237,7 @@ async def test_a_theme_of_ones_own_is_made_kept_picked_exported_copied_and_delet
     await night.locator(".theme-card-pick").click(position={"x": 12, "y": 12})
     assert await page.evaluate("localStorage.getItem('dot.themeDark')") == "harbour-night"
     assert await page.evaluate("localStorage.getItem('dot.theme')") == "harbour"
-    # The short form is kept written out whole, as T3 Code reads a theme file.
+    # The short form is kept written out whole, as a theme file.
     short_form: Path = tmp_path / "moss.json"
     await asyncio.to_thread(short_form.write_text, json.dumps(_SHORT), encoding="utf-8")
     await _add(page, short_form)

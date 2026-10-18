@@ -41,7 +41,7 @@ const PREVIEW_CHARS = 240;
 const MEMORY_RESULT = /^(Saved|Updated|Forgot): \[([^\]\s]+)\]/;
 const MEMORY_CHANGES = { Saved: "Saved to memory", Updated: "Updated memory", Forgot: "Removed from memory" };
 const MEMORY_WORDS_CHARS = 120;
-// How the helpers of a group stand, in the order a reader scans them, after T3 Code's: those under way first, then how
+// How the helpers of a group stand, in the order a reader scans them: those under way first, then how
 // the others ended.
 const FLOCK_WORDS = [
   ["working", ["queued", "running"]],
@@ -265,7 +265,7 @@ function paintContext(context) {
 }
 
 /**
- * The group of helpers that follow one another (item 245), after T3 Code's group of subagents: a head with their faces,
+ * The group of helpers that follow one another (item 245): a head with their faces,
  * how many they are and how they stand, the time from the first one's start to the last one's end and a chevron that
  * folds their rows away. It is open from the start.
  */
@@ -605,7 +605,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     paintRing(scope.panel.status, status);
     scope.panel.face.setAttribute("data-state", faceState(status));
     scope.panel.face.classList.add("ended");
-    // Its last line is the start of its answer, as T3 Code's rows show (item 245), after how it ended unless it is done;
+    // Its last line is the start of its answer (item 245), after how it ended unless it is done;
     // a run with no answer says how it ended and in how many steps.
     const answer = clip(plainLine(result), PREVIEW_CHARS);
     const facts = answer === "" ? [status, plural(steps, "step", "steps")] : status === "done" ? [answer] : [status, answer];
@@ -649,10 +649,10 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   }
 
   /** The row of every delegated run that has not ended says how long it has worked at `now` (seconds): the page calls
-   * this every second while the run works, so a folded row's time counts on between the events of its run, as T3 Code
-   * counts a working subagent's (item 123), and as an event comes. The card a row shows follows (item 226), and so does
-   * the head of the group the row is in (item 245). What reads the same as before is not written again (item 310): the
-   * page calls this on every event of the run and its helpers. */
+   * this every second while the run works, so a folded row's time counts on between the events of its run (item 123),
+   * and as an event comes. The card a row shows follows (item 226), and so does the head of the group the row is in
+   * (item 245). What reads the same as before is not written again (item 310): the page calls this on every event of
+   * the run and its helpers. */
   function tick(now) {
     const flocks = new Set();
     for (const scope of liveChildren) {
@@ -683,7 +683,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   }
 
   /**
-   * A folded block for the thinking of step `step` (item 246), after T3 Code's: a line with the brain, "Thinking…"
+   * A folded block for the thinking of step `step` (item 246): a line with the brain, "Thinking…"
    * while the model thinks and "Thought" once it is done, the start of the thought beside it; opened, the whole thought.
    * It goes into the open group of steps, else at the end of the scope, where the group that the step's calls start
    * takes it in (`groupFor`); a group that ends before a call of the step comes leaves it out (`liftThought`).
@@ -1140,9 +1140,9 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       note(scope, record.ts, "file", `Dot's answer named ${noun} that do not exist (${listed}) and was asked to correct it`, "warn");
     },
 
-    // The run goes on from where the run before it was cut off ([agent] resume, Continue or dotx resume), after T3
-    // Code's (item 299): a line with a bolt that says Dot restarted and resumed the turn; opened, how that run was cut
-    // off, how each call of the step it was in ended, and the way to that run.
+    // The run goes on from where the run before it was cut off ([agent] resume, Continue or dotx resume): a line with a
+    // bolt that says Dot restarted and resumed the turn (item 299); opened, how that run was cut off, how each call of
+    // the step it was in ended, and the way to that run.
     resumed(scope, record) {
       const data = record.data;
       const cutOff = CUT_OFFS[data.cut_off];

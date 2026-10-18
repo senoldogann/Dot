@@ -875,7 +875,7 @@ const BROWSER_MODES = [
   { id: "own", label: "Own Chrome", hint: "A Chrome profile of Dot's own, signed in to nothing" },
   { id: "attach", label: "My Chrome", hint: "Your Chrome, with your profiles and sign-ins; Dot opens it when it is closed" },
 ];
-// The sizes a page of Dot's own Chrome may have (item 354, after T3 Code's default viewport): its window's, or a screen's.
+// The sizes a page of Dot's own Chrome may have (item 354): its window's, or a screen's.
 const PAGE_SIZES = [
   { id: "window", label: "Its window", fit: true, width: 0, height: 0 },
   { id: "1280x860", label: "1280 × 860", fit: false, width: 1280, height: 860 },
@@ -960,8 +960,8 @@ function buildBrowser(isDisposed) {
       }
     },
   });
-  // After T3 Code's Settings › Browser (item 354): whether runs may use the browser, how its pages look, and whether a
-  // run's page shows by itself.
+  // Settings › Browser (item 354): whether runs may use the browser, how its pages look, and whether a run's page shows
+  // by itself.
   const enabled = switchSetting({
     label: "Runs may use the browser",
     hint: "Off, no run is offered the browser tools, an agent's neither, from the next run on; computer use still sees the screen.",
@@ -1006,7 +1006,7 @@ function buildBrowser(isDisposed) {
     write: async (on) => setValue(AUTO_COMPUTER, on ? "shown" : "hidden"),
     onToggled: () => autoComputer.paint(),
   });
-  // The profiles of Dot's own Chrome (item 355, after T3 Code's): Default, Incognito and the ones added; runs work on
+  // The profiles of Dot's own Chrome (item 355): Default, Incognito and the ones added; runs work on
   // the one in use.
   const profileList = el("div", { class: "profile-list", role: "list", "aria-label": "Profiles" });
   const profileName = el("input", {

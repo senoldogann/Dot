@@ -1,9 +1,8 @@
-"""The side panel of a run in tabs (item 203), after T3 Code's: Run (the details and the cost), Plan, Actions and
-Screen, one at a time, each section of a tab open, the plan's steps done beside its tab; the arrows, Home and End
-move between the tabs, and the tab chosen last is kept. Beside the conversation the panel slides in and out, at once
-under reduced motion, and the Screen tab without a frame keeps the shape of a screen and says why (item 220). A
-scripted run with a plan, served by a real server, beside the conversation and as a drawer on a phone, light and
-dark."""
+"""The side panel of a run in tabs (item 203): Run (the details and the cost), Plan, Actions and Screen, one at a time,
+each section of a tab open, the plan's steps done beside its tab; the arrows, Home and End move between the tabs, and
+the tab chosen last is kept. Beside the conversation the panel slides in and out, at once under reduced motion, and the
+Screen tab without a frame keeps the shape of a screen and says why (item 220). A scripted run with a plan, served by a
+real server, beside the conversation and as a drawer on a phone, light and dark."""
 
 import asyncio
 import time

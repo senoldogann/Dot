@@ -150,7 +150,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     }
   }
 
-  // Over the whole page, as T3 Code's phone app shows its browser (item 298): the card moves into a dialog of its own,
+  // Over the whole page (item 298): the card moves into a dialog of its own,
   // the page's address on top, the view as wide as the screen and the pill at the foot, and goes back to the panel when
   // the dialog closes. The view starts as it opens, for a run that is going on.
   let full = null;

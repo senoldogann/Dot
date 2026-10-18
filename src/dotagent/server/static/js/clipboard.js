@@ -1,4 +1,4 @@
-// What a copy out of the conversation puts on the clipboard (item 206), after T3 Code's: a selection that starts in a
+// What a copy out of the conversation puts on the clipboard (item 206): a selection that starts in a
 // message or an answer goes on it as the markdown it was written in, for a paste into the composer or any other text
 // field, and as a clean copy of its nodes in HTML, for a paste into a document. Both are read from copies of the
 // selected nodes; nothing here builds markup from a string.

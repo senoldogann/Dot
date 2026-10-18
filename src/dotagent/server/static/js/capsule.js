@@ -1,4 +1,4 @@
-// The line over the composer (items 297, 352 and 360), after the line over T3 Code's: how long the run has worked, or
+// The line over the composer (items 297, 352 and 360): how long the run has worked, or
 // that it waits for you; how its helpers stand; how many messages wait in the queue. Each part is the way to where it is
 // told of. It says neither what the run does now, which the conversation shows, nor how many commands run in the chat,
 // which stand right under it (item 360). The line shows on every width while one of its parts has something to say,

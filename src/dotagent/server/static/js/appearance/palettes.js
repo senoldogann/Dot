@@ -1,8 +1,8 @@
-// T3 Code's six palettes (item 126), the roles of them Dot reads (tokens.js maps them to Dot's tokens): T3 Code's
-// own look (as Clean), T3 Chat's (as Rose), Grove, Ocean, Ember and Iris, for light and for dark. Taken verbatim from
-// T3 Code 0.0.45, packages/shared/src/themePalettes.ts (MIT; see LICENSE). A role names what T3 Code paints with it:
-// canvas the page, surface the cards and the composer, accentSurface a hovered or picked row, input a control's
-// border, messageAction the send button, messageSurface the owner's message, updateSurface a tint of the accent.
+// The six palettes (item 126), the roles of them Dot reads (tokens.js maps them to Dot's tokens): Clean, Rose, Grove,
+// Ocean, Ember and Iris, for light and for dark. Taken verbatim from code under the MIT licence (see LICENSE in this
+// folder). A role names what a palette paints with it: canvas the page, surface the cards and the composer,
+// accentSurface a hovered or picked row, input a control's border, messageAction the send button, messageSurface the
+// owner's message, updateSurface a tint of the accent.
 
 export const PALETTES = {
   clean: {

@@ -1,11 +1,11 @@
-"""The themes of one's own (item 128): files of T3 Code's theme format in the ``themes`` folder of Dot's home, one
-``<id>.json`` per theme, the file's name its id. A file is T3 Code's theme file (version 1: a name, light or dark, the
-colours of its roles, and the other scheme's colours under ``variants``) or the short form T3 Code publishes (a canvas
-and an accent the page derives the other roles from, with ``colors`` laid over them). The page draws them
-(``static/js/appearance/own.js``); the daemon keeps them. It checks a file the way the page reads it, on the way in and
-on the way out, writes a file whole or not at all, and caps what the folder may hold as T3 Code caps its folder of
-published themes (``apps/server/src/environmentTheme.ts``), so that a mistake dropped in the folder costs little. A file
-the page could not draw is left out of the list with the reason, never read as a theme."""
+"""The themes of one's own (item 128): theme files in the ``themes`` folder of Dot's home, one ``<id>.json`` per theme,
+the file's name its id. A file is a theme file (version 1: a name, light or dark, the colours of its roles, and the
+other scheme's colours under ``variants``) or the short form of one (a canvas and an accent the page derives the other
+roles from, with ``colors`` laid over them). The page draws them (``static/js/appearance/own.js``); the daemon keeps
+them. It checks a file the way the page reads it, on the way in and on the way out, writes a file whole or not at all,
+and caps what the folder may hold as the theme format's own checks do (see
+``src/dotagent/server/static/js/appearance/LICENSE``), so that a mistake dropped in the folder costs little. A file the
+page could not draw is left out of the list with the reason, never read as a theme."""
 
 import errno
 import math
@@ -31,8 +31,7 @@ MAX_THEME_FILE_BYTES: int = 32 * 1024
 MAX_THEME_FOLDER_BYTES: int = 192 * 1024
 MAX_NAME_UNITS: int = 48
 THEME_ID: re.Pattern[str] = re.compile(r"^[a-z0-9](?:[a-z0-9-]{0,47})$")
-# Dot's own themes, and the ids T3 Code keeps from any theme file (its built-ins, the names of the schemes and the
-# old names it still reads), so that a theme moves between the two without taking a name either side has.
+# The ids of Dot's own themes and the names of the colour schemes, which no theme of one's own takes.
 RESERVED_THEME_IDS: frozenset[str] = frozenset(
     {
         "neutral",
@@ -46,17 +45,10 @@ RESERVED_THEME_IDS: frozenset[str] = frozenset(
         "system",
         "light",
         "dark",
-        "t3-chat",
-        "t3-code",
-        "t3-chat-dark",
-        "t3-grove",
-        "t3-ocean",
-        "t3-ember",
-        "t3-iris",
     }
 )
-# T3 Code's colour roles (packages/shared/src/themePalettes.ts THEME_COLOR_ROLES); appearance/generator.js names the
-# same, and tests/unit/test_theme_folder.py holds the two lists together.
+# The colour roles of a theme file; appearance/generator.js names the same, and tests/unit/test_theme_folder.py holds
+# the two lists together.
 THEME_ROLES: frozenset[str] = frozenset(
     {
         "canvas",
@@ -168,14 +160,15 @@ def _roles(colours: dict[str, str]) -> dict[str, str]:
 
 
 def _name(value: str) -> str:
-    # Counted as the page and T3 Code count it, in UTF-16 code units.
+    # Counted as the page and the theme format's own checks count it, in UTF-16 code units.
     if len(value.encode("utf-16-le")) // 2 > MAX_NAME_UNITS:
         raise ValueError(f"a name of {MAX_NAME_UNITS} characters at most")
     return value
 
 
 def _no_nulls(value: object) -> object:
-    # A key without a value is left out of a theme file: the page and T3 Code refuse a null where a value goes.
+    # A key without a value is left out of a theme file: the page and the theme format's own checks refuse a null where
+    # a value goes.
     if isinstance(value, dict):
         empty: list[str] = sorted(str(key) for key, item in value.items() if item is None)
         if empty:
@@ -187,7 +180,7 @@ ThemeName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1
 ThemeColour = Annotated[
     str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64), AfterValidator(_colour)
 ]
-# A seed of the short form, as T3 Code publishes one.
+# A seed of the short form of a theme file: a canvas or an accent.
 Seed = Annotated[str, StringConstraints(pattern=r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")]
 Palette = Annotated[dict[str, ThemeColour], AfterValidator(_roles)]
 Appearance = Literal["light", "dark"]
@@ -206,15 +199,15 @@ class ThemeVariants(FrozenModel):
 
 
 class ThemeCollection(FrozenModel):
-    """The family of themes T3 Code files a theme under; kept as it came."""
+    """The family of themes a theme file is filed under; kept as it came."""
 
     id: Annotated[str, StringConstraints(pattern=r"^[a-zA-Z0-9][a-zA-Z0-9.:-]{0,127}$")]
     label: ThemeName
 
 
 class ThemeFile(FrozenModel):
-    """A theme as its file holds it. The colours are T3 Code's roles; a role a file leaves out is the one of T3 Code's
-    default palette for its scheme (Dot's Rose), and with a canvas and an accent the derived palette is under them."""
+    """A theme as its file holds it. A role a file leaves out is the one of the default palette for its scheme (Dot's
+    Rose), and with a canvas and an accent the derived palette is under them."""
 
     version: Literal[1] | None = None
     id: Annotated[str, StringConstraints(pattern=THEME_ID.pattern)] | None = None
@@ -359,7 +352,7 @@ def read_theme_folder(folder: Path) -> ThemeFolder:
 
 
 def theme_text(theme: ThemeFile) -> str:
-    """The file of a theme: its JSON with two spaces of indent and a line end, as T3 Code writes it."""
+    """The file of a theme: its JSON with two spaces of indent and a line end."""
     return theme.model_dump_json(indent=2, exclude_none=True) + "\n"
 
 

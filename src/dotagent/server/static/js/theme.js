@@ -1,7 +1,7 @@
 // The look of the interface (item 126): a theme picked for the light scheme and one for the dark, and the colour scheme
 // itself, the system's or light or dark held with `data-scheme` on the page element (themes.css reads it through
 // color-scheme). A theme is a look of themes.css (Neutral, Paper: a block of tokens and, for Paper, a voice and a few
-// shapes) or one of T3 Code's palettes (appearance/palettes.js). The tokens of the two picks are written on the page
+// shapes) or a palette (appearance/palettes.js). The tokens of the two picks are written on the page
 // element as `light-dark()` pairs (appearance/tokens.js), nothing when one look is picked for both, and kept in this
 // browser with the picks so that boot.js puts them on the page before the first paint. `data-theme` names the theme of
 // the scheme on screen, so a look's shapes follow it; the layout a theme starts with (see layout.js) is the light
@@ -41,12 +41,12 @@ function palette(id, label, hint) {
 export const THEMES = [
   look("neutral", "Neutral", "Dot's own: warm grey and ink, plain like a chat app.", true),
   look("paper", "Paper", "Warm paper, serif answers and one terracotta accent.", false),
-  palette("clean", "Clean", "T3 Code's own look: near-white, grey and a blue accent."),
-  palette("rose", "Rose", "After T3 Chat: blush whites and a raspberry accent."),
-  palette("grove", "Grove", "After T3 Code's Grove: sage greys and an ochre accent."),
-  palette("ocean", "Ocean", "After T3 Code's Ocean: cool greys and a teal accent."),
-  palette("ember", "Ember", "After T3 Code's Ember: warm stone and a rust accent."),
-  palette("iris", "Iris", "After T3 Code's Iris: lavender greys and a magenta accent."),
+  palette("clean", "Clean", "Near-white, grey and a blue accent."),
+  palette("rose", "Rose", "Blush whites and a raspberry accent."),
+  palette("grove", "Grove", "Sage greys and an ochre accent."),
+  palette("ocean", "Ocean", "Cool greys and a teal accent."),
+  palette("ember", "Ember", "Warm stone and a rust accent."),
+  palette("iris", "Iris", "Lavender greys and a magenta accent."),
 ];
 
 export const SCHEMES = [

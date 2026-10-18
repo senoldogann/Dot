@@ -1,7 +1,7 @@
-"""A chat's menu (item 130), after T3 Code's thread menu: the "…" button of a chat's row, a right-click on the row and
-the context-menu key open the same menu, which the arrow keys walk and Escape closes; from it a chat is pinned above the
-days and stays so after a reload, named in its row (Enter keeps the name, Escape leaves it), its link copied, chosen for
-deletion with others, and deleted after a question; on a phone the button always shows, beside the age."""
+"""A chat's menu (item 130): the "…" button of a chat's row, a right-click on the row and the context-menu key open the
+same menu, which the arrow keys walk and Escape closes; from it a chat is pinned above the days and stays so after a
+reload, named in its row (Enter keeps the name, Escape leaves it), its link copied, chosen for deletion with others, and
+deleted after a question; on a phone the button always shows, beside the age."""
 
 import asyncio
 import re

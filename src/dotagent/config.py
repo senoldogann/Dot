@@ -58,8 +58,8 @@ def _debug_port(value: int) -> int:
     return value
 
 
-# A profile of Dot's own Chrome (item 355, after T3 Code's): "default", "incognito", or the name of one the owner added,
-# which names its folder.
+# A profile of Dot's own Chrome (item 355): "default", "incognito", or the name of one the owner added, which names its
+# folder.
 _PROFILE_NAME: re.Pattern[str] = re.compile(r"^[^\W_][\w -]{0,47}$")
 _RESERVED_PROFILES: frozenset[str] = frozenset({"default", "incognito"})
 

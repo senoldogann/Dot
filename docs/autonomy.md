@@ -164,8 +164,8 @@ question to you counts: it is asked again). A run of `dotx run`, of a schedule o
 another (so a run that brings the daemon down is not resumed again and again), and a run cut off in a call that may have
 changed something (a command, a write, a click, or a delegation, whose run may have done anything) wait for you. `resume
 = "off"` leaves every such run to you; **Go on after a restart** in Settings › System › Daemon writes the choice into
-the config file (item 231), and the daemon's next start reads it. The new run's turn opens with a line with a bolt,
-after T3 Code's (item 299): "Dot restarted and resumed this turn" when the daemon went on with it by itself, else
+the config file (item 231), and the daemon's next start reads it. The new run's turn opens with a line with a bolt
+(item 299): "Dot restarted and resumed this turn" when the daemon went on with it by itself, else
 "Resumed this turn after" what cut it off; opened, it says how that run was cut off, how each call of the step it was in
 ended, and links to it. A run that waits for you wears the same bolt over its composer, with what cut it off ("Dot
 restarted while this run worked.") and Continue.

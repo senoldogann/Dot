@@ -1,8 +1,7 @@
-"""The feet of a conversation's messages (item 205), after T3 Code's: under each of the owner's messages, once its turn
-has its answer, when it was sent and a copy of it as it was written, and under a message that opened a turn Edit from
-here (item 282, which ``test_rewind`` follows through); under each answer, a copy of it and when it came. A turn at work
-keeps the feet of its messages back until its answer is in. A real server on a scripted model, wide and on a phone,
-light and dark."""
+"""The feet of a conversation's messages (item 205): under each of the owner's messages, once its turn has its answer,
+when it was sent and a copy of it as it was written, and under a message that opened a turn Edit from here (item 282,
+which ``test_rewind`` follows through); under each answer, a copy of it and when it came. A turn at work keeps the feet
+of its messages back until its answer is in. A real server on a scripted model, wide and on a phone, light and dark."""
 
 import asyncio
 import re

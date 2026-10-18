@@ -1,9 +1,8 @@
-"""The marks of a conversation's messages (item 201), after T3 Code's: a column of short marks at the left of the
-conversation, one for each message of the owner. Resting the pointer on it shows the message nearest to it and the start
-of its answer; a click, or Enter after the arrows, goes to that message; the marks of the messages in sight stand
-out. On a phone, or in a conversation of one message, there is no column. Beside the side panel, the conversation
-leaves the column its room (item 228), and neither covers the other. A real server on a scripted model, wide and on a
-phone, light and dark."""
+"""The marks of a conversation's messages (item 201): a column of short marks at the left of the conversation, one for
+each message of the owner. Resting the pointer on it shows the message nearest to it and the start of its answer; a
+click, or Enter after the arrows, goes to that message; the marks of the messages in sight stand out. On a phone, or in
+a conversation of one message, there is no column. Beside the side panel, the conversation leaves the column its room
+(item 228), and neither covers the other. A real server on a scripted model, wide and on a phone, light and dark."""
 
 import asyncio
 import time

@@ -23,7 +23,7 @@ Anthropic one), a site under `[policy.spend]` that is not a bare host in lower c
 | `connected-servers.json`                         | the MCP servers you added in Customize, by address or command        |
 | `mcp-sign-ins/`                                  | what signing in to those servers gave: tokens and client (mode 0600) |
 | `opencode/`                                      | the OpenCode server Dot starts, the chats' sessions, the free models |
-| `themes/`                                        | your own themes, one T3 Code theme file each (Settings › Appearance) |
+| `themes/`                                        | your own themes, one theme file each (Settings › Appearance)         |
 | `browser-profile/`                               | the Default profile of Dot's Chrome, the browser tools' own          |
 | `browser-incognito/`                             | the Incognito profile of Dot's Chrome, emptied as Chrome starts and closes |
 | `browser-profiles/`                              | the profiles of Dot's Chrome added in Settings › Browser, one folder each |

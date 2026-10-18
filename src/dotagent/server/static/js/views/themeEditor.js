@@ -1,4 +1,4 @@
-// The editor of a theme of one's own (item 128), after T3 Code's: a name, and for each scheme the theme has a palette
+// The editor of a theme of one's own (item 128): a name, and for each scheme the theme has a palette
 // for, the background and the accent the generator makes the palette from (appearance/generator.js) and the action
 // colour Dot paints its buttons, switches and send button with, which starts as the generator's companion of the
 // accent; under them the families of colours, to change one at a time. The page is drawn in the palette being changed

@@ -1,4 +1,4 @@
-// The marks of a conversation's messages (item 201), after T3 Code's: a column of short marks at the left of the
+// The marks of a conversation's messages (item 201): a column of short marks at the left of the
 // conversation, one for each message the owner wrote, top to bottom as they stand in it. Resting the pointer on the column
 // shows the message nearest to it and the start of its answer, and a click goes to that message; from the keyboard the
 // arrows walk the marks and Enter goes. The marks of the messages in sight stand out, and follow the scroll. The column

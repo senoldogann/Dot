@@ -1,12 +1,11 @@
-"""Each step's thinking is a block that folds (item 246), after T3 Code's, on the pages of a daemon in Chrome. While the
-model thinks, the block says "Thinking…" with the start of the thought beside it, folded; the reader may open it and
-read the thought as it comes. Once the step is over it says "Thought" and is the first row of the step's group, before
-the step's call; the thought of a step that writes a message stands before the message, out of the group before it,
-and so does the thought of the step that ends the run, before the answer. The `assistant` events keep the thinking, of
-a long one its start and its end, so the page loaded again shows the same blocks in the same places, folded: each opens
-to its thought and folds again, and a long one scrolls within its box. Wide and on a phone, light and dark. Before, a
-line said "Thinking…" with a count of characters and went away when the step ended, and nothing of the thought was
-kept.
+"""Each step's thinking is a block that folds (item 246), on the pages of a daemon in Chrome. While the model thinks,
+the block says "Thinking…" with the start of the thought beside it, folded; the reader may open it and read the thought
+as it comes. Once the step is over it says "Thought" and is the first row of the step's group, before the step's call;
+the thought of a step that writes a message stands before the message, out of the group before it, and so does the
+thought of the step that ends the run, before the answer. The `assistant` events keep the thinking, of a long one its
+start and its end, so the page loaded again shows the same blocks in the same places, folded: each opens to its thought
+and folds again, and a long one scrolls within its box. Wide and on a phone, light and dark. Before, a line said
+"Thinking…" with a count of characters and went away when the step ended, and nothing of the thought was kept.
 
 No network and no model service is used: a scripted model streams the thoughts.
 """

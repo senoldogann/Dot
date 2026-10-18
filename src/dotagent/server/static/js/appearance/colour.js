@@ -1,8 +1,7 @@
-// The colour arithmetic of the themes (item 126), after T3 Code's palette engine (apps/web/src/themePalette.ts; see
-// LICENSE): colours are read from the CSS forms the themes are written in, stepped and solved in OKLCH, mapped back
-// into sRGB along their own lightness and hue, and measured by the WCAG contrast ratio that
-// tests/unit/test_css_tokens.py measures too. An sRGB colour is `{ r, g, b }` with channels from 0 to 255; an OKLCH
-// colour is `{ L, C, h }`.
+// The colour arithmetic of the themes (item 126), derived code (see LICENSE in this folder): colours are read from the
+// CSS forms the themes are written in, stepped and solved in OKLCH, mapped back into sRGB along their own lightness and
+// hue, and measured by the WCAG contrast ratio that tests/unit/test_css_tokens.py measures too. An sRGB colour is
+// `{ r, g, b }` with channels from 0 to 255; an OKLCH colour is `{ L, C, h }`.
 
 const HEX = /^#([0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i;
 const FUNCTION = /^(rgba?|oklch)\(\s*([^()]*)\)$/i;
@@ -90,7 +89,7 @@ function fromLinear(channel) {
   return Math.round(clamp(c, 0, 1) * 255);
 }
 
-/** The colour in OKLCH (Björn Ottosson's matrices, as T3 Code has them). */
+/** The colour in OKLCH (Björn Ottosson's matrices). */
 export function rgbToOklch(colour) {
   const r = toLinear(colour.r);
   const g = toLinear(colour.g);
@@ -210,7 +209,7 @@ export function readableOn(colour, ground, least) {
 const LIGHT_INK = { r: 255, g: 250, b: 255 };
 const DARK_INK = { r: 36, g: 21, b: 35 };
 
-/** The near-white or near-black (else white or black) that reads best on `ground`, as T3 Code picks it. */
+/** The near-white or near-black (else white or black) that reads best on `ground`. */
 export function inkFor(ground) {
   const light = contrast(ground, LIGHT_INK);
   const dark = contrast(ground, DARK_INK);

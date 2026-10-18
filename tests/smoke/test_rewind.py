@@ -1,13 +1,13 @@
-"""Edit from here (item 282), after T3 Code's: a chat of three turns, whose runs change files with the file tools on a
-scripted model, is rewound from its page to before its second message. The second and third turns leave the chat, the
-files are as the first turn left them (the file the third made is gone, with its folder), the chat's OpenCode session is
-let go, and the second message with its file is back in the composer of the first turn's page; sent from there, the next
-run's history holds no word of the turns taken out. A rewind that keeps the changes leaves the files, and one to a turn
-taken out already is refused; rewound to its first message, the chat gives the message to New chat, and the page of a
-run taken out still opens. In the store, a rewind across a compaction reads the history kept aside, a question a run
-taken out left waits no more, and a helper's run, a run from before the places were kept, a chat at work, a chat whose
-queue holds messages and one that changed since its runs were read are refused. The dialog wide and light, and on a
-phone in the dark. A real server and a real headless Chrome; no model service is called."""
+"""Edit from here (item 282): a chat of three turns, whose runs change files with the file tools on a scripted model, is
+rewound from its page to before its second message. The second and third turns leave the chat, the files are as the
+first turn left them (the file the third made is gone, with its folder), the chat's OpenCode session is let go, and the
+second message with its file is back in the composer of the first turn's page; sent from there, the next run's history
+holds no word of the turns taken out. A rewind that keeps the changes leaves the files, and one to a turn taken out
+already is refused; rewound to its first message, the chat gives the message to New chat, and the page of a run taken
+out still opens. In the store, a rewind across a compaction reads the history kept aside, a question a run taken out
+left waits no more, and a helper's run, a run from before the places were kept, a chat at work, a chat whose queue holds
+messages and one that changed since its runs were read are refused. The dialog wide and light, and on a phone in the
+dark. A real server and a real headless Chrome; no model service is called."""
 
 import asyncio
 import sqlite3
@@ -208,7 +208,7 @@ async def test_a_chat_rewound_to_its_second_message_takes_its_files_back_and_giv
                 page.locator(".run-thread > .user-message").get_by_role("button", name="Edit from here")
             ).to_be_visible()
 
-            # The dialog says what T3 Code's says, and Cancel leaves all as it was.
+            # The dialog says what the rewind does, and Cancel leaves all as it was.
             await earlier.nth(1).get_by_role("button", name="Edit from here").click()
             dialog: Locator = page.locator("dialog.modal")
             await expect(dialog.get_by_role("heading", name="Edit from here?")).to_be_visible()

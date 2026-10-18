@@ -1,4 +1,4 @@
-// The menu of the composer's Model pill (item 208), after T3 Code's model picker: a rail on its left with a star for the
+// The menu of the composer's Model pill (item 208): a rail on its left with a star for the
 // favourites and the mark of each provider, a search over the models of every provider, and the models of the view the
 // rail shows, each with a star that keeps it among the favourites. The favourites are kept in this browser, as the
 // home's choices are; the menu opens on them when there are any, else on the provider of the model a run would use.

@@ -94,7 +94,7 @@
   --radius-lg: 20px;
   --radius-composer: 24px;
   --radius-pill: 999px;
-  /* The composer's lift (item 121, after T3 Code): a hairline of shadow and a soft one that falls below it. */
+  /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
   --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
   /* Spacing (item 74): one rhythm of 8 px, 4 for the smallest, and the hairline for what sits a breath apart; every
      gap, padding and margin is a token or on the 4 px grid (tests/unit/test_css_tokens.py). */
@@ -131,7 +131,7 @@
   --lane-w: 768px;
 }
 
-/* The chat's width (Settings › Appearance, item 127, after T3 Code's): the home and the conversation read at 768 px,
+/* The chat's width (Settings › Appearance, item 127): the home and the conversation read at 768 px,
    at 1152 when wide, or as wide as the window leaves them. */
 :root[data-chat-width="wide"] {
   --lane-w: 1152px;
@@ -1219,7 +1219,7 @@ a.pill:hover {
   font-weight: var(--weight-label);
 }
 
-/* On a phone a card's name stands over the card, out of its surface, as a group's name over T3 Code's rows: in the
+/* On a phone a card's name stands over the card, out of its surface, as a group's name over its rows: in the
    settings' tabs (item 330), on Activity, Customize › Plugins and the agent's editor (item 332). Each such card has one body,
    whose ground the card's is. */
 @media (max-width: 720px) {
@@ -2878,7 +2878,7 @@ a.pill:hover {
   font-weight: var(--weight-label);
 }
 
-/* The model menu (item 208, modelpicker.js), after T3 Code's: the rail of the favourites and the providers on its left,
+/* The model menu (item 208, modelpicker.js): the rail of the favourites and the providers on its left,
    the search and the models beside it. The menu keeps one height whatever it shows, and only its list scrolls. */
 .composer-popover:has(> .model-picker) {
   width: 360px;
@@ -3920,7 +3920,7 @@ a.memory-line:hover .memory-change {
   color: var(--bad);
 }
 
-/* A step's thinking (item 246), after T3 Code's: a line among the step's tool calls, the brain where a call has its
+/* A step's thinking (item 246): a line among the step's tool calls, the brain where a call has its
    icon, "Thinking…" shimmering while the model thinks and "Thought" once it is done, the start of the thought beside
    it; opened, the whole thought hangs under it on a hairline, as a call's result does. */
 .thought {
@@ -3958,7 +3958,7 @@ a.memory-line:hover .memory-change {
   overflow-wrap: anywhere;
 }
 
-/* A turn that goes on after Dot restarted (item 299), after T3 Code's: a quiet line with an amber bolt, "Dot restarted
+/* A turn that goes on after Dot restarted (item 299): a quiet line with an amber bolt, "Dot restarted
    and resumed this turn"; opened, how the run before it was cut off hangs under it on a hairline, as a call's result
    does. The line that offers to resume a run that was cut off, and an earlier turn that resumed one, wear the bolt. */
 .restart {
@@ -4390,7 +4390,7 @@ a.memory-line:hover .memory-change {
   white-space: nowrap;
 }
 
-/* Helpers that follow one another (item 245), after T3 Code's group of subagents: a head with their faces, how many
+/* Helpers that follow one another (item 245): a head with their faces, how many
    they are and how they stand, the time from the first one's start to the last one's end and a chevron; under it, their
    rows in one box. */
 .helpers > summary {
@@ -4810,7 +4810,7 @@ a.memory-line:hover .memory-change {
   border-radius: var(--radius-lg);
 }
 
-/* The commands at work in a chat (item 229), after T3 Code's line of background work: a sheet as the queue's, right
+/* The commands at work in a chat (item 229): a sheet as the queue's, right
    above the composer and under the queue; the frame is drawn over its lower edge, and it over the queue's. The loops
    of the chat (item 281) are the same sheet, above the commands. */
 .background-work,
@@ -4923,7 +4923,7 @@ a.memory-line:hover .memory-change {
   display: inline;
 }
 
-/* The queue of a chat (item 148), after T3 Code's: a sheet that rises from behind the top of the composer, its lower
+/* The queue of a chat (item 148): a sheet that rises from behind the top of the composer, its lower
    edge under the frame's round corners; the frame is drawn over it. */
 .queue {
   position: relative;
@@ -6452,7 +6452,7 @@ button.attach-chip:hover {
   margin-left: -20px;
 }
 
-/* ---------- a phone's run page, after T3 Code's phone app (items 295 and 297) ---------- */
+/* ---------- a phone's run page (items 295 and 297) ---------- */
 
 /* The chat's title over the agent and the model and the bar's quick ways are a phone's; a wider page keeps the face and
    the name and the panel's switch alone. The line over the composer is every width's (item 352). */

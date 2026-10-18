@@ -1,5 +1,5 @@
 // The settings. In a Mac's window, one page with the tabs down its left side; on a phone, a list of the tabs in groups
-// whose rows open each tab as a page of its own, after T3 Code's (item 330). Each tab is drawn by the module that owns it.
+// whose rows open each tab as a page of its own (item 330). Each tab is drawn by the module that owns it.
 
 import { api, query } from "../api.js";
 import { el, modelName } from "../dom.js";

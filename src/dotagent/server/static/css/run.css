@@ -45,7 +45,7 @@
   --panel-w: minmax(320px, 1fr);
 }
 
-/* Beside the conversation the panel stands at the window's right edge, as T3 Code's does (item 238): the frame lets go
+/* Beside the conversation the panel stands at the window's right edge (item 238): the frame lets go
    of its reading width, the conversation keeps its own in the room the panel leaves it, and the panel stands as far from
    the edge as from the top bar. */
 .page[data-layout="run"]:has(.run-layout[data-inspector="on"]) {
@@ -147,7 +147,7 @@
   }
 }
 
-/* On a phone a chat is one screen (item 352), as a phone's chat apps and T3 Code's are: the top bar and the composer
+/* On a phone a chat is one screen (item 352), as in a phone's chat apps: the top bar and the composer
    stay where they are and only the conversation scrolls between them, so a scroll, its bounce at either end and the
    keyboard move nothing else. The stage fills what is seen of the window (layout.js's followSeen: the keyboard pans
    the page and leaves less of it seen), the window itself does not scroll, and the dock is the column's foot. */
@@ -487,7 +487,7 @@
 
 /* The panel stays beside the conversation under the stage bar, whose height layout.js measures into --stagebar-h (the
    banner and the density change it), to its full height with its own scroll. It is one card on the composer's corner
-   whose sections sit on hairlines (item 121, after T3 Code); as a drawer it is the drawer itself. */
+   whose sections sit on hairlines (item 121); as a drawer it is the drawer itself. */
 .inspector {
   container: inspector / inline-size;
   position: sticky;
@@ -502,7 +502,7 @@
   background: var(--surface);
 }
 
-/* The panel's tabs (item 203), after T3 Code's side panel: one surface at a time, the chosen one in ink over a line,
+/* The panel's tabs (item 203): one surface at a time, the chosen one in ink over a line,
    a short count beside a name (the plan's steps done, the screenshots). The strip stays at the top of the panel as it
    scrolls; beside the conversation the header's button hides the panel, and the drawer keeps its own close button. */
 .inspector-head {
@@ -591,7 +591,7 @@
   }
 }
 
-/* The agents of a chat (item 227), in the Agents tab, after the rows of T3 Code's Agents sheet (item 296): a row for
+/* The agents of a chat (items 227 and 296), in the Agents tab: a row for
    each, the face with its state at the corner; the goal over the provider's mark, the model and the state in a word,
    and what it does or did last; how long it took and a chevron at the right; the whole row is the way to its page. */
 .agent-list {
@@ -1374,7 +1374,7 @@
 }
 
 @media (max-width: 720px) {
-  /* The panel rises from the foot of what is seen as a sheet, after T3 Code's Agents sheet (item 296): nine tenths of
+  /* The panel rises from the foot of what is seen as a sheet (item 296): nine tenths of
      the seen height, round at the top, a grabber over the tabs; dragging the head down closes it. */
   .inspector[data-mode="drawer"] {
     inset: auto 0 var(--seen-bottom);
@@ -1417,7 +1417,7 @@
   }
 }
 
-/* Dot's computer over a phone's page (item 298, computer.js), as T3 Code's phone app shows its browser: the close and
+/* Dot's computer over a phone's page (item 298, computer.js): the close and
    the title on top, the page's address in a pill, the view as wide as the screen, and the pill of who has control at
    the foot. */
 dialog.computer-full {
@@ -1507,7 +1507,7 @@ dialog.computer-full::backdrop {
   margin-top: 4px;
 }
 
-/* On a phone the line about a turn's latest step reads at a hint's size, as T3 Code's folded steps do (item 329). */
+/* On a phone the line about a turn's latest step reads at a hint's size (item 329). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   .steps-latest {
     font-size: var(--text-sm);
