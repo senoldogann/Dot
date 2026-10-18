@@ -5218,7 +5218,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 277 | Every chat wears a creature, its last message under its name                          | done        | d2476f5 |
 | 278 | Connect apps: the Mac's applications and the web's, set up from the sidebar           | done        | 4f21322 |
 | 279 | Connect apps: the tools of other services, over MCP, signed in from Dot               | done        | 8aa45dd |
-| 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | in progress |         |
+| 280 | Dot starts lean: the fewest words and tools, the rest found when needed               | done        | 32e427f |
 | 281 | A chat can be a loop that asks Dot again until it is done                             | done        | 48e7219 |
 | 282 | A chat can be rewound to an earlier message, its files with it                        | done        | 427c51e |
 | 283 | Zen's free models work in Dot, as OpenCode's own agent                                | done        | aeee10b |
@@ -5289,6 +5289,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 | 357 | Lines of at most 120 characters, held by `ruff check`                                  | done        | 4ebf951 |
 | 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | done        | 177b005 |
+| 359 | A phone takes Dot's new pages over a slow network too                                  | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -12401,7 +12402,7 @@ opens, one removed, nothing wider than the phone).
 
 ### 280. Dot starts lean: the fewest words and tools, the rest found when needed
 
-**Status: in progress.** The owner's word of 2026-10-18: write it and run the evals on the main model, OpenRouter's
+**Status: done (`32e427f`).** The owner's word of 2026-10-18: write it and run the evals on the main model, OpenRouter's
 DeepSeek V4.1 Flash. **As built (2026-10-18).** `[agent] prompt` (`full` or `lean`) chooses the system prompt's style:
 `lean` keeps the rules of trust and safety, of hesitating (item 327) and of how a run ends as `full` has them and says
 how to work and each kind of tool in a line or two (6,486 characters for a plain task, 5,944 when the evals ran, where
@@ -14245,6 +14246,20 @@ redrawn at it (Playwright's CSS pixels leave Chrome's zoom out), and a scroll wi
 `click_at` at a button's centre in CSS pixels hits it at 75, 100 and 125. Tests: `tests/unit/test_browser_profiles.py`,
 `tests/smoke/test_browser_settings.py`. Docs: `docs/browser-and-computer-use.md`.
 
+### 359. A phone takes Dot's new pages over a slow network too
+
+**Status: in progress.** The owner's word of 2026-10-18: "mobilde yeni composer'ı hâlâ göremiyorum" (on the phone I
+still do not see the new composer, item 352). **As built (2026-10-18).** The phone's service worker answers a page from
+its kept copy when the network has not answered within 200 ms (item 328), and dropped the network's answer that came
+later: the copy was renewed only by an answer within 200 ms. A phone that reaches the Mac through Tailscale, slower than
+that on every request, kept opening the build it first kept, and the one reload a page of another build makes was
+answered from the same copy. `sw.js` keeps the late answer as the copy for the next opening. Tests:
+`tests/smoke/test_phone_return.py`, after an update on a network always slower than the wait (the test proxy's `slow`):
+the copy answers, and once the network answers its pages are the copy kept, which fails on the code before. The waits on
+a page's caches are made real: Playwright's `wait_for_function` takes the promise of an async function for true at once,
+so the two helpers that waited for the service worker's copy (`test_phone_return.py`, `test_reconnect.py`) waited for
+nothing. Docs: `docs/phone.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15020,3 +15035,4 @@ redrawn at it (Playwright's CSS pixels leave Chrome's zoom out), and a scroll wi
 - 2026-10-17 (Opus 5.5): item 271, after its merge: the live daemon could not read Tailscale's status, because the app's program answers as its command line only with `TAILSCALE_BE_CLI=true` when no terminal runs it; fixed on `item-271-tailscale-cli`.
 - 2026-10-18 (Opus 5.5): item 358 on the owner's choice of the same day (of the rows T3 Code's Settings › Browser has that item 354 left out, the default zoom), on `item-358-browser-zoom`.
 - 2026-10-18 (Opus 5.5): item 280 on the owner's word of the same day, on `item-280-lean`: a lean system prompt behind `[agent] prompt`, and three eval runs of the same 41 tasks that keep both defaults full.
+- 2026-10-18 (Opus 5.5): item 359 on the owner's word of the same day (the new composer not on the phone), on `item-359-phone-pages`: over a slow network the phone's service worker kept the build it first kept; it keeps the network's late answer now.

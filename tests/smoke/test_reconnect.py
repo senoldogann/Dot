@@ -40,6 +40,8 @@ _STALL_WAIT_MS: float = 60_000
 _LONGEST_PAUSE_AFTER_S: float = 8.0
 # Far shorter than what is left of the pause a page is in when it is told to try at once.
 _AT_ONCE_MS: float = 3_000
+# The longest the service worker may take to keep its copy of the shell.
+_UNTIL_S: float = 15.0
 # Back in view, a page keeps a lost daemon to itself for 8 s (RETURN_GRACE_MS in static/js/state.js, item 328): a stop
 # soon after the return is told within this long.
 _TOLD_AFTER_RETURN_MS: float = 10_000
@@ -243,7 +245,11 @@ async def _keep_shell_copy(page: Page) -> None:
     that opened Dot before has one."""
     await page.wait_for_function("() => navigator.serviceWorker.controller !== null")
     await page.reload()
-    await page.wait_for_function("async () => (await caches.match('/js/main.js')) !== undefined")
+    # The cache is asked from here: wait_for_function takes the promise of an async function for true at once.
+    deadline: float = time.monotonic() + _UNTIL_S
+    while await page.evaluate("async () => (await caches.match('/js/main.js')) !== undefined") is not True:
+        assert time.monotonic() < deadline, "the service worker kept no copy of the shell"
+        await asyncio.sleep(0.1)
 
 
 async def _open_side_menu(page: Page, width: int) -> None:

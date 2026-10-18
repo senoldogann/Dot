@@ -69,7 +69,9 @@ function after(ms, value) {
 
 /**
  * A page opened: the network's answer when it comes within NETWORK_WAIT_MS, else the kept copy, whose files the page
- * then takes too; the kept copy also when the network fails, and the network's late answer when nothing is kept.
+ * then takes too; the kept copy also when the network fails, and the network's late answer when nothing is kept. A late
+ * answer becomes the kept copy all the same (item 359): a phone whose network is always slower than NETWORK_WAIT_MS
+ * would otherwise open the build it first kept for ever, and reload into it again when the daemon names another.
  */
 async function openPage(event) {
   const answer = fetch(event.request).then(
@@ -84,6 +86,7 @@ async function openPage(event) {
   const kept = await keptCopy(event.request);
   if (kept !== null) {
     keptClients.set(event.resultingClientId, kept.name);
+    event.waitUntil(answer.then((late) => (late.response === undefined ? undefined : keepPage(event.request, late.response))));
     return kept.response;
   }
   const late = await answer;
