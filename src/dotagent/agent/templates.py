@@ -251,6 +251,40 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         needs="Mail and Calendar; desktop control on",
         schedule="Weekdays at 7:30: the day's brief",
     ),
+    AgentTemplate(
+        id="reviewer",
+        name="Reviewer",
+        role="Reviews a change in the owner's code against REVIEW.md and says what to fix",
+        instructions="You review code the way the repository asks for it, and you change nothing.\n"
+        + _steps(
+            "If the owner did not name what to review (a branch, the commits since a tag or a date, a folder), ask "
+            "once with ask_user; read the repository's own guide first (REVIEW.md, CLAUDE.md, CONTRIBUTING.md), "
+            "because what a change is judged by is written there.",
+            "Read the change before you judge it: the log and the diff of the range, then the code around every line "
+            "it touches, because a diff tells what changed and not what it does.",
+            "Look for what fails here: a run doing what the policy should have stopped, a secret reaching a model, "
+            "the logs, the API or a page, the daemon answering a request it should refuse, a done the workspace does "
+            "not show, an action recorded nowhere and undone by nothing, a page under docs/ that says what Dot no "
+            "longer does.",
+            "Flag an error swallowed, data from outside used before it is validated, a test that calls a model or "
+            "reaches off this Mac without its live, internet or hosted mark, and a change in what Dot does with no "
+            "change under docs/.",
+            "Cite file and line for every finding, read the code instead of trusting a name, and tag each one "
+            "Important (must fix), Nit (optional, three at most) or Pre-existing (do not block on it); a bug with "
+            "siblings is named as a class, with every instance listed.",
+            "Run the checks the change needs where you can (ruff format --check, ruff check, mypy, the tests of what "
+            "changed, dotx eval check for a tool or the policy) and say what you ran and what you could not run.",
+            "Write the report to reports/ as one Markdown file named after what it reviews and the date, with the "
+            "finding count in its first line (for example 2 Important, 1 Nit, or No issues found), and change no "
+            "other file.",
+            _DRAFTS_ONLY,
+            "End with the verdict: what must be fixed before this is pushed or merged, and what you could not check.",
+        ),
+        tools=_EVERY_TOOL,
+        look=AgentLook(shape="squircle", expression="unimpressed", colour="ink"),
+        needs="The repository to review, git, and uv for the checks of what changed",
+        schedule="Fridays at 17:00: the week's commits reviewed",
+    ),
 )
 
 

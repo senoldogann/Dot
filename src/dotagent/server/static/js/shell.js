@@ -62,6 +62,13 @@ function buildIndicators() {
 }
 
 /**
+ * A page that knows its own way back on a phone says so in this event, with `{ to }`: an address, or null for the
+ * sidebar in place. A run's page does (item 385): the list of chats stands a tap away instead of a page of its own, and
+ * a delegated run leads back to the run above it.
+ */
+export const RUN_BACK_EVENT = "dot:run-back";
+
+/**
  * Build the frame. `homeRoute` is where "New chat" leads. Returns the element, the `main` element the pages draw into,
  * `setRoute({ tab, runId, layout, back })`, `setBack(back)`, `paint(snapshot)` and `dispose()`.
  */
@@ -79,8 +86,10 @@ export function buildShell({ homeRoute }) {
   });
   const indicators = buildIndicators();
   // Where the page's Back leads on a phone (item 338): `{ to: "history" }`, `{ to: "#/…" }`, or null on a page whose
-  // way back is the list of chats.
+  // way back is the list of chats. A page may know better than its route and says so once it is drawn (pageBack; item
+  // 385): undefined leaves the route's answer, null is the sidebar in place, and `{ to }` another page.
   let back = null;
+  let pageBack;
   const menu = el("button", {
     class: "icon-btn",
     type: "button",
@@ -96,15 +105,23 @@ export function buildShell({ homeRoute }) {
     },
   });
   function backs() {
-    return PHONE.matches && back !== null;
+    return PHONE.matches && wayBack() !== null;
+  }
+  // What the button leads to: what the page itself said, else what its route says.
+  function wayBack() {
+    return pageBack === undefined ? back : pageBack;
   }
   // The page above takes this page's place in the history, so that the browser's own Back after it does not come back
   // here.
   function goBack() {
-    if (back.to === "history") {
+    const way = wayBack();
+    if (way === null) {
+      return;
+    }
+    if (way.to === "history") {
       history.back();
     } else {
-      location.replace(back.to);
+      location.replace(way.to);
     }
   }
   // On a phone the button at the top left is the one way back, a chevron (item 295): to the
@@ -201,6 +218,13 @@ export function buildShell({ homeRoute }) {
     toast("ok", `Colour scheme: ${SCHEMES.find((scheme) => scheme.id === id).label}`);
   }
 
+  // A page that knows where its way back leads says it once it is drawn (a run's page, item 385).
+  function onPageBack(event) {
+    const to = event.detail !== null && typeof event.detail === "object" ? event.detail.to : undefined;
+    pageBack = to === undefined || to === null ? null : { to };
+    paintOpener();
+  }
+
   function onViewportChange(event) {
     narrow = event.matches;
     drawer = false;
@@ -218,6 +242,7 @@ export function buildShell({ homeRoute }) {
   narrowQuery.addEventListener("change", onViewportChange);
   PHONE.addEventListener("change", paintOpener);
   window.addEventListener("keydown", onEscape);
+  window.addEventListener(RUN_BACK_EVENT, onPageBack);
   const removeShortcuts = installShortcuts({ search: focusSearch, newRun, appearance: openAppearance, nextScheme: cycleScheme });
   apply();
 
@@ -228,6 +253,8 @@ export function buildShell({ homeRoute }) {
       sidebar.setRoute(route);
       main.dataset.layout = route.layout;
       back = route.back;
+      // A page that is drawn now says its own way back; until then the route's answer stands.
+      pageBack = undefined;
       paintOpener();
       if (narrow && drawer) {
         setOpen(false);
@@ -243,6 +270,7 @@ export function buildShell({ homeRoute }) {
       narrowQuery.removeEventListener("change", onViewportChange);
       PHONE.removeEventListener("change", paintOpener);
       window.removeEventListener("keydown", onEscape);
+      window.removeEventListener(RUN_BACK_EVENT, onPageBack);
       removeShortcuts();
       stopFollowing();
       sidebar.dispose();

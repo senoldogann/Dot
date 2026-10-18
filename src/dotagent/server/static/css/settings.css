@@ -1617,6 +1617,82 @@
   display: block;
 }
 
+/* The memory list (Settings › Memory): a note is a row that reads as one card — the sentence first, then a quiet line of
+   what it carries (who saved it, when, how it scored), and the actions at the end of that line where the eye can find
+   them instead of a column of buttons down the page. */
+.page[data-layout="page"] .list-row {
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+  padding: var(--space-3) var(--space-4);
+  border-top: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.page[data-layout="page"] .list-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  background: var(--bg-subtle, var(--surface-2));
+}
+
+.page[data-layout="page"] .row-main {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.page[data-layout="page"] .note-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  /* A phone reads at its own size: the meta line stays at the interface size there and steps down only in a window. */
+  font-size: var(--text-ui);
+  color: var(--muted);
+}
+
+@media (min-width: 721px) {
+  .page[data-layout="page"] .note-meta {
+    font-size: var(--text-xs);
+  }
+}
+
+.page[data-layout="page"] .note-meta .chip {
+  max-width: 100%;
+}
+
+.page[data-layout="page"] .row-actions {
+  gap: var(--space-1);
+  opacity: 0;
+  transition: opacity var(--motion-quick) var(--ease);
+}
+
+.page[data-layout="page"] .list-row:hover .row-actions,
+.page[data-layout="page"] .list-row:focus-within .row-actions {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .page[data-layout="page"] .row-actions {
+    opacity: 1;
+  }
+}
+
+@media (max-width: 720px) {
+  .page[data-layout="page"] .list-row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .page[data-layout="page"] .row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
 .when-line .badge {
   margin-inline-start: var(--space-1);
 }

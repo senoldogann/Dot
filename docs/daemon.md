@@ -303,8 +303,10 @@ sight (a phone that put the app away) starts again once it is back (item 276). T
 first browser step, and a run at work that first uses its browser opens the panel on the Screen tab beside the chat,
 unless Settings › Browser turned that off (item 354); until a frame comes it keeps the shape of a screen and says why,
 with a mark and a title (no page yet, waiting for the page, the view closed, the run ended, or a run in a `dotx`
-command, item 220). **Watch** and **Close the view** open and close it by hand; once the run has ended it keeps the last
-screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the agent's name). Since that
+command, item 220). A Screen tab that has had no page at all says instead, in the empty panel the other tabs use, that
+Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
+Settings › Browser that opens it when a run starts its browser (item 385). **Watch** and **Close the view** open and
+close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the agent's name). Since that
 view shows the page, Dot's own Chrome stays in the background while a run works (`[browser] raise_window`, off by
 default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in gets the focus back right after
 Chrome starts and after a page opens a tab of its own, and switching tabs does not raise the window; Settings › Browser

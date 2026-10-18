@@ -122,6 +122,51 @@
   margin-top: 16px;
 }
 
+/* The line over the composer is one bar (item 385): how the run works, how its helpers stand and how many messages wait
+   at its left, the way down at its right end. It is a pane of glass, the look of the composer under it on a phone. */
+.status-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  width: fit-content;
+  max-width: 100%;
+  min-height: 40px;
+  margin: 0 auto var(--space-1);
+  padding-right: var(--space-1);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-pill);
+  background: var(--glass-surface);
+  -webkit-backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur);
+  box-shadow: var(--shadow-raised);
+}
+
+.status-bar[hidden] {
+  display: none;
+}
+
+/* The capsule keeps its parts and drops the look it wore alone: the bar holds one ground for all of it. */
+.status-bar > .capsule:not([hidden]) {
+  flex: 0 1 auto;
+  min-width: 0;
+  margin: 0;
+  border-radius: 0;
+  background: none;
+}
+
+/* The way down sits in the bar's right end, not over the conversation (item 385). */
+.status-bar > .jump {
+  position: static;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+  transform: none;
+}
+
 /* The note that the run's stream is lost floats under the bar, over the conversation: a slot of no height that stays
    in sight while the conversation scrolls, so what is read never moves when it comes or goes (item 328). */
 .connection-slot {
@@ -209,7 +254,26 @@
     top: var(--space-2);
   }
 
-  /* The dock keeps a position of its own: the way down (`.jump`) stands just above it. */
+  /* The count of what a group did stays on the head's one line (item 385): it gives way with an ellipsis instead of
+     pushing the state onto a row of its own. */
+  .steps-count {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* The last tool's name is the count's detail, and on a phone the count has the room (item 385). */
+  .steps-latest {
+    display: none;
+  }
+
+  /* The bar's parts are a phone's width together (item 385): the three counters and the way down fit one row. */
+  .status-bar .capsule-part {
+    padding-inline: var(--space-1);
+  }
+
+  /* The dock keeps a position of its own: the bar over the composer stands in it, not over the conversation. */
   html.chat-shell .dock {
     position: relative;
     translate: none;
@@ -235,8 +299,10 @@
     padding-bottom: calc(var(--space-1) + var(--safe-bottom));
   }
 
+  /* The dock floats over the conversation's foot (item 374), so the thread keeps its own height under it, and a
+     helper's row, which WebKit can lay a little under its group's own height, still ends above the bar (item 385). */
   html.chat-shell .run-thread {
-    padding-bottom: calc(var(--dock-h, 96px) + var(--space-2));
+    padding-bottom: calc(var(--dock-h, 96px) + var(--space-6));
   }
 
   /* The opening curtain's dock keeps the room the chat's keeps under the composer, so the composer stands where it
@@ -246,18 +312,31 @@
     padding-bottom: calc(var(--space-1) + var(--safe-bottom));
   }
 
-  /* The dock has no top padding here: the arrow down stands just above what it holds, not over it (item 352). */
-  html.chat-shell .dock > .jump {
-    bottom: calc(100% + var(--space-2));
+  /* The bar over the composer is a phone's line (item 385): one row across the dock, the parts at its left and the way
+     down in the same pane at its right, never a circle of its own over the conversation. */
+  .status-bar {
+    width: 100%;
+    min-height: 40px;
+  }
+
+  .status-bar > .jump {
+    width: 32px;
+    height: 32px;
+  }
+
+  /* The conversation's rows sit a breath apart on a phone (item 385): the message, what Dot did and its answer read as
+     one chat, and only a turn or a group of steps keeps its distance. */
+  html.chat-shell .run-thread > * + * {
+    margin-top: var(--space-2);
   }
 
   .composer {
     --shadow-composer: var(--shadow-raised);
 
-    background: color-mix(in srgb, var(--surface) 62%, transparent);
-    -webkit-backdrop-filter: blur(24px) saturate(1.5);
-    backdrop-filter: blur(24px) saturate(1.5);
-    border-color: color-mix(in srgb, var(--border-strong) 60%, transparent);
+    background: var(--glass-surface);
+    -webkit-backdrop-filter: var(--glass-blur);
+    backdrop-filter: var(--glass-blur);
+    border-color: var(--glass-border);
   }
 
   /* The box takes the line it types on, the "+" and the send beside it at the thumb, and the choices the quiet line

@@ -5,7 +5,8 @@ On a phone, a touch screen of a phone's width, on every page and in the open sid
 
 - no text is under 13 px, and at least nine characters in ten are 15 px or more (the body is 16 px, as iOS's own);
   code keeps the size chosen for it, 13 px, and is held to the first alone;
-- nothing that is tapped is under 44 by 44 px, but a link inside a line of text;
+- nothing that is tapped is under 32 by 32 px, but a link inside a line of text (item 385: 36 px buttons, 40 px rows
+  of the conversation, 32 px for what sits in a line);
 - a step's duration shows without a hover, and a tap anywhere on a setting's row turns its switch.
 
 In a Mac's window the seven sizes of the text, the body and the switch are as before. Before, the body was 14 px, most
@@ -60,8 +61,9 @@ _SETTINGS: tuple[str, ...] = (
 _LEAST_PX: float = 13.0
 _READ_PX: float = 15.0
 _READ_SHARE: float = 0.9
-# The least side of what a finger taps, Apple's 44 pt.
-_FINGER_PX: float = 44.0
+# The least side of what a finger taps (item 385): a phone's buttons are 36, a row of the conversation 40, and what sits
+# in a line, such as a chip or a way to a page, 32.
+_FINGER_PX: float = 32.0
 # A page is read once two looks this far apart find the same, and given this long to settle.
 _SETTLE_MS: int = 400
 _SETTLE_S: float = 10.0

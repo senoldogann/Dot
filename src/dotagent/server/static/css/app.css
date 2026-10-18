@@ -96,6 +96,11 @@
   --radius-pill: 999px;
   /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
   --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
+  /* The glass of what stands over the conversation at the foot (item 385): the composer and the bar over it, a
+     translucent surface a hairline frames with the page blurred under it. */
+  --glass-surface: color-mix(in srgb, var(--surface) 78%, transparent);
+  --glass-border: color-mix(in srgb, var(--border-strong) 60%, transparent);
+  --glass-blur: blur(24px) saturate(1.5);
   /* Spacing (item 74): one rhythm of 8 px, 4 for the smallest, and the hairline for what sits a breath apart; every
      gap, padding and margin is a token or on the 4 px grid (tests/unit/test_css_tokens.py). */
   --space-half: 2px;
@@ -3476,7 +3481,8 @@ a.pill:hover {
 .timeline {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  /* Rows of the run's flow sit a breath apart (item 385): a chat's rhythm, not a page's paragraphs. */
+  gap: var(--space-1);
 }
 
 /* Dot's answers are not boxed: they read as text on the page. Only what the user wrote sits in a rounded bubble. */
@@ -3484,13 +3490,14 @@ a.pill:hover {
   min-width: 0;
 }
 
-/* Your message sits on the raised surface (item 79); the yellow is Dot's face alone. */
+/* Your message sits on the raised surface (item 79); the yellow is Dot's face alone. Its padding is a chat bubble's
+   (item 385): the words, and no room above and below them to scroll past. */
 .bubble.user {
   align-self: flex-end;
   width: fit-content;
   max-width: 85%;
   margin-left: auto;
-  padding: 8px 16px;
+  padding: var(--space-1) var(--space-3);
   border-radius: var(--radius-lg);
   background: var(--surface-2);
   color: var(--text);
@@ -4594,6 +4601,57 @@ a.memory-line:hover .memory-change {
   border-radius: var(--radius-sm);
 }
 
+/* A phone keeps the head of a delegated run, and of the helpers it belongs to, one line tall (item 385): the state
+   words never wrap, the title or the last line gives way with an ellipsis, and nothing pushes a second row. The rows a
+   finger taps stay 40 px tall through `min-height` (app.css). */
+@media (max-width: 720px) {
+  .child > summary {
+    gap: var(--space-2);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .child-main {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .child-title {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+
+  .child-progress {
+    flex: none;
+    max-width: 50%;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .helpers > summary {
+    gap: var(--space-2);
+    min-height: 40px;
+  }
+
+  .helpers-main {
+    flex-direction: row;
+    align-items: baseline;
+    gap: var(--space-2);
+  }
+
+  .helpers-title {
+    flex: none;
+    white-space: nowrap;
+  }
+
+  .helpers-state {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+}
+
 /* The card of a delegated run (item 226): its face and whole goal, its model and level, its state with the time it has
    taken, and what it does or did last. It stands on the window by its row (helpercard.js places it), over the dock and
    under the drawer, and takes no pointer, so that it never comes between the pointer and the row. */
@@ -4856,15 +4914,15 @@ a.memory-line:hover .memory-change {
   display: flex;
   flex-direction: column;
   /* The message, the flow of what the run did and its answer sit as close as the lines of the run's own page do
-     (`.timeline`; item 377). */
-  gap: var(--space-2);
+     (`.timeline`; items 377 and 385). */
+  gap: var(--space-1);
 }
 
 /* What an earlier turn did (item 374): its tool calls, open under its message as the run's own page shows them. */
 .turn-ops {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--space-1);
 }
 
 /* The flow of a turn (item 374): the agent's words between the folded lines of what it ran, all of them at the
@@ -6839,49 +6897,75 @@ button.attach-chip:hover {
   }
 }
 
-/* On a phone everything that is tapped is a finger's size, 44 px each way at least (item 329, Apple's 44 pt): the
-   buttons, the fields, the choices of a segmented control, the rows of a menu and the heads of the steps. A link inside a
-   line of text is no target of its own (WCAG 2.5.8). */
+/* On a phone what is tapped is a thumb's, not an iOS row's (item 385): the buttons are 36 px tall and the small ones
+   32, the rows of the conversation keep a tappable 40, and only what the dock holds as its main action keeps 40 — the
+   send and the "+" a compact 36. A link inside a line of text is no target of its own (WCAG 2.5.8). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   .btn,
-  .btn.sm,
   .input,
   .select,
   .segmented button,
   .menu-item,
+  .chip {
+    min-height: 36px;
+  }
+
+  .btn.sm {
+    min-height: 32px;
+  }
+
+  .chip {
+    padding-inline: var(--space-2);
+  }
+
+  /* The heads of the steps are what a finger opens, so they keep 40 px, and their padding stays a hairline. */
   .tool-head,
   .steps-head,
   .helpers-head {
-    min-height: 44px;
+    min-height: 40px;
   }
 
   .btn.icon-only,
   .btn.sm.icon-only {
-    width: 44px;
+    width: 36px;
   }
 
   .composer {
-    --composer-control: 44px;
+    --composer-control: 36px;
   }
 
-  /* The composer's round buttons keep the 36 px they show in a clear ring that makes them a finger's size. */
+  /* The composer's round buttons are the send's size, at the dock's right, and so is the stop's square in them. */
   .composer .plus-button,
   .composer .btn.send {
-    width: 44px;
-    height: 44px;
-    min-height: 44px;
-    border: 4px solid transparent;
-    background-clip: padding-box;
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    border-width: 0;
+  }
+
+  .composer .btn.send .icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  .composer[data-stop] .btn.send .icon {
+    width: 14px;
+    height: 14px;
+  }
+
+  /* What stops the run is a square one can put a thumb on, not a wide block (item 385). */
+  .composer[data-stop] .btn.send {
+    border-radius: var(--radius-sm);
   }
 
   .composer-pill {
-    height: 44px;
+    height: 36px;
   }
 
   .btn,
   .segmented button,
   .composer-pill {
-    min-width: 44px;
+    min-width: 36px;
   }
 
   /* Four choices of a phone's size fit the smallest phone's width (an iPhone SE). */
@@ -6894,20 +6978,23 @@ button.attach-chip:hover {
   .fold-toggle,
   .home-today-title,
   .home-today-more,
-  .back,
+  .back {
+    min-height: 36px;
+  }
+
   .capsule-part {
-    min-height: 44px;
+    min-height: 32px;
   }
 
   .context-meter {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 36px;
+    min-height: 36px;
   }
 
   .child > summary .child-open,
   :is(.answer-foot, .note) > a.small {
-    min-width: 44px;
-    min-height: 44px;
+    min-width: 32px;
+    min-height: 32px;
     align-items: center;
     justify-content: center;
   }

@@ -3,11 +3,12 @@ served daemon with one finished chat of the scripted model:
 
 - a tab opened from the settings' list says Back, and Back returns to the list, where the button opens the chats;
 - a service's page opened by its address says Back and leads to Plugins; one opened from a tile returns there;
-- a run opened from the home's Today strip says Back and returns to the home;
-- a chat opened from the sidebar has the button that opens the list of chats;
+- a chat's page, wherever it was opened from, has the button that opens the list of chats in place (item 385);
+- a delegated run's page goes Back to the run that started it;
 - no page draws a link back of its own on a phone; in a Mac's window no Back shows, and the link back of a page under
   another (a service's page, Diagnostics) shows with the sidebar beside it and without it (item 380);
-- a follow-up sent in a run opened from the home goes on in the same chat, whose page keeps Back to the home (item 345).
+- a follow-up sent in a run opened from the home goes on in the same chat, whose page keeps that way to the chats (item
+  345).
 
 Before, the button opened the list of chats on every page, so Back from a tab, a service or a run left the page it came
 from, and a tab had its own "All settings" besides.
@@ -108,32 +109,35 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
     await expect(page).to_have_url(f"{address}/#/customize/plugins")
-    # A run opened from the home's Today strip returns to the home (item 364: the Activity page is gone).
+    # A chat's page opens the list of chats in place (item 385), wherever the page was opened from: no page of chats
+    # between them, and the address stays the run's.
     await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
     await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
-    await expect(button).to_have_attribute("aria-label", "Back")
+    await expect(button).to_have_attribute("aria-label", "Show sidebar")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/runs")
-    # The browser's Forward to the run, and a reload of it, keep its Back (review B5); as Back it opens no panel and
-    # says it controls none (review B8).
-    await page.go_forward()
+    await expect(page.locator(".sidebar")).to_be_in_viewport()
     await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
-    await expect(button).to_have_attribute("aria-label", "Back")
+    await page.keyboard.press("Escape")
+    await expect(page.locator(".sidebar")).not_to_be_in_viewport()
+    # The browser's Forward to the run, and a reload of it, keep that way to the chats (review B5).
     await page.reload()
     await expect(page.locator(".answer").last).to_contain_text("Done.")
-    await expect(button).to_have_attribute("aria-label", "Back")
-    assert await button.get_attribute("aria-expanded") is None and await button.get_attribute("aria-controls") is None
-    await button.click()
-    await expect(page).to_have_url(f"{address}/#/runs")
+    await expect(button).to_have_attribute("aria-label", "Show sidebar")
     # A link to an old address counts for the page it leads to (review B3), and so does a link whose clicks a part of
     # the page stops, or one in a dialog outside the page (review B4).
+    await page.goto(f"{address}/#/runs")
     await page.evaluate(_LINKS)
     await page.locator("#old-address").click()
     await expect(page).to_have_url(f"{address}/#/settings/memory")
+    await expect(page.locator(".memory-layout")).to_be_visible()
     await expect(button).to_have_attribute("aria-label", "Back")
+    # As Back it opens no panel and says it controls none (review B8).
+    assert await button.get_attribute("aria-expanded") is None and await button.get_attribute("aria-controls") is None
     await button.click()
     await expect(page).to_have_url(f"{address}/#/runs")
+    await expect(button).to_have_attribute("aria-label", "Show sidebar")
+    await page.goto(f"{address}/#/runs")
     await page.evaluate(_LINKS)
     await page.locator("#stopped-link").click()
     await expect(page).to_have_url(f"{address}/#/customize/plugins/notion")
@@ -161,20 +165,19 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
 
 
 async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
-    """A follow-up goes on in the same chat (item 345): before, its run's page was a new entry of the history that no
-    link had opened, so the button opened the chats and the page it came from was two steps of the browser's Back
-    away."""
+    """A follow-up goes on in the same chat (item 345), whose page opens the list of chats in place (item 385)."""
     button: Locator = page.locator(".stagebar-left button")
     await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
     await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
-    await expect(button).to_have_attribute("aria-label", "Back")
+    await expect(button).to_have_attribute("aria-label", "Show sidebar")
     await page.locator(".dock textarea").fill("And the totals, please")
     await page.locator(".dock .btn.send").click()
     await expect(page).to_have_url(re.compile(rf"#/runs/(?!{run.id}$)[^/]+$"))
-    await expect(button).to_have_attribute("aria-label", "Back")
+    await expect(button).to_have_attribute("aria-label", "Show sidebar")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/runs")
+    await expect(page.locator(".sidebar")).to_be_in_viewport()
+    await expect(page).to_have_url(re.compile(rf"#/runs/(?!{run.id}$)[^/]+$"))
 
 
 async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_path: Path) -> None:
@@ -231,6 +234,28 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     phone: Page = await phone_context.new_page()
                     await phone.goto(ui_url("127.0.0.1", port, TOKEN))
                     await _phone_walk(phone, address, ended)
+                    # A delegated run's page goes Back to the run that started it (item 385).
+                    child: RunRecord = await manager.start(
+                        "Check the fares",
+                        "chat",
+                        SCRIPTED_MODEL,
+                        ended.thread_id,
+                        "ui",
+                        ended.id,
+                        None,
+                        "standard",
+                        None,
+                        "yolo",
+                        None,
+                        (),
+                    )
+                    async with asyncio.timeout(_RUN_WAIT_S):
+                        await manager.wait(child.id)
+                    await phone.goto(f"{address}/#/runs/{child.id}")
+                    await expect(phone.locator(".stagebar-left button")).to_have_attribute("aria-label", "Back")
+                    await phone.locator(".stagebar-left button").click()
+                    await expect(phone).to_have_url(f"{address}/#/runs/{ended.id}")
+                    await phone.goto(f"{address}/#/runs/{ended.id}")
                     await phone.screenshot(path=str(tmp_path / "back-phone.png"))
                     follow_up: Page = await phone_context.new_page()
                     await _follow_up_walk(follow_up, address, ended)
