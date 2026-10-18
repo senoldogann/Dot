@@ -68,6 +68,10 @@ def page_sizes(path: Path) -> tuple[PageSize, ...]:
     )
 
 
+# The tallest page drawn, in pixels: at the widest of PAGE_WIDTHS a bitmap of about 150 MB at most.
+MOST_PAGE_HEIGHT: int = 20_000
+
+
 def page_png(path: Path, number: int, width: int) -> bytes:
     """Page ``number`` (from 1) of the PDF at ``path`` as a PNG ``width`` pixels wide, on white."""
     if width not in PAGE_WIDTHS:
@@ -79,6 +83,12 @@ def page_png(path: Path, number: int, width: int) -> bytes:
     page: object = CGPDFDocumentGetPage(document, number)
     shown: PageSize = _size(page)
     height: int = max(1, round(width * shown.height / shown.width))
+    if height > MOST_PAGE_HEIGHT:
+        # A page far taller than wide would take gigabytes as a bitmap (item 386): it is refused, not drawn.
+        raise InvalidValueError(
+            "the page is too tall to draw",
+            {"path": str(path), "page": number, "width": width, "height": height, "most": MOST_PAGE_HEIGHT},
+        )
     context: object = CGBitmapContextCreate(
         None, width, height, 8, 0, CGColorSpaceCreateDeviceRGB(), kCGImageAlphaPremultipliedLast
     )

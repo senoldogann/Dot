@@ -180,6 +180,12 @@ def test_a_pdf_page_is_drawn_at_the_width_asked_in_its_proportions(tmp_path: Pat
     with pytest.raises(InvalidValueError) as missing:
         page_png(pdf, 3, 600)
     assert missing.value.message == "the PDF has no such page"
+    # A page far taller than wide is refused before its bitmap is made: 600 px wide it would be 600,000 tall (item 386).
+    strip: io.BytesIO = io.BytesIO()
+    Image.new("RGB", (10, 10_000), (255, 255, 255)).save(strip, format="PDF", resolution=72.0)
+    with pytest.raises(InvalidValueError) as tall:
+        page_png(_file(tmp_path / "strip.pdf", strip.getvalue()), 1, 600)
+    assert tall.value.message == "the page is too tall to draw"
 
 
 def test_a_workbooks_drawing_is_its_sheets_and_any_other_drawing_its_page() -> None:

@@ -165,8 +165,11 @@ def add_skill(folder: Path, skill: FoundSkill, limit: CopyLimit) -> None:
 def remove_skill(folder: Path, agent: str, name: str) -> None:
     """Delete Dot's copy of the skill ``name`` of ``agent`` from its skills folder ``folder``: only a folder whose
     marker says Dot copied it from that skill, whether or not the agent still has it. Raises ElsewhereError when the
-    skill was not added from here."""
+    skill was not added from here, and when ``name`` is not the name of a folder right in ``folder`` (item 386: an
+    absolute path or one with ``..`` would reach a folder elsewhere, which this would delete)."""
     copy: Path = folder / name
+    if name in (".", "..") or Path(name).name != name or copy.resolve().parent != folder.resolve():
+        raise ElsewhereError(f"{name!r} is not the name of a skill in Dot's skills folder", {"agent": agent})
     made: SkillCopy | None = copied_from(copy)
     if made is None or (made.agent, made.name) != (agent, name):
         raise ElsewhereError(
