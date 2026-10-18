@@ -1233,6 +1233,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     rootRunId: runId,
     actorId: agent !== null ? agent.id : run.parent_run_id === null ? "dot" : run.id,
     startedAt: run.created_at,
+    // A run that was at work when the page opened ends under the reader's eyes; one that had ended is read again.
+    revealing: () => active,
     onGrow,
     onPlan: paintPlan,
     onStats: ({ step, input: inputTokens, output: outputTokens }) => {

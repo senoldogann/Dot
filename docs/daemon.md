@@ -206,37 +206,40 @@ and "Thought" once it is done, the start of the thought beside it; opened, the w
 of it, of a longer one its start and its end, its secrets masked; it is there when the page is loaded again. A step
 asked again from its start drops what its failed try streamed. A message streams as it will stay (item 274): formatted
 as it comes, drawn at most once a frame with the parts already written left as they are, its caret at the end of its
-text, so that its end moves nothing. The answer of the run is the last message, with a copy button (its icon turns to a check once the answer is on the clipboard), when it came and how the
-run ended under it; how long the run took shows where the pointer rests on it (on a touch screen it always shows). A
-copy out of the conversation keeps its markdown (item 206): a selection that starts in a message or
-an answer goes on the clipboard as the markdown it was written in, a list as a list, a table as a table and code in its
-fence, with the formatted copy alongside for the applications that read it; the line under a message or an answer stays
-out, and a copy within a block of code is its code. The box stands at the foot of the window from the first message, the
-conversation filling the space above it from the top, and is the same frame as the home's, with the attach button and
-the send in its bar; what you typed there and did not send waits for you. While the end of the conversation, or its
-answer, is below the window, a round arrow just above the composer leads there; it stays away while the page follows a
-working run down, as the page does until you scroll up. At the left of the conversation a column
-of short marks stands for your messages, one mark for each, top to bottom (item 201): resting the
-pointer on it shows the message nearest to it and the start of its answer, a click goes to that message, and from the
-keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are darker. The column needs a
-pointer that rests, two messages or more, and a window wider than a phone's; there, the conversation leaves it its room
-at the left, beside the side panel too (item 228). In the side panel (Run details), under Details on the Run tab,
-**Cost** lists the bill of the run, each value beside its label as in Details: where the minutes went (the model, the
-summaries, the tools, the time spent waiting for you), the steps, the input tokens with the share the provider served
-from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs it delegated and the web
-searches by engine. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run ID`), read again every ten
-seconds while the run works and once at its end. A strip under the head links the other runs of the same thread, and the
-box at the bottom queues a message for after a run that is going on, or follows up on a finished one. While the run
-works and the box is empty, the box's send is the run's **Stop** (a round button in the danger colour with a square) and
-cancels it; a word typed turns it back into the send, **Queue**, and the message waits in the chat's queue (see [How a
-run works](runs.md#how-a-run-works)), shown above the box: a sheet whose head (Queued and the count) folds
-it, with a row per message: a handle to drag it to another place or move it with the arrow keys, its text on one line
-(all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel gives the box its
-draft back), **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run with what the box
-holds, past the queue, or with the queue's next message when the box is empty. Settings › General › Composer can have a
-message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the
-queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why, with **Read
-again**. A line over the box (items 352 and 360) says in a few quiet words how long the run has worked,
+text, so that its end moves nothing. An answer that ends a run while its page is open is written in the same way
+(item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands on it as it
+will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a
+reply that streamed already and reduced motion show it at once. The answer of the run is the last message, with a copy
+button (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how
+long the run took shows where the pointer rests on it (on a touch screen it always shows). A copy out of the
+conversation keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as
+the markdown it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy
+alongside for the applications that read it; the line under a message or an answer stays out, and a copy within a block
+of code is its code. The box stands at the foot of the window from the first message, the conversation filling the space
+above it from the top, and is the same frame as the home's, with the attach button and the send in its bar; what you
+typed there and did not send waits for you. While the end of the conversation, or its answer, is below the window, a
+round arrow just above the composer leads there; it stays away while the page follows a working run down, as the page
+does until you scroll up. At the left of the conversation a column of short marks stands for your messages, one mark for
+each, top to bottom (item 201): resting the pointer on it shows the message nearest to it and the start of its answer, a
+click goes to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in
+sight are darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there,
+the conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Run details),
+under Details on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
+minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the
+share the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs
+it delegated and the web searches by engine. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run
+ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
+of the same thread, and the box at the bottom queues a message for after a run that is going on, or follows up on a
+finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in the
+danger colour with a square) and cancels it; a word typed turns it back into the send, **Queue**, and the message waits
+in the chat's queue (see [How a run works](runs.md#how-a-run-works)), shown above the box: a sheet whose head (Queued
+and the count) folds it, with a row per message: a handle to drag it to another place or move it with the arrow keys,
+its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
+gives the box its draft back), **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run
+with what the box holds, past the queue, or with the queue's next message when the box is empty. Settings › General ›
+Composer can have a message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the
+box holds in the queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why,
+with **Read again**. A line over the box (items 352 and 360) says in a few quiet words how long the run has worked,
 or that it waits for you, how its helpers stand and how many messages are queued; each part opens what it tells of, and
 the line comes while one of its parts has something to say and goes when none has. It does not say what the run does
 now, which the conversation shows, nor count the commands at work in the chat, which stand right under it. When the run
