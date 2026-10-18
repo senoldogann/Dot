@@ -168,6 +168,22 @@ function buildChatCard() {
   return section("Chat", null, el("div", { class: "card-pad stack" }, lines.element));
 }
 
+/** The ways to Diagnostics (item 370) and Open source licences (item 371), pages of their own. */
+function buildAbout() {
+  const row = (href, title, text) =>
+    el("a", { class: "list-row about-row", href }, el("div", { class: "row-main" }, el("div", { class: "row-title" }, title), el("div", { class: "row-text small muted" }, text)), icon("chevron"));
+  return section(
+    "About this Dot",
+    null,
+    el(
+      "div",
+      { class: "list" },
+      row("#/diagnostics", "Diagnostics", "Dot's processes and what they take, the room what it keeps takes, and its logs."),
+      row("#/licences", "Open source licences", "The notices of the packages, the assets and the tools Dot uses."),
+    ),
+  );
+}
+
 function buildDaemon() {
   const refreshButton = el(
     "button",
@@ -1630,7 +1646,7 @@ export function mountSystem(root, ctx) {
     failsafe.paint(snapshot);
   }
 
-  root.append(paneHead("The daemon, its emergency stop and its health checks.", null), daemon.element, failsafe.element, doctor.element);
+  root.append(paneHead("The daemon, its emergency stop and its health checks.", null), daemon.element, failsafe.element, doctor.element, buildAbout());
   const stop = onChange(paint);
   paint(getSnapshot());
   attempt(refresh);

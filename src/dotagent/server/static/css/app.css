@@ -6714,3 +6714,99 @@ button.attach-chip:hover {
     height: 28px;
   }
 }
+
+/* ---------- Settings › System's Diagnostics (item 370) and Open source licences (item 371) ---------- */
+
+/* A row of System that opens one of the two pages: its title and line, the chevron at its right. */
+.about-row {
+  color: inherit;
+}
+
+.about-row > .icon {
+  flex: none;
+  color: var(--muted);
+  rotate: -90deg;
+}
+
+/* A process sits in under the one that started it, by how deep it is under the daemon. */
+.process-name[data-depth="1"] {
+  padding-left: var(--space-4);
+}
+
+.process-name[data-depth="2"] {
+  padding-left: calc(2 * var(--space-4));
+}
+
+.process-name[data-depth="3"] {
+  padding-left: calc(3 * var(--space-4));
+}
+
+.process-name[data-depth="4"] {
+  padding-left: calc(4 * var(--space-4));
+}
+
+/* A folder's or a tool's path breaks where it must; its size or its licence keeps to one line at the side. */
+.folder-path {
+  overflow-wrap: anywhere;
+}
+
+.folder-size,
+.tool-licence {
+  flex: none;
+  white-space: nowrap;
+  text-align: right;
+}
+
+.log-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.log-controls .select {
+  flex: 1 1 280px;
+  min-width: 0;
+}
+
+.log-controls .input {
+  flex: 1 1 200px;
+  min-width: 0;
+}
+
+/* The last lines of a log: a box of its own that scrolls both ways, its lines whole. */
+.log-lines {
+  max-height: 420px;
+  margin: 0;
+  padding: var(--space-3);
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font: var(--code-size) / var(--code-leading) var(--mono);
+  white-space: pre;
+}
+
+.notice {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-2);
+}
+
+.notice-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2);
+  cursor: pointer;
+}
+
+.notice-name {
+  font-weight: var(--weight-label);
+}
+
+.notice-text {
+  max-height: 320px;
+  margin: var(--space-2) 0 0;
+  overflow: auto;
+  font: var(--text-xs) / 1.5 var(--mono);
+  white-space: pre-wrap;
+}
