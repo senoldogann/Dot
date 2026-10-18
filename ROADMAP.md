@@ -14606,13 +14606,14 @@ the draft's files came back as descriptions, a photo as a file's icon. Tests: `t
 it, without so much room). **As built (2026-10-18).** The run measured about 28 px between the lines of a turn in the
 main checkout of the time, whose flow was not yet item 374 as reviewed; on main the lines of the flow stood 8 px apart
 already. What was left: a turn's message, its flow and its answer stood 16 px apart, and now stand 8 px apart, as the
-lines of the run's own page do (`.timeline`); the paragraphs of the words a run says between its commands sit 8 px apart
-instead of 0.65 em (about 10 px), in an earlier turn's flow and on the run's own page alike, while an answer keeps its
-paragraphs' room (`app.css`). The run gave the second change to the earlier turns alone, at 4 px; the review gave it to
-the run's own page too, so a turn reads the same once it is an earlier one, and kept 8 px, so a paragraph's break is
-still told from a line's. Measured on a scripted chat in Chrome, wide and dark and on a phone in light. Tests:
-`tests/unit/test_css_tokens.py`, `tests/smoke/test_thread_turns.py`, `test_chat_scroll.py`, `test_chat_calm.py`,
-`test_sunshine.py` and `test_answer_streams.py` pass unchanged.
+lines of the run's own page do (`.timeline`); the paragraphs of the words an earlier turn said between its commands sit
+8 px apart instead of 0.65 em (about 10 px), while a list, a quote and a block of code keep the room their own rules
+give them, and an answer keeps its paragraphs' (`app.css`). The run's own page leaves its lines as they are: a reply it
+streamed gives way to the answer at the end, and a message is drawn live as it will stay (item 274). The run had the
+paragraphs at 4 px; the review kept 8 px, so a paragraph's break is still told from a line's. Measured on a scripted
+chat in Chrome, wide and dark and on a phone in light. Tests: `tests/unit/test_css_tokens.py`,
+`tests/smoke/test_thread_turns.py`, `test_chat_scroll.py`, `test_chat_calm.py`, `test_sunshine.py` and
+`test_answer_streams.py` pass unchanged.
 
 ## Log
 

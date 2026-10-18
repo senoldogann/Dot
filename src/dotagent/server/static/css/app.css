@@ -4808,10 +4808,12 @@ a.memory-line:hover .memory-change {
   padding-left: calc(28px + var(--space-2));
 }
 
-/* The words a run says between its commands are short: their paragraphs sit closer than an answer's, in an earlier
-   turn's flow and on the run's own page alike (item 377). `:where` keeps the weight of `.prose > * + *`, which this
-   follows, so a list, a quote, a block of code and a rule keep the room their own rules give them. */
-:where(.turn-say, .bubble.say) .prose > * + * {
+/* The words an earlier turn said between its commands are short: their paragraphs sit closer than an answer's (item
+   377). The run's own page leaves its lines as they are, since a reply it streamed gives way to the answer, which keeps
+   its paragraphs' room, and a message is drawn live as it will stay (item 274). `:where` keeps the weight of
+   `.prose > * + *`, which this follows, so a list, a quote, a block of code and a rule keep the room their own rules
+   give them. */
+:where(.turn-say) .prose > * + * {
   margin-top: var(--space-2);
 }
 
