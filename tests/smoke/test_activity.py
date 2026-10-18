@@ -1,7 +1,8 @@
 """Activity end to end (item 47): a run waiting for an answer, a run working and a session of a campaign in flight,
 read as ``GET /activity`` and shown in the sidebar's sections, and what ended on the home's Today strip (item 364: the
 Activity page is gone), in a headless Chrome at a wide and at a phone width, in light and in dark. The runs are played
-by the scripted model, one after the other, so each takes the next turn of the shared script."""
+by the scripted model, each from a script of its own matched on its goal, so runs at work at once never take each
+other's turns."""
 
 import asyncio
 import time
@@ -141,7 +142,7 @@ async def client(runtime: Runtime, manager: RunManager) -> AsyncIterator[httpx.A
         await serving
 
 
-def _turn(tool: str, arguments: dict[str, str | bool]) -> ScriptedTurn:
+def _turn(tool: str, arguments: dict[str, str | bool | int]) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=tool, arguments=arguments),))
 
 
