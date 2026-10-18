@@ -34,7 +34,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFaile
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
-import { PHONE } from "../layout.js";
+import { PHONE, trackHeight } from "../layout.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -306,10 +306,29 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // --------------------------------------------------------------------------------------------- lessons
   // What a run that reached its goal the hard way can tell the runs after it, drawn once it ended (see agent.lessons).
   const lessonsBody = el("div", { class: "lessons" });
+  // More shows when the four lines cut a lesson's text, measured where it stands: a phone's column cuts a shorter text
+  // than a wide one does, and a card still folded is measured once it opens. One watch for the rows drawn last.
+  const lessonCuts = new ResizeObserver((entries) => {
+    for (const { target } of entries) {
+      if (!target.classList.contains("open")) {
+        target.nextElementSibling.hidden = target.scrollHeight <= target.clientHeight + 1;
+      }
+    }
+  });
+  const lessonsCount = el("span", { class: "lessons-count" });
+  // Folded on arrival (item 374): the lessons of a run are a note to open when it is wanted, not a wall over the answer;
+  // its head says what waits inside (paintLessons).
   const lessonsCard = el(
-    "section",
-    { class: "card", hidden: true, "aria-label": "Lessons from this run" },
-    el("div", { class: "card-head" }, icon("sparkle"), el("span", null, "Lessons from this run")),
+    "details",
+    { class: "card lessons-card", hidden: true, role: "region", "aria-label": "Lessons from this run" },
+    el(
+      "summary",
+      { class: "lessons-head" },
+      el("span", { class: "lessons-mark" }, icon("sparkle")),
+      el("span", { class: "lessons-title" }, "Lessons from this run"),
+      lessonsCount,
+      el("span", { class: "lessons-chevron" }, icon("chevron")),
+    ),
     lessonsBody,
   );
   // The lessons being saved or dismissed, by index, so that a second press does not send the same decision twice.
@@ -333,28 +352,51 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   }
 
   function lessonButton(lesson, action, words) {
-    return el("button", { class: "btn sm", type: "button", onclick: () => decideLesson(lesson.index, action) }, words);
+    return el("button", { class: "btn ghost sm", type: "button", onclick: () => decideLesson(lesson.index, action) }, words);
   }
 
+  // A lesson reads as a line of the conversation, not as a card of its own (item 374): the text folds to four lines
+  // with More beside it, and what became of it is a quiet word under the text, the actions the only buttons.
   function lessonRow(lesson) {
-    const text = el("span", { class: "lesson-text" }, lesson.text);
+    const text = el("div", { class: "lesson-text" }, lesson.text);
+    const more = el("button", { class: "lesson-more", type: "button", hidden: true }, "More");
+    more.addEventListener("click", () => {
+      const open = text.classList.toggle("open");
+      more.textContent = open ? "Less" : "More";
+      more.setAttribute("aria-expanded", open ? "true" : "false");
+    });
+    lessonCuts.observe(text);
+    const body = el("div", { class: "lesson-body" }, text, more);
     if (lesson.state === "saved") {
       // Saved on its own or by you, a lesson can be taken back: Undo forgets the note it wrote.
-      const said = el("span", { class: "chip" }, icon("check"), lesson.by === "auto" ? "Saved on its own" : "Saved to memory");
-      return el("div", { class: "lesson saved" }, text, el("div", { class: "cluster" }, said, lessonButton(lesson, "undo", "Undo")));
+      return el(
+        "div",
+        { class: "lesson saved" },
+        body,
+        el(
+          "div",
+          { class: "lesson-foot" },
+          el("span", { class: "lesson-state" }, icon("check"), lesson.by === "auto" ? "Saved on its own" : "Saved to memory"),
+          lessonButton(lesson, "undo", "Undo"),
+        ),
+      );
     }
     if (lesson.state === "dismissed" && lesson.by === "auto") {
       // Left out by the second look, with why; it is still yours to keep.
-      const why = el("span", { class: "lesson-why" }, `Left out: ${lesson.reason}`);
-      return el("div", { class: "lesson dismissed" }, text, why, el("div", { class: "cluster" }, lessonButton(lesson, "save", "Save anyway")));
+      return el(
+        "div",
+        { class: "lesson dismissed" },
+        body,
+        el("div", { class: "lesson-foot" }, el("span", { class: "lesson-why" }, `Left out: ${lesson.reason}`), lessonButton(lesson, "save", "Save anyway")),
+      );
     }
     if (lesson.state === "dismissed") {
-      return el("div", { class: "lesson dismissed" }, text, el("span", { class: "chip" }, icon("x"), "Dismissed"));
+      return el("div", { class: "lesson dismissed" }, body, el("div", { class: "lesson-foot" }, el("span", { class: "lesson-state" }, icon("x"), "Dismissed")));
     }
     // The words sit in the buttons themselves, as on an approval card, so that a phone keeps them.
     const save = el("button", { class: "btn primary sm", type: "button", onclick: () => decideLesson(lesson.index, "save") }, icon("check"), "Save to memory");
-    const dismiss = el("button", { class: "btn sm", type: "button", onclick: () => decideLesson(lesson.index, "dismiss") }, "Dismiss");
-    return el("div", { class: "lesson" }, text, el("div", { class: "cluster" }, save, dismiss));
+    const dismiss = el("button", { class: "btn ghost sm", type: "button", onclick: () => decideLesson(lesson.index, "dismiss") }, "Dismiss");
+    return el("div", { class: "lesson" }, body, el("div", { class: "lesson-foot" }, save, dismiss));
   }
 
   /** `lessons` is what became of the lessons of the run, or null when none were drawn from it. */
@@ -363,11 +405,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     if (lessons === null) {
       return;
     }
-    const proposed = lessons.lessons.some((lesson) => lesson.state === "proposed");
+    const proposed = lessons.lessons.filter((lesson) => lesson.state === "proposed").length;
+    // Folded, the head says what waits inside: why the lessons could not be drawn, the ones that wait for your
+    // decision, else how many there are.
+    lessonsCount.textContent =
+      lessons.error !== null ? "could not be drawn" : proposed > 0 ? `${proposed} to decide` : String(lessons.lessons.length);
+    lessonsCount.dataset.tone = lessons.error !== null ? "bad" : proposed > 0 ? "warn" : "";
+    lessonCuts.disconnect();
     lessonsBody.replaceChildren(
       ...lessons.lessons.map(lessonRow),
       ...[
-        lessons.tainted && proposed
+        lessons.tainted && proposed > 0
           ? el(
               "div",
               { class: "note warn" },
@@ -1257,7 +1305,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el("h1", { class: "visually-hidden" }, run.goal),
     connectionSlot,
     problem,
-    earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null)),
+    earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null), signal),
     goalMessage,
     timeline.element,
     waitingList,
@@ -1265,11 +1313,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     lessonsCard,
     continuedIn(history.later),
   );
-  threadBox = thread;
   paintWorking();
   const filesWatch = new MutationObserver(debounce(() => paintFiles(thread), FILES_SETTLE_MS));
   filesWatch.observe(thread, { childList: true, subtree: true });
   const main = el("div", { class: "run-main" }, thread, dock);
+  // On a phone the dock floats over the conversation's foot (item 374), a pane of glass with the messages going by
+  // under it: its height is kept on the column that holds them both, where the conversation's padding reads it.
+  threadBox = thread;
+  const stopDockHeight = trackHeight(dock, main, "--dock-h");
   // The marks of the conversation's messages stand at the layout's left edge (item 201).
   const outline = messageOutline({ layout, main, thread, dock });
   layout.append(outline.element, main, stage.handle, inspector.element, inspector.scrim);
@@ -1350,6 +1401,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     thread.removeEventListener("scroll", onScroll);
     document.documentElement.classList.remove("chat-shell");
     filesWatch.disconnect();
+    lessonCuts.disconnect();
+    stopDockHeight();
     outline.dispose();
     stopLifecycle();
     stopBack();

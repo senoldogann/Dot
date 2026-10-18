@@ -543,7 +543,7 @@ function interfaceCard() {
   const layoutNote = el("div", { class: "hint grow" });
   const fold = switchSetting({
     label: "Fold tool steps",
-    hint: "The tool calls of a turn collapse into one “Worked for…” line; open it to see every step.",
+    hint: "The tool calls of a stretch of work fold into one line that says what they did, “Ran 2 commands and read 1 file”; open it to see every step.",
     read: foldSteps,
     write: setFoldSteps,
     onToggled: paint,

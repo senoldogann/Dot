@@ -1,13 +1,77 @@
 // One tool call of a run: a collapsed row that shows what ran and how it went, and opens to the arguments and output.
 
 import { imageUrl } from "./api.js";
-import { clip, copyText, duration, el } from "./dom.js";
+import { clip, copyText, duration, el, plural } from "./dom.js";
 import { icon, toolIconName } from "./icons.js";
 import { showImage, toast } from "./ui.js";
 
 const PRIMARY_KEYS = ["command", "url", "path", "query", "goal", "text", "name", "app", "ref", "title", "script", "key"];
 const SUMMARY_CHARS = 200;
 const TEXT_PREVIEW_CHARS = 6000;
+
+// What a tool call is, in the words of a flow's summary (item 374): "Ran 2 commands and read 1 file".
+const KIND_OF_TOOL = {
+  shell: "command",
+  terminal: "command",
+  read_file: "read",
+  write_file: "write",
+  edit_file: "write",
+  web_search: "search",
+  web_fetch: "page",
+  schedule_create: "schedule",
+  schedule_list: "schedule",
+  memory_save: "memory",
+};
+
+/** What one tool call counted as in a flow's summary. */
+export function callKind(tool) {
+  if (tool in KIND_OF_TOOL) {
+    return KIND_OF_TOOL[tool];
+  }
+  if (tool.startsWith("browser_")) {
+    return "browser";
+  }
+  if (tool.startsWith("desktop_")) {
+    return "desktop";
+  }
+  return "other";
+}
+
+// How each count reads: the first part says what it did, the others go on with it ("Ran 2 commands and read 1 file").
+const FLOW_WORDS = {
+  command: (count) => `Ran ${plural(count, "command", "commands")}`,
+  read: (count) => `read ${plural(count, "file", "files")}`,
+  write: (count) => `wrote ${plural(count, "file", "files")}`,
+  search: (count) => `searched the web ${count === 1 ? "once" : `${count} times`}`,
+  page: (count) => `opened ${plural(count, "page", "pages")}`,
+  browser: (count) => `took ${plural(count, "browser step", "browser steps")}`,
+  desktop: (count) => `used the desktop ${count === 1 ? "once" : `${count} times`}`,
+  schedule: (count) => `changed ${plural(count, "schedule", "schedules")}`,
+  memory: (count) => `kept ${plural(count, "note", "notes")}`,
+  other: (count) => `used ${plural(count, "tool", "tools")}`,
+};
+// The order the parts are said in, whatever order the calls came in.
+const FLOW_ORDER = ["command", "read", "write", "search", "page", "browser", "desktop", "schedule", "memory", "other"];
+
+/** The summary of a group of calls — "Ran 2 commands and read 1 file" — or "" when it holds no call. */
+export function flowWords(kinds) {
+  const parts = FLOW_ORDER.filter((kind) => (kinds[kind] ?? 0) > 0).map((kind) => FLOW_WORDS[kind](kinds[kind]));
+  if (parts.length === 0) {
+    return "";
+  }
+  const said = parts.length === 1 ? parts[0] : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+  return `${said[0].toUpperCase()}${said.slice(1)}`;
+}
+
+/** The counts of the calls a group of steps made, by `callKind`. */
+export function countKinds(tools) {
+  const kinds = {};
+  for (const tool of tools) {
+    const kind = callKind(tool);
+    kinds[kind] = (kinds[kind] ?? 0) + 1;
+  }
+  return kinds;
+}
 
 /** A short line for what the model asked the tool to do, taken from the most telling argument. */
 export function describeArguments(args) {
@@ -119,7 +183,7 @@ export function toolRow({ tool, args }) {
     el("span", { class: "chev" }, icon("chevron")),
   );
   const body = el("div", { class: "tool-body" });
-  const details = el("details", { class: "tool" }, head, body);
+  const details = el("details", { class: "tool running" }, head, body);
   const shots = el("div", { class: "shots" });
   const node = el("div", { class: "stack tight" }, details, shots);
   let result = null;
@@ -149,6 +213,7 @@ export function toolRow({ tool, args }) {
 
   function finish(outcome) {
     result = outcome;
+    details.classList.remove("running");
     state.replaceChildren(icon(outcome.ok ? "check" : "x"));
     state.className = `tool-state ${outcome.ok ? "ok" : "bad"}`;
     if (!outcome.ok) {
@@ -173,6 +238,7 @@ export function toolRow({ tool, args }) {
       return false;
     }
     cut = true;
+    details.classList.remove("running");
     state.replaceChildren(icon("alert"));
     state.className = "tool-state cut";
     badges.replaceChildren(el("span", { class: "badge b-warn" }, "cut off"));

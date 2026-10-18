@@ -10,7 +10,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
+from playwright.async_api import APIResponse, Browser, BrowserContext, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import LESSONS_TOOL, VET_TOOL
@@ -35,9 +35,14 @@ _GOAL: str = "Keep the line hello in notes.txt and read it back."
 _KEPT: str = "read_file fails on a file that does not exist yet; create notes.txt with write_file first."
 _LEFT: str = "Reading a file back right after writing it confirms that the write worked."
 _WHY: str = "says nothing a later run needs"
+# A lesson of almost the most a lesson may hold: more than four lines in a phone's column, fewer in a wide one.
+_LONG: str = (
+    "A file a run writes and reads back in the same step should be written with write_file and read with read_file, "
+    "never echoed through the shell, because the shell guard asks about a redirect and the run then waits on the "
+    "owner for a write it could have made without a question."
+)
 _RUN_WAIT_S: float = 30.0
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "dark"), (390, "light"))
-_SHOT_DIR: Path = Path("/tmp/dot-plan21/lessons-card")
 
 
 def _turn(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
@@ -45,20 +50,21 @@ def _turn(tool: str, arguments: dict[str, object]) -> ScriptedTurn:
 
 
 def _script() -> list[ScriptedTurn]:
-    """A run that reads notes.txt before it exists, writes and reads it, and finishes; then the lesson writer's two
-    lessons and the second look, which keeps the first and leaves the second out."""
+    """A run that reads notes.txt before it exists, writes and reads it, and finishes; then the lesson writer's three
+    lessons and the second look, which keeps the first and leaves the other two out."""
     return [
         _turn("read_file", {"path": "notes.txt"}),
         _turn("write_file", {"path": "notes.txt", "content": "hello\n"}),
         _turn("read_file", {"path": "notes.txt"}),
         _turn(FINISH_TOOL, {"answer": "The file holds hello.", "success": True}),
-        _turn(LESSONS_TOOL, {"lessons": [_KEPT, _LEFT]}),
+        _turn(LESSONS_TOOL, {"lessons": [_KEPT, _LEFT, _LONG]}),
         _turn(
             VET_TOOL,
             {
                 "verdicts": [
                     {"lesson": 1, "keep": True, "reason": "know-how about read_file"},
                     {"lesson": 2, "keep": False, "reason": _WHY},
+                    {"lesson": 3, "keep": False, "reason": _WHY},
                 ]
             },
         ),
@@ -137,7 +143,7 @@ async def _page(
 
 
 async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with_save_anyway(
-    runtime: Runtime, served: tuple[RunManager, str]
+    runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
     manager, address = served
     run: RunRecord = await manager.start(
@@ -147,7 +153,6 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
         assert (await manager.wait(run.id)).status == "done"
         await manager.learned(run.id)
     assert await runtime.store.count_memories() == 1
-    await asyncio.to_thread(_SHOT_DIR.mkdir, parents=True, exist_ok=True)
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch()
         try:
@@ -155,28 +160,93 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
                 page, errors = await _page(browser, address, run.id, width, scheme)
                 card: Locator = page.get_by_role("region", name="Lessons from this run")
                 await expect(card).to_be_visible()
+                assert not await card.locator(".lesson").first.is_visible(), "the lessons arrive folded"
+                assert await card.get_attribute("open") is None
+                await card.scroll_into_view_if_needed()
+                await card.screenshot(path=str(tmp_path / f"card-folded-{width}-{scheme}.png"))
+                await card.locator(".lessons-head").click()
+                await expect(card.locator(".lesson").first).to_be_visible()
+                assert await card.get_attribute("open") is not None
                 kept: Locator = card.locator(".lesson").nth(0)
                 left: Locator = card.locator(".lesson").nth(1)
                 await expect(kept.locator(".lesson-text")).to_have_text(_KEPT)
-                await expect(kept.locator(".chip")).to_have_text("Saved on its own")
+                await expect(kept.locator(".lesson-state")).to_have_text("Saved on its own")
                 await expect(kept.get_by_role("button", name="Undo")).to_be_visible()
                 await expect(left.locator(".lesson-why")).to_have_text(f"Left out: {_WHY}")
                 await expect(left.get_by_role("button", name="Save anyway")).to_be_visible()
+                # More shows where the four lines cut a lesson: the long one on a phone, none on a wide window.
+                await expect(kept.locator(".lesson-more")).to_be_hidden()
+                long: Locator = card.locator(".lesson").nth(2)
+                more: Locator = long.get_by_role("button", name="More")
+                if width < 600:
+                    await expect(more).to_be_visible()
+                    await more.click()
+                    await expect(long.get_by_role("button", name="Less")).to_be_visible()
+                    await expect(long.locator(".lesson-text")).to_have_class("lesson-text open")
+                else:
+                    await expect(more).to_be_hidden()
                 await card.scroll_into_view_if_needed()
-                await card.screenshot(path=str(_SHOT_DIR / f"card-{width}-{scheme}.png"))
+                await card.screenshot(path=str(tmp_path / f"card-{width}-{scheme}.png"))
                 assert errors == []
                 if width == _SHOTS[-1][0]:
                     # On the phone: Undo forgets the note, and Save anyway keeps the lesson that was left out.
                     await kept.get_by_role("button", name="Undo").click()
-                    await expect(kept.locator(".chip")).to_have_text("Dismissed")
+                    await expect(kept.locator(".lesson-state")).to_have_text("Dismissed")
                     await expect(page.get_by_text("Undone: the lesson is no longer in memory.")).to_be_visible()
                     await left.get_by_role("button", name="Save anyway").click()
-                    await expect(left.locator(".chip")).to_have_text("Saved to memory")
+                    await expect(left.locator(".lesson-state")).to_have_text("Saved to memory")
                     await expect(left.get_by_role("button", name="Undo")).to_be_visible()
-                    await card.screenshot(path=str(_SHOT_DIR / f"card-{width}-{scheme}-decided.png"))
+                    await card.screenshot(path=str(tmp_path / f"card-{width}-{scheme}-decided.png"))
                     assert errors == []
+                await page.context.close()
+            # Folded, the head says what waits inside: lessons that wait for a decision, or why none could be drawn.
+            for lessons, said in (
+                ({"state": "proposed", "by": None, "reason": None}, "2 to decide"),
+                (None, "could not be drawn"),
+            ):
+                page, errors = await _page_with_lessons(browser, address, run.id, lessons)
+                count: Locator = page.get_by_role("region", name="Lessons from this run").locator(".lessons-count")
+                await expect(count).to_have_text(said)
+                await expect(count).to_have_attribute("data-tone", "warn" if lessons is not None else "bad")
+                assert errors == []
+                # A read of the run still under way when the page goes is let go, not rewritten.
+                await page.unroute_all(behavior="ignoreErrors")
                 await page.context.close()
         finally:
             await browser.close()
     notes = await runtime.store.list_memories(10, 0)
     assert [note.content for note in notes] == [_LEFT]
+
+
+async def _page_with_lessons(
+    browser: Browser, address: str, run_id: str, lesson: dict[str, str | None] | None
+) -> tuple[Page, list[str]]:
+    """The page of the run with what the daemon says of its lessons rewritten: two lessons whose fields are ``lesson``,
+    or, for ``None``, none and the error of lessons that could not be drawn."""
+
+    async def rewrite(route: Route) -> None:
+        answer: APIResponse = await route.fetch()
+        detail = await answer.json()
+        drawn = detail["lessons"]
+        if lesson is None:
+            detail["lessons"] = {**drawn, "lessons": [], "error": "the review model did not answer"}
+        else:
+            detail["lessons"] = {
+                **drawn,
+                "lessons": [{**each, **lesson} for each in drawn["lessons"][:2]],
+                "error": None,
+            }
+        await route.fulfill(response=answer, json=detail)
+
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    context: BrowserContext = await browser.new_context(
+        viewport={"width": 1280, "height": 900}, reduced_motion="reduce"
+    )
+    page: Page = await context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    await page.route(f"**/api/runs/{run_id}", rewrite)
+    await page.goto(ui_url(host, port, TOKEN))
+    await page.goto(f"{address}/#/runs/{run_id}")
+    return page, errors

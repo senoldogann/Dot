@@ -189,10 +189,11 @@ leaving, a click or Escape puts it away, and on a touch screen a tap opens the r
 parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the box would be,
 which stays at the window's foot as the conversation scrolls (item 244): the model,
 how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not),
-"Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single "Worked
-for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns took
-(open it for every call, result and screenshot: each call one quiet line with its icon, its result on a hairline under
-it once opened), while approvals, questions and policy notes stay in the open. The lines of how a run was set up (the
+"Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that
+says what they did, "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it
+while it runs, "Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and
+screenshot, each call one quiet line with its icon, its result on a hairline under it once opened, while approvals,
+questions and policy notes stay in the open. The lines of how a run was set up (the
 notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
 model) are one quiet line that names them in short, amber when one of them warns (the embedding service failed, so the
 notes were found by their words alone), and opens on a click to the lines themselves (item 352). What the model thought

@@ -113,6 +113,8 @@
 
 .run-thread {
   flex: 1 0 auto;
+  min-width: 0;
+  overflow-x: clip;
 }
 
 .run-main > * + *,
@@ -212,6 +214,88 @@
     position: relative;
     translate: none;
     margin-top: 0;
+  }
+
+  /* No band of the page's colour behind the composer (item 374): the dock draws no ground, and it floats over the
+     conversation, a pane of glass with the messages going by under it (run.js keeps its height in `--dock-h`). */
+  .dock {
+    background: none;
+  }
+
+  html.chat-shell .run-main {
+    position: relative;
+  }
+
+  html.chat-shell .dock {
+    position: absolute;
+    inset-inline: 0;
+    bottom: 0;
+    z-index: 6;
+    padding-top: 0;
+    padding-bottom: calc(var(--space-1) + var(--safe-bottom));
+  }
+
+  html.chat-shell .run-thread {
+    padding-bottom: calc(var(--dock-h, 96px) + var(--space-2));
+  }
+
+  /* The opening curtain's dock keeps the room the chat's keeps under the composer, so the composer stands where it
+     will (item 359). */
+  .waiting .dock {
+    padding-top: 0;
+    padding-bottom: calc(var(--space-1) + var(--safe-bottom));
+  }
+
+  /* The dock has no top padding here: the arrow down stands just above what it holds, not over it (item 352). */
+  html.chat-shell .dock > .jump {
+    bottom: calc(100% + var(--space-2));
+  }
+
+  .composer {
+    --shadow-composer: var(--shadow-raised);
+
+    background: color-mix(in srgb, var(--surface) 62%, transparent);
+    -webkit-backdrop-filter: blur(24px) saturate(1.5);
+    backdrop-filter: blur(24px) saturate(1.5);
+    border-color: color-mix(in srgb, var(--border-strong) 60%, transparent);
+  }
+
+  /* The box takes the line it types on, the "+" and the send beside it at the thumb, and the choices the quiet line
+     under it with the context meter at its end. */
+  .composer-bar {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "plus field send"
+      "options options meter";
+    align-items: end;
+    column-gap: var(--space-1);
+    row-gap: var(--space-1);
+  }
+
+  .composer-bar > .plus-button {
+    grid-area: plus;
+  }
+
+  .composer-bar > .composer-field {
+    grid-area: field;
+    flex: none;
+    order: 0;
+  }
+
+  .composer-bar > .send {
+    grid-area: send;
+  }
+
+  /* The line of the choices keeps its height while they are not there yet, so the opening curtain's composer stands
+     where the chat's does (item 359). */
+  .composer-bar > .composer-options {
+    grid-area: options;
+    min-height: var(--composer-control);
+  }
+
+  .composer-bar > .context-meter {
+    grid-area: meter;
   }
 
   /* No bar covers the conversation's top: what the column goes to stands right there. */
@@ -379,36 +463,157 @@
 
 /* ---------- lessons drawn from a run ---------- */
 
+/* The card weighs less than the conversation (item 374): a quiet heading, one hairline between the lessons, the words
+   at the size of a message and the actions as small ghosts under it. It reads the same on a phone, on the desktop and
+   in the web interface, which share this sheet. */
+.lessons-card {
+  border-color: color-mix(in srgb, var(--border) 70%, transparent);
+  background: color-mix(in srgb, var(--surface-2) 55%, transparent);
+}
+
+.lessons-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  color: var(--muted);
+  cursor: pointer;
+  list-style: none;
+}
+
+.lessons-head::-webkit-details-marker {
+  display: none;
+}
+
+.lessons-card[open] .lessons-head {
+  padding-bottom: 4px;
+}
+
+.lessons-chevron {
+  display: inline-flex;
+  rotate: 0deg;
+  transition: rotate var(--motion-quick);
+}
+
+.lessons-card[open] .lessons-chevron {
+  rotate: 90deg;
+}
+
+.lessons-mark {
+  display: inline-flex;
+  opacity: 0.7;
+}
+
+.lessons-title {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-label);
+  letter-spacing: var(--tracking-caps);
+  text-transform: uppercase;
+}
+
+.lessons-count {
+  margin-left: auto;
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+/* A head that says the lessons could not be drawn, or that some wait for your decision, says it in its tone. */
+.lessons-count[data-tone="bad"] {
+  color: var(--bad);
+}
+
+.lessons-count[data-tone="warn"] {
+  color: var(--warn);
+}
+
 .lessons {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  padding: 12px 16px;
+  gap: 0;
+  padding: 4px 16px 8px;
 }
 
-/* A lesson keeps its text on the left; its buttons go under it when the column is narrow. */
+/* A lesson reads as a line of the conversation: its text on the left, what became of it and its actions under it. */
 .lesson {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 12px;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+
+.lesson:first-child {
+  border-top: 0;
+}
+
+.lesson-body {
+  min-width: 0;
 }
 
 .lesson-text {
-  flex: 1 1 260px;
-  min-width: 0;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  overflow: hidden;
+  color: color-mix(in srgb, var(--text) 92%, transparent);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
   overflow-wrap: anywhere;
+}
+
+.lesson-text.open {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+
+.lesson-more {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: var(--text-xs);
+  cursor: pointer;
+}
+
+.lesson-more:hover {
+  color: var(--text);
+}
+
+.lesson-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+.lesson-foot .btn.sm {
+  padding-block: var(--space-half);
+  padding-inline: var(--space-2);
+}
+
+.lesson-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--muted);
+  font-size: var(--text-xs);
+}
+
+.lesson-state svg {
+  width: 12px;
+  height: 12px;
+  opacity: 0.8;
 }
 
 .lesson.dismissed .lesson-text {
   color: var(--muted);
 }
 
-/* Why the second look left a lesson out, on a line of its own under the lesson. */
+/* Why the second look left a lesson out, quiet beside the way to keep it. */
 .lesson-why {
-  flex: 1 0 100%;
   color: var(--muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
 }
 
 /* ---------- groups of tool steps ---------- */

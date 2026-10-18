@@ -1,10 +1,9 @@
 // The conversation of one run, built from its events as they arrive: what the agent said, which tools it used, what it
 // asked, what the delegated runs did and, at the end, the answer. Events of a delegated run land in a panel nested in the
 // tool call that started it, closed until the reader opens it or the run asks the reader something (item 123). The
-// tool calls between two messages sit in one group, "Worked for 12 s" with "5 tool calls" beside it, that the
-// reader can fold away. A group is timed from the moment the work began (the start of the run or the last message) to the
-// moment it ended, so the groups of a run add up to the time the run took; the part of that time the model's turns took is
-// in brackets, "Worked for 12 s (model 8 s)".
+// tool calls between two messages sit in one group that says what they did, "Ran 2 commands and read 1 file", with the
+// time it took beside it (item 374), that the reader can fold away. A group is timed from the moment the work began (the
+// start of the run or the last message) to the moment it ended, so the groups of a run add up to the time the run took.
 
 import { AUTO_LINES, valueOf } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
@@ -21,7 +20,7 @@ import { answerMessage, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
-import { describeArguments, toolRow } from "./tools.js";
+import { callKind, describeArguments, flowWords, toolRow } from "./tools.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
@@ -88,9 +87,10 @@ export function flockState(statuses) {
 // `drawn` holds the lines each of its blocks was drawn from, `queued` is set while a draw waits for the next frame and
 // `ended` once the message is in or the step is asked again.
 function newBubble(scope, step, live) {
+  // The words of the flow wear no face of their own (item 374): the face belongs to the answer that closes the turn,
+  // and the words line up with the answer's.
   const body = el("div", { class: live ? "prose stream" : "" });
-  const face = el("span", { class: "turn-face" }, actorFace(scope.actorId, "idle", null));
-  const node = el("div", { class: live ? "bubble live" : "bubble", role: "article", "aria-label": "Dot" }, face, body);
+  const node = el("div", { class: live ? "bubble live say" : "bubble say", role: "article", "aria-label": "Dot" }, body);
   scope.container.append(node);
   const caret = el("span", { class: "stream-caret", "aria-hidden": "true" });
   return { node, body, step, text: "", drawn: [], caret, queued: false, ended: false };
@@ -208,19 +208,22 @@ function buildGroup(ts) {
   const body = el("div", { class: "steps-body" });
   const head = el("summary", { class: "steps-head" }, state, title, count, failed, el("span", { class: "chev" }, icon("chevron")), latest);
   const node = el("details", { class: "steps", open: !foldSteps() }, head, body);
-  return { node, body, state, title, count, failed, latest, live: null, tail: true, pending: 0, calls: 0, failedCalls: 0, cutCalls: 0, start: ts, end: ts, longest: 0, modelSeconds: 0, last: "" };
+  return { node, body, state, title, count, failed, latest, live: null, tail: true, pending: 0, calls: 0, kinds: {}, failedCalls: 0, cutCalls: 0, start: ts, end: ts, longest: 0, last: "" };
 }
 
-/** Show a group as it stands: "Working…" while it is the tail of the run or a call is out, "Worked for …" once it is over. */
+/** Show a group as it stands: "Working…" while it is the tail of the run or a call is out, what it did once it is over. */
 function paintGroup(group) {
   const live = group.tail || group.pending > 0;
   if (group.live !== live) {
     group.live = live;
     group.state.replaceChildren(live ? el("span", { class: "spinner" }) : icon("check"));
   }
-  const model = group.modelSeconds > 0 ? ` (model ${duration(group.modelSeconds)})` : "";
-  setText(group.title, live ? "Working…" : `Worked for ${duration(Math.max(group.end - group.start, group.longest))}${model}`);
-  setText(group.count, plural(group.calls, "tool call", "tool calls"));
+  // A stretch of work reads as what it ran (item 374), "Ran 2 commands and read 1 file", with the time it took beside
+  // it, and while it runs, how much of it is behind it.
+  const took = duration(Math.max(group.end - group.start, group.longest));
+  const words = flowWords(group.kinds);
+  setText(group.title, live ? "Working…" : words === "" ? `Worked for ${took}` : words);
+  setText(group.count, live ? (words === "" ? "" : `${words[0].toLowerCase()}${words.slice(1)} so far`) : words === "" ? "" : took);
   const troubles = [group.failedCalls > 0 ? `${group.failedCalls} failed` : "", group.cutCalls > 0 ? `${group.cutCalls} cut off` : ""];
   group.failed.hidden = group.failedCalls === 0 && group.cutCalls === 0;
   setText(group.failed, troubles.filter((text) => text !== "").join(" · "));
@@ -666,23 +669,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
   }
 
   /**
-   * The seconds of a model turn join the group whose time they were spent in: the open group, which lasts at least until
-   * the turn's event, or, with none open, the group the turn's tool calls start when it wrote nothing before them (the
-   * finish call is not shown). A turn that wrote a message with no group open was spent before that message, in no group.
-   */
-  function addModelTime(scope, data) {
-    if (data.seconds === undefined) {
-      return;
-    }
-    const startsGroup = data.text.trim() === "" && data.tool_calls.some((name) => name !== FINISH_TOOL);
-    const group = scope.group ?? (startsGroup ? groupFor(scope) : null);
-    if (group !== null) {
-      group.modelSeconds += data.seconds;
-      paintGroup(group);
-    }
-  }
-
-  /**
    * A folded block for the thinking of step `step` (item 246): a line with the brain, "Thinking…"
    * while the model thinks and "Thought" once it is done, the start of the thought beside it; opened, the whole thought.
    * It goes into the open group of steps, else at the end of the scope, where the group that the step's calls start
@@ -806,6 +792,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     const row = toolRow({ tool: call.tool, args: call.args });
     group.body.append(row.node);
     group.calls += 1;
+    const kind = callKind(call.tool);
+    group.kinds[kind] = (group.kinds[kind] ?? 0) + 1;
     group.pending += 1;
     group.last = describeCall(call.tool, call.args);
     const entry = { row, group, args: call.args };
@@ -862,7 +850,6 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       const data = record.data;
       // A new turn: its calls go in the open group, or in the group its first call makes.
       scope.turnGroup = scope.group;
-      addModelTime(scope, data);
       settleThought(scope, data);
       if (scope.panel !== null) {
         scope.panel.steps = Math.max(scope.panel.steps, data.step);
@@ -892,7 +879,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
       scope.turnGroup = null;
       scope.boundary = record.ts;
       const target = bubble ?? newBubble(scope, data.step, false);
-      target.node.className = "bubble";
+      target.node.className = "bubble say";
       target.body.replaceWith(prose(data.text));
       scope.reply = { node: target.node, text: data.text };
       if (!ORDINARY_ENDS.has(data.finish)) {

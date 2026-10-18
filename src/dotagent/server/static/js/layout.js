@@ -24,7 +24,7 @@ function remember(key, value) {
   writePref(key, value ? "on" : "off");
 }
 
-/** Whether the tool steps of a run start folded into one "Worked for" line. */
+/** Whether the tool steps of a run start folded, each stretch of work into its one line ("Ran 2 commands"). */
 export function foldSteps() {
   const chosen = choice(FOLD_KEY);
   return chosen === null ? themeInUse().foldSteps : chosen;
