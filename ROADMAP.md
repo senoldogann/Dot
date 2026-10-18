@@ -14559,7 +14559,7 @@ tab wide and light and on a phone and dark). Docs: `docs/daemon.md`, `docs/auton
 
 ### 375. The smoke tests that failed under the load of `-n auto`
 
-**Status: in progress.** This session's word to a Dot run of 2026-10-18, which the owner carried on ("Devam etmen
+**Status: done (`601a41c`).** This session's word to a Dot run of 2026-10-18, which the owner carried on ("Devam etmen
 gerekiyorsa devam et", then "Ne gerekiyorsa onu yap": go on if you need to, then do whatever is needed): find why smoke
 tests fail under the load of `-n auto` and pass alone, and fix it in `tests/`. **As built (2026-10-18).** Two causes in
 `tests/smoke/test_activity.py`: its four runs drew their turns from one scripted model they shared, so on a slow machine
@@ -14572,6 +14572,26 @@ wait for the list to rest before they open a menu, and for the menu to rest befo
 unchanged. A Dot run of the owner's found and fixed these; this item reviews them and adds them, on main's versions of
 the tests. The others it looked at (`test_opening`, `test_setup_card`, `test_terminal`, `test_file_panel`,
 `test_customize_plugins`, `test_opencode_bridge`) passed its four runs of `-n auto` but one, and have no fix yet.
+
+### 376. A queued message's files come into the box that edits it, and leave with the edit
+
+**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Bir diğer bug, kuyruktaki bir mesajı tekrar
+düzenledim, birkaç fotoğraf ekledim, tamam dedikten sonra fotoğraflar hâlâ composer'da kalmış; ayrıca bir kuyruk
+mesajında fotoğraf var ise düzenleme yaparken composer'a o fotoğraflar da gelmeli düzenleme modunda ve küçük görünmeli,
+bir çarpı işareti olmalı, text yazmasına gerek yok fotoğrafta" (I edited a queued message again and added photos; after
+OK the photos were still in the composer; and a queued message's photos should come into the composer when it is edited,
+small, with a ×, no text on the photo). **As built (2026-10-18).** The edit of a queued message carried its text alone,
+and the box's files were left out of it. Now the queue's view names each message's files (`QueuedMessageView`,
+`routes_queue.py`); the pencil puts them in the box with the text, small, a photo as its own picture (`GET
+/api/attachments/{id}/image`, `attachments.js` `restoreSmall`), a file as its icon, each with its × and its name as the
+tooltip; Save sends the files the box holds (`PATCH /api/queue/{id}` with `attachments`, checked as a new message's are;
+left out, they stay), and Save or Cancel takes the edit's files out of the box and gives the draft its own back
+(`queue.js`). A file gone from the workspace is left out of the view with a warning in the log, so the queue still
+answers. A Dot run of the owner's built it; the review split the edit into an edit of the text and an edit with files
+(`edit_queued`, `edit_queued_with_files`) instead of a parameter that switches between them, checked the files an edit
+names, kept the queue readable past a lost file, showed the photo itself instead of an icon, gave the × a finger's ring
+on a touch screen, and split the test into an API test and a marked browser test. Tests: `tests/smoke/test_queue.py`.
+Docs: `docs/daemon.md`.
 
 ## Log
 
@@ -15364,3 +15384,4 @@ the tests. The others it looked at (`test_opening`, `test_setup_card`, `test_ter
 - 2026-10-18 (Opus 5.5): item 366 merged as `6cb0f4a` (PR #366). Item 367 on `item-367-at-picks`: `@` in the composer picks an MCP server, a tool or a skill.
 - 2026-10-18 (Opus 5.5): item 367 merged as `a0b7954` (PR #367). Item 368 on `item-368-changes`: Changes in the side panel, the files a chat's runs wrote, with their diffs.
 - 2026-10-18 (Opus 5.5): item 368 merged as `299ddc4` (PR #368); the pre-push review passed it on its fifth push. Item 375 on `item-375-flaky-tests`: the smoke tests that failed under the load of `-n auto`, as a Dot run of the owner's fixed them, reviewed.
+- 2026-10-18 (Opus 5.5): item 375 merged as `601a41c` (PR #369); the pre-push review passed it with two Nits, fixed in the next push. Item 376 on `item-376-queue-files`: a queued message's files come into the box that edits it, as a Dot run of the owner's built it, reviewed.

@@ -1,7 +1,7 @@
 // Files attached to a message: picked, dropped or pasted, uploaded at once, and listed with their state until the message goes.
 // A long text pasted goes as a file of its own (item 269), and a file listed opens beside the conversation once uploaded.
 
-import { api } from "./api.js";
+import { api, blobUrl } from "./api.js";
 import { clip, el, requestFile } from "./dom.js";
 import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
@@ -73,13 +73,14 @@ export function sentFiles(files) {
 }
 
 /**
- * The file picker, the list of attached files and the drop/paste handling for one message box (the composer's "+"
- * menu opens the picker, item 318). `dropTarget` takes
- * dropped files and `input` pasted ones, and a long text pasted into `input` as a file (item 269), which can be put back
- * into the box as text. A file uploaded opens beside the conversation from its chip (`requestFile`). `ids()` names the
- * uploaded files for the message, `ready()` describes them (`{ id, name, size }`) for a draft and `restore(files)` lists
- * them again from one, `count()` counts the files listed, whatever their state, `busy()` is true while one is still
- * uploading, `clear()` empties the list after the message went, and `onChange()` runs after every change.
+ * The file picker, the list of attached files and the drop/paste handling for one message box (the composer's "+" menu
+ * opens the picker, item 318). `dropTarget` takes dropped files and `input` pasted ones, and a long text pasted into
+ * `input` as a file (item 269), which can be put back into the box as text. A file uploaded opens beside the
+ * conversation from its chip (`requestFile`). `ids()` names the uploaded files for the message, `ready()` describes
+ * them (`{ id, name, size }`) for a draft and `restore(files)` lists them again from one, `restoreSmall(files)` lists a
+ * queued message's files small in the box that edits it (`{ id, name, size, kind }`, item 376), `count()` counts the
+ * files listed, whatever their state, `busy()` is true while one is still uploading, `clear()` empties the list after
+ * the message went, and `onChange()` runs after every change.
  */
 export function createAttachments({ dropTarget, input, onChange }) {
   const entries = [];
@@ -235,6 +236,47 @@ export function createAttachments({ dropTarget, input, onChange }) {
         const entry = { file: null, id, name, size, state: "ready", preview: null, pasted: null, status, open: null, node: null };
         entry.node = chip(name, null, status, entry);
         entry.node.className = "attach-chip ready";
+        opens(entry);
+        entries.push(entry);
+        list.append(entry.node);
+      }
+      paint();
+    },
+    restoreSmall: (files) => {
+      for (const { id, name, size, kind } of files) {
+        // A queued message's file in the box that edits it (item 376): small, the picture itself (or a file's icon)
+        // and its ×, no words on it; the name is its tooltip and opens it beside the conversation.
+        const entry = { file: null, id, name, size, state: "ready", preview: null, pasted: null, status: null, open: null, node: null };
+        const picture = el("img", { class: "attach-thumb", alt: "" });
+        entry.open = el(
+          "button",
+          { class: "attach-open", type: "button", title: `Show ${name}`, "aria-label": `Show ${name}`, disabled: true, onclick: (event) => requestFile(event.currentTarget) },
+          kind === "image" ? picture : icon("file"),
+        );
+        entry.node = el(
+          "span",
+          { class: "attach-chip ready small", title: name },
+          entry.open,
+          el("button", { class: "btn ghost sm attach-remove", type: "button", title: "Remove", "aria-label": `Remove ${name}`, onclick: () => remove(entry) }, icon("x")),
+        );
+        if (kind === "image") {
+          blobUrl(`/attachments/${encodeURIComponent(id)}/image`).then(
+            (url) => {
+              // A chip taken away before its picture came lets the picture go at once.
+              if (entries.includes(entry)) {
+                entry.preview = url;
+                picture.src = url;
+              } else {
+                URL.revokeObjectURL(url);
+              }
+            },
+            (error) => {
+              // The picture could not be read: the chip says so where it stands, and the file still opens.
+              entry.open.replaceChildren(icon("alert"));
+              entry.open.title = `${name}: ${error.message}`;
+            },
+          );
+        }
         opens(entry);
         entries.push(entry);
         list.append(entry.node);

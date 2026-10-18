@@ -2296,6 +2296,19 @@ class Store:
             raise await self._not_waiting(message_id)
 
     @_writing
+    async def edit_queued_with_files(self, message_id: str, text: str, attachments: Sequence[str]) -> None:
+        """Change the text of a queued message and the files it carries (item 376); one starting as its chat's next run
+        is refused (``RunConflict``)."""
+        cursor = await self._db.execute(
+            "UPDATE queued_messages SET text = ?, attachments = ?"
+            " WHERE id = ? AND id NOT IN (SELECT message_id FROM queue_claims)",
+            (text, ",".join(attachments), message_id),
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise await self._not_waiting(message_id)
+
+    @_writing
     async def delete_queued(self, message_id: str) -> None:
         """Take a message out of its chat's queue; one starting as its chat's next run is refused (``RunConflict``)."""
         cursor = await self._db.execute(

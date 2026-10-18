@@ -1037,6 +1037,15 @@ class RunManager:
         await self._queue_changed(thread_id, None, None, None)
         return thread_id
 
+    async def edit_queued_with_files(self, message_id: str, text: str, files: Sequence[StoredAttachment]) -> str:
+        """Change the text of a queued message and the files it carries (item 376); returns its chat. One starting as
+        the chat's next run is refused."""
+        store: Store = self._runtime.store
+        await store.edit_queued_with_files(message_id, text, [file.id for file in files])
+        thread_id: str = (await store.get_queued(message_id)).thread_id
+        await self._queue_changed(thread_id, None, None, None)
+        return thread_id
+
     async def remove_queued(self, message_id: str) -> str:
         """Take a message out of its chat's queue; returns its chat. One starting as the chat's next run is refused."""
         store: Store = self._runtime.store

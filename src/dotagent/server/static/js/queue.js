@@ -42,6 +42,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
   // The message the composer edits, and the draft it held before.
   let editingId = null;
   let draft = "";
+  let draftFiles = [];
   // The row whose handle was pressed, which alone may be dragged; the row dragged and where it would land.
   let armedId = null;
   let draggedId = null;
@@ -141,9 +142,13 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
   function startEdit(message) {
     if (editingId === null) {
       draft = frame.textarea.value;
+      draftFiles = frame.attachments.ready();
     }
     editingId = message.id;
     frame.textarea.value = message.text;
+    // The files the message carries come back into the box with its text (item 376), small and each with its ×.
+    frame.attachments.clear();
+    frame.attachments.restoreSmall(message.files);
     frame.autosize();
     frame.textarea.focus();
     onEdit();
@@ -157,6 +162,12 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     editingId = null;
     frame.textarea.value = draft;
     draft = "";
+    // The files the edit put in the box leave with it; the ones the draft had come back.
+    frame.attachments.clear();
+    if (draftFiles.length > 0) {
+      frame.attachments.restore(draftFiles);
+    }
+    draftFiles = [];
     // The draft the composer keeps follows the box again.
     frame.textarea.dispatchEvent(new Event("input"));
     frame.autosize();
@@ -349,7 +360,7 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     },
     editing: () => editingId,
     saveEdit: async (text) => {
-      const view = await api.patch(`/queue/${editingId}`, { text });
+      const view = await api.patch(`/queue/${editingId}`, { text, attachments: frame.attachments.ids() });
       endEdit();
       show(view);
     },

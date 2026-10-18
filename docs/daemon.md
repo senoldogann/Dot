@@ -237,7 +237,9 @@ danger colour with a square) and cancels it; a word typed turns it back into the
 in the chat's queue (see [How a run works](runs.md#how-a-run-works)), shown above the box: a sheet whose head (Queued
 and the count) folds it, with a row per message: a handle to drag it to another place or move it with the arrow keys,
 its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
-gives the box its draft back), **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run
+gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its
+own picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the
+message's), **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run
 with what the box holds, past the queue, or with the queue's next message when the box is empty. Settings › General ›
 Composer can have a message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the
 box holds in the queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why,
@@ -542,8 +544,9 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |
 | `POST /runs/{id}/loop` (`{"every": "30m", "text": …}`)                         | a loop of the run's chat (item 281): a schedule of the chat, returned |
 | `GET\|POST\|PUT /threads/{id}/queue`, `POST /threads/{id}/queue/resume`         | a chat's queue (`held`, `messages`); queue a message (`text` and the choices of `POST /runs`; 409 for a chat with no run yet, a campaign's, or the thread of a delegated run); reorder it (`{"ids": […]}`, each once); resume a held one |
-| `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message; send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue |
+| `PATCH\|DELETE /queue/{id}` (`{"text": …}`), `POST /queue/{id}/steer`            | edit or take out a queued message, its files too when `attachments` names them (item 376; left out, they stay); send it to the run at work now (409 with none); 409 while its run is starting; each answers with the queue, each message's `files` named |
 | `POST /attachments` (`{"name", "media_type", "data_b64"}`)                      | keep a file for a message; `POST /runs` and `steer` name it in `attachments` |
+| `GET /attachments/{id}/image`                                                  | the picture of an image kept for a message (item 376), for its small chip in the box that edits a queued message |
 | `GET /threads?limit=N`, `DELETE /threads` (`{"ids": […]}`)                      | the chats, the pinned first, then newest activity first, each with the face it wears (`actor_id`) and its last line (`last_message`, `last_role`); delete some with their runs (409 with the ids while one has a run under way) |
 | `PATCH /threads/{id}` (`{"title": …, "pinned": …, "seen": …, "choices": …}`)   | name a chat, pin it, mark it seen or unseen, or keep the choices its next follow-up starts with (`mode`, `model`, `effort`, `approvals`, `goal_mode`; `GET /runs/{id}` has them as `choices`); one at least (204; 404 for no chat); a chat's `unread` is in the list |
 | `GET /threads/{id}/helpers?limit=N`                                            | the runs a chat's runs delegated, newest first (the side panel's Agents tab; 404 for no chat) |
