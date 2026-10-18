@@ -14,7 +14,8 @@ after Grok's "Updated memory"). The line of a saved or corrected note opens Sett
 to read, correct or forget (`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note forgotten since is said to
 be gone. A note saved again, or a call that failed, changed nothing and leaves no line. The line names no agent: a
 note a run saves is Dot's, for every run (item 94). The notes a run is handed at its start leave a line too, "Recalled 3
-memories", but only when its chat had not been handed one of them before: a follow-up handed the same notes says
+memories", not in the conversation but under Set up in the side panel's Run tab (item 365), and only when its chat
+had not been handed one of them before: a follow-up handed the same notes says
 nothing, and one handed a new note says how many are new, "(1 new)" (item 335).
 
 ```bash
