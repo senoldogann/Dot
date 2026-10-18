@@ -5291,7 +5291,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | done        | 177b005 |
 | 359 | A phone takes Dot's new pages over a slow network too                                  | done        | 83d81e3 |
 | 360 | A phone's chat scrolls up and down only, and its line over the composer is quieter     | done        | a6f0397 |
-| 361 | OpenRouter's refusal for the account's privacy settings says why, and what to change   | in progress |         |
+| 361 | OpenRouter's refusal for the account's privacy settings says why, and what to change   | done        | 994ab2d |
+| 362 | The lines of what ran without asking are out of a chat until turned on                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14290,8 +14291,8 @@ does not scroll sideways while the table and the code do, which fails on the cod
 
 ### 361. OpenRouter's refusal for the account's privacy settings says why, and what to change
 
-**Status: in progress.** The owner's word of 2026-10-18, after a run's lessons failed with OpenRouter's "HTTP 404: 0
-endpoints out of 1 requested are available matching your guardrail restrictions and data policy … Paid model training
+**Status: done (`994ab2d`).** The owner's word of 2026-10-18, after a run's lessons failed with OpenRouter's "HTTP 404:
+0 endpoints out of 1 requested are available matching your guardrail restrictions and data policy … Paid model training
 violation (account settings)": "Bu gibi durumlarda ne yapacağız bunu yap" (what do we do in such cases; do it). **As
 built (2026-10-18).** The review model of the owner's config, `openrouter:meta/muse-spark-1.3-contributor`, has one
 provider at OpenRouter, which keeps and trains on what it is sent. The account's privacy settings ruled it out, for paid
@@ -14301,9 +14302,23 @@ refused access (`ProviderAccessError`, as a 403 is), whose words say what exclud
 that: "OpenRouter's privacy settings for this account leave no provider of the model (ZDR violation): choose another
 model in Settings › Models, or change them at https://openrouter.ai/settings/privacy". As after a 403, a run whose own
 model gets it moves to its standby model, and the model is paused for `helper_cooldown_s` until a call to it is
-answered. Which model reviews stays the owner's choice: one
-whose providers keep what they are sent passes only with Zero Data Retention off. Test:
-`tests/unit/test_provider_errors.py`, with OpenRouter's own answer. Docs: `docs/models.md`.
+answered. Which model reviews stays the owner's choice: one whose providers keep what they are sent passes only with
+Zero Data Retention off. Test: `tests/unit/test_provider_errors.py`, with OpenRouter's own answer. Docs:
+`docs/models.md`.
+
+### 362. The lines of what ran without asking are out of a chat until turned on
+
+**Status: in progress.** The owner's word of 2026-10-18: "yolo modda hâlâ working içerisinde YOLO, not asked: Run: cd …
+— auto-review refused this action (secret_access): Run: … bu gibi uyarıları gösteriyor, ama göstermesin" (in yolo mode
+such lines still show inside the working group; they should not). **As built (2026-10-18).** Item 346 made the lines of
+what ran without asking (each action YOLO let through, each one the reviewer approved) a switch of Settings › General,
+on by default and kept in each browser, so a phone where it was never turned off showed them all. The line quoted is one
+YOLO let through: the auto-review would refuse it (`secret_access`), YOLO waives that, and the note says what the policy
+wanted. The switch now starts off (`AUTO_LINES` `initial: "hidden"`), and a browser shows the lines only once it is
+turned on there. The records and the events stay, and a refusal (a reviewer's denial) still shows, as what it held back
+did not happen. Tests: `tests/smoke/test_yolo_line.py` (the lines are out of a chat until the switch brings them in, and
+it takes them out again, wide and light, on a phone and dark); the tests that count such lines (`test_late_helper.py`,
+`test_chat_calm.py`) turn them on first. Docs: `docs/autonomy.md`, `docs/daemon.md`.
 
 ## Log
 
@@ -15083,3 +15098,4 @@ whose providers keep what they are sent passes only with Zero Data Retention off
 - 2026-10-18 (Opus 5.5): item 359 on the owner's word of the same day (the new composer not on the phone), on `item-359-phone-pages`: over a slow network the phone's service worker kept the build it first kept; a late answer of another build now has the next opening wait for the network.
 - 2026-10-18 (Opus 5.5): item 359 merged as `83d81e3` (PR #354), and the daemon restarted on it. Item 360 on the owner's word of the same day (two screenshots of the phone), on `item-360-chat-width`: a phone's conversation scrolls up and down only, and the line over the composer drops what the run does now and the count of the commands, in fewer and quieter words.
 - 2026-10-18 (Opus 5.5): item 360 merged as `a6f0397` (PR #355). Item 361 on the owner's word of the same day (a run's lessons failed with OpenRouter's 404 for the account's privacy settings), on `item-361-provider-policy`: that 404 is a refused access that says why and what to change.
+- 2026-10-18 (Opus 5.5): item 361 merged as `994ab2d` (PR #356); with paid model training and Zero Data Retention turned off at OpenRouter, the owner's review model answers again. Item 362 on the owner's word of the same day, on `item-362-quiet-yolo`: the lines of what ran without asking are out of a chat until turned on.

@@ -113,6 +113,8 @@ async def _open_run(browser: Browser, address: str, run_id: str, width: int, sch
     )
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     await page.goto(ui_url(host, port, TOKEN))
+    # The lines of what ran without asking show only once they are turned on (item 362).
+    await page.evaluate("localStorage.setItem('dot.autoLines', 'shown')")
     await page.goto(f"{address}/#/runs/{run_id}")
     return page
 
