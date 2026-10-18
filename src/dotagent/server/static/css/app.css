@@ -4050,39 +4050,14 @@ a.memory-line:hover .memory-change {
   line-height: var(--leading-sm);
 }
 
-/* How a run was set up (item 352): one quiet line that names the notes and skills it was handed, its budget and its
-   tools in short, its mark amber or red when one of its lines warns; opened, those lines hang under it on a hairline. */
-.context-line {
-  min-width: 0;
-}
-
-.context-mark {
-  color: var(--muted);
-}
-
-.context-summary {
-  flex: 1;
-  min-width: 0;
-  color: var(--muted);
-  font-size: var(--text-sm);
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.context-line.warn .context-mark {
-  color: var(--warn);
-}
-
-.context-line.bad .context-mark {
-  color: var(--bad);
-}
-
-.context-body {
+/* How a run was set up (item 365), in the side panel's Run tab: its lines one under another, quiet, a warning in
+   its own tone. */
+.setup-lines {
+  display: grid;
   gap: var(--space-1);
 }
 
-.context-body > .note {
+.setup-lines > .note {
   padding: 0;
 }
 

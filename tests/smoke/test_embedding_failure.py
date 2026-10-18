@@ -143,14 +143,17 @@ async def _served(runtime: Runtime, manager: RunManager) -> AsyncIterator[str]:
         await serving
 
 
-async def _lines(page: Page) -> list[str]:
-    """The texts of the timeline's warning lines, with every folded group of steps and the context line opened."""
-    folded: Locator = page.locator(
-        "details.steps:not([open]) > summary.steps-head, details.context-line:not([open]) > summary"
-    )
-    while await folded.count() > 0:
-        await folded.first.click()
-    return [text.strip() for text in await page.locator(".timeline .note.warn").all_inner_texts()]
+async def _setup_warnings(page: Page, width: int) -> list[str]:
+    """The warning lines of how the run was set up, in the side panel's Run tab (item 365): the panel turned on beside
+    a wide conversation, opened as a drawer on a phone."""
+    if width < 960:
+        await page.locator("button[aria-label='Run details']").click()
+    else:
+        await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
+        await page.reload()
+    setup: Locator = page.locator("#panel-run-setup")
+    await expect(setup).to_be_visible()
+    return [text.strip() for text in await setup.locator(".note.warn").all_inner_texts()]
 
 
 @pytest.mark.browser
@@ -205,18 +208,17 @@ async def test_a_run_whose_embeddings_fail_finds_its_notes_and_skills_by_their_w
                             await page.goto(ui_url(host, port, TOKEN))
                             await page.goto(f"{address}/#/runs/{run.id}")
                             await expect(page.locator(".timeline")).to_contain_text("report.md is written.")
-                            # Both are one compact line, said once, whose details open on a tap (item 352).
-                            context: Locator = page.locator(".timeline details.context-line.warn")
-                            await expect(context).to_have_count(1)
-                            await expect(context.locator(".context-summary")).to_contain_text(
-                                "notes and skills found by their words alone"
-                            )
-                            lines: list[str] = await _lines(page)
+                            # Nothing of it stands in the conversation: the side panel lists both, and the head
+                            # of its Set up says them once (item 365).
+                            await expect(page.locator(".timeline")).not_to_contain_text("by their words alone")
+                            lines: list[str] = await _setup_warnings(page, width)
                             assert [line.split(" — ")[0] for line in lines] == [
                                 "Notes recalled by their words alone: the embedding service failed",
                                 "Skills listed by their words alone: the embedding service failed",
                             ], lines
-                            await page.locator(".timeline .note.warn").first.scroll_into_view_if_needed()
+                            await expect(page.locator(".setup-summary")).to_contain_text(
+                                "notes and skills found by their words alone"
+                            )
                             await page.screenshot(path=str(tmp_path / f"words-{width}-{scheme}.png"))
                             await page.close()
                     finally:

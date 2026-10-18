@@ -168,6 +168,19 @@ async def _run_page(browser: Browser, address: str, run_id: str, width: int, sch
     return page
 
 
+async def _setup(page: Page, width: int) -> Locator:
+    """The Set up section of the run's side panel (item 365): the panel turned on beside a wide conversation, opened as
+    a drawer on a phone."""
+    if width < 960:
+        await page.locator("button[aria-label='Run details']").click()
+    else:
+        await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
+        await page.reload()
+    setup: Locator = page.locator("#panel-run-setup")
+    await expect(setup).to_be_visible()
+    return setup
+
+
 async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_filled(
     runtime: Runtime, served: str, tmp_path: Path
 ) -> None:
@@ -238,16 +251,9 @@ async def test_a_model_with_a_context_size_of_its_own_has_the_meter_and_the_time
         try:
             for width, scheme in _SHOTS:
                 page: Page = await _run_page(browser, served, sized.id, width, scheme)
-                # The timeline says where the budget comes from, in the line of how the run was set up (item 352).
-                context: Locator = page.locator(".context-line").first
-                await expect(context.locator(".context-summary")).to_contain_text("budget 192k")
-                await context.locator("summary").click()
-                await expect(
-                    page.get_by_text(
-                        "Context budget 192k tokens, the size chosen for the model in Settings, tool output up to 12k "
-                        "characters"
-                    )
-                ).to_be_visible()
+                # The conversation says nothing of the budget (item 365): the side panel does, below.
+                await expect(page.locator(".answer").last).to_be_visible()
+                await expect(page.locator(".timeline")).not_to_contain_text("Context budget")
                 meter: Locator = page.locator(_METER)
                 await expect(meter).to_have_attribute(
                     "aria-label", "Context: 78% of the run's budget, 150k of 192k tokens"
@@ -265,16 +271,21 @@ async def test_a_model_with_a_context_size_of_its_own_has_the_meter_and_the_time
                     ]
                 )
                 await page.screenshot(path=str(tmp_path / f"sized-{width}-{scheme}.png"), animations="disabled")
-                await page.close()
-            # A size the window cut: the note names both.
-            page = await _run_page(browser, served, cut.id, 1280, "light")
-            await page.locator(".context-line").first.locator("summary").click()
-            await expect(
-                page.get_by_text(
-                    "Context budget 154k tokens, the 192k chosen for the model in Settings cut to fit its window of "
-                    "205k, tool output up to 12k characters"
+                # Where the budget comes from is a line of how the run was set up, in the side panel's Run tab.
+                await page.keyboard.press("Escape")
+                setup: Locator = await _setup(page, width)
+                await expect(page.locator(".setup-summary")).to_contain_text("budget 192k")
+                await expect(setup).to_contain_text(
+                    "Context budget 192k tokens, the size chosen for the model in Settings, tool output up to 12k "
+                    "characters"
                 )
-            ).to_be_visible()
+                await page.close()
+            # A size the window cut: the line names both.
+            page = await _run_page(browser, served, cut.id, 1280, "light")
+            await expect(await _setup(page, 1280)).to_contain_text(
+                "Context budget 154k tokens, the 192k chosen for the model in Settings cut to fit its window of 205k, "
+                "tool output up to 12k characters"
+            )
             await page.close()
         finally:
             await browser.close()

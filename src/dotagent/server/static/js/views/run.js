@@ -28,6 +28,7 @@ import { messageOutline } from "../outline.js";
 import { emptyPanel, errorPanel, loadingPanel, panelSection } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
+import { setupSection } from "../setup.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFailed } from "../state.js";
@@ -287,6 +288,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       finishedAt,
     });
   }
+
+  // ----------------------------------------------------------------------------------------------- set up
+  // How the run was set up (item 365): its notes and skills, its context budget, its tool groups, the model a step
+  // went to. The conversation keeps none of these lines; the Run tab lists them.
+  const setup = setupSection();
 
   // ------------------------------------------------------------------------------------------------ cost
   // What the run cost and where (see cost.js): read on arrival, every COST_REFRESH_MS while it works, once at its end.
@@ -1192,7 +1198,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", icon: "info", sections: [details.element, cost.element, filesCard.element] },
+      { id: "run", label: "Run", icon: "info", sections: [details.element, setup.element, cost.element, filesCard.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
       { id: "screen", label: "Screen", icon: "monitor", sections: [computer.element] },
@@ -1239,6 +1245,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       }
     },
     onScaffold: (scaffold) => meter.setBudget(scaffold),
+    onSetup: (line) => setup.add(line),
     onCalls: ({ calls, failed }) => {
       seen.calls = calls;
       seen.failed = failed;

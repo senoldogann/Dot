@@ -195,8 +195,9 @@ while it runs, "Worked for 12 s" for a stretch with no call; item 374). Open, it
 screenshot, each call one quiet line with its icon, its result on a hairline under it once opened, while approvals,
 questions and policy notes stay in the open. The lines of how a run was set up (the
 notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
-model) are one quiet line that names them in short, amber when one of them warns (the embedding service failed, so the
-notes were found by their words alone), and opens on a click to the lines themselves (item 352). What the model thought
+model) are not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming
+them in short, a line that warns in amber (the embedding service failed, so the notes were found by their words
+alone); a delegated run's lines are on its own page. What the model thought
 in a step is a line of its own there, before the step's calls (item 246), or out of the fold before the
 message the step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the
 model thinks
@@ -273,12 +274,12 @@ with one line of description.
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
 at the head of the conversation. The panel is one card on the composer's corner, in four tabs
-(item 203): **Run** (Details, Cost and the conversation's Files), **Plan** (its steps; the tab says how many are done),
-**Agents** (the agents of the chat) and **Screen** (Dot's computer and the screenshots, which the tab
-counts). A tab shows its sections open, on hairlines; the arrow keys, Home and End move between the tabs, and the tab
-chosen last is kept in the browser (`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out
-before it hides, the conversation taking its room back once the slide is over, at once under reduced motion (item 220).
-It stands at the window's right edge, as far from it as from the top bar, and the conversation keeps
+(item 203): **Run** (Details, how the run was Set up, Cost and the conversation's Files), **Plan** (its steps; the tab
+says how many are done), **Agents** (the agents of the chat) and **Screen** (Dot's computer and the screenshots, which
+the tab counts). A tab shows its sections open, on hairlines; the arrow keys, Home and End move between the tabs, and
+the tab chosen last is kept in the browser (`dot.panelTab`). Beside the conversation the panel slides in as it is shown
+and out before it hides, the conversation taking its room back once the slide is over, at once under reduced motion
+(item 220). It stands at the window's right edge, as far from it as from the top bar, and the conversation keeps
 its reading width in the room the panel leaves it (item 238). It has a size: three buttons on Dot's computer make it
 **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest, 360 px, the
 rest for the panel), and the handle between the conversation and the panel drags it to any width between (the arrow keys

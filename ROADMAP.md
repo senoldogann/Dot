@@ -14461,7 +14461,7 @@ not show; the notes' box, which no longer scrolled inside (item 218); the tab's 
 
 ### 374. The chat reads as one flow: open turns, folded work, a composer of glass
 
-**Status: in progress.** The owner's words of 2026-10-18 to Dot runs: "Lessons from this run alanını daha minimal ve hoş
+**Status: done (`cf7ad72`).** The owner's words of 2026-10-18 to Dot runs: "Lessons from this run alanını daha minimal ve hoş
 yapabilir miyiz? … Çalışan komutlar ve thinking texti üzerinden ayrıca sunshine animasyon aksın, ayrıca sohbet ve
 composer aynı scroll içinde olsun" (could the lessons be more minimal and nicer? A sunshine should run over the commands
 at work and the thinking text, and the chat and the composer should scroll as one); "Lessons from this run default
@@ -14490,6 +14490,20 @@ composer stood lower than the chat's (item 359), and the arrow down, which stood
 whose events could not be read, which said nothing and now says why, with the way to its run; the other app's name in
 comments. Tests: `tests/smoke/test_thread_turns.py`, `test_sunshine.py`, `test_chat_scroll.py` (new); `test_composer.py`
 and `test_lessons_card.py` follow. Docs: `docs/runs.md`, `docs/daemon.md`.
+
+### 365. A chat says nothing of how a run was set up
+
+**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca sohbet içinde budget 256k vs. bu gibi şeyler görünmesin
+… ekteki fotoğraftaki [başka bir uygulama] akışı gibi temiz ve fresh olsun" (in the chat, "budget 256k" and the like
+should not show; it should be clean and fresh, like the flow of [another app] in the screenshot). Item 374 made the
+flow; this item takes the last such lines out of it. **As built (2026-10-18).** The lines of how a run was set up (the
+notes and skills it was handed and how they were found, its context budget, its reminders of the goal, its tool groups,
+a step sent to another model) are no longer in the conversation, not even as the one quiet line of item 352: the side
+panel's Run tab lists them under Set up, between Details and Cost, its head naming them in short and a warning keeping
+its amber (`setup.js`, `timeline.js`, `views/run.js`). A line that comes in the middle of a run, a step sent to another
+model, no longer splits a stretch of work in two. A delegated run's lines are on its own page. Tests:
+`tests/smoke/test_chat_calm.py`, `test_context_meter.py` and `test_embedding_failure.py` find them in the side panel and
+not in the conversation. Docs: `docs/daemon.md`.
 
 ## Log
 
@@ -15277,3 +15291,4 @@ and `test_lessons_card.py` follow. Docs: `docs/runs.md`, `docs/daemon.md`.
 - 2026-10-18 (Opus 5.5): items 370 and 371 merged as `4390262` (PR #361). Items 372 to 374 on the owner's words of the same day, the work Dot runs of theirs had left in the main checkout, reviewed and added in three pull requests; item 372 on `item-372-searxng`: the SearXNG rung.
 - 2026-10-18 (Opus 5.5): item 372 merged as `8c7971e` (PR #362). Item 373 on `item-373-providers`: Settings › Providers, and the settings pages that list first.
 - 2026-10-18 (Opus 5.5): item 373 merged as `010580c` (PR #363). Item 374 on `item-374-chat-flow`: the chat reads as one flow.
+- 2026-10-18 (Opus 5.5): item 374 merged as `cf7ad72` (PR #364); the pre-push review blocked four pushes, each on a finding of its own, and the owner chose to go on until it passed. Items 365 to 368 on the owner's word of the same day, stacked one on the other: item 365 on `item-365-quiet-setup`, a chat that says nothing of how a run was set up.

@@ -186,8 +186,9 @@ async def test_a_change_of_the_memory_is_a_quiet_line_that_leads_to_the_note(
             try:
                 page: Page = await _open(browser, address, f"/runs/{run.id}", 1280, "light")
                 lines: Locator = page.locator(".timeline .memory-line")
-                # The run's first event is drawn: it starts with the owner's three notes.
-                await expect(page.locator(".timeline")).to_contain_text("Recalled 3 memories")
+                # The run's first event is drawn: it starts with the owner's three notes, a line of how it was set up,
+                # which the side panel's Run tab holds (item 365).
+                await expect(page.locator("#panel-run-setup")).to_contain_text("Recalled 3 memories")
                 await expect(lines).to_have_count(0)
                 # As the run works: the lines come in while the page is open.
                 held.go.set()
