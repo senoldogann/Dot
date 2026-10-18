@@ -63,30 +63,67 @@ function leftOutServers(failures) {
   ];
 }
 
-function statusEntries(status) {
+/** The daemon's facts in four groups: what this Dot is, how it acts, what it works with, and its models. Each is the
+ * group's name over a box of rows, a label at the left and its value at the right, as the settings list groups its tabs
+ * (item 330), rather than one wide grid where a model name and an uptime shared a line by accident. */
+function statusGroups(status) {
   return [
-    entry("Version", status.version),
-    entry("Process id", String(status.pid)),
-    entry("Uptime", duration(Math.max(0, Date.now() / 1000 - status.started_at))),
-    entry("Started", dateTimeFull(status.started_at)),
-    entry("Address", `${status.host}:${status.port}`),
-    entry("Safety preset", status.preset),
-    entry("Approvals", approvalLabel(status.approvals)),
-    entry("Goal mode", status.goal_mode ? "on" : "off"),
-    entry("Scheduler", status.scheduler_running ? "running" : "stopped"),
-    entry("Desktop control", desktopText(status)),
-    entry("MCP tools", String(status.mcp_tools)),
-    entry("Active runs", String(status.active_runs.length)),
-    entry("Waiting for you", plural(status.pending_approvals, "approval", "approvals")),
-    entry("Main model", status.models.main),
-    entry("Vision model", orDash(status.models.vision)),
-    entry("Fast model", orDash(status.models.fast)),
-    entry("Review model", orDash(status.models.review)),
-    entry("Reasoning effort", orDash(status.models.effort)),
-    // A whole row, so it comes after the cells, like Home: among them it would cut the row before it short.
-    status.mcp_failures.length > 0 ? wideEntry("MCP servers left out", leftOutServers(status.mcp_failures)) : null,
-    wideEntry("Home", el("span", { class: "mono" }, status.home)),
+    {
+      title: "This Dot",
+      rows: [
+        entry("Version", status.version),
+        entry("Process id", String(status.pid)),
+        entry("Uptime", duration(Math.max(0, Date.now() / 1000 - status.started_at))),
+        entry("Started", dateTimeFull(status.started_at)),
+        entry("Address", `${status.host}:${status.port}`),
+        entry("Home", el("span", { class: "mono" }, status.home)),
+      ],
+    },
+    {
+      title: "How it acts",
+      rows: [
+        entry("Safety preset", status.preset),
+        entry("Approvals", approvalLabel(status.approvals)),
+        entry("Goal mode", status.goal_mode ? "on" : "off"),
+      ],
+    },
+    {
+      title: "What it works with",
+      rows: [
+        entry("Scheduler", status.scheduler_running ? "running" : "stopped"),
+        entry("Desktop control", desktopText(status)),
+        entry("MCP tools", String(status.mcp_tools)),
+        entry("Active runs", String(status.active_runs.length)),
+        entry("Waiting for you", plural(status.pending_approvals, "approval", "approvals")),
+      ],
+    },
+    {
+      title: "Models",
+      rows: [
+        entry("Main model", status.models.main),
+        entry("Vision model", orDash(status.models.vision)),
+        entry("Fast model", orDash(status.models.fast)),
+        entry("Review model", orDash(status.models.review)),
+        entry("Reasoning effort", orDash(status.models.effort)),
+      ],
+    },
   ];
+}
+
+/** The daemon's facts as they are drawn: the groups, and under them the MCP servers left out, if any, a whole row too
+ * long for a group's. */
+function statusFacts(status) {
+  const groups = el(
+    "div",
+    { class: "kv-groups" },
+    statusGroups(status).map((group) =>
+      el("section", { class: "kv-group" }, el("h2", { class: "settings-group-title" }, group.title), el("dl", { class: "kv kv-rows" }, group.rows)),
+    ),
+  );
+  if (status.mcp_failures.length === 0) {
+    return [groups];
+  }
+  return [groups, el("dl", { class: "kv kv-wide-rows" }, wideEntry("MCP servers left out", leftOutServers(status.mcp_failures)))];
 }
 
 /** Desktop notifications: the one setting that also depends on what the browser allows. */
@@ -223,7 +260,7 @@ function buildDaemon() {
     element: section("Daemon", refreshButton, el("div", null, body, el("div", { class: "card-pad" }, goOn.element))),
     paint(snapshot) {
       if (snapshot.status !== null) {
-        body.replaceChildren(el("dl", { class: "kv" }, statusEntries(snapshot.status)));
+        body.replaceChildren(...statusFacts(snapshot.status));
         resume = snapshot.status.resume;
         goOn.element.hidden = false;
         paintResume();
@@ -1469,6 +1506,7 @@ function buildBrowser(isDisposed) {
     el(
       "div",
       { class: "card-pad stack" },
+      el("h2", { class: "setting-group-name" }, "Where it browses"),
       enabled.element,
       el(
         "div",
@@ -1482,11 +1520,14 @@ function buildBrowser(isDisposed) {
       ),
       signInSetting,
       profileSetting,
+      el("h2", { class: "setting-group-name" }, "The page it opens"),
       sizeSetting,
       appearance.element,
       zoomSetting,
+      el("h2", { class: "setting-group-name" }, "While a run works"),
       raise.element,
       autoComputer.element,
+      el("h2", { class: "setting-group-name" }, "Developer"),
       el(
         "div",
         { class: "setting" },

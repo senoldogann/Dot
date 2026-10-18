@@ -339,13 +339,14 @@ access (HTTP 403) says that, with its words), **Providers** (the providers Dot s
 models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
 with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
 **Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches Dot at and a pairing code for its
-home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, the emergency stop and
-the health checks in a fold, closed, with the number of failures on its line, and the ways to **Diagnostics** and **Open
-source licences**, pages of their own). Which folds are open is kept in the browser. The tabs sit beside their content
-when the window has the room and above it otherwise, in one row that scrolls sideways with the open tab in sight and
-stays under the bar as the page scrolls (item 272); on a phone they are a list in groups whose rows open each tab as a
-page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory,
-schedules, rules and system pages lead to their tabs.
+home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, its facts in four
+groups each named over its rows of a label and a value, item 378: this Dot, how it acts, what it works with and its
+models; the emergency stop and the health checks in a fold, closed, with the number of failures on its line, and the
+ways to **Diagnostics** and **Open source licences**, pages of their own). Which folds are open is kept in the browser.
+The tabs sit beside their content when the window has the room and above it otherwise, in one row that scrolls sideways
+with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are a list in groups
+whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)). The
+earlier addresses of the memory, schedules, rules and system pages lead to their tabs.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
