@@ -43,15 +43,20 @@ _ANSWER: str = "\n\n".join(
     ]
 )
 _RUN_WAIT_S: float = 60.0
-# Every frame's length of the answer's words and whether its foot shows, from before the answer comes.
+# A window shorter than the run's page, so that landing on its answer is a scroll.
+_SHORT_WINDOW: int = 420
+# Every frame's length of the answer's words, whether its foot shows and where the answer's top stands in the window,
+# from before the answer comes.
 _SAMPLER: str = """() => {
   window.__seen = [];
   const sample = () => {
     const words = document.querySelector('.answer > .prose');
     const foot = document.querySelector('.answer > .answer-foot');
+    const answer = document.querySelector('.answer');
     window.__seen.push([
       words === null ? -1 : words.textContent.length,
       foot === null ? null : getComputedStyle(foot).visibility,
+      answer === null ? null : Math.round(answer.getBoundingClientRect().top),
     ]);
     requestAnimationFrame(sample);
   };
@@ -126,30 +131,33 @@ async def _start(manager: RunManager) -> RunRecord:
 
 
 async def _watch(
-    browser: Browser, address: str, run: RunRecord, reduced: bool
+    browser: Browser, address: str, run: RunRecord, reduced: bool, height: int
 ) -> tuple[list[list[int | str | None]], int]:
-    """What the page showed of the answer of `run` frame by frame, from its opening, and the length of its words."""
+    """What the page showed of the answer of `run` frame by frame, from its opening, in a window `height` tall, and the
+    length of its words."""
     host, port = "127.0.0.1", int(address.rpartition(":")[2])
     context = await browser.new_context(
-        viewport={"width": 1280, "height": 900},
+        viewport={"width": 1280, "height": height},
         color_scheme="light",
         reduced_motion="reduce" if reduced else "no-preference",
     )
-    page: Page = await context.new_page()
     errors: list[str] = []
-    page.on("pageerror", lambda error: errors.append(str(error)))
-    await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
-    await page.goto(ui_url(host, port, TOKEN))
-    await page.goto(f"{address}/#/runs/{run.id}")
-    await page.evaluate(_SAMPLER)
-    answer = page.locator(".answer > .answer-foot")
-    await expect(answer).to_be_visible(timeout=_RUN_WAIT_S * 1000)
-    await expect(answer).to_have_css("visibility", "visible")
-    await page.wait_for_timeout(200)
-    seen: list[list[int | str | None]] = await page.evaluate("window.__seen")
-    whole: int = await page.locator(".answer > .prose").evaluate("(words) => words.textContent.length")
+    try:
+        page: Page = await context.new_page()
+        page.on("pageerror", lambda error: errors.append(str(error)))
+        await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+        await page.goto(ui_url(host, port, TOKEN))
+        await page.goto(f"{address}/#/runs/{run.id}")
+        await page.evaluate(_SAMPLER)
+        foot = page.locator(".answer > .answer-foot")
+        await expect(foot).to_be_visible(timeout=_RUN_WAIT_S * 1000)
+        await expect(foot).to_have_css("visibility", "visible")
+        await page.wait_for_timeout(200)
+        seen: list[list[int | str | None]] = await page.evaluate("window.__seen")
+        whole: int = await page.locator(".answer > .prose").evaluate("(words) => words.textContent.length")
+    finally:
+        await context.close()
     assert errors == []
-    await context.close()
     return seen, whole
 
 
@@ -159,14 +167,20 @@ async def test_an_answer_that_ends_a_run_under_the_readers_eyes_is_written_in(se
         browser: Browser = await playwright.chromium.launch()
         try:
             run: RunRecord = await _start(manager)
-            seen, whole = await _watch(browser, address, run, reduced=False)
-            lengths: list[int] = [int(length) for length, _ in seen if isinstance(length, int) and length >= 0]
-            partial: list[int] = [length for length in lengths if 0 < length < whole]
+            # A window shorter than the conversation: the page must scroll to land on the answer.
+            seen, whole = await _watch(browser, address, run, reduced=False, height=_SHORT_WINDOW)
+            lengths: list[int] = [int(length) for length, _, _ in seen if isinstance(length, int) and length >= 0]
+            partial = [frame for frame in seen if isinstance(frame[0], int) and 0 < frame[0] < whole]
             assert len(partial) >= 5, f"the words came at once: {sorted(set(lengths))[:12]} of {whole}"
             assert lengths == sorted(lengths), "the words only ever grew"
             assert lengths[-1] == whole
             # The foot waits until the words are all in.
-            assert all(shown == "hidden" for length, shown in seen if isinstance(length, int) and 0 < length < whole)
+            assert all(shown == "hidden" for _, shown, _ in partial)
+            # The words are written in sight, where the answer stands: its top in the upper half of the window, still
+            # once the page has landed on it.
+            tops = [int(top) for _, _, top in partial[2:] if isinstance(top, int)]
+            assert tops and max(tops) < _SHORT_WINDOW / 2, tops
+            assert max(tops) - min(tops) <= 2, tops
         finally:
             await browser.close()
 
@@ -179,12 +193,12 @@ async def test_under_reduced_motion_and_on_a_run_read_again_the_answer_shows_at_
         browser: Browser = await playwright.chromium.launch()
         try:
             live: RunRecord = await _start(manager)
-            seen, whole = await _watch(browser, address, live, reduced=True)
-            assert next(length for length, _ in seen if isinstance(length, int) and length >= 0) == whole
+            seen, whole = await _watch(browser, address, live, reduced=True, height=900)
+            assert next(length for length, _, _ in seen if isinstance(length, int) and length >= 0) == whole
             ended: RunRecord = await _start(manager)
             async with asyncio.timeout(_RUN_WAIT_S):
                 assert (await manager.wait(ended.id)).status == "done"
-            seen, whole = await _watch(browser, address, ended, reduced=False)
-            assert next(length for length, _ in seen if isinstance(length, int) and length >= 0) == whole
+            seen, whole = await _watch(browser, address, ended, reduced=False, height=900)
+            assert next(length for length, _, _ in seen if isinstance(length, int) and length >= 0) == whole
         finally:
             await browser.close()

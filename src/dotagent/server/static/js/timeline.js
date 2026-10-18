@@ -150,7 +150,9 @@ function revealStop(text, at) {
 /**
  * The answer `answer` of a run that ended under the reader's eyes, its words `text` written in as a live message is
  * drawn (item 366): a few words a frame, formatted as they will stay, the caret at their end, and the answer's foot
- * once they are all in. The words in, the answer is the one drawn at once, so their end moves nothing.
+ * once they are all in. The words keep the room they will take from the start, so the page lands on the answer as it
+ * will stand and they are written into it in sight; once they are in, the answer is the one drawn at once, so their
+ * end moves nothing. An answer the page let go of (the reader went elsewhere) is not written on.
  */
 function revealAnswer(answer, text) {
   const body = answer.querySelector(":scope > .prose");
@@ -159,14 +161,19 @@ function revealAnswer(answer, text) {
   }
   const foot = answer.querySelector(":scope > .answer-foot");
   const live = { body, text: "", drawn: [], caret: el("span", { class: "stream-caret", "aria-hidden": "true" }), queued: false, ended: false };
+  const room = body.offsetHeight;
   body.replaceChildren();
   body.classList.add("stream");
+  body.style.minHeight = `${room}px`;
   if (foot !== null) {
     foot.style.visibility = "hidden";
   }
   const step = Math.max(REVEAL_MIN_CHARS, Math.ceil(text.length / REVEAL_MOST_FRAMES));
   let at = 0;
   function frame() {
+    if (!answer.isConnected) {
+      return;
+    }
     at = revealStop(text, at + step);
     live.text = text.slice(0, at);
     drawLive(live);
@@ -174,7 +181,6 @@ function revealAnswer(answer, text) {
       requestAnimationFrame(frame);
       return;
     }
-    live.ended = true;
     body.replaceWith(prose(text));
     if (foot !== null) {
       foot.style.visibility = "";

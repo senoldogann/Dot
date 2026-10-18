@@ -14514,12 +14514,15 @@ olmasın, animasyonlu bir şekilde streaming olarak gelsin cevaplar" (at the end
 at once with a thud; it should not: the answers should come streaming, animated). **As built (2026-10-18).** An answer
 that ends a run while its page is open is written in (`timeline.js`): a few words a frame, at least four characters and
 in 120 frames at most, about two seconds however long it is, each word whole, formatted as it will stay and drawn as a
-live message is (item 274), the caret at its end and the answer's foot once it is all in; then the answer is the one
-drawn at once, so its end moves nothing. A run that had ended when its page opened shows its answer at once, as does an
-answer whose words a reply had streamed already, and any answer under reduced motion. The answer comes whole from the
-run, as the finish tool's argument, so the page writes it in; nothing changes in what the daemon sends. Tests:
-`tests/smoke/test_answer_streams.py` (the words grow frame by frame and the foot waits for them; under reduced motion
-and on a run opened after it ended, the answer is whole from its first frame). Docs: `docs/daemon.md`.
+live message is (item 274), the caret at its end and the answer's foot once it is all in; the words keep the room they
+will take from the start, so the page lands on the answer as it will stand and they are written into it in sight; then
+the answer is the one drawn at once, so its end moves nothing. An answer the page let go of is not written on. A run
+that had ended when its page opened shows its answer at once, as does an answer whose words a reply had streamed
+already, and any answer under reduced motion. The answer comes whole from the run, as the finish tool's argument, so the
+page writes it in; nothing changes in what the daemon sends. Tests: `tests/smoke/test_answer_streams.py` (the words grow
+frame by frame, in sight and still where the answer stands in a window shorter than the page, and the foot waits for
+them; under reduced motion and on a run opened after it ended, the answer is whole from its first frame). Docs:
+`docs/daemon.md`.
 
 ## Log
 
