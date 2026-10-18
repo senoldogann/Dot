@@ -14682,7 +14682,7 @@ without it). Docs: `docs/daemon.md`.
 
 ### 381. The pages load lighter, the app installs whole, and a phone out of reach is told so
 
-**Status: in progress.** The owner's plan of 2026-10-18 (its first pull request: the pages' load and the app on a
+**Status: done (`4193389`).** The owner's plan of 2026-10-18 (its first pull request: the pages' load and the app on a
 phone), built by an agent of the owner's on `plan/now-1-loading-and-pwa`. **As built (2026-10-18).** The daemon answers
 with gzip what a browser asks it for that way, through Starlette's own middleware, which a request for an event stream
 goes around (`compress.py`): the pages' scripts and sheets and the API's answers past 1 KiB, while the event streams go
@@ -14698,6 +14698,20 @@ holds until their first frame, a keepalive 15 s on for a quiet one), logged the 
 it in silence, removed a test that pinned the worker's text rather than its behaviour, and named this item instead of
 the plan's finding numbers. Tests: `tests/unit/test_compression.py`, `test_manifest.py`, `test_static_ui.py` (the
 modules preloaded), `tests/smoke/test_offline_page.py`, `test_phone_return.py`. Docs: `docs/phone.md`.
+
+### 382. A file's text is changed with the file tools, and the shell runs things
+
+**Status: in progress.** The owner's word of 2026-10-18, after Dot's code changes made with shell commands showed
+nowhere in Changes: Dot should change files with edit_file and write_file and run commands with the shell, as a
+direction only, refusing nothing. **As built (2026-10-18).** Both styles of the system prompt (`agent/prompt.py`) say to
+change the text of a file with `edit_file` and to write a file whole with `write_file`, not with sed, a heredoc or a
+script, since their changes go into the undo journal, show in Changes and can be undone; the full one says the shell is
+for running things (tests, builds, git, formatters), one mechanical change across many files and a file `edit_file`
+cannot change. The shell's own description says the same instead of calling itself the fastest and most reliable tool,
+and keeps preferring itself to the GUI (`tools/shell.py`); `edit_file` and `write_file` say that their change goes into
+the undo journal, shows in Changes and can be undone (`tools/files.py`). The policy, the shell guard and the approvals
+are as they were: a command that writes a file is not refused. Tests: `tests/unit/test_lean_prompt.py` (both prompts and
+the shell's description carry the direction). Docs: `docs/runs.md`.
 
 ## Log
 
@@ -15496,3 +15510,4 @@ modules preloaded), `tests/smoke/test_offline_page.py`, `test_phone_return.py`. 
 - 2026-10-18 (Opus 5.5): item 378 merged as `94ca713` (PR #372); the pre-push review passed its three pushes, the first two with Nits, fixed. Item 379 on `item-379-findings`: the findings a Dot run of the owner's checked, fixed as reviewed.
 - 2026-10-18 (Opus 5.5): item 379 merged as `b86a996` (PR #373); the pre-push review blocked its first push on two Important findings (no schedule's row was drawn, and following SearXNG's redirects went past the address gate) and passed the next with a Nit, answered. Item 380 on `item-380-one-chat-back`: a chat's page leads to no other, and a page under another keeps its link back, as a Dot run of the owner's made them, reviewed.
 - 2026-10-18 (Opus 5.5): item 380 merged as `9fbd11b` (PR #374). Item 381 on `item-381-load-and-pwa`: the pages load lighter and the app installs whole, as an agent of the owner's built them from the owner's plan, reviewed.
+- 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.

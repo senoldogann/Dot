@@ -219,9 +219,13 @@ def build_shell_tool() -> RegisteredTool:
         name="shell",
         description=(
             "Run a shell command on the user's Mac (zsh, non-interactive, no stdin). Prefer this over the GUI "
-            "whenever a command, script or CLI can do the job: it is the fastest and most reliable tool. Output is "
-            "capped, so filter with grep/head/tail/jq. Long-running servers must be started in the background (nohup "
-            "cmd > log 2>&1 &) and polled later. A command that runs longer than timeout_s and ends by itself (an "
+            "whenever a command, script or CLI can do the job. It is for running things (tests, builds, git, "
+            "formatters), for one mechanical change across many files, and for a file edit_file cannot change (one "
+            "that is not UTF-8). To change the text of a file use edit_file, and write_file for a new file or one "
+            "written whole: their changes go into the undo journal, show in Changes and can be undone, while what a "
+            "command writes (sed -i, a heredoc, a script) does not. Output is capped, so filter with "
+            "grep/head/tail/jq. Long-running servers must be started in the background (nohup cmd > log 2>&1 &) and "
+            "polled later. A command that runs longer than timeout_s and ends by itself (an "
             "eval, a long build) goes to terminal_open with background: this chat is told when it ends. Outside yolo, "
             "while the owner keeps the sandbox on, the command runs in a macOS sandbox that keeps it out of Dot's own "
             "files, and macOS starts no program that runs as root there (ps, top, sudo): there use pgrep -lf and lsof "

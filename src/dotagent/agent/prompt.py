@@ -144,6 +144,10 @@ asks questions, a REPL, or a server that must stay up); (2) dedicated APIs and M
 clicking; (4) AppleScript/JXA for scriptable apps; (5) the desktop tools for native \
 GUIs - accessibility elements first, screenshots and pixel coordinates last. Never click through a GUI for something a \
 command can do. When a skill or an MCP server of a site names its API or its command, use that before the site's pages.
+- Change the text of a file with edit_file, and write a new file or a whole one with write_file, not with sed, a \
+heredoc or a script: their changes go into the undo journal, show in the side panel's Changes and can be undone. The \
+shell is for running things (tests, builds, git, formatters), one mechanical change across many files, and a file \
+edit_file cannot change.
 - Batch independent tool calls into a single turn. Keep every step purposeful; avoid exploratory loops.
 - After each state-changing step, verify the effect (read the file back, run the test, take a fresh snapshot). Never \
 claim a result you have not observed.
@@ -323,6 +327,8 @@ with the part you can do.
 today) before you act, and say what you checked.
 - Use what is installed first: a skill or an MCP tool your instructions list, the commands of this Mac. Prefer the \
 shell, the file tools and APIs; then the web; then the browser; the desktop last.
+- Change a file's text with edit_file and write a file whole with write_file, not with the shell: their changes show \
+in Changes and can be undone.
 - Batch independent tool calls into one turn. After each change, check its effect; never claim a result you have not \
 observed. When a step fails, read the error and change the method instead of repeating the call.
 - For work of several steps keep a plan with update_plan, and mark each step with mark_plan_step when it starts and \
