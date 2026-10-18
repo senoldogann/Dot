@@ -18,7 +18,9 @@ type JsonTransport = Literal["stdio", "http", "sse", "streamable-http"]
 
 class McpServerJson(FrozenModel):
     """One entry of ``mcpServers``: a command with ``args`` and ``env``, or a ``url`` with ``headers``; ``type`` names
-    the transport. Keys Dot does not use are ignored."""
+    the transport. ``allow``, ``startup_timeout_s`` and ``call_timeout_s`` are Dot's own, as in an ``[[mcp]]`` table:
+    the tools a plugin's server offers the model, and the time it has to start and to answer. Keys Dot does not use are
+    ignored."""
 
     model_config = ConfigDict(frozen=True, extra="ignore")
 
@@ -28,6 +30,9 @@ class McpServerJson(FrozenModel):
     env: dict[str, str] = Field(default_factory=dict)
     url: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
+    allow: list[str] = Field(default_factory=list)
+    startup_timeout_s: float | None = None
+    call_timeout_s: float | None = None
 
 
 class McpServersFile(FrozenModel):

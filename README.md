@@ -89,6 +89,13 @@ on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the s
   the daemon's proof that it holds the token, and the pairing of a phone. A phone comes in through your own tailnet.
 - **A vulnerability** is reported privately, as [SECURITY.md](SECURITY.md) says.
 
+## Integrations
+
+`integrations/` carries ready-made additions. [REA](integrations/rea/README.md) (Reverse Engineer Anything) adds its MCP
+server and workflow skill: a run can inspect a shipped app or binary and explain how a feature works, with the evidence
+and its limits. [replica-skill](integrations/replica-skill/DOT.md) adds eleven skills that turn an app into a recon map,
+a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
+
 ## Documentation
 
 - [The command line](docs/command-line.md): `dotx doctor`, `run`, `chat` and their flags

@@ -75,6 +75,8 @@ dev = [
 line-length = 120
 target-version = "py313"
 src = ["src", "tests"]
+# What integrations/ carries keeps the form its upstream gives it.
+extend-exclude = ["integrations"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "B", "UP", "ANN", "ASYNC", "SIM", "RUF", "PLE", "PLW"]

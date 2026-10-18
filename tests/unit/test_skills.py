@@ -253,6 +253,50 @@ def test_a_command_server_keeps_secret_references_in_env_only(tmp_path: Path) ->
     assert config.transport_kind() == "stdio"
 
 
+def test_a_plugin_server_may_name_the_tools_dot_offers_and_its_timeouts(tmp_path: Path) -> None:
+    entry: McpServerJson = _entry(
+        command="npx",
+        args=["-y", "rea-agents@latest", "mcp"],
+        allow=["open_binary", "inspect_macho"],
+        startup_timeout_s=300,
+        call_timeout_s=600,
+    )
+    config: McpServerConfig = to_server_config("rea", "mcp", entry, _variables(tmp_path), tmp_path / "f")
+    assert config.name == "rea-mcp"
+    assert config.allow == ["open_binary", "inspect_macho"]
+    assert (config.startup_timeout_s, config.call_timeout_s) == (300.0, 600.0)
+
+
+def test_a_plugin_server_that_names_no_dot_settings_gets_the_defaults_of_an_mcp_table(tmp_path: Path) -> None:
+    config: McpServerConfig = to_server_config(
+        "acme", "notes", _entry(command="server"), _variables(tmp_path), tmp_path / "f"
+    )
+    assert (config.allow, config.startup_timeout_s, config.call_timeout_s) == ([], 60.0, 120.0)
+
+
+def test_a_plugin_server_with_a_timeout_dot_refuses_is_left_out_with_the_reason(tmp_path: Path) -> None:
+    with pytest.raises(PluginError) as refused:
+        to_server_config(
+            "acme", "notes", _entry(command="server", call_timeout_s=0), _variables(tmp_path), tmp_path / "f"
+        )
+    assert "not valid for Dot" in refused.value.message
+
+
+def test_the_rea_integration_is_a_plugin_dot_loads() -> None:
+    root: Path = Path(__file__).resolve().parents[2] / "integrations" / "rea"
+    reading = read_plugin(root)
+    assert reading.problems == ()
+    plugin = reading.plugin
+    assert plugin.name == "rea"
+    (server,) = plugin.servers
+    assert server.name == "rea-mcp"
+    assert len(server.allow) == 30
+    assert (server.startup_timeout_s, server.call_timeout_s) == (300.0, 600.0)
+    # The server runs the release the plugin names, never the newest one npm has.
+    assert f"rea-agents@{plugin.version}" in server.args
+    assert (root / "skills" / "reverse-engineer-anything" / "SKILL.md").is_file()
+
+
 @pytest.mark.parametrize(
     ("plugin", "server", "fields", "complaint"),
     [

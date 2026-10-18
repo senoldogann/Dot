@@ -1,0 +1,42 @@
+{
+  "mcpServers": {
+    "mcp": {
+      "command": "npx",
+      "args": ["-y", "rea-agents@6.5.0", "mcp"],
+      "allow": [
+        "open_binary",
+        "close_binary",
+        "binary_session",
+        "inspect_artifact",
+        "extract_artifact",
+        "project_apple_application_graph",
+        "inspect_macho",
+        "inspect_signature",
+        "inspect_plist",
+        "list_architectures",
+        "procedure_pseudo_code",
+        "analyze_function",
+        "batch_decompile",
+        "search_strings",
+        "xrefs",
+        "trace_feature",
+        "trace_call_path",
+        "list_browser_targets",
+        "inspect_web_page",
+        "analyze_web_bundle",
+        "analyze_javascript_application",
+        "observe_javascript_runtime",
+        "inspect_web_network_capture",
+        "capture_web_screenshot",
+        "compare_web_screenshots",
+        "inspect_android_package",
+        "search_android_classes",
+        "inspect_android_method",
+        "compare_application_versions",
+        "export_evidence_bundle"
+      ],
+      "startup_timeout_s": 300,
+      "call_timeout_s": 600
+    }
+  }
+}

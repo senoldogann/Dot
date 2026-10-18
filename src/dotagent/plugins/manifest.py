@@ -3,6 +3,7 @@
 import json
 import re
 from pathlib import Path
+from typing import cast
 
 from pydantic import ValidationError
 
@@ -100,6 +101,11 @@ def expand_fully(value: str, variables: PluginVariables, path: Path, field: str)
     return expanded
 
 
+def _timeout(written: float | None, field: str) -> float:
+    """The timeout a plugin names, else the one Dot gives an ``[[mcp]]`` server that names none."""
+    return cast(float, McpServerConfig.model_fields[field].default) if written is None else written
+
+
 def server_name(plugin: str, server: str) -> str:
     """``<plugin>-<server>`` in lower case with ``_`` and spaces as ``-``; it must satisfy Dot's server-name rule."""
     derived: str = f"{plugin}-{server}".lower().replace("_", "-").replace(" ", "-")
@@ -131,6 +137,9 @@ def to_server_config(
             url=None if entry.url is None else expand_fully(entry.url, variables, path, "url"),
             headers={key: expand_variables(value, variables, path) for key, value in entry.headers.items()},
             transport=transport,
+            allow=list(entry.allow),
+            startup_timeout_s=_timeout(entry.startup_timeout_s, "startup_timeout_s"),
+            call_timeout_s=_timeout(entry.call_timeout_s, "call_timeout_s"),
         )
     except ValidationError as exc:
         raise PluginError(
