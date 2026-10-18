@@ -16,7 +16,7 @@ import { markdownMirror } from "./mirror.js";
 import { arePicks, createPicks, pickMark } from "./picks.js";
 import { anchoredPopover } from "./popover.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
-import { filterGroups, paletteGroups, replaceSlashWord, slashWord } from "./slash.js";
+import { filterGroups, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 
 const DRAFT_PREFIX = "dot.draft.";
 // The draft key of a new chat's composer.
@@ -63,8 +63,8 @@ function loadPalette() {
 }
 
 /** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`), autosize up to `maxPx`, the slash
- * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer) and the
- * markdown it holds shown under it; `edited()` runs after a pick of the menu changed the text, as the input event does
+ * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer), the at menu
+ * of the MCP servers, their tools and the skills (item 367) and the markdown it holds shown under it; `edited()` runs after a pick of the menu changed the text, as the input event does
  * after typing, and `picked(pick)` after a skill or a tool was picked for the message (`{ kind, name }`, item 318).
  * Returns the menu element and the box's field (the box with its markdown under it) to place in the composer's frame,
  * `autosize()`, to call after any change of the text, and `dispose()`. */
@@ -97,7 +97,7 @@ export function wireComposer(textarea, { maxPx, send, commands, edited, picked }
 
   function paint() {
     menu.replaceChildren();
-    const groups = filterGroups(paletteGroups(commands, palette), range.word);
+    const groups = filterGroups(range.trigger === "@" ? pickGroups(palette) : paletteGroups(commands, palette), range.word);
     shown = groups.flatMap((group) => group.items);
     active = Math.min(active, Math.max(shown.length - 1, 0));
     for (const group of groups) {
@@ -121,7 +121,9 @@ export function wireComposer(textarea, { maxPx, send, commands, edited, picked }
       menu.append(el("div", { class: "slash-note" }, `Skills and MCP tools could not be loaded: ${problem}`));
     }
     if (shown.length === 0 && problem === null) {
-      menu.append(el("div", { class: "slash-note" }, `Nothing matches /${range.word}.`));
+      // The at menu holds nothing but what the palette lists: until it is read, it says so rather than that nothing matches.
+      const loading = palette === null && range.trigger === "@";
+      menu.append(el("div", { class: "slash-note" }, loading ? "Reading the MCP servers and skills…" : `Nothing matches ${range.trigger}${range.word}.`));
     }
     menu.hidden = false;
     textarea.setAttribute("aria-expanded", "true");
@@ -136,7 +138,7 @@ export function wireComposer(textarea, { maxPx, send, commands, edited, picked }
   function pick(item) {
     const { start } = range;
     const caret = textarea.selectionStart;
-    const replaced = replaceSlashWord(textarea.value, start, caret, item.insert ?? "");
+    const replaced = replaceMenuWord(textarea.value, start, caret, item.insert ?? "");
     textarea.value = replaced.text;
     textarea.setSelectionRange(replaced.caret, replaced.caret);
     close();
@@ -151,9 +153,9 @@ export function wireComposer(textarea, { maxPx, send, commands, edited, picked }
     }
   }
 
-  // The menu follows the caret: open on a slash word, closed anywhere else.
+  // The menu follows the caret: open on a slash word or an at word (item 367), closed anywhere else.
   function follow() {
-    const found = slashWord(textarea.value, textarea.selectionStart);
+    const found = menuWord(textarea.value, textarea.selectionStart);
     if (found === null) {
       close();
       return;

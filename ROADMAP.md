@@ -14509,7 +14509,7 @@ find them in the side panel and not in the conversation. Docs: `docs/daemon.md`,
 
 ### 366. An answer that ends a run under the reader's eyes is written in
 
-**Status: in progress.** The owner's word of 2026-10-18: "Dot session bitiminde mesajları pat diye birden yazıyor, böyle
+**Status: done (`6cb0f4a`).** The owner's word of 2026-10-18: "Dot session bitiminde mesajları pat diye birden yazıyor, böyle
 olmasın, animasyonlu bir şekilde streaming olarak gelsin cevaplar" (at the end of a session Dot writes its messages all
 at once with a thud; it should not: the answers should come streaming, animated). **As built (2026-10-18).** An answer
 that ends a run while its page is open is written in (`timeline.js`): a few words a frame, at least four characters and
@@ -14523,6 +14523,18 @@ page writes it in; nothing changes in what the daemon sends. Tests: `tests/smoke
 frame by frame, in sight and still where the answer stands in a window shorter than the page, and the foot waits for
 them; under reduced motion and on a run opened after it ended, the answer is whole from its first frame). Docs:
 `docs/daemon.md`.
+
+### 367. `@` in the composer picks an MCP server, a tool or a skill
+
+**Status: in progress.** The owner's word of 2026-10-18: "MCP ve plugin çağrılarını başa @ eklersek de filtrelesin,
+seçebilelim" (MCP and plugin calls: with an @ in front, they should be filtered and picked too). **As built
+(2026-10-18).** `@` at the start of a word in the composer opens the menu the slash opens, for the picks alone
+(`slash.js` `menuWord` and `pickGroups`, `composer.js`): the MCP servers by name with the number of their tools, then
+the skills and each server's tools, filtered by the letters after the at; the arrows, Enter, Tab and Escape work as in
+the slash menu, and a pick is the chip the **+** makes (a tool the chip of its server), the at word gone. An `@` inside
+a word, as in an e-mail address, opens nothing. The picks go with the message as before (item 318). Tests:
+`tests/smoke/test_composer_picks.py` (the menu's groups and a server's count of tools, a server and a skill picked by
+their first letters, an address typed, wide and light and on a phone and dark). Docs: `docs/daemon.md`.
 
 ## Log
 
@@ -15312,3 +15324,4 @@ them; under reduced motion and on a run opened after it ended, the answer is who
 - 2026-10-18 (Opus 5.5): item 373 merged as `010580c` (PR #363). Item 374 on `item-374-chat-flow`: the chat reads as one flow.
 - 2026-10-18 (Opus 5.5): item 374 merged as `cf7ad72` (PR #364); the pre-push review blocked four pushes, each on a finding of its own, and the owner chose to go on until it passed. Items 365 to 368 on the owner's word of the same day, stacked one on the other: item 365 on `item-365-quiet-setup`, a chat that says nothing of how a run was set up.
 - 2026-10-18 (Opus 5.5): item 365 merged as `c3bfb97` (PR #365). Item 366 on `item-366-answer-streams`: an answer that ends a run under the reader's eyes is written in.
+- 2026-10-18 (Opus 5.5): item 366 merged as `6cb0f4a` (PR #366). Item 367 on `item-367-at-picks`: `@` in the composer picks an MCP server, a tool or a skill.
