@@ -2,8 +2,9 @@
 a question takes to its answerer."""
 
 import fnmatch
-import re
 from typing import Literal
+
+import regex
 
 from dotagent.core.errors import ConfigError
 from dotagent.policy.types import (
@@ -21,6 +22,8 @@ from dotagent.policy.types import (
 from dotagent.store.models import Behavior, RuleRecord, RunMode
 
 _DENY_FLAGS: frozenset[Flag] = frozenset({"secret_access", "exfiltration"})
+# The longest an owner's rule may take to match one action (item 387); a usual pattern takes microseconds.
+RULE_MATCH_TIMEOUT_S: float = 0.25
 # Why an allowed action asks once untrusted content is in context; a yolo run reads it in the line of what it did.
 _TAINT_REASON: str = "untrusted content is in context and this action reaches outside the Mac"
 # What a yolo run lets through as well: the always-on refusals and the hand-offs of money and credentials, unless a
@@ -94,11 +97,21 @@ def match_rule(info: ActionInfo, rules: list[RuleRecord]) -> RuleRecord | None:
         if rule.match_regex == "":
             return rule
         try:
-            matched: bool = re.search(rule.match_regex, haystack, re.IGNORECASE) is not None
-        except re.error as exc:
+            matched: bool = (
+                regex.search(rule.match_regex, haystack, regex.IGNORECASE, timeout=RULE_MATCH_TIMEOUT_S) is not None
+            )
+        except regex.error as exc:
             raise ConfigError(
                 "stored rule has an invalid regular expression",
                 {"rule_id": rule.id, "regex": rule.match_regex, "error": str(exc)},
+            ) from exc
+        except TimeoutError as exc:
+            # A pattern that backtracks for long would hold the daemon's event loop, and every page and stream with it,
+            # as long as it runs (item 387): it is stopped and the action refused as for a rule that cannot be read,
+            # rather than passed over, which could let an action through that the rule stops.
+            raise ConfigError(
+                "stored rule's regular expression takes too long to match",
+                {"rule_id": rule.id, "regex": rule.match_regex, "timeout_s": RULE_MATCH_TIMEOUT_S},
             ) from exc
         if matched:
             return rule

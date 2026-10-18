@@ -14753,6 +14753,19 @@ schedule whose firing a crash cut before its run was under way is due again at t
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
 
+### 387. An owner's rule is matched with a timeout
+
+**Status: in progress, for the owner to merge** (it changes `src/dotagent/policy/` and the dependencies in
+`pyproject.toml`, paths that need a human). The finding B8 of the deep review of 2026-10-19 and the owner's choice of
+the same day: the `regex` package, with a timeout. **As built (2026-10-19).** An owner's rule is matched with the
+`regex` package instead of `re`, with a timeout of 0.25 s an action (`policy/engine.py` `match_rule`,
+`RULE_MATCH_TIMEOUT_S`): `re` holds the interpreter's lock for the whole match, so a pattern that backtracks for long,
+`(a|aa)+$` on a long line, held the daemon's event loop, and every page and stream with it, for as long as it ran, and
+running it in a thread did not help (item 385 tried and took that back). A match that times out is refused as a rule
+that cannot be read is, rather than passed over, which could let through an action the rule stops. `regex` reads the
+patterns `re` reads. Dependencies: `regex`, and `types-regex` for the type check. Tests:
+`tests/unit/test_rule_timeout.py`. Docs: `docs/safety.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15553,3 +15566,4 @@ starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 387 on `item-387-rule-timeout`, the review's B8 with the owner's choice of the `regex` package, for the owner to merge.
