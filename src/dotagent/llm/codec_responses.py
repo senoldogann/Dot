@@ -10,6 +10,7 @@ from collections.abc import Sequence
 from pydantic import JsonValue
 
 from dotagent.core.errors import ProviderProtocolError
+from dotagent.core.ids import new_id
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.connector import StreamCodec, parse_event_object
 from dotagent.llm.http import SseEvent
@@ -327,6 +328,23 @@ def _reasoning_text(item: JsonObject) -> str:
     return "\n\n".join(text for summary in get_objects(item, "summary") if (text := get_str(summary, "text")))
 
 
+def _with_own_call_ids(items: Sequence[JsonObject]) -> tuple[JsonObject, ...]:
+    """``items`` with every function call's id its own: one the provider left empty or gave twice gets a new one, as
+    the chat codec does (item 386), written into the item itself. The next request sends these items back as they are
+    (``store`` is off), and each result by the id of its call, so the call and its result keep one id there too."""
+    used: set[str] = set()
+    kept: list[JsonObject] = []
+    for item in items:
+        if get_str(item, "type") != "function_call":
+            kept.append(item)
+            continue
+        given: str = get_str(item, "call_id")
+        identifier: str = given if given and given not in used else new_id("call")
+        used.add(identifier)
+        kept.append(item if identifier == given else {**item, "call_id": identifier})
+    return tuple(kept)
+
+
 def _tool_call_of(item: JsonObject) -> ToolCall:
     return ToolCall(
         id=get_str(item, "call_id"),
@@ -348,7 +366,7 @@ def _finish_of(state: ResponsesState, has_calls: bool) -> FinishReason:
 def responses_reply(state: ResponsesState) -> ModelReply:
     """The finished reply. The terminal event's output list wins; otherwise the items finished one by one."""
     output: tuple[JsonObject, ...] = state.final_output or tuple(state.items[index] for index in sorted(state.items))
-    kept: tuple[JsonObject, ...] = tuple(item for item in output if _keep(item))
+    kept: tuple[JsonObject, ...] = _with_own_call_ids([item for item in output if _keep(item)])
     calls: tuple[ToolCall, ...] = tuple(
         _tool_call_of(item) for item in kept if get_str(item, "type") == "function_call"
     )

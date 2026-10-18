@@ -221,7 +221,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   and a file in the side panel's **Files** (on its Run tab: the conversation's files, those its messages carried and
   those its answers name) open it in the side panel, which takes half of the
   page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the daemon draws
-  with Core Graphics as they come into view. A Word document, an Excel workbook and a presentation show first as macOS's
+  with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused rather than
+  drawn (item 386). A Word document, an Excel workbook and a presentation show first as macOS's
   Quick Look draws them (item 268), as Finder would: their fonts, fills, pictures and shapes, a workbook's sheets one
   tab each (Quick Look leaves hidden sheets out and shows the values the file saved). The daemon asks `qlmanage` for the
   drawing once per version of the file, keeps it in `looks/` in its home (emptied at its start) under an id nobody can

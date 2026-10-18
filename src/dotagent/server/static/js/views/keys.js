@@ -46,7 +46,10 @@ const PROVIDERS = {
     needed: false,
   },
   typesafe: {
-    use: "Optional: the typed judge, which reads click labels no rule knows and campaign claims; the switch here turns it on. Check sends one small judgment.",
+    use:
+      "Optional: the typed judge, which reads click labels no rule knows and campaign claims; the switch here turns it on. " +
+      "The saved key alone gives runs the judge_items tool and a campaign's post checks, the switch on or off; remove the key to stop those. " +
+      "Check sends one small judgment.",
     page: "https://console.typesafe.ai",
     site: "console.typesafe.ai",
     needed: false,

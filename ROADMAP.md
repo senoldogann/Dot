@@ -14715,8 +14715,8 @@ the shell's description carry the direction). Docs: `docs/runs.md`.
 
 ### 384. A note keeps where it came from, a secret is not saved, and a review model of the run's own is named
 
-**Status: in progress.** The owner's plan of 2026-10-18 (its first pull request on the trust of memory), built by an
-agent of the owner's on `plan/memory-trust-1`, and the owner's word of 2026-10-19 on its open question: (A), a note
+**Status: done (`0616fe2`).** The owner's plan of 2026-10-18 (its first pull request on the trust of memory), built by
+an agent of the owner's on `plan/memory-trust-1`, and the owner's word of 2026-10-19 on its open question: (A), a note
 saved while reading outside content never enters the notes a run starts with. **As built (2026-10-19).** A note a run
 saves or rewrites while it has read content third parties can author is marked (`memories.tainted`, added to the store's
 columns), and keeps the mark; a lesson drawn from such a run and the reflection's journal that names it carry it too,
@@ -14736,6 +14736,22 @@ from a site's lessons and from the lesson writer, which the start and the live n
 secrets in a thread; and shortened the memory tools' descriptions, which the model reads at every call. Tests:
 `tests/unit/test_memory_taint.py`, `tests/smoke/test_memory_taint.py`, `tests/unit/test_doctor.py`. Docs:
 `docs/memory-and-schedules.md`, `docs/safety.md`, `docs/models.md`.
+
+### 386. The deep review of 2026-10-19: what was found outside the paths a human merges, fixed
+
+**Status: in progress.** The owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve problemleri
+düzelt" (review the deep review report of 2026-10-19 and fix its problems). This item holds its findings outside the
+paths a human merges; item 385 holds those inside them. **As built (2026-10-19).** B6: removing a skill added from
+another agent deletes only a folder right in Dot's skills folder; a name that is an absolute path, holds a slash or is
+`..` is refused (`help/added.py` `remove_skill`), where before `folder / "/Users/x"` was `/Users/x`. B7: a PDF page more
+than 20,000 px tall at the width asked is refused before its bitmap is made (`previews/pdfpages.py`), where a page of 1
+by 1,000 would have taken over a gigabyte. B9: the Responses codec gives a function call whose id is empty or repeated
+one of its own, as the chat codec does, in the call's own item too (`llm/codec_responses.py`): the next request sends
+those items back as they are, as `store` is off, and each result by its call's id, so the two keep one id and neither is
+pruned as unpaired; the pre-push review found the first version wrote the new ids into the calls alone. B10: a one-time
+schedule whose firing a crash cut before its run was under way is due again at the time it fired as the scheduler
+starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
+`test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
 
 ## Log
 
@@ -15536,3 +15552,4 @@ secrets in a thread; and shortened the memory tools' descriptions, which the mod
 - 2026-10-18 (Opus 5.5): item 380 merged as `9fbd11b` (PR #374). Item 381 on `item-381-load-and-pwa`: the pages load lighter and the app installs whole, as an agent of the owner's built them from the owner's plan, reviewed.
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
+- 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.

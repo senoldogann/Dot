@@ -102,8 +102,22 @@ class Scheduler:
             if record.last_status in _UNFINISHED:
                 await store.set_schedule_status(record.id, "interrupted")
                 log.warning("schedule_interrupted", schedule_id=record.id, status=record.last_status)
+                if record.last_status == "starting" and record.cron is None and record.last_run_at is not None:
+                    await self._due_again_unless_started(record, record.last_run_at)
         self._loop = asyncio.create_task(self._tick_forever(), name="scheduler")
         return self._loop
+
+    async def _due_again_unless_started(self, record: ScheduleRecord, fired_at: float) -> None:
+        """A one-time firing an earlier process recorded at ``fired_at`` and died before its run was under way (item
+        386): the firing had switched the schedule off for good, so it is due again, as one whose start failed is,
+        unless a run of the firing was made after all, which would then run twice."""
+        store: Store = self._runtime.store
+        if record.thread_id is not None:
+            latest: list[RunRecord] = await store.list_runs(1, record.thread_id)
+            if latest and latest[0].source == SCHEDULE_SOURCE and latest[0].created_at >= fired_at:
+                return
+        await store.keep_schedule_due(record.id, fired_at, fired_at)
+        log.warning("schedule_due_again", schedule_id=record.id, fired_at=fired_at)
 
     def running(self) -> bool:
         return self._loop is not None and not self._loop.done()

@@ -658,6 +658,44 @@ async def test_a_schedule_left_starting_or_running_is_marked_interrupted_and_log
     assert sorted(map(str, told)) == sorted(map(str, [(running.id, "running"), (starting.id, "starting")]))
 
 
+async def test_a_one_time_firing_a_crash_cut_before_its_run_is_due_again_unless_its_run_was_made(
+    runtime: Runtime,
+) -> None:
+    """Item 386: a one-time firing switched its schedule off as it was recorded, so a process that died before the run
+    was under way left it off for good. As the scheduler starts it is due again at the time it fired; one whose run had
+    been made all the same stays off, so that it does not run twice."""
+    cut: ScheduleRecord = await _schedule(runtime, _once(runtime, "Cut once", 60.0))
+    made: ScheduleRecord = await _schedule(runtime, _once(runtime, "Made once", 60.0))
+    fired: float = time.time()
+    for record in (cut, made):
+        thread: ThreadRecord = await runtime.store.create_thread(record.name, SCHEDULE_SOURCE)
+        await runtime.store.record_schedule_fire(record.id, fired, None, thread.id, "starting")
+        if record is made:
+            await runtime.store.create_run(
+                thread.id,
+                GOAL,
+                "research",
+                f"ollama:{MODEL}",
+                None,
+                SCHEDULE_SOURCE,
+                "medium",
+                "standard",
+                None,
+                "ask",
+                False,
+                None,
+                None,
+                None,
+            )
+    scheduler: Scheduler = Scheduler(runtime, RunManager(runtime))
+    await scheduler.start()
+    await scheduler.stop()
+    again: ScheduleRecord = await runtime.store.get_schedule(cut.id)
+    kept: ScheduleRecord = await runtime.store.get_schedule(made.id)
+    assert (again.enabled, again.next_run_at, again.last_status) == (True, fired, "interrupted")
+    assert (kept.enabled, kept.next_run_at, kept.last_status) == (False, None, "interrupted")
+
+
 async def test_dotx_stats_counts_what_waits_and_will_not_move_on_by_itself(
     runtime: Runtime, capsys: pytest.CaptureFixture[str]
 ) -> None:

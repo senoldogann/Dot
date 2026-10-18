@@ -139,6 +139,11 @@ def test_a_skill_is_added_as_a_copy_that_dot_reads_and_removing_it_deletes_that_
         add_skill(skills_dir(), _skill_of(found, "notes"), SKILL_COPY_LIMIT)
     with pytest.raises(ElsewhereError, match="was not added to Dot from here"):
         remove_skill(skills_dir(), "Claude Code", "notes")
+    # A name that is not a folder right in Dot's skills folder reaches nothing outside it (item 386).
+    for name in (str(home), "../notes", "a/b", ".."):
+        with pytest.raises(ElsewhereError, match="is not the name of a skill in Dot's skills folder"):
+            remove_skill(skills_dir(), "Claude Code", name)
+    assert home.is_dir()
     # What was refused left nothing in Dot's skills folder, hidden or not.
     assert sorted(path.name for path in skills_dir().iterdir()) == ["notes", "pdf-tools"]
     remove_skill(skills_dir(), "Claude Code", "pdf-tools")
