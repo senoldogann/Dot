@@ -1,11 +1,18 @@
 """How a provider's HTTP answers are told apart (item 254): a 402 is a model the plan does not include, terminal like a
 spent quota, on every provider; Ollama's 429 that says the plan's included usage is used up is terminal as well, while
 another 429 stays a rate limit to retry; and the pause of a model names which it was. Ollama's answer that its model
-runner broke off is retried as a broken connection is (item 256)."""
+runner broke off is retried as a broken connection is (item 256). OpenRouter's 404 for a model the account's privacy
+settings leave no provider of is a refused access that says why and where to change it (item 361)."""
 
-from dotagent.core.errors import ProviderQuotaError, ProviderRateLimitError, ProviderRunnerError
+from dotagent.core.errors import ProviderAccessError, ProviderQuotaError, ProviderRateLimitError, ProviderRunnerError
 from dotagent.llm.http import is_retryable_provider_error
-from dotagent.llm.provider_errors import WireError, classify_generic, classify_ollama
+from dotagent.llm.provider_errors import (
+    WireError,
+    classify_generic,
+    classify_ollama,
+    classify_openrouter,
+    parse_wire_error,
+)
 from dotagent.llm.router import unavailable_reason
 
 SPENT: WireError = WireError(kind="", code="", message="You used all included Pro usage", limit_name="")
@@ -52,3 +59,32 @@ def test_ollamas_answer_that_its_model_runner_broke_off_is_retried_and_another_4
     assert not isinstance(plain, ProviderRunnerError) and not is_retryable_provider_error(plain)
     # Only Ollama reads the runner's words: another provider's 400 stays a plain failure.
     assert not is_retryable_provider_error(classify_generic(400, RUNNER, None, {}))
+
+
+# OpenRouter's answer of 2026-10-18 to a call of a model whose one provider keeps and trains on what it is sent.
+_POLICY_BODY: str = (
+    '{"error": {"message": "0 endpoints out of 1 requested are available matching your guardrail restrictions and data '
+    "policy. We removed them for the following reasons (an endpoint may have matched multiple reasons):\\nZDR "
+    "violation (account settings): 1 endpoint excluded; configurable at https://openrouter.ai/settings/privacy\\nPaid "
+    "model training violation (account settings): 1 endpoint excluded; configurable at "
+    'https://openrouter.ai/settings/privacy", "code": 404}}'
+)
+
+
+def test_openrouters_404_for_its_privacy_settings_is_a_refused_access_that_says_why_and_where() -> None:
+    error = classify_openrouter(404, parse_wire_error(_POLICY_BODY), None, {"model": "m"})
+    assert isinstance(error, ProviderAccessError) and error.status == 404
+    assert error.message == (
+        "OpenRouter's privacy settings for this account leave no provider of the model (ZDR violation; Paid model "
+        "training violation): choose another model in Settings › Models, or change them at "
+        "https://openrouter.ai/settings/privacy"
+    )
+    assert unavailable_reason(error) == "access refused"
+    # Another 404, such as a model OpenRouter does not have, stays a plain failure.
+    unknown = classify_openrouter(
+        404, WireError(kind="", code="404", message="Model not found", limit_name=""), None, {}
+    )
+    assert (
+        type(unknown).__name__ == "ProviderHttpError"
+        and unknown.message == "provider answered HTTP 404: Model not found"
+    )

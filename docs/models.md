@@ -113,7 +113,11 @@ answer keeps its words, Ollama's too.
   calls. A model whose id ends in `:free`, or whose prices are both zero, says Free; OpenRouter limits the free ones to
   a few requests a minute and a day. Dot sends no `HTTP-Referer` or `X-OpenRouter-Title`, so its requests do not count
   Dot in OpenRouter's rankings. The prompt caching OpenRouter does by itself (OpenAI, DeepSeek, Gemini and others)
-  applies; the cache marks Claude would need through OpenRouter are not sent.
+  applies; the cache marks Claude would need through OpenRouter are not sent. A model that the account's privacy
+  settings leave no provider of, as a model whose providers keep what they are sent is under Zero Data Retention, is
+  answered 404; Dot reads that as a refused access: the error names what excluded the providers and where to change it
+  (https://openrouter.ai/settings/privacy), or to choose another model, and the model is paused as after a 403 (item
+  361).
 - **OpenCode Go**: Dot knows the route of the models in its catalog, and of a new Claude, Qwen, MiniMax, Grok, GPT or
   Muse model by the start of its name; any other new model goes to Chat Completions. `route_overrides = { "<model-id>" =
   "chat" }` in `[providers.opencode_go]` adds or corrects one (`chat`, `responses` or `messages`). The Messages route
