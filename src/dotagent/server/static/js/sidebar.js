@@ -1,10 +1,10 @@
 // The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns and Customize,
 // what waits and what works (folded or not, as the owner left them), the chats themselves (several of them can be
 // deleted at once) and, in the foot, the way to the settings; a run stops from its composer (item 289). A row whose
-// run works says Working and for how long (item 122). A chat's menu (item 130), after T3 Code's thread menu, pins it,
+// run works says Working and for how long (item 122). A chat's menu (item 130) pins it,
 // names it, copies its link, starts choosing chats with it and deletes it; the pinned chats come first, under Pinned.
 // A chat whose latest run ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark
-// read. Each chat stands once (item 202), after T3 Code's Working shelf: a chat at work stands under Working, with the
+// read. Each chat stands once (item 202): a chat at work stands under Working, with the
 // runs it delegated folded under it, and goes back among the days once it rests; a pinned one stays under Pinned, its
 // delegated runs under it.
 
@@ -104,7 +104,7 @@ function mark(node, current) {
   }
 }
 
-/** What a row whose run works shows at its right, where its age sits at rest, as T3 Code's sidebar does (item 122): a
+/** What a row whose run works shows at its right, where its age sits at rest (item 122): a
  * dashed circle, "Working" and the time since the run was asked for, at `since` (seconds). */
 function workingSlot(since) {
   return el(
@@ -393,7 +393,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     for (const [id, node] of rowNodes) {
       mark(node, id === routeThreadId);
     }
-    // Folded, Working keeps the open chat in sight (item 202), as T3 Code's shelf does: a chat just sent on its way
+    // Folded, Working keeps the open chat in sight (item 202): a chat just sent on its way
     // from the composer stands there.
     for (const { chatId, node } of workingNodes) {
       node.hidden = folds.working === true && (chatId === null || chatId !== routeThreadId);
@@ -1091,7 +1091,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   paintLists();
   load();
 
-  // On a phone the sidebar is the list of chats over the whole screen, after T3 Code's phone app (item 294): Dot's name
+  // On a phone the sidebar is the list of chats over the whole screen (item 294): Dot's name
   // at its head beside the close, and at its foot, under the thumb, Settings, the search and a new chat. The search
   // moves between the head of the list and the foot as the width changes; there is one box.
   const searchBox = el("label", { class: "side-search" }, icon("search"), search, el("kbd", { "aria-hidden": "true" }, "⌘K"));

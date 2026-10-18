@@ -16,11 +16,11 @@ days, and a chat opens at its latest run. Each chat wears a creature of Dot's ch
 shows faces (item 277): a chat with an agent the agent's look, a chat with Dot a shape and a colour its own id picks;
 the creature works while the chat's run goes on, waits while the run waits for you and is sad once it failed. Its name
 stands over its last line: the answer of its latest run in plain words, or your message, after "You:", while the run
-works. The creatures rest; only those at work move. Each chat stands once (item 202, after T3 Code's Working shelf):
+works. The creatures rest; only those at work move. Each chat stands once (item 202):
 while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
 ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
-**Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second), as T3 Code's
-sidebar has it. Under it hang all the runs it delegated (item 198), each saying the same while it works and how it ended
+**Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second).
+Under it hang all the runs it delegated (item 198), each saying the same while it works and how it ended
 once it has, behind a line that says how many there are and, while some have ended, how many work; a click on it folds
 them, and the fold is kept. Working lists too what is no chat's: a schedule about to fire, the session of a campaign
 (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
@@ -40,7 +40,7 @@ list stays where you scrolled it while it is painted again (a chat deleted, pinn
 under Select, a run that starts or ends, a follow-up in the open chat): it brings the open chat into view only when the
 page comes to another chat (item 204).
 
-A chat's menu, after T3 Code's thread menu, opens from the **…** button at the right of its row (shown where the pointer
+A chat's menu opens from the **…** button at the right of its row (shown where the pointer
 rests or the focus is, over the time, and always on a touch screen), from a right-click on the row, or from the
 context-menu key (Shift+F10); the arrow keys walk it and Escape closes it. **Pin** keeps the chat under **Pinned**,
 above the days, the last pinned first, however old it grows; **Unpin** puts it back among the days. **Rename** makes its
@@ -108,7 +108,7 @@ and the model's name gives way with an ellipsis, while the reasoning keeps its l
 the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
 least 16 px on a touch screen other than an iPhone's or an iPad's, which would zoom the page into a smaller one (item
 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
-or a click outside closes it. The model's menu (item 208, after T3 Code's) has a rail on its left, a star for the
+or a click outside closes it. The model's menu (item 208) has a rail on its left, a star for the
 favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the models
 of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model a star
 that keeps it among the favourites in that browser, where the menu opens once there are any. The arrows and Enter pick a
@@ -120,8 +120,8 @@ and one that follows the default moves with it. Escape or Cancel goes back witho
 and did not send is kept in this browser and is there again when you come back (so is the box of each run). Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
 ⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
-browser (item 230, after T3 Code's settings). The markdown in the box shows as it reads (item 207, after T3 Code's
-composer): its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
+browser (item 230). The markdown in the box shows as it reads (item 207):
+its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
 sent is the text as typed. A message whose answer was lost on its way back (the page says the sending failed and keeps
@@ -164,8 +164,8 @@ start, agent, model, approval mode, goal mode and campaign) are in the panel's D
 first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
 answer does: its headings, lists, tables, code, quotes and emphasis (item 206). Under each of your messages, once its
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
-rests) and a copy of it as you wrote it (item 205, after T3 Code); the files a message came with stand between it and
-that line. Under a message that opened a turn stands **Edit from here** too (item 282, after T3 Code), which asks
+rests) and a copy of it as you wrote it (item 205); the files a message came with stand between it and
+that line. Under a message that opened a turn stands **Edit from here** too (item 282), which asks
 whether to "rewind chat to before this message". **Revert and keep changes** takes that turn and the ones after it out
 of the chat (they still count in what Dot spent, and a question they left for you waits no more) and ends the history
 the model reads where it ended before the message, a summary made since included; the message comes back into the box of
@@ -177,16 +177,16 @@ not rewound while a run works on it or messages wait in its queue.
 A delegated run is a row: the face with its state at the corner (turning while it works, amber while it waits for
 you, green with a check when it is done, red when it failed), its goal over the last thing it did and, once it ended,
 the start of its answer (item 245), the time it has taken (counting on every second while it works), the way to its own
-page and a chevron that opens its steps. Rows that follow each other gather in one group, as T3 Code groups its
-subagents: its head shows their faces, how many they are and how they stand ("3 helpers", "1 working · 2 done"), the
+page and a chevron that opens its steps. Rows that follow each other gather in one group:
+its head shows their faces, how many they are and how they stand ("3 helpers", "1 working · 2 done"), the
 time from the first one's start to the last one's end and a chevron that folds the rows away; an approval a helper asks
-for opens the group. The row is closed from the start, as T3 Code draws a subagent: an approval the run asks for
+for opens the group. The row is closed from the start; an approval the run asks for
 opens it until you have decided, and a row you never opened or closed yourself closes again. Resting the pointer on a
-row, or moving the focus to it, shows its card (item 226, after T3 Code's): the whole goal, the model with its reasoning
+row, or moving the focus to it, shows its card (item 226): the whole goal, the model with its reasoning
 level, how the run stands and for how long, counting on while it works, and what it does now or did last; the pointer
 leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own page names the
 parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the box would be,
-which stays at the window's foot as the conversation scrolls (item 244), as T3 Code keeps a subagent's bar: the model,
+which stays at the window's foot as the conversation scrolls (item 244): the model,
 how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not),
 "Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single "Worked
 for 12 s (model 8 s) · 5 tool calls" line, where the part in brackets is how much of that time the model's turns took
@@ -195,7 +195,7 @@ it once opened), while approvals, questions and policy notes stay in the open. T
 notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
 model) are one quiet line that names them in short, amber when one of them warns (the embedding service failed, so the
 notes were found by their words alone), and opens on a click to the lines themselves (item 352). What the model thought
-in a step is a line of its own there, before the step's calls (item 246, after T3 Code), or out of the fold before the
+in a step is a line of its own there, before the step's calls (item 246), or out of the fold before the
 message the step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the
 model thinks
 and "Thought" once it is done, the start of the thought beside it; opened, the whole thought: up to 12,000 characters
@@ -204,7 +204,7 @@ asked again from its start drops what its failed try streamed. A message streams
 as it comes, drawn at most once a frame with the parts already written left as they are, its caret at the end of its
 text, so that its end moves nothing. The answer of the run is the last message, with a copy button (its icon turns to a check once the answer is on the clipboard), when it came and how the
 run ended under it; how long the run took shows where the pointer rests on it (on a touch screen it always shows). A
-copy out of the conversation keeps its markdown, as T3 Code's does (item 206): a selection that starts in a message or
+copy out of the conversation keeps its markdown (item 206): a selection that starts in a message or
 an answer goes on the clipboard as the markdown it was written in, a list as a list, a table as a table and code in its
 fence, with the formatted copy alongside for the applications that read it; the line under a message or an answer stays
 out, and a copy within a block of code is its code. The box stands at the foot of the window from the first message, the
@@ -212,7 +212,7 @@ conversation filling the space above it from the top, and is the same frame as t
 the send in its bar; what you typed there and did not send waits for you. While the end of the conversation, or its
 answer, is below the window, a round arrow just above the composer leads there; it stays away while the page follows a
 working run down, as the page does until you scroll up. At the left of the conversation a column
-of short marks stands for your messages, one mark for each, top to bottom (item 201, after T3 Code's): resting the
+of short marks stands for your messages, one mark for each, top to bottom (item 201): resting the
 pointer on it shows the message nearest to it and the start of its answer, a click goes to that message, and from the
 keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are darker. The column needs a
 pointer that rests, two messages or more, and a window wider than a phone's; there, the conversation leaves it its room
@@ -225,26 +225,26 @@ seconds while the run works and once at its end. A strip under the head links th
 box at the bottom queues a message for after a run that is going on, or follows up on a finished one. While the run
 works and the box is empty, the box's send is the run's **Stop** (a round button in the danger colour with a square) and
 cancels it; a word typed turns it back into the send, **Queue**, and the message waits in the chat's queue (see [How a
-run works](runs.md#how-a-run-works)), shown above the box as T3 Code shows it: a sheet whose head (Queued and the count) folds
+run works](runs.md#how-a-run-works)), shown above the box: a sheet whose head (Queued and the count) folds
 it, with a row per message: a handle to drag it to another place or move it with the arrow keys, its text on one line
 (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel gives the box its
 draft back), **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run with what the box
 holds, past the queue, or with the queue's next message when the box is empty. Settings › General › Composer can have a
 message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the
 queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why, with **Read
-again**. A line over the box (items 352 and 360, after T3 Code's) says in a few quiet words how long the run has worked,
+again**. A line over the box (items 352 and 360) says in a few quiet words how long the run has worked,
 or that it waits for you, how its helpers stand and how many messages are queued; each part opens what it tells of, and
 the line comes while one of its parts has something to say and goes when none has. It does not say what the run does
 now, which the conversation shows, nor count the commands at work in the chat, which stand right under it. When the run
 ends done, the next message starts and the page follows it; every open page shows the queue as it
-changes. In a campaign's chat the message steers the session. The box wears the home's pills too, after T3 Code's
-composer: the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up
+changes. In a campaign's chat the message steers the session. The box wears the home's pills too:
+the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up
 or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199):
 those its first run started with, then each one chosen in the box, at once and for every browser, so a reload, a restart
 of the daemon or a run moved to a standby model leaves them as they are (a chat from before has the open run's until its
 next run starts). They are not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run
 under way keeps its own: while it works, the pills step back and say that they wait for the next follow-up. Beside the
-send, a ring after T3 Code's shows how much of the run's context budget its last step filled (item 222): the tokens that
+send, a ring shows how much of the run's context budget its last step filled (item 222): the tokens that
 step sent the model against the run's budget (`context_tokens` or the model's own context size, or three quarters of
 the window when that is less); it turns to the warning colour past 80 % and to the danger colour past the budget, and a
 click shows the figures, the point past which Dot summarizes the older part of the run, the model's window, and why
@@ -258,7 +258,7 @@ the failed ones), the tokens (of every model call of the run: its steps and its 
 and the goal check), the duration, the start and the run id; its other tabs hold the plan, the actions, the agents of
 the chat and the latest screenshots. Each tab wears its icon, and where the strip has no room for every name, the tabs
 not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs the chat's runs
-handed work to, after T3 Code's "Previous agents": five at first and the rest on **Show N more**, each with its face and
+handed work to: five at first and the rest on **Show N more**, each with its face and
 goal, its provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how
 long it took, and a row opens its page (item 296). It stays closed until the panel button in the head of the run opens
 it (the choice is kept in the browser); open, it sits beside the conversation from 960 px, is a drawer below that, and
@@ -270,13 +270,13 @@ with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
-at the head of the conversation. The panel is one card on the composer's corner, in four tabs after T3 Code's side panel
+at the head of the conversation. The panel is one card on the composer's corner, in four tabs
 (item 203): **Run** (Details and Cost), **Plan** (its steps; the tab says how many are done), **Actions** (what the run
 changed and asked, and the conversation's Files) and **Screen** (Dot's computer and the screenshots, which the tab
 counts). A tab shows its sections open, on hairlines; the arrow keys, Home and End move between the tabs, and the tab
 chosen last is kept in the browser (`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out
 before it hides, the conversation taking its room back once the slide is over, at once under reduced motion (item 220).
-It stands at the window's right edge, as T3 Code's does, as far from it as from the top bar, and the conversation keeps
+It stands at the window's right edge, as far from it as from the top bar, and the conversation keeps
 its reading width in the room the panel leaves it (item 238). It has a size: three buttons on Dot's computer make it
 **Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest, 360 px, the
 rest for the panel), and the handle between the conversation and the panel drags it to any width between (the arrow keys
@@ -331,32 +331,32 @@ scrolls sideways with the open tab in sight and stays under the bar as the page 
 a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)).
 The earlier addresses of the memory, schedules, rules and system pages lead to their tabs.
 
-Settings › Appearance (⌥⌘A), after T3 Code's page, holds the look of this browser. **Colour scheme** is three cards,
+Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards,
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and
 Dark; ⇧⌥⌘A steps through them. **Themes** is a gallery of cards with a light and a dark orb each: the card takes its
 theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light can wear one theme
 and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper** (warm
-paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it is picked for; T3
-Code's six palettes are **Clean** (T3 Code's own look: near-white, grey and a blue accent), **Rose** (T3 Chat's),
-**Grove**, **Ocean**, **Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (its action colour, which
-T3 Code paints its solid controls with, is Dot's accent) and held to the rule of the looks below: a text tier or an ink
+paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it is picked for; Dot's
+six palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and a raspberry accent),
+**Grove**, **Ocean**, **Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (the colour a palette
+paints its solid controls with is Dot's accent) and held to the rule of the looks below: a text tier or an ink
 that would read under its ratio is moved in lightness until it reads, and in dark a card lies a step above the page; a
 browser test measures every theme in both schemes as the page paints it. The two picks are written on the page as
 `light-dark()` pairs (nothing when one look is picked for both) and kept with the picks, so the first paint after a
 reload already wears them. Themes of your own join the gallery: **Create theme** starts from the themes in use for light
 and dark, **Duplicate** (on a card, as Edit, Export and Delete are on one of your own) copies any theme, **Export**
-saves one as T3 Code's theme file, and **Delete** asks first and gives a scheme it was picked for back to Neutral. The
+saves one in the theme file format, and **Delete** asks first and gives a scheme it was picked for back to Neutral. The
 editor takes a name and, for each scheme the theme has, the **Background** and the **Accent** its palette is made from,
-as T3 Code's generator makes one, and the **Action** colour Dot paints its buttons, switches and send button with (the
+as the theme generator makes one, and the **Action** colour Dot paints its buttons, switches and send button with (the
 generator turns it away from the accent, so Dot lets you set it); **Colour families** change one colour, and the ones
-made with it, at a time. The page wears the palette while you change it. **Add theme** reads a file: T3 Code's theme
+made with it, at a time. The page wears the palette while you change it. **Add theme** reads a file: a theme
 file (version 1, or the short form of a name, an appearance, a canvas and an accent) or a VS Code colour theme, mapped
-as T3 Code maps one. The daemon keeps them, one theme file each, in its home's `themes` folder (made with the first
+onto a palette. The daemon keeps them, one theme file each, in its home's `themes` folder (made with the first
 theme saved; 32 themes, 32 KB a file and 192 KB in all at most), so every browser has them; a file put there by hand
 shows after a reload, one Dot cannot read is listed under the gallery with the reason, and a colour a theme leaves out
-is T3 Chat's, as in T3 Code. **Interface**: **Contrast**, 50 to 200 % (100, the theme's own, by default): under 100 the
+is Rose's. **Interface**: **Contrast**, 50 to 200 % (100, the theme's own, by default): under 100 the
 text tiers and the lines fade toward the page, over it they move toward black in light and white in dark, the lines a
-quarter as far, as T3 Code mixes them; **Chat width**, how wide the home and a conversation read (Comfortable, 768 px,
+quarter as far; **Chat width**, how wide the home and a conversation read (Comfortable, 768 px,
 the default; Wide, 1152 px; Full); **Density**, how close the rows, cards and lists sit (comfortable or compact); and
 two switches that follow the theme picked for light until you set them yourself: fold the tool steps (on in all but
 Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how long the sidebar and the details panel
@@ -370,9 +370,9 @@ families typed) and size (12 to 20 px, 15 by default); the code's font (Geist Mo
 and the size of an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on)
 and long lines of code wrapped (off). The choices are kept in the browser only, and `boot.js` puts each of them on the
 page before the first paint. The palettes, the colour arithmetic, the orbs, the contrast's mixing, the families typed,
-the theme generator, the theme file with its checks and the VS Code import are a port of T3 Code
-(github.com/pingdotgg/t3code, MIT, T3 Tools Inc.) to plain ES modules (`static/js/appearance/LICENSE`); Dot is not
-affiliated with T3 Tools Inc. The looks are one visual system. Colour: every colour is a token of `themes.css` naming
+the theme generator, the theme file with its checks and the VS Code import are a port of an MIT-licensed project to
+plain ES modules; its notice is `static/js/appearance/LICENSE`, and Dot is not affiliated with that project. The looks
+are one visual system. Colour: every colour is a token of `themes.css` naming
 its light and its dark value in one place; surfaces step up by lightness (page, sunken sidebar, raised cards) rather
 than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
 measured against every surface by a unit test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones);

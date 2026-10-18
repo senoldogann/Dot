@@ -1,4 +1,4 @@
-// The card of a delegated run (item 226), after T3 Code's: resting the pointer on a helper's row in the conversation,
+// The card of a delegated run (item 226): resting the pointer on a helper's row in the conversation,
 // or moving the keyboard's focus to it, shows what the row has no room for: the helper's whole goal, its model and
 // reasoning level, how it stands and for how long, and what it is doing or did last. One card serves the rows of a
 // conversation, beside the row it tells of; it follows the helper as it works, at the second the row's time counts on,

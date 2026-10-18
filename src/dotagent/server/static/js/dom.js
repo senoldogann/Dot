@@ -211,7 +211,7 @@ function dayStart(date) {
 }
 
 /**
- * When a message was sent or an answer came, as short as its day allows, after T3 Code (item 205): "14:03" today,
+ * When a message was sent or an answer came, as short as its day allows (item 205): "14:03" today,
  * "Yesterday, 14:03", "5 Oct, 14:03" this year, "5 Oct 2025, 14:03" before.
  */
 export function messageTime(ts) {
@@ -268,7 +268,7 @@ export function age(ts) {
   return DAY.format(new Date(ts * 1000));
 }
 
-/** How long something has worked since `ts`, in T3 Code's sidebar units (item 122): "12s", "4m", "1h 5m". */
+/** How long something has worked since `ts`, in the sidebar's units (item 122): "12s", "4m", "1h 5m". */
 export function workingFor(ts) {
   const seconds = Math.max(0, Math.floor(Date.now() / 1000 - ts));
   if (seconds < 60) {

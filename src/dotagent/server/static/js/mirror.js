@@ -1,4 +1,4 @@
-// The markdown the composer's box holds, shown as it reads (item 207), after T3 Code's composer: a copy of the box's
+// The markdown the composer's box holds, shown as it reads (item 207): a copy of the box's
 // text lies under the box, its marks quiet, bold words, headings and a table's head heavier, code and the lines of a
 // block of code tinted, quotes softer and links in the colour of links, while the box itself, its letters clear, keeps
 // the caret, the selection, the spelling, the keys and the undo of a text field. The copy has to set its letters where

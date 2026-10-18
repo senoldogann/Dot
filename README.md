@@ -120,8 +120,8 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 Dot is released under the MIT License ([LICENSE](LICENSE)). The parts it carries from others keep their own licences,
 each beside them: the Inter and Geist Mono fonts (SIL Open Font License, `static/fonts`), the icons, which are Lucide's
 (ISC, and MIT for those Lucide took from Feather, `static/js/LICENSE-Lucide.txt`), the providers' marks
-(`static/icons/providers/LICENSE`), the parts of the appearance settings ported from T3 Code (MIT,
-`static/js/appearance/LICENSE`) and the character, a port of bloub (MIT, `static/js/character/LICENSE`).
+(`static/icons/providers/LICENSE`), the parts of the appearance settings ported from an MIT-licensed project
+(`static/js/appearance/LICENSE`) and the character, a port of bloub (MIT, `static/js/character/LICENSE`).
 
 Report a security problem privately, as [SECURITY.md](SECURITY.md) says, not in a public issue. Dependabot raises
 alerts and fixes for dependencies with a known vulnerability, and each week one pull request per kind of dependency

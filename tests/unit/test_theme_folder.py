@@ -1,5 +1,5 @@
-"""The themes of one's own (item 128): the daemon keeps a theme as T3 Code's theme file in its home's ``themes`` folder,
-checks every file on the way in and on the way out as the page reads it, writes a file whole or not at all, and caps the
+"""The themes of one's own (item 128): the daemon keeps a theme as a theme file in its home's ``themes`` folder, checks
+every file on the way in and on the way out as the page reads it, writes a file whole or not at all, and caps the
 folder; a file the page could not draw is left out of the list with the reason."""
 
 import json
@@ -31,7 +31,7 @@ _GENERATOR: Path = (
     / "appearance"
     / "generator.js"
 )
-# A theme file as T3 Code exports one: canonical OKLCH colours, the other scheme under variants.
+# A theme file in full: canonical OKLCH colours, the other scheme under variants.
 _EXPORTED: dict[str, object] = {
     "version": 1,
     "id": "harbour",
@@ -41,7 +41,7 @@ _EXPORTED: dict[str, object] = {
     "variants": {"dark": {"canvas": "rgb(16 22 30)", "accent": "#4aa3df"}},
     "managed": True,
 }
-# The short form T3 Code publishes: a name, a scheme and the two colours the rest is derived from.
+# The short form of a theme file: a name, a scheme and the two colours the rest is derived from.
 _SHORT: dict[str, object] = {"name": "Moss", "appearance": "dark", "canvas": "#14201a", "accent": "#7fbf6a"}
 
 
@@ -53,7 +53,7 @@ def _with(change: dict[str, object]) -> bytes:
     return _bytes({key: value for key, value in {**_EXPORTED, **change}.items() if value is not None})
 
 
-def test_a_theme_file_of_t3_code_and_its_short_form_are_read() -> None:
+def test_a_theme_file_and_its_short_form_are_read() -> None:
     exported: ThemeFile = parse_theme_file(_bytes(_EXPORTED))
     assert exported.colors is not None and exported.colors["accent"] == "oklch(0.55 0.15 230 / 0.9)"
     assert exported.variants is not None and exported.variants.dark is not None
@@ -100,7 +100,7 @@ def test_the_daemon_refuses_a_null_or_a_loose_flag_as_the_page_does(change: dict
     assert reason in refused.value.message
 
 
-def test_a_theme_is_saved_as_t3_codes_file_whole_and_under_its_own_id(tmp_path: Path) -> None:
+def test_a_theme_is_saved_as_a_theme_file_whole_and_under_its_own_id(tmp_path: Path) -> None:
     folder: Path = tmp_path / "themes"
     theme: ThemeFile = parse_theme_file(_with({"id": None}))
     stored = save_theme(folder, "harbour", theme)
@@ -112,7 +112,7 @@ def test_a_theme_is_saved_as_t3_codes_file_whole_and_under_its_own_id(tmp_path: 
     assert json.loads((folder / "harbour.json").read_text(encoding="utf-8"))["name"] == "Harbour at dusk"
     with pytest.raises(InvalidValueError, match="not the one it is saved under"):
         save_theme(folder, "other", parse_theme_file(_bytes(_EXPORTED)))
-    for taken in ("neutral", "rose", "t3-chat", "dark"):
+    for taken in ("neutral", "rose", "clean", "dark"):
         with pytest.raises(InvalidValueError, match="built-in"):
             save_theme(folder, taken, theme)
     with pytest.raises(InvalidValueError, match="lowercase letters"):

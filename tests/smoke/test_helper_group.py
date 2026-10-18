@@ -1,10 +1,10 @@
-"""Helpers that follow one another sit in one group (item 245), after T3 Code's group of subagents, on the pages of a
-daemon in Chrome. A run delegates four helpers in one step: three answer at once, one waits in a shell command. In
-the run's conversation their rows are one group whose head shows three faces and "+1", "4 helpers", "1 working · 3
-done" and a time that counts on while one works; a click on the head folds the rows away and another brings them
-back. A row that is done shows the start of its answer as one plain line. Once the working helper is stopped the head
-says "3 done · 1 stopped" and its time stands still, and the page loaded again shows the same group. Wide and on a
-phone, light and dark. Before, each helper was a row of its own, and a row that was done said "done · 1 step".
+"""Helpers that follow one another sit in one group (item 245), on the pages of a daemon in Chrome. A run delegates four
+helpers in one step: three answer at once, one waits in a shell command. In the run's conversation their rows are one
+group whose head shows three faces and "+1", "4 helpers", "1 working · 3 done" and a time that counts on while one
+works; a click on the head folds the rows away and another brings them back. A row that is done shows the start of its
+answer as one plain line. Once the working helper is stopped the head says "3 done · 1 stopped" and its time stands
+still, and the page loaded again shows the same group. Wide and on a phone, light and dark. Before, each helper was a
+row of its own, and a row that was done said "done · 1 step".
 
 No network and no model service is used: the scripted model plays the run and its helpers.
 """

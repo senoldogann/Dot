@@ -1,11 +1,11 @@
-// The themes of one's own (item 128): the files the daemon keeps in its home's `themes` folder (GET, PUT and DELETE
-// /api/themes, dotagent/themes.py), each T3 Code's theme file (version 1) or the short form T3 Code publishes. A theme
-// has a palette of T3 Code's roles for its own scheme and, under `variants`, for the other; a role a palette leaves out
-// is the one of T3 Code's default palette for that scheme (Dot's Rose), a palette with a canvas and an accent is laid
-// over the one the generator derives from them, and a translucent colour is drawn over the canvas. tokens.js maps the
-// roles to Dot's tokens and holds them to Dot's rule, as it holds the built-in palettes. A file is checked here as the
-// daemon checks it, whether it comes from the daemon or from a file the owner adds: T3 Code's theme file, its short
-// form, or a VS Code colour theme (vscode.js).
+// The themes of one's own (item 128), derived code (see LICENSE in this folder): the files the daemon keeps in its
+// home's `themes` folder (GET, PUT and DELETE /api/themes, dotagent/themes.py), each a theme file (version 1) or its
+// short form. A theme has a palette of roles for its own scheme and, under `variants`, for the other; a role a palette
+// leaves out is the one of the default palette for that scheme (Dot's Rose), a palette with a canvas and an accent is
+// laid over the one the generator derives from them, and a translucent colour is drawn over the canvas. tokens.js maps
+// the roles to Dot's tokens and holds them to Dot's rule, as it holds the built-in palettes. A file is checked here as
+// the daemon checks it, whether it comes from the daemon or from a file the owner adds: a theme file, its short form,
+// or a VS Code colour theme (vscode.js).
 
 import { api } from "../api.js";
 import { THEMES, findTheme, forgetTheme, setOwnThemes } from "../theme.js";
@@ -25,8 +25,9 @@ const SEED = /^#(?:[0-9a-f]{3}|[0-9a-f]{6})$/i;
 const COLLECTION_ID = /^[a-z0-9][a-z0-9.:-]{0,127}$/i;
 const FILE_KEYS = ["version", "id", "name", "appearance", "canvas", "accent", "colors", "variants", "collection", "managed"];
 const ROLES = new Set(THEME_ROLES);
-// The ids T3 Code keeps from any theme file, beside Dot's own themes (dotagent/themes.py RESERVED_THEME_IDS).
-const T3_RESERVED = ["system", "light", "dark", "t3-chat", "t3-code", "t3-chat-dark", "t3-grove", "t3-ocean", "t3-ember", "t3-iris"];
+// The ids a theme file may not take beside those of Dot's own themes: the names of the schemes (dotagent/themes.py
+// RESERVED_THEME_IDS).
+const SCHEME_IDS = ["system", "light", "dark"];
 
 /** What is wrong with a theme file, said for the owner. */
 export class ThemeFileError extends Error {}
@@ -80,8 +81,8 @@ function checkedVariants(value, appearance) {
 }
 
 /**
- * The theme of a file's JSON value: T3 Code's theme file (version 1) or its short form, checked as the daemon checks
- * it. Throws ThemeFileError with what is wrong.
+ * The theme of a file's JSON value: a theme file (version 1) or its short form, checked as the daemon checks it. Throws
+ * ThemeFileError with what is wrong.
  */
 export function themeFileOf(value) {
   if (!isRecord(value)) {
@@ -273,7 +274,7 @@ export async function deleteOwnTheme(id) {
   await loadOwnThemes();
 }
 
-/** T3 Code's themeIdFromName: the name in lowercase, every run of other characters a dash. */
+/** The id a name makes: the name in lowercase, every run of other characters a dash. */
 export function idFromName(name) {
   const id = name
     .trim()
@@ -293,7 +294,7 @@ export function freeId(id) {
   const taken = (candidate) =>
     findTheme(candidate) !== undefined ||
     files.has(`${candidate}.json`) ||
-    T3_RESERVED.includes(candidate) ||
+    SCHEME_IDS.includes(candidate) ||
     THEMES.some((theme) => theme.id === candidate);
   let candidate = id;
   for (let count = 2; taken(candidate); count += 1) {
@@ -304,8 +305,8 @@ export function freeId(id) {
 }
 
 /**
- * The file of a theme of one's own as T3 Code's theme file (version 1), JSON with two spaces of indent and a line end;
- * a palette derived from two colours is written out whole, so that T3 Code shows the theme as Dot draws it.
+ * The file of a theme of one's own as a theme file (version 1), JSON with two spaces of indent and a line end; a
+ * palette derived from two colours is written out whole, so that whatever opens the file shows the theme as Dot does.
  */
 export function exportedText(theme) {
   const file = theme.file;
@@ -321,7 +322,7 @@ export function exportedText(theme) {
 
 /**
  * The theme file of a file the owner adds, ready to keep: a VS Code colour theme made into one, a short form written
- * out whole, T3 Code's file as it is. Throws ThemeFileError with what is wrong.
+ * out whole, a theme file as it is. Throws ThemeFileError with what is wrong.
  */
 export function importedFile(text) {
   let value;

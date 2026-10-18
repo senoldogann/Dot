@@ -1,4 +1,4 @@
-// Settings › Appearance (item 126), after T3 Code's page: the colour scheme as three miniatures of Dot's window, each
+// Settings › Appearance (item 126): the colour scheme as three miniatures of Dot's window, each
 // drawn on the tokens of the scheme it names (System split down the middle), and the themes as a gallery of cards with
 // a light and a dark orb each, the card taking the theme for both schemes and an orb for its own; then the interface,
 // the motion and the type (item 127), the density, the layout and the faces among them, which General held before.
@@ -271,7 +271,7 @@ function themesCard(onEditing) {
       el(
         "div",
         { class: "hint" },
-        "A card takes its theme for light and dark; an orb, for its own scheme only. Clean is T3 Code's own look and Rose T3 Chat's; Grove, Ocean, Ember and Iris are T3 Code's palettes.",
+        "A card takes its theme for light and dark; an orb, for its own scheme only. A sun or a moon on an orb marks the theme in use for light or for dark.",
       ),
       el("div", { class: "theme-gallery" }, ...cards.map((card) => card.element)),
       el(
@@ -337,7 +337,7 @@ function themesCard(onEditing) {
     editor.focus();
   }
 
-  // A new theme starts as the page is drawn now, from the theme picked for each scheme, as T3 Code's does, so that
+  // A new theme starts as the page is drawn now, from the theme picked for each scheme, so that
   // tuning what is in use is a change away; a new background or accent makes it the generator's.
   function createTheme() {
     const picks = themePicks();
@@ -369,7 +369,7 @@ function themesCard(onEditing) {
     }
   }
 
-  // A file the owner adds: T3 Code's theme file or its short form, or a VS Code colour theme, kept as a theme.
+  // A file the owner adds: a theme file or its short form, or a VS Code colour theme, kept as a theme.
   async function addFrom(file) {
     if (file.size > MOST_FILE_BYTES) {
       throw new Error(`${file.name} is larger than a theme file can be.`);
@@ -438,7 +438,7 @@ function rangeOf({ label, hint, setting, min, max, step, unit }) {
   });
 }
 
-// A family of the type (T3 Code's, with Dot's stacks to start from): the stack Dot draws with, the others it offers, or
+// A family of the type (with Dot's stacks to start from): the stack Dot draws with, the others it offers, or
 // "Another family…", which opens a field for families typed, a comma between two; a family typed goes before the stack
 // it replaces. What the field cannot take is said under it and not kept.
 function familySetting({ label, hint, setting, stacks }) {
@@ -628,7 +628,7 @@ function motionCard() {
   return { element, dispose: () => REDUCED_MOTION.removeEventListener("change", paintMotion) };
 }
 
-/** The text (item 331, after T3 Code's): a line of an answer over the size of every text, the body's on this device. */
+/** The text (item 331): a line of an answer over the size of every text, the body's on this device. */
 function textCard() {
   const size = rangeOf({
     label: "Text size",

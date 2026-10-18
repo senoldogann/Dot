@@ -58,7 +58,7 @@ const CUT_OFF_LINES = {
   process_ended: "Its dotx command was told to end while this run worked.",
   process_died: "Its dotx command died while this run worked.",
 };
-// Edit from here (item 282), worded as T3 Code words it: the dialog's line and the owner's two ways of rewinding.
+// Edit from here (item 282): the dialog's line and the owner's two ways of rewinding.
 const REWIND_MESSAGE = "Rewind chat to before this message. Your prompt and attachments return to the composer.";
 const REWIND_CHOICES = [
   { value: "revert", label: "Revert files too", tone: "danger" },
@@ -548,9 +548,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onCount: () => paintCapsule(),
   });
   // ⌘⇧Enter sends what the box holds the other way than the send does (`steers`): to the run now, past the queue, or
-  // into the queue where a message steers; with the box empty, it sends the queue's next message to the run (T3
-  // Code's key). Escape ends the edit of a queued message. A key the box already took (a pick of the slash menu, or of
-  // an input method's composition) is left to it.
+  // into the queue where a message steers; with the box empty, it sends the queue's next message to the run. Escape
+  // ends the edit of a queued message. A key the box already took (a pick of the slash menu, or of an input method's
+  // composition) is left to it.
   input.addEventListener("keydown", (event) => {
     if (event.defaultPrevented || event.isComposing || event.keyCode === 229) {
       return;
@@ -567,7 +567,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       queue.cancelEdit();
     }
   });
-  // The choices of the next follow-up (item 133), after T3 Code's composer: the mode, the model with its reasoning,
+  // The choices of the next follow-up (item 133): the mode, the model with its reasoning,
   // approvals and goal mode of the chat (item 199), which the daemon keeps as its first run started and as they are
   // chosen here, so that a reload, another browser or a run moved to a standby model leaves them as they are; a chat
   // from before has the open run's. The agent stays the chat's, and Keep going is a new chat's, since a campaign
@@ -618,7 +618,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   });
   frame.options.append(choices.pills.mode, choices.pills.model, choices.pills.reasoning, choices.pills.options);
   const stopStatus = onChange(choices.sync);
-  // The chat's commands at work (item 229), between the queue and the composer, as T3 Code shows its background work.
+  // The chat's commands at work (item 229), between the queue and the composer.
   const background = backgroundWork({ threadId: run.thread_id });
   // The chat's loops (item 281), beside its commands at work.
   const loops = chatLoops({ threadId: run.thread_id });
@@ -869,7 +869,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     return next.id;
   }
 
-  // Edit from here (item 282, after T3 Code): the chat goes back to before the message of the run `past`, and the message
+  // Edit from here (item 282): the chat goes back to before the message of the run `past`, and the message
   // with its files goes to the composer of the run the chat ends with now, or of a new chat when none is left; the files
   // the runs taken out changed are taken back too when the owner chooses so.
   async function editFromHere(past) {
@@ -1294,7 +1294,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   });
   // The agents of the chat: the runs its runs handed work to (item 227).
   const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
-  // The side panel (item 84), in tabs after T3 Code's (item 203), each with its icon (item 227): the run (its details
+  // The side panel (item 84), in tabs (item 203), each with its icon (item 227): the run (its details
   // and its cost, item 96), the plan, the actions (and the files of the conversation), the agents of the chat and the
   // screen (Dot's computer and the screenshots). The run's state is the top bar's face and the Details section's first
   // fact; no card at the head of the conversation (item 113).
@@ -1367,8 +1367,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onBrowserStep: (page) => {
       computer.notePage(page);
       screenButton.hidden = false;
-      // A run at work that opens its browser shows its page beside the chat (item 354, after T3 Code's floating
-      // preview) unless Settings › Browser turned that off; a phone keeps the button, which opens it over the page.
+      // A run at work that opens its browser shows its page beside the chat (item 354) unless Settings › Browser turned
+      // that off; a phone keeps the button, which opens it over the page.
       if (active && !elsewhere && valueOf(AUTO_COMPUTER) === "shown") {
         inspector.peekTab("screen");
       }
@@ -1383,8 +1383,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // Dot's face and name, or a delegated run's breadcrumb, name the page in the top bar (item 78), and the side panel's
   // switch is the bar's one tool (item 120): the run's state, start, agent, model, approvals and campaign are in the
   // Details of the panel's Run tab. The goal, the first message, is the page's heading for a reader of the structure.
-  // On a phone the bar names the chat instead, its title over the agent and the model, after T3 Code's phone app (item
-  // 295); a helper's page names its goal and says it is a helper.
+  // On a phone the bar names the chat instead, its title over the agent and the model (item 295); a helper's page names
+  // its goal and says it is a helper.
   const headingTitle = el("span", { class: "stage-heading-title" }, clip(parentId === null ? detail.title : run.goal, TITLE_CHARS));
   const headingSub = el("span", { class: "stage-heading-sub" });
   const heading = el("span", { class: "stage-heading" }, headingTitle, headingSub);

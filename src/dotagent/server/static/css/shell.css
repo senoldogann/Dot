@@ -484,7 +484,7 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* A row whose run works says so where its age sits at rest, as T3 Code's sidebar does (item 122): a dashed circle, the
+/* A row whose run works says so where its age sits at rest (item 122): a dashed circle, the
    word and the time it has worked, in the running state's colour; only the figure changes, nothing shimmers. */
 .side-working {
   flex: none;
@@ -753,7 +753,7 @@
   padding-left: 96px;
 }
 
-/* ---------- a phone, after T3 Code's phone app (items 294 and 295) ---------- */
+/* ---------- a phone (items 294 and 295) ---------- */
 
 /* The sidebar's title and its round new chat are a phone's. */
 .side-title,
@@ -769,7 +769,7 @@
 }
 
 @media (max-width: 720px) {
-  /* The way back to the chats and the sidebar's close are round buttons on a surface, as T3 Code's back button. */
+  /* The way back to the chats and the sidebar's close are round buttons on a surface. */
   .stagebar-left > .icon-btn,
   .side-head > .icon-btn {
     border: 1px solid var(--border);
@@ -812,7 +812,7 @@
     padding: 8px 12px 12px;
   }
 
-  /* The rows a step roomier, on hairlines as T3 Code's list. */
+  /* The rows a step roomier, on hairlines. */
   .side-chat > .side-run {
     padding-top: 12px;
     padding-bottom: 12px;

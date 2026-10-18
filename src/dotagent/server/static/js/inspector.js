@@ -1,8 +1,8 @@
 // The side panel of the run page: the details and the plan of the run, the agents of its chat and the screens the agent
-// looked at, in tabs after T3 Code's side panel (item 203), each with its icon (item 227), one at a time, the one
+// looked at, in tabs (item 203), each with its icon (item 227), one at a time, the one
 // chosen last kept per browser. On a wide page it sits beside the conversation when the reader wants it (see
 // layout.js), sliding in and out (item 220); on a narrow page it is a drawer that the button in the header slides in
-// over the conversation, and on a phone a sheet that rises from the bottom, after T3 Code's (item 296). A file the
+// over the conversation, and on a phone a sheet that rises from the bottom (item 296). A file the
 // conversation carries or names takes the panel while it is open (item 195, filepanel.js).
 
 import { imageUrl } from "./api.js";
@@ -423,7 +423,7 @@ export function createInspector({ layout, tabs, screensIn }) {
     }
   }
 
-  // A phone's sheet goes down with a drag of its head, as T3 Code's sheets do: let go far enough down it closes, else
+  // A phone's sheet goes down with a drag of its head: let go far enough down it closes, else
   // it springs back. The tabs still scroll sideways (run.css lets the head pan only that way).
   let drag = null;
   function sheetShown() {

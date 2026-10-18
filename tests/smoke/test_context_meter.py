@@ -1,8 +1,8 @@
-"""The context meter of a run's composer (item 222), after T3 Code's: a ring of how much of the run's context budget its
-last step filled, warning near the budget and past it, and on a click the figures: the tokens the step sent the model,
-the budget past which Dot summarizes the older part of the run, and the model's window; for a model given a context
-size of its own (item 250), that size and the point past which the run summarizes, which the timeline notes too. Runs
-seeded with their scaffold and assistant events, served by a real server, wide and on a phone, light and dark."""
+"""The context meter of a run's composer (item 222): a ring of how much of the run's context budget its last step
+filled, warning near the budget and past it, and on a click the figures: the tokens the step sent the model, the budget
+past which Dot summarizes the older part of the run, and the model's window; for a model given a context size of its own
+(item 250), that size and the point past which the run summarizes, which the timeline notes too. Runs seeded with their
+scaffold and assistant events, served by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import time

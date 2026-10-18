@@ -1,4 +1,4 @@
-// The queue of a chat (item 148), after T3 Code's: what is sent while a run works waits above the composer and starts
+// The queue of a chat (item 148): what is sent while a run works waits above the composer and starts
 // as the chat's next run, one message after the other, once the run before it has ended done. A message can be moved
 // (its handle is dragged, or takes the arrow keys), edited in the composer, sent to the run at work now (Steer) or
 // taken out. A stop, a failure or a crash of the daemon holds the queue until Resume; a run that a stop of the daemon

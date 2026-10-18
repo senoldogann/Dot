@@ -38,7 +38,7 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _WAIT_COMMAND: str = "sleep 300"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
-# T3 Code's units: seconds under a minute, minutes under an hour, then hours and minutes.
+# The units of the time worked: seconds under a minute, minutes under an hour, then hours and minutes.
 _WORKING: re.Pattern[str] = re.compile(r"^Working\s*(\d+s|\d+m|\d+h \d+m)$")
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),

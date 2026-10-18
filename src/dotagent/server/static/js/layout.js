@@ -109,7 +109,7 @@ export function trackStagebar(stagebar) {
 }
 
 const TOUCH_FIRST = window.matchMedia("(hover: none) and (pointer: coarse)");
-// A phone held upright, which gets the layout after T3 Code's phone app (items 294 to 298); the stylesheets share the
+// A phone held upright, which gets the phone layout (items 294 to 298); the stylesheets share the
 // width.
 export const PHONE = window.matchMedia("(max-width: 720px)");
 

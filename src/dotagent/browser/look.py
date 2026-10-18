@@ -1,6 +1,6 @@
-"""How the pages of Dot's browser look (item 354, after T3 Code's Settings › Browser): the size of a page of Dot's own
-Chrome, which fills its window or has a size of its own, the colour scheme every page is told to prefer, and how large
-Dot's own Chrome draws pages (item 358)."""
+"""How the pages of Dot's browser look (item 354, Settings › Browser): the size of a page of Dot's own Chrome, which
+fills its window or has a size of its own, the colour scheme every page is told to prefer, and how large Dot's own
+Chrome draws pages (item 358)."""
 
 import math
 from typing import Literal

@@ -1,13 +1,12 @@
-"""A phone's run page and list of chats after T3 Code's phone app (items 294 to 298), on a served daemon, in WebKit as
-the owner's iPhone, light and dark. The bar names the chat over the agent and the model, and holds its tools in one
-pill: Dot's computer once the run has had a page, the helpers with their count, and the details. A line over the
-composer says how long the run has worked, how its helpers stand and how many messages are queued (item 352), and its
-parts open where they tell of. The details rise from the foot as a sheet with a grabber, and a drag of its head closes
-it; the Agents tab's rows say each helper's state, model and what it does. Dot's computer opens over the whole page with
-the page's address and the pill of who has control, and goes back to the panel when it closes. The sidebar is the list
-of chats over the whole screen, Dot's name at its head and Settings, the search and a new chat at its foot. A wide
-window keeps its bar as it was: the face, the name and the panel's switch alone; the line over the composer is there
-too.
+"""A phone's run page and list of chats (items 294 to 298), on a served daemon, in WebKit as the owner's iPhone, light
+and dark. The bar names the chat over the agent and the model, and holds its tools in one pill: Dot's computer once the
+run has had a page, the helpers with their count, and the details. A line over the composer says how long the run has
+worked, how its helpers stand and how many messages are queued (item 352), and its parts open where they tell of. The
+details rise from the foot as a sheet with a grabber, and a drag of its head closes it; the Agents tab's rows say each
+helper's state, model and what it does. Dot's computer opens over the whole page with the page's address and the pill of
+who has control, and goes back to the panel when it closes. The sidebar is the list of chats over the whole screen,
+Dot's name at its head and Settings, the search and a new chat at its foot. A wide window keeps its bar as it was: the
+face, the name and the panel's switch alone; the line over the composer is there too.
 
 The model is a scripted one; the run's page is a local one in Dot's own headless Chrome.
 """
@@ -41,7 +40,7 @@ from dotagent.tools.delegate import DELEGATE_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio]
 
-TOKEN: str = "phone-t3-test-token"
+TOKEN: str = "phone-layout-test-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _OWNERS_PHONE: str = "iPhone 17 Pro Max"
 _GOAL: str = "Find the cheapest flight to Berlin and check the baggage rules"
@@ -161,7 +160,7 @@ async def _at_work(runtime: Runtime, run: RunRecord) -> None:
             await asyncio.sleep(0.2)
 
 
-async def test_a_phones_run_page_and_list_of_chats_follow_t3_codes_phone_app(own_home: Path, tmp_path: Path) -> None:
+async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_home: Path, tmp_path: Path) -> None:
     with _site() as site:
         async with _served(own_home, site) as (runtime, manager, address), async_playwright() as playwright:
             run: RunRecord = await manager.start(

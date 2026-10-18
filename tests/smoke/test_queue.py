@@ -7,9 +7,9 @@ a delegated run takes no queue, as it is no chat (item 170). A message is claime
 so a removal or an edit in that moment is refused; it starts after the run at work on the chat in any process, two
 processes that move the queue at once start it once, the claim of a process that died holds the queue, a message
 steered as its run ends goes back and starts after it, and a claim the store refused to end is ended by the next start
-(item 184). The chat's page shows it all above the composer, as T3 Code does, served by a real server, wide and on a
-phone, light and dark. Settings › General chooses the key that sends, Enter or ⌘Enter, and whether a message sent while
-a run works waits in the queue or steers the run, ⌘⇧Enter sending it the other way (item 230).
+(item 184). The chat's page shows it all above the composer, served by a real server, wide and on a phone, light and
+dark. Settings › General chooses the key that sends, Enter or ⌘Enter, and whether a message sent while a run works waits
+in the queue or steers the run, ⌘⇧Enter sending it the other way (item 230).
 
 No network and no model service is used: the scripted model ends each run with its first reply, which the test lets go.
 """

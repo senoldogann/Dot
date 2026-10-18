@@ -1,8 +1,8 @@
-"""The composer's model menu (item 208), after T3 Code's: a rail of the favourites and of each provider's mark shows one
-view at a time, a search finds models across every provider, a star keeps a model among the favourites (in this
-browser) without picking it, and the keys move, pick, star and leave; on a touch screen the search leaves the focus
-where it is. Change, on the default's row, makes the daemon's default from the menu (item 209). A real server, whose
-providers list the test's models and answer nothing; nothing is sent. Wide and on a phone, light and dark."""
+"""The composer's model menu (item 208): a rail of the favourites and of each provider's mark shows one view at a time,
+a search finds models across every provider, a star keeps a model among the favourites (in this browser) without picking
+it, and the keys move, pick, star and leave; on a touch screen the search leaves the focus where it is. Change, on the
+default's row, makes the daemon's default from the menu (item 209). A real server, whose providers list the test's
+models and answer nothing; nothing is sent. Wide and on a phone, light and dark."""
 
 import asyncio
 import json

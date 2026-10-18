@@ -1,8 +1,8 @@
-// A VS Code colour theme as a theme of one's own (item 128), ported from T3 Code's apps/web/src/vscodeThemeImport.ts
-// (see LICENSE). A VS Code theme describes an editor's chrome, not a palette: a few hundred workbench keys, most unset,
-// overlays in hex with alpha. The palette the generator derives from the editor's background and a visible accent is
-// the floor, and the theme's own workbench colours replace the roles they name where they stay readable and stand apart
-// from the surfaces beside them; overlays are laid over the surface they sit on.
+// A VS Code colour theme as a theme of one's own (item 128), derived code (see LICENSE in this folder). A VS Code theme
+// describes an editor's chrome, not a palette: a few hundred workbench keys, most unset, overlays in hex with alpha.
+// The palette the generator derives from the editor's background and a visible accent is the floor, and the theme's own
+// workbench colours replace the roles they name where they stay readable and stand apart from the surfaces beside them;
+// overlays are laid over the surface they sit on.
 
 import { contrast, luminance, mix, parseColour, toHex } from "./colour.js";
 import { vividPalette } from "./generator.js";
@@ -120,8 +120,8 @@ function nameOf(value) {
 }
 
 /**
- * The theme file (T3 Code's, version 1, without an id) of a VS Code colour theme, as T3 Code's parseVsCodeThemeFile
- * makes it; null when the theme has no editor background to build on.
+ * The theme file (version 1, without an id) of a VS Code colour theme; null when the theme has no editor background to
+ * build on.
  */
 export function vsCodeThemeFile(value) {
   const colours = isRecord(value.colors) ? value.colors : {};

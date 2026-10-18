@@ -1,4 +1,4 @@
-// The context meter of a run's composer (item 222), after T3 Code's: a ring of how much of the run's context budget its
+// The context meter of a run's composer (item 222): a ring of how much of the run's context budget its
 // last step filled, and on a click what that is: the tokens the step sent the model against the budget past which Dot
 // summarizes the older part of the run, the model's whole window, and why the budget is smaller and where it is set
 // (item 239), and the context size chosen for the model in Settings › Models (item 250). The run's scaffold event gives

@@ -1,9 +1,9 @@
-"""The agents of a chat (item 227), after T3 Code's "Previous agents": the side panel's Agents tab lists the runs the
-chat's runs handed work to, newest first, five at first and the rest on "Show N more", each with its goal, its state and
-model and how long it took, and a row opens the helper's page; the tab counts them, and a chat with none says where
-they would show. Every tab wears its icon, and where the strip has no room for every name, the tabs not chosen keep
-their icon alone. ``GET /api/threads/{id}/helpers`` gives the list. Runs seeded in the store, served by a real server,
-beside the conversation and as a drawer on a phone, light and dark."""
+"""The agents of a chat (item 227): the side panel's Agents tab lists the runs the chat's runs handed work to, newest
+first, five at first and the rest on "Show N more", each with its goal, its state and model and how long it took, and a
+row opens the helper's page; the tab counts them, and a chat with none says where they would show. Every tab wears its
+icon, and where the strip has no room for every name, the tabs not chosen keep their icon alone.
+``GET /api/threads/{id}/helpers`` gives the list. Runs seeded in the store, served by a real server, beside the
+conversation and as a drawer on a phone, light and dark."""
 
 import asyncio
 import time

@@ -222,9 +222,9 @@ def runs_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/runs/{run_id}/rewind")
     async def rewind_run(run_id: str, request: RewindRequest) -> RewindView:
-        """Rewind the run's chat to before its first message, as T3 Code's Edit from here does (item 282, see
-        ``agent.rewind``), and take back the file changes of the runs taken out when ``files`` is ``revert``. Returns
-        where the chat ends now and what goes back to the composer."""
+        """Rewind the run's chat to before its first message (Edit from here, item 282, see ``agent.rewind``), and take
+        back the file changes of the runs taken out when ``files`` is ``revert``. Returns where the chat ends now and
+        what goes back to the composer."""
         files: list[AttachedFile] = await opening_files(store, run_id)
         taken_out: list[RunRecord] = await store.runs_from(run_id)
         plan: UndoPlan = (

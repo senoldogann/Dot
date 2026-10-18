@@ -22,7 +22,7 @@ function stamp(ts, title) {
   return el("time", { class: "message-time", datetime: new Date(ts * 1000).toISOString(), title }, messageTime(ts));
 }
 
-// A copy of `text` as it was written, after T3 Code's (item 205): the icon turns to a check for a moment once the text
+// A copy of `text` as it was written (item 205): the icon turns to a check for a moment once the text
 // is on the clipboard; a copy that fails says why.
 function copyButton(text, label) {
   let restore = null;
@@ -77,7 +77,7 @@ function editFromHereButton(editFromHere) {
 /**
  * What the user wrote, as a bubble on the right, the files that came with it (`files`, as the timeline has them), and
  * under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `editFromHere` is null,
- * Edit from here, which rewinds the chat to before it (item 282, after T3 Code). The foot shows once the turn has its
+ * Edit from here, which rewinds the chat to before it (item 282). The foot shows once the turn has its
  * answer: a run at work keeps it back (`.run-working`, `.turn-working`). The text reads as markdown, as an answer does
  * (item 206).
  */

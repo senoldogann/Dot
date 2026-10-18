@@ -1,8 +1,7 @@
-// The agents of a chat (item 227), after T3 Code's "Previous agents": in the side panel's Agents tab, the runs the chat's
-// runs handed part of their work to, newest first, each with its face and state, its goal, its provider's mark, model
-// and state in a word, what it is doing or did last when the conversation on the page knows (item 296, after the rows
-// of T3 Code's Agents sheet), and how long it took or has taken so far; a few at first, the rest on demand. A row
-// opens the helper's own page.
+// The agents of a chat (item 227): in the side panel's Agents tab, the runs the chat's runs handed part of their work
+// to, newest first, each with its face and state, its goal, its provider's mark, model and state in a word, what it is
+// doing or did last when the conversation on the page knows (item 296), and how long it took or has taken so far; a few
+// at first, the rest on demand. A row opens the helper's own page.
 
 import { actorFace } from "./actors.js";
 import { api } from "./api.js";

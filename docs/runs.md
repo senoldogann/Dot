@@ -169,7 +169,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   answer stands, wherever it was given. It takes no steering from the pages: a message sent there waits in the chat's
   queue. A chat has one run at work at a time, whichever process drives it: a second is refused (409), and the run a
   `dotx` command left at work when it died is closed first.
-- A message sent to a chat while its run works waits in the chat's queue, after T3 Code's: it starts as the chat's next
+- A message sent to a chat while its run works waits in the chat's queue: it starts as the chat's next
   run, with the mode, model, reasoning, approvals and goal mode it was sent with, once the run before it has ended done,
   one message after the other. A stop, a failed run or a crash of the daemon holds the queue until you resume it; a
   shutdown of the daemon does not, and once the run it cut off is resumed and the new run ends done, the queue goes on.
@@ -343,8 +343,8 @@ sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` with
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 A command that runs long and ends by itself, as an eval or a long build, past the 30 minutes that `shell` may wait
-(`[shell] max_timeout_s`), goes to a terminal session in the background (`terminal_open` with `background`, item 229,
-after T3 Code's background work): it is not closed while it runs for being left unread, and the run that started it can
+(`[shell] max_timeout_s`), goes to a terminal session in the background (`terminal_open` with `background`, item 229):
+it is not closed while it runs for being left unread, and the run that started it can
 end. When it ends by itself, its chat is told in a message of its queue, which starts the chat's next run with the
 chat's choices once no run works there (a held queue keeps it). The message says which command ended, with its exit
 status and how long it ran, and nothing it printed, which the run reads with `terminal_read`, as untrusted; Dot wrote

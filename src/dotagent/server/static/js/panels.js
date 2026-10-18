@@ -149,7 +149,7 @@ export function foldCard({ id, title, actions, body, openByDefault }) {
 /**
  * A section of the run's side panel (item 203): a head with its title, a short line that sums it up
  * (`setSummary(...nodes)`) and `actions` at its right, over `body`, which is always open: the panel's tabs choose what
- * is in sight, after T3 Code's side panel. Its body is `panel-${id}`. Returns the element and `setSummary`, as
+ * is in sight. Its body is `panel-${id}`. Returns the element and `setSummary`, as
  * `foldCard` does.
  */
 export function panelSection({ id, title, actions, body }) {

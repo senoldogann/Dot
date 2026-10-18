@@ -1,5 +1,5 @@
-"""Settings › Browser after T3 Code's (item 354): runs may be kept off the browser, and a page of Dot's own Chrome has
-the size and the colour scheme chosen for it, from Chrome's next start.
+"""Settings › Browser (item 354): runs may be kept off the browser, and a page of Dot's own Chrome has the size and the
+colour scheme chosen for it, from Chrome's next start.
 
 The first test plays a run in the real loop with the scripted model and reads the tools it was offered; the second
 drives a real headless Chrome on a throw-away profile against a page served on this Mac.
@@ -278,7 +278,7 @@ async def _changed(page: Page, path: str, change: Callable[[], Awaitable[object]
 
 
 @pytest.mark.browser
-async def test_settings_browser_sets_what_t3_codes_sets_and_keeps_it(tmp_path: Path) -> None:
+async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: Path) -> None:
     async with _daemon(()) as (_manager, address), async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:

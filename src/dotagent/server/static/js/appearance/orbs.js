@@ -1,7 +1,6 @@
-// A theme's orb (item 126), drawn as T3 Code draws it (apps/web/src/components/settings/ThemePreviewCircles.tsx and
-// packages/shared/src/themePreview.ts; see LICENSE): a ball of the theme's page colour, kept near true for its scheme,
-// lit by the accent from one corner and tinted by the action colour from the other, the light blurred and spread a
-// little past the ball's edge. The colours come in as CSS colours and are mixed by the browser.
+// A theme's orb (item 126), derived code (see LICENSE in this folder): a ball of the theme's page colour, kept near
+// true for its scheme, lit by the accent from one corner and tinted by the action colour from the other, the light
+// blurred and spread a little past the ball's edge. The colours come in as CSS colours and are mixed by the browser.
 
 import { el } from "../dom.js";
 

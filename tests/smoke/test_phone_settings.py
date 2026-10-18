@@ -1,6 +1,5 @@
-"""On a phone the settings are a list of their tabs in groups, after T3 Code's (item 330), in WebKit as the owner's
-iPhone (440 px wide) and as a small one (320 px), on a served daemon with two schedules, three notes and the Ocean
-theme.
+"""On a phone the settings are a list of their tabs in groups (item 330), in WebKit as the owner's iPhone (440 px wide)
+and as a small one (320 px), on a served daemon with two schedules, three notes and the Ocean theme.
 
 On a phone:
 

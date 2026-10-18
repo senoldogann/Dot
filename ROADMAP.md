@@ -5059,12 +5059,12 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 118 | Chrome behind: every tab opened in the background, the front given back             | done        | 6dfbf07 |
 | 119 | The models: the prompt cache on OpenCode Go's Messages route, the free ones marked   | done        | acfc56a |
 | 120 | The run page's head: Stop in the send button's place, the emergency stop in the sidebar | done        | 6c1a7b3 |
-| 121 | The calm look, after T3 Code: the sidebar, the chat, the composer and the panel     | done        | 4f2b0cd |
+| 121 | The calm look: the sidebar, the chat, the composer and the panel                    | done        | 4f2b0cd |
 | 122 | The sidebar says what works: Working and its time on a chat's row and a working run's | done        | 10fd83f |
 | 123 | A helper folded in the chat: its row until the owner opens it                       | done        | a2de64d |
 | 124 | The home's first screen: the composer in the middle, the day folded under it         | done        | 41ec542 |
 | 125 | What the failed runs showed: the journal's day, the snapshot's arguments             | done        | 36c0eeb |
-| 126 | Themes, after T3 Code: a page for the look, a theme for light and one for dark       | done        | c5dfc76 |
+| 126 | Themes: a page for the look, a theme for light and one for dark                      | done        | c5dfc76 |
 | 127 | The interface, the motion and the type                                               | done        | 9c73d80 |
 | 128 | Your own themes, kept by the daemon                                                  | done        | 30b2434 |
 | 129 | The composer at the foot of the window                                               | done        | 048f3aa |
@@ -5086,7 +5086,7 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 145 | The CI and the desktop shell                                                         | done        | 969d5f0 |
 | 146 | The gaps the final review of part 23 found                                           | done        | e558f21 |
 | 147 | A folder whose reading macOS broke off does not fail a search                        | done        | ca16c37 |
-| 148 | The queue of a chat, after T3 Code                                                   | done        | 5f6747b |
+| 148 | The queue of a chat                                                                  | done        | 5f6747b |
 | 149 | The scheduler goes on past a failure                                                 | done        | 1ec1497 |
 | 150 | A tool that raises fails its call, not its run                                       | done        | ba4f2a6 |
 | 151 | A question a run left reaches the owner                                              | done        | 6788a66 |
@@ -5139,14 +5139,14 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 198 | The side menu shows every agent of a run, folded under it                            | done        | dee248f |
 | 199 | The default model is chosen in Settings, and a chat keeps its model                  | done        | de8069e |
 | 200 | Reconnecting, checked end to end                                                     | done        | 0dab7de |
-| 201 | Marks of the conversation's messages: a look and a jump, after T3 Code               | done        | 4f23e25 |
+| 201 | Marks of the conversation's messages: a look and a jump                              | done        | 4f23e25 |
 | 202 | The side menu, designed again                                                        | done        | 7e03ac3 |
 | 203 | The run's side panel, designed again                                                 | done        | 94985af |
 | 204 | Adding or deleting keeps the page where it is                                        | done        | db647a3 |
-| 205 | A message's time, its copy and a send again, after T3 Code                           | done        | 9934575 |
+| 205 | A message's time, its copy and a send again                                          | done        | 9934575 |
 | 206 | Markdown in the conversation, and copies that keep it                                | done        | 33a7f8d |
-| 207 | The composer shows the markdown it holds, after T3 Code                              | done        | 23f1d9a |
-| 208 | The model menu: providers at the side, a search and favourites, after T3 Code        | done        | 2545d60 |
+| 207 | The composer shows the markdown it holds                                             | done        | 23f1d9a |
+| 208 | The model menu: providers at the side, a search and favourites                       | done        | 2545d60 |
 | 209 | The default model, changed from the model menu                                       | done        | a83c6b7 |
 | 210 | The shell check: changes of permissions                                              | done        | 34f4816 |
 | 211 | Secrets kept from the agent by default                                               | done        | e6c8185 |
@@ -5284,8 +5284,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 351 | The audit of 2026-10-17: what held, fixed outside the human-only paths                 | done        | 2f94b84 |
 | 352 | A calm chat: one set-up line, a live line over the composer, one screen on a phone     | done        | b2e8090 |
 | 353 | Keep going is chosen from the composer's "+", beside Goal mode                         | done        | 9c1352e |
-| 354 | Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view| done        | 3dedca5 |
-| 355 | Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added        | done        | 3dedca5 |
+| 354 | Settings › Browser: runs kept off the browser, how pages look, the view                | done        | 3dedca5 |
+| 355 | Profiles of Dot's Chrome: Default, Incognito and the ones added                        | done        | 3dedca5 |
 | 356 | The second audit of 2026-10-17: what held outside the shell guard, fixed               | done        | e82ee9f |
 | 357 | Lines of at most 120 characters, held by `ruff check`                                  | done        | 4ebf951 |
 | 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | done        | 177b005 |
@@ -5293,7 +5293,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 360 | A phone's chat scrolls up and down only, and its line over the composer is quieter     | done        | a6f0397 |
 | 361 | OpenRouter's refusal for the account's privacy settings says why, and what to change   | done        | 994ab2d |
 | 362 | The lines of what ran without asking are out of a chat until turned on                 | done        | 22d1409 |
-| 363 | integrations/ carries REA and the replica skills; a plugin's server names its tools    | in progress |         |
+| 363 | integrations/ carries REA and the replica skills; a plugin's server names its tools    | done        | d08dcd5 |
+| 369 | The repository names no other product; the licence notices keep what the law asks      | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -6920,12 +6921,12 @@ shell, and the tour's 90 shots read by eye, which show nothing changed where not
 The owner's sixteenth word, on 2026-10-12, during part 15's review, with three screenshots (a delegated run saying that
 clicks in the browser were restricted, "read-only mode"; the run page's top bar: the state, the start, the model and its
 reasoning, YOLO, Goal mode, the panel's switch, Cancel, the running count, the connection's dot and the emergency stop;
-T3 Code's window with its sidebar, its chat and its panel): why read-only, a yolo run should have every right, find the
-problems and fix them; Chrome keeps bouncing in the Dock and coming to the front, do it in the background if it can be
-done; OpenCode Zen's free models should be in the list; whatever makes the OpenCode models faster, and Claude's; the top
-bar's area is not needed: Cancel takes the send button's place while a session works and becomes send again when a new
-message is typed, the emergency stop moves to a better place, the top is cleared; and the look of T3 Code, its chat, its
-sidebar and its panel, clean and simple, adapted to Dot, from its repository if need be.
+another app's window with its sidebar, its chat and its panel): why read-only, a yolo run should have every right, find
+the problems and fix them; Chrome keeps bouncing in the Dock and coming to the front, do it in the background if it can
+be done; OpenCode Zen's free models should be in the list; whatever makes the OpenCode models faster, and Claude's; the
+top bar's area is not needed: Cancel takes the send button's place while a session works and becomes send again when a
+new message is typed, the emergency stop moves to a better place, the top is cleared; and the look of another app, its
+chat, its sidebar and its panel, clean and simple, adapted to Dot, from its repository if need be.
 
 **Status (2026-10-12): built.** Items 117 to 121 merged in a day (`e51f9c1`, `6dfbf07`, `acfc56a`, `6c1a7b3`,
 `4f2b0cd`), each behind the gate and its smoke tests, and those that changed the pages with their screenshot tour read.
@@ -6936,8 +6937,8 @@ Messages route sends the cache mark (Claude Haiku 5.5 read 10,383 tokens of a re
 Claude on Go reaches that route instead of a refusal, and the models Go serves free say Free in the picker; Zen's free
 models stay out of the list, because OpenCode serves them only to its own client (every call from another answers 403
 `FreeTierError`) and Dot does not pose as it. The run page's head keeps the face, the name and the panel's switch, the
-composer's send is the run's Stop while it works, and the emergency stop sits in the sidebar's foot. The look follows T3
-Code's: a sidebar a tone darker without a line, a chat's age at the right of its row, tool steps as quiet lines, the
+composer's send is the run's Stop while it works, and the emergency stop sits in the sidebar's foot. The look is calm:
+a sidebar a tone darker without a line, a chat's age at the right of its row, tool steps as quiet lines, the
 composer on a corner of its own with a soft shadow, the panel one card. The daemon was restarted on `4f2b0cd` with no
 run active. What waits: the desktop app rebuilt by the owner, as after part 15 (`cd desktop && npm run build`); its
 pages come from the daemon, so part 16 reaches it without a rebuild.
@@ -6973,12 +6974,12 @@ Goal mode, the campaign, the panel's switch, Continue and Cancel (`views/run.js`
 right holds the approvals waiting, the runs in progress, the connection's dot and the emergency stop, a red square on
 every page (`shell.js buildIndicators`). The sidebar's Waiting and Working sections count the same runs, and the panel's
 details list the mode, the model, the reasoning, the approvals and Goal mode. While a run works, a message typed is sent
-as a steer under the label Steer. (121) T3 Code's look, read from its repository (MIT, `apps/web/src`): a sidebar of 256
-px a tone darker than the page, its rows quiet (the project small, the title in the body size, the state or the time on
-the right in tabular figures); one chat lane of 46 rem; the user's messages in a soft bubble, the agent's without one; a
-turn's tools as one line with an icon ("Ran 3 commands"); hairlines rather than boxes; the composer a white card on a 24
-px corner with a soft shadow, whose round send button becomes a red Stop while the agent works with an empty box; the
-panel a floating card of 280 px with hairline sections; the details revealed on hover.
+as a steer under the label Steer. (121) Another app's look, read from its repository (MIT, `apps/web/src`): a sidebar of
+256 px a tone darker than the page, its rows quiet (the project small, the title in the body size, the state or the time
+on the right in tabular figures); one chat lane of 46 rem; the user's messages in a soft bubble, the agent's without
+one; a turn's tools as one line with an icon ("Ran 3 commands"); hairlines rather than boxes; the composer a white card
+on a 24 px corner with a soft shadow, whose round send button becomes a red Stop while the agent works with an empty
+box; the panel a floating card of 280 px with hairline sections; the details revealed on hover.
 
 **The shape of this part (the decisions).** First the helper's rights: a delegated run takes its parent's mode, which
 the model can no longer narrow; a research run the owner starts stays read-only, as its name says. The two other
@@ -6988,7 +6989,7 @@ the cache mark on Go's Messages route, which makes Claude on Go faster and cheap
 free models marked in the picker; Zen's free models stay out of the list, because OpenCode refuses them to any client
 but its own and Dot does not pretend to be OpenCode. Then the run page's head: Stop in the send button's place, the
 emergency stop at the sidebar's foot, and nothing at the top but the title and the panel's switch. Last, the calm look
-of T3 Code adapted to Dot's tokens, faces and mark.
+in Dot's tokens, faces and mark.
 
 ### How to start part 16 (the handoff prompt)
 
@@ -7121,16 +7122,16 @@ connection while it is not live; the running count goes (the sidebar's Working s
 emergency stop moves to the sidebar's foot beside Settings, a red square with its words in its tooltip as before. The
 run page's smoke tests follow the controls; the tour is read by eye.
 
-### 121. The calm look, after T3 Code: the sidebar, the chat, the composer and the panel
+### 121. The calm look: the sidebar, the chat, the composer and the panel
 
 **Status: done.** Merged as `4f2b0cd` (PR #144, MYP-261 Done).
 
-**As built (2026-10-12).** Read from T3 Code's repository (MIT) and the owner's screenshot of it, through Dot's tokens
-and in both schemes. The sidebar is a tone darker than the page with no line between them; a chat's row carries its last
-activity at the right in figures of one width (`age` in `dom.js`: "now", "5m", "3h", "2d", "3w", then the day; read
-again every minute while the page rests, the date in its tooltip). A tool step is one quiet line with its icon instead
-of a box, its body hanging under it on a hairline once opened, and the steps of a group sit on a line of 1 px instead of
-2. The composer has a corner of its own, 24 px (`--radius-composer`), and a soft shadow that falls below it
+**As built (2026-10-12).** Read from another app's repository (MIT) and the owner's screenshot of it, through Dot's
+tokens and in both schemes. The sidebar is a tone darker than the page with no line between them; a chat's row carries
+its last activity at the right in figures of one width (`age` in `dom.js`: "now", "5m", "3h", "2d", "3w", then the day;
+read again every minute while the page rests, the date in its tooltip). A tool step is one quiet line with its icon
+instead of a box, its body hanging under it on a hairline once opened, and the steps of a group sit on a line of 1 px
+instead of 2. The composer has a corner of its own, 24 px (`--radius-composer`), and a soft shadow that falls below it
 (`--shadow-composer`) on every page, not only in the run's dock. The run's panel is one card on that corner whose
 sections (Dot's computer, Details, Cost, Plan, Actions, Screen) sit on hairlines, the head of an open section without a
 line under it; as a drawer it is the drawer itself. Where a pointer can hover, when the answer came and how long the run
@@ -7140,7 +7141,7 @@ smoke test scripts sixty steps instead of thirty, since thirty quiet lines no lo
 height. The README's look passages follow. 117 smoke tests that read these parts of the page pass, the tour passes and
 was read by eye at both widths in both schemes, and so do the 906 unit tests.
 
-**What.** T3 Code's look, read from its repository (MIT) and adapted to Dot's tokens and both schemes, through the
+**What.** Another app's look, read from its repository (MIT) and adapted to Dot's tokens and both schemes, through the
 tokens first: the sidebar a tone darker than the page with no border and quiet rows (the title in the body size, the
 time or the state on the right in tabular figures, a hover a step lighter); the chat in one lane; the owner's messages
 in a soft bubble and Dot's without one; a step's tools as one quiet line with an icon; hairlines rather than boxes; the
@@ -7151,19 +7152,19 @@ states. The tour is read by eye at both widths and in both schemes.
 ## Part 17: the sidebar says what works, a helper folded in the chat (planned 2026-10-12)
 
 The owner's seventeenth word, on 2026-10-12, after part 16: while helpers work, and an ordinary session too, the left
-menu could say something like "working …m", as T3 Code does; and by default a helper's content should be folded in the
+menu could say something like "working …m"; and by default a helper's content should be folded in the
 chat. Every word of it researched as written, and applied as exactly as it can be.
 
 **Status (2026-10-12): built.** Items 122 and 123 merged in a day (`10fd83f`, `a2de64d`), each behind the gate and its
-smoke tests, their screenshots read at both widths in both schemes. The sidebar says what works as T3 Code's does: where
+smoke tests, their screenshots read at both widths in both schemes. The sidebar says what works: where
 a row's age sits at rest, a chat whose latest run works and every run of the Working section, a delegated run under its
 parent included, show a dashed circle, Working and the time since the run was asked for ("12s", "4m", "1h 5m"), read
 every second; a run that waits for the owner keeps its amber dot and its age. In a run's chat a helper is its row,
 closed from its start, its last line and its time in sight, the time counting on every second; an approval it asks for
 opens the row until the owner has decided, and a row the owner never opened or closed by hand folds again then and at
 the helper's end. A helper cannot ask the owner a question (`ask_user` is not offered to a delegated run), so the
-question the plan counted on to open a row does not exist. Not built, from the readings of T3 Code: the other labels of
-its sidebar's status slot (Approval, Input, Done) and the closed group that gathers two subagents or more ("3
+question the plan counted on to open a row does not exist. Not built, from the readings of another app: the other labels
+of its sidebar's status slot (Approval, Input, Done) and the closed group that gathers two subagents or more ("3
 subagents", "1 working · 2 done"). The daemon was restarted on `a2de64d` with no run active; the desktop app takes its
 pages from the daemon, so part 17 reaches it without a rebuild.
 
@@ -7177,8 +7178,8 @@ chat a helper is a row (item 82: its face with the state at the corner, its goal
 has taken, the way to its own page and a chevron), a `details` that opens as the helper starts (`timeline.js
 childScope`, `open: true`), so its every step, message and answer stand in the parent's conversation while it works; it
 folds itself when it ends done and the reader has not touched it, and stays open when it failed. A question or an
-approval a helper asks lands as a card inside that panel. T3 Code, read from its repository (MIT, `apps/web/src`): a row
-of its sidebar shows its state where the time sits at rest (`Sidebar.tsx`); while the thread works, a dashed circle
+approval a helper asks lands as a card inside that panel. Another app, read from its repository (MIT, `apps/web/src`): a
+row of its sidebar shows its state where the time sits at rest (`Sidebar.tsx`); while the thread works, a dashed circle
 (Lucide's `CircleDashed`), the word Working and the time since the current work was asked for, in tabular figures, read
 again every second and counted in the fewest units ("12s", "4m", "1h 5m": `formatWorkingDurationLabel` in
 `Sidebar.logic.ts`), with no shimmer ("a label that animates forever is noise in a sidebar full of them"); a pending
@@ -7189,13 +7190,13 @@ more helpers of a turn fold into one row, "3 subagents" over a count of their st
 until opened (`MessagesTimeline.tsx`, `V2SubagentGroup`).
 
 **The shape of this part (the decisions).** First the sidebar: a chat whose latest run works, and every run of the
-Working section with its helpers, says Working and how long, in T3 Code's words, units and mark, where the time sits at
-rest and in the colour of Dot's running state; a run that waits for the owner keeps its amber dot and its time, since
-the Waiting section names what it waits for. The chats' list learns when its latest run was asked for. Then the chat: a
-helper's row is closed from its start, its last line and its time saying what it does; an approval or a question it asks
-opens it, and the rows it sits in, because what needs the owner never hides in a fold; at its end it folds again unless
-the owner opened or closed it by hand. Dot's helpers keep their rows one under the other: T3 Code's group of several is
-not built.
+Working section with its helpers, says Working and how long, with a dashed circle and in the fewest units, where the
+time sits at rest and in the colour of Dot's running state; a run that waits for the owner keeps its amber dot and its
+time, since the Waiting section names what it waits for. The chats' list learns when its latest run was asked for. Then
+the chat: a helper's row is closed from its start, its last line and its time saying what it does; an approval or a
+question it asks opens it, and the rows it sits in, because what needs the owner never hides in a fold; at its end it
+folds again unless the owner opened or closed it by hand. Dot's helpers keep their rows one under the other: a group of
+several is not built.
 
 ### How to start part 17 (the handoff prompt)
 
@@ -7210,8 +7211,8 @@ not built.
 **Status: done.** Merged as `10fd83f` (PR #147, MYP-262 Done).
 
 **As built (2026-10-12).** Where a row's age sits at rest, `sidebar.js workingSlot` shows Lucide's dashed circle
-(`icons.js circleDashed`, the paths of Lucide 1.8.0), the word Working and `workingFor` (`dom.js`: "12s", "4m", "1h 5m",
-T3 Code's units), read again every second by one ticker over the sidebar, in figures of one width, the running state's
+(`icons.js circleDashed`, the paths of Lucide 1.8.0), the word Working and `workingFor` (`dom.js`: "12s", "4m",
+"1h 5m"), read again every second by one ticker over the sidebar, in figures of one width, the running state's
 colour (`--accent`) and the label's weight; the circle stands still. A chat shows it while its latest run is queued or
 running, counted from `ThreadSummary.latest_created_at`, new: the latest run's `created_at`, read by the same query. A
 run of the Working section shows it from its row's `since`, which is the run's `created_at`, the delegated runs nested
@@ -7219,12 +7220,12 @@ under their parent included. A schedule due there, every row of the Waiting sect
 answer stay as they were (an amber dot and an age for the chat); the rows keep their dot or face at the left. The
 README's sidebar passage says it. `tests/smoke/test_working_rows.py` starts a chat that works, a run it delegates and a
 chat that asks a question, on the scripted model, and reads the sidebar at both widths in both schemes: the two runs of
-the Working section and the working chat say Working with a time in T3 Code's units, the asking chat keeps its amber dot
-and its age, the seconds move while the page rests, and once the runs are cancelled every chat shows its age again. 27
-smoke tests pass (the new one, the activity sections, the server and the tour), their shots read by eye at both widths
-in both schemes, and so do the 906 unit tests.
+the Working section and the working chat say Working with a time in the fewest units, the asking chat keeps its amber
+dot and its age, the seconds move while the page rests, and once the runs are cancelled every chat shows its age again.
+27 smoke tests pass (the new one, the activity sections, the server and the tour), their shots read by eye at both
+widths in both schemes, and so do the 906 unit tests.
 
-**What.** As T3 Code's sidebar does: where a row's time sits at rest, a chat whose latest run is queued or running shows
+**What.** Where a row's time sits at rest, a chat whose latest run is queued or running shows
 a dashed circle, the word Working and the time since that run was asked for ("12s", "4m", "1h 5m"), read again every
 second; so does every run of the Working section, a helper under its parent included (those rows have no time today, so
 the state takes their right edge). The colour is Dot's running state's, the figures are tabular, and nothing shimmers. A
@@ -7240,8 +7241,8 @@ not move. A smoke test reads the rows at both widths in both schemes and sees th
 that starts closed: its face and state, its goal over its last line, its time and the way to its page show, and its
 steps, messages and answer wait behind the chevron. While the parent works, the run page (`run.js`) calls the timeline's
 new `tick(now)` every second and after each event it hands the timeline, so a page opened later shows the time at once;
-`tick` writes into the row of each delegated run that has not ended the time since it began, as T3 Code counts a working
-subagent's. Before, the time stood at the run's last event, a few milliseconds for a helper that waits in a long shell
+`tick` writes into the row of each delegated run that has not ended the time since it began.
+Before, the time stood at the run's last event, a few milliseconds for a helper that waits in a long shell
 command. `reveal` opens the row of a run that asks the reader for an approval (an `approval_requested` in its scope) and
 the rows it sits in, each counting what waits inside it; `unreveal`, on the decision, closes each that has nothing left
 waiting and that the reader never opened or closed by hand (the row's `touched`, set by a click on its summary). At its
@@ -7377,11 +7378,11 @@ night's reflection at 03:30, or "From 2026-10-08 to 2026-10-12" when it reads mo
 that was off). `browser_snapshot`'s description says it shows the tab again, every element in and around the viewport
 with refs, and that it takes no arguments. Unit tests for the journal's day; the README's reflection passage follows.
 
-## Part 19: the Appearance page, after T3 Code (planned 2026-10-12)
+## Part 19: the Appearance page (planned 2026-10-12)
 
-The owner's nineteenth word, on 2026-10-12, with three screenshots of T3 Code's Settings › Appearance: whether Dot can
-have that page, since T3 Code is open source and much in it could be taken into Dot if it is done smartly. The word
-before it, the same day, asked whether Dot's home had caught the plainness of T3 Code's; the answer (partly: a warm
+The owner's nineteenth word, on 2026-10-12, with three screenshots of another app's Settings › Appearance: whether Dot
+can have that page, since that app is open source and much in it could be taken into Dot if it is done smartly. The word
+before it, the same day, asked whether Dot's home had caught the plainness of that app's; the answer (partly: a warm
 palette and a busier middle) left six choices with the owner, of which this part offers the first, neutral whites, as a
 theme to pick, and leaves the default as it is.
 
@@ -7389,7 +7390,7 @@ theme to pick, and leaves the default as it is.
 and its tests, the Appearance tab's screenshots read on a desktop and a phone in both schemes. Settings › Appearance
 holds the colour scheme as three miniatures of the window, the themes as a gallery of orbs with a theme for light and
 one for dark, and the interface, the motion and the type, every setting on the page before the first paint. Themes of
-one's own are made from a background, an accent and an action colour, duplicated, edited, exported, added from T3 Code's
+one's own are made from a background, an accent and an action colour, duplicated, edited, exported, added from theme
 files or VS Code's, and kept by the daemon in its home's `themes` folder for every browser. A review of item 128 against
 its done criteria found a Cancel during a save that left the new theme unpicked and the daemon reading a null where the
 page refuses one; both were fixed before the merge. The daemon was restarted on `30b2434` with no run active; the
@@ -7408,47 +7409,47 @@ the two blocks and holds every text tier to 4.5:1 (text, text-2) or 3:1 (muted, 
 home are 768 px wide; code blocks scroll sideways. There is no range control, no command palette (`shortcuts.js`: ⌘K
 searches the runs, ⇧⌘O starts one), and no diff on any page.
 
-What T3 Code does, read from its repository (MIT, © 2026 T3 Tools Inc.; a checkout outside this repository, read and
+What that app does, read from its repository (MIT; a checkout outside this repository, read and
 never run). Settings › Appearance holds the colour scheme as three cards, each a miniature of the window in the colours
 it would show, System split down the middle, and the themes as a gallery of cards, each with a light and a dark orb: a
 ball of the theme's canvas lit by its accent and tinted by its action colour (`ThemePreviewCircles.tsx`). A click on a
-card takes the theme for both schemes, a click on an orb for that scheme only (`t3code:theme-halves:v1`); the orbs in
+card takes the theme for both schemes, a click on an orb for that scheme only; the orbs in
 use are ringed and badged with a sun or a moon. A built-in theme is a literal map of 61 colour roles for light and for
 dark (`packages/shared/src/themePalettes.ts`). A theme of one's own is made from two colours, a canvas and an accent, by
 `createVividThemeColors` (`apps/web/src/themePalette.ts`): it steps the surfaces from the canvas in OKLCH lightness,
 tints them with the accent's hue, solves the text to 7:1 against the canvas and the muted text to the strength of the
 stock palette, and solves the status colours' lightness to 4.6:1 on their surfaces. Themes of one's own are made,
-duplicated, edited, exported and imported (T3 Code's own file, version 1, and VS Code colour themes, whose editor
+duplicated, edited, exported and imported (its own file, version 1, and VS Code colour themes, whose editor
 colours feed the roles), and the server can publish themes from a folder for its clients. Interface: contrast from 50 to
 200 % (text and borders mixed toward the ground below 100, toward black or white above), glass opacity, the chat's width
 (46rem, 72rem or full), diff colours and the composer's git context. Motion: the panels' animation, 0 to 400 ms.
 Typography: the interface, prompt, code and terminal fonts and sizes with previews, font smoothing and word wrap.
 Everything is kept per browser; only the theme is put on the page before the first paint.
 
-**The shape of this part (the decisions).** Dot takes the page and its mechanics, not T3 Code's look as a whole: Neutral
-stays the default, Paper stays, and so do the faces, the mark and the type system. A theme becomes what T3 Code makes of
-one, a set of colours for light and one for dark, and Dot's tokens are where they land: a theme picked for light and
+**The shape of this part (the decisions).** Dot takes the page and its mechanics, not another app's look as a whole:
+Neutral stays the default, Paper stays, and so do the faces, the mark and the type system. A theme becomes
+a set of colours for light and one for dark, and Dot's tokens are where they land: a theme picked for light and
 another for dark are written on the page element as `light-dark()` pairs, so the scheme switches as it does today, and
-nothing is written when Neutral or Paper is picked for both. T3 Code's built-in palettes are ported as data and mapped
-to Dot's tokens, with Dot's rule for every text tier on every surface solved the way T3 Code solves its text; its own
-look comes as Clean and T3 Chat's as Rose, since those two names are T3's. What Dot has no use for stays out: glass (Dot
+nothing is written when Neutral or Paper is picked for both. Another app's built-in palettes are ported as data and
+mapped to Dot's tokens, with Dot's rule for every text tier on every surface solved the way that app solves its text;
+the two named after its products come as Clean and Rose. What Dot has no use for stays out: glass (Dot
 draws no translucent surface), diff colours (no page shows a diff), the environment's artwork and the composer's git
 context. A theme of one's own is kept by the daemon, in a `themes` folder in its home, rather than by one browser, so
-the desktop app, the browser and the phone share it, and a theme file put there by hand or by Dot shows in the gallery:
-T3 Code's published themes, made the one place themes are kept. T3 Code's file format (version 1) is Dot's, so a theme
+the desktop app, the browser and the phone share it, and a theme file put there by hand or by Dot shows in the gallery,
+which makes the folder the one place themes are kept. Dot's file format (version 1) is that app's, so a theme
 moves between the two. Every setting is kept per browser and put on the page before the first paint, as the look is
 today.
 
 ### How to start part 19 (the handoff prompt)
 
 > Read ROADMAP.md part 19 and the status table of part 9 (rows 126 to 128). One item at a time, in order; the protocol
-> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. T3 Code's
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. That app's
 > source is read, never run, from a checkout outside this repository, and what is ported carries its MIT notice. Never
 > touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run;
 > the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is
 > English. Every UI item ends with the screenshot tour read by eye.
 
-### 126. Themes, after T3 Code: a page for the look, a theme for light and one for dark
+### 126. Themes: a page for the look, a theme for light and one for dark
 
 **Status: done.** Merged as `c5dfc76` (PR #157, MYP-267 Done).
 
@@ -7459,45 +7460,45 @@ card is a miniature of the window made of spans on the tokens (`.wire-*` in `set
 with `color-scheme`, so every `light-dark()` token inside it resolves to that side, and System clips a light and a dark
 pane at the middle. A theme (`theme.js THEMES`) is a look of `themes.css` or a palette. A look's tokens are read from
 the stylesheet's own rule through the CSSOM (`appearance/tokens.js lookTokens`), so `themes.css` stays the one place
-they live; the palettes (`appearance/palettes.js`) are 23 of the 61 roles of T3 Code's six built-ins, taken verbatim,
-which `paletteTokens` maps onto Dot's 28 colour tokens. T3 Code's action colour is Dot's accent, since T3 Code paints
-its solid controls with it (its `index.css` says so): Grove's controls are ochre, Ocean's teal, Ember's rust and Iris's
-magenta, as in T3 Code, and the hints say so. Each text tier is solved against the surface it reads worst on by moving
-its OKLCH lightness away from it (`appearance/colour.js readableOn`, after T3 Code's solver), to 4.6:1 or 3.1:1, a tenth
+they live; the palettes (`appearance/palettes.js`) are 23 of the 61 roles of another app's six built-ins, taken
+verbatim, which `paletteTokens` maps onto Dot's 28 colour tokens. The action colour is Dot's accent, since that app
+paints its solid controls with it (its `index.css` says so): Grove's controls are ochre, Ocean's teal, Ember's rust and
+Iris's magenta, as in that app, and the hints say so. Each text tier is solved against the surface it reads worst on by
+moving its OKLCH lightness away from it (`appearance/colour.js readableOn`), to 4.6:1 or 3.1:1, a tenth
 above Dot's rule so that the browser's rounding never lands under it; the status inks are solved on their grounds the
-same way, success taking T3 Code's emerald. The surfaces step from the card: T3 Code's accent surface where it lies
-further from the page, else a step of 0.035 in OKLCH lightness. T3 Code's vivid palettes draw their cards on the page
+same way, success taking that app's emerald. The surfaces step from the card: the palette's own accent surface where it
+lies further from the page, else a step of 0.035 in OKLCH lightness. The vivid palettes draw their cards on the page
 itself, which broke Dot's rule that a dark card lies above the page (the smoke test found it in Grove, Ocean, Ember and
 Iris); a dark card no lighter than the page is now a step above it. The picks (`dot.theme`, which kept its name, and
 `dot.themeDark`) write the 28 tokens as `light-dark()` pairs on the page element and keep them in `dot.themeTokens`;
 Neutral or Paper for both write nothing and drop the kept values. `data-theme` names the pick of the scheme on screen
 and follows the system's changes, so Paper's serif voice and shapes are Paper's only while it is shown. `boot.js` checks
-every kept pair against a pattern of plain colours before it sets it. The orbs (`appearance/orbs.js`) are T3 Code's: a
+every kept pair against a pattern of plain colours before it sets it. The orbs (`appearance/orbs.js`) are ported: a
 ball of the canvas mixed toward white or near-black, lit by two radial gradients in oklab, blurred 3 px and spread to
 1.1 inside a 56 px rim whose edge is a token of each scheme in `themes.css`; a click between the orbs falls through to
 the card. ⌥⌘A opens the tab and ⇧⌥⌘A steps System, Light and Dark with a toast (`shortcuts.js`, which reads the key by
-`event.code`, since ⌥A types "å" on a Mac). `static/js/appearance/LICENSE` carries T3 Code's MIT licence, names the
-modules ported and says Dot is not affiliated with T3 Tools Inc. `tests/smoke/test_themes.py` picks each of the eight
-themes in each scheme and reads the colours the page paints through a probe, held to the rule of `test_css_tokens.py`;
-picks Paper for light and Ember for dark, checks the orbs, the cards in use, the layout's note and the switch that
-follows Paper, then aborts `main.js` and reloads, so that only `boot.js` runs, and reads the same colours in each
-scheme; and presses the two keys. `test_controls.py` and `test_character.py` follow the settings to the new tab, and the
-tour has it.
+`event.code`, since ⌥A types "å" on a Mac). `static/js/appearance/LICENSE` carries the MIT licence of the project the
+code comes from, names the modules ported and says Dot is not affiliated with it. `tests/smoke/test_themes.py` picks
+each of the eight themes in each scheme and reads the colours the page paints through a probe, held to the rule of
+`test_css_tokens.py`; picks Paper for light and Ember for dark, checks the orbs, the cards in use, the layout's note and
+the switch that follows Paper, then aborts `main.js` and reloads, so that only `boot.js` runs, and reads the same
+colours in each scheme; and presses the two keys. `test_controls.py` and `test_character.py` follow the settings to the
+new tab, and the tour has it.
 
 **What.** Settings gets an **Appearance** tab after General, and the look's card leaves General for it. The colour
 scheme is three cards, System, Light and Dark, each a miniature of Dot's window (the sidebar and its rows, a message,
 the composer and its send button) drawn on the tokens of the scheme it names, System split down the middle; the chosen
-one is ringed. The themes are a gallery of cards, each with a light and a dark orb drawn as T3 Code draws them and the
+one is ringed. The themes are a gallery of cards, each with a light and a dark orb and the
 theme's name: a click on the card takes the theme for both schemes, a click on an orb for that scheme only, and the orbs
-in use are ringed and carry a sun or a moon. The themes are Neutral (the default) and Paper as they are, and T3 Code's
-palettes ported (its own look as Clean, T3 Chat's as Rose, Grove, Ocean, Ember and Iris), their roles mapped to Dot's
+in use are ringed and carry a sun or a moon. The themes are Neutral (the default) and Paper as they are, and the
+palettes ported (Clean, Rose, Grove, Ocean, Ember and Iris), their roles mapped to Dot's
 tokens: the surfaces, the sidebar, the borders, the text and its tiers, the accent and what is drawn on it, the owner's
 bubble and the status colours. Every text tier reads on every surface at Dot's thresholds and every ink on its ground at
-4.5:1, in both schemes, solved where the port falls short as T3 Code solves its text. A theme picked for light and
+4.5:1, in both schemes, solved where the port falls short as the source solves its text. A theme picked for light and
 another for dark are written on the page element as `light-dark()` pairs; Neutral or Paper for both leave the stylesheet
 alone; Paper's serif voice follows Paper while it is shown, and the layout a look starts with follows the theme picked
 for light. What is picked is kept in the browser with the values it wrote, which `boot.js` puts on the page before the
-first paint. ⌘⌥⇧A cycles System, Light and Dark, and ⌘⌥A opens the tab. T3 Code's MIT notice sits beside the ported
+first paint. ⌘⌥⇧A cycles System, Light and Dark, and ⌘⌥A opens the tab. The MIT notice sits beside the ported
 code, and the README's look passage follows. A smoke test reads every theme's tiers and inks in both schemes in a
 browser, picks a mix and reloads without a flash, and clicks through the gallery; the controls page is read in a ported
 theme; the tour is read by eye.
@@ -7510,7 +7511,7 @@ theme; the tour is read by eye.
 two layout switches and their note), **Motion** gained the panels' slide, and **Type** follows them. Each setting is one
 object of `appearance/settings.js` (its key, its default, the values it takes and what it puts on the page element), and
 `boot.js` writes the same for every key before the first paint, the default being no key and nothing on the page. The
-contrast is T3 Code's arithmetic (`appearanceContrast.ts`): the share of a tier kept below 100 (`--contrast-base`), the
+contrast is the ported arithmetic (`appearanceContrast.ts`): the share of a tier kept below 100 (`--contrast-base`), the
 push toward black or white above it (`--contrast-boost`) and a quarter of that for the lines. `themes.css` names the
 theme's text tiers, `--control` and the two line colours again on the page element under `data-contrast` and mixes them
 on the body, since a token cannot be worked out from itself; at 100 nothing is written, so the colours a probe reads are
@@ -7519,7 +7520,7 @@ page's column. The panels' slide is `--motion-panel`, on the docked sidebar's co
 its scrim, still none under reduced motion. The seven sizes of the type and their line-heights are `calc()` of
 `--type-scale`, the interface's size over 14; the composer (`--composer-size`, `--composer-font`) and an answer's code
 blocks (`--code-size` on `.prose pre`) have their own. A family is a stack `app.css` names (`--family-<id>`: Inter, the
-system's, a serif, Geist Mono, SF Mono, Menlo) or families typed, quoted as T3 Code quotes them (`appearanceFonts.ts`,
+system's, a serif, Geist Mono, SF Mono, Menlo) or families typed, quoted as in the port (`appearanceFonts.ts`,
 with the typed quotes dropped and CSS's keywords quoted) and put before the stack they replace; letters, digits, spaces,
 commas, quotes, dots, dashes and underscores may be typed, up to 200, and anything else is refused under the field and
 not kept. Paper's voice is `var(--family-serif)`. Font smoothing off and code wrapped are attributes the stylesheets
@@ -7533,9 +7534,9 @@ refused and the one kept stays. With `main.js` aborted, so that only `boot.js` r
 and tokens on the page; with it, the controls show the values kept; the home reads 1152 px wide, its composer in the
 code's family at 18 px; set back to the defaults, nothing is left on the page element and no key is kept.
 
-**What.** The tab's other sections, as T3 Code has them where Dot has a use for them. Interface: the contrast, 50 to 200
+**What.** The tab's other sections, where Dot has a use for them. Interface: the contrast, 50 to 200
 % with 100 as today (below 100 the text tiers and the borders are mixed toward the ground, above it toward black in
-light and white in dark, as T3 Code does); the chat's width (Comfortable, 768 px as today; Wide, 1152 px; Full); and the
+light and white in dark); the chat's width (Comfortable, 768 px as today; Wide, 1152 px; Full); and the
 density, moved here with the switches of the tool steps and the details panel. Motion: the panels' slide, 0 to 400 ms
 with 200 as today (0 is instant, and the system's reduced motion still wins), and the faces that move, moved here. Type:
 the interface's font (Inter as today, the system's, or a family typed) and its size (13 to 17 px around today's 14,
@@ -7551,32 +7552,32 @@ read by eye.
 **Status: done.** Merged as `30b2434` (PR #159, MYP-269 Done).
 
 **As built (2026-10-12).** The daemon keeps the themes in `<home>/themes` (`core/paths.py themes_dir`), which
-`ensure_layout` leaves alone: the first theme saved makes it, mode 0700. `dotagent/themes.py` checks a theme file as T3
-Code's `themePalette.ts` and `environmentTheme.ts` do: version 1 or T3 Code's short form (a name, an appearance, a
-canvas and an accent in hex), a name of 1 to 48 UTF-16 units, T3 Code's 61 roles and no other key, colours in the
+`ensure_layout` leaves alone: the first theme saved makes it, mode 0700. `dotagent/themes.py` checks a theme file as the
+ported `themePalette.ts` and `environmentTheme.ts` do: version 1 or the short form (a name, an appearance, a
+canvas and an accent in hex), a name of 1 to 48 UTF-16 units, the 61 roles and no other key, colours in the
 grammar of `colour.js parseColour` (hex of 3, 4, 6 or 8 digits, `rgb()`, `oklch()`, `transparent`), a variant only for
-the other appearance, and an id, the file's name, of lowercase letters, digits and dashes that no theme of Dot's or T3
-Code's has; a key without a value is left out rather than null, and `managed` is true or false, as the page reads them.
+the other appearance, and an id, the file's name, of lowercase letters, digits and dashes that no built-in theme
+has; a key without a value is left out rather than null, and `managed` is true or false, as the page reads them.
 A file is opened with `O_NOFOLLOW | O_NONBLOCK` and weighed with `fstat`, so a link, a pipe or a folder is skipped, as
 are a file over 32 KB, the files past the 32nd and the ones past 192 KB in all; each is listed with its reason and
 logged as `theme_skipped`. A theme is written whole, through a temporary file and `os.replace`, one change of the folder
 at a time so that the caps are weighed against what is there. `server/routes_themes.py` serves `GET /api/themes` (the
 folder, its themes and the files skipped), `PUT` and `DELETE /api/themes/{id}`; a theme goes out with the keys it has
 only, since FastAPI wrote the missing ones as `null` and the page refused the themes it had just saved (the smoke test
-found it). On the page, `appearance/generator.js` ports T3 Code's generator: the 61 roles from a canvas and an accent,
+found it). On the page, `appearance/generator.js` ports the generator: the 61 roles from a canvas and an accent,
 and a family of colours changed with the ones made with it (`withFamily`). `appearance/own.js` reads a theme file as the
-daemon does, fills the roles a theme leaves out from T3 Chat's palette as T3 Code does, lays an alpha over the canvas
+daemon does, fills the roles a theme leaves out from the Rose palette, lays an alpha over the canvas
 and maps the roles onto Dot's tokens through item 126's `paletteTokens`, so a theme of one's own holds Dot's rule as the
-built-ins do; `appearance/vscode.js` maps a VS Code colour theme's workbench colours as T3 Code's `vscodeThemeImport.ts`
-does. `theme.js` holds the themes of one's own beside the built-ins: until the daemon's list arrives a pick it does not
-know is pending and the values `boot.js` wrote stay; a theme deleted gives its schemes back to Neutral; and while the
-editor is open the page wears the palette being changed (`previewTokens`, `data-theme="draft"`) and the scheme's
-controls wait. The editor (`views/themeEditor.js`) has T3 Code's Background and Accent, an **Action** field of Dot's
-and, in a fold, the families (Sidebar, Surface, Highlight surface, Border, Input border, Text, Muted text, Message
-surface, Error and Warning), beside a sample of the chat. T3 Code's generator turns the action colour 50° of hue away
-from the accent, which painted Dot's buttons purple under a blue accent, so the action is set on its own and kept when
-the palette is made again. Create starts from the palettes of the themes in use, as T3 Code's does; `managed` (the
-generator's alone, as T3 Code marks it) is written only when no palette was changed by hand; Duplicate reads a look's
+built-ins do; `appearance/vscode.js` maps a VS Code colour theme's workbench colours as the ported
+`vscodeThemeImport.ts` does. `theme.js` holds the themes of one's own beside the built-ins: until the daemon's list
+arrives a pick it does not know is pending and the values `boot.js` wrote stay; a theme deleted gives its schemes back
+to Neutral; and while the editor is open the page wears the palette being changed (`previewTokens`,
+`data-theme="draft"`) and the scheme's controls wait. The editor (`views/themeEditor.js`) has a Background and an
+Accent, an **Action** field of Dot's and, in a fold, the families (Sidebar, Surface, Highlight surface, Border, Input
+border, Text, Muted text, Message surface, Error and Warning), beside a sample of the chat. The ported generator turns
+the action colour 50° of hue away from the accent, which painted Dot's buttons purple under a blue accent, so the
+action is set on its own and kept when the palette is made again. Create starts from the palettes of the themes in use;
+`managed` (the generator's alone) is written only when no palette was changed by hand; Duplicate reads a look's
 colours back from its tokens; Export downloads `<id>.json` with the derived colours written out; Add theme takes a file
 of 2 MB at most. A new theme's id is one that no theme and no file left out of the folder has, matched without case as a
 Mac's disk matches names, so a file put there by hand is not written over; Cancel waits while a theme is saved, since a
@@ -7594,21 +7595,21 @@ width, waited for with a function, since Playwright evals an expression again on
 Content-Security-Policy refuses that. Export in the desktop app is not tried: its web view has no handler for a
 download.
 
-**What.** **Create theme** makes a theme from a background and an accent, the rest derived by T3 Code's generator,
+**What.** **Create theme** makes a theme from a background and an accent, the rest derived by a generator,
 ported and held to Dot's thresholds, with an advanced view for the families of colours; **Duplicate** copies any theme
 into the editor; a theme of one's own is **edited**, **exported** as a file and **deleted**; **Add theme** imports a
-file: T3 Code's theme file (version 1), the short form T3 Code publishes (a name, light or dark, a canvas and an
-accent), or a VS Code colour theme, whose editor colours feed the roles as T3 Code maps them. The editor shows the theme
+file: a theme file (version 1), its short form (a name, light or dark, a canvas and an
+accent), or a VS Code colour theme, whose editor colours feed the roles. The editor shows the theme
 on the page while it is drawn. Themes of one's own are kept by the daemon as files in its home's `themes` folder (`GET`,
 `PUT` and `DELETE /api/themes`), checked on the way in (the version, a name of 1 to 48 characters, an id no built-in
 has, colours that parse, a size cap) and written whole or not at all; the desktop app, the browser and the phone share
 them, and a valid file put in the folder shows in the gallery. The README follows; unit tests for the daemon's checks; a
 smoke test creates, picks, reloads, exports, imports a VS Code theme and deletes; the tour is read by eye.
 
-## Part 20: a chat's menu and the composer at the foot, after T3 Code (planned 2026-10-12)
+## Part 20: a chat's menu and the composer at the foot (planned 2026-10-12)
 
-The owner's twentieth word, on 2026-10-12, with a screenshot of T3 Code's sidebar, where a right-click on a thread
-opens its menu: that Dot take the actions on a chat it needs, from T3 Code or of its own design, as long as they work
+The owner's twentieth word, on 2026-10-12, with a screenshot of another app's sidebar, where a right-click on a thread
+opens its menu: that Dot take the actions on a chat it needs, from that app or of its own design, as long as they work
 for Dot. With it, a screenshot of a run page: after the first message the composer stands right under it, near the top
 of the window, and belongs at the bottom.
 
@@ -7623,7 +7624,7 @@ its dot going away. On the run page the composer is the dock (`.dock`, sticky at
 there once the conversation is taller than the window, and stands right under a short one, so the first message has it
 near the top.
 
-What T3 Code does, read from its repository (MIT, © 2026 T3 Tools Inc.; a checkout outside this repository, read and
+What that app does, read from its repository (MIT; a checkout outside this repository, read and
 never run). A right-click on a thread's row opens its menu (`threadActionMenu.logic.ts`, run by `Sidebar.tsx`), the
 desktop app's own menu or, in a browser, a menu of the page; the row has no button for it. Pin puts the thread in a
 Pinned group at the top. Settle moves it to a folded "Settled (n)" shelf at the foot of the list, by hand, or by itself
@@ -7648,7 +7649,7 @@ first message.
 ### How to start part 20 (the handoff prompt)
 
 > Read ROADMAP.md part 20 and the status table of part 9 (rows 129 to 131). One item at a time, in order; the protocol
-> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. T3 Code's
+> of part 5 (branch, gate, PR, Linear MYP issue, squash merge, hash in the table, log line) is unchanged. That app's
 > source is read, never run, from a checkout outside this repository, and what is ported carries its MIT notice. Never
 > touch the owner's data directory except to read it and to restart the daemon when `/api/status` shows no active run;
 > the owner's goals stay out of this file; PLAN.md stays untracked. The owner reads Turkish; everything written is
@@ -7704,7 +7705,7 @@ against the done criteria found them met and five edges, fixed before the merge:
 right-click in the name's field is the field's, the row comes back without waiting for the list, Enter while an input
 method composes is left to it, and the menu holds the keys after a click between its items.
 
-**What.** A chat's row gets a menu, after T3 Code's: a "…" button at its right (on hover and on focus, always on a touch
+**What.** A chat's row gets a menu: a "…" button at its right (on hover and on focus, always on a touch
 screen), a right-click on the row and the context-menu key open it; the arrow keys move through it, Escape closes it
 and gives the focus back. **Pin** / **Unpin**: pinned chats sit in a Pinned group above Today, the last pinned first, and
 are listed however old they are. **Rename**: the title becomes a field in the row; Enter or leaving the field keeps the
@@ -7743,7 +7744,7 @@ smoke test opens the chat by Enter and fails without the fix); the backfill now 
 proves it runs only when the column is added.
 
 **What.** A chat whose latest run ended after the chat was last seen shows a dot in the accent colour and says unread
-to a screen reader, as T3 Code marks a thread with a turn not yet seen; opening the chat, or having it open in view when
+to a screen reader; opening the chat, or having it open in view when
 the run ends, marks it seen. **Mark unread** in a chat's menu makes it unread until it is opened again, and **Mark
 read** clears one. The daemon keeps when each chat was last seen (`threads.seen_at`), so the phone and the desktop
 agree; the chats there when the column is added are taken as seen, and a scheduled run that ends leaves its chat unread.
@@ -7781,8 +7782,8 @@ its own middle, lower.
 a run to keep going turn goal mode on for it, and the checker, told so, accepts a finish only when the goal is done,
 blocked or impossible; every model is told plainly not to stop to report or to offer work it can do itself, and every
 goal check sends back an answer that offers work within the goal instead of doing it. The dock of a chat's page offers
-what the home's box offers, for the next message, as T3 Code's composer keeps its model and reasoning on every turn of a
-thread. The window puts its traffic lights on the top bars' centre line, and the sidebar's head grows to the top bar's
+what the home's box offers, for the next message.
+The window puts its traffic lights on the top bars' centre line, and the sidebar's head grows to the top bar's
 height so that its button stands there too.
 
 ### How to start part 21 (the handoff prompt)
@@ -7859,8 +7860,8 @@ level to the daemon); `tests/smoke/test_composer.py` and the tour for the home's
 review against the done criteria found them met and the smoke test short of their negative cases, which it now reads; a
 follow-up now always waits for the model list, as every follow-up on a run with a model recorded did.
 
-**What.** On a chat's page the dock offers what the home's box offers for the next message, after T3 Code's composer,
-which keeps its model and reasoning on every turn of a thread: the mode, the model with its reasoning, and the Options
+**What.** On a chat's page the dock offers what the home's box offers for the next message:
+the mode, the model with its reasoning, and the Options
 (approvals and goal mode), set at first to the open run's. A follow-up starts its run with them. While a run works, a
 message steers that run, which keeps its own model and options; the choices then wait for the next follow-up, and their
 pills say so. The agent stays the chat's, and Keep going stays a choice of a new chat (a campaign starts from a goal of
@@ -8335,18 +8336,18 @@ ripgrep cannot read, still failing the search. The first failed on the code of b
 since item 146; found when the owner asked, after part 23, whether the guards of parts 22 and 23 took the agent's
 freedom.
 
-## Part 24: the queue of a chat, after T3 Code (planned 2026-10-13)
+## Part 24: the queue of a chat (planned 2026-10-13)
 
-The owner's twenty-fourth word, on 2026-10-13, after part 23: add T3 Code's queued messages to Dot, as T3 Code has them.
+The owner's twenty-fourth word, on 2026-10-13, after part 23: add queued messages to Dot.
 
-**Status (2026-10-13): planned.** T3 Code's queue was read in its source (the banner above its composer, and the
+**Status (2026-10-13): planned.** Another app's queue was read in its source (the banner above its composer, and the
 server's rules for when a queued message starts and when it waits), then Dot's run page, run manager and store for where
 a queue fits.
 
 **The shape of this part (the decisions).** One item (148). The queue is the daemon's, kept per chat in the store, so it
 goes on with no page open, and a queued message is not a run until it starts: a run in the `queued` status would count
 as working, be closed at a restart and keep the daemon from being idle. It starts when the chat's run ends done and
-waits on any other end, as in T3 Code: a stop, a failure or a restart holds the queue until the owner resumes it.
+waits on any other end: a stop, a failure or a restart holds the queue until the owner resumes it.
 
 ### How to start part 24 (the handoff prompt)
 
@@ -8356,7 +8357,7 @@ waits on any other end, as in T3 Code: a stop, a failure or a restart holds the 
 > owner's data directory except to read it, by the kinds and numbers of what is stored, and to restart the daemon when
 > `/api/status` shows no active run; PLAN.md stays untracked. The owner reads Turkish; everything written is English.
 
-### 148. The queue of a chat, after T3 Code
+### 148. The queue of a chat
 
 **Status: done.** Merged as `5f6747b` (PR #184; no Linear issue, the Linear connector was signed out).
 
@@ -8367,8 +8368,8 @@ done, the run manager starts the queue's first message as the chat's next run, w
 next one waits for that run, and so on. Any other end, a stop, a failure or a start of the daemon, holds the queue until
 the owner resumes it: what failed would likely fail the next message too, and a stop stops the chat. Nothing starts
 while a run of the chat works, a delegated run or a campaign's session leaves the queue alone, and a campaign's chat
-takes no queue, so a message there steers the session as before. The page shows the queue above the composer as T3 Code
-does (`static/js/queue.js`): a sheet whose head (an ordered list, Queued, the count, a chevron) folds it, and a row per
+takes no queue, so a message there steers the session as before. The page shows the queue above the composer
+(`static/js/queue.js`): a sheet whose head (an ordered list, Queued, the count, a chevron) folds it, and a row per
 message: a handle that drags it to another place or moves it with the arrow keys, its text on one line with all of it in
 the tooltip, a pencil that edits it in the composer (the send says Save; Escape or Cancel gives the box its draft back),
 Steer, which sends it to the run at work now, and × to take it out. While the run works the send says Queue; ⌘⇧Enter
@@ -8386,7 +8387,7 @@ dark: three messages queued, one moved with the keys and one by a drag, one edit
 its button and one with the key, the chat followed to the next run, which is stopped, and the paused queue resumed. They
 failed on the code of before, where the run manager has no queue and the send says Steer.
 
-**What.** T3 Code's queued messages in Dot: a message sent while a run works waits and starts after it, instead of
+**What.** Queued messages in Dot: a message sent while a run works waits and starts after it, instead of
 steering the run at once, and the queue can be reordered, edited, sent into the run and resumed, from any open page.
 
 ## Part 25: solid ground, from the deep review (planned 2026-10-13)
@@ -9687,7 +9688,7 @@ running" for all of them.
 
 The owner's thirtieth word, on 2026-10-14: Dot should master Excel, Word and OneDrive, which matter a great deal to the
 owner; the Excel, Word and PDF files sent to a chat, or picked from the side menu, should open in a panel beside it; the
-chat should show charts, 3D drawings and other visuals, as T3 Code has begun to; and the agent should ask questions in
+chat should show charts, 3D drawings and other visuals; and the agent should ask questions in
 the middle of its work, with its recommendation, and take a typed answer. Research carefully, and build it the cleanest
 way.
 
@@ -9695,8 +9696,8 @@ way.
 (`tools/meta.py`); attachments take images, PDF and text and refuse Word, Excel and PowerPoint files
 (`agent/attachments.py`), and the page shows only the images among them; nothing of Dot's own making is shown as a page,
 and the pages' policy frames nothing (`server/guard.py`); Dot drives applications with AppleScript and the accessibility
-tools, with nothing of its own about Office. T3 Code's pages (`html_render`) were read for the frame: a page kept as a
-file, served in a sandbox without its origin, sized by a message from inside it and given the theme's colours.
+tools, with nothing of its own about Office. Another app's pages (`html_render`) were read for the frame: a page kept as
+a file, served in a sandbox without its origin, sized by a message from inside it and given the theme's colours.
 Microsoft's own MCP servers for Word and OneDrive need a work or school account (Microsoft Entra); Excel and Word for
 Mac still take AppleScript, which macOS asks the owner to allow once.
 
@@ -9752,7 +9753,7 @@ nothing made from the token. It serves the page after a bootstrap of its own and
 nothing of the web UI and it reaches neither the API nor the page around it; it fetches nothing but libraries from four
 CDNs (cdn.jsdelivr.net, unpkg.com, cdnjs.cloudflare.com, esm.sh), submits no form, and only the pages of the daemon
 frame it, which may now frame pages of their own server (`frame-src 'self'`). The frame and the page speak three
-messages of the MCP Apps protocol, as T3 Code's pages do: the page tells its height (80 to 2,000 pixels), the frame
+messages of the MCP Apps protocol: the page tells its height (80 to 2,000 pixels), the frame
 sends the colours of the theme on screen as CSS variables and sends them again when the theme or the system's scheme
 changes, and a link the user clicks in the page opens in the browser. A script of the page cannot open one by itself,
 nor with a click made elsewhere: the frame must hold the focus as well as the click. A page that loads another page in
@@ -9771,7 +9772,7 @@ test passed in WebKit, the engine of the desktop shell. With the pages of before
 `frame-src 'self'` the frame never loads.
 
 **What.** A tool keeps a page of HTML the run writes (a chart, a 3D drawing, a table, a diagram), and the chat shows it
-in a card, as T3 Code shows the pages its agents render. The daemon serves the page at an address of its own, signed
+in a card. The daemon serves the page at an address of its own, signed
 with the token, in a frame that gives it no way to the daemon or to the page around it (a sandbox without the same
 origin) and no network but scripts and styles from a few package CDNs; the card sizes the frame to the page and hands it
 the colours of the theme in use.
@@ -9877,10 +9878,10 @@ installed, and eval tasks check the skills.
 
 The owner's thirty-first word, on 2026-10-14: the default model should be chosen in Settings, and the model chosen in a
 chat should stay chosen through a reload or a restart; reconnecting should be sure to work; small marks at the left of
-the conversation, one for each message, should show the message when the pointer rests on one and go to it on a click,
-as in T3 Code; once a run is stopped, the rows of the runs it delegated should stop moving; a run with three agents at
+the conversation, one for each message, should show the message when the pointer rests on one and go to it on a click;
+once a run is stopped, the rows of the runs it delegated should stop moving; a run with three agents at
 work showed one of them in the side menu, and they could not be folded or unfolded; and the left menu and the right
-panel should both be designed and work better, after T3 Code or in a way of Dot's own.
+panel should both be designed and work better, in a way of Dot's own.
 
 **Status (2026-10-14): planned.** What exists was read in the code. A run that was stopped stored its end before the
 ends of the runs it delegated (`RunManager.delegate` stopped a delegated run and went on at once), and the run page
@@ -10013,12 +10014,12 @@ system's own.
 drops, the app opened while the daemon is down, the Mac waking from sleep. A page that reads nothing again after a break
 reads what changed. A test for each.
 
-### 201. Marks of the conversation's messages: a look and a jump, after T3 Code
+### 201. Marks of the conversation's messages: a look and a jump
 
 **Status: done.** Merged as `4f23e25` (PR #240; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** At the left of the conversation a column of short marks stands for the owner's messages, one
-mark for each, top to bottom as they stand in it (`outline.js`, after T3 Code's): the question of each earlier turn, the
+mark for each, top to bottom as they stand in it (`outline.js`): the question of each earlier turn, the
 run's goal and each message sent while it worked; a delegated run's are its own. Resting the pointer on the column shows
 the message of the mark nearest to it and the start of its answer, the last that Dot wrote before the next message, in
 three lines; a click brings that message to the top of what the window shows, under the stage bar. The column is one
@@ -10027,27 +10028,27 @@ to. A mark is short at rest and longer the nearer it is to the one chosen, and t
 darker as the conversation scrolls. The column stands at the left edge of the run's layout, in the middle of what the
 window shows between the stage bar and the dock, 8 px between marks until it is as tall as the window lets it be. It
 needs a pointer that rests, two messages or more, and 40 px of room at the left of the conversation (its inset, a whole
-mark and a little air): a phone has none, and beside the side panel a window needs 1512 px. T3 Code asks for 48, which
-the side panel never leaves. Tests: `tests/smoke/test_outline.py`, a real server on a scripted model, with a chat of
+mark and a little air): a phone has none, and beside the side panel a window needs 1512 px.
+Tests: `tests/smoke/test_outline.py`, a real server on a scripted model, with a chat of
 five messages and long answers and one of a single message: the marks at 1280 px, light and dark, clear of the
 conversation, the one in sight darker; resting on the second shows its message and the start of its answer; a click, and
 Enter after the arrows, bring a message into view; no column on a phone, for a single message, or beside the side panel
 at 1280 px, and one at 1512 px. On the code of before there was no column. It passed in WebKit too.
 
 **What.** A column of short marks at the left of the conversation, one for each message of the owner: resting on one
-shows the message and the start of its answer, and a click goes to it. After T3 Code's.
+shows the message and the start of its answer, and a click goes to it.
 
 ### 202. The side menu, designed again
 
 **Status: done.** Merged as `7e03ac3` (PR #241; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-14).** Each chat stands once in the side menu, after T3 Code's Working shelf (`sidebar.js`). Before,
+**As built (2026-10-14).** Each chat stands once in the side menu (`sidebar.js`). Before,
 a chat at work stood twice: its run among the rows of the Working section, with the runs it delegated, and the chat
 among the days, with nothing under it; a pinned chat at work stood under Working and under Pinned. Now a chat whose
 latest run is one of the runs at work leaves its day for Working, as the chat it is (its row, its menu, Working and the
 time at its right, the face of the agent or the campaign at work in its dot's place), with the runs it delegated folded
-under it as in item 198, and goes back among the days once the run ends. A pinned chat stays under Pinned, as T3 Code
-keeps pins where the owner put them, with the runs it delegated under it there. Working lists as before what is no
+under it as in item 198, and goes back among the days once the run ends. A pinned chat stays under Pinned,
+with the runs it delegated under it there. Working lists as before what is no
 listed chat's: a schedule about to fire, the session of a campaign (which works in a thread of its own), a run whose
 chat is not listed. Waiting for you is as it was: what a run asks is the news, and the chat of that run keeps its amber
 dot among the days. Working counts what it lists. Folded, it keeps the open chat in sight, so that a chat just sent on
@@ -10070,7 +10071,7 @@ in it and what waits for the owner, and how its parts fold. Screenshots looked a
 
 **Status: done.** Merged as `94985af` (PR #242; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-14).** The run's side panel shows one thing at a time, in tabs after T3 Code's side panel
+**As built (2026-10-14).** The run's side panel shows one thing at a time, in tabs
 (`inspector.js`, `panels.js`). Before, it stacked seven cards that arrived folded (Dot's computer, Details, Cost, Plan,
 Files, Actions, Screen), each with a line under its title; open, they made one column some 1 800 px tall at 1280 px. Now
 its head is a strip of four tabs: Run (the details and the cost), Plan (the plan's steps; the tab says how many are
@@ -10098,15 +10099,14 @@ cost, the plan, the files, the actions and the screens. Screenshots looked at, w
 
 ## Part 33: a page that stays put, messages with their time, markdown kept (planned 2026-10-14)
 
-The owner's thirty-second word, on 2026-10-14: in T3 Code a text pasted into the composer comes in as markdown, not as
-the broken text Dot shows, and copies come out cleaner; that order should hold in Dot's conversation and in its
+The owner's thirty-second word, on 2026-10-14: in another app a text pasted into the composer comes in as markdown, not
+as the broken text Dot shows, and copies come out cleaner; that order should hold in Dot's conversation and in its
 composer. Under the owner's own message, once it has an answer, there should be the time it was sent, a copy and a way
 to send it again; under the agent's answer, its time and a copy. Deleting or adding something scrolls the app back to
 the top, as a refresh would, and it should not. And, if it can be done, the composer's model menu should have small
-marks of the providers at its left that filter their models, a search, and favourites the owner chooses, as T3 Code's
-has.
+marks of the providers at its left that filter their models, a search, and favourites the owner chooses.
 
-**Status (2026-10-14): planned.** What exists was read in the code, and T3 Code's sources were read for the way it does
+**Status (2026-10-14): planned.** What exists was read in the code, and that app's sources were read for the way it does
 each. The side menu reveals the open chat with `scrollIntoView` every time it paints its list (after a delete, a pin, a
 rename, a read, and since item 202 after each reload of the activity), so a list scrolled away from the open chat jumps
 back to it; a pin and a mark give the moved chat's row the focus, and leaving Select gives it to Select at the head of
@@ -10115,7 +10115,7 @@ read after it. The owner's messages are shown as typed, never read as markdown, 
 answer has a Copy button with its word and shows its time where the pointer rests. A copy of a part of the conversation
 is the browser's plain text, so a table, a list or a heading loses its markdown. The composer is a plain text box, so
 the markdown in it shows its marks. The model menu lists the models that call tools under their providers, with no
-search and no favourites. T3 Code turns a copied part of its conversation back into markdown, keeps the composer's text
+search and no favourites. That app turns a copied part of its conversation back into markdown, keeps the composer's text
 as markdown while it shows it styled (its marks faded, shown only where the caret is), puts the time, a copy and "Edit
 from here" under a message, and gives its model menu a rail of providers with favourites first, a search and a star on
 each model.
@@ -10159,14 +10159,14 @@ correction open on another note stays open through the forget. On the code of be
 294 px at the first delete, Escape under Select took it to the top, and the Memory page fell back to 30 notes. It passed
 in WebKit too.
 
-### 205. A message's time, its copy and a send again, after T3 Code
+### 205. A message's time, its copy and a send again
 
 **Status: done.** Merged as `9934575` (PR #244; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-14).** Each of the owner's messages has a foot once its turn has its answer, after T3 Code's
+**As built (2026-10-14).** Each of the owner's messages has a foot once its turn has its answer
 (`messages.js`): when it was sent, as short as its day allows ("14:05", "Yesterday, 14:05", "5 Oct, 14:05", the year too
 when it was another; the full date where the pointer rests; `messageTime` in `dom.js`), a copy of it as it was written,
-and **Send again**. A copy's icon turns to a check for a moment once the text is on the clipboard, as T3 Code's does,
+and **Send again**. A copy's icon turns to a check for a moment once the text is on the clipboard,
 where a toast said it before. Send again sends the message once more with the files it came with, as the composer's
 Enter does (into the queue or to the run while one works, otherwise as the chat's next run, whose page opens); the run
 page sends both ways with one function (`deliver`), and what is typed in the composer stays. The files of an earlier
@@ -10187,7 +10187,7 @@ passed in WebKit too.
 
 **What.** Under each of the owner's messages that has its answer: the time it was sent (the day too when it was not
 today, the full date where the pointer rests), a copy of the message as it was written, and a button that sends it again
-to the same chat, with the files it carried. Under each answer: its time and a copy, an icon each. After T3 Code's.
+to the same chat, with the files it carried. Under each answer: its time and a copy, an icon each.
 
 ### 206. Markdown in the conversation, and copies that keep it
 
@@ -10196,7 +10196,7 @@ to the same chat, with the files it carried. Under each answer: its time and a c
 **As built (2026-10-14).** The owner's messages are drawn by the answers' reader (`prose.js`): a goal, a message that
 steered a run and an earlier turn read as markdown, with their headings, lists, quotes, tables, code, emphasis and web
 links, and the line breaks as typed; in the bubble, code and the heads of a table sit one surface up from it. A copy out
-of the conversation keeps its markdown, after T3 Code's (`clipboard.js`): a selection that starts in a message or an
+of the conversation keeps its markdown (`clipboard.js`): a selection that starts in a message or an
 answer goes on the clipboard as the markdown it was written in, read back from copies of the selected nodes. Headings
 come back at the level they were written at (`data-level`; Dot draws them one level down), with lists, quotes, fenced
 code (its fence longer than any run of backticks in it), inline code, bold, italic, web links (an address that repeats
@@ -10205,7 +10205,7 @@ button, copies as its code; the other buttons, the faces, the line under a messa
 reader hears stay out. A selection across the items of a list or the rows of a table keeps its list or table; one within
 a line keeps its marks. The formatted copy goes along as clean HTML for the applications that read it: of the attributes
 only a web link's address stays, and it is serialized from the nodes, never built from a string. A copy within one block
-of code, or out of the composer, is the browser's own. T3 Code's composer takes a paste as its text, so the composer's
+of code, or out of the composer, is the browser's own. The composer's
 part is item 207. Tests: `tests/smoke/test_markdown_copy.py`, a real server, a chat of two turns whose first message
 holds a table and a list and whose answer holds every kind of block and mark; at 1280 px light and dark and at 390 px:
 the message's table, list and marks, a whole answer copied back to the text it was written in, the message with its
@@ -10215,14 +10215,14 @@ and a real ⌘C to the clipboard in Chrome. On the code of before, it found no t
 too.
 
 **What.** The owner's messages are read as markdown, as the answers are (headings, lists, tables, code, emphasis). A
-copy of a part of the conversation keeps its markdown, as T3 Code's does: the text carries the markdown, and the
+copy of a part of the conversation keeps its markdown: the text carries the markdown, and the
 formatted copy goes along for the applications that read it. The copy buttons copy the markdown as written.
 
-### 207. The composer shows the markdown it holds, after T3 Code
+### 207. The composer shows the markdown it holds
 
 **Status: done.** Merged as `23f1d9a` (PR #246; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-14).** T3 Code's composer is a rich text editor that hides the marks it reads; Dot's box stays a
+**As built (2026-10-14).** Not a rich text editor that hides the marks it reads: Dot's box stays a
 text field, which the slash menu, the files, the queue, the drafts, the keys, the listening face and the send all use,
 and shows its markdown from under it (`mirror.js`): a copy of the box's text lies under the box in the same room, letter
 for letter, and the box's own letters are clear over it, so the caret, the selection (the system's colour, light enough
@@ -10249,15 +10249,15 @@ pixel off differs in 2 %), while the copy as it shows differs from the copy in o
 box in it (5 px higher before it was a column). On the code of before, it found no copy. It passed in WebKit too.
 
 **What.** The composer keeps the markdown it holds and shows it styled: headings as headings, emphasis, code, lists,
-quotes, fences, rules and tables' pipes, their marks faded, after T3 Code's composer. A paste of markdown shows at once
+quotes, fences, rules and tables' pipes, their marks faded. A paste of markdown shows at once
 in that order. What is sent is the markdown, as now; the slash menu, the files, the queue, the drafts and the keys work
 as before.
 
-### 208. The model menu: providers at the side, a search and favourites, after T3 Code
+### 208. The model menu: providers at the side, a search and favourites
 
 **Status: done.** Merged as `2545d60` (PR #247; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-14).** The Model pill's menu is T3 Code's model picker made of Dot's own parts (`modelpicker.js`): a
+**As built (2026-10-14).** The Model pill's menu is made of Dot's own parts (`modelpicker.js`): a
 rail on its left with the favourites' star, a rule, then the mark of each provider that lists models that can call
 tools, its name where the pointer rests; the view shown is pressed, with a bar on the rail's edge. A provider's view
 lists its models in the order the provider gives them, the favourites' view lists the favourites with their providers'
@@ -10287,7 +10287,7 @@ and the tests of the composer's other menus pass unchanged.
 
 **What.** The composer's model menu gets a rail of the providers' marks at its left (favourites first), which filters
 the list to one provider; a search over every provider's models; a star on each model that keeps it among the
-favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight. After T3 Code's.
+favourites; and keys: the arrows and Enter, ⌘1 to ⌘9 for the rows in sight.
 
 ## Part 34: the default model from the model menu, and what the outside review found (planned 2026-10-14)
 
@@ -10298,7 +10298,7 @@ report the owner had pasted, checked here on macOS first); and the fixes suggest
 **Status (2026-10-14): planned.** Settings › Models has had the default model's menu since item 199, and it works: it
 was checked on the daemon of the owner's Mac in WebKit and in Chrome, read-only, with every model listed. But the owner
 picks models in the composer's model menu, where a pick changes the chat's model alone and the default's row cannot
-change the default, and the default had never been changed (`[models] main` was still unset). T3 Code starts its new
+change the default, and the default had never been changed (`[models] main` was still unset). Another app starts its new
 chats on the model picked last. The outside review's findings were each checked on the code of item 208 on macOS, those
 of the shell check by asking the policy what it would decide, with nothing run.
 
@@ -10483,7 +10483,7 @@ The owner's thirty-fourth word, on 2026-10-14: the list of skills on the Skills 
 inside past a point, and so should the notes of the Memory page; a button should import with ease the skills and
 settings of the Mac's other apps, Claude Code, Codex and the others; the Screen tab could look better while it is empty,
 and the side panel should open and close with a motion; every provider's models should show their context window right,
-with a meter of it as T3 Code has; and Claude's models that have fast mode, Ultracode or Ultrathink should offer them.
+with a meter of it; and Claude's models that have fast mode, Ultracode or Ultrathink should offer them.
 
 **Status (2026-10-14): planned.** Each was checked on the code first. Settings › Skills and Settings › Memory listed
 every row on the page itself. The Skills page showed what the other agents set up with an Add for each, one at a time.
@@ -10582,7 +10582,7 @@ among them, and a run's budget follows it.
 
 **Status: done.** Merged as `a99e07e` (PR #261; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-14).** After T3 Code's, a ring beside the send of a run's composer shows how much of the run's
+**As built (2026-10-14).** A ring beside the send of a run's composer shows how much of the run's
 context budget its last step filled (`contextmeter.js`), and a click opens its figures: the tokens that step sent the
 model, the budget past which Dot summarizes the older part of the run (`[agent] context_tokens`, or three quarters of
 the model's window when that is less) and the model's window. The ring takes the pills' ink, the warning colour past
@@ -10615,19 +10615,19 @@ a time; the API's refusal is shown as it is.
 
 ## Part 36: helpers at a glance, previous agents, commands in the background (planned 2026-10-14)
 
-The owner's thirty-fifth and thirty-sixth words, on 2026-10-14. The first: a helper's row should look as T3 Code's does,
-with a card on hovering it that gives the helper's model, its reasoning level, how long it has run and what it is doing;
-what is useful among T3 Code's settings should come to Dot; and at the conversation's far left there should be the rail
-of dashes that stands for each message and each session. The second, queued after the first: the side panel should list
-the previous agents as T3 Code's does, and look better, with SVG icons; a run's lessons that could not be drawn as "the
+The owner's thirty-fifth and thirty-sixth words, on 2026-10-14. The first: a helper's row should have
+a card on hovering it that gives the helper's model, its reasoning level, how long it has run and what it is doing;
+what is useful among another app's settings should come to Dot; and at the conversation's far left there should be the
+rail of dashes that stands for each message and each session. The second, queued after the first: the side panel should
+list the previous agents, and look better, with SVG icons; a run's lessons that could not be drawn as "the
 review model did not call propose_lessons", and a summary's check that flagged a path under `~` as unverified, should be
 fixed if they are faults; and a command that runs for hours, past the shell's limit of 30 minutes, should run in the
-background, as in T3 Code, with Dot checking on it.
+background, with Dot checking on it.
 
 **Status (2026-10-14): planned.** Each was checked on the code first. A helper's row in the conversation showed its
 title and its state; its model and reasoning level were kept but shown nowhere, and what it was doing showed only once
 it was opened. The run page's side panel had no list of a chat's helpers. The rail of marks of item 201 hid itself when
-less than 40 px was left at the conversation's left, as beside the docked side panel. Of T3 Code's settings, Dot had
+less than 40 px was left at the conversation's left, as beside the docked side panel. Of that app's settings, Dot had
 skills in the slash menu and a question before a delete; Enter always sent, a message to a busy run was always queued
 (⌘⇧Enter steered it), runs went on after a restart only through `[agent] resume` in the config file, and Settings ›
 Models showed the fast, review and vision models with no way to change them. The review model that draws a run's lessons
@@ -10641,7 +10641,7 @@ told a chat that a long command had ended.
 faults first. A refusal is said as it is and not asked again, and Dot does not turn to another model by itself: whether
 the lessons should is left to the owner, who can choose the review model in Settings › Models (item 232). A command in
 the background belongs to its chat: it outlives the run that started it but not the daemon, and its end is told to the
-chat as a message. Of T3 Code's other settings, Dot has what they do already or has no use for them; the list, with the
+chat as a message. Of that app's other settings, Dot has what they do already or has no use for them; the list, with the
 reasons, is in the report of this part. Item 196 of part 31 still waits on the owner.
 
 ### How to start part 36 (the handoff prompt)
@@ -10690,7 +10690,7 @@ so at once, instead of asking again and saying that the model did not use its to
 **Status: done.** Merged as `0db06a8` (PR #265; no Linear issue, the Linear connector was signed out).
 
 **As built (2026-10-14).** Resting the pointer on a helper's row for 400 ms, or moving the keyboard's focus to it, shows
-a card beside it (`static/js/helpercard.js`), as T3 Code does for a subagent: the helper's face and whole goal, the
+a card beside it (`static/js/helpercard.js`): the helper's face and whole goal, the
 model with its reasoning level (and Fast in fast mode), its state with the time it has taken, counting on at the second
 the row's time does, and what it does now (the call that is out, else Thinking) or did last. It stands under the row, or
 over it where the window has no room below, and describes the row while it shows; the pointer leaving, a click, the
@@ -10707,7 +10707,7 @@ level, its state with the time it has run, and what it is doing or did last.
 
 **As built (2026-10-14).** `GET /api/threads/{id}/helpers` lists the runs a chat's runs started on their behalf, newest
 first (a helper has a thread of its own, so the chat's own list of runs never held them). The side panel's new Agents
-tab (`static/js/agentlist.js`) shows them as T3 Code's "Previous agents": the face with its state, the goal over its
+tab (`static/js/agentlist.js`) shows them as a list of previous agents: the face with its state, the goal over its
 state and model, how long it took; five at first and the rest on Show N more; a row opens the helper's page, and the tab
 counts them. Every tab wears an SVG icon, and where the strip has no room for every name, the tabs not chosen show their
 icon and count alone. Tests: `tests/smoke/test_previous_agents.py`, seeded runs, the API and the tab, wide and on a
@@ -10742,13 +10742,13 @@ closed while it runs for being left unread, and the run that opened it can end. 
 in a message of its queue, with the chat's choices, which starts the chat's next run once no run works there; the
 message says which command ended, its exit status and how long it ran, and nothing it printed, and as Dot's words it is
 no instruction of the owner. `GET /api/threads/{id}/terminals` and `DELETE /api/threads/{id}/terminals/{session}` list
-and stop a chat's sessions, and the chat's page shows its commands at work right above the composer, as T3 Code shows
-its background work, with a dot that pulses for one whose end wakes Dot. A delegated run, a campaign's session and a
+and stop a chat's sessions, and the chat's page shows its commands at work right above the composer,
+with a dot that pulses for one whose end wakes Dot. A delegated run, a campaign's session and a
 `dotx` command open none. Tests: `tests/smoke/test_background_commands.py` and two in `tests/smoke/test_terminal.py`; on
 the code of before, `terminal_open` refuses `background` and no run follows.
 
 **What.** A run can start a long command in the background, past the shell's limit, and go on; a line over the box shows
-what runs, as T3 Code's does, and when a command ends its chat is told, with its last lines.
+what runs, and when a command ends its chat is told, with its last lines.
 
 ### 230. The composer's keys
 
@@ -10892,7 +10892,7 @@ holds no headline whose figures could pass for the count.
 
 The owner's thirty-eighth word, on 2026-10-15: an import from other apps failed with "an item is named more than once";
 the context meter of a model that holds a million tokens shows a budget of 96,000; the side panel should stand at the
-window's right edge, as T3 Code's does; and after many features, speed, streaming, the agent's flow and ease of use had
+window's right edge; and after many features, speed, streaming, the agent's flow and ease of use had
 not been reviewed.
 
 **Status (2026-10-15): planned.** Each was checked on the code, and the cache on the owner's record of model calls of
@@ -10982,7 +10982,7 @@ narrow page is as it was. Before, the panel stood 20 px from the window's right 
 544 px at 2,560; now 12 px at each. Tests: `tests/smoke/test_side_panel.py` measures the panel and the conversation at
 the three widths, and fails on the code of before. Checked in Chrome and WebKit, wide and on a phone, light and dark.
 
-**What.** Beside a conversation the side panel stands at the window's right edge, as T3 Code's does, at every width that
+**What.** Beside a conversation the side panel stands at the window's right edge, at every width that
 has room for it; the conversation keeps its reading width.
 
 ### 239. The meter says why the budget is smaller than the window
@@ -11102,11 +11102,11 @@ starts. A run that resumes another starts tainted when that one was at the cut, 
 to say that a command in the background ended, when the chat's last run ended tainted. A message of the owner starts a
 run untainted and a steer clears the taint, as before.
 
-## Part 40: helpers and thinking as T3 Code shows them (planned 2026-10-15)
+## Part 40: how helpers and thinking are shown (planned 2026-10-15)
 
-The owner's fortieth word, on 2026-10-15, with two screenshots of T3 Code: the bar of a helper's page should stay in
-sight however its conversation scrolls; the helpers in a conversation would look better as T3 Code's group of subagents
-does; and the reader should fold and unfold the thinking blocks at will, with a brain for their icon.
+The owner's fortieth word, on 2026-10-15, with two screenshots of another app: the bar of a helper's page should stay in
+sight however its conversation scrolls; the helpers in a conversation would look better as a group of subagents;
+and the reader should fold and unfold the thinking blocks at will, with a brain for their icon.
 
 **Status (2026-10-15): planned.** On the code at `bbe607e`: a helper's page closes its conversation with a pill (its
 model, its time, whether its parent works, the way back) that comes after the dock, so it scrolls away with the
@@ -11149,8 +11149,8 @@ foot as the conversation scrolls, with the arrow down above it.
 
 **As built (2026-10-15).** `timeline.js` places a helper's row with `placeHelper`: rows that follow one another at the
 end of a scope gather in one group (`.helpers`, open from the start), which the second row makes, taking the first in.
-Its head (`paintFlock`) shows the first three faces and "+N", "N helpers", how they stand in the order T3 Code reads
-them (working, waiting for you, done, failed, stopped), and the time from the first one's start to the last one's end,
+Its head (`paintFlock`) shows the first three faces and "+N", "N helpers", how they stand in a fixed order
+(working, waiting for you, done, failed, stopped), and the time from the first one's start to the last one's end,
 counting on every second while one works; an approval a helper asks for opens its group. A row that ended shows the
 start of its answer as one plain line (`plainLine`: no marks of headings, lists, bold or code, links as their words),
 after how it ended unless it is done; a run with no answer says how it ended and in how many steps, as before. Tests:
@@ -11161,7 +11161,7 @@ brings them back, "3 done · 1 stopped" once the working one is stopped, and the
 the code of before there is no group. `tests/smoke/test_helper_fold.py` reads the start of the answer where it read
 "done".
 
-**What.** Helpers whose rows follow one another sit in one group, as T3 Code groups its subagents: a head with their
+**What.** Helpers whose rows follow one another sit in one group: a head with their
 faces (three, then "+N"), how many they are, how they stand ("1 working · 3 done") and the time from the first one's
 start to the last one's end, and a chevron that folds their rows away; the rows share one box. A row that is done shows
 the start of its answer as one plain line.
@@ -11506,7 +11506,7 @@ with a WebKit copy. They fail on the code of before.
 The owner's forty-fourth word, on 2026-10-15: whether DeepSeek and Grok really support a choice like Ultrathink, and
 that the levels offered must be true ones ("we cannot use what is not valid"); that typing ultrathink or ultracode in
 the composer should be the choice for that message, the composer's border turning into a gradient while it is (a
-screenshot of T3 Code's composer with Ultrathink chosen: a green, orange and purple gradient around the box); whether
+screenshot of a composer with Ultrathink chosen: a green, orange and purple gradient around the box); whether
 constant compaction harms long runs, and that the compaction notes should leave the conversation; that Excel and
 OneDrive are now open; and, from the forty-third word and the report of part 43, a DeepSeek run that failed with a
 `tokenize` error of the local Ollama runner, and that a schedule starting a fresh chat with the same prompt every day
@@ -12471,8 +12471,8 @@ and stops when its run says done; Stop ends it.
 
 **Status: done.** Merged as `427c51e` (PR #323; no Linear issue, the Linear connector was signed out).
 
-**What.** On a message of the owner's that opened a turn, Edit from here, as T3 Code has it (the owner asked for its
-way): a dialog, "Edit from here? Rewind chat to before this message. Your prompt and attachments return to the
+**What.** On a message of the owner's that opened a turn, Edit from here:
+a dialog, "Edit from here? Rewind chat to before this message. Your prompt and attachments return to the
 composer.", with Cancel, Revert files too and Revert and keep changes. Either way the turn and the later ones leave the
 chat (their runs stay stored, marked, with what they cost, and the questions they left expire), the history the model
 reads ends where it ended before the message, and the message with its files comes back into the box of the turn
@@ -12496,7 +12496,7 @@ command's changes stay. The chat's OpenCode session is let go, so that its next 
   turns, which comes to about 20 MB kept aside). Keeping each distinct message once would bring that down.
 
 **Why.** The third saying: open to being wrong, with a way back. The plan had the later turns stay greyed in the chat;
-in T3 Code they leave it, and so they do here.
+they leave it instead.
 
 **Tests.** Smoke, `test_rewind.py`: a chat of three turns rewound from its page to its second message, the files as the
 first turn left them, the second message and its file in the box, the next run without the third; a rewind that keeps
@@ -12843,14 +12843,14 @@ test's `visualViewport`.
 
 **Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-16).** After T3 Code's phone app. `static/js/sidebar.js`: the head holds Dot's name (`.side-title`)
+**As built (2026-10-16).** `static/js/sidebar.js`: the head holds Dot's name (`.side-title`)
 and the close button (an x on a phone, the panel's icon otherwise); on a phone the search moves to the foot after
 Settings, with a round New chat (`.side-compose`), and back to the top of the body on a wider window (`placeForWidth`,
 on `PHONE`'s change). `static/js/shell.js`: the bar's opener is a round chevron on a phone. `css/shell.css`: on a phone
 the sidebar covers the screen in the page's colour, its rows are taller with hairlines between chats, the body's own
 buttons give way, and the foot holds a round Settings (its word kept for a screen reader), the search as a 44 px pill
 and the round New chat; a touch screen shows no keyboard hints. README: Dot on the phone. Tests:
-`tests/smoke/test_phone_t3.py` (the sidebar is as wide as the screen, "Dot" at its head, the search, New chat and
+`tests/smoke/test_phone_layout.py` (the sidebar is as wide as the screen, "Dot" at its head, the search, New chat and
 Settings at its foot, light and dark).
 
 ### 295. A phone's chat bar: back, the chat over its agent and model, tools in one pill
@@ -12862,7 +12862,7 @@ on a phone the bar names the chat (`.stage-heading`: its title, or a helper's go
 on a helper's page; `paintHeading`), and holds its tools in one pill (`.stage-pill`): Dot's computer once the run has
 had a page, the helpers with their count once the chat has some (both `.stage-quick`), and the details' switch. A wider
 bar is as it was: the face, the name and the switch alone (`css/app.css`). README: Dot on the phone. Tests:
-`tests/smoke/test_phone_t3.py` (title, "Dot · scripted", the three tools; at 1280 px the name and one tool),
+`tests/smoke/test_phone_layout.py` (title, "Dot · scripted", the three tools; at 1280 px the name and one tool),
 `tests/smoke/test_run_stop.py` (the heading on a phone, the name on a wide window).
 
 ### 296. The details rise as a sheet on a phone; helpers say their state, model and work
@@ -12875,21 +12875,21 @@ closes it, and a shorter one puts it back. `openTab(id)` opens the details on a 
 row says, under its goal, the provider's mark, the model and the state ("Running", "Waiting for you" in amber, "Failed"
 in red), and a line of what the helper does now or did last ("Now: shell · sleep 600", from the conversation on the
 page: `timeline.helper(id)`, `helpercard.actionLine`), with its time and a chevron, wide and on a phone. README: the
-side panel, Dot on the phone. Tests: `tests/smoke/test_phone_t3.py` (the sheet's place and grabber, its rows' states,
-model and "Now:" line, a drag closes it), `tests/smoke/test_previous_agents.py` (state words and model, wide and on a
-phone).
+side panel, Dot on the phone. Tests: `tests/smoke/test_phone_layout.py` (the sheet's place and grabber, its rows'
+states, model and "Now:" line, a drag closes it), `tests/smoke/test_previous_agents.py` (state words and model, wide and
+on a phone).
 
 ### 297. A line over a phone's composer: how long the run has worked, and its helpers
 
 **Status: done.** Merged as `b4e554f` (PR #324; no Linear issue, the Linear connector was signed out).
 
-**As built (2026-10-16).** `static/js/capsule.js`: `createCapsule`, a line over the composer after T3 Code's: "Working
+**As built (2026-10-16).** `static/js/capsule.js`: `createCapsule`, a line over the composer: "Working
 <time>" with a turning mark, or "Waiting for you" with a bell while the run waits, and how its helpers stand while it
 works ("2 working", from `timeline.flockState`). Each part opens what it tells of (the Run tab, the Agents tab), and the
-line shows only while the run works. T3 Code's line also counts the queued messages; Dot's queue has its banner right
+line shows only while the run works. The line counts no queued messages; Dot's queue has its banner right
 under the line (item 148), so the line does not say it again. `static/js/views/run.js` paints it each second and on each
 change of the run and its helpers. A wider page shows no line (`css/app.css`). README: Dot on the phone. Tests:
-`tests/smoke/test_phone_t3.py` ("Working", "2 working", no "queued" while the banner shows the queued message; the
+`tests/smoke/test_phone_layout.py` ("Working", "2 working", no "queued" while the banner shows the queued message; the
 helpers' part opens the sheet on Agents; no line at 1280 px).
 
 ### 298. Dot's computer opens over the whole phone, with its address and Take over
@@ -12900,7 +12900,7 @@ helpers' part opens the sheet on Agents; no line at 1280 px).
 whole page (`dialog.computer-full`, on what is seen) with a round close; the page's address in a pill, the live frame
 and "Dot has control" with Take over, as on the side panel; closed, the card goes back to the panel's Screen tab. The
 bar's Dot's computer opens it. Input from the phone to the page is not part of it. README: Dot on the phone. Tests:
-`tests/smoke/test_phone_t3.py` (the address, "Dot has control", Take over, the full screen, and the card back on the
+`tests/smoke/test_phone_layout.py` (the address, "Dot has control", Take over, the full screen, and the card back on the
 Screen tab once it closes).
 
 ### 299. A turn that goes on after Dot restarted says so, with a bolt
@@ -12909,8 +12909,8 @@ Screen tab once it closes).
 
 **What was found.** A run that went on after a restart opened with one long muted line ("Resumed on its own when the
 daemon started: …") and an earlier turn of it with "Resumed where the run above was cut off"; a run that waited for the
-owner said "This run was cut off while it worked." The owner asked for T3 Code's row: a bolt and "T3 Code restarted and
-resumed this turn", opened for the details.
+owner said "This run was cut off while it worked." The owner asked for the row another app shows: a bolt and
+"[another app] restarted and resumed this turn", opened for the details.
 
 **As built (2026-10-16).** `static/js/timeline.js`: the `resumed` event is a folded line (`details.restart`) with an
 amber bolt: "Dot restarted and resumed this turn" when the daemon went on with the run by itself after it stopped, else
@@ -13528,11 +13528,11 @@ use shows, since the tests call no model.
 
 **Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
-**What was found.** The owner's word of 2026-10-16, with five screenshots of T3 Code's phone app: "Web tarafinda mobilde
-hala istedigim sabiyeti ve netligi hisswdemiyorum. Uygulamayi arka plana atip baska seylere ugrasip tekrar dondugumde
-daha sakin gelen bir UI istiyorum" (on the phone they still miss the steadiness and clarity they want; coming back to
-the app from other things, they want it to come back calmer). Measured in WebKit as their iPhone 17 Pro Max, with a
-proxy acting out a phone's network: back from the background on a network that woke in 4 s, a chat's page said
+**What was found.** The owner's word of 2026-10-16, with five screenshots of another app on a phone: "Web tarafinda
+mobilde hala istedigim sabiyeti ve netligi hisswdemiyorum. Uygulamayi arka plana atip baska seylere ugrasip tekrar
+dondugumde daha sakin gelen bir UI istiyorum" (on the phone they still miss the steadiness and clarity they want; coming
+back to the app from other things, they want it to come back calmer). Measured in WebKit as their iPhone 17 Pro Max,
+with a proxy acting out a phone's network: back from the background on a network that woke in 4 s, a chat's page said
 "Reconnecting" and put "Connection lost. Reconnecting…" into the conversation at about 2 s, which pushed it down 36 px
 until about 4 s, and then drew the page again (about 118 elements added and 92 taken out, every row of the sidebar made
 anew). Opened again after the page was let go, the page waited for the network for its own files, since the service
@@ -13640,7 +13640,7 @@ and some hints named the config file's keys (`[agent] context_tokens in config.t
 
 **Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
-**What was found.** The same word of the owner (item 328), with T3 Code's phone app beside it: its settings open on a
+**What was found.** The same word of the owner (item 328), with another app on a phone beside it: its settings open on a
 list of groups, each a card of rows with a mark, a name, what the page holds and an arrow, and a row opens its page with
 a way back. Dot's settings on a phone were the tabs in one row that scrolls sideways (item 272) over the open tab's pane,
 `#/settings` was General, and every card held its name inside its surface. On an iPhone SE, General squeezed "What Dot
@@ -13676,10 +13676,10 @@ is called" a word a line beside its field.
 
 **Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
-**What was found.** T3 Code's Appearance on the owner's phone: the colour schemes drawn as phones, the themes two a row,
-each with a light and a dark sphere and its name, and one Text card, a sample line over a "Text size" in points that
-messages, labels and headings follow, 16 by default. Dot's Type card had an "Interface size" of 13 to 17 px around 14,
-which already scaled every text of the interface, the answers too (a phone read 14 as its 16 since item 329); its
+**What was found.** Another app's Appearance on the owner's phone: the colour schemes drawn as phones, the themes two a
+row, each with a light and a dark sphere and its name, and one Text card, a sample line over a "Text size" in points
+that messages, labels and headings follow, 16 by default. Dot's Type card had an "Interface size" of 13 to 17 px around
+14, which already scaled every text of the interface, the answers too (a phone read 14 as its 16 since item 329); its
 schemes were drawn as Mac windows, and an iPhone SE had one theme a row.
 
 **As built (2026-10-17).**
@@ -13708,10 +13708,10 @@ schemes were drawn as Mac windows, and an iPhone SE had one theme a row.
 
 **Status: done.** Merged as `34ad323` (PR #328; no Linear issue, the Linear connector was signed out).
 
-**What was found.** After item 329 the pages of a phone already read at its sizes and take a finger. Against T3 Code's
-grouped lists: Activity's three sections and Connect apps' carried their names inside their cards, a delegated run's row
-on Activity ran to three lines of facts beside its time, and Team's empty page named a tool (`message_agent`). The
-sidebar, Agents, an agent's page and Campaigns already stood in named groups, with empty lines that say what to do.
+**What was found.** After item 329 the pages of a phone already read at its sizes and take a finger. Against another
+app's grouped lists: Activity's three sections and Connect apps' carried their names inside their cards, a delegated
+run's row on Activity ran to three lines of facts beside its time, and Team's empty page named a tool (`message_agent`).
+The sidebar, Agents, an agent's page and Campaigns already stood in named groups, with empty lines that say what to do.
 
 **As built (2026-10-17).**
 
@@ -14132,26 +14132,26 @@ the code before. Docs: `safety.md`, `models.md`, `autonomy.md`.
 
 ### 352. A calm chat: one set-up line, a live line over the composer, one screen on a phone
 
-**Status: done (`b2e8090`).** The owner's word of 2026-10-17, with two screenshots (Dot's chat on an iPhone, T3 Code's
-line over its composer): "Fotoğrafta gördüğün gibi çok fazla bilgi mesajı gösteriyoruz ayrıca ikinci fotoğrafta
-göreceğin gibi T3 Code arayüzünde mesela arka planda bir background task çalıştığı zaman bunu da gösteriyor alt tarafta
-böyle dinamik ve daha güzel hoş bir tasarım yapabiliriz ayrıca sohbette telefonda çalışırken sadece sohbet içi scroll
-olmalı mesela alttaki kompozer her zaman sabit olmalı" (we show too many info lines; T3 Code shows what runs in the
-background in a dynamic line at the bottom, a nicer design; on a phone only the chat should scroll, the composer always
-in place). **As built (2026-10-17).** The lines of how a run was set up (the notes and skills it was handed and how they
-were found, its context budget, its tool groups, a step sent to another model) are one quiet line (`timeline.js`
-`contextNote`, `details.context-line`) that names them in short ("notes found by their words alone · 1 memory"), amber
-or red when one of them warns, and opens to the lines themselves; they were a line each (the screenshot: three before
-the answer). The line over the composer (`capsule.js`, item 297) is every width's: the run's time and what it does now
-(the head of its latest step at work), or that it waits for you; its helpers; how many messages wait in the queue (its
-part opens the queue) and how many commands run in the chat (its part shows them). It rises into place and comes and
-goes as its parts do; on a phone what the run does now shows while no other part stands beside the time. On a phone a
-chat is one screen (`html.chat-shell`, `run.css`): the stage fills what is seen of the window, the window does not
-scroll, and only the conversation scrolls between the bar and the composer, so a scroll, its bounce and the keyboard
-move nothing else; `run.js` scrolls, follows and jumps through the box that scrolls. Tests: `test_chat_calm.py` (the
-context line, wide and on an iPhone, light and dark, the embedding service an address where nothing listens; on an
-iPhone only the conversation scrolls; both fail on `main`), `test_phone_t3.py` (the line counts what is queued, on a
-wide window too). Docs: `docs/daemon.md`, `docs/phone.md`.
+**Status: done (`b2e8090`).** The owner's word of 2026-10-17, with two screenshots (Dot's chat on an iPhone, another
+app's line over its composer): "Fotoğrafta gördüğün gibi çok fazla bilgi mesajı gösteriyoruz ayrıca ikinci
+fotoğrafta göreceğin gibi [başka bir uygulama] arayüzünde mesela arka planda bir background task çalıştığı
+zaman bunu da gösteriyor alt tarafta böyle dinamik ve daha güzel hoş bir tasarım yapabiliriz ayrıca sohbette
+telefonda çalışırken sadece sohbet içi scroll olmalı mesela alttaki kompozer her zaman sabit olmalı" (we show too
+many info lines; [another app] shows what runs in the background in a dynamic line at the bottom, a nicer design; on a
+phone only the chat should scroll, the composer always in place). **As built (2026-10-17).** The lines of how a run was
+set up (the notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to
+another model) are one quiet line (`timeline.js` `contextNote`, `details.context-line`) that names them in short ("notes
+found by their words alone · 1 memory"), amber or red when one of them warns, and opens to the lines themselves; they
+were a line each (the screenshot: three before the answer). The line over the composer (`capsule.js`, item 297) is every
+width's: the run's time and what it does now (the head of its latest step at work), or that it waits for you; its
+helpers; how many messages wait in the queue (its part opens the queue) and how many commands run in the chat (its part
+shows them). It rises into place and comes and goes as its parts do; on a phone what the run does now shows while no
+other part stands beside the time. On a phone a chat is one screen (`html.chat-shell`, `run.css`): the stage fills what
+is seen of the window, the window does not scroll, and only the conversation scrolls between the bar and the composer,
+so a scroll, its bounce and the keyboard move nothing else; `run.js` scrolls, follows and jumps through the box that
+scrolls. Tests: `test_chat_calm.py` (the context line, wide and on an iPhone, light and dark, the embedding service an
+address where nothing listens; on an iPhone only the conversation scrolls; both fail on `main`), `test_phone_layout.py`
+(the line counts what is queued, on a wide window too). Docs: `docs/daemon.md`, `docs/phone.md`.
 
 ### 353. Keep going is chosen from the composer's "+", beside Goal mode
 
@@ -14165,43 +14165,43 @@ chat's page has none. Test: `tests/smoke/test_composer.py` (the "+" holds Goal m
 hides goal mode and shows the line under the frame; the Options no longer hold it), which failed on the code before.
 Docs: `docs/daemon.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`.
 
-### 354. Settings › Browser after T3 Code's: runs kept off the browser, how pages look, the view
+### 354. Settings › Browser: runs kept off the browser, how pages look, the view
 
-**Status: done (`3dedca5`).** The owner's word of 2026-10-17, with a screenshot of T3 Code's Settings › Browser: "Amacımız
-t3code daki browser sistemini temizce ve daha iyisini kendi sistemimize entegre etmekti. T3Code zaten opensource
-istersen bakabilirsin." (our aim was to bring T3 Code's browser system into ours, cleanly and better; T3 Code is open
-source). **As built (2026-10-17).** Four of T3 Code's rows in Settings › Browser, on what Dot's browser already does
-(its own Chrome or the owner's, Dot's computer, Take over): **Runs may use the browser** (`[browser] enabled`; off, no
-run is offered a `browser_*` tool, OpenCode's agent neither; T3 Code's override per project is an agent's own tools,
-which only narrow it); **Size of a page** (a page of Dot's own Chrome fills its window, `fit_window`, or has one of five
-sizes, and the model is told the size the page has) and **Appearance of pages** (System, Light or Dark: Playwright's
-`color_scheme`, "null" for the Mac's, and `emulate_media` on the tabs Dot opens in the owner's Chrome), both `POST
-/api/browser/look` (`browser/look.py`), which lets go of Chrome so that it starts with them; **Show Dot's computer when
-a run opens the browser** (`dot.autoComputer`, this browser's): a run at work that first uses its browser opens the
-panel's Screen tab beside the chat (`inspector.peekTab`, which leaves the panel and the tab the reader chose as they
-were), and a phone keeps its button. Left out: the zoom of a page (Chrome keeps it per site) and where links open (Dot's
-links open where the owner reads Dot). Tests: `tests/smoke/test_browser_settings.py` (the tools of a run with the
-browser on and off, through the real loop; a real headless Chrome's page at 1024 × 768 dark, 390 × 844 light and filling
-its window; the rows wide and on a phone, light and dark, kept in `config.toml`; the Screen tab shown by itself for a
-run that waits on its question, not once turned off, and a phone's drawer left closed). Docs:
-`docs/browser-and-computer-use.md`, `docs/daemon.md`.
+**Status: done (`3dedca5`).** The owner's word of 2026-10-17, with a screenshot of another app's Settings › Browser:
+"Amacımız [başka bir uygulama] daki browser sistemini temizce ve daha iyisini kendi sistemimize entegre etmekti.
+[başka bir uygulama] zaten opensource istersen bakabilirsin." (our aim was to bring [another app]'s browser system into
+ours, cleanly and better; [another app] is open source). **As built (2026-10-17).** Four rows in Settings › Browser,
+on what Dot's browser already does (its own Chrome or the owner's, Dot's computer, Take over): **Runs may use the
+browser** (`[browser] enabled`; off, no run is offered a `browser_*` tool, OpenCode's agent neither; another app's
+override per project is an agent's own tools, which only narrow it); **Size of a page** (a page of Dot's own Chrome
+fills its window, `fit_window`, or has one of five sizes, and the model is told the size the page has) and **Appearance
+of pages** (System, Light or Dark: Playwright's `color_scheme`, "null" for the Mac's, and `emulate_media` on the tabs
+Dot opens in the owner's Chrome), both `POST /api/browser/look` (`browser/look.py`), which lets go of Chrome so that it
+starts with them; **Show Dot's computer when a run opens the browser** (`dot.autoComputer`, this browser's): a run at
+work that first uses its browser opens the panel's Screen tab beside the chat (`inspector.peekTab`, which leaves the
+panel and the tab the reader chose as they were), and a phone keeps its button. Left out: the zoom of a page (Chrome
+keeps it per site) and where links open (Dot's links open where the owner reads Dot). Tests:
+`tests/smoke/test_browser_settings.py` (the tools of a run with the browser on and off, through the real loop; a real
+headless Chrome's page at 1024 × 768 dark, 390 × 844 light and filling its window; the rows wide and on a phone, light
+and dark, kept in `config.toml`; the Screen tab shown by itself for a run that waits on its question, not once turned
+off, and a phone's drawer left closed). Docs: `docs/browser-and-computer-use.md`, `docs/daemon.md`.
 
-### 355. Profiles of Dot's Chrome after T3 Code's: Default, Incognito and the ones added
+### 355. Profiles of Dot's Chrome: Default, Incognito and the ones added
 
-**Status: done (`3dedca5`).** The owner's word of 2026-10-17 (T3 Code's browser system in Dot, cleanly and better; its
-Settings › Browser lists Browser profiles: Default, Set as default, Clear cookies and cache, Add profile, and Incognito,
-whose data is cleared when the app closes). **As built (2026-10-17).** `browser/profiles.py`: Dot's own Chrome works on
-one profile at a time (`[browser] profile`): Default (`browser-profile`), Incognito (`browser-incognito`, emptied before
-Chrome starts on it and after it closes) and the ones added (`browser-profiles/<name>`, up to 24, a name of up to 48
-letters of any script, digits, spaces, `-` and `_`). Settings › Browser lists them with In use: Use (`POST
-/api/browser/profile`, which lets go of Chrome, refused while runs are active), Clear (its cookies and caches; Chrome
-let go of when it works on it), Delete (an added profile not in use), Add profile; a profile a Chrome window has open is
-not changed. Sign in…, `dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use,
-and the new folders are guarded as Default is. Tests: `tests/unit/test_browser_profiles.py` (the list, the names,
-adding, deleting, clearing, emptying), `tests/smoke/test_browser_settings.py` (a real headless Chrome works on Default,
-then on an added profile, then on Incognito, whose folder is gone once its Chrome closed; Settings › Browser adds, uses
-and deletes a profile, wide and on a phone). Docs: `docs/browser-and-computer-use.md`, `docs/configuration.md`,
-`docs/safety.md`.
+**Status: done (`3dedca5`).** The owner's word of 2026-10-17 (another app's browser system in Dot, cleanly and better;
+its Settings › Browser lists Browser profiles: Default, Set as default, Clear cookies and cache, Add profile, and
+Incognito, whose data is cleared when the app closes). **As built (2026-10-17).** `browser/profiles.py`: Dot's own
+Chrome works on one profile at a time (`[browser] profile`): Default (`browser-profile`), Incognito
+(`browser-incognito`, emptied before Chrome starts on it and after it closes) and the ones added
+(`browser-profiles/<name>`, up to 24, a name of up to 48 letters of any script, digits, spaces, `-` and `_`). Settings
+› Browser lists them with In use: Use (`POST /api/browser/profile`, which lets go of Chrome, refused while runs are
+active), Clear (its cookies and caches; Chrome let go of when it works on it), Delete (an added profile not in use), Add
+profile; a profile a Chrome window has open is not changed. Sign in…, `dotx browser login`,
+`dotx browser import-chrome` and `dotx doctor` work on the profile in use, and the new folders are guarded as Default
+is. Tests: `tests/unit/test_browser_profiles.py` (the list, the names, adding, deleting, clearing, emptying),
+`tests/smoke/test_browser_settings.py` (a real headless Chrome works on Default, then on an added profile, then on
+Incognito, whose folder is gone once its Chrome closed; Settings › Browser adds, uses and deletes a profile, wide and
+on a phone). Docs: `docs/browser-and-computer-use.md`, `docs/configuration.md`, `docs/safety.md`.
 
 ### 356. The second audit of 2026-10-17: what held outside the shell guard, fixed
 
@@ -14237,9 +14237,9 @@ taken out. `pyproject.toml` no longer ignores E501, so `ruff check` holds every 
 
 ### 358. Settings › Browser: the zoom Dot's own Chrome draws pages at
 
-**Status: done (`177b005`).** The owner's choice of 2026-10-18, among the rows of T3 Code's Settings › Browser that item
-354 left out: the default zoom. **As built (2026-10-18).** `[browser] zoom` (percent, 25 to 500, 100 by default) is how
-large Dot's own Chrome draws pages: `browser/profiles.py` writes it as Chrome's default zoom
+**Status: done (`177b005`).** The owner's choice of 2026-10-18, among the rows of another app's Settings › Browser
+that item 354 left out: the default zoom. **As built (2026-10-18).** `[browser] zoom` (percent, 25 to 500, 100 by
+default) is how large Dot's own Chrome draws pages: `browser/profiles.py` writes it as Chrome's default zoom
 (`partition.default_zoom_level`, the level whose power of 1.2 is the factor, as Chrome's own settings page writes it)
 into the preferences of the profile in use before Chrome starts on it, the other preferences kept. Settings › Browser ›
 **Zoom of pages** offers Chrome's steps from 50 to 200 and sends it with the look (`POST /api/browser/look`); Dot's own
@@ -14288,7 +14288,7 @@ the conversation shows, nor counts the commands at work, which stand right under
 the queue in a few quiet words on the page's ground, with no frame and no shadow. Tests:
 `tests/smoke/test_chat_calm.py`, on a WebKit iPhone: a chat with each of those, a wide table and a wide block of code
 does not scroll sideways while the table and the code do, which fails on the code before;
-`tests/smoke/test_phone_t3.py`: the line names no call. Docs: `docs/phone.md`, `docs/daemon.md`.
+`tests/smoke/test_phone_layout.py`: the line names no call. Docs: `docs/phone.md`, `docs/daemon.md`.
 
 ### 361. OpenRouter's refusal for the account's privacy settings says why, and what to change
 
@@ -14323,21 +14323,39 @@ them in, and it takes them out again, wide and light, on a phone and dark); the 
 
 ### 363. integrations/ carries REA and the replica skills; a plugin's server names its tools
 
-**Status: in progress.** The owner's word of 2026-10-18 on the work a Dot run of theirs had left in the main checkout:
-"Ben yaptım kontrol et doğru yapmış mıyım sonra onu da ekle" (I made it: check whether I did it right, then add it too).
-**As built (2026-10-18).** The owner's run made `integrations/rea`, a Dot plugin for REA (Reverse Engineer Anything,
-MIT, github.com/morluto/rea): its MCP server through `npx`, 30 of its 207 tools in `allow`, 300 s to start and 600 s a
-call, and its workflow skill unchanged; and `integrations/replica-skill`, the eleven skills of replica-skill (MIT, Jake
-Schincariol), which install as ordinary skills. A server of a plugin's `.mcp.json` may now carry Dot's own `allow`,
-`startup_timeout_s` and `call_timeout_s`, as an `[[mcp]]` table does (`plugins/types.py`, `plugins/manifest.py`: a
-timeout Dot refuses leaves the server out with the reason), and `dotx mcp list` starts the plugins' servers too. The
-review found the code right, and changed four things. The server named `rea-agents@latest`, so every start could run
-whatever release npm had newest, with the owner's rights; it names 6.5.0 now, the release the plugin and its skill name,
-and a test holds the two together. The README says what the browser tools reach (the Chrome DevTools endpoint a call
-names, Dot's own Chrome's too), which the owner chose to keep. The update of the replica skills ran `rsync --delete`,
-which would have deleted their `DOT.md`; it leaves it now. The vendored Python is out of ruff's reach
-(`extend-exclude`), so `ruff check .` passes again. The copy installed in the owner's Dot home is the reviewed one.
-Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and the two folders' own.
+**Status: done (`d08dcd5`).** The owner's word of 2026-10-18 on the work a Dot run of theirs had left in the main
+checkout: "Ben yaptım kontrol et doğru yapmış mıyım sonra onu da ekle" (I made it: check whether I did it right, then
+add it too). **As built (2026-10-18).** The owner's run made `integrations/rea`, a Dot plugin for REA (Reverse Engineer
+Anything, MIT, github.com/morluto/rea): its MCP server through `npx`, 30 of its 207 tools in `allow`, 300 s to start and
+600 s a call, and its workflow skill unchanged; and `integrations/replica-skill`, the eleven skills of replica-skill
+(MIT, Jake Schincariol), which install as ordinary skills. A server of a plugin's `.mcp.json` may now carry Dot's own
+`allow`, `startup_timeout_s` and `call_timeout_s`, as an `[[mcp]]` table does (`plugins/types.py`,
+`plugins/manifest.py`: a timeout Dot refuses leaves the server out with the reason), and `dotx mcp list` starts the
+plugins' servers too. The review found the code right, and changed four things. The server named `rea-agents@latest`, so
+every start could run whatever release npm had newest, with the owner's rights; it names 6.5.0 now, the release the
+plugin and its skill name, and a test holds the two together. The README says what the browser tools reach (the Chrome
+DevTools endpoint a call names, Dot's own Chrome's too), which the owner chose to keep. The update of the replica skills
+ran `rsync --delete`, which would have deleted their `DOT.md`; it leaves it now. The vendored Python is out of ruff's
+reach (`extend-exclude`), so `ruff check .` passes again. The copy installed in the owner's Dot home is the reviewed
+one. Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and the two folders' own.
+
+### 369. The repository names no other product; the licence notices keep what the law asks
+
+**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca bizim kodlarımız içindeki tüm [başka bir uygulama]
+etiketlerini, yorum satırlarını da kaldır lütfen, açık kaynak olarak sıkıntı yaşamayalım" (also remove every label and
+comment line in our code that names [another app], so that we have no trouble as open source), and of this roadmap,
+"Oradan da kaldır" (remove it from there too). **As built (2026-10-18).** The code, the tests, the docs, the README and
+this roadmap named another app about four hundred times: design notes ("after its thread menu"), the theme file format,
+the palettes' descriptions in Settings › Appearance, the ids of its built-in themes and the names of a test file and
+four tests. They describe Dot in its own words now: a comparison is dropped and what it said of Dot kept; the theme file
+is the theme file (version 1); a palette says its colours; the owner's quoted words read "[başka bir uygulama]". The ids
+of the other app's built-in themes are no longer reserved (`themes.py` `RESERVED_THEME_IDS`, `own.js` `SCHEME_IDS`), so
+a theme of one's own may take them. The licence notices keep what the MIT licence asks: `static/js/appearance/LICENSE`
+names the project the appearance code is derived from and keeps its copyright, as `static/js/character/LICENSE` does for
+bloub, and what `integrations/` vendors keeps its upstream's words. `tests/unit/test_own_words.py` fails on the name in
+any other file of the repository. The rewriting was split over four agents (the roadmap, the docs, the web UI, Python
+and the tests), whose results were checked against the repository. Tests: `tests/smoke/test_phone_layout.py` (was
+`test_phone_t3.py`), `tests/unit/test_theme_folder.py`.
 
 ## Log
 
@@ -14886,25 +14904,25 @@ Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and 
 - 2026-10-12 (Opus 5.5): item 118 merged as `6dfbf07` (PR #141, MYP-258 Done): every tab Dot opens is a background CDP target with a mark of its own (tabs made at the same time no longer share a page, a race the user's Chrome had since item 98), a tab a page opens itself gives the front back to the application that had it (with Accessibility), and `raise_window` keeps the tabs in front as before; 906 unit tests, 71 browser smoke tests.
 - 2026-10-12 (Opus 5.5): item 119 merged as `acfc56a` (PR #142, MYP-259 Done): OpenCode Go's Messages route sends the automatic cache mark (Claude Haiku 5.5 read 10,383 tokens of a repeated prompt from the cache with it, none without), Claude on Go goes to the Messages route (Claude Haiku 5.5 was sent to Chat Completions and refused), the catalog follows Go's list, the models Go serves free say Free in the picker, and Zen's free models stay out (OpenCode serves them only to its own client); 906 unit tests, 38 smoke tests and the live Go tests with the key.
 - 2026-10-12 (Opus 5.5): item 120 merged as `6c1a7b3` (PR #143, MYP-260 Done): the run page's top bar keeps the face, the name and the panel's switch (its facts in Details, which gained the agent and the campaign), the composer's send is the run's Stop while the run works and the box is empty (Steer once a word is typed), a delegated run's pill ends with a Stop, Continue is a line above the composer, the top bar's right keeps the approvals waiting and the connection while it is not live, and the emergency stop sits in the sidebar's foot (beside the sidebar's opener while the sidebar is closed); 906 unit tests, 14 smoke tests and the tour.
-- 2026-10-12 (Opus 5.5): item 121 merged as `4f2b0cd` (PR #144, MYP-261 Done): the look after T3 Code's, through Dot's tokens and in both schemes: the sidebar a tone darker than the page with no line between them and a chat's last activity at the right of its row, a tool step one quiet line with its body on a hairline, the composer on a corner of its own (24 px) with a soft shadow on every page, the run's panel one card with its sections on hairlines, and the answer's time and length on a second look where a pointer can hover; 906 unit tests, 117 smoke tests and the tour read by eye at both widths in both schemes; the daemon restarted on it with no run active.
-- 2026-10-12 (Opus 5.5): part 17 planned, items 122 and 123, from the owner's word after part 16 and a reading of T3 Code's sidebar and chat in its repository; no code changed.
-- 2026-10-12 (Opus 5.5): item 122 merged as `10fd83f` (PR #147, MYP-262 Done): where a row's age sits at rest, a chat whose latest run works and every run of the Working section, delegated runs included, show a dashed circle, Working and the time since the run was asked for in T3 Code's units, read every second; `ThreadSummary.latest_created_at` is new; 906 unit tests, 27 smoke tests and the tour.
+- 2026-10-12 (Opus 5.5): item 121 merged as `4f2b0cd` (PR #144, MYP-261 Done): the calm look, through Dot's tokens and in both schemes: the sidebar a tone darker than the page with no line between them and a chat's last activity at the right of its row, a tool step one quiet line with its body on a hairline, the composer on a corner of its own (24 px) with a soft shadow on every page, the run's panel one card with its sections on hairlines, and the answer's time and length on a second look where a pointer can hover; 906 unit tests, 117 smoke tests and the tour read by eye at both widths in both schemes; the daemon restarted on it with no run active.
+- 2026-10-12 (Opus 5.5): part 17 planned, items 122 and 123, from the owner's word after part 16 and a reading of another app's sidebar and chat in its repository; no code changed.
+- 2026-10-12 (Opus 5.5): item 122 merged as `10fd83f` (PR #147, MYP-262 Done): where a row's age sits at rest, a chat whose latest run works and every run of the Working section, delegated runs included, show a dashed circle, Working and the time since the run was asked for in the fewest units, read every second; `ThreadSummary.latest_created_at` is new; 906 unit tests, 27 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 123 merged as `a2de64d` (PR #148, MYP-263 Done): in a run's chat a delegated run's row starts closed, its time counting on every second and at once on a page opened later; an approval it asks for opens it and the rows it sits in until the owner has decided, and a row the owner never touched folds again then and at the run's end; a delegated run has no `ask_user`, which the README's Delegation passage now says; 906 unit tests, 30 smoke tests and the tour; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): part 18 planned, items 124 and 125, from the owner's word after part 17, a measurement of the home and a reading of the last two days' failed runs (counts and kinds only); no code changed.
 - 2026-10-12 (Opus 5.5): item 124 merged as `41ec542` (PR #151, MYP-264 Done): the home's greeting and composer stand in the middle of the space under the top bar however long the day is, the upper row of the grid being half of what their measured height leaves; the Today strip follows in the page's flow, so the sidebar and the top bar stay as the window scrolls, shows two rows a section and folds at its title, kept per browser; 906 unit tests, 15 smoke tests and the tour.
 - 2026-10-12 (Opus 5.5): item 125 merged as `36c0eeb` (PR #152, MYP-265 Done): the journal names the day it tells, the date of the middle of the time the reflection read, or its first and last day when that time is longer than a day and a quarter; `browser_snapshot`'s description says it takes no arguments; 907 unit tests and the reflection's smoke test; the daemon restarted on it with no run active.
 - 2026-10-12 (Opus 5.5): the rule drafter's fix merged as `8090ebc` (PR #154, under item 110, MYP-266 Done): the owner's sentence "Dot can run everything without permission from me" drafts a rule for every tool instead of a refusal in Spanish, and a sentence no rule can be made of is answered in English, with no note about a broad rule taken for a refusal; a hosted test on the owner's review model, 907 unit tests and the Rules page's smoke tests.
-- 2026-10-12 (Opus 5.5): part 19 planned, items 126 to 128, from the owner's word with three screenshots of T3 Code's Settings › Appearance and a reading of T3 Code's source (MIT): the page, its themes with a theme per scheme, its interface, motion and type settings, and themes of one's own kept by the daemon; no code changed.
-- 2026-10-12 (Opus 5.5): item 126 merged as `c5dfc76` (PR #157, MYP-267 Done): Settings › Appearance holds the colour scheme as three miniatures of the window and the themes as a gallery with a light and a dark orb each, after T3 Code's page; T3 Code's six palettes are ported and mapped onto Dot's tokens, every theme held to Dot's contrast rule in both schemes as the browser paints it (a dark card a palette draws on the page is lifted a step above it); a theme per scheme rides on the page element as `light-dark()` pairs and is there before the first paint; ⌥⌘A opens the tab and ⇧⌥⌘A steps through the schemes.
-- 2026-10-12 (Opus 5.5): item 127 merged as `9c73d80` (PR #158, MYP-268 Done): Settings › Appearance gains Interface (the contrast, 50 to 200 %, mixed as T3 Code mixes it; the chat's width; the density and the two layout switches), Motion (the panels' slide, 0 to 400 ms, and the faces that move) and Type (the interface's font and size, the answers', the composer's and the code's fonts and sizes with a preview each, font smoothing and wrapped code); every setting is kept in the browser and put on the page by `boot.js` before the first paint, nothing when it is the default; a range control joins `#/controls`; 907 unit tests and a smoke test that sets each one and reads it on the page and after a reload.
-- 2026-10-12 (Opus 5.5): item 128 merged as `30b2434` (PR #159, MYP-269 Done): themes of one's own, made in an editor from a background, an accent and an action colour (T3 Code's generator, ported), duplicated, edited, exported and added from T3 Code's theme file, its short form or a VS Code colour theme, kept by the daemon in its home's `themes` folder (checked as T3 Code checks a file, capped, written whole, read without following links) and held to Dot's contrast rule; a review against the done criteria found two faults, fixed before the merge; 929 unit tests and a smoke test in a browser; the daemon restarted on it with no run active; part 19 built.
-- 2026-10-12 (Opus 5.5): part 20 planned, items 129 to 131, from the owner's word with a screenshot of T3 Code's thread menu and one of a run page whose composer stood near the top, and a reading of T3 Code's source (MIT): the composer at the foot of the window, a chat's menu (pin, rename, copy the link, select, delete) and unread chats, the pin, the name and what was seen kept by the daemon; Settle, Snooze, Regenerate title and Archive stay out; no code changed.
+- 2026-10-12 (Opus 5.5): part 19 planned, items 126 to 128, from the owner's word with three screenshots of another app's Settings › Appearance and a reading of its source (MIT): the page, its themes with a theme per scheme, its interface, motion and type settings, and themes of one's own kept by the daemon; no code changed.
+- 2026-10-12 (Opus 5.5): item 126 merged as `c5dfc76` (PR #157, MYP-267 Done): Settings › Appearance holds the colour scheme as three miniatures of the window and the themes as a gallery with a light and a dark orb each; six palettes are ported and mapped onto Dot's tokens, every theme held to Dot's contrast rule in both schemes as the browser paints it (a dark card a palette draws on the page is lifted a step above it); a theme per scheme rides on the page element as `light-dark()` pairs and is there before the first paint; ⌥⌘A opens the tab and ⇧⌥⌘A steps through the schemes.
+- 2026-10-12 (Opus 5.5): item 127 merged as `9c73d80` (PR #158, MYP-268 Done): Settings › Appearance gains Interface (the contrast, 50 to 200 %; the chat's width; the density and the two layout switches), Motion (the panels' slide, 0 to 400 ms, and the faces that move) and Type (the interface's font and size, the answers', the composer's and the code's fonts and sizes with a preview each, font smoothing and wrapped code); every setting is kept in the browser and put on the page by `boot.js` before the first paint, nothing when it is the default; a range control joins `#/controls`; 907 unit tests and a smoke test that sets each one and reads it on the page and after a reload.
+- 2026-10-12 (Opus 5.5): item 128 merged as `30b2434` (PR #159, MYP-269 Done): themes of one's own, made in an editor from a background, an accent and an action colour (a generator, ported), duplicated, edited, exported and added from a theme file, its short form or a VS Code colour theme, kept by the daemon in its home's `themes` folder (checked, capped, written whole, read without following links) and held to Dot's contrast rule; a review against the done criteria found two faults, fixed before the merge; 929 unit tests and a smoke test in a browser; the daemon restarted on it with no run active; part 19 built.
+- 2026-10-12 (Opus 5.5): part 20 planned, items 129 to 131, from the owner's word with a screenshot of another app's thread menu and one of a run page whose composer stood near the top, and a reading of its source (MIT): the composer at the foot of the window, a chat's menu (pin, rename, copy the link, select, delete) and unread chats, the pin, the name and what was seen kept by the daemon; Settle, Snooze, Regenerate title and Archive stay out; no code changed.
 - 2026-10-12 (Opus 5.5): item 129 merged as `048f3aa` (PR #161, MYP-270 Done): the run page's column is at least as tall as the window and the conversation grows into the room a short one leaves, so the composer stands at the window's foot from the first message, on a desktop with the details panel open or closed and on a phone; a long run scrolls under it as before; a smoke test reads the composer's foot at the window's.
-- 2026-10-12 (Opus 5.5): item 130 merged as `d7e7d5e` (PR #162, MYP-271 Done): a chat's menu after T3 Code's thread menu, from a "…" button, a right-click or the context-menu key: Pin (a Pinned group above the days, kept by the daemon in `threads.pinned_at`), Rename in the row, Copy link, Select and Delete; `PATCH /api/threads/{id}`; a review against the done criteria found them met and five edges, fixed before the merge; 930 unit tests and a smoke test in a browser on a desktop and a phone.
+- 2026-10-12 (Opus 5.5): item 130 merged as `d7e7d5e` (PR #162, MYP-271 Done): a chat's menu, from a "…" button, a right-click or the context-menu key: Pin (a Pinned group above the days, kept by the daemon in `threads.pinned_at`), Rename in the row, Copy link, Select and Delete; `PATCH /api/threads/{id}`; a review against the done criteria found them met and five edges, fixed before the merge; 930 unit tests and a smoke test in a browser on a desktop and a phone.
 - 2026-10-12 (Opus 5.5): part 21 planned, items 132 to 134, from the owner's word with a screenshot of a run on a hosted model that ended with a report and suggestions and one of the desktop window's top left, and a reading of the store by kinds and numbers: runs that keep going on every model when asked to, the composer's choices on a chat's page and the traffic lights on the line of the top bars; no code changed.
 - 2026-10-12 (Opus 5.5): item 132 merged as `002575b` (PR #164, MYP-273 Done): words that ask a run not to stop, in English or in Turkish, put a task or research run a person starts in goal mode whatever the switch says, the goal checker is told and accepts a finish only when every part of the goal is done and shown, every goal check sends back an answer that offers to do a part of the goal not done yet, and every model is told to keep acting and to take the ask at its word; the Details card reads "On, asked not to stop". A review against the done criteria found two blockers, fixed before the merge: a phone's curly apostrophe, and an offer rule that reached past the goal.
-- 2026-10-12 (Opus 5.5): item 131 merged as `34e1fe1` (PR #165, MYP-272 Done): a chat whose latest run ended after it was last seen shows its dot in the accent and says unread, as T3 Code marks a thread with a turn not yet seen; the daemon keeps `threads.seen_at` (the chats of an older store taken as seen), `GET /api/threads` carries `unread` and `PATCH /api/threads/{id}` takes `seen`; the open chat is seen while the page is in view, and its menu offers Mark read and Mark unread. A review against the done criteria found them met and one regression, fixed before the merge: a chat opened by a key lost the focus when its dot went.
-- 2026-10-12 (Opus 5.5): item 133 merged as `bf11312` (PR #166, MYP-274 Done): the dock of a chat's page wears the home's pills, after T3 Code's composer: the mode, the model with its reasoning and the Options, set at first to the open run's and held by the page, and a follow-up starts its run with them; while a run works the pills wait for the next follow-up and say so. The pickers are one module that both boxes use. A review against the done criteria found them met and the smoke test short of their negative cases, which it now reads.
+- 2026-10-12 (Opus 5.5): item 131 merged as `34e1fe1` (PR #165, MYP-272 Done): a chat whose latest run ended after it was last seen shows its dot in the accent and says unread; the daemon keeps `threads.seen_at` (the chats of an older store taken as seen), `GET /api/threads` carries `unread` and `PATCH /api/threads/{id}` takes `seen`; the open chat is seen while the page is in view, and its menu offers Mark read and Mark unread. A review against the done criteria found them met and one regression, fixed before the merge: a chat opened by a key lost the focus when its dot went.
+- 2026-10-12 (Opus 5.5): item 133 merged as `bf11312` (PR #166, MYP-274 Done): the dock of a chat's page wears the home's pills: the mode, the model with its reasoning and the Options, set at first to the open run's and held by the page, and a follow-up starts its run with them; while a run works the pills wait for the next follow-up and say so. The pickers are one module that both boxes use. A review against the done criteria found them met and the smoke test short of their negative cases, which it now reads.
 - 2026-10-12 (Opus 5.5): item 134 merged as `a5b0220` (PR #167, MYP-275 Done): the desktop window puts its traffic lights 26 px under the top, on the centre line of the top bars' 52 px rows (`traffic_light_position` 20, 28), and the sidebar's head grows to the bars' height, so the lights, the button that folds the sidebar and the top bar's opener and emergency stop stand on one line with room above and below; the page keeps 96 px for the lights. Part 21 is done; the window is the owner's to read once the app is rebuilt.
 - 2026-10-12 (Opus 5.5): part 22 planned, items 135 to 139, from the owner's word asking for a check of everything written so far: four reviews of the code by area, each finding read again in the code and ranked by weight, the offline smoke suite on main and the dependencies against the advisories; the fixes follow in that order, one pull request each.
 - 2026-10-12 (Opus 5.5): item 135 merged as `cb76e7d` (PR #169, MYP-276 Done): Dot's own folders (what it loads and runs, and the emergency stop's file) are a path class of their own, read like the home folder and changed like a protected location; the shell guard learns more write targets; a new flag, `upload`, asks before a shell line sends data out once the run has read untrusted content; an agent answers a message in the stricter of its approvals and the sender's; the browser never opens Dot's own interface and the desktop tools never act in Dot's own window outside `yolo`; `truncate` outside the workspace is destructive.
@@ -14921,7 +14939,7 @@ Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and 
 - 2026-10-12 (Opus 5.5): item 145 merged as `969d5f0` (PR #180, MYP-286 Done): the CI's actions are pinned by commit; only the shell's own pages and those of the daemon's address may call the desktop shell; the Rust crates were checked against the advisories (two, both in the GTK stack built only on Linux); and the two tests part 22 left are in. The shell's part reaches the owner's Mac when the owner rebuilds the desktop app. The final review of the five found every criterion met and five gaps, which item 146 takes.
 - 2026-10-12 (Opus 5.5): item 146 merged as `e558f21` (PR #181, MYP-287 Done): Dot's own code is among what it loads and runs, the daemon's job starts Python with `-P`, the login shell Dot reads at its start runs in the sandbox, a search shows what it found beside the places it may not read, the shell guard reads zsh's redirects past noclobber, and a playbook retired while a run ended is not counted; the daemon restarted with it, its job rewritten. Part 23 is done.
 - 2026-10-13 (Opus 5.5): item 147 merged as `ca16c37` (PR #183; no Linear issue, the connector was signed out): a search shows what it found where macOS broke off the reading of a folder, as it does beside the places it may not read; found in the records of a run while answering the owner's question whether the guards of parts 22 and 23 took the agent's freedom. The daemon restarted with it. Part 23 is done.
-- 2026-10-13 (Opus 5.5): item 148 merged as `5f6747b` (PR #184; no Linear issue, the connector was signed out): T3 Code's queued messages in Dot: a message sent while a chat's run works waits in the chat's queue, shown above the composer, and starts as the chat's next run once that run has ended done; a stop, a failure or a restart holds the queue until Resume. The browser test found and the item fixed the focus and the drag of the rows and Cancel on a phone. Part 24 is done.
+- 2026-10-13 (Opus 5.5): item 148 merged as `5f6747b` (PR #184; no Linear issue, the connector was signed out): Queued messages in Dot: a message sent while a chat's run works waits in the chat's queue, shown above the composer, and starts as the chat's next run once that run has ended done; a stop, a failure or a restart holds the queue until Resume. The browser test found and the item fixed the focus and the drag of the rows and Cancel on a phone. Part 24 is done.
 - 2026-10-13 (Opus 5.5): item 149 merged as `1ec1497` (PR #186; no Linear issue, the connector was signed out): a tick of the scheduler does its parts each on its own and a failed tick is tried again, so one error no longer ends the daemon with every run it holds; only twenty failed ticks in a row end it. A check of `test_composer.py` that read a colour while it faded was made to wait for it.
 - 2026-10-13 (Opus 5.5): item 150 merged as `ba4f2a6` (PR #187; no Linear issue, the connector was signed out): any error of a tool fails that call, not the run, and one no tool expects is logged with its traceback; `edit_file` keeps a file's CRLF line ends and refuses a file that is not UTF-8 text, saying so.
 - 2026-10-13 (Opus 5.5): item 151 merged as `6788a66` (PR #188; no Linear issue, the connector was signed out): a question a run left, a campaign that ended by itself, a firing a schedule missed and a restart after an unclean stop reach the owner, on the phone and (but the restart) in the page's notifications, and the end of a run tells the first line of its answer.
@@ -14979,14 +14997,14 @@ Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and 
 - 2026-10-14 (Opus 5.5): item 198 merged as `dee248f` (PR #237; no Linear issue, the connector was signed out): The side menu shows every run a run at work delegated, those that ended too, folded under a line that says how many there are and how many work; the fold is kept, and Activity shows them under the run as well.
 - 2026-10-14 (Opus 5.5): item 199 merged as `de8069e` (PR #238; no Linear issue, the connector was signed out): The default model is chosen in Settings › Models and starts the runs that name none at once; a chat keeps what its composer chose, through a reload, another browser and a move of its run to a standby model.
 - 2026-10-14 (Opus 5.5): item 200 merged as `0dab7de` (PR #239; no Linear issue, the connector was signed out): A page that loses the daemon comes back by itself: one loaded while the daemon is down tries again and says when, a stream silent for 45 seconds is cut and made again, a page back in view or on the network tries at once, and the desktop window keeps the page through a restart of the daemon.
-- 2026-10-14 (Opus 5.5): item 201 merged as `4f23e25` (PR #240; no Linear issue, the connector was signed out): At the left of the conversation, a column of short marks stands for the owner's messages, after T3 Code's: resting the pointer on it shows a message and the start of its answer, and a click or Enter goes to it.
-- 2026-10-14 (Opus 5.5): item 202 merged as `7e03ac3` (PR #241; no Linear issue, the connector was signed out): Each chat stands once in the side menu, after T3 Code's Working shelf: a chat whose latest run works leaves its day for Working, as the chat it is, with the runs it delegated folded under it, and goes back once the run ends; a pinned chat stays under Pinned.
-- 2026-10-14 (Opus 5.5): item 203 merged as `94985af` (PR #242; no Linear issue, the connector was signed out): The run's side panel shows one thing at a time, in four tabs after T3 Code's side panel (Run, Plan, Actions, Screen), each tab's sections open, the cost listed as the details are, and the tab chosen last kept.
+- 2026-10-14 (Opus 5.5): item 201 merged as `4f23e25` (PR #240; no Linear issue, the connector was signed out): At the left of the conversation, a column of short marks stands for the owner's messages: resting the pointer on it shows a message and the start of its answer, and a click or Enter goes to it.
+- 2026-10-14 (Opus 5.5): item 202 merged as `7e03ac3` (PR #241; no Linear issue, the connector was signed out): Each chat stands once in the side menu: a chat whose latest run works leaves its day for Working, as the chat it is, with the runs it delegated folded under it, and goes back once the run ends; a pinned chat stays under Pinned.
+- 2026-10-14 (Opus 5.5): item 203 merged as `94985af` (PR #242; no Linear issue, the connector was signed out): The run's side panel shows one thing at a time, in four tabs (Run, Plan, Actions, Screen), each tab's sections open, the cost listed as the details are, and the tab chosen last kept.
 - 2026-10-14 (Opus 5.5): item 204 merged as `db647a3` (PR #243; no Linear issue, the connector was signed out): Adding or deleting keeps the page where it is: the side menu brings the open chat into view only when the page comes to another chat, and the Memory page keeps the notes it read, their rows and its place.
 - 2026-10-14 (Opus 5.5): item 205 merged as `9934575` (PR #244; no Linear issue, the connector was signed out): Under each of the owner's messages, once its turn has its answer: when it was sent, a copy of it and Send again; under each answer, a copy of it and when it came.
 - 2026-10-14 (Opus 5.5): item 206 merged as `33a7f8d` (PR #245; no Linear issue, the connector was signed out): The owner's messages read as markdown, and a copy out of the conversation keeps the markdown it was written in, a list as a list and a table as a table.
 - 2026-10-14 (Opus 5.5): item 207 merged as `23f1d9a` (PR #246; no Linear issue, the connector was signed out): The composer's box shows the markdown it holds as it reads, its marks quieter than its words, letter for letter under the text as typed.
-- 2026-10-14 (Opus 5.5): item 208 merged as `2545d60` (PR #247; no Linear issue, the connector was signed out): The composer's model menu has a rail of the favourites and the providers' marks, a search across providers, a star on each model and keys, after T3 Code's.
+- 2026-10-14 (Opus 5.5): item 208 merged as `2545d60` (PR #247; no Linear issue, the connector was signed out): The composer's model menu has a rail of the favourites and the providers' marks, a search across providers, a star on each model and keys.
 - 2026-10-14 (Opus 5.5): item 209 merged as `a83c6b7` (PR #248; no Linear issue, the connector was signed out): the composer's model menu changes the daemon's default model too: Change on the default's row, then a pick.
 - 2026-10-14 (Opus 5.5): item 210 merged as `34f4816` (PR #249; no Linear issue, the connector was signed out): the shell check judges a change of permissions or of owner by every path the line names.
 - 2026-10-14 (Opus 5.5): item 211 merged as `e6c8185` (PR #250; no Linear issue, the connector was signed out): more of the places where a Mac keeps credentials and private data are protected by default.
@@ -15024,7 +15042,7 @@ Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and 
 - 2026-10-15 (Opus 5.5): item 242 merged as `cbd4a68` (PR #283; no Linear issue, the connector was signed out): an approval card shows the whole of what an action acts on, wrapped, in a box that scrolls past twelve lines; the reviewer of an `auto` run reads up to 12,000 characters of it, and of a longer one its start and its end.
 - 2026-10-15 (Opus 5.5): item 243 merged as `bbe607e` (PR #284; no Linear issue, the connector was signed out): a resumed run starts as tainted as the run it resumes was when it was cut off, and the run that tells a chat that its command in the background ended as the chat's last run ended; `tool_result` and `run_queued` events hold whether the run was tainted. Part 39 is done.
 - 2026-10-15 (Opus 5.5): item 244 merged as `5cfec1c` (PR #285; no Linear issue, the connector was signed out): the pill of a helper's page is in the dock, so it stays at the window's foot as the conversation scrolls.
-- 2026-10-15 (Opus 5.5): item 245 merged as `6b86a8d` (PR #286; no Linear issue, the connector was signed out): helpers that follow one another sit in one group, as T3 Code groups its subagents, with a head that counts them, says how they stand and folds them away; a row that is done shows the start of its answer.
+- 2026-10-15 (Opus 5.5): item 245 merged as `6b86a8d` (PR #286; no Linear issue, the connector was signed out): helpers that follow one another sit in one group, with a head that counts them, says how they stand and folds them away; a row that is done shows the start of its answer.
 - 2026-10-15 (Opus 5.5): item 246 merged as `5ef5a7b` (PR #287; no Linear issue, the connector was signed out): each step's thinking is a block with a brain that folds and unfolds, "Thinking…" while the model thinks and "Thought" once it is done, among its step's calls or before its message; the `assistant` event keeps the thinking, its secrets masked, up to 12,000 characters, and a step the loop asks again drops what its failed try streamed. Part 40 is done.
 - 2026-10-15 (Opus 5.5): item 247 merged as `66f49a3` (PR #288; no Linear issue, the connector was signed out): the repository has the MIT licence, a security policy that sends reports through GitHub's private vulnerability reporting, now on, a weekly Dependabot configuration and the notice of the icons' licence.
 - 2026-10-15 (Opus 5.5): item 248 merged as `8d3efd5` (PR #292; no Linear issue, the connector was signed out): a run that a restart, a crash or a shutdown cut off goes on by itself by default, when the calls it cut off only read and it was cut off at most 30 minutes before.
@@ -15102,8 +15120,8 @@ Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and 
 - 2026-10-17 (Opus 5.5): PR #334 (item 349, OpenRouter) merged as `196ff64` after CI and a second fresh-context review whose findings it fixes (a variant id the doctor did not know, lines over 120 columns, the lists of providers). Item 351 on `items-351-audit-fixes` as PR #335; its review's findings fixed (a failing one-time schedule waits between tries, the answer check reads only the word after a folder, a known address may gain a query or a closing slash); `test_browser_sign_in`'s stand-in no longer writes its pid before its arguments (300 of 300 probes failed before, none after).
 - 2026-10-17 (Opus 5.5): PR #335 (item 351, the audit's fixes) merged as `2f94b84` after CI; main's checkout moved to it and the daemon restarted at 17:36:46 while no run worked. Item 352 on the owner's word of the same day (fewer info lines, a live line over the composer, a phone's chat as one screen), on `items-352-chat-calm`.
 - 2026-10-17 (Opus 5.5): item 353 on the owner's answer of the same day (Keep going into the "+" beside Goal mode, Plan first kept), on `item-353-keep-going`: the home's Keep going switch is a row of the composer's "+" after Goal mode's, the Options pill holds the approvals alone; `test_composer.py` failed on the code before.
-- 2026-10-17 (Opus 5.5): item 354 on the owner's word of the same day (T3 Code's browser system in Dot, cleanly and better, with a screenshot of its Settings › Browser), on `item-354-browser-settings`: runs may be kept off the browser, a page of Dot's own Chrome fills its window or has a size, pages are told the Mac's colour scheme or one chosen, and a run at work shows its page beside the chat by itself; T3 Code's zoom and link target left out, with the reason.
-- 2026-10-17 (Opus 5.5): item 355 on the same word, on `item-354-browser-settings` after 354: profiles of Dot's own Chrome (Default, Incognito, added ones; Use, Clear, Delete, Add profile). T3 Code's recordings (frame rate, key and mouse presses) are not built: what they would record is too close to what the session's safety check stopped twice that day, and they were the largest, least needed part.
+- 2026-10-17 (Opus 5.5): item 354 on the owner's word of the same day (another app's browser system in Dot, cleanly and better, with a screenshot of its Settings › Browser), on `item-354-browser-settings`: runs may be kept off the browser, a page of Dot's own Chrome fills its window or has a size, pages are told the Mac's colour scheme or one chosen, and a run at work shows its page beside the chat by itself; the zoom and link target left out, with the reason.
+- 2026-10-17 (Opus 5.5): item 355 on the same word, on `item-354-browser-settings` after 354: profiles of Dot's own Chrome (Default, Incognito, added ones; Use, Clear, Delete, Add profile). That app's recordings (frame rate, key and mouse presses) are not built: what they would record is too close to what the session's safety check stopped twice that day, and they were the largest, least needed part.
 
 - 2026-10-17 (Opus 5.5): item 356 on the owner's word of the same day (a second outside report: fix what is real), on `item-356-audit-runtime`: two read-only verifiers checked every claim; the shell guard's findings stay reported for the owner, the six that held elsewhere are fixed, each with a test that fails on the code before.
 - 2026-10-17 (Opus 5.5): item 281 on the owner's choice of the same day, on `item-281-loop`: `/loop 30m <message>` makes a schedule of the chat that asks it again until a run deletes it or the owner stops it, with a line over the composer.
@@ -15112,10 +15130,11 @@ Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and 
 - 2026-10-17 (Opus 5.5): item 357 on the owner's word of the same day ("Tüm bu açık problemleri düzelt", fix all these open problems), on `item-357-long-lines`: the 391 long lines wrapped with every value kept, and `ruff check` holds every line of Python to 120 characters.
 - 2026-10-17 (Opus 5.5): item 357 done (`4ebf951`); item 280 left for the owner's word on spending a hosted model's quota on its evals, with how to run them.
 - 2026-10-17 (Opus 5.5): item 271, after its merge: the live daemon could not read Tailscale's status, because the app's program answers as its command line only with `TAILSCALE_BE_CLI=true` when no terminal runs it; fixed on `item-271-tailscale-cli`.
-- 2026-10-18 (Opus 5.5): item 358 on the owner's choice of the same day (of the rows T3 Code's Settings › Browser has that item 354 left out, the default zoom), on `item-358-browser-zoom`.
+- 2026-10-18 (Opus 5.5): item 358 on the owner's choice of the same day (of the rows another app's Settings › Browser has that item 354 left out, the default zoom), on `item-358-browser-zoom`.
 - 2026-10-18 (Opus 5.5): item 280 on the owner's word of the same day, on `item-280-lean`: a lean system prompt behind `[agent] prompt`, and three eval runs of the same 41 tasks that keep both defaults full.
 - 2026-10-18 (Opus 5.5): item 359 on the owner's word of the same day (the new composer not on the phone), on `item-359-phone-pages`: over a slow network the phone's service worker kept the build it first kept; a late answer of another build now has the next opening wait for the network.
 - 2026-10-18 (Opus 5.5): item 359 merged as `83d81e3` (PR #354), and the daemon restarted on it. Item 360 on the owner's word of the same day (two screenshots of the phone), on `item-360-chat-width`: a phone's conversation scrolls up and down only, and the line over the composer drops what the run does now and the count of the commands, in fewer and quieter words.
 - 2026-10-18 (Opus 5.5): item 360 merged as `a6f0397` (PR #355). Item 361 on the owner's word of the same day (a run's lessons failed with OpenRouter's 404 for the account's privacy settings), on `item-361-provider-policy`: that 404 is a refused access that says why and what to change.
 - 2026-10-18 (Opus 5.5): item 361 merged as `994ab2d` (PR #356); with paid model training and Zero Data Retention turned off at OpenRouter, the owner's review model answers again. Item 362 on the owner's word of the same day, on `item-362-quiet-yolo`: the lines of what ran without asking are out of a chat until turned on.
 - 2026-10-18 (Opus 5.5): item 362 merged as `22d1409` (PR #357). Item 363 on the owner's word of the same day, on `item-363-integrations`: the owner's REA and replica-skill integrations, reviewed, with REA's release named.
+- 2026-10-18 (Opus 5.5): item 363 merged as `d08dcd5` (PR #358). Item 369 on the owner's word of the same day, on `item-369-own-words`: the repository names no other product, and the licence notices keep their names.

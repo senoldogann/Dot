@@ -1,9 +1,9 @@
-// The settings of Settings › Appearance beside the theme and the scheme (item 127), after T3 Code's (see LICENSE): the
-// contrast, the chat's width, the slide of the panels and the type. Each is kept in this browser under its key, the
-// default as no key at all, and put on the page element as boot.js puts it there before the first paint: an attribute
-// where the stylesheets switch on one, a token on the element's style where a value is carried, and nothing at the
-// default. A family is one of the stacks app.css names (`--family-<id>`) or families typed, which go before the stack
-// they replace, as T3 Code puts them, so that no glyph goes missing.
+// The settings of Settings › Appearance beside the theme and the scheme (item 127), in part derived code (see LICENSE
+// in this folder): the contrast, the chat's width, the slide of the panels and the type. Each is kept in this browser
+// under its key, the default as no key at all, and put on the page element as boot.js puts it there before the first
+// paint: an attribute where the stylesheets switch on one, a token on the element's style where a value is carried, and
+// nothing at the default. A family is one of the stacks app.css names (`--family-<id>`) or families typed, which go
+// before the stack they replace, so that no glyph goes missing.
 
 import { readPref, removePref, writePref } from "../prefs.js";
 
@@ -28,14 +28,14 @@ function oneOf(ids) {
   return (stored) => (ids.includes(stored) ? stored : null);
 }
 
-// One family typed, as CSS reads it: a plain name as it is, anything else in double quotes (T3 Code's
-// quoteFontFamilyName, with the typed quotes dropped so that the quotes written always close).
+// One family typed, as CSS reads it: a plain name as it is, anything else in double quotes (the typed quotes are
+// dropped, so that the quotes written always close).
 function quoted(name) {
   const bare = name.replaceAll('"', "").replaceAll("'", "").trim();
   return bare === "" || (/^[a-zA-Z][a-zA-Z0-9-]*$/.test(bare) && !KEYWORDS.test(bare)) ? bare : `"${bare}"`;
 }
 
-/** The families typed as a CSS list, or null when nothing is typed (T3 Code's cssFontFamilies). */
+/** The families typed as a CSS list, or null when nothing is typed. */
 export function familyList(typed) {
   const families = typed.split(",").map(quoted).filter((name) => name !== "");
   return families.length > 0 ? families.join(", ") : null;
@@ -146,9 +146,9 @@ export const AUTO_LINES = {
   paint: () => undefined,
 };
 
-/** Whether the details panel opens on Dot's computer when a run that is going on first works in its browser (item 354,
- * after T3 Code's floating preview), beside the chat on a wide window; a phone keeps the button of its bar. Settings ›
- * Browser chooses it; it puts nothing on the page. */
+/** Whether the details panel opens on Dot's computer when a run that is going on first works in its browser (item 354),
+ * beside the chat on a wide window; a phone keeps the button of its bar. Settings › Browser chooses it; it puts
+ * nothing on the page. */
 export const AUTO_COMPUTER = {
   key: "dot.autoComputer",
   initial: "shown",

@@ -1,14 +1,14 @@
-// T3 Code's palette generator (item 128), ported from apps/web/src/themePalette.ts (see LICENSE): every colour role of
-// a palette from two colours, a canvas and an accent, worked out in OKLCH. The surfaces step away from the canvas in
-// lightness, tinted with the accent's hue at a low chroma; the text is solved to 7:1 on the canvas and the muted text to
-// the strength of T3 Code's stock palettes; a companion action colour is turned 50° off the accent; every foreground is
-// solved on its own surface, and the error and warning colours are T3 Code's standard ones laid over the canvas. A
-// family of roles moves together when the colour that stands for it is changed (`withFamily`), for the families Dot
-// draws with. Colours come out as `#rrggbb`, which T3 Code reads as it reads its own.
+// The palette generator (item 128), derived code (see LICENSE in this folder): every colour role of a palette from two
+// colours, a canvas and an accent, worked out in OKLCH. The surfaces step away from the canvas in lightness, tinted
+// with the accent's hue at a low chroma; the text is solved to 7:1 on the canvas and the muted text to the strength of
+// the stock palettes; a companion action colour is turned 50° off the accent; every foreground is solved on its own
+// surface, and the error and warning colours are the standard ones laid over the canvas. A family of roles moves
+// together when the colour that stands for it is changed (`withFamily`), for the families Dot draws with. Colours come
+// out as `#rrggbb`, as a theme file holds them.
 
 import { contrast, inkFor, luminance, mix, oklchToRgb, parseColour, rgbToOklch, solveLightness, toHex } from "./colour.js";
 
-/** T3 Code's colour roles (packages/shared/src/themePalettes.ts); dotagent/themes.py names the same. */
+/** The colour roles of a palette; dotagent/themes.py names the same. */
 export const THEME_ROLES = [
   "canvas",
   "chrome",
@@ -77,10 +77,10 @@ export const THEME_ROLES = [
 const DARK_LUMINANCE = 0.179;
 // A foreground on its surface: 4.5:1 with a little headroom for the browser's rounding.
 const ON_SURFACE = 4.6;
-// The muted text of T3 Code's stock palettes: zinc-500 on its light canvas, #818181 on its dark one.
+// The muted text of the stock palettes: zinc-500 on a light canvas, #818181 on a dark one.
 const MUTED_LIGHT = 4.705;
 const MUTED_DARK = 5.082;
-// The status colours of T3 Code's own look (red-500 and amber-500), which a generated palette keeps.
+// The status colours of Clean (red-500 and amber-500), which a generated palette keeps.
 const STANDARD_STATUS = {
   light: { error: "#fb2c36", errorForeground: "#c10007", warning: "#fe9a00", warningForeground: "#bb4d00" },
   dark: { error: "#fb414a", errorForeground: "#ff6467", warning: "#fe9a00", warningForeground: "#ffb900" },
@@ -105,7 +105,7 @@ function toneOn(colour, ground, least, dark) {
   return oklchToRgb(solveLightness(rgbToOklch(colour), ground, least, dark ? "lighter" : "darker"));
 }
 
-// T3 Code's readableThemeText: `foreground` mixed toward `background` by `amount`, or, where that reads under `least`,
+// The text of `foreground` on `background`: mixed toward `background` by `amount`, or, where that reads under `least`,
 // the quietest mix between the two that still reads at it.
 function readableText(background, foreground, amount, least) {
   const softened = mix(foreground, background, amount);
@@ -154,13 +154,13 @@ function hexes(colours) {
   return Object.fromEntries(Object.entries(colours).map(([role, colour]) => [role, toHex(colour)]));
 }
 
-/** T3 Code's createVividThemeColors: every role of a palette from its canvas and its accent (CSS colours). */
+/** Every role of a palette from its canvas and its accent (CSS colours). */
 export function vividPalette(canvasValue, accentValue) {
   const canvasRgb = rgbOf(canvasValue);
   const accentRgb = rgbOf(accentValue);
   const canvas = rgbToOklch(canvasRgb);
   const accent = rgbToOklch(accentRgb);
-  // The ramp follows the canvas picked, not the scheme the palette is for, as T3 Code's does.
+  // The ramp follows the canvas picked, not the scheme the palette is for.
   const dark = isDark(canvasRgb);
   const hue = accent.C < 0.02 ? canvas.h : accent.h;
   const tint = Math.min(0.045, Math.max(0.008, accent.C * 0.22));
@@ -249,9 +249,9 @@ export function vividPalette(canvasValue, accentValue) {
 }
 
 /**
- * The families of colours the editor shows, each by the role that stands for it, T3 Code's for the roles Dot draws
- * with: the page, the sidebar and the surfaces, the lines, the text, the accent and the action, the owner's message,
- * and the error and the warning.
+ * The families of colours the editor shows, each by the role that stands for it, for the roles Dot draws with: the
+ * page, the sidebar and the surfaces, the lines, the text, the accent and the action, the owner's message, and the
+ * error and the warning.
  */
 export const FAMILIES = [
   { role: "canvas", label: "Background" },
@@ -270,8 +270,8 @@ export const FAMILIES = [
 ];
 
 /**
- * T3 Code's updateThemeColorFamily: `palette` with the family `role` stands for set to `value` (an opaque colour), the
- * roles that go with it worked out again on the palette's canvas and every other role as it was.
+ * A copy of `palette` with the family `role` stands for set to `value` (an opaque colour), the roles that go with it
+ * worked out again on the palette's canvas and every other role as it was.
  */
 export function withFamily(palette, role, value) {
   const selected = rgbOf(value);

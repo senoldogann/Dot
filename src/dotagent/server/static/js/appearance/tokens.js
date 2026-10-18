@@ -1,9 +1,9 @@
 // Dot's colour tokens from a theme (item 126). A look (Neutral, Paper) is a block of themes.css and is read from the
-// stylesheet itself, so that file stays the one place its values live; a palette (palettes.js) is a set of T3 Code's
-// roles, mapped here onto Dot's tokens and held to the rule tests/unit/test_css_tokens.py holds the looks to: every
-// text tier reads on every surface (4.5:1 for the text and its second tier, 3:1 for the muted and the faint ones) and
-// every ink on its ground at 4.5:1, solved where the palette falls short the way T3 Code solves its text, by moving the
-// lightness away from the ground. The status colours keep T3 Code's standard hues and are solved on each canvas.
+// stylesheet itself, so that file stays the one place its values live; a palette (palettes.js) is a set of roles,
+// mapped here onto Dot's tokens and held to the rule tests/unit/test_css_tokens.py holds the looks to: every text tier
+// reads on every surface (4.5:1 for the text and its second tier, 3:1 for the muted and the faint ones) and every ink
+// on its ground at 4.5:1, solved where the palette falls short by moving the lightness away from the ground. The status
+// colours keep their standard hues and are solved on each canvas.
 
 import { contrast, inkFor, luminance, mix, oklchToRgb, parseColour, readableOn, rgbToOklch, toHex } from "./colour.js";
 
@@ -44,11 +44,11 @@ const LOOK_SELECTORS = { neutral: ":root", paper: ':root[data-theme="paper"]' };
 const HEADROOM = 0.1;
 const LEAST_TEXT = 4.5 + HEADROOM;
 const LEAST_QUIET = 3 + HEADROOM;
-// The luminance under which a canvas is dark: where white and black text have the same headroom (T3 Code's).
+// The luminance under which a canvas is dark: where white and black text have the same headroom.
 const DARK_LUMINANCE = 0.179;
 // One step between two of Dot's surfaces in OKLCH lightness, about the steps of its own looks in dark.
 const SURFACE_STEP = 0.035;
-// Success has no role in T3 Code's palettes; its standard is emerald, as T3 Code's stock success colour is.
+// Success has no role in the palettes; its standard is emerald.
 const SUCCESS = {
   light: { signal: "#10b981", ink: "#047857" },
   dark: { signal: "#10b981", ink: "#34d399" },
@@ -144,7 +144,7 @@ function stepped(colour, step) {
 }
 
 // The surfaces Dot steps through (the card, the hover, the pressed), each a step further from the page than the last:
-// down in light, up in dark. T3 Code's accent surface is the hover when it lies that way, else a step from the card.
+// down in light, up in dark. The accent surface is the hover when it lies that way, else a step from the card.
 function surfaceSteps(surface, hover, border, dark) {
   const further = (one, other) => (dark ? luminance(other) > luminance(one) : luminance(other) < luminance(one));
   const step = dark ? SURFACE_STEP : -SURFACE_STEP;
@@ -153,8 +153,8 @@ function surfaceSteps(surface, hover, border, dark) {
   return [second, further(second, third) ? third : stepped(second, step)];
 }
 
-// A status colour on its tinted ground, as T3 Code makes its error and warning: the ground is the canvas mixed toward
-// the signal, the ink the standard ink solved on that ground.
+// A status colour on its tinted ground: the ground is the canvas mixed toward the signal, the ink the standard ink
+// solved on that ground.
 function status(canvas, signal, ink, dark) {
   const weak = mix(canvas, signal, dark ? 0.16 : 0.08);
   return { ink: readableOn(ink, weak, LEAST_TEXT), weak, border: mix(weak, signal, 0.35) };
@@ -165,7 +165,7 @@ export function paletteTokens(roles) {
   const canvas = rgbOf(roles, "canvas");
   const dark = luminance(canvas) < DARK_LUMINANCE;
   const sidebar = rgbOf(roles, "sidebar");
-  // In dark a card lies a step above the page, as in Dot's looks; T3 Code's vivid palettes draw cards on the page.
+  // In dark a card lies a step above the page, as in Dot's looks; a palette may draw its cards on the page.
   const card = rgbOf(roles, "surface");
   const surface = dark && luminance(card) <= luminance(canvas) ? stepped(canvas, SURFACE_STEP) : card;
   const border = rgbOf(roles, "border");
@@ -173,7 +173,7 @@ export function paletteTokens(roles) {
   const grounds = [canvas, sidebar, surface, surface2, surface3];
   const text = tier(rgbOf(roles, "text"), grounds, LEAST_TEXT);
   const muted = tier(rgbOf(roles, "textMuted"), grounds, LEAST_QUIET);
-  // Dot's accent is T3 Code's action colour, the one it paints every solid control with (buttons, switches, send).
+  // Dot's accent is the palette's action colour, the one it paints every solid control with (buttons, switches, send).
   const accent = rgbOf(roles, "messageAction");
   const bubble = rgbOf(roles, "messageSurface");
   const bad = { ink: rgbOf(roles, "errorForeground"), weak: rgbOf(roles, "errorSurface") };

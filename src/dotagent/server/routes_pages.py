@@ -3,7 +3,7 @@
 The daemon serves a page as the run wrote it, after a bootstrap of its own, and the guard sandboxes it
 (``PAGE_HEADERS``): its origin is opaque, so its scripts reach nothing of Dot's. The bootstrap gives the page the CSS
 variables of :data:`THEME_VARIABLES`, and speaks three messages of the MCP Apps protocol (JSON-RPC 2.0 over
-``postMessage``) with the frame it is in, as T3 Code's pages do:
+``postMessage``) with the frame it is in:
 
 - ``ui/notifications/host-context-changed`` from the frame: the conversation's theme,
   ``{"theme": "light" | "dark", "styles": {"variables": {name: value}}}``. The frame puts the same object in the address

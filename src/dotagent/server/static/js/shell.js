@@ -107,7 +107,7 @@ export function buildShell({ homeRoute }) {
       location.replace(back.to);
     }
   }
-  // On a phone the button at the top left is the one way back, a chevron as in T3 Code's phone app (item 295): to the
+  // On a phone the button at the top left is the one way back, a chevron (item 295): to the
   // page before, or to the page's parent (item 338), and on a page opened from the sidebar to the list of chats. The
   // pages' own links back are for a wider window.
   function paintOpener() {

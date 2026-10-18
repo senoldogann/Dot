@@ -123,8 +123,8 @@ def playbooks_dir() -> Path:
 
 
 def themes_dir() -> Path:
-    """Where the themes of one's own are kept: one ``<id>.json`` file of T3 Code's theme format per theme, made with the
-    first theme saved (item 128)."""
+    """Where the themes of one's own are kept: one ``<id>.json`` theme file per theme, made with the first theme saved
+    (item 128)."""
     return dot_home() / "themes"
 
 

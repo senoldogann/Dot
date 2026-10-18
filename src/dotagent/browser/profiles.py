@@ -1,9 +1,9 @@
-"""The profiles of Dot's own Chrome (item 355, after T3 Code's): each keeps cookies and sign-ins of its own, and one is
-in use at a time (``[browser] profile``). Default is the profile Dot always had (``browser-profile`` in its home);
-Incognito keeps nothing, as its folder is emptied before Chrome starts on it and after it closes; the ones the owner
-adds live under ``browser-profiles``, a folder each, named as the profile. The Chrome of the user has its own profiles,
-so these apply to Dot's own Chrome only. The zoom Dot's own Chrome draws pages at (item 358) is written into the
-preferences of the profile in use before Chrome starts on it.
+"""The profiles of Dot's own Chrome (item 355): each keeps cookies and sign-ins of its own, and one is in use at a time
+(``[browser] profile``). Default is the profile Dot always had (``browser-profile`` in its home); Incognito keeps
+nothing, as its folder is emptied before Chrome starts on it and after it closes; the ones the owner adds live under
+``browser-profiles``, a folder each, named as the profile. The Chrome of the user has its own profiles, so these apply
+to Dot's own Chrome only. The zoom Dot's own Chrome draws pages at (item 358) is written into the preferences of the
+profile in use before Chrome starts on it.
 """
 
 import math
@@ -21,7 +21,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 
 DEFAULT_PROFILE: str = "default"
 INCOGNITO_PROFILE: str = "incognito"
-# As many as T3 Code allows.
+# The most profiles that can be added beside Default and Incognito.
 MAX_ADDED_PROFILES: int = 24
 # What Chrome keeps of the sites in a profile's folder (its first profile, "Default"): the cookies with the files SQLite
 # keeps beside them, and the caches. Read on Chrome 155 on macOS (2026-10-17); chrome_import.py copies the same cookies.
