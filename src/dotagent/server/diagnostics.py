@@ -1,7 +1,8 @@
 """What Settings › System › Diagnostics shows (item 370), read when the page asks: the daemon's process and those it
 started, with what each takes of the CPU and of memory; the room Dot's own folders take on disk; and the logs, the last
 lines of one. A process is named by its executable alone, as its arguments may carry a key, and a log's lines go out
-with their secrets masked. The owner's own Chrome is never measured: only the folders Dot keeps."""
+with every secret Dot holds masked, word for word, and the forms of the others: a log may be the raw output of an MCP
+server or of launchd. The owner's own Chrome is never measured: only the folders Dot keeps."""
 
 import asyncio
 import os
@@ -27,8 +28,9 @@ from dotagent.core.paths import (
     undo_dir,
     workspace_dir,
 )
-from dotagent.core.text import redact_secrets
+from dotagent.core.text import redact_known
 from dotagent.core.types import FrozenModel
+from dotagent.secrets import known_secrets
 
 # The columns `ps` is asked for, without a header: the executable's path comes last, as it may hold spaces.
 _PS_COLUMNS: str = "pid=,ppid=,rss=,%cpu=,etime=,comm="
@@ -207,6 +209,13 @@ def shown_path(path: Path) -> str:
     return f"~{text[len(home) :]}" if text == home or text.startswith(f"{home}/") else text
 
 
+def _unreadable(error: OSError) -> None:
+    """A folder Dot keeps that it cannot read: its size would be short, so the measure fails and says where."""
+    raise DiagnosticsError(
+        "a folder Dot keeps could not be read", {"path": str(error.filename), "error": error.strerror or str(error)}
+    )
+
+
 def _size(path: Path) -> int:
     """The bytes the file ``path``, or the files under the folder ``path``, take; none for a path that is not there."""
     if not path.exists():
@@ -214,7 +223,7 @@ def _size(path: Path) -> int:
     if not path.is_dir():
         return path.lstat().st_size
     total: int = 0
-    for folder, _, names in os.walk(path):
+    for folder, _, names in os.walk(path, onerror=_unreadable):
         for name in names:
             try:
                 total += os.lstat(os.path.join(folder, name)).st_size
@@ -267,12 +276,13 @@ def list_logs(folder: Path) -> LogsView:
     )
 
 
-def tail_lines(data: bytes, cut: bool, count: int) -> tuple[str, ...]:
-    """The last ``count`` lines of ``data``, the end of a log, their secrets masked; when ``cut``, the read began
-    inside the file and its first line is left out, as it may be the end of one."""
+def tail_lines(data: bytes, cut: bool, count: int, known: Sequence[str]) -> tuple[str, ...]:
+    """The last ``count`` lines of ``data``, the end of a log, with every value of ``known`` (the secrets Dot holds)
+    masked and the known forms of the others; when ``cut``, the read began inside the file and its first line is left
+    out, as it may be the end of one."""
     lines: list[str] = data.decode("utf-8", errors="replace").splitlines()
     kept: list[str] = lines[1:] if cut else lines
-    return tuple(redact_secrets(line) for line in kept[-count:])
+    return tuple(redact_known(line, known) for line in kept[-count:])
 
 
 def read_tail(folder: Path, name: str, count: int) -> LogTail:
@@ -280,9 +290,12 @@ def read_tail(folder: Path, name: str, count: int) -> LogTail:
     if name not in {file.name for file in list_logs(folder).files}:
         raise NotFoundError("Dot has no log of this name", {"name": name, "folder": str(folder)})
     path: Path = folder / name
-    size: int = path.stat().st_size
-    start: int = max(0, size - _TAIL_BYTES)
-    with path.open("rb") as handle:
-        handle.seek(start)
-        data: bytes = handle.read()
-    return LogTail(name=name, lines=tail_lines(data, start > 0, count))
+    try:
+        size: int = path.stat().st_size
+        start: int = max(0, size - _TAIL_BYTES)
+        with path.open("rb") as handle:
+            handle.seek(start)
+            data: bytes = handle.read()
+    except FileNotFoundError as error:
+        raise NotFoundError("the log went while it was read", {"name": name, "folder": str(folder)}) from error
+    return LogTail(name=name, lines=tail_lines(data, start > 0, count, known_secrets()))

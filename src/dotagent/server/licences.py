@@ -7,6 +7,7 @@ import shutil
 from collections.abc import Sequence
 from importlib.metadata import Distribution, distributions
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from dotagent.core.types import FrozenModel
 from dotagent.server.diagnostics import shown_path
@@ -120,15 +121,21 @@ def licence_of(expression: str | None, field: str | None, classifiers: Sequence[
     return ", ".join(dict.fromkeys(named))
 
 
+def _web(address: str) -> bool:
+    """Whether ``address`` is a web page's, http or https: a package's metadata may name anything."""
+    parts = urlsplit(address)
+    return parts.scheme in {"http", "https"} and parts.netloc != ""
+
+
 def url_of(home_page: str | None, project_urls: Sequence[str]) -> str:
-    """The page a package's metadata points at: its Home-page, else its first Project-URL whose label names a home, a
-    source or a repository, else its first Project-URL; "" when it gives none."""
-    if home_page is not None and home_page.strip() not in {"", "UNKNOWN"}:
+    """The web page a package's metadata points at: its Home-page, else its first Project-URL whose label names a home,
+    a source or a repository, else its first Project-URL; only an http or https address, "" when it gives none."""
+    if home_page is not None and _web(home_page.strip()):
         return home_page.strip()
     pairs: list[tuple[str, str]] = [
         (label.strip().lower(), address.strip())
         for label, _, address in (entry.partition(",") for entry in project_urls)
-        if address.strip() != ""
+        if _web(address.strip())
     ]
     return next((address for label, address in pairs if label in _HOME_LABELS), pairs[0][1] if pairs else "")
 

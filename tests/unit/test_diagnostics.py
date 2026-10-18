@@ -70,17 +70,29 @@ def test_the_end_of_a_log_masks_its_secrets_and_leaves_out_a_line_the_read_cut()
     data: bytes = (
         b"ing a line cut\nfirst\nAuthorization: Bearer sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789\nlast\n"
     )
-    assert tail_lines(data, True, 10)[0] == "first"
-    assert tail_lines(data, False, 10)[0] == "ing a line cut"
-    masked: tuple[str, ...] = tail_lines(data, True, 2)
+    assert tail_lines(data, True, 10, ())[0] == "first"
+    assert tail_lines(data, False, 10, ())[0] == "ing a line cut"
+    masked: tuple[str, ...] = tail_lines(data, True, 2, ())
     assert len(masked) == 2 and masked[1] == "last"
     assert "abcdefghijklmnopqrstuvwxyz0123456789" not in masked[0]
+    # A secret Dot holds is masked word for word, whatever its form: the raw output of an MCP server may print it.
+    plain: bytes = b"connecting with token=nothing-like-a-key-but-Dots-own-42\n"
+    assert tail_lines(plain, False, 1, ("nothing-like-a-key-but-Dots-own-42",)) == ("connecting with token=***",)
 
 
-def test_a_log_is_read_by_its_name_and_any_other_name_is_refused(tmp_path: Path) -> None:
+def test_a_log_is_read_by_its_name_and_any_other_name_is_refused(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The secrets Dot holds include its env file's values: one of them, with no form a pattern knows, is masked.
+    home: Path = tmp_path / "home"
+    home.mkdir()
+    monkeypatch.setenv("DOT_HOME", str(home))
+    (home / ".env").write_text("CUSTOM_PROVIDER_KEY=a-plain-value-of-dots-own-1234\n", encoding="utf-8")
+    (tmp_path / "server.log").write_text("the server got a-plain-value-of-dots-own-1234\n", encoding="utf-8")
+    assert read_tail(tmp_path, "server.log", 1).lines == ("the server got ***",)
     (tmp_path / "dotx.log").write_text("".join(f"line {number}\n" for number in range(1, 51)), encoding="utf-8")
     (tmp_path / "notes.txt").write_text("not a log\n", encoding="utf-8")
-    assert [file.name for file in list_logs(tmp_path).files] == ["dotx.log"]
+    assert sorted(file.name for file in list_logs(tmp_path).files) == ["dotx.log", "server.log"]
     assert read_tail(tmp_path, "dotx.log", 3).lines == ("line 48", "line 49", "line 50")
     for name in ("notes.txt", "../dotx.log", "missing.log"):
         with pytest.raises(NotFoundError):

@@ -26,6 +26,10 @@ def test_a_packages_page_is_its_home_else_the_url_its_labels_name_else_the_first
     assert url_of(None, ["Docs, https://docs.example", "Source, https://src.example"]) == "https://src.example"
     assert url_of("UNKNOWN", ["Docs, https://docs.example"]) == "https://docs.example"
     assert url_of(None, []) == ""
+    # Only a web page's address is a link: a package's metadata may name anything.
+    assert url_of("javascript:alert(1)", ["Source, javascript:alert(2)", "Docs, https://docs.example"]) == (
+        "https://docs.example"
+    )
 
 
 def test_a_notice_of_the_pages_is_named_for_what_follows_licence_or_for_its_folder(tmp_path: Path) -> None:
