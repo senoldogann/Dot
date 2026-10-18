@@ -196,8 +196,9 @@ screenshot, each call one quiet line with its icon, its result on a hairline und
 questions and policy notes stay in the open. The lines of how a run was set up (the
 notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
 model) are not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming
-them in short, a line that warns in amber (the embedding service failed, so the notes were found by their words
-alone); a delegated run's lines are on its own page. What the model thought
+them in short and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a
+line that warns in amber (the embedding service failed, so the notes were found by their words alone); a delegated
+run's lines are on its own page. What the model thought
 in a step is a line of its own there, before the step's calls (item 246), or out of the fold before the
 message the step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the
 model thinks

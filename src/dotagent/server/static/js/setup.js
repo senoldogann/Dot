@@ -7,11 +7,13 @@ import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 
-// The kinds of line a long run gives again and again, said once with how many there are: the goal repeated to the
-// model, and the steps sent to another model.
+// The kinds of line a long run gives again and again, said once with how many there are: each time the goal was
+// repeated to the model, each step sent to another model, and each such step asked again on the run's model. The
+// lines said once a run (how often the goal is repeated: "cadence") are kinds of their own.
 const REPEATED = {
   reminder: (count) => `goal repeated ${count} times`,
   route: (count) => `${count} steps on another model`,
+  "route-back": (count) => `${count} steps back on the run's model`,
 };
 
 /**

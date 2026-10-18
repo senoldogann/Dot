@@ -1127,7 +1127,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
         setupLine(scope, "budget", budget, "sliders", `Context budget ${compact(data.context_tokens)} tokens, the size chosen for the model in Settings, ${output}`, "");
       }
       if (data.reminder_every !== null) {
-        setupLine(scope, "reminder", `goal every ${data.reminder_every} steps`, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");
+        setupLine(scope, "cadence", `goal every ${data.reminder_every} steps`, "target", `The goal is repeated every ${data.reminder_every} steps: ${data.reason}`, "");
       }
     },
 
@@ -1302,7 +1302,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, onGrow, onPlan, 
     },
     step_route_failed(scope, record) {
       const data = record.data;
-      setupLine(scope, "route", `step ${data.step} back on the run's model`, "refresh", `${data.model} could not answer step ${data.step}; asked again on the run's model: ${data.error}`, "warn");
+      setupLine(scope, "route-back", `step ${data.step} back on the run's model`, "refresh", `${data.model} could not answer step ${data.step}; asked again on the run's model: ${data.error}`, "warn");
     },
 
     // A session of a campaign ranked the posts it could answer (`topic`, `weights`, `posts` with their scores, the
