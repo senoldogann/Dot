@@ -552,11 +552,14 @@ _NOTED_AND_WHOLE: str = """async (build) => {
   return names.includes(`dot-newer-${build}`) && copy !== undefined
     && (await (await caches.open(copy)).match("/js/main.js")) !== undefined;
 }"""
-# Whether the copy kept is of the build named alone, the shell with it.
+# Whether the copy kept is of the build named alone, the shell with it; the page kept for a Mac out of reach is of no
+# build, so it stays beside them.
 _KEPT_WHOLE: str = """async (build) => {
   const names = await caches.keys();
-  return names.length === 1 && names[0] === `dot-pages-${build}`
-    && (await (await caches.open(names[0])).match("/js/main.js")) !== undefined;
+  const pages = names.filter((name) => name.startsWith("dot-pages-"));
+  return pages.length === 1 && pages[0] === `dot-pages-${build}`
+    && names.every((name) => name === `dot-pages-${build}` || name === "dot-offline")
+    && (await (await caches.open(pages[0])).match("/js/main.js")) !== undefined;
 }"""
 
 

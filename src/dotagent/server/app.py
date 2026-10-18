@@ -31,6 +31,7 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import looks_dir
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.previews.quicklook import QuickLook, open_quick_look
+from dotagent.server.compress import GzipCompression
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
 from dotagent.server.kept_pages import KeptPages, ServedPages, keep_pages
@@ -161,6 +162,8 @@ def create_app(ctx: ServerContext) -> FastAPI:
         return _error_response(422, "the request is not valid", {"errors": problems})
 
     app.add_middleware(LocalGuard, token=ctx.token, port=ctx.port, reach=frozenset(ctx.runtime.config.server.reach))
+    # Added last to be the outermost layer, so that every answer, the pages' as much as the API's, goes through it.
+    app.add_middleware(GzipCompression)
     # The web app manifest has a type of its own that the platform's table may not know.
     mimetypes.add_type("application/manifest+json", ".webmanifest")
     app.mount("/", ServedPages(pages), name="ui")
