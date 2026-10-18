@@ -305,7 +305,8 @@ or your own words. The run reads which option you chose, and whether it was the 
 > program run a command line), compares paths without case, and treats what it cannot read (a command named by a
 > substitution or a pattern, `eval` of one, a setting of git it does not know, a line it cannot parse) as a destructive
 > step outside the workspace, which every preset asks about. A script the line downloads and then runs (`curl -o`, `wget
-> -O` or `git clone`, then `bash`, `source` or its path) is judged as piping the download into a shell; a file named
+> -O` or `git clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp`, an
+> `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged as piping the download into a shell; a file named
 > after an at sign (`curl --data-binary @file`) as that file; a script handed to a terminal app (`open -a Terminal`, a
 > `.command` file) as a step outside Dot's sandbox, which every preset asks about (item 385). It does not follow what a
 > recursive command does inside the

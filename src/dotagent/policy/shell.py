@@ -535,7 +535,8 @@ _OPEN_RUNS: tuple[str, ...] = (
     ".jar",
 )
 _OPEN_INSTALLS: tuple[str, ...] = (".pkg", ".mpkg")
-# The terminal apps ``open -a`` or ``open -b`` can hand a file to, which run it as a script (item 385).
+# The terminal apps ``open -a`` or ``open -b`` can hand a file to, which run it as a script (item 385); a name is
+# matched inside the app's name or bundle id (``com.apple.Terminal``).
 _TERMINAL_APPS: tuple[str, ...] = (
     "terminal",
     "iterm",
@@ -548,8 +549,6 @@ _TERMINAL_APPS: tuple[str, ...] = (
     "xterm",
     "tabby",
     "termius",
-    "com.apple.terminal",
-    "com.googlecode.iterm2",
 )
 
 _PIPE_TO_SHELL: re.Pattern[str] = re.compile(
@@ -1476,14 +1475,10 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
         return _with_places(assigned, [*assigned.cwds, *(_places(operands[0], assigned) if wanted else [Path.home()])])
     if command == "ln":
         return _linked(assigned, rest[1:])
-    fetched: list[str] = _fetched_places(command, rest[1:]) or _carried_download(command, rest[1:], assigned)
-    if fetched:
-        places: list[Path] = [
-            _located(value, cwd, assigned)
-            for raw in fetched
-            for value in _expansions(raw, assigned) or [raw]
-            for cwd in assigned.cwds
-        ]
+    places: list[Path] = _fetched_places(command, rest[1:], assigned) or _located_all(
+        _carried_download(command, rest[1:], assigned), assigned
+    )
+    if places:
         return replace(assigned, downloaded=(*assigned.downloaded, *places))
     return assigned
 
@@ -1855,19 +1850,28 @@ def _cloned_into(args: list[str], scope: ShellScope) -> list[Finding]:
     return _writes_to("git clone", operands[1:2] or ["."], _git_scope(args, rest, scope))
 
 
-def _fetched_places(command: str, args: list[str]) -> list[str]:
+def _fetched_places(command: str, args: list[str], scope: ShellScope) -> list[Path]:
     """Where a command puts what it brings from the network (item 385): the files of a fetcher
     (:func:`_fetched_files`), and the folder ``git clone`` makes (the one it is given, else the one its address
-    names)."""
+    names), from the directories git's ``-C`` moves it to."""
     if command in _NETWORK_FETCHERS:
-        return _fetched_files(command, args)
+        return _located_all(_fetched_files(command, args), scope)
     if command != "git":
         return []
     sub, rest = _git_subcommand(args)
     operands: list[str] = _clone_operands(rest) if sub == "clone" else []
     if not operands:
         return []
-    return operands[1:2] or [Path(operands[0].rstrip("/")).name.removesuffix(".git")]
+    folder: list[str] = operands[1:2] or [Path(operands[0].rstrip("/")).name.removesuffix(".git")]
+    return _located_all(folder, _git_scope(args, rest, scope))
+
+
+def _located_all(raws: list[str], scope: ShellScope) -> list[Path]:
+    """Where each of ``raws`` lands from each directory the line may be in; a word only the running line knows is
+    taken as written."""
+    return [
+        _located(value, cwd, scope) for raw in raws for value in _expansions(raw, scope) or [raw] for cwd in scope.cwds
+    ]
 
 
 def _carried_download(command: str, args: list[str], scope: ShellScope) -> list[str]:
@@ -1974,8 +1978,20 @@ def _httpie_sends(args: list[str]) -> bool:
 def _fetched_files(command: str, args: list[str]) -> list[str]:
     """Where a fetcher saves what it fetched: the ``-o`` files of curl and the others, the folder of curl's ``-O`` (its
     ``--output-dir``, else the directory the line is in), and wget's ``-O`` file or else its ``-P`` folder or the
-    directory the line is in (wget's ``-o`` is its log); ``-`` is the standard output."""
-    files: list[str] = _option_values(args, "-o", "--output")
+    directory the line is in (wget's ``-o`` is its log); ``-`` is the standard output. A ``-o`` file of curl lies in its
+    ``--output-dir``, and one of aria2c in its ``-d`` folder."""
+    named: list[str] = _option_values(args, "-o", "--output")
+    # curl's --output-dir and aria2c's -d hold the -o files too, when these do not name a folder of their own.
+    folder: list[str] = (
+        _option_values(args, "", "--output-dir")
+        if command == "curl"
+        else _option_values(args, "-d", "--dir")
+        if command == "aria2c"
+        else []
+    )
+    files: list[str] = [
+        str(Path(folder[-1]) / name) if folder and not name.startswith(("/", "~", "$")) else name for name in named
+    ]
     if command == "curl" and any(
         arg in ("--remote-name", "--remote-name-all") or re.fullmatch(r"-[A-Za-z#]*O[A-Za-z#]*", arg) for arg in args
     ):

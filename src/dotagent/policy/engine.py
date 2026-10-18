@@ -112,6 +112,11 @@ def owner_handoff(info: ActionInfo, rules: list[RuleRecord]) -> Decision | None:
     rule: RuleRecord | None = match_rule(info, rules)
     if rule is None or rule.behavior != "handoff":
         return None
+    return _handed_off(rule)
+
+
+def _handed_off(rule: RuleRecord) -> Decision:
+    """The decision of a rule of the owner's that hands the action off."""
     return Decision(verdict="handoff", source="rule", reason=rule.description or f"rule {rule.id}", rule_id=rule.id)
 
 
@@ -164,12 +169,7 @@ def decide(
     rule: RuleRecord | None = match_rule(info, rules)
     if allowance is not None:
         if rule is not None and rule.behavior == "handoff":
-            return Decision(
-                verdict="handoff",
-                source="rule",
-                reason=rule.description or f"rule {rule.id}",
-                rule_id=rule.id,
-            )
+            return _handed_off(rule)
         return allowance
     if rule is not None:
         verdict: Verdict = _BEHAVIOR_VERDICT[rule.behavior]

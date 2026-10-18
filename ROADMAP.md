@@ -14776,8 +14776,9 @@ an owner's rule whose regular expression backtracks for long, is not fixed: matc
 event loop, as `re` holds the interpreter's lock, so a fix needs the `regex` package with its timeout or a process of
 its own, which is the owner's to choose. A security review by a separate agent found the thread did not help, a file
 named as the terminal app slipped by, and interpreters other than the shells were missed; the pre-push review found
-`open -na`, a download fed on standard input, a path given by a variable and the other copy commands; each is fixed or
-taken back. Tests: `tests/unit/test_spend.py`, `tests/unit/test_shell_policy.py`. Docs: `docs/safety.md`.
+`open -na`, a download fed on standard input, a path given by a variable, the other copy commands, `git -C` and curl's
+`--output-dir`; each is fixed or taken back. Tests: `tests/unit/test_spend.py`, `tests/unit/test_shell_policy.py`. Docs:
+`docs/safety.md`.
 
 ## Log
 
