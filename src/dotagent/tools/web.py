@@ -489,6 +489,7 @@ def _search_tool() -> RegisteredTool:
             ctx.runtime.search_key_present,
             config.web.anthropic_search if ctx.runtime.anthropic_key_present else None,
             ctx.browser.human_like,
+            bool(config.web.searxng_url),
         )
 
     async def anthropic_relay(config: AppConfig) -> AnthropicSearch:
@@ -523,7 +524,7 @@ def _search_tool() -> RegisteredTool:
         outcome: SearchOutcome = await search(
             ctx.runtime.web,
             ladder,
-            engine_attempts(ctx.runtime.web, key, relay, _page_reader(ctx)),
+            engine_attempts(ctx.runtime.web, key, relay, _page_reader(ctx), config.web.searxng_url or None),
             args.query,
             wanted,
         )

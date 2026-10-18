@@ -8,12 +8,13 @@ from dotagent.core.types import FrozenModel
 from dotagent.web.types import SearchHit
 
 # The engines a search can go to.
-SearchEngine = Literal["ollama", "anthropic", "duckduckgo", "brave", "browser"]
+SearchEngine = Literal["searxng", "ollama", "anthropic", "duckduckgo", "brave", "browser"]
 
 # How long an engine that limited this machine sits out; the searches of that time go to the next rung at once.
 # DuckDuckGo's bot check, once met, stays for a while; Brave's is a rate limit of a minute or so; the browser rung
 # meeting a check is a sign the machine is marked, so it sits out as long as DuckDuckGo.
 BENCH_S: Mapping[SearchEngine, float] = {
+    "searxng": 120.0,
     "ollama": 60.0,
     "anthropic": 120.0,
     "duckduckgo": 600.0,

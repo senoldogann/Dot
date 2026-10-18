@@ -257,29 +257,30 @@ on from, so no part of it is out of reach. A shell command runs with the `PATH` 
 group (cancelling a run ends the whole group) and under a timeout (`[shell] default_timeout_s`, at most
 `max_timeout_s`). An AppleScript (`apple_script`) ends with its call as well: one whose run is stopped or whose call
 times out is killed. `web_search` climbs a ladder of engines until one answers (`[web] search_backend`, default `auto`;
-`dotx doctor` shows the ladder): the hosted search of Ollama when `OLLAMA_API_KEY` is set (no bot check), then the
-Anthropic API's own web search when `ANTHROPIC_API_KEY` is set (relayed by `[models] search`, Haiku 5.5 by default; the
-API bills $10 per 1,000 searches next to the tokens, a failed search is not billed; `[web] anthropic_search = "first"`
-puts it before Ollama, `"off"` leaves it out), then the HTML pages of DuckDuckGo and Brave Search (no key), then
-DuckDuckGo opened in Dot's own Chrome when the run's browser is Dot's own with a visible window (its bot check runs
-there and passes; a headless Chrome is shown a CAPTCHA, measured 2026-10-11). An engine that limits this machine is
-benched (DuckDuckGo 10 minutes, Brave 90 seconds, the Anthropic rung 2 minutes) and the searches of that time skip it at
-once; the same query within 10 minutes is answered from memory. The first line of a result names the engine that
-answered, every rung skipped with its reason, and the age of a remembered answer. Bing is not a rung: without a session
-its page answers some queries with the results of another query. `web_fetch` reads HTML and PDF and refuses localhost,
-LAN and cloud-metadata addresses unless `[web] allow_private_hosts` is set. A page that turns the plain request away
-(HTTP 401, 403, 429, 503 or 999, LinkedIn's refusal) or shows little text without JavaScript is read in the run's
-Chrome, in a tab the owner does not work in that closes after the read: a scratch tab of Dot's own Chrome, or a tab
-opened behind the owner's in the owner's attached Chrome (item 98); the first line of the result says so. A host that
-refused a plain request once is remembered for the run, and the next fetch of that host goes to the browser first. The
-plain request itself sends the headers a browser's address bar sends (`Sec-Fetch-*`, `Upgrade-Insecure-Requests`) with
-the same user agent. A page that refuses the browser too says that, with both answers, and names the next rung in one
-line: another source, `web_search` with the address as the query for the hosted search's snippet, or `browser_open` and
-Take over for a login wall. A page that is not there (HTTP 404 or 410) is reported with the links of the host's front
-page that share a word with the address asked for (a dozen at most), so the next turn opens the right page instead of
-guessing another address; the system prompt says the same (find a page with `web_search` or `web_crawl`, never by trying
-`/careers/` on a hunch). `web_search` returns up to 10 results; a larger `max_results` is lowered to 10 and the result
-says so.
+`dotx doctor` shows the ladder): the owner's SearXNG instance when `[web] searxng_url` is set (its own engines compose
+the answer, no key; a loopback instance is the usual case and is trusted configuration), then the hosted search of
+Ollama when `OLLAMA_API_KEY` is set (no bot check), then the Anthropic API's own web search when `ANTHROPIC_API_KEY` is
+set (relayed by `[models] search`, Haiku 5.5 by default; the API bills $10 per 1,000 searches next to the tokens, a
+failed search is not billed; `[web] anthropic_search = "first"` puts it before Ollama, `"off"` leaves it out), then the
+HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Dot's own Chrome when the run's browser is
+Dot's own with a visible window (its bot check runs there and passes; a headless Chrome is shown a CAPTCHA, measured
+2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds, SearXNG and the
+Anthropic rung 2 minutes) and the searches of that time skip it at once; the same query within 10 minutes is answered
+from memory. The first line of a result names the engine that answered, every rung skipped with its reason, and the age
+of a remembered answer. Bing is not a rung: without a session its page answers some queries with the results of another
+query. `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web]
+allow_private_hosts` is set. A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's
+refusal) or shows little text without JavaScript is read in the run's Chrome, in a tab the owner does not work in that
+closes after the read: a scratch tab of Dot's own Chrome, or a tab opened behind the owner's in the owner's attached
+Chrome (item 98); the first line of the result says so. A host that refused a plain request once is remembered for the
+run, and the next fetch of that host goes to the browser first. The plain request itself sends the headers a browser's
+address bar sends (`Sec-Fetch-*`, `Upgrade-Insecure-Requests`) with the same user agent. A page that refuses the browser
+too says that, with both answers, and names the next rung in one line: another source, `web_search` with the address as
+the query for the hosted search's snippet, or `browser_open` and Take over for a login wall. A page that is not there
+(HTTP 404 or 410) is reported with the links of the host's front page that share a word with the address asked for (a
+dozen at most), so the next turn opens the right page instead of guessing another address; the system prompt says the
+same (find a page with `web_search` or `web_crawl`, never by trying `/careers/` on a hunch). `web_search` returns up to
+10 results; a larger `max_results` is lowered to 10 and the result says so.
 
 **Crawling and extraction.** `web_crawl(url, scope, max_pages, max_depth)` reads many pages of one site in one call:
 breadth first from the start address, following the links within the scope (`prefix`, the pages under the start

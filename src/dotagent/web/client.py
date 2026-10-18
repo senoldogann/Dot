@@ -233,6 +233,11 @@ class WebClient:
             cookies=_deny_all_cookies(),
         )
 
+    @property
+    def user_agent(self) -> str:
+        """The User-Agent Dot sends, for a request of the search's own."""
+        return self._config.user_agent
+
     async def aclose(self) -> None:
         await self._client.aclose()
 

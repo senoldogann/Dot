@@ -1,10 +1,12 @@
 """Web search as a ladder of engines, so that one engine's bot check is a rung skipped, not a failed call.
 
-The rungs, in the order ``auto`` climbs them: the hosted search of Ollama (needs a key, has no bot check), the HTML page
-of DuckDuckGo, the HTML page of Brave Search (both scraped, no key), and DuckDuckGo's HTML page opened in Dot's own
-Chrome, where its bot check runs and passes. An engine that limits this machine is benched for a while, so the searches
-that follow skip it at once instead of waiting on it; the one answer is remembered for a while, so the same query asked
-again costs no engine anything. The result names the engine that answered and every rung skipped, with its reason.
+The rungs, in the order ``auto`` climbs them: a SearXNG instance of the owner's own when ``[web] searxng_url`` names
+one (its engines do the work, no key and no bot check from Dot's side), the hosted search of Ollama (needs a key, has no
+bot check), the HTML page of DuckDuckGo, the HTML page of Brave Search (both scraped, no key), and DuckDuckGo's HTML
+page opened in Dot's own Chrome, where its bot check runs and passes. An engine that limits this machine is benched
+for a while, so the searches that follow skip it at once instead of waiting on it; the one answer is remembered for a
+while, so the same query asked again costs no engine anything. The result names the engine that answered and every rung
+skipped, with its reason.
 
 Bing is not a rung: without a session its HTML page answers some queries with the results of another query, and a
 wrong answer is worse than a skipped rung (measured 2026-10-11: three of six queries).
@@ -18,7 +20,8 @@ from html.parser import HTMLParser
 from typing import Literal
 from urllib.parse import parse_qs, quote_plus, urlsplit
 
-from pydantic import BaseModel, ConfigDict, ValidationError
+import httpx
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from dotagent.core.errors import WebError, WebThrottledError
 from dotagent.core.logs import get_logger
@@ -30,9 +33,10 @@ from dotagent.web.types import SearchHit
 
 log = get_logger(__name__)
 
-# What the configuration may say: ``auto`` is the whole ladder (the hosted search of Ollama when its key is present,
-# the browser rung when the run's browser is Dot's own Chrome); a named engine is that engine alone.
-SearchChoice = Literal["auto", "duckduckgo", "brave", "ollama", "anthropic"]
+# What the configuration may say: ``auto`` is the whole ladder (SearXNG when its URL is set, the hosted search of
+# Ollama when its key is present, the browser rung when the run's browser is Dot's own Chrome); a named engine is that
+# engine alone.
+SearchChoice = Literal["auto", "searxng", "duckduckgo", "brave", "ollama", "anthropic"]
 # Where the Anthropic rung stands when its key is present: after Ollama's free search (auto), before it (first), or
 # nowhere (off); ``None`` at the call site means the key is absent.
 AnthropicRung = Literal["auto", "first", "off"]
@@ -49,6 +53,9 @@ _BRAVE_URL: str = "https://search.brave.com/search"
 _BRAVE_HOSTS: frozenset[str] = frozenset({"search.brave.com"})
 _OLLAMA_SEARCH_URL: str = "https://ollama.com/api/web_search"
 _OLLAMA_MAX_RESULTS: int = 10
+# The JSON answer of a SearXNG instance, and the time an instance has to compose one.
+_SEARXNG_ANSWER_BYTES: int = 2_000_000
+_SEARXNG_TIMEOUT_S: float = 20.0
 _ANTHROPIC_MESSAGES_URL: str = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_VERSION: str = "2023-06-01"
 _ANTHROPIC_SEARCH_TOOL: str = "web_search_20250305"
@@ -233,20 +240,93 @@ def parse_brave(html: str) -> ResultsPage:
     return ResultsPage(hits=tuple(hits.values()), announced_no_results=False)
 
 
+def searxng_search_url(base_url: str, query: str) -> str:
+    """The JSON search address of a SearXNG instance for a query (the instance lists ``json`` in ``search.formats``)."""
+    return f"{base_url.rstrip('/')}/search?q={quote_plus(query)}&format=json&safesearch=0"
+
+
+def parse_searxng(payload: bytes) -> ResultsPage:
+    """The hits of a SearXNG JSON answer, in the instance's order, each address once. An empty ``results`` array is the
+    instance saying it matched nothing; a body of any other shape is an error, not an empty page."""
+    try:
+        answer: _SearxAnswer = _SearxAnswer.model_validate_json(payload)
+    except ValidationError as exc:
+        raise WebError(
+            "the SearXNG instance answered without the JSON of a search",
+            {"bytes": len(payload), "error": str(exc)[:_ERROR_BODY_CHARS]},
+        ) from exc
+    hits: dict[str, SearchHit] = {}
+    for entry in answer.results:
+        address: str | None = result_address(entry.url)
+        title: str = _flat(entry.title, _MAX_TITLE_CHARS)
+        if address is not None and title and address not in hits:
+            hits[address] = SearchHit(title=title, url=address, snippet=_flat(entry.content, _MAX_SNIPPET_CHARS))
+    if not answer.results and answer.unresponsive_engines:
+        raise WebError(
+            "the SearXNG instance's engines did not answer the search",
+            {"unresponsive": ", ".join(f"{engine}: {why}" for engine, why in answer.unresponsive_engines[:3])},
+        )
+    return ResultsPage(hits=tuple(hits.values()), announced_no_results=not answer.results)
+
+
+async def search_searxng(client: WebClient, base_url: str, query: str, max_results: int) -> tuple[SearchHit, ...]:
+    """Search through a SearXNG instance's JSON API: its own engines (Google, Bing, DuckDuckGo, Brave, ...) compose the
+    answer, so the quality is theirs and no key is spent. The instance is configuration, not a page a run picked, so a
+    loopback instance is reached without the address gate; that is the usual case."""
+    url: str = searxng_search_url(base_url, query)
+    headers: dict[str, str] = {"User-Agent": client.user_agent, "Accept": "application/json"}
+    timeout: httpx.Timeout = httpx.Timeout(10.0, connect=5.0, read=_SEARXNG_TIMEOUT_S)
+    try:
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as http:
+            response: httpx.Response = await http.get(url, headers=headers)
+    except httpx.TimeoutException as exc:
+        raise WebError("the SearXNG instance did not answer in time", {"query": query, "url": base_url}) from exc
+    except httpx.HTTPError as exc:
+        raise WebError(
+            "the SearXNG instance could not be reached", {"query": query, "url": base_url, "error": str(exc)[:200]}
+        ) from exc
+    if response.status_code == 429:
+        raise WebThrottledError(
+            "the SearXNG instance is limiting the searches of this machine", {"query": query, "status": 429}
+        )
+    if response.status_code == 403:
+        # SearXNG refuses a format its settings do not list; a limit of its own is a 429.
+        raise WebError(
+            "the SearXNG instance refused its JSON format: list json in search.formats of its settings.yml",
+            {"query": query, "url": base_url, "status": 403},
+        )
+    if response.status_code != 200:
+        raise WebError(
+            "the SearXNG instance did not answer the search",
+            {"status": response.status_code, "body": response.text[:_ERROR_BODY_CHARS]},
+        )
+    page: ResultsPage = parse_searxng(response.content[:_SEARXNG_ANSWER_BYTES])
+    if not page.hits and not page.announced_no_results:
+        # Results came, and none of them names a page: the next rung answers instead of an empty one.
+        raise WebError("the SearXNG instance's results name no page", {"query": query, "url": base_url})
+    return page.hits[:max_results]
+
+
 def search_ladder(
-    choice: SearchChoice, ollama_key_present: bool, anthropic: AnthropicRung | None, browser_present: bool
+    choice: SearchChoice,
+    ollama_key_present: bool,
+    anthropic: AnthropicRung | None,
+    browser_present: bool,
+    searxng_present: bool,
 ) -> tuple[SearchEngine, ...]:
-    """The engines a search climbs, in order. ``auto`` is the whole ladder: Ollama's hosted search when its key is
-    present, the Anthropic rung where ``anthropic`` puts it (``None``: no key), DuckDuckGo, Brave, and DuckDuckGo in
-    Dot's own Chrome when the run's browser is Dot's own. A named engine is that engine alone."""
+    """The engines a search climbs, in order. ``auto`` is the whole ladder: the owner's SearXNG instance when its URL is
+    set, Ollama's hosted search when its key is present, the Anthropic rung where ``anthropic`` puts it (``None``: no
+    key), DuckDuckGo, Brave, and DuckDuckGo in Dot's own Chrome when the run's browser is Dot's own. A named engine is
+    that engine alone."""
     match choice:
         case "auto":
+            searx: tuple[SearchEngine, ...] = ("searxng",) if searxng_present else ()
             ollama: tuple[SearchEngine, ...] = ("ollama",) if ollama_key_present else ()
             hosted: tuple[SearchEngine, ...] = () if anthropic is None or anthropic == "off" else ("anthropic",)
             head: tuple[SearchEngine, ...] = (*hosted, *ollama) if anthropic == "first" else (*ollama, *hosted)
             last: tuple[SearchEngine, ...] = ("browser",) if browser_present else ()
-            return (*head, "duckduckgo", "brave", *last)
-        case "duckduckgo" | "brave" | "ollama" | "anthropic":
+            return (*searx, *head, "duckduckgo", "brave", *last)
+        case "searxng" | "duckduckgo" | "brave" | "ollama" | "anthropic":
             return (choice,)
 
 
@@ -314,10 +394,14 @@ class AnthropicSearch(FrozenModel):
 
 
 def engine_attempts(
-    client: WebClient, ollama_key: str | None, anthropic: AnthropicSearch | None, read_page: ReadPage | None
+    client: WebClient,
+    ollama_key: str | None,
+    anthropic: AnthropicSearch | None,
+    read_page: ReadPage | None,
+    searxng_url: str | None,
 ) -> dict[SearchEngine, Attempt]:
-    """The tries of the engines this run can ask: Ollama's with its key, Anthropic's with its key and model, the
-    browser's with a page reader."""
+    """The tries of the engines this run can ask: SearXNG's with the URL of the owner's instance, Ollama's with its
+    key, Anthropic's with its key and model, the browser's with a page reader."""
 
     async def duckduckgo(query: str, max_results: int) -> tuple[SearchHit, ...]:
         return await search_duckduckgo(client, query, max_results)
@@ -326,6 +410,22 @@ def engine_attempts(
         return await search_brave(client, query, max_results)
 
     attempts: dict[SearchEngine, Attempt] = {"duckduckgo": duckduckgo, "brave": brave}
+    if searxng_url is not None and searxng_url.strip():
+        instance: str = searxng_url.strip()
+
+        async def searxng(query: str, max_results: int) -> tuple[SearchHit, ...]:
+            return await search_searxng(client, instance, query, max_results)
+
+        attempts["searxng"] = searxng
+    else:
+
+        async def searxng_unconfigured(query: str, max_results: int) -> tuple[SearchHit, ...]:
+            raise WebError(
+                'search_backend = "searxng" needs [web] searxng_url (the address of a SearXNG instance)',
+                {"query": query},
+            )
+
+        attempts["searxng"] = searxng_unconfigured
     if ollama_key is not None:
         key: str = ollama_key
 
@@ -405,6 +505,24 @@ async def search_in_browser(read_page: ReadPage, query: str, max_results: int) -
     is read like the plain one."""
     html: str = await read_page(duckduckgo_url(query))
     return _results_or_error(parse_duckduckgo(html), "DuckDuckGo in Dot's browser", query, len(html), max_results)
+
+
+class _SearxResult(BaseModel):
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    url: str
+    title: str = ""
+    content: str = ""
+
+
+class _SearxAnswer(BaseModel):
+    """An instance that matched nothing answers with an empty ``results`` array; one whose engines all refused names
+    them in ``unresponsive_engines``, each a pair of the engine and the reason."""
+
+    model_config = ConfigDict(extra="ignore", frozen=True)
+
+    results: list[_SearxResult] = Field(default_factory=list)
+    unresponsive_engines: list[tuple[str, str]] = Field(default_factory=list)
 
 
 class _OllamaResult(BaseModel):

@@ -445,7 +445,10 @@ class CrawlConfig(FrozenModel):
 
 
 class WebConfig(FrozenModel):
-    search_backend: Literal["auto", "duckduckgo", "brave", "ollama", "anthropic"]
+    search_backend: Literal["auto", "searxng", "duckduckgo", "brave", "ollama", "anthropic"]
+    # The base address of the owner's SearXNG instance (https://docs.searxng.org), whose own engines answer a search
+    # without a key; empty: no such rung.
+    searxng_url: str
     # Where the Anthropic rung stands on the auto ladder when ANTHROPIC_API_KEY is set: after Ollama's free search
     # (auto), before it (first), or not at all (off).
     anthropic_search: Literal["auto", "first", "off"]
@@ -456,6 +459,17 @@ class WebConfig(FrozenModel):
     allow_private_hosts: bool
     user_agent: str
     crawl: CrawlConfig
+
+    @field_validator("searxng_url")
+    @classmethod
+    def _searxng_url_is_a_base(cls, value: str) -> str:
+        address: str = value.strip().rstrip("/")
+        if not address:
+            return ""
+        parts = urlsplit(address)
+        if parts.scheme not in {"http", "https"} or not parts.netloc or parts.username or parts.password:
+            raise ValueError("searxng_url must be an http or https address without credentials")
+        return address
 
 
 class SchedulerConfig(FrozenModel):

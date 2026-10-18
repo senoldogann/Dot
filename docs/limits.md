@@ -33,8 +33,12 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
 - DuckDuckGo answers a burst of searches with its bot check (HTTP 202) and Brave Search with a rate limit (HTTP 429)
   after a handful in quick succession. Dot spaces its searches (`search_spacing_s`), benches an engine that limits it
   and moves to the next rung, so a search fails outright only when every engine does (`dotx stats` counts these under
-  the web failures; the browser rung needs Dot's own Chrome with a visible window). The hosted Ollama search has no such
-  limit: with `search_backend = "auto"` (the default) it is the first rung as soon as `OLLAMA_API_KEY` is set.
+  the web failures; the browser rung needs Dot's own Chrome with a visible window). A SearXNG instance of the owner's
+  (`[web] searxng_url`) sits first on the auto ladder when it is set and is benched for two minutes when it answers 429;
+  its own engines rate-limit too, so an instance whose engines all refused falls through to the next rung. One that
+  answers 403 has its JSON format off: the search says to list `json` in `search.formats` of its `settings.yml`. The
+  hosted Ollama search has no such limit, and with `search_backend = "auto"` it is the next rung as soon as
+  `OLLAMA_API_KEY` is set.
 - The thresholds of the memory search were measured on a small hand-written set of English and Turkish notes
   (indicative, not a benchmark); another language, another embedding model or a much larger memory may need other
   `min_similarity` values.
