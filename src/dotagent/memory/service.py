@@ -177,43 +177,52 @@ async def save_memory(
     run_id: str | None,
     agent_id: str | None,
     expires_at: float | None,
+    tainted: bool = False,
 ) -> SavedMemory:
     """Save a note, Dot's or, with ``agent_id``, an agent's own (:func:`visible_to`), holding until ``expires_at``
     (``None``: until it is changed). The same text twice stays one note (the tags are merged, the owner kept, the time
     it holds is the latest save's), saved one after the other or at once, as long as the saver is handed the note that
-    has it (another agent's note is not merged into); a resting note saved again is awake. A new note comes back with
-    the existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are
-    outdated."""
+    has it (another agent's note is not merged into); a resting note saved again is awake. A run that had read content
+    third parties can author saves a tainted note (``tainted``), and marks one that had the text already: a note keeps
+    where it came from. A new note comes back with the existing notes the saver is handed that are nearly the same, so
+    the caller can retire the ones that are outdated."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text, agent_id)
     if existing is not None:
-        return await _saved_again(index.store, existing, clean_tags, expires_at)
+        return await _saved_again(index.store, existing, clean_tags, expires_at, tainted)
     vector: Vector | None = None
     similar: tuple[MemoryHit, ...] = ()
     if index.embedder is not None:
         await backfill(index)
         vector = (await index.embedder.embed([text]))[0]
         similar = tuple(hit for hit in await _similar_notes(index, vector) if visible_to(hit.record, agent_id))
-    record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector, expires_at)
+    record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector, expires_at, tainted)
     if not created:
         # Another save of the text, by another run or process, added it meanwhile.
-        return await _saved_again(index.store, record, clean_tags, expires_at)
+        return await _saved_again(index.store, record, clean_tags, expires_at, tainted)
     return SavedMemory(record=record, created=True, similar=similar)
 
 
 async def _saved_again(
-    store: Store, existing: MemoryRecord, tags: tuple[str, ...], expires_at: float | None
+    store: Store,
+    existing: MemoryRecord,
+    tags: tuple[str, ...],
+    expires_at: float | None,
+    tainted: bool = False,
 ) -> SavedMemory:
     """The note ``existing``, whose text was saved again with ``tags``, holding until ``expires_at``: the tags are
     merged into its own, and a note the reflection rested (tagged ``rest``), or whose time ran out or changes, is
-    awake, written anew now, since a run found it worth saving again."""
+    awake, written anew now, since a run found it worth saving again. A save by a tainted run marks it."""
     merged: tuple[str, ...] = normalize_tags([*existing.tags, *tags])
     if REST_TAG in existing.tags or existing.expires_at != expires_at:
         awake: tuple[str, ...] = tuple(tag for tag in merged if tag != REST_TAG)
         woken: MemoryRecord = await store.wake_memory(existing.id, awake, time.time(), expires_at)
-        return SavedMemory(record=woken, created=False, similar=())
-    record: MemoryRecord = existing if merged == existing.tags else await store.set_memory_tags(existing.id, merged)
+        record: MemoryRecord = woken
+    else:
+        record = existing if merged == existing.tags else await store.set_memory_tags(existing.id, merged)
+    if tainted and not record.tainted:
+        record = await store.mark_memory_tainted(record.id)
     return SavedMemory(record=record, created=False, similar=())
 
 
@@ -511,22 +520,28 @@ async def update_memory_note(index: MemoryIndex, memory_id: str, content: str, t
 
 
 async def rewrite_memory_note(
-    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], run_id: str
+    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], run_id: str, tainted: bool = False
 ) -> MemoryRecord:
     """A run's rewrite of a note in place, as :func:`update_memory_note`, except that the run becomes its author: the
-    text is the model's now, so a note the user wrote no longer reads as theirs (item 157)."""
+    text is the model's now, so a note the user wrote no longer reads as theirs (item 157). A run that had read content
+    third parties can author leaves the note tainted, and a clean one leaves the mark a note had."""
     await index.store.get_memory(memory_id)
-    return await _rewritten(index, memory_id, content, tags, run_id)
+    return await _rewritten(index, memory_id, content, tags, run_id, tainted)
 
 
 async def _rewritten(
-    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], source_run: str | None
+    index: MemoryIndex,
+    memory_id: str,
+    content: str,
+    tags: Sequence[str],
+    source_run: str | None,
+    tainted: bool = False,
 ) -> MemoryRecord:
     text: str = _checked_text(content, index.config.max_chars)
     vector: Vector | None = None
     if index.embedder is not None:
         vector = (await index.embedder.embed([text]))[0]
-    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, source_run)
+    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, source_run, tainted)
 
 
 async def forget_memory(index: MemoryIndex, memory_id: str) -> MemoryRecord:

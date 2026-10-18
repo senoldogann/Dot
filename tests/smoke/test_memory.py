@@ -22,7 +22,7 @@ import pytest_asyncio
 from dotagent.agent.verify import new_facts
 from dotagent.config import AppConfig, load_config
 from dotagent.core.errors import ConfigError, ProviderAuthError, ProviderTransportError, StoreError
-from dotagent.core.paths import workspace_dir
+from dotagent.core.paths import env_file_path, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.memory.embedder import OpenAIEmbedder, build_embedder, build_ollama_embedder, build_openai_embedder
 from dotagent.memory.service import (
@@ -566,3 +566,22 @@ async def test_the_policy_gates_what_the_model_may_remember(runtime: Runtime) ->
     assert decide(plain.action, "research", False, "aggressive", [], None).source == "preset"
     assert "memory_save" in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}
     assert "memory_search" in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}
+
+
+async def test_a_note_that_holds_a_secret_is_refused_and_nothing_is_saved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 384: a key-like text and the daemon's own key are refused before anything is written, and the model is told
+    to record where the key lives instead."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path))
+    daemon_key: str = "dot-daemon-key-0123456789"
+    env_file_path().write_text(f"DOT_TEST_MEMORY_KEY={daemon_key}\n", encoding="utf-8")
+    built: Runtime = await build_runtime(load_config(tmp_path / "config.toml"))
+    try:
+        for content in (f"The OpenAI key is {KEY_LIKE}", f"The daemon key is {daemon_key}"):
+            refused, _ = await _call(built, "memory_save", {"content": content})
+            assert refused.is_error, refused.text
+            assert "record where the key lives" in refused.text.lower(), refused.text
+        assert await built.store.count_memories() == 0
+    finally:
+        await close_runtime(built)

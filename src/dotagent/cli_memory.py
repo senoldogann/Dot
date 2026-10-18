@@ -53,7 +53,8 @@ async def cmd_memory_list(command: MemoryListCommand) -> int:
         records: list[MemoryRecord] = await index.store.list_memories(command.limit, 0)
         total: int = await index.store.count_memories()
     for record in records:
-        sys.stdout.write(f"{render_note(record)}\n")
+        mark: str = " — saved while reading outside content" if record.tainted else ""
+        sys.stdout.write(f"{render_note(record)}{mark}\n")
     sys.stderr.write(f"{len(records)} of {total} notes\n")
     return 0
 

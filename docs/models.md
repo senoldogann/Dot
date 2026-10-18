@@ -17,6 +17,8 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 
 `review` checks the work of `main`. A model checking its own work is the weaker check, so pick a `review` model of
 another family than `main` when you can; `dotx doctor` warns while they are the same model, as they are by default.
+With `[agent] lessons = "auto"` the warning also says that lessons are approved by the run's own model, and that an
+independent check needs another `[models] review` model.
 What `review` is asked has the secrets Dot holds and the ones it recognises masked, as it may be another provider's.
 
 Settings › Models chooses `fast`, `review` and `vision` under the default model (item 232), each from the models that

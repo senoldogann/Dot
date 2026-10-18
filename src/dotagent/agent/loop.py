@@ -1719,6 +1719,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         # The facts as they stand when a tool asks: each step replaces them.
         facts=lambda: facts,
         spawner=agent.spawner,
+        # The taint as it stands when a tool asks: a step result of this run may have set it.
+        tainted=lambda: agent.gate.tainted,
         run_tools=frozenset(spec.name for spec in specs),
     )
     checker: GoalChecker | None = (

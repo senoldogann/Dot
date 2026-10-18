@@ -209,8 +209,9 @@ def test_the_doctor_warns_when_the_main_model_is_its_own_review_model() -> None:
     models: ModelsConfig = load_default_config().models.model_copy(
         update={"main": "ollama:minimax-m2.7:cloud", "review": "ollama:minimax-m2.7:cloud"}
     )
-    same: CheckResult = _review_row(models)
+    same: CheckResult = _review_row(models, "off")
     assert (same.name, same.ok, same.required) == ("review model", False, False)
     assert same.detail.startswith("ollama:minimax-m2.7:cloud is also the main model")
-    other: CheckResult = _review_row(models.model_copy(update={"review": "openai:gpt-5.4"}))
+    assert "Lessons are approved" not in same.detail
+    other: CheckResult = _review_row(models.model_copy(update={"review": "openai:gpt-5.4"}), "off")
     assert (other.ok, other.required) == (True, False)

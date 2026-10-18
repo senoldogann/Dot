@@ -2,7 +2,8 @@
 
 Notes are written by Dot itself, so they count as the user's side of the trust boundary; what keeps a web page from
 planting one is the ``persistence`` flag, which makes saving and forgetting ask for approval once the run has read
-untrusted content.
+untrusted content. A note saved then keeps that origin (``tainted``), and a search that returns one counts as reading
+such content again. A note that holds a key or a secret Dot holds is refused: record where the key lives, not the key.
 """
 
 import time
@@ -21,6 +22,7 @@ from dotagent.memory.service import (
 )
 from dotagent.policy.elements import looks_like_key
 from dotagent.policy.types import ActionInfo, Flag
+from dotagent.secrets import known_secrets
 from dotagent.store.models import MemoryRecord
 from dotagent.tools.base import (
     ACTING_MODES,
@@ -28,8 +30,10 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
+    fail,
     make_live_tool,
     make_tool,
+    mark_untrusted,
     ok,
 )
 from dotagent.tools.context import ToolContext
@@ -59,6 +63,17 @@ def _write_action(tool: str, summary: str, flags: tuple[Flag, ...]) -> ActionInf
         summary=_clip(summary, _SUMMARY_CHARS),
         target="memory",
         flags=flags,
+    )
+
+
+def _secret_refusal(content: str) -> ToolResult | None:
+    """The refused note when ``content`` holds a secret, like a key Dot holds or something that looks like a key;
+    ``None`` when it holds none. The model is told where the key lives instead."""
+    if not looks_like_key(content) and not any(secret in content for secret in known_secrets()):
+        return None
+    return fail(
+        "Not saved: this note holds a secret, an API key, a token or a password. Record where the key lives, not the "
+        "key: for example 'The OpenAI key is saved with dotx auth set OPENAI_API_KEY.'"
     )
 
 
@@ -120,10 +135,14 @@ def _save_tool() -> RegisteredTool:
         return _write_action("memory_save", f"Remember: {args.content}", flags)
 
     async def run(args: SaveArgs, ctx: ToolContext) -> ToolResult:
-        # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94).
+        refused: ToolResult | None = _secret_refusal(args.content)
+        if refused is not None:
+            return refused
+        # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94). A run that had read
+        # content third parties can author saves a tainted note: yolo removes the approval, not the origin.
         expires_at: float | None = expiry_of(args.valid_days, time.time())
         saved: SavedMemory = await save_memory(
-            ctx.runtime.memory, args.content, args.tags, ctx.run_id, None, expires_at
+            ctx.runtime.memory, args.content, args.tags, ctx.run_id, None, expires_at, ctx.tainted()
         )
         return ok(render_saved(saved))
 
@@ -132,7 +151,8 @@ def _save_tool() -> RegisteredTool:
         description=(
             "Save one durable fact for future runs: a preference, a correction, a detail about the user or their Mac, "
             "a convention that will apply again. One fact per call. Do not save secrets, progress on the current "
-            "task, or what is easy to look up again."
+            "task, or what is easy to look up again. A note that holds a key or a secret Dot holds is refused: record "
+            "where the key lives, not the key."
         ),
         args_model=SaveArgs,
         modes=ALL_MODES,
@@ -159,7 +179,9 @@ def _search_tool() -> RegisteredTool:
         await ctx.runtime.memory.store.mark_memories_used(
             ctx.run_id, [hit.record.id for hit in hits], time.time(), "search"
         )
-        return ok(render_hits(args.query, hits))
+        result: ToolResult = ok(render_hits(args.query, hits))
+        # A note saved while its run read outside content carries that content: reading it here taints this run too.
+        return mark_untrusted(result) if any(hit.record.tainted for hit in hits) else result
 
     return make_tool(
         name="memory_search",
@@ -227,8 +249,11 @@ def _update_tool() -> RegisteredTool:
         return _write_action("memory_update", f"Change “{record.content}” to “{args.content}”", flags)
 
     async def run(args: UpdateArgs, ctx: ToolContext) -> ToolResult:
+        refused: ToolResult | None = _secret_refusal(args.content)
+        if refused is not None:
+            return refused
         updated: MemoryRecord = await rewrite_memory_note(
-            ctx.runtime.memory, args.memory_id, args.content, args.tags, ctx.run_id
+            ctx.runtime.memory, args.memory_id, args.content, args.tags, ctx.run_id, ctx.tainted()
         )
         return ok(f"Updated: {render_note(updated)}")
 
@@ -236,7 +261,8 @@ def _update_tool() -> RegisteredTool:
         name="memory_update",
         description=(
             "Rewrite a saved note whose fact has changed or was wrong, keeping its id. Prefer it over forgetting and "
-            "saving again."
+            "saving again. A note that holds a key or a secret Dot holds is refused: record where the key lives, not "
+            "the key."
         ),
         args_model=UpdateArgs,
         modes=ACTING_MODES,
