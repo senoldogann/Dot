@@ -8,10 +8,11 @@ that pass (up to `parallel_tools` at once) and hands the results back, until the
 A chat keeps its turns on one page (item 374): each earlier turn reads as its question, what it did and its answer,
 with no "open run" to hop through. What it did is what its run said, in the order it said it, and each stretch of its
 tool calls as one line that says what they did ("Ran 2 commands and read 1 file"), which opens to every call and its
-result, as on the run's own page. Appearance › *Fold tool steps* says whether those lines start folded (Neutral and
-the palettes fold them, Paper does not). The short marks at the left of the conversation stand for its messages, and a
-click on one goes to it — the last of them to the newest question and the work under it. A very long conversation
-keeps its last forty turns on the page and says how many it leaves out.
+result, as on the run's own page. That line opens and folds on a click while the run still works and after it ends,
+and the reader's choice stays; folded, it still says what call runs now. Appearance › *Fold tool steps* says whether
+those lines start folded (Neutral and the palettes fold them, Paper does not). The short marks at the left of the
+conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
+work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out.
 
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
 figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI
@@ -198,8 +199,10 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   (`schedule_delete`) once the work is done for good. Right above the composer a line shows each loop of the chat, how
   often it asks again, when next, and a Stop that deletes it. A rhythm a cron expression cannot keep exactly is refused
   (422).
-- Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB each). A
-  text pasted into the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
+- Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
+  each). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
+  the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
   reads any attached file, as material rather than instructions; the pencil on its chip puts it back into the box as
   text. A message is still the owner's words: a send with files and an empty box asks for a few words and sends

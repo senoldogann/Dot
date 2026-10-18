@@ -77,9 +77,9 @@ export function sentFiles(files) {
  * opens the picker, item 318). `dropTarget` takes dropped files and `input` pasted ones, and a long text pasted into
  * `input` as a file (item 269), which can be put back into the box as text. A file uploaded opens beside the
  * conversation from its chip (`requestFile`). `ids()` names the uploaded files for the message, `ready()` describes
- * them (`{ id, name, size }`) for a draft and `restore(files)` lists them again from one, `restoreSmall(files)` lists a
- * queued message's files small in the box that edits it (`{ id, name, size, kind }`, item 376), `count()` counts the
- * files listed, whatever their state, `busy()` is true while one is still uploading, `clear()` empties the list after
+ * them (`{ id, name, size, kind }`) for a draft and `restore(files)` lists them again from one, `restoreSmall(files)`
+ * lists a queued message's files small in the box that edits it (`{ id, name, size, kind }`, item 376), `count()` counts
+ * the files listed, whatever their state, `busy()` is true while one is still uploading, `clear()` empties the list after
  * the message went, `setAside()` takes the files out of the list as they stand and `putBack(kept)` lists them again
  * (the box that edits a queued message borrows the list, item 376), and `onChange()` runs after every change.
  */
@@ -107,9 +107,14 @@ export function createAttachments({ dropTarget, input, onChange }) {
 
   function setState(entry, state, text) {
     entry.state = state;
-    entry.node.className = `attach-chip ${state}`;
+    mark(entry, state);
     entry.status.textContent = text;
     onChange();
+  }
+
+  /** The chip wears its state, and a picture's tile its shape. */
+  function mark(entry, state) {
+    entry.node.className = entry.picture ? `attach-chip ${state} picture` : `attach-chip ${state}`;
   }
 
   // The chip's file, uploaded, opens beside the conversation as a sent file's does.
@@ -128,17 +133,28 @@ export function createAttachments({ dropTarget, input, onChange }) {
     input.dispatchEvent(new Event("input", { bubbles: true }));
   }
 
+  // A photo shows the picture itself, its name its tooltip; another file shows an icon, its name and its size. `preview`
+  // is the picture's address once there is one.
   function chip(name, preview, status, entry) {
+    entry.picture = preview !== null || entry.kind === "image";
+    entry.thumb = entry.picture ? el("img", { class: "attach-thumb", src: preview, alt: "" }) : icon("file");
     entry.open = el(
       "button",
-      { class: "attach-open", type: "button", title: `Show ${name}`, disabled: true, onclick: (event) => requestFile(event.currentTarget) },
-      preview === null ? icon("file") : el("img", { class: "attach-thumb", src: preview, alt: "" }),
-      el("span", null, clip(name, NAME_CHARS)),
-      status,
+      {
+        class: "attach-open",
+        type: "button",
+        title: `Show ${name}`,
+        "aria-label": entry.picture ? `Show ${name}` : null,
+        disabled: true,
+        onclick: (event) => requestFile(event.currentTarget),
+      },
+      entry.thumb,
+      entry.picture ? null : el("span", null, clip(name, NAME_CHARS)),
+      entry.picture ? null : status,
     );
     return el(
       "span",
-      { class: "attach-chip uploading", title: name },
+      { class: entry.picture ? "attach-chip uploading picture" : "attach-chip uploading", title: name },
       entry.open,
       entry.pasted === null
         ? null
@@ -164,15 +180,20 @@ export function createAttachments({ dropTarget, input, onChange }) {
     } catch (error) {
       setState(entry, "failed", `Failed: ${error.message}`);
       entry.node.title = `${entry.file.name}: ${error.message}`;
+      if (entry.picture) {
+        // A photo that failed keeps its red tile and says why in its tooltip and to a screen reader; its × takes it away.
+        entry.open.replaceChildren(icon("alert"));
+        entry.open.setAttribute("aria-label", `${entry.file.name}: ${error.message}`);
+      }
     }
   }
 
   // `file` listed and uploaded; `pasted` is the text it was made of (item 269), else null.
   function addOne(file, pasted) {
-    const isImage = file.type.startsWith("image/");
-    const preview = isImage ? URL.createObjectURL(file) : null;
+    const kind = file.type.startsWith("image/") ? "image" : "file";
+    const preview = kind === "image" ? URL.createObjectURL(file) : null;
     const status = el("span", { class: "muted" }, "Uploading…");
-    const entry = { file, id: null, name: file.name, size: file.size, state: "uploading", preview, pasted, status, open: null, node: null };
+    const entry = { file, id: null, name: file.name, size: file.size, kind, state: "uploading", preview, pasted, status, open: null, node: null, picture: false, thumb: null };
     entry.node = chip(file.name, preview, status, entry);
     entries.push(entry);
     list.append(entry.node);
@@ -230,13 +251,34 @@ export function createAttachments({ dropTarget, input, onChange }) {
     picker,
     list,
     ids: () => entries.filter((entry) => entry.state === "ready").map((entry) => entry.id),
-    ready: () => entries.filter((entry) => entry.state === "ready").map((entry) => ({ id: entry.id, name: entry.name, size: entry.size })),
+    ready: () => entries
+      .filter((entry) => entry.state === "ready")
+      .map((entry) => ({ id: entry.id, name: entry.name, size: entry.size, kind: entry.kind })),
     restore: (files) => {
-      for (const { id, name, size } of files) {
+      for (const { id, name, size, kind } of files) {
         const status = el("span", { class: "muted" }, sizeLabel(size));
-        const entry = { file: null, id, name, size, state: "ready", preview: null, pasted: null, status, open: null, node: null };
+        const entry = { file: null, id, name, size, kind: kind ?? "file", state: "ready", preview: null, pasted: null, status, open: null, node: null, picture: false, thumb: null };
         entry.node = chip(name, null, status, entry);
-        entry.node.className = "attach-chip ready";
+        mark(entry, "ready");
+        // A draft's photo is read from the daemon again, to show itself where a file shows its name.
+        if (entry.picture) {
+          blobUrl(`/attachments/${encodeURIComponent(id)}/image`).then(
+            (url) => {
+              // A chip taken away before its picture came lets the picture go at once.
+              if (entries.includes(entry)) {
+                entry.preview = url;
+                entry.thumb.src = url;
+              } else {
+                URL.revokeObjectURL(url);
+              }
+            },
+            (error) => {
+              // The picture could not be read: the chip says so where it stands, and the file still opens.
+              entry.open.replaceChildren(icon("alert"));
+              entry.open.title = `${name}: ${error.message}`;
+            },
+          );
+        }
         opens(entry);
         entries.push(entry);
         list.append(entry.node);
