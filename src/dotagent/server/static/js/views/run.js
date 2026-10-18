@@ -316,7 +316,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
   });
   const lessonsCount = el("span", { class: "lessons-count" });
-  // Folded on arrival (item 374): the lessons of a run are a note to open when it is wanted, not a wall over the answer.
+  // Folded on arrival (item 374): the lessons of a run are a note to open when it is wanted, not a wall over the answer;
+  // its head says what waits inside (paintLessons).
   const lessonsCard = el(
     "details",
     { class: "card lessons-card", hidden: true, role: "region", "aria-label": "Lessons from this run" },
@@ -404,13 +405,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     if (lessons === null) {
       return;
     }
-    const proposed = lessons.lessons.some((lesson) => lesson.state === "proposed");
-    lessonsCount.textContent = String(lessons.lessons.length);
+    const proposed = lessons.lessons.filter((lesson) => lesson.state === "proposed").length;
+    // Folded, the head says what waits inside: why the lessons could not be drawn, the ones that wait for your
+    // decision, else how many there are.
+    lessonsCount.textContent =
+      lessons.error !== null ? "could not be drawn" : proposed > 0 ? `${proposed} to decide` : String(lessons.lessons.length);
+    lessonsCount.dataset.tone = lessons.error !== null ? "bad" : proposed > 0 ? "warn" : "";
     lessonCuts.disconnect();
     lessonsBody.replaceChildren(
       ...lessons.lessons.map(lessonRow),
       ...[
-        lessons.tainted && proposed
+        lessons.tainted && proposed > 0
           ? el(
               "div",
               { class: "note warn" },

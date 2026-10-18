@@ -10,7 +10,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
+from playwright.async_api import APIResponse, Browser, BrowserContext, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import LESSONS_TOOL, VET_TOOL
@@ -199,7 +199,54 @@ async def test_a_lesson_saved_on_its_own_has_undo_and_one_left_out_says_why_with
                     await card.screenshot(path=str(tmp_path / f"card-{width}-{scheme}-decided.png"))
                     assert errors == []
                 await page.context.close()
+            # Folded, the head says what waits inside: lessons that wait for a decision, or why none could be drawn.
+            for lessons, said in (
+                ({"state": "proposed", "by": None, "reason": None}, "2 to decide"),
+                (None, "could not be drawn"),
+            ):
+                page, errors = await _page_with_lessons(browser, address, run.id, lessons)
+                count: Locator = page.get_by_role("region", name="Lessons from this run").locator(".lessons-count")
+                await expect(count).to_have_text(said)
+                await expect(count).to_have_attribute("data-tone", "warn" if lessons is not None else "bad")
+                assert errors == []
+                # A read of the run still under way when the page goes is let go, not rewritten.
+                await page.unroute_all(behavior="ignoreErrors")
+                await page.context.close()
         finally:
             await browser.close()
     notes = await runtime.store.list_memories(10, 0)
     assert [note.content for note in notes] == [_LEFT]
+
+
+async def _page_with_lessons(
+    browser: Browser, address: str, run_id: str, lesson: dict[str, str | None] | None
+) -> tuple[Page, list[str]]:
+    """The page of the run with what the daemon says of its lessons rewritten: two lessons whose fields are ``lesson``,
+    or, for ``None``, none and the error of lessons that could not be drawn."""
+
+    async def rewrite(route: Route) -> None:
+        answer: APIResponse = await route.fetch()
+        detail = await answer.json()
+        drawn = detail["lessons"]
+        if lesson is None:
+            detail["lessons"] = {**drawn, "lessons": [], "error": "the review model did not answer"}
+        else:
+            detail["lessons"] = {
+                **drawn,
+                "lessons": [{**each, **lesson} for each in drawn["lessons"][:2]],
+                "error": None,
+            }
+        await route.fulfill(response=answer, json=detail)
+
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    context: BrowserContext = await browser.new_context(
+        viewport={"width": 1280, "height": 900}, reduced_motion="reduce"
+    )
+    page: Page = await context.new_page()
+    errors: list[str] = []
+    page.on("pageerror", lambda error: errors.append(str(error)))
+    await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    await page.route(f"**/api/runs/{run_id}", rewrite)
+    await page.goto(ui_url(host, port, TOKEN))
+    await page.goto(f"{address}/#/runs/{run_id}")
+    return page, errors

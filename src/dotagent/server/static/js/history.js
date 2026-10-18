@@ -56,17 +56,20 @@ export function backgroundNote(goal) {
 }
 
 /** A stretch of work as a turn's page shows it: one folded line — "Ran 2 commands and read 1 file" — that opens to
- * every call and its result. */
-function stepsBlock(tools, rows) {
+ * every call and its result, and says beside it, as the run's own page does, how many failed or were cut off. */
+function stepsBlock(batch) {
+  const troubles = [batch.failed > 0 ? `${batch.failed} failed` : "", batch.cut > 0 ? `${batch.cut} cut off` : ""];
+  const said = troubles.filter((words) => words !== "").join(" · ");
   const head = el(
     "summary",
     { class: "steps-head" },
     el("span", { class: "steps-state" }, icon("check")),
-    el("span", { class: "steps-title" }, flowWords(countKinds(tools))),
+    el("span", { class: "steps-title" }, flowWords(countKinds(batch.tools))),
     el("span", { class: "steps-count" }),
+    said === "" ? null : el("span", { class: "badge b-warn" }, said),
     el("span", { class: "chev" }, icon("chevron")),
   );
-  return el("details", { class: "steps", open: !foldSteps() }, head, el("div", { class: "steps-body" }, rows));
+  return el("details", { class: "steps", open: !foldSteps() }, head, el("div", { class: "steps-body" }, batch.rows));
 }
 
 /** Every event of the run `runId`, a page at a time after the last one read; null once `signal` aborted (the page
@@ -114,7 +117,20 @@ async function fillFlow(past, flow, signal) {
   const answer = (past.result ?? "").trim();
   const blocks = [];
   let batch = null;
+  // The calls waiting for their results, with the stretch they are in; a finish waits apart, and shows only when it
+  // was refused, as on the run's own page.
   const open = new Map();
+  const finishing = new Map();
+  const place = (tool, args) => {
+    if (batch === null) {
+      batch = { tools: [], rows: [], failed: 0, cut: 0 };
+      blocks.push(batch);
+    }
+    const row = toolRow({ tool, args });
+    batch.tools.push(tool);
+    batch.rows.push(row.node);
+    return { row, batch };
+  };
   for (const event of events) {
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
@@ -122,28 +138,36 @@ async function fillFlow(past, flow, signal) {
         batch = null;
         blocks.push({ say: said });
       }
-    } else if (event.kind === "tool_call" && event.data.tool !== FINISH_TOOL) {
-      const row = toolRow({ tool: event.data.tool, args: event.data.args });
-      open.set(event.data.call_id, row);
-      if (batch === null) {
-        batch = { tools: [], rows: [] };
-        blocks.push(batch);
-      }
-      batch.tools.push(event.data.tool);
-      batch.rows.push(row.node);
+    } else if (event.kind === "tool_call" && event.data.tool === FINISH_TOOL) {
+      finishing.set(event.data.call_id, event.data.args);
+    } else if (event.kind === "tool_call") {
+      open.set(event.data.call_id, place(event.data.tool, event.data.args));
     } else if (event.kind === "tool_result") {
-      const row = open.get(event.data.call_id);
-      if (row !== undefined) {
-        row.finish(event.data);
+      const refused = finishing.get(event.data.call_id);
+      if (refused !== undefined) {
+        finishing.delete(event.data.call_id);
+        if (event.data.ok) {
+          continue;
+        }
+        open.set(event.data.call_id, place(FINISH_TOOL, refused));
+      }
+      const entry = open.get(event.data.call_id);
+      if (entry !== undefined) {
+        entry.row.finish(event.data);
+        if (!event.data.ok) {
+          entry.batch.failed += 1;
+        }
         open.delete(event.data.call_id);
       }
     }
   }
-  for (const row of open.values()) {
-    row.settle();
+  for (const entry of open.values()) {
+    if (entry.row.settle()) {
+      entry.batch.cut += 1;
+    }
   }
   const nodes = blocks.map((block) =>
-    block.say === undefined ? stepsBlock(block.tools, block.rows) : el("div", { class: "turn-say" }, prose(block.say)),
+    block.say === undefined ? stepsBlock(block) : el("div", { class: "turn-say" }, prose(block.say)),
   );
   keepPlace(flow, () => {
     flow.replaceChildren(...nodes);

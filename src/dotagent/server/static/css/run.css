@@ -518,6 +518,15 @@
   color: var(--muted);
 }
 
+/* A head that says the lessons could not be drawn, or that some wait for your decision, says it in its tone. */
+.lessons-count[data-tone="bad"] {
+  color: var(--bad);
+}
+
+.lessons-count[data-tone="warn"] {
+  color: var(--warn);
+}
+
 .lessons {
   display: flex;
   flex-direction: column;

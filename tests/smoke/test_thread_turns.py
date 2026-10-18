@@ -283,3 +283,58 @@ async def test_the_answer_stays_in_its_place_while_the_earlier_turns_fill_above_
                 await context.close()
         finally:
             await browser.close()
+
+
+async def test_an_earlier_turn_says_what_failed_and_shows_a_finish_that_was_refused(
+    runtime: Runtime, thread: tuple[str, list[RunRecord]], tmp_path: Path
+) -> None:
+    """An earlier turn's stretch of work says how many of its calls failed, as the run's own page does, and shows a
+    finish that was refused, which the run's own page shows too (item 374). Its events are seeded."""
+    address, runs = thread
+    second: RunRecord = runs[1]
+    events = await runtime.store.list_events(second.id, 0, 2000)
+    call = next(event for event in events if event.kind == "tool_call" and event.data["tool"] == "shell")
+    result = next(
+        event for event in events if event.kind == "tool_result" and event.data["call_id"] == call.data["call_id"]
+    )
+    said = next(event for event in events if event.kind == "assistant")
+    await runtime.store.add_event(second.id, "assistant", {**said.data, "text": "Trying the tide tables."})
+    await runtime.store.add_event(second.id, "tool_call", {**call.data, "call_id": "failing-call"})
+    await runtime.store.add_event(
+        second.id, "tool_result", {**result.data, "call_id": "failing-call", "ok": False, "output": "no such table"}
+    )
+    finish: dict[str, object] = {"answer": "Too soon.", "success": True}
+    await runtime.store.add_event(
+        second.id, "tool_call", {**call.data, "tool": FINISH_TOOL, "call_id": "refused-finish", "args": finish}
+    )
+    await runtime.store.add_event(
+        second.id,
+        "tool_result",
+        {
+            **result.data,
+            "tool": FINISH_TOOL,
+            "call_id": "refused-finish",
+            "ok": False,
+            "output": "The goal is not met.",
+        },
+    )
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="dark")
+            await page.add_init_script(
+                "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.foldSteps', 'off')"
+            )
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"{address}/#/runs/{runs[-1].id}")
+            turn: Locator = page.locator(".history .turn").nth(1)
+            await expect(turn.locator(".turn-say")).to_contain_text("Trying the tide tables.", timeout=15000)
+            stretch: Locator = turn.locator(".turn-ops details.steps").last
+            await expect(stretch.locator(".steps-head .badge")).to_have_text("2 failed")
+            await expect(stretch.locator(".tool-name")).to_have_text(["shell", FINISH_TOOL])
+            await expect(stretch.locator(".tool-state.bad")).to_have_count(2)
+            await page.screenshot(path=str(tmp_path / "chat-failed-turn.png"))
+            await page.context.close()
+        finally:
+            await browser.close()

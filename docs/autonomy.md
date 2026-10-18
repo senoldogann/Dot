@@ -235,7 +235,9 @@ today;
 `dotx reflect` runs one now. A reflection that fails is kept: the strip shows "The nightly review failed" with why until
 one after it is done, and `dotx stats` says when the reflection was last done and the failure since. Learning does not
 stop unseen at a run's end either: lessons that could not be drawn leave `lessons_failed` with why on the run's page,
-skill work that failed `playbook_failed`, and `dotx stats` counts the runs of each.
+skill work that failed `playbook_failed`, and `dotx stats` counts the runs of each. The card of a run's lessons arrives
+folded (item 374); its head says "could not be drawn" in red, or how many lessons wait for your decision in amber,
+else how many there are, and opened it shows why, or the lessons.
 
 **Taking back the file changes of a run.** Before `write_file` or `edit_file` changes a file, the run notes the change
 in its journal (`undo/` in the home directory), and its first change to a file keeps a copy of the file as it was. When
