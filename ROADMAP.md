@@ -14647,16 +14647,19 @@ checkout; this item reviews them and adds them. Settings › Providers: the list
 provider's page does, so a key the daemon has from its environment or the Keychain no longer reads "No key yet" there
 (`views/keys.js` `keyLine`); closing a form that was not open no longer drops the focus to the page; a provider's models
 are drawn again only when what they show changed (the models, why they could not be read, the models of the roles their
-chips name) instead of at every event of the daemon's stream. The flow's words (`tools.js`) know the terminal's
-commands, `web_extract` and `web_crawl`, `memory_update`, `schedule_delete` and the tools that list, find and search
-files, and the tool `terminal` that does not exist is gone. SearXNG follows a jump on the way to the instance, as a
-proxy's from http to https, instead of taking it for no answer (`web/search.py`). The schedules' and the memory's lines
-of parts share one helper (`dom.js` `joined`), which leaves out an empty part. The review left out the run's reading of
-an engine named alone in SearXNG's answer: `_SearxAnswer` validates the pairs at the boundary, so a malformed one is a
-`WebError` the ladder takes, not a crash; it made the models' check include why they could not be read and the roles'
-models, which the run's left out; and it kept `memory_search`, `memory_forget` and a terminal's reads and closes out of
-the counts, which the run had as notes kept and commands. Tests: `tests/unit/test_search_ladder.py` (a 301 to the
-instance is followed).
+chips name) instead of at every event of the daemon's stream. The flow's words (`tools.js`) count the terminal's
+commands, `web_extract`, `memory_update` and `schedule_delete`, and the tool `terminal` that does not exist is gone.
+SearXNG's address that leads elsewhere, as a proxy's jump from http to https does, says to set `[web] searxng_url` to
+where it leads, instead of "did not answer the search" (`web/search.py`); the run followed the jump, which the review
+left out, since the instance is let past the address gate as configuration and where it leads is not. The schedules' and
+the memory's lines of parts share one helper (`dom.js` `joined`), which leaves out an empty part. The review left out
+the run's reading of an engine named alone in SearXNG's answer: `_SearxAnswer` validates the pairs at the boundary, so a
+malformed one is a `WebError` the ladder takes, not a crash; it made the models' check include why they could not be
+read and the roles' models, which the run's left out; kept out of the counts the tools whose words would say more than
+happened (a search of the notes as a note kept, a terminal's reads as commands, a folder listed as a file read, a crawl
+as one page), and gave the schedules' line its parts as the one list the shared helper takes, which the run's call did
+not, so no schedule's row was drawn. Tests: `tests/unit/test_search_ladder.py` (a 301 says where it leads),
+`tests/smoke/test_schedule_memory.py` (a schedule's line is drawn).
 
 ## Log
 

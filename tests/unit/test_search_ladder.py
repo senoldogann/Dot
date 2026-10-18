@@ -249,9 +249,10 @@ async def test_a_searxng_instance_answers_and_a_limit_is_told_from_a_format_turn
     try:
         hits = await search_searxng(client, f"{searx}/ok", "reaktor", 1)
         assert [hit.url for hit in hits] == ["https://www.reaktor.com/"]
-        # A jump on the way, as a proxy's from http to https, is followed to the instance's answer.
-        moved = await search_searxng(client, f"{searx}/moved", "reaktor", 1)
-        assert [hit.url for hit in moved] == ["https://www.reaktor.com/"]
+        # A jump on the way, as a proxy's from http to https, is not followed past the address gate: it says where to.
+        with pytest.raises(WebError, match="leads elsewhere") as moved:
+            await search_searxng(client, f"{searx}/moved", "reaktor", 1)
+        assert str(moved.value.context["location"]).startswith("/ok/")
         # A limit benches the rung for a while; a format turned off is the instance's settings, so it says which.
         with pytest.raises(WebThrottledError):
             await search_searxng(client, f"{searx}/busy", "reaktor", 5)

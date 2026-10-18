@@ -171,7 +171,7 @@ function scheduleRow(view, handlers) {
       el(
         "div",
         { class: "row-meta when-line" },
-        ...joined(
+        ...joined([
           el("span", { class: "mono", title: "When it runs" }, view.when),
           next,
           last,
@@ -179,7 +179,7 @@ function scheduleRow(view, handlers) {
           view.zone === localZone()
             ? null
             : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
-        ),
+        ]),
       ),
     ),
     el("div", { class: "row-actions" }, edit, remove),
