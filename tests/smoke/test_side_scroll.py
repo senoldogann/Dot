@@ -181,6 +181,54 @@ async def _scrolls_inside(box: Locator) -> bool:
     return int(shown) <= _BOX_MOST_PX and int(whole) > int(shown)
 
 
+async def _list_rested(page: Page) -> None:
+    """Wait until the side menu's rows stop being redrawn. A redraw closes the menu opened over them (menu.js), so a
+    menu opened while the list is still painting — after a delete, or on a machine under load — is taken away under the
+    mouse."""
+    await page.evaluate(
+        """() => new Promise((done) => {
+          const runs = document.querySelector(".side-runs") ?? document.body;
+          let quiet = 0;
+          const observer = new MutationObserver(() => { quiet = 0; });
+          observer.observe(runs, {childList: true, subtree: true, characterData: true});
+          const step = () => {
+            quiet += 1;
+            if (quiet >= 8) {
+              observer.disconnect();
+              done();
+            } else {
+              requestAnimationFrame(step);
+            }
+          };
+          requestAnimationFrame(step);
+        })"""
+    )
+
+
+async def _rested(menu: Locator) -> None:
+    """Wait until the menu stops moving. It opens with a short animation, and under load the frames come so far apart
+    that a click or a key lands on it mid-way: its own box moves between two frames and the browser's check of where to
+    press gives up."""
+    await menu.evaluate(
+        """node => new Promise((done) => {
+          let before = null;
+          let still = 0;
+          const step = () => {
+            const box = node.getBoundingClientRect();
+            const now = [box.x, box.y, box.width, box.height].join(":");
+            still = now === before ? still + 1 : 0;
+            before = now;
+            if (still >= 3) {
+              done();
+            } else {
+              requestAnimationFrame(step);
+            }
+          };
+          requestAnimationFrame(step);
+        })"""
+    )
+
+
 async def _list_scroll(page: Page) -> int:
     return int(await page.locator(".side-body").evaluate("node => node.scrollTop"))
 
@@ -215,7 +263,9 @@ async def test_the_side_menu_stays_where_it_was_scrolled_through_a_delete_a_pin_
                 # A delete far from the open chat leaves the list where it was scrolled.
                 last: Locator = chats.last
                 title: str = (await last.locator(".side-run-goal").text_content() or "").strip()
+                await _list_rested(page)
                 await last.get_by_role("button", name=f"More for {title}").click()
+                await _rested(page.get_by_role("menu", name=title))
                 await page.get_by_role("menu", name=title).get_by_role("menuitem", name="Delete").click()
                 await page.get_by_role("dialog").get_by_role("button", name="Delete").click()
                 await expect(page.locator(".toast", has_text="Deleted 1 chat.")).to_be_visible()
@@ -225,7 +275,9 @@ async def test_the_side_menu_stays_where_it_was_scrolled_through_a_delete_a_pin_
                 before = await _scroll_list_to_end(page)
                 pinned: Locator = chats.last
                 pinned_title: str = (await pinned.locator(".side-run-goal").text_content() or "").strip()
+                await _list_rested(page)
                 await pinned.get_by_role("button", name=f"More for {pinned_title}").click()
+                await _rested(page.get_by_role("menu", name=pinned_title))
                 await page.get_by_role("menu", name=pinned_title).get_by_role("menuitem", name="Pin").click()
                 await expect(side.get_by_text("Pinned", exact=True)).to_be_visible()
                 assert await _list_scroll(page) > before - _ROW_SLACK_PX

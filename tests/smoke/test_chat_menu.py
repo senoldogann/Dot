@@ -133,6 +133,54 @@ async def _stored_titles(client: httpx.AsyncClient, expected: list[str]) -> None
         await asyncio.sleep(0.05)
 
 
+async def _list_rested(page: Page) -> None:
+    """Wait until the side menu's rows stop being redrawn. A redraw closes the menu opened over them (menu.js), so a
+    menu opened while the list is still painting — after a delete, or on a machine under load — is taken away under the
+    mouse."""
+    await page.evaluate(
+        """() => new Promise((done) => {
+          const runs = document.querySelector(".side-runs") ?? document.body;
+          let quiet = 0;
+          const observer = new MutationObserver(() => { quiet = 0; });
+          observer.observe(runs, {childList: true, subtree: true, characterData: true});
+          const step = () => {
+            quiet += 1;
+            if (quiet >= 8) {
+              observer.disconnect();
+              done();
+            } else {
+              requestAnimationFrame(step);
+            }
+          };
+          requestAnimationFrame(step);
+        })"""
+    )
+
+
+async def _rested(menu: Locator) -> None:
+    """Wait until the menu stops moving. It opens with a short animation, and under load the frames come so far apart
+    that a click or a key lands on it mid-way: its own box moves between two frames and the browser's check of where to
+    press gives up."""
+    await menu.evaluate(
+        """node => new Promise((done) => {
+          let before = null;
+          let still = 0;
+          const step = () => {
+            const box = node.getBoundingClientRect();
+            const now = [box.x, box.y, box.width, box.height].join(":");
+            still = now === before ? still + 1 : 0;
+            before = now;
+            if (still >= 3) {
+              done();
+            } else {
+              requestAnimationFrame(step);
+            }
+          };
+          requestAnimationFrame(step);
+        })"""
+    )
+
+
 async def _signed_in(context: BrowserContext, client: httpx.AsyncClient) -> tuple[Page, list[str]]:
     """A page of `context` signed in on the home, with the errors it throws."""
     host, port = _base(client)
@@ -176,15 +224,17 @@ async def test_a_chats_menu_pins_names_copies_chooses_and_deletes_it(
         await garden.hover()
         await expect(more).to_have_css("opacity", "1")
         await expect(garden.locator(".side-age")).to_be_hidden()
+        await _list_rested(page)
         await more.click()
         menu: Locator = page.get_by_role("menu", name="Garden plan")
         await expect(menu.get_by_role("menuitem")).to_have_text(_ITEMS)
+        await _rested(menu)
         await expect(more).to_have_attribute("aria-expanded", "true")
         await expect(menu.get_by_role("menuitem", name="Pin")).to_be_focused()
-        await page.screenshot(path=str(tmp_path / "menu-1280-light.png"), animations="disabled")
         for key, item in (("ArrowDown", "Mark read"), ("End", "Delete"), ("ArrowDown", "Pin"), ("ArrowUp", "Delete")):
             await page.keyboard.press(key)
             await expect(menu.get_by_role("menuitem", name=item)).to_be_focused()
+        await page.screenshot(path=str(tmp_path / "menu-1280-light.png"), animations="disabled")
         # A click between the items keeps the keys with the menu.
         await menu.locator(".menu-separator").click()
         await page.keyboard.press("ArrowDown")

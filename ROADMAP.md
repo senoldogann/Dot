@@ -14538,21 +14538,40 @@ their first letters, an address typed, wide and light and on a phone and dark). 
 
 ### 368. Changes in the side panel: the files a chat's runs wrote, with their diffs
 
-**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca yan bölüme bir Changes alanı ekleyelim … kod yazma veya
-session içerisinde oluşturmalar vs. olursa bunları görebilmek için" (add a Changes area to the side panel, to see code
-written or things created in a session). **As built (2026-10-18).** The side panel has a Changes tab, second after Run,
-which counts the files (`changes.js`, `views/run.js`): each file the chat's runs wrote or created with `write_file` and
-`edit_file`, up to the run of the page and with the runs they delegated to, the one changed last first, its name over
-its folder, "created" or "gone", and the lines added and removed; opened, the hunks of its unified diff from before the
-chat's first change to it to what is there now, each line in the tone of what it does, in a box that scrolls sideways.
-It is read on arrival, after each write or edit a run reports, and once the run ends. The daemon reads the runs'
-journals of file changes for it (`GET /api/runs/{id}/changes`, `server/changes.py`), without changing `undo/`: the copy
-the chat's first change to a file kept is the before. A file where the panel beside a chat shows no file (a hidden
+**Status: done (`299ddc4`).** The owner's word of 2026-10-18: "Ayrıca yan bölüme bir Changes alanı ekleyelim … kod yazma
+veya session içerisinde oluşturmalar vs. olursa bunları görebilmek için" (add a Changes area to the side panel, to see
+code written or things created in a session). **As built (2026-10-18).** The side panel has a Changes tab, second after
+Run, which counts the files (`changes.js`, `views/run.js`): each file the chat's runs wrote or created with `write_file`
+and `edit_file`, up to the run of the page and with the runs they delegated to, the one changed last first, its name
+over its folder, "created" or "gone", and the lines added and removed; opened, the hunks of its unified diff from before
+the chat's first change to it to what is there now, each line in the tone of what it does, in a box that scrolls
+sideways. It is read on arrival, after each write or edit a run reports, and once the run ends. The daemon reads the
+runs' journals of file changes for it (`GET /api/runs/{id}/changes`, `server/changes.py`), without changing `undo/`: the
+copy the chat's first change to a file kept is the before. A file where the panel beside a chat shows no file (a hidden
 folder, an application's files, outside the home folder), a binary file, one past 512 KB, one that is gone and one whose
-first change kept no copy show why instead of a diff; the lines of a diff are masked of the secrets Dot holds. A
-command's own writes are not in the journals, so they are not in Changes. Tests: `tests/unit/test_changes.py` (a file
-two runs changed, one they made, the files without a diff, a masked key), `tests/smoke/test_changes_panel.py` (the API,
-and the tab wide and light and on a phone and dark). Docs: `docs/daemon.md`, `docs/autonomy.md`.
+first change kept no copy show why instead of a diff. Each side of a file is masked whole of the secrets Dot holds
+before it is diffed, so a private key over many lines is masked whatever part of it a hunk shows, and the log tail of
+Diagnostics (item 370) is masked whole before it is cut into lines. The changes are taken in the order they were made,
+whichever run made them, so a file a delegated run made and its parent edited is diffed from before both. A command's
+own writes are not in the journals, so they are not in Changes. Tests: `tests/unit/test_changes.py` (a file two runs
+changed, one they made, the files without a diff, a masked key), `tests/smoke/test_changes_panel.py` (the API, and the
+tab wide and light and on a phone and dark). Docs: `docs/daemon.md`, `docs/autonomy.md`.
+
+### 375. The smoke tests that failed under the load of `-n auto`
+
+**Status: in progress.** This session's word to a Dot run of 2026-10-18, which the owner carried on ("Devam etmen
+gerekiyorsa devam et", then "Ne gerekiyorsa onu yap": go on if you need to, then do whatever is needed): find why smoke
+tests fail under the load of `-n auto` and pass alone, and fix it in `tests/`. **As built (2026-10-18).** Two causes in
+`tests/smoke/test_activity.py`: its four runs drew their turns from one scripted model they shared, so on a slow machine
+one run spent another's turns and that one failed with no reply left, and they worked for twelve seconds by the clock,
+so a slow walk of the pages found the Working section empty. Each run has a script of its own now, matched on the goal
+its first message opens with, and they work until the test opens a gate file. In `tests/smoke/test_chat_menu.py` and the
+side menu's test of `tests/smoke/test_side_scroll.py`, a redraw of the list closes the menu opened over it (as it
+should: the menu acts on the rows it was opened from), and under load the redraw came after the menu opened: the tests
+wait for the list to rest before they open a menu, and for the menu to rest before they press it. What they check is
+unchanged. A Dot run of the owner's found and fixed these; this item reviews them and adds them, on main's versions of
+the tests. The others it looked at (`test_opening`, `test_setup_card`, `test_terminal`, `test_file_panel`,
+`test_customize_plugins`, `test_opencode_bridge`) passed its four runs of `-n auto` but one, and have no fix yet.
 
 ## Log
 
@@ -15344,3 +15363,4 @@ and the tab wide and light and on a phone and dark). Docs: `docs/daemon.md`, `do
 - 2026-10-18 (Opus 5.5): item 365 merged as `c3bfb97` (PR #365). Item 366 on `item-366-answer-streams`: an answer that ends a run under the reader's eyes is written in.
 - 2026-10-18 (Opus 5.5): item 366 merged as `6cb0f4a` (PR #366). Item 367 on `item-367-at-picks`: `@` in the composer picks an MCP server, a tool or a skill.
 - 2026-10-18 (Opus 5.5): item 367 merged as `a0b7954` (PR #367). Item 368 on `item-368-changes`: Changes in the side panel, the files a chat's runs wrote, with their diffs.
+- 2026-10-18 (Opus 5.5): item 368 merged as `299ddc4` (PR #368); the pre-push review passed it on its fifth push. Item 375 on `item-375-flaky-tests`: the smoke tests that failed under the load of `-n auto`, as a Dot run of the owner's fixed them, reviewed.
