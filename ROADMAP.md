@@ -14254,13 +14254,16 @@ its kept copy when the network has not answered within 200 ms (item 328), and dr
 later: the copy was renewed only by an answer within 200 ms. A phone that reaches the Mac through Tailscale, slower than
 that on every request, kept opening the build it first kept, and the one reload a page of another build makes was
 answered from the same copy. `sw.js` now notes a late answer that names another build than the copy's, as the name of an
-empty cache, which outlives the service worker iOS stops between openings; the next opening waits for the network, so
-that the page and its files come from that build and are kept whole, and the copy answers until then and when the
-network fails, still whole for when the Mac is out of reach. Tests: `tests/smoke/test_phone_return.py`, after an update
-on a network always slower than the wait (the test proxy's `slow`): the copy answers and stays whole, the newer build is
-noted, and the next opening keeps it whole, which fails on the code before. The waits on a page's caches are made real:
-Playwright's `wait_for_function` takes the promise of an async function for true at once, so the two helpers that waited
-for the service worker's copy (`test_phone_return.py`, `test_reconnect.py`) waited for nothing. Docs: `docs/phone.md`.
+empty cache, which outlives the service worker iOS stops between openings; the next opening waits for the network up to
+5 seconds, so that the page and its files come from that build and are kept whole. The copy answers until then, when the
+network fails, and when it has not answered within those 5 seconds, as when the Mac is out of reach and its connections
+hang rather than fail; it stays whole for that. Tests: `tests/smoke/test_phone_return.py`, after an update on a network
+always slower than the wait (the test proxy's `slow`): the copy answers and stays whole, the newer build is noted, an
+opening while the Mac is out of reach (the proxy's `sleep`) is answered by the copy once the 5 seconds are over and
+keeps the note, and the next opening keeps the newer build whole, which fails on the code before. The waits on a page's
+caches are made real: Playwright's `wait_for_function` takes the promise of an async function for true at once, so the
+two helpers that waited for the service worker's copy (`test_phone_return.py`, `test_reconnect.py`) waited for nothing.
+Docs: `docs/phone.md`.
 
 ## Log
 

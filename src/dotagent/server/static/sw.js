@@ -3,9 +3,10 @@
 // showed) is ever cached, and a push from the daemon becomes a notification whose tap opens the run.
 //
 // A page opened while the phone's network wakes (item 328) does not wait for it: when the network has not answered
-// within NETWORK_WAIT_MS, the kept copy answers, and every file of that page comes from the same copy. The copies are
-// kept by the build of the pages they are of (the daemon names it in BUILD_HEADER, kept_pages.py), one build at a time,
-// so a page is never half one build and half another; the page then compares its build with the daemon's (state.js).
+// within NETWORK_WAIT_MS, the kept copy answers, and every file of that page comes from the same copy; after a newer
+// build was noted (item 359), an opening waits for the network up to NEWER_WAIT_MS instead. The copies are kept by the
+// build of the pages they are of (the daemon names it in BUILD_HEADER, kept_pages.py), one build at a time, so a page
+// is never half one build and half another; the page then compares its build with the daemon's (state.js).
 
 const PAGES_CACHE = "dot-pages-";
 // A cache named for a build the network named after a copy of another build had answered (item 359). It holds nothing:
@@ -14,6 +15,9 @@ const PAGES_CACHE = "dot-pages-";
 const NEWER_CACHE = "dot-newer-";
 const BUILD_HEADER = "X-Dot-Pages";
 const NETWORK_WAIT_MS = 200;
+// How long an opening waits for the network after a newer build was noted (item 359): long enough for a slow network to
+// answer, short enough that a Mac out of reach, whose connections hang rather than fail, leaves the copy to answer.
+const NEWER_WAIT_MS = 5000;
 const API_PREFIX = "/api";
 const PAGES_PREFIX = "/pages/";
 
@@ -31,7 +35,9 @@ self.addEventListener("activate", (event) => {
       .keys()
       .then((names) =>
         Promise.all(
-          names.filter((name) => !name.startsWith(PAGES_CACHE) && !name.startsWith(NEWER_CACHE)).map((name) => caches.delete(name)),
+          names
+            .filter((name) => !name.startsWith(PAGES_CACHE) && !name.startsWith(NEWER_CACHE))
+            .map((name) => caches.delete(name)),
         ),
       )
       .then(() => self.clients.claim()),
@@ -71,7 +77,8 @@ async function keptCopy(request) {
   return null;
 }
 
-/** Whether the network named a build after a copy of another had answered, which the next opening waits for (item 359). */
+/** Whether the network named a build after a copy of another had answered, which the next opening waits for up to
+ * NEWER_WAIT_MS (item 359). */
 async function newerNamed() {
   return (await caches.keys()).some((name) => name.startsWith(NEWER_CACHE));
 }
@@ -92,15 +99,17 @@ function after(ms, value) {
 /**
  * A page opened: the network's answer when it comes within NETWORK_WAIT_MS, else the kept copy, whose files the page
  * then takes too; the kept copy also when the network fails, and the network's late answer when nothing is kept. A late
- * answer that names another build than the copy's is noted, and the next opening waits for the network (item 359):
- * otherwise a phone whose network is always slower than NETWORK_WAIT_MS would open the build it first kept for ever.
+ * answer that names another build than the copy's is noted, and the next opening waits for the network up to
+ * NEWER_WAIT_MS (item 359): otherwise a phone whose network is always slower than NETWORK_WAIT_MS would open the build
+ * it first kept for ever.
  */
 async function openPage(event) {
   const answer = fetch(event.request).then(
     (response) => ({ response }),
     (error) => ({ error }),
   );
-  const early = (await newerNamed()) ? await answer : await Promise.race([answer, after(NETWORK_WAIT_MS, null)]);
+  const wait = (await newerNamed()) ? NEWER_WAIT_MS : NETWORK_WAIT_MS;
+  const early = await Promise.race([answer, after(wait, null)]);
   if (early !== null && early.response !== undefined) {
     keepPage(event.request, early.response.clone());
     return early.response;

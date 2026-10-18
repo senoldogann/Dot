@@ -86,8 +86,10 @@ _LOST_S: float = 15.0
 _CAUGHT_UP_S: float = 2.0
 # How soon the bar and the composer of the chat stand when Dot is opened again.
 _IN_PLACE_MS: int = 500
-# A network always slower than the service worker waits for it (item 359).
+# A network always slower than the service worker waits for it, and how long an opening waits for the network after a
+# newer build was noted (NEWER_WAIT_MS in static/sw.js, item 359).
 _SLOW_S: float = 0.6
+_NEWER_WAIT_S: float = 5.0
 # The longest a page's caches may take to hold what a test waits for.
 _UNTIL_S: float = 15.0
 _WORDS: tuple[str, ...] = ("Reconnecting", "Connection lost", "Connecting")
@@ -583,6 +585,16 @@ async def test_a_copy_of_an_earlier_build_opened_on_a_slow_network_gives_way_to_
             # The network's answer, once it comes, is noted, and the copy stays whole, for when the Mac is out of reach.
             await _until_true(first, _NOTED_AND_WHOLE, "later")
             await first.close()
+            # Opened while the Mac is out of reach, its connections hanging: the copy answers once the wait is over.
+            proxy.sleep()
+            away: Page = await context.new_page()
+            started = time.monotonic()
+            await away.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
+            waited_s: float = time.monotonic() - started
+            assert waited_s < _NEWER_WAIT_S + 2, f"the copy answered after {waited_s:.1f} s"
+            await _until_true(away, _NOTED_AND_WHOLE, "later")
+            await away.close()
+            proxy.wake(0)
             # The next opening waits for the network, and keeps the daemon's build whole.
             second: Page = await context.new_page()
             await second.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
