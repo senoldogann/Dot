@@ -4909,31 +4909,6 @@ a.memory-line:hover .memory-change {
   grid-column: 1;
 }
 
-.continued a {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-control);
-  background: var(--surface);
-  color: var(--text-2);
-  font-size: var(--text-sm);
-}
-
-.continued a:hover {
-  background: var(--surface-2);
-  text-decoration: none;
-}
-
-.continued .muted {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
 /* The box what is fixed stands in, which layout.js measures to tell where the seen part ends (item 293). */
 .seen-box {
   position: fixed;

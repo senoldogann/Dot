@@ -360,6 +360,9 @@ item 371) shows the notices that come with the pages (the fonts, the icons, and 
 whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names
 and a search, and the tools Dot uses (Google Chrome, Ollama, Node.js, Tailscale, OpenCode), each with where it is on
 this Mac or that it is not, looked for on the PATH of the owner's shell (`GET /api/licences`).
+Both pages, like the other pages under another (an agent's or a campaign's page, Team, a service's page), have their
+link back at their top in a wide window, with the sidebar beside them too (item 380): the sidebar names the list they
+are under, not the page itself.
 
 Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards,
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and
