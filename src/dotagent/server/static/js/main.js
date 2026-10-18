@@ -22,6 +22,8 @@ import * as agents from "./views/agents.js";
 import * as team from "./views/team.js";
 import * as campaigns from "./views/campaigns.js";
 import * as controls from "./views/controls.js";
+import * as diagnostics from "./views/diagnostics.js";
+import * as licences from "./views/licences.js";
 import * as customize from "./views/customize.js";
 import * as run from "./views/run.js";
 import * as runs from "./views/runs.js";
@@ -86,6 +88,9 @@ const ROUTES = [
     // On a phone a tab is a page of the list of the settings (item 330); in a wider window the tabs are the page.
     parent: ([tab]) => (tab === undefined || !PHONE.matches ? null : "/settings"),
   },
+  // Settings › System's Diagnostics (item 370) and Open source licences (item 371), pages of their own under it.
+  { tab: "settings", layout: "page", title: "Diagnostics", pattern: /^\/diagnostics$/, view: diagnostics, parent: () => "/settings/system" },
+  { tab: "settings", layout: "page", title: "Open source licences", pattern: /^\/licences$/, view: licences, parent: () => "/settings/system" },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
   { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls, parent: () => null },
 ];

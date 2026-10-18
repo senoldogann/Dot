@@ -5294,8 +5294,10 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 361 | OpenRouter's refusal for the account's privacy settings says why, and what to change   | done        | 994ab2d |
 | 362 | The lines of what ran without asking are out of a chat until turned on                 | done        | 22d1409 |
 | 363 | integrations/ carries REA and the replica skills; a plugin's server names its tools    | done        | d08dcd5 |
-| 364 | No Actions tab in the side panel and no Activity page; the home shows the rest         | in progress |         |
+| 364 | No Actions tab in the side panel and no Activity page; the home shows the rest         | done        | 6d476e6 |
 | 369 | The repository names no other product; the licence notices keep what the law asks      | done        | 58d0425 |
+| 370 | Settings › System › Diagnostics: Dot's processes, the room it takes, its logs          | in progress |         |
+| 371 | Settings › System › Open source licences: what Dot uses, read as it is                 | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14342,7 +14344,7 @@ one. Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`,
 
 ### 364. No Actions tab in the side panel and no Activity page; the home shows the rest
 
-**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca sağ menüdeki Actions alanı bence gereksiz onu
+**Status: done (`6d476e6`).** The owner's word of 2026-10-18: "Ayrıca sağ menüdeki Actions alanı bence gereksiz onu
 kaldıralım komple ve, Sol menüdeki activity alanı da gereksiz onu da kaldıralım komple" (the Actions area of the right
 menu is not needed, take it away completely, and the Activity of the left menu too). **As built (2026-10-18).** The side
 panel has four tabs: Run (Details, Cost and the conversation's Files, which the Actions tab held), Plan, Agents and
@@ -14378,6 +14380,39 @@ bloub, and what `integrations/` vendors keeps its upstream's words. `tests/unit/
 any other file of the repository. The rewriting was split over four agents (the roadmap, the docs, the web UI, Python
 and the tests), whose results were checked against the repository. Tests: `tests/smoke/test_phone_layout.py` (was
 `test_phone_t3.py`), `tests/unit/test_theme_folder.py`.
+
+### 370. Settings › System › Diagnostics: Dot's processes, the room it takes, its logs
+
+**Status: in progress.** The owner's word of 2026-10-18, with the two rows of [başka bir uygulama]'s settings
+("Diagnostics: Inspect processes, resource use, and logs on this environment", "Open source licenses: Notices for
+dependencies, assets, and optional tools"): "Kendi sistemimizde de Ayarlarda bu 2 ayar dinamik gerçek olarak olsa?"
+(could our own settings have these two, dynamic and real?). **As built (2026-10-18).** Settings › System has a card,
+About this Dot, with the ways to Diagnostics (`#/diagnostics`) and Open source licences (item 371). Diagnostics reads
+this Mac as it is (`server/diagnostics.py`, `routes_about.py`): the daemon's process and the ones it started, each under
+its parent, the eldest first, with its share of the CPU, its memory and how long it has run, from one `ps` in the C
+locale, read again every five seconds while the page is seen (`GET /api/diagnostics/processes`); the room each kind of
+what Dot keeps takes (`/disk`: the store and its journal files, the workspace, the profiles of Dot's own Chrome,
+screenshots, downloads, undo journals, eval reports, skills and plugins, the logs, the home in all); and the logs, the
+last 300 lines of one, with a filter (`/logs`, `/logs/{name}?lines=`, 1 to 1000). A process is named by its executable
+alone, as its arguments may carry a key; a log's lines come with their secrets masked; a name that is not one of the
+logs is refused; the owner's own Chrome is never measured; a path under the owner's home shows as `~/…`. The processes
+table scrolls sideways in its box on a phone (item 360); the folders are rows. Tests: `tests/unit/test_diagnostics.py`
+(`ps`'s lines and times, the tree, the tail, the refused names), `tests/smoke/test_about_pages.py` (the API and the
+page, wide and light, on a phone and dark). Docs: `docs/daemon.md`.
+
+### 371. Settings › System › Open source licences: what Dot uses, read as it is
+
+**Status: in progress.** The owner's word of 2026-10-18, with the two rows of [başka bir uygulama]'s settings
+("Diagnostics: Inspect processes, resource use, and logs on this environment", "Open source licenses: Notices for
+dependencies, assets, and optional tools"): "Kendi sistemimizde de Ayarlarda bu 2 ayar dinamik gerçek olarak olsa?"
+(could our own settings have these two, dynamic and real?). **As built (2026-10-18).** Open source licences
+(`#/licences`, `server/licences.py`) reads what is really there: the notices that come with the pages (the fonts, the
+icons, and the code taken from other projects, whose copyright the MIT licence asks Dot to keep: the appearance code's
+and the character's), by what they cover, each opening on its words; the Python packages installed beside the daemon
+with the licence each one's metadata names (its SPDX expression, else the first line of its License field, else its
+classifiers) and the page it is known by, with a search; and the tools Dot uses (Google Chrome, Ollama, Node.js,
+Tailscale, OpenCode), each with where it is on this Mac, looked for on the PATH of the owner's shell, or that it is not
+(`GET /api/licences`). Tests: `tests/unit/test_licences.py`, `tests/smoke/test_about_pages.py`. Docs: `docs/daemon.md`.
 
 ## Log
 
@@ -15161,3 +15196,4 @@ and the tests), whose results were checked against the repository. Tests: `tests
 - 2026-10-18 (Opus 5.5): item 362 merged as `22d1409` (PR #357). Item 363 on the owner's word of the same day, on `item-363-integrations`: the owner's REA and replica-skill integrations, reviewed, with REA's release named.
 - 2026-10-18 (Opus 5.5): item 363 merged as `d08dcd5` (PR #358). Item 369 on the owner's word of the same day, on `item-369-own-words`: the repository names no other product, and the licence notices keep their names.
 - 2026-10-18 (Opus 5.5): item 369 merged as `58d0425` (PR #359). Item 364 on the owner's word of the same day, on `item-364-fewer-places`: no Actions tab in the side panel and no Activity page; the home's Today strip shows the rest in place.
+- 2026-10-18 (Opus 5.5): item 364 merged as `6d476e6` (PR #360). Items 370 and 371 on the owner's word of the same day, on `item-370-diagnostics-licences`: Settings › System's Diagnostics and Open source licences, read from what is there.

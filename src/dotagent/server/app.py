@@ -34,6 +34,7 @@ from dotagent.previews.quicklook import QuickLook, open_quick_look
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
 from dotagent.server.kept_pages import KeptPages, ServedPages, keep_pages
+from dotagent.server.routes_about import about_router
 from dotagent.server.routes_agents import agents_router
 from dotagent.server.routes_browser import browser_router
 from dotagent.server.routes_campaigns import campaigns_router
@@ -99,6 +100,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(health_router())
     app.include_router(proof_router(ctx.token))
     app.include_router(system_router(ctx, pages.build))
+    app.include_router(about_router(ctx))
     app.include_router(runs_router(ctx))
     app.include_router(queue_router(ctx))
     app.include_router(threads_router(ctx))

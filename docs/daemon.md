@@ -326,11 +326,25 @@ access (HTTP 403) says that, with its words), **API keys** (the key of each prov
 providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses with and what Chrome has to allow first; see
 [Browser use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches
 Dot at and a pairing code for its home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the
-daemon, the emergency stop and the health checks in a fold, closed, with the number of failures on its line). Which folds are open is kept in
+daemon, the emergency stop and the health checks in a fold, closed, with the number of failures on its line, and the
+ways to **Diagnostics** and **Open source licences**, pages of their own). Which folds are open is kept in
 the browser. The tabs sit beside their content when the window has the room and above it otherwise, in one row that
 scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are
 a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)).
 The earlier addresses of the memory, schedules, rules and system pages lead to their tabs.
+
+**Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
+servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
+memory and how long it has run, read again every five seconds while the page is seen; the room each kind of what Dot
+keeps takes on disk (the store, the workspace, the profiles of Dot's own Chrome, screenshots, downloads, the undo
+journals, the eval reports, skills and plugins, the logs and the home in all); and the logs, the last 300 lines of the
+one written last, or of another, with a filter. A process is named by its executable alone, as its arguments may carry a
+key, a log's lines come with their secrets masked, and the owner's own Chrome is never measured
+(`GET /api/diagnostics/processes`, `/disk`, `/logs` and `/logs/{name}?lines=`). **Open source licences** (`#/licences`,
+item 371) shows the notices that come with the pages (the fonts, the icons, and the code taken from other projects,
+whose copyright Dot keeps), the Python packages installed beside the daemon with the licence each one's metadata names
+and a search, and the tools Dot uses (Google Chrome, Ollama, Node.js, Tailscale, OpenCode), each with where it is on
+this Mac or that it is not, looked for on the PATH of the owner's shell (`GET /api/licences`).
 
 Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards,
 each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and

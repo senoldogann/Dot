@@ -19,7 +19,10 @@ export function sizeLabel(size) {
   if (size < 1024) {
     return `${size} B`;
   }
-  return size < 1024 * 1024 ? `${Math.round(size / 1024)} KB` : `${(size / 1024 / 1024).toFixed(1)} MB`;
+  if (size < 1024 * 1024) {
+    return `${Math.round(size / 1024)} KB`;
+  }
+  return size < 1024 ** 3 ? `${(size / 1024 / 1024).toFixed(1)} MB` : `${(size / 1024 ** 3).toFixed(1)} GB`;
 }
 
 /** Whether a pasted text goes as a file rather than into the box (item 269). */
