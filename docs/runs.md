@@ -88,7 +88,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   false` in `[agent]` turns it off. Every tool result records its channel (a command, an API, the web, the browser, the
   desktop, or the run's own tools), and `dotx stats` shows the calls per channel and the share of the acting calls that
   went through a GUI: the prompt sends the agent to a command or an API first, the browser second, the desktop last.
-  The timeline shows a budget cut to the window, why a model is weak, and each reminder.
+  The side panel's Run tab shows under Set up a budget cut to the window, why a model is weak, and each reminder
+  (item 365).
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
   step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
@@ -97,7 +98,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it turns the group on, and
   its result asks the model to call the tool again. A group stays on for the rest of the run. `auto` is `grouped` for a
   model of the weak tier and for a model whose window cut the context budget, and `full` for every other model. The
-  timeline shows the groups a grouped run starts with and each group it turns on.
+  side panel's Run tab shows under Set up the groups a grouped run starts with and each group it turns on.
 - `prompt` in `[agent]` decides how much the system prompt says (item 280). `full`, the default, says how to work and
   each kind of tool at length (the web, the browser, the desktop, memory, schedules). `lean` keeps the rules of trust
   and safety, of hesitating and of how a run ends as `full` has them, word for word where they are the same rule, and

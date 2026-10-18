@@ -35,8 +35,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   of its run that it names (`site-amazon-com`, `site-notes`; item 308), and when a run first reaches a site or drives
   an application, its next step is handed the lessons tagged with it that it was not handed yet (at most five) and the
   learned skills written there that its instructions did not list (at most three), counted as handed like the notes
-  it started with; the timeline says "Recalled 2 memories learned on www.amazon.com". The run's
-  timeline says how many notes it recalled and the tokens they took.
+  it started with; the side panel's Run tab says under Set up "Recalled 2 memories learned on www.amazon.com", as
+  it says there how many notes the run recalled and the tokens they took (item 365).
 - Use decides what is recalled: a note handed to a run counts as used, and a search lifts the agent's notes a run was
   handed lately (a use a moment ago is worth a second place in one ranking; the lift halves every `use_half_life_days`,
   30), so the notes that help overtake the ones first written. An agent's note that no run was handed for `rest_days`
@@ -68,10 +68,10 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings.
   `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
   again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
-  notes and lists its skills by their words alone and goes on, and the timeline and the terminal say so in a warning
-  line (`embedding_failed`, item 256). The word search does not mind case, accents or the Turkish dotted and dotless i
-  (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the words that start with its first
-  five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`).
+  notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Run tab, under
+  Set up, say so in a warning line (`embedding_failed`, items 256 and 365). The word search does not mind case, accents
+  or the Turkish dotted and dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the
+  words that start with its first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`).
 - Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
   outdated.
 - The default embedding model, `bge-m3`, is multilingual: English and Turkish notes are found by meaning (on a small
