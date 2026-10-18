@@ -582,3 +582,62 @@ async def test_the_plus_menu_picks_plugins_skills_and_plan_first_as_chips_that_g
                     await page.close()
             finally:
                 await browser.close()
+
+
+@pytest.mark.browser
+async def test_an_at_word_picks_a_server_or_a_skill_by_its_name(login_env: dict[str, str], tmp_path: Path) -> None:
+    """`@` at the start of a word opens the menu of the picks alone (item 367): the MCP servers by name with the number
+    of their tools, then the skills and the servers' tools, filtered by the letters after it; Enter makes the chip and
+    takes the at word away, and an `@` inside a word opens nothing. Wide and light, and on a phone and dark."""
+    with scratch_home() as home, eval_environment(home, {}):
+        _write_skill(home)
+        async with (
+            _daemon(login_env, _config("full"), []) as (runtime, manager, _model),
+            _served(runtime, manager) as address,
+            async_playwright() as playwright,
+        ):
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                passes: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+                for width, scheme in passes:
+                    refused: list[str] = []
+                    page: Page = await _home_page(browser, address, width, scheme)
+                    page.on("console", _collect_refusals(refused))
+                    composer: Locator = page.locator(".composer")
+                    goal: Locator = page.locator("textarea[aria-label='Goal']")
+                    chips: Locator = composer.locator(".pick-list .pick-chip")
+                    menu: Locator = composer.locator(".slash-menu")
+                    await goal.click()
+                    await goal.type("Look it up @")
+                    await expect(menu).to_be_visible()
+                    await expect(menu.locator(".slash-group").first).to_have_text("MCP servers")
+                    server: Locator = menu.get_by_role("option").filter(has_text=SERVER).first
+                    await expect(server.locator(".slash-hint")).to_have_text("10 tools")
+                    await expect(menu.locator(".slash-group", has_text="Skills")).to_have_count(1)
+                    await expect(menu.locator(".slash-group", has_text="Commands")).to_have_count(0)
+                    box: dict[str, float] | None = await menu.bounding_box()
+                    assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+                    await page.screenshot(path=str(tmp_path / f"at-menu-{width}-{scheme}.png"), animations="disabled")
+                    await goal.type(SERVER[:3])
+                    await expect(menu.get_by_role("option").first).to_contain_text(SERVER)
+                    await goal.press("Enter")
+                    await expect(menu).to_be_hidden()
+                    await expect(goal).to_have_value("Look it up ")
+                    await expect(composer.locator(".pick-chip[data-kind='plugin']")).to_have_attribute(
+                        "data-name", SERVER
+                    )
+                    await goal.type(f"@{SKILL_NAME[:6]}")
+                    await expect(menu.get_by_role("option")).to_have_count(1)
+                    await goal.press("Enter")
+                    await expect(goal).to_have_value("Look it up ")
+                    await expect(chips).to_have_count(2)
+                    # An at inside a word, as in an address, is part of the words.
+                    await goal.type("owner@example.org")
+                    await expect(menu).to_be_hidden()
+                    await expect(goal).to_have_value("Look it up owner@example.org")
+                    await _fits(page, chips, composer)
+                    await page.screenshot(path=str(tmp_path / f"at-chips-{width}-{scheme}.png"), animations="disabled")
+                    assert refused == [], refused
+                    await page.close()
+            finally:
+                await browser.close()

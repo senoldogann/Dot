@@ -132,17 +132,19 @@ a word opens the slash menu over the box: the commands of the composer (`/task`,
 `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools, read from
 the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape
 closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the slash
-word goes; a command does its work. A run that waits for your approval shows above the composer, as a card, and moves it
-down only when the cards do not fit there.
+word goes; a command does its work. `@` at the start of a word opens the same menu for the picks alone (item 367): the
+MCP servers by name with the number of their tools, then the skills and each server's tools, filtered by the letters
+after it; a pick is a chip and the at word goes. An `@` inside a word, as in an address, opens nothing. A run that waits
+for your approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens **Add files**, in the box of a run **Save
 skill**, the **Goal mode** switch, on the home for a task of Dot's **Keep going** (item 353), and **Plan first**, then
 **Plugins**, the MCP servers with tools (a connected app's
-among them), and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked, there or in the slash menu,
-is a chip under the box in a colour of its name, which its × takes away; Plan first is a chip too, and a chat has neither
-it nor goal mode. The picks go with the message (`plugins`, `skills` and `plan_first` of `POST /api/runs`, and of a
-message the queue holds), and once it is sent they stand under it as chips (the run's `picks` event); a message that
-steers the run under way leaves them for the next one, and the page says so, and a queued message with picks is not
+among them), and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked, there or in the slash or
+at menu, is a chip under the box in a colour of its name, which its × takes away; Plan first is a chip too, and a chat
+has neither it nor goal mode. The picks go with the message (`plugins`, `skills` and `plan_first` of `POST /api/runs`,
+and of a message the queue holds), and once it is sent they stand under it as chips (the run's `picks` event); a message
+that steers the run under way leaves them for the next one, and the page says so, and a queued message with picks is not
 steered into the run at work: it stays queued to start a run of its own. A run sent with picks starts with each
 picked server's tool group on from its first step when its tools are grouped (with every tool offered they are on
 anyway), and its first message is your words, then a line that names the servers to use, Plan first's (write the plan
