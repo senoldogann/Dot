@@ -277,7 +277,9 @@ async def search_searxng(client: WebClient, base_url: str, query: str, max_resul
     headers: dict[str, str] = {"User-Agent": client.user_agent, "Accept": "application/json"}
     timeout: httpx.Timeout = httpx.Timeout(10.0, connect=5.0, read=_SEARXNG_TIMEOUT_S)
     try:
-        async with httpx.AsyncClient(timeout=timeout, follow_redirects=False, trust_env=False) as http:
+        # A proxy in front of the instance may answer with a jump (http to https, a trailing slash): it is followed,
+        # since its body is a page, not the JSON of a search.
+        async with httpx.AsyncClient(timeout=timeout, follow_redirects=True, trust_env=False) as http:
             response: httpx.Response = await http.get(url, headers=headers)
     except httpx.TimeoutException as exc:
         raise WebError("the SearXNG instance did not answer in time", {"query": query, "url": base_url}) from exc

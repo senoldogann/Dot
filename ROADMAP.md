@@ -14617,7 +14617,7 @@ chat in Chrome, wide and dark and on a phone in light. Tests: `tests/unit/test_c
 
 ### 378. Settings › System and Browser read in groups
 
-**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "System ve browser sayfalarinida daha iyi bir
+**Status: done (`94ca713`).** The owner's word of 2026-10-18 to a Dot run: "System ve browser sayfalarinida daha iyi bir
 tasarim yapabilme sansimiz var mi ? Eger var ise onlarida yap. Ayrica sag menüdeki review alanida daha düzgün olsa daha
 iyi olur." (can the System and Browser pages have a better design too? If so, make it. The review area of the right-hand
 menu would be better neater, too). **As built (2026-10-18).** Settings › System's Daemon card had its eighteen facts in
@@ -14637,6 +14637,26 @@ holds (the run had How it asks), and left the side panel's section titles in sen
 for them and drew them in small capitals, and which part of the side panel the owner meant is asked. Tests:
 `tests/smoke/test_about_pages.py` (the four groups and the rows of This Dot, wide and light and on a phone and dark),
 `test_browser_settings.py` (the five names). Docs: `docs/daemon.md`, `docs/browser-and-computer-use.md`.
+
+### 379. The findings a Dot run checked, fixed as reviewed
+
+**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Ekteki bulgulari incele gercekten varsa düzelt,
+ardindan rapor ver ne yaptigine dair" (look into the findings attached, fix those that are real, then report what you
+did). **As built (2026-10-18).** The run found six real and nine no longer true on main, and fixed the six in the main
+checkout; this item reviews them and adds them. Settings › Providers: the list asks where a key comes from, as the
+provider's page does, so a key the daemon has from its environment or the Keychain no longer reads "No key yet" there
+(`views/keys.js` `keyLine`); closing a form that was not open no longer drops the focus to the page; a provider's models
+are drawn again only when what they show changed (the models, why they could not be read, the models of the roles their
+chips name) instead of at every event of the daemon's stream. The flow's words (`tools.js`) know the terminal's
+commands, `web_extract` and `web_crawl`, `memory_update`, `schedule_delete` and the tools that list, find and search
+files, and the tool `terminal` that does not exist is gone. SearXNG follows a jump on the way to the instance, as a
+proxy's from http to https, instead of taking it for no answer (`web/search.py`). The schedules' and the memory's lines
+of parts share one helper (`dom.js` `joined`), which leaves out an empty part. The review left out the run's reading of
+an engine named alone in SearXNG's answer: `_SearxAnswer` validates the pairs at the boundary, so a malformed one is a
+`WebError` the ladder takes, not a crash; it made the models' check include why they could not be read and the roles'
+models, which the run's left out; and it kept `memory_search`, `memory_forget` and a terminal's reads and closes out of
+the counts, which the run had as notes kept and commands. Tests: `tests/unit/test_search_ladder.py` (a 301 to the
+instance is followed).
 
 ## Log
 
@@ -15432,3 +15452,4 @@ for them and drew them in small capitals, and which part of the side panel the o
 - 2026-10-18 (Opus 5.5): item 375 merged as `601a41c` (PR #369); the pre-push review passed it with two Nits, fixed in the next push. Item 376 on `item-376-queue-files`: a queued message's files come into the box that edits it, as a Dot run of the owner's built it, reviewed.
 - 2026-10-18 (Opus 5.5): item 376 merged as `f05ddc2` (PR #370); the pre-push review blocked its first push on an Important finding (Save left out a file still uploading) and passed the next two with Nits, the last one answered. Item 377 on `item-377-chat-spacing`: the lines of a chat sit closer, on the owner's word to a Dot run.
 - 2026-10-18 (Opus 5.5): item 377 merged as `8cf9f06` (PR #371); the pre-push review blocked its first push on an Important finding (the rule's weight beat the room of lists and code) and passed the next with a Nit, fixed. Item 378 on `item-378-system-design`: Settings › System and Browser read in groups, as a Dot run of the owner's designed them, reviewed.
+- 2026-10-18 (Opus 5.5): item 378 merged as `94ca713` (PR #372); the pre-push review passed its three pushes, the first two with Nits, fixed. Item 379 on `item-379-findings`: the findings a Dot run of the owner's checked, fixed as reviewed.
