@@ -5290,7 +5290,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 357 | Lines of at most 120 characters, held by `ruff check`                                  | done        | 4ebf951 |
 | 358 | Settings › Browser: the zoom Dot's own Chrome draws pages at                           | done        | 177b005 |
 | 359 | A phone takes Dot's new pages over a slow network too                                  | done        | 83d81e3 |
-| 360 | A phone's chat scrolls up and down only, and its line over the composer is quieter     | in progress |         |
+| 360 | A phone's chat scrolls up and down only, and its line over the composer is quieter     | done        | a6f0397 |
+| 361 | OpenRouter's refusal for the account's privacy settings says why, and what to change   | in progress |         |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14268,16 +14269,16 @@ Docs: `docs/phone.md`.
 
 ### 360. A phone's chat scrolls up and down only, and its line over the composer is quieter
 
-**Status: in progress.** The owner's word of 2026-10-18, with two screenshots of the phone: "sağa sola sohbet içi scroll
-olmamalı sadece tablo vs kendi içinde scroll olmalı sığmaz ise" (the chat should not scroll sideways; only a table and
-the like should scroll in its own box when it does not fit) and "Alttaki working alanı composer üstündeki neden
-komutları da gösteriyor kaldır onları ve o alanı daha minimal yap" (why does the working line over the composer show the
-commands too; take them away and make it more minimal). **As built (2026-10-18).** On a phone the conversation is a box
-that scrolls (item 352), and a box that scrolls up and down scrolls sideways too as soon as anything in it is wider. In
-the owner's 40 latest chats, measured in WebKit at the phone's width, it was up to 8 px wider. What reached past it: the
-last button of a message's foot (a finger's 44 px, with the -8 px margin that puts its mark under the bubble's edge), a
-yolo line's long command (a flex item that would not shrink below its longest word), a long MCP tool's name
-(`flex: none`, 56 px past), and the space that ends a bold word's line (3 px, unseen). The conversation's box now
+**Status: done (`a6f0397`).** The owner's word of 2026-10-18, with two screenshots of the phone: "sağa sola sohbet içi
+scroll olmamalı sadece tablo vs kendi içinde scroll olmalı sığmaz ise" (the chat should not scroll sideways; only a
+table and the like should scroll in its own box when it does not fit) and "Alttaki working alanı composer üstündeki
+neden komutları da gösteriyor kaldır onları ve o alanı daha minimal yap" (why does the working line over the composer
+show the commands too; take them away and make it more minimal). **As built (2026-10-18).** On a phone the conversation
+is a box that scrolls (item 352), and a box that scrolls up and down scrolls sideways too as soon as anything in it is
+wider. In the owner's 40 latest chats, measured in WebKit at the phone's width, it was up to 8 px wider. What reached
+past it: the last button of a message's foot (a finger's 44 px, with the -8 px margin that puts its mark under the
+bubble's edge), a yolo line's long command (a flex item that would not shrink below its longest word), a long MCP tool's
+name (`flex: none`, 56 px past), and the space that ends a bold word's line (3 px, unseen). The conversation's box now
 scrolls up and down only (`overflow-x: hidden`); the button keeps its mark where it was with a padding instead of the
 margin; the command and the name break where they must. A table and a block of code scroll in their own box, as they
 did. The line over the composer no longer says what the run does now (its latest call, as `shell · <622 chars>`), which
@@ -14286,6 +14287,23 @@ the queue in a few quiet words on the page's ground, with no frame and no shadow
 `tests/smoke/test_chat_calm.py`, on a WebKit iPhone: a chat with each of those, a wide table and a wide block of code
 does not scroll sideways while the table and the code do, which fails on the code before;
 `tests/smoke/test_phone_t3.py`: the line names no call. Docs: `docs/phone.md`, `docs/daemon.md`.
+
+### 361. OpenRouter's refusal for the account's privacy settings says why, and what to change
+
+**Status: in progress.** The owner's word of 2026-10-18, after a run's lessons failed with OpenRouter's "HTTP 404: 0
+endpoints out of 1 requested are available matching your guardrail restrictions and data policy … Paid model training
+violation (account settings)": "Bu gibi durumlarda ne yapacağız bunu yap" (what do we do in such cases; do it). **As
+built (2026-10-18).** The review model of the owner's config, `openrouter:meta/muse-spark-1.3-contributor`, has one
+provider at OpenRouter, which keeps and trains on what it is sent. The account's privacy settings ruled it out, for paid
+model training and, once the owner allowed that, for Zero Data Retention, so every call of the review model failed: the
+lessons of each run, and a goal check, an `auto` approval or a drafted rule as well. OpenRouter's 404 for that is now a
+refused access (`ProviderAccessError`, as a 403 is), whose words say what excluded the providers and where to change
+that: "OpenRouter's privacy settings for this account leave no provider of the model (ZDR violation): choose another
+model in Settings › Models, or change them at https://openrouter.ai/settings/privacy". As after a 403, a run whose own
+model gets it moves to its standby model, and the model is paused for `helper_cooldown_s` until a call to it is
+answered. Which model reviews stays the owner's choice: one
+whose providers keep what they are sent passes only with Zero Data Retention off. Test:
+`tests/unit/test_provider_errors.py`, with OpenRouter's own answer. Docs: `docs/models.md`.
 
 ## Log
 
@@ -15064,3 +15082,4 @@ does not scroll sideways while the table and the code do, which fails on the cod
 - 2026-10-18 (Opus 5.5): item 280 on the owner's word of the same day, on `item-280-lean`: a lean system prompt behind `[agent] prompt`, and three eval runs of the same 41 tasks that keep both defaults full.
 - 2026-10-18 (Opus 5.5): item 359 on the owner's word of the same day (the new composer not on the phone), on `item-359-phone-pages`: over a slow network the phone's service worker kept the build it first kept; a late answer of another build now has the next opening wait for the network.
 - 2026-10-18 (Opus 5.5): item 359 merged as `83d81e3` (PR #354), and the daemon restarted on it. Item 360 on the owner's word of the same day (two screenshots of the phone), on `item-360-chat-width`: a phone's conversation scrolls up and down only, and the line over the composer drops what the run does now and the count of the commands, in fewer and quieter words.
+- 2026-10-18 (Opus 5.5): item 360 merged as `a6f0397` (PR #355). Item 361 on the owner's word of the same day (a run's lessons failed with OpenRouter's 404 for the account's privacy settings), on `item-361-provider-policy`: that 404 is a refused access that says why and what to change.

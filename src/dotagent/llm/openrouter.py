@@ -26,7 +26,7 @@ from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.codec_chat import ChatOptions, build_chat_body, chat_codec
 from dotagent.llm.connector import get_json, retry_with_reset, stream_model_reply
 from dotagent.llm.http import build_client, request_context
-from dotagent.llm.provider_errors import classify_generic
+from dotagent.llm.provider_errors import classify_generic, classify_openrouter
 from dotagent.llm.traits import ModelTraits, info_from_traits, is_known_label
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.llm.wire import get_float, get_int, get_list, get_obj, get_str
@@ -245,11 +245,11 @@ class OpenRouterProvider:
         url: str = self._url("/chat/completions")
         payload: str = dumps_compact(body)
         context: JsonObject = request_context(url, body)
-        codec = chat_codec(classify_generic, _CHAT_OPTIONS)
+        codec = chat_codec(classify_openrouter, _CHAT_OPTIONS)
 
         async def attempt() -> ModelReply:
             return await stream_model_reply(
-                self._client, url, payload, self._headers, context, classify_generic, codec, request.model, sink
+                self._client, url, payload, self._headers, context, classify_openrouter, codec, request.model, sink
             )
 
         async with self._slots:

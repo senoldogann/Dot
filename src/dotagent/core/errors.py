@@ -51,7 +51,7 @@ class ProviderAuthError(ProviderHttpError):
 
 class ProviderAccessError(ProviderHttpError):
     """403: the provider knows the key and refuses what was asked: a model, a region or a plan the key may not
-    use."""
+    use. OpenRouter's 404 for a model the account's privacy settings leave no provider of is one too (item 361)."""
 
 
 class ProviderRateLimitError(ProviderHttpError):

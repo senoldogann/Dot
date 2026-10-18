@@ -53,6 +53,14 @@ _OPENCODE_QUOTA: frozenset[str] = frozenset(
 _ANTHROPIC_QUOTA: frozenset[str] = frozenset({"billing_error"})
 # How ollama.com words a plan whose included usage is spent ("You used all included … usage"), with HTTP 429.
 _OLLAMA_PLAN_SPENT: str = "used all included"
+# How OpenRouter answers a call to a model that the account's privacy settings leave no provider of, with HTTP 404 (item
+# 361): "0 endpoints out of 1 requested are available matching your guardrail restrictions and data policy. We removed
+# them for the following reasons …:" and a line for each, "ZDR violation (account settings): 1 endpoint excluded; …".
+_OPENROUTER_POLICY: str = "data policy"
+_OPENROUTER_EXCLUDED: re.Pattern[str] = re.compile(
+    r"^\s*(.+?)(?: \(account settings\))?: \d+ endpoints? excluded", re.MULTILINE
+)
+_OPENROUTER_PRIVACY: str = "https://openrouter.ai/settings/privacy"
 # How Ollama's server words a model runner that broke off: its request to the runner on the loopback failed (item 256;
 # seen as an HTTP 400 of the embedding route, `Post "http://127.0.0.1:<port>/tokenize": ... connection reset by peer`).
 _OLLAMA_RUNNER_LOST: re.Pattern[str] = re.compile(
@@ -207,6 +215,23 @@ def classify_anthropic(
         return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
     if status == 400 and wire is not None and _ANTHROPIC_NO_CREDIT in wire.message.lower():
         return ProviderQuotaError(error_message(status, wire), status, retry_after_s, detail)
+    return classify_generic(status, wire, retry_after_s, detail)
+
+
+def classify_openrouter(
+    status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
+) -> ProviderHttpError:
+    """OpenRouter: a 404 that says the account's privacy settings leave no provider of the model is a refused access,
+    worded with what excluded them and where to change that (item 361)."""
+    if status == 404 and wire is not None and _OPENROUTER_POLICY in wire.message:
+        reasons: str = redact_secrets("; ".join(_OPENROUTER_EXCLUDED.findall(wire.message)))[:_MESSAGE_CHARS]
+        excluded: str = f" ({reasons})" if reasons else ""
+        return ProviderAccessError(
+            f"OpenRouter's privacy settings for this account leave no provider of the model{excluded}: choose another "
+            f"model in Settings › Models, or change them at {_OPENROUTER_PRIVACY}",
+            status,
+            detail,
+        )
     return classify_generic(status, wire, retry_after_s, detail)
 
 
