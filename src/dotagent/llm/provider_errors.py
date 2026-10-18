@@ -224,8 +224,8 @@ def classify_openrouter(
     """OpenRouter: a 404 that says the account's privacy settings leave no provider of the model is a refused access,
     worded with what excluded them and where to change that (item 361)."""
     if status == 404 and wire is not None and _OPENROUTER_POLICY in wire.message:
-        reasons: list[str] = _OPENROUTER_EXCLUDED.findall(wire.message)
-        excluded: str = f" ({'; '.join(reasons)})" if reasons else ""
+        reasons: str = redact_secrets("; ".join(_OPENROUTER_EXCLUDED.findall(wire.message)))[:_MESSAGE_CHARS]
+        excluded: str = f" ({reasons})" if reasons else ""
         return ProviderAccessError(
             f"OpenRouter's privacy settings for this account leave no provider of the model{excluded}: choose another "
             f"model in Settings › Models, or change them at {_OPENROUTER_PRIVACY}",

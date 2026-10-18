@@ -14299,8 +14299,9 @@ model training and, once the owner allowed that, for Zero Data Retention, so eve
 lessons of each run, and a goal check, an `auto` approval or a drafted rule as well. OpenRouter's 404 for that is now a
 refused access (`ProviderAccessError`, as a 403 is), whose words say what excluded the providers and where to change
 that: "OpenRouter's privacy settings for this account leave no provider of the model (ZDR violation): choose another
-model in Settings › Models, or change them at https://openrouter.ai/settings/privacy". The model is paused for
-`helper_cooldown_s`, as after a 403, until a call to it is answered. Which model reviews stays the owner's choice: one
+model in Settings › Models, or change them at https://openrouter.ai/settings/privacy". As after a 403, a run whose own
+model gets it moves to its standby model, and the model is paused for `helper_cooldown_s` until a call to it is
+answered. Which model reviews stays the owner's choice: one
 whose providers keep what they are sent passes only with Zero Data Retention off. Test:
 `tests/unit/test_provider_errors.py`, with OpenRouter's own answer. Docs: `docs/models.md`.
 
