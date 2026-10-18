@@ -14746,11 +14746,12 @@ another agent deletes only a folder right in Dot's skills folder; a name that is
 `..` is refused (`help/added.py` `remove_skill`), where before `folder / "/Users/x"` was `/Users/x`. B7: a PDF page more
 than 20,000 px tall at the width asked is refused before its bitmap is made (`previews/pdfpages.py`), where a page of 1
 by 1,000 would have taken over a gigabyte. B9: the Responses codec gives a function call whose id is empty or repeated
-one of its own, as the chat codec does (`llm/codec_responses.py`); the request carries the calls back by these ids, as
-`store` is off. B10: a one-time schedule whose firing a crash cut before its run was under way is due again at the time
-it fired as the scheduler starts, unless a run of it was made (`scheduler/runner.py`). Tests:
-`tests/unit/test_help_added.py`, `test_previews.py`, `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs:
-`docs/runs.md`, `docs/memory-and-schedules.md`.
+one of its own, as the chat codec does, in the call's own item too (`llm/codec_responses.py`): the next request sends
+those items back as they are, as `store` is off, and each result by its call's id, so the two keep one id and neither is
+pruned as unpaired; the pre-push review found the first version wrote the new ids into the calls alone. B10: a one-time
+schedule whose firing a crash cut before its run was under way is due again at the time it fired as the scheduler
+starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
+`test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
 
 ## Log
 
