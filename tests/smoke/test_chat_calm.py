@@ -1,8 +1,9 @@
 """A chat that reads calm (item 352), on a run's page in Chrome and on a WebKit iPhone, light and dark.
 
-- How the run was set up reads as one quiet line, not a line each: the notes recalled by their words alone, the notes
-  handed over, the skills listed by their words alone. The line names them in short, wears the warning's tone, and opens
-  on a tap to the lines themselves. Before, each was a line of its own between the goal and the answer.
+- How the run was set up is not in the conversation (item 365): the notes recalled by their words alone, the notes
+  handed over, the skills listed by their words alone are lines of the side panel's Run tab, under Set up, whose head
+  names them in short; the warning keeps its tone. Before item 352 each was a line of its own between the goal and the
+  answer, and before item 365 they were one quiet line there.
 - On a phone a chat is one screen: the top bar and the composer stay where they are and only the conversation scrolls
   between them. Before, the window scrolled, and the composer stuck to its foot.
 - **On a phone the conversation scrolls up and down only (item 360)**, whatever it holds: a message's foot, a yolo line
@@ -162,7 +163,21 @@ def _finish(answer: str) -> ScriptedTurn:
     return ScriptedTurn(text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": answer, "success": True}),))
 
 
-async def test_how_a_run_was_set_up_reads_as_one_line_that_opens(login_env: dict[str, str], tmp_path: Path) -> None:
+# The head of Set up for a long run's lines (item 365), from the page's own module.
+_LONG_RUN_SUMMARY: str = """import('/js/setup.js').then(({ setupSummary }) => setupSummary([
+  { kind: 'budget', short: 'budget 192k' },
+  { kind: 'cadence', short: 'goal every 10 steps' },
+  { kind: 'reminder', short: 'goal at step 10' },
+  { kind: 'reminder', short: 'goal at step 20' },
+  { kind: 'route', short: 'step 3 on gpt-5.6' },
+  { kind: 'route-back', short: "step 3 back on the run's model" },
+  { kind: 'words', short: 'notes' },
+]))"""
+
+
+async def test_how_a_run_was_set_up_is_in_the_side_panel_not_the_conversation(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
     turns: list[ScriptedTurn] = [_finish("Three invoices: March, April and May.") for _ in range(4)]
     with scratch_home() as home, eval_environment(home, {}):
         async with _daemon(login_env, turns) as (runtime, manager, address), async_playwright() as playwright:
@@ -185,27 +200,36 @@ async def test_how_a_run_was_set_up_reads_as_one_line_that_opens(login_env: dict
                         context = await browser.new_context(**options)
                         page: Page = await context.new_page()
                         await page.goto(ui_url(host, port, TOKEN))
+                        # The side panel is on beside a wide conversation; a phone opens it as a drawer.
+                        await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
                         run: RunRecord = await _ended(runtime, manager, f"{_GOAL} ({name}, {scheme})")
                         await page.goto(f"{address}/#/runs/{run.id}")
                         await expect(page.locator(".answer").last).to_be_visible()
-                        lines: Locator = page.locator(".timeline > .context-line")
-                        await expect(lines).to_have_count(1)
-                        line: Locator = lines.first
-                        # Nothing of how the run was set up stands on a line of its own.
+                        # Nothing of how the run was set up stands in the conversation.
+                        thread: Locator = page.locator(".timeline")
+                        await expect(thread).not_to_contain_text("Recalled 1 memory")
+                        await expect(thread).not_to_contain_text("by their words alone")
                         await expect(page.locator(".timeline > .note")).to_have_count(0)
-                        summary: Locator = line.locator(".context-summary")
-                        await expect(summary).to_contain_text("1 memory")
-                        await expect(summary).to_contain_text("notes")
-                        await expect(summary).to_contain_text("found by their words alone")
-                        await expect(line).to_have_class("context-line warn")
-                        await expect(line.locator(".context-body")).to_be_hidden()
-                        await page.screenshot(path=tmp_path / f"context-{name}-{scheme}.png")
-                        await line.locator("summary").click()
-                        await expect(line.locator(".context-body")).to_contain_text(
+                        await page.screenshot(path=tmp_path / f"setup-chat-{name}-{scheme}.png")
+                        if phone:
+                            await page.locator("button[aria-label='Run details']").click()
+                        setup: Locator = page.locator("#panel-run-setup")
+                        await expect(setup).to_be_visible()
+                        await expect(setup).to_contain_text("Recalled 1 memory")
+                        await expect(setup).to_contain_text(
                             "Notes recalled by their words alone: the embedding service failed"
                         )
-                        await expect(line.locator(".context-body")).to_contain_text("Recalled 1 memory")
-                        await page.screenshot(path=tmp_path / f"context-open-{name}-{scheme}.png")
+                        await expect(setup.locator(".note.warn")).to_have_count(1)
+                        summary: Locator = page.locator(".setup-summary")
+                        await expect(summary).to_contain_text("1 memory")
+                        await expect(summary).to_contain_text("notes found by their words alone")
+                        # A kind a long run repeats is said once, with its count.
+                        said: str = await page.evaluate(_LONG_RUN_SUMMARY)
+                        assert said == (
+                            "budget 192k · goal every 10 steps · goal repeated 2 times · step 3 on gpt-5.6 · "
+                            "step 3 back on the run's model · notes found by their words alone"
+                        ), said
+                        await page.screenshot(path=tmp_path / f"setup-panel-{name}-{scheme}.png")
                         await context.close()
             finally:
                 await chromium.close()
