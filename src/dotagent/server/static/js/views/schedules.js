@@ -3,7 +3,7 @@
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
-import { clip, debounce, el, modelName, plural, switchRow } from "../dom.js";
+import { clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
@@ -171,7 +171,7 @@ function scheduleRow(view, handlers) {
       el(
         "div",
         { class: "row-meta when-line" },
-        ...spread(
+        ...joined([
           el("span", { class: "mono", title: "When it runs" }, view.when),
           next,
           last,
@@ -179,16 +179,11 @@ function scheduleRow(view, handlers) {
           view.zone === localZone()
             ? null
             : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
-        ),
+        ]),
       ),
     ),
     el("div", { class: "row-actions" }, edit, remove),
   );
-}
-
-/** The parts of a line that are not null, each after a dot. */
-function spread(...parts) {
-  return parts.filter((part) => part !== null).flatMap((part, index) => (index === 0 ? [part] : [" · ", part]));
 }
 
 /** This Mac's time zone, as the browser names it. */

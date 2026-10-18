@@ -295,6 +295,13 @@ async def search_searxng(client: WebClient, base_url: str, query: str, max_resul
             "the SearXNG instance refused its JSON format: list json in search.formats of its settings.yml",
             {"query": query, "url": base_url, "status": 403},
         )
+    if response.is_redirect:
+        # Not followed: the instance is let past the address gate as the owner's configuration, and where it leads is
+        # not. A proxy's jump (http to https, a trailing slash) says which address to configure instead.
+        raise WebError(
+            "the SearXNG instance's address leads elsewhere: set [web] searxng_url to the address it leads to",
+            {"url": base_url, "status": response.status_code, "location": response.headers.get("location", "")},
+        )
     if response.status_code != 200:
         raise WebError(
             "the SearXNG instance did not answer the search",

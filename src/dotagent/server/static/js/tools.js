@@ -12,7 +12,12 @@ const TEXT_PREVIEW_CHARS = 6000;
 // What a tool call is, in the words of a flow's summary (item 374): "Ran 2 commands and read 1 file".
 const KIND_OF_TOOL = {
   shell: "command",
-  terminal: "command",
+  // A terminal is opened on a command and typed into; reading it and closing it say nothing a count of them would.
+  terminal_open: "command",
+  terminal_send: "command",
+  web_extract: "page",
+  memory_update: "memory",
+  schedule_delete: "schedule",
   read_file: "read",
   write_file: "write",
   edit_file: "write",

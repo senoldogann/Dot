@@ -203,12 +203,18 @@ def test_a_searxng_answer_whose_engines_all_refused_is_an_error_not_an_empty_pag
 
 
 class _SearxHandler(BaseHTTPRequestHandler):
-    """Four instances under one address: ``/ok`` answers the search, ``/blank`` answers with results that name no page,
-    ``/off`` has the JSON format off (SearXNG's 403 for a format its settings do not list) and ``/busy`` is limiting
-    this machine (its limiter's 429)."""
+    """Five instances under one address: ``/ok`` answers the search, ``/moved`` sends it on to ``/ok`` (a proxy's jump
+    from http to https), ``/blank`` answers with results that name no page, ``/off`` has the JSON format off (SearXNG's
+    403 for a format its settings do not list) and ``/busy`` is limiting this machine (its limiter's 429)."""
 
     def do_GET(self) -> None:
         instance: str = self.path.split("/")[1]
+        if instance == "moved":
+            self.send_response(301)
+            self.send_header("Location", self.path.replace("/moved", "/ok", 1))
+            self.send_header("Content-Length", "0")
+            self.end_headers()
+            return
         status: int = {"ok": 200, "blank": 200, "off": 403, "busy": 429}[instance]
         body: bytes = (
             _SEARXNG_ANSWER
@@ -243,6 +249,10 @@ async def test_a_searxng_instance_answers_and_a_limit_is_told_from_a_format_turn
     try:
         hits = await search_searxng(client, f"{searx}/ok", "reaktor", 1)
         assert [hit.url for hit in hits] == ["https://www.reaktor.com/"]
+        # A jump on the way, as a proxy's from http to https, is not followed past the address gate: it says where to.
+        with pytest.raises(WebError, match="leads elsewhere") as moved:
+            await search_searxng(client, f"{searx}/moved", "reaktor", 1)
+        assert str(moved.value.context["location"]).startswith("/ok/")
         # A limit benches the rung for a while; a format turned off is the instance's settings, so it says which.
         with pytest.raises(WebThrottledError):
             await search_searxng(client, f"{searx}/busy", "reaktor", 5)

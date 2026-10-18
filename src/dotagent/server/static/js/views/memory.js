@@ -2,7 +2,7 @@
 // The notes keep a size and scroll inside past their first rows (item 218).
 
 import { api, query } from "../api.js";
-import { ago, clip, dateTime, dateTimeFull, debounce, el, plural } from "../dom.js";
+import { ago, clip, dateTime, dateTimeFull, debounce, el, joined, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -26,11 +26,6 @@ function parseTags(text) {
     }
   }
   return tags;
-}
-
-/** The nodes that are there, each after a dot: one line of words that wraps, not a row of chips. */
-function dotted(parts) {
-  return parts.filter((part) => part !== null && part !== "").flatMap((part, index) => (index === 0 ? [part] : [" · ", part]));
 }
 
 /** The words of a note; a long note shows its beginning, with a button to read the rest. */
@@ -157,7 +152,7 @@ function memoryRow({ record, similarity, score }, actions) {
           el(
             "span",
             { class: "when-line" },
-            ...dotted([
+            ...joined([
               el("span", { title: dateTimeFull(record.created_at) }, `Saved ${ago(record.created_at)}`),
               ...lifespan(record),
               ...provenance(record),

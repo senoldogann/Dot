@@ -220,10 +220,11 @@ function modelsOf(provider) {
 
 // The word under a provider's name in the list: where its key stands, in the few words a row has room for.
 function keyLine(view) {
-  if (!view.saved) {
+  // A key in use may be the daemon's own (its environment or the Keychain): `source` says so while `saved` is false.
+  if (view.source === null) {
     return aboutProvider(view.provider).needed ? "No key yet" : "Optional · no key";
   }
-  return `Authenticated · key ••••${view.tail}`;
+  return view.saved ? `Authenticated · key ••••${view.tail}` : `Authenticated · ${SOURCES[view.source] ?? view.source}`;
 }
 
 /**
@@ -361,11 +362,21 @@ function buildProvider(initial, isDisposed, host) {
     outcome.hidden = false;
   }
 
+  let modelsShown = "";
+
   function paintModels() {
     if (modelsSection === null) {
       return;
     }
     const entry = modelsOf(view.provider);
+    // Drawn again only when something it shows changed: the models, why they could not be read, and the models of the
+    // roles their chips name. A stream event that changes none of them leaves the rows as they are.
+    const roles = ROLES.map((role) => getSnapshot().status?.models[role.id] ?? null);
+    const shown = JSON.stringify([entry, modelsProblem, roles]);
+    if (shown === modelsShown) {
+      return;
+    }
+    modelsShown = shown;
     if (entry === null) {
       modelCount.textContent = "";
       modelBox.replaceChildren(
@@ -440,9 +451,12 @@ function buildProvider(initial, isDisposed, host) {
 
   // The button that opened the form shows again in its place, and the focus goes back to it.
   function closeForm() {
+    const wasOpen = form.isOpen();
     form.close();
     paint();
-    edit.focus();
+    if (wasOpen) {
+      edit.focus();
+    }
   }
 
   async function runCheck() {

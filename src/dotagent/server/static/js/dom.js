@@ -319,6 +319,12 @@ export function compact(count) {
   return `${(count / 1_000_000).toFixed(1)}M`;
 }
 
+/** The parts that are there, each after a dot: one line of words that wraps, not a row of chips. */
+export function joined(parts) {
+  const there = parts.filter((part) => part !== null && part !== "");
+  return there.flatMap((part, index) => (index === 0 ? [part] : [" · ", part]));
+}
+
 export function plural(count, one, many) {
   return `${count} ${count === 1 ? one : many}`;
 }
