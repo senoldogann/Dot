@@ -109,6 +109,33 @@ def test_a_private_key_of_many_lines_is_masked_whatever_part_of_it_changed(place
     assert (by_name["old.pem"].diff, by_name["old.pem"].note) == ("", "the change is inside a secret, which is masked")
 
 
+def test_a_file_a_delegated_run_made_and_its_parent_edited_is_diffed_from_before_both(
+    places: tuple[Path, Path, Path],
+) -> None:
+    root, home, workspace = places
+    notes = workspace / "notes.md"
+    # The delegated run makes the file, then the run that delegated it edits it; the page lists the parent first.
+    _write(root, "child", notes, b"one\n", 1_000_000)
+    _write(root, "parent", notes, b"one\ntwo\n", 1_000_000)
+    [changed] = chat_changes(root, ["parent", "child"], home, workspace, ()).files
+    assert (changed.created, changed.added, changed.removed, changed.changes) == (True, 2, 0, 2)
+
+
+def test_a_file_that_cannot_be_read_says_so_and_the_others_keep_their_diffs(places: tuple[Path, Path, Path]) -> None:
+    root, home, workspace = places
+    kept = workspace / "kept.md"
+    _write(root, "run-1", kept, b"kept\n", 1_000_000)
+    locked = workspace / "locked.md"
+    _write(root, "run-1", locked, b"locked\n", 1_000_000)
+    locked.chmod(0)
+    try:
+        files = {Path(file.path).name: file for file in chat_changes(root, ["run-1"], home, workspace, ()).files}
+    finally:
+        locked.chmod(0o644)
+    assert files["locked.md"].note is not None and files["locked.md"].note.startswith("cannot be read")
+    assert files["kept.md"].added == 1
+
+
 def test_a_chat_without_journals_has_no_changes(places: tuple[Path, Path, Path]) -> None:
     root, home, workspace = places
     view = chat_changes(root, ["run-without-changes"], home, workspace, ())

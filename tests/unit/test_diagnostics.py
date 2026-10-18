@@ -89,6 +89,10 @@ def test_the_end_of_a_log_masks_its_secrets_and_leaves_out_a_line_the_read_cut()
     # A private key printed over many lines is masked whole, whatever lines of it the end shows.
     shown: str = "\n".join(tail_lines(b"started\n" + _PEM + b"done\n", False, 3, ()))
     assert "MIIEvQIBADAN" not in shown and "BKcwggSjAgEA" not in shown and shown.endswith("done")
+    # A read that began inside the key holds its end without its start: what comes before the end is the key's.
+    inside: bytes = _PEM[_PEM.index(b"MIIEvQ") + 4 :]
+    shown = "\n".join(tail_lines(b"cut line\n" + inside + b"done\n", True, 10, ()))
+    assert "BKcwggSjAgEA" not in shown and "END PRIVATE KEY" not in shown and shown.endswith("done"), shown
 
 
 def test_a_log_is_read_by_its_name_and_any_other_name_is_refused(

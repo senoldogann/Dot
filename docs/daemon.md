@@ -279,7 +279,7 @@ with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
-at the head of the conversation. The panel is one card on the composer's corner, in four tabs
+at the head of the conversation. The panel is one card on the composer's corner, in five tabs
 (item 203): **Run** (Details, how the run was Set up, Cost and the conversation's Files), **Changes** (the files the
 chat's runs wrote or created with `write_file` and `edit_file`, up to this run, which the tab counts: each with what
 became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;

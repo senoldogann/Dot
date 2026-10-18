@@ -89,11 +89,16 @@ def _sides(root: Path, origin: RunChange, path: Path, home: Path, workspace: Pat
     if entry.existed and not entry.backup:
         return _no_diff(f"no copy of what was there before was kept: {entry.skipped}")
     before_path: Path | None = backup_path(run_journal(root, origin.run_id), entry.seq) if entry.existed else None
-    before_size: int = 0 if before_path is None else before_path.stat().st_size
-    if before_size > MAX_DIFF_BYTES or now_path.stat().st_size > MAX_DIFF_BYTES:
-        return _no_diff("too large to show a diff of")
-    old = _text(b"" if before_path is None else before_path.read_bytes())
-    new = _text(now_path.read_bytes())
+    try:
+        before_size: int = 0 if before_path is None else before_path.stat().st_size
+        if before_size > MAX_DIFF_BYTES or now_path.stat().st_size > MAX_DIFF_BYTES:
+            return _no_diff("too large to show a diff of")
+        old = _text(b"" if before_path is None else before_path.read_bytes())
+        new = _text(now_path.read_bytes())
+    except OSError as error:
+        # The file, or the copy its first change kept, cannot be read now (gone, or no longer readable): the file is
+        # listed with why, and the others keep their diffs.
+        return _no_diff(f"cannot be read: {error.strerror or error}")
     if old is None or new is None:
         return _no_diff("a binary file")
     return _Sides(before=old, after=new, note=None, gone=False)
@@ -114,9 +119,16 @@ def chat_changes(root: Path, run_ids: Sequence[str], home: Path, workspace: Path
     """The Changes of the runs ``run_ids``, the oldest first, from their journals below the undo dir ``root``: the
     first change a path had among them is what it is diffed from. ``home`` and ``workspace`` are where the panel shows
     files; ``known`` the secrets Dot holds. Blocking."""
-    changes: list[RunChange] = [
-        RunChange(run_id=run_id, entry=entry) for run_id in run_ids for entry in read_journal(run_journal(root, run_id))
-    ]
+    # The changes in the order they were made, whichever run made them: a run's delegated runs come after it in
+    # ``run_ids``, but they change files before it goes on.
+    changes: list[RunChange] = sorted(
+        (
+            RunChange(run_id=run_id, entry=entry)
+            for run_id in run_ids
+            for entry in read_journal(run_journal(root, run_id))
+        ),
+        key=lambda change: (change.entry.ts, change.entry.seq),
+    )
     by_path: dict[str, list[RunChange]] = {}
     for change in changes:
         by_path.setdefault(change.entry.path, []).append(change)

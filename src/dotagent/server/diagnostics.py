@@ -40,6 +40,9 @@ _ELAPSED: re.Pattern[str] = re.compile(r"^(?:(?:(\d+)-)?(\d+):)?(\d+):(\d+)$")
 _TAIL_BYTES: int = 262_144
 # The most lines a page may ask of a log.
 MAX_TAIL_LINES: int = 1000
+# Where a private key in PEM starts and ends (core.text masks one from its start).
+_KEY_BEGIN: re.Pattern[str] = re.compile(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----")
+_KEY_END: re.Pattern[str] = re.compile(r"-----END [A-Z0-9 ]*PRIVATE KEY-----")
 
 
 class DiagnosticsError(DotError):
@@ -283,10 +286,16 @@ def tail_lines(data: bytes, cut: bool, count: int, known: Sequence[str]) -> tupl
     """The last ``count`` lines of ``data``, the end of a log, with every value of ``known`` (the secrets Dot holds)
     masked and the known forms of the others; when ``cut``, the read began inside the file and its first line is left
     out, as it may be the end of one. The end read is masked whole, before it is cut into lines, so a secret of many
-    lines (a private key in PEM) is masked whatever lines of it are shown."""
+    lines (a private key in PEM) is masked whatever lines of it are shown, a key whose start the read cut off too."""
     lines: list[str] = data.decode("utf-8", errors="replace").splitlines()
-    kept: list[str] = lines[1:] if cut else lines
-    return tuple(redact_known("\n".join(kept), known).splitlines()[-count:])
+    kept: str = "\n".join(lines[1:] if cut else lines)
+    # A read that began inside a private key holds its end without its start, which the masking finds the key by:
+    # all that comes before that end is the key's.
+    end: re.Match[str] | None = _KEY_END.search(kept)
+    begin: re.Match[str] | None = _KEY_BEGIN.search(kept)
+    if end is not None and (begin is None or begin.start() > end.start()):
+        kept = f"***{kept[end.end() :]}"
+    return tuple(redact_known(kept, known).splitlines()[-count:])
 
 
 def read_tail(folder: Path, name: str, count: int) -> LogTail:
