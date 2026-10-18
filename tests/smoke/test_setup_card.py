@@ -1,7 +1,7 @@
 """The home's Set up a model card (item 333), in WebKit as the owner's iPhone, on a served daemon whose default model is
 OpenAI's while no OpenAI key is set. The card says so, and each of its ways leads to a model:
 
-- **Add a key:** a key saved in Settings › API keys makes OpenAI list the model, and the card goes. A stand-in OpenAI
+- **Add a key:** a key saved in Settings › Providers makes OpenAI list the model, and the card goes. A stand-in OpenAI
   service on this Mac lists its models to that key alone.
 - **Removed key:** with the key removed the card comes back.
 - **Choose a model:** the scripted model, made the default in Settings › Models, answers a message from the home.

@@ -1,6 +1,6 @@
 """The problems of the providers in Settings › Models (item 185): a provider that refused access (HTTP 403) says so,
 with its words, and has no link to the keys, which would not help; one that refused its key (HTTP 401) says that and
-links to API keys; one without a key says it has none. Served by a real server, wide and on a phone, light and dark;
+links to Providers; one without a key says it has none. Served by a real server, wide and on a phone, light and dark;
 the screenshots are the record of the look. The providers are stand-ins: no network and no model service is used."""
 
 import asyncio
