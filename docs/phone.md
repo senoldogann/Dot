@@ -110,8 +110,11 @@ Mac is on and awake.
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. It keeps them by the build of the pages they are of, which the daemon names in the `X-Dot-Pages` header of
 every file, one build at a time (item 328): a page opened while the network has not answered within 200 ms is answered
-from that copy, every file of it from the same copy, and a page of another build than the daemon's loads again before it
-shows anything, so that it never meets an API it does not know. A page loaded from them while the daemon is out of reach says so and tries again by itself (item 200):
-after 2 seconds, then twice as long each time up to 30, and at once when the browser is back on the network or the page
-back in view, until the daemon answers. Without Tailscale, the same works on the Mac itself (`localhost` counts as
-secure) and on nothing else.
+from that copy, every file of it from the same copy. When the network's answer, once it comes, names another build, the
+next opening waits up to 5 seconds for the network, and keeps that build whole (item 359), so that a phone whose network
+is always slower than 200 ms takes an update all the same; the copy answers until then, and when the network fails or
+does not answer within those 5 seconds. A page of another build than the daemon's loads again before it shows anything,
+so that it never meets an API it does not know. A page loaded from them while the daemon is out of reach says so and
+tries again by itself (item 200): after 2 seconds, then twice as long each time up to 30, and at once when the browser
+is back on the network or the page back in view, until the daemon answers. Without Tailscale, the same works on the Mac
+itself (`localhost` counts as secure) and on nothing else.

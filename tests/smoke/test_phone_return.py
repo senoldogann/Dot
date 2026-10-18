@@ -12,6 +12,8 @@ gone and new ones wait while the network wakes. The page runs in WebKit, as the 
   daemon…".
 - **The browser's bar** takes the page's colour, light and dark.
 - **A page that Dot's update left behind** says so without moving the chat, and loads again once it is put away.
+- **A copy of an earlier build, opened on a slow network,** gives way to the daemon's pages once the network answers, so
+  that the next opening takes them (item 359).
 
 The model is a scripted one.
 """
@@ -38,7 +40,7 @@ from playwright.async_api import (
     async_playwright,
     expect,
 )
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -84,6 +86,12 @@ _LOST_S: float = 15.0
 _CAUGHT_UP_S: float = 2.0
 # How soon the bar and the composer of the chat stand when Dot is opened again.
 _IN_PLACE_MS: int = 500
+# A network always slower than the service worker waits for it, and how long an opening waits for the network after a
+# newer build was noted (NEWER_WAIT_MS in static/sw.js, item 359).
+_SLOW_S: float = 0.6
+_NEWER_WAIT_S: float = 5.0
+# The longest a page's caches may take to hold what a test waits for.
+_UNTIL_S: float = 15.0
 _WORDS: tuple[str, ...] = ("Reconnecting", "Connection lost", "Connecting")
 # What the pages of an updated daemon are, as the status a page reads tells it.
 _OTHER_PAGES: str = "0" * 16
@@ -163,6 +171,7 @@ class Proxy:
     - `sleep()` stops passing bytes on every connection, without closing any, as a phone put away leaves its network.
     - `wake(seconds)` is the network of a phone that comes back: every connection from before is closed, and new ones
       wait `seconds` before they pass.
+    - `slow(seconds)` is a network that is always slow: every part of every answer waits `seconds` before it passes.
     """
 
     def __init__(self) -> None:
@@ -170,6 +179,7 @@ class Proxy:
         self.port: int = 0
         self.asleep: bool = False
         self.hold_until: float = 0.0
+        self.latency_s: float = 0.0
         self._open: set[asyncio.StreamWriter] = set()
         self._server: asyncio.Server | None = None
 
@@ -183,6 +193,9 @@ class Proxy:
 
     def sleep(self) -> None:
         self.asleep = True
+
+    def slow(self, seconds: float) -> None:
+        self.latency_s = seconds
 
     def wake(self, seconds: float) -> None:
         for writer in list(self._open):
@@ -200,20 +213,46 @@ class Proxy:
             return
         upstream, to_upstream = await asyncio.open_connection("127.0.0.1", self.target)
         self._open.add(to_upstream)
-        await asyncio.gather(self._pass(client, to_upstream), self._pass(upstream, to_client))
+        await asyncio.gather(self._pass(client, to_upstream, False), self._pass(upstream, to_client, True))
 
-    async def _pass(self, source: asyncio.StreamReader, sink: asyncio.StreamWriter) -> None:
-        """Pass the bytes of ``source`` to ``sink`` until either closes; while the network sleeps, they are dropped."""
+    async def _pass(self, source: asyncio.StreamReader, sink: asyncio.StreamWriter, answers: bool) -> None:
+        """Pass the bytes of ``source`` to ``sink`` until either closes; while the network sleeps, they are dropped, and
+        the daemon's ``answers`` wait as long as the network is slow."""
         try:
             while chunk := await source.read(65_536):
                 if self.asleep:
                     continue
+                if answers and self.latency_s > 0:
+                    await asyncio.sleep(self.latency_s)
                 sink.write(chunk)
                 await sink.drain()
         except ConnectionError:
             pass
         finally:
             sink.close()
+
+
+class RenamedBuild:
+    """Answers as a daemon of another build once ``named`` holds its name, as an update of Dot would: every answer names
+    it in the build header the service worker keeps its copies by."""
+
+    def __init__(self, app: ASGIApp, named: list[str]) -> None:
+        self.app: ASGIApp = app
+        self.named: list[str] = named
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or not self.named:
+            await self.app(scope, receive, send)
+            return
+        name: bytes = self.named[0].encode("ascii")
+
+        async def renamed(message: Message) -> None:
+            if message["type"] == "http.response.start":
+                headers = [(key, name if key == b"x-dot-pages" else value) for key, value in message["headers"]]
+                message = {**message, "headers": headers}
+            await send(message)
+
+        await self.app(scope, receive, renamed)
 
 
 class NotedPages:
@@ -252,9 +291,10 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 
 
 @asynccontextmanager
-async def _served(home: Path) -> AsyncIterator[tuple[Runtime, RunManager, Proxy, list[str]]]:
+async def _served(home: Path) -> AsyncIterator[tuple[Runtime, RunManager, Proxy, list[str], list[str]]]:
     """A daemon on the Dot home ``home`` whose model is the scripted one, behind the proxy, which the pages reach it
-    through: its runtime, its run manager, the proxy and the files of the pages asked of it."""
+    through: its runtime, its run manager, the proxy, the files of the pages asked of it, and the name of the build it
+    answers as once a test puts one in (:class:`RenamedBuild`)."""
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
     )
@@ -278,15 +318,17 @@ async def _served(home: Path) -> AsyncIterator[tuple[Runtime, RunManager, Proxy,
             stopping=stopping,
         )
         asked: list[str] = []
+        named: list[str] = []
         app: FastAPI = create_app(context)
         app.add_middleware(NotedPages, asked=asked)
+        app.add_middleware(RenamedBuild, named=named)
         server: DotServer = DotServer(serving_config(app), stopping)
         serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
         while not server.started:
             assert not serving.done(), "the server stopped while starting"
             await asyncio.sleep(0.05)
         try:
-            yield runtime, manager, proxy, asked
+            yield runtime, manager, proxy, asked, named
         finally:
             server.should_exit = True
             stopping.set()
@@ -357,12 +399,21 @@ async def _chat_page(context: BrowserContext, proxy: Proxy, run: RunRecord) -> P
     return page
 
 
+async def _until_true(page: Page, script: str, arg: object) -> None:
+    """Wait until the async function ``script`` of the page, given ``arg``, gives true: ``wait_for_function`` takes the
+    promise such a function returns for true at once."""
+    deadline: float = time.monotonic() + _UNTIL_S
+    while await page.evaluate(script, arg) is not True:
+        assert time.monotonic() < deadline, script
+        await asyncio.sleep(0.1)
+
+
 async def _keep_pages_copy(page: Page) -> None:
     """Let the service worker take the page; loaded again, the page leaves it a copy of the pages, as a phone that
     opened Dot before has one."""
     await page.wait_for_function("() => navigator.serviceWorker.controller !== null")
     await page.reload()
-    await page.wait_for_function("async () => (await caches.match('/js/main.js')) !== undefined")
+    await _until_true(page, "async () => (await caches.match('/js/main.js')) !== undefined", None)
     await expect(page.locator(".helpers-body")).to_contain_text("step", timeout=15_000)
 
 
@@ -400,7 +451,7 @@ async def _away_and_back(page: Page, proxy: Proxy, wake_s: float) -> None:
 async def test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_network_wakes(
     own_home: Path, tmp_path: Path
 ) -> None:
-    async with _served(own_home) as (runtime, manager, proxy, _asked), async_playwright() as playwright:
+    async with _served(own_home) as (runtime, manager, proxy, _asked, _named), async_playwright() as playwright:
         run, earlier = await _at_work(runtime, manager)
         browser: Browser = await playwright.webkit.launch(headless=True)
         try:
@@ -438,7 +489,7 @@ async def test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_n
 async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pages_colour(
     own_home: Path, tmp_path: Path
 ) -> None:
-    async with _served(own_home) as (runtime, manager, proxy, asked), async_playwright() as playwright:
+    async with _served(own_home) as (runtime, manager, proxy, asked, _named), async_playwright() as playwright:
         run, _earlier = await _at_work(runtime, manager)
         title: str = (await runtime.store.get_thread(run.thread_id)).title
         browser: Browser = await playwright.webkit.launch(headless=True)
@@ -494,10 +545,69 @@ async def test_dot_opened_again_shows_the_chat_in_place_and_the_bar_takes_the_pa
             await browser.close()
 
 
+# Whether the build named is noted as newer while the copy kept still holds the shell, for when the Mac is out of reach.
+_NOTED_AND_WHOLE: str = """async (build) => {
+  const names = await caches.keys();
+  const copy = names.find((name) => name.startsWith("dot-pages-"));
+  return names.includes(`dot-newer-${build}`) && copy !== undefined
+    && (await (await caches.open(copy)).match("/js/main.js")) !== undefined;
+}"""
+# Whether the copy kept is of the build named alone, the shell with it.
+_KEPT_WHOLE: str = """async (build) => {
+  const names = await caches.keys();
+  return names.length === 1 && names[0] === `dot-pages-${build}`
+    && (await (await caches.open(names[0])).match("/js/main.js")) !== undefined;
+}"""
+
+
+async def test_a_copy_of_an_earlier_build_opened_on_a_slow_network_gives_way_to_the_daemons_pages(
+    own_home: Path,
+) -> None:
+    """Before, the network's answer that came after the copy had answered was dropped: a phone whose network is always
+    slower than the service worker waits opened the build it first kept for ever."""
+    async with _served(own_home) as (runtime, manager, proxy, _asked, named), async_playwright() as playwright:
+        run, _earlier = await _at_work(runtime, manager)
+        browser: Browser = await playwright.webkit.launch(headless=True)
+        try:
+            context: BrowserContext = await _phone(browser, playwright, "light", "allow")
+            page: Page = await _chat_page(context, proxy, run)
+            await _keep_pages_copy(page)
+            await page.close()
+            # Dot is updated: the daemon answers as another build than the copy the phone keeps, over a network that
+            # is always slower than the service worker waits.
+            named.append("later")
+            proxy.slow(_SLOW_S)
+            first: Page = await context.new_page()
+            started: float = time.monotonic()
+            await first.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
+            opened_ms: float = (time.monotonic() - started) * 1000
+            assert opened_ms < _IN_PLACE_MS, f"the copy did not answer: the page took {opened_ms:.0f} ms to open"
+            # The network's answer, once it comes, is noted, and the copy stays whole, for when the Mac is out of reach.
+            await _until_true(first, _NOTED_AND_WHOLE, "later")
+            await first.close()
+            # Opened while the Mac is out of reach, its connections hanging: the copy answers once the wait is over.
+            proxy.sleep()
+            away: Page = await context.new_page()
+            started = time.monotonic()
+            await away.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
+            waited_s: float = time.monotonic() - started
+            assert waited_s < _NEWER_WAIT_S + 2, f"the copy answered after {waited_s:.1f} s"
+            await _until_true(away, _NOTED_AND_WHOLE, "later")
+            await away.close()
+            proxy.wake(0)
+            # The next opening waits for the network, and keeps the daemon's build whole.
+            second: Page = await context.new_page()
+            await second.goto(f"http://127.0.0.1:{proxy.port}/", wait_until="commit")
+            await _until_true(second, _KEPT_WHOLE, "later")
+            await context.close()
+        finally:
+            await browser.close()
+
+
 async def test_a_page_that_an_update_left_behind_says_so_in_place_and_loads_again_once_put_away(
     own_home: Path, tmp_path: Path
 ) -> None:
-    async with _served(own_home) as (runtime, manager, proxy, _asked), async_playwright() as playwright:
+    async with _served(own_home) as (runtime, manager, proxy, _asked, _named), async_playwright() as playwright:
         run, _earlier = await _at_work(runtime, manager)
         browser: Browser = await playwright.webkit.launch(headless=True)
         try:

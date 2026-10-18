@@ -29,6 +29,10 @@ of the same name), and a mark that is not in the table fails, so a mistyped one 
 The smoke tests of the eval runner (`tests/smoke/test_evals_runner.py`) need no service at all: a scripted model
 plays the real loop, tools, policy and store.
 
+A browser test that waits for something only an async function of the page can tell (the service worker's caches)
+polls it with `page.evaluate`: Playwright's `wait_for_function` takes the promise such a function returns for true at
+once, and waits for nothing (item 359).
+
 The gate runs on every pull request and every push to `main` that changes more than prose (`.github/workflows/gate.yml`,
 on macOS because the package depends on PyObjC; a change to the Markdown at the root, `docs/` or the issue and pull
 request templates alone skips it): the format check, the lint, mypy, the unit tests, `dotx eval check` and every smoke
