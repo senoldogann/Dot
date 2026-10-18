@@ -16,7 +16,9 @@ from dotagent.cli_commands import (
     Command,
     HarnessAdoptCommand,
     HarnessDiffCommand,
+    HarnessExperiencesCommand,
     HarnessFinalCommand,
+    HarnessGraphCommand,
     HarnessListCommand,
     HarnessProbeCommand,
     HarnessProposeCommand,
@@ -24,6 +26,7 @@ from dotagent.cli_commands import (
     HarnessSetCommand,
     HarnessShowCommand,
     HarnessStepCommand,
+    HarnessStepsCommand,
 )
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
@@ -33,6 +36,7 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedTurn
 from dotagent.harness.components import COMPONENTS, NO_HARNESS, HarnessText
 from dotagent.harness.contrast import scores_of
+from dotagent.harness.graph import Lineage, graph_of, lineage_of, mermaid
 from dotagent.harness.probe import ProbeAsk, ProbeReport, ask_from_file, probe_apart, probe_here, report_json
 from dotagent.harness.propose import propose_from_run
 from dotagent.harness.roles import ROLE_NAMES
@@ -52,7 +56,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessStep, HarnessVersion
+from dotagent.store.models import HarnessExperience, HarnessStep, HarnessVersion
 
 # What a version's line names in place of a text: Dot's own text, which a run takes while none is adopted.
 OWN_TEXT: str = "Dot's own text"
@@ -116,8 +120,33 @@ async def cmd_harness_show(command: HarnessShowCommand) -> int:
     if version is None:
         sys.stdout.write(f"No version is adopted: every run takes {OWN_TEXT}.\n")
         return 0
-    sys.stdout.write("\n".join(render_version(version)) + "\n")
+    async with _store() as store:
+        lineage: Lineage = await lineage_of(store, version.id)
+    sys.stdout.write("\n".join([*render_version(version), *render_lineage(lineage)]) + "\n")
     return 0
+
+
+def render_lineage(lineage: Lineage) -> list[str]:
+    """What the store knows of a version's past: its ancestors, how its probes went, the steps that touched it and the
+    experiences about it."""
+    lines: list[str] = []
+    if lineage.ancestors:
+        lines.extend(["", "## made from", *(version_line(older) for older in lineage.ancestors)])
+    if lineage.probes:
+        passed: int = sum(1 for probe in lineage.probes if probe.passed)
+        lines.extend(["", f"## probes: {passed} of {len(lineage.probes)} attempts passed"])
+    if lineage.steps:
+        lines.extend(
+            ["", "## steps", *(f"{step.id}  {step.state}  {_when(step.started_at)}" for step in lineage.steps)]
+        )
+    if lineage.experiences:
+        lines.extend(["", "## experiences", *(experience_line(each) for each in lineage.experiences)])
+    return lines
+
+
+def experience_line(experience: HarnessExperience) -> str:
+    when: str = _when(experience.created_at)
+    return f"{experience.id}  {when}  [{experience.confidence}] {experience.cue}: {experience.lesson}"
 
 
 async def cmd_harness_diff(command: HarnessDiffCommand) -> int:
@@ -299,6 +328,37 @@ async def cmd_harness_final(command: HarnessFinalCommand) -> int:
     return 0
 
 
+async def cmd_harness_graph(command: HarnessGraphCommand) -> int:
+    async with _store() as store:
+        text: str = mermaid(await graph_of(store, command.steps))
+    sys.stdout.write(text + "\n")
+    return 0
+
+
+async def cmd_harness_steps(command: HarnessStepsCommand) -> int:
+    async with _store() as store:
+        steps: list[HarnessStep] = await store.list_harness_steps(command.limit)
+    if not steps:
+        sys.stdout.write(
+            "No step yet: 'dotx harness step' runs one, [harness] step_time has the daemon run one a night.\n"
+        )
+        return 0
+    for step in steps:
+        sys.stdout.write("\n".join(render_step(step)) + "\n")
+    return 0
+
+
+async def cmd_harness_experiences(command: HarnessExperiencesCommand) -> int:
+    async with _store() as store:
+        experiences: list[HarnessExperience] = await store.list_harness_experiences(command.limit)
+    if not experiences:
+        sys.stdout.write("No experience yet: a step writes one when an edit helped or hurt with evidence.\n")
+        return 0
+    for experience in experiences:
+        sys.stdout.write(experience_line(experience) + "\n")
+    return 0
+
+
 async def dispatch(command: Command) -> int:
     """Carry out one of this module's commands."""
     match command:
@@ -322,5 +382,11 @@ async def dispatch(command: Command) -> int:
             return await cmd_harness_probe(command)
         case HarnessFinalCommand():
             return await cmd_harness_final(command)
+        case HarnessGraphCommand():
+            return await cmd_harness_graph(command)
+        case HarnessStepsCommand():
+            return await cmd_harness_steps(command)
+        case HarnessExperiencesCommand():
+            return await cmd_harness_experiences(command)
         case _:
             raise InvalidValueError("not a command of this module", {"name": command.name})

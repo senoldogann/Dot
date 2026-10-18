@@ -14865,6 +14865,20 @@ for later.** A scoring set with headroom: the first step with a real model (Clau
 under the base and the candidate alike, so the loop can only keep until the set holds tasks the main model fails
 sometimes; and a secondary signal (steps, tokens) when pass rates tie.
 
+### 392. The harness: provenance
+
+**Status: done (2026-10-19), on `harness-4`, stacked on `harness-3`.** The fourth layer (Graphs). `harness/graph.py`
+reads the store into a graph: versions (made from, composed of), steps (learned from a run, proposed candidates, probed
+the survivor), experiences (about a version, written in a step) and the runs learned from, and draws it as a Mermaid
+flowchart; a version's lineage is its ancestors, the attempts of its probes, the steps that touched it (as base,
+candidate or probed version) and the experiences about it. `GET /api/harness/graph|steps|experiences` and `GET
+/api/harness/{id}/lineage`; `dotx harness graph|steps|experiences`, and `show` ends with the lineage. The library is
+read: the proposer is shown the newest experiences before it writes; an experience written from a run that had read
+content third parties can author is kept marked `tainted` and never shown to it (the rule of item 384's notes).
+**Decision.** The graph is read from the tables the step already writes (`harness_versions.parent_id`, the notes'
+`composed_of`, the steps' outcome, the probes and experiences by version), not from an edge table of its own: one source
+of truth, nothing to keep in step.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15669,3 +15683,4 @@ sometimes; and a secondary signal (steps, tokens) when pass rates tie.
 - 2026-10-19 (Fable 5.1): item 388's whole gate ran: 705 passed, the 17 browser tests that failed under `-n auto` passed serially, as they do on main. Item 389 on `harness-1`, stacked on `js-gate`: the harness's first layer, versions of the texts a run's prompt takes, written, adopted and retired by the owner (docs/harness.md); the method of Harness² (arXiv 2610.14224) adopted, its code not.
 - 2026-10-19 (Fable 5.1): item 389 committed on `harness-1`; item 390 on `harness-2`: the four roles of the step and `dotx harness propose`.
 - 2026-10-19 (Fable 5.1): item 390 committed on `harness-2`; item 391 on `harness-3`: the probe apart from the daemon, the contrast, the step and its schedule, `dotx harness step|probe|final`.
+- 2026-10-19 (Fable 5.1): item 391 committed on `harness-3`; item 392 on `harness-4`: the provenance graph, the lineage, the library read by the proposer.

@@ -144,8 +144,24 @@ under any text by a capable model, so a candidate can come out worse on them but
 before the step can adopt on evidence, the scoring set needs tasks with headroom (ones the main model fails sometimes),
 which is left for later, as is a secondary signal (steps, tokens) when pass rates tie.
 
+## Provenance
+
+What Dot changed about itself, when, and on what evidence is a graph the store keeps and the owner can read: a version
+is *made from* the one adopted when it was written, and *composed of* the candidates the composer merged; a step
+*learned from* a run, *proposed* its candidates and *probed* the survivor; an experience is *about* a version and
+*written in* a step. `GET /api/harness/graph` returns the nodes (versions with their state, the newest steps, the
+experiences with their confidence, the runs learned from) and the edges; `dotx harness graph` draws the same as a
+Mermaid flowchart. A version's *lineage* (`GET /api/harness/{id}/lineage`, the end of `dotx harness show`) is the same
+read from that version: its ancestors, the attempts of the probes that played it, the steps that touched it and the
+experiences about it. `dotx harness steps` and `experiences` (`GET /api/harness/steps`, `/experiences`) list the newest
+of each; the graph carries the newest steps (`--steps`, 50 by default) and four experiences a step. The library is in
+use: the proposer is shown the newest experiences, a line each of the cue, the lesson and the confidence, before it
+writes a candidate. An experience written in a step that learned from a run which had read content third parties can
+author is kept marked (`tainted`, said on the page) and never shown to the proposer, as a tainted note is never shown to
+the lesson writer: its words cannot pass into a clean run's candidate unmarked.
+
 ## What is built so far
 
 Item 389 built the versions, their components, the prompt's reading of the adopted one, the command line and the API.
-Item 390 built the roles and `dotx harness propose`. Item 391 built the probe, the step and its schedule. The
-provenance graph and the page follow, one item each; this page grows with them.
+Item 390 built the roles and `dotx harness propose`. Item 391 built the probe, the step and its schedule. Item 392
+built the provenance graph, the lineage and the library's reading. The page follows; this page grows with it.
