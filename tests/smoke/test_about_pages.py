@@ -1,8 +1,9 @@
-"""Settings › System's Diagnostics (item 370) and Open source licences (item 371), on a served daemon in Chrome, wide
-and light, on a phone and dark. Diagnostics lists the daemon's own process and those it started, the room what Dot
-keeps takes, and a log's last lines with its secrets masked and a filter; a name that is not a log is refused. The
-licences list the notices that come with the pages, the Python packages beside the daemon with a search, and the tools
-Dot uses. Nothing outside this Mac is reached: the logs are a folder of the test's own."""
+"""Settings › System's facts of the daemon in their groups (item 378), Diagnostics (item 370) and Open source licences
+(item 371), on a served daemon in Chrome, wide and light, on a phone and dark. Diagnostics lists the daemon's own
+process and those it started, the room what Dot keeps takes, and a log's last lines with its secrets masked and a
+filter; a name that is not a log is refused. The licences list the notices that come with the pages, the Python packages
+beside the daemon with a search, and the tools Dot uses. Nothing outside this Mac is reached: the logs are a folder of
+the test's own."""
 
 import asyncio
 import os
@@ -126,6 +127,15 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     )
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{address}/#/settings/system")
+                    # The daemon's facts in four groups, each a heading over its rows of a label and a value.
+                    groups = page.locator(".kv-group")
+                    await expect(groups.get_by_role("heading")).to_have_text(
+                        ["This Dot", "How it acts", "What it works with", "Models"]
+                    )
+                    await expect(groups.first.locator("dt")).to_have_text(
+                        ["Version", "Process id", "Uptime", "Started", "Address", "Home"]
+                    )
+                    await page.screenshot(path=tmp_path / f"system-{width}-{scheme}.png", full_page=True)
                     await page.get_by_role("link", name=re.compile(r"^Diagnostics")).click()
                     await expect(page).to_have_url(f"{address}/#/diagnostics")
                     await expect(page.locator("tr[data-pid]").first).to_contain_text("(Dot's daemon)")

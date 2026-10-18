@@ -709,6 +709,21 @@ a.pill:hover {
   margin-top: 0;
 }
 
+/* A card of settings in groups (Settings › Browser): each group's name in the small muted line the settings list names
+   its groups with (item 330), nearer the settings it names than the group before it; the setting under it draws no line
+   over itself, so the name is what parts the groups. */
+.setting-group-name {
+  margin: var(--space-3) 0 0;
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-text);
+  line-height: var(--leading-sm);
+}
+
+.setting-group-name:first-child {
+  margin-top: 0;
+}
+
 .section-head {
   margin: 24px 0 8px;
 }
@@ -2047,6 +2062,56 @@ a.pill:hover {
    never sees three and a stray one. */
 .kv-pairs {
   grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+}
+
+/* The daemon's facts (System): each group's name over a box of rows, as the settings list groups its tabs (item 330), a
+   label at the left of a row and its value at the right. Two groups abreast on a wide page, one under the other on a
+   phone. The MCP servers left out, a value too long for a row, take a box of their own under them, the label over it. */
+.kv-groups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+  gap: var(--space-4) var(--space-3);
+  padding: var(--space-4);
+}
+
+.kv-group {
+  min-width: 0;
+}
+
+.kv.kv-rows,
+.kv.kv-wide-rows {
+  grid-template-columns: minmax(0, 1fr);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.kv.kv-rows {
+  margin: 0;
+}
+
+.kv.kv-rows > div {
+  display: grid;
+  grid-template-columns: minmax(96px, 36%) minmax(0, 1fr);
+  gap: var(--space-3);
+  align-items: baseline;
+  padding: var(--space-2) var(--space-4);
+}
+
+.kv.kv-rows > div,
+.kv.kv-wide-rows > div {
+  box-shadow: none;
+}
+
+.kv.kv-rows > div + div {
+  border-top: 1px solid var(--border);
+}
+
+.kv.kv-rows dd {
+  margin: 0;
+}
+
+.kv.kv-wide-rows {
+  margin: 0 var(--space-4) var(--space-4);
 }
 
 .kv dt {

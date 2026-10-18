@@ -285,6 +285,10 @@ async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: P
             for width, scheme in _SHOTS:
                 page: Page = await _page(browser, address, width, scheme)
                 await page.goto(f"{address}/#/settings/browser")
+                # The rows stand in five groups, each named over its settings (item 378).
+                await expect(page.locator(".setting-group-name")).to_have_text(
+                    ["Where it browses", "The page it opens", "While a run works", "Developer", "How Chrome stands"]
+                )
                 allowed: Locator = page.get_by_role("switch", name="Runs may use the browser")
                 await expect(allowed).to_have_attribute("aria-checked", "true")
                 await _changed(page, "/api/browser/enabled", allowed.click)

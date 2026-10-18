@@ -14600,20 +14600,43 @@ the draft's files came back as descriptions, a photo as a file's icon. Tests: `t
 
 ### 377. The lines of a chat sit closer
 
-**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Sohbet içerisinde textler arası üstten ve alttan
-çok fazla boşluk var lütfen bunu genel uygulamalardan nasılsa default'u yani düzgün bir hale getir çok fazla alttan
-üstten boşluk olmamalı" (in the chat there is too much room above and below the texts; make it as the usual apps have
-it, without so much room). **As built (2026-10-18).** The run measured about 28 px between the lines of a turn in the
-main checkout of the time, whose flow was not yet item 374 as reviewed; on main the lines of the flow stood 8 px apart
-already. What was left: a turn's message, its flow and its answer stood 16 px apart, and now stand 8 px apart, as the
-lines of the run's own page do (`.timeline`); the paragraphs of the words an earlier turn said between its commands sit
-8 px apart instead of 0.65 em (about 10 px), while a list, a quote and a block of code keep the room their own rules
+**Status: done (`8cf9f06`).** The owner's word of 2026-10-18 to a Dot run: "Sohbet içerisinde textler arası üstten ve
+alttan çok fazla boşluk var lütfen bunu genel uygulamalardan nasılsa default'u yani düzgün bir hale getir çok fazla
+alttan üstten boşluk olmamalı" (in the chat there is too much room above and below the texts; make it as the usual apps
+have it, without so much room). **As built (2026-10-18).** The run measured about 28 px between the lines of a turn in
+the main checkout of the time, whose flow was not yet item 374 as reviewed; on main the lines of the flow stood 8 px
+apart already. What was left: a turn's message, its flow and its answer stood 16 px apart, and now stand 8 px apart, as
+the lines of the run's own page do (`.timeline`); the paragraphs of the words an earlier turn said between its commands
+sit 8 px apart instead of 0.65 em (about 10 px), while a list, a quote and a block of code keep the room their own rules
 give them, and an answer keeps its paragraphs' (`app.css`). The run's own page leaves its lines as they are: a reply it
 streamed gives way to the answer at the end, and a message is drawn live as it will stay (item 274). The run had the
 paragraphs at 4 px; the review kept 8 px, so a paragraph's break is still told from a line's. Measured on a scripted
 chat in Chrome, wide and dark and on a phone in light. Tests: `tests/unit/test_css_tokens.py`,
 `tests/smoke/test_thread_turns.py`, `test_chat_scroll.py`, `test_chat_calm.py`, `test_sunshine.py` and
 `test_answer_streams.py` pass unchanged.
+
+### 378. Settings › System and Browser read in groups
+
+**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "System ve browser sayfalarinida daha iyi bir
+tasarim yapabilme sansimiz var mi ? Eger var ise onlarida yap. Ayrica sag menüdeki review alanida daha düzgün olsa daha
+iyi olur." (can the System and Browser pages have a better design too? If so, make it. The review area of the right-hand
+menu would be better neater, too). **As built (2026-10-18).** Settings › System's Daemon card had its eighteen facts in
+one grid of cells, where a model's name and an uptime could share a line. It has them in four groups now, two abreast on
+a wide page and one under another on a phone: This Dot (the version, the process, the uptime, the start, the address and
+the home folder), How it acts (the safety preset, the approvals, goal mode), What it works with (the scheduler, desktop
+control, the MCP tools, the runs at work and those waiting) and Models; each is its name over a box of rows, a label at
+the left and its value at the right, as the settings list groups its tabs (item 330), and the MCP servers left out take
+a box of their own under them (`views/system.js` `statusGroups`, `app.css`). Settings › Browser's card names its five
+groups over their settings in the same small muted line: Where it browses, The page it opens, While a run works,
+Developer, How Chrome stands. A Dot run of the owner's made the design; the review kept its groups and rows, and made
+its names sentence case as the section labels are (item 79, `docs/daemon.md`) rather than small capitals drawn with a
+title's tightened tracking, took the margins a list of facts has by default out of its boxes, set the groups two abreast
+so the models' names keep one line, put the home folder in This Dot, left out a group named Profiles over the setting
+named Profiles, gave how Chrome stands a group of its own instead of Developer's, named the second group for what it
+holds (the run had How it asks), and left the side panel's section titles in sentence case: the run took the review area
+for them and drew them in small capitals, and which part of the side panel the owner meant is asked. Tests:
+`tests/smoke/test_about_pages.py` (the four groups and the rows of This Dot, wide and light and on a phone and dark),
+`test_browser_settings.py` (the five names). Docs: `docs/daemon.md`, `docs/browser-and-computer-use.md`.
 
 ## Log
 
@@ -15408,3 +15431,4 @@ chat in Chrome, wide and dark and on a phone in light. Tests: `tests/unit/test_c
 - 2026-10-18 (Opus 5.5): item 368 merged as `299ddc4` (PR #368); the pre-push review passed it on its fifth push. Item 375 on `item-375-flaky-tests`: the smoke tests that failed under the load of `-n auto`, as a Dot run of the owner's fixed them, reviewed.
 - 2026-10-18 (Opus 5.5): item 375 merged as `601a41c` (PR #369); the pre-push review passed it with two Nits, fixed in the next push. Item 376 on `item-376-queue-files`: a queued message's files come into the box that edits it, as a Dot run of the owner's built it, reviewed.
 - 2026-10-18 (Opus 5.5): item 376 merged as `f05ddc2` (PR #370); the pre-push review blocked its first push on an Important finding (Save left out a file still uploading) and passed the next two with Nits, the last one answered. Item 377 on `item-377-chat-spacing`: the lines of a chat sit closer, on the owner's word to a Dot run.
+- 2026-10-18 (Opus 5.5): item 377 merged as `8cf9f06` (PR #371); the pre-push review blocked its first push on an Important finding (the rule's weight beat the room of lists and code) and passed the next with a Nit, fixed. Item 378 on `item-378-system-design`: Settings › System and Browser read in groups, as a Dot run of the owner's designed them, reviewed.
