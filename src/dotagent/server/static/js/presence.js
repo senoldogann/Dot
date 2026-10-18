@@ -89,8 +89,8 @@ function stripRows(activity, key) {
 }
 
 /** The sections of the Today strip that have rows: `{ key, title, count, rows, rest }`. `rows` are the section's first
- * two and `rest` the others its "Show N more" opens, each a run without the runs it delegated; `count` is how many the
- * two hold together, so the title counts what the section shows. */
+ * two and `rest` the others its "Show N more" opens, each a run without the runs it delegated; `count` is how many `rows`
+ * and `rest` hold together, so the title counts what the section shows. */
 export function todaySections(activity) {
   return SECTIONS.map(({ key, title }) => ({ key, title, all: stripRows(activity, key) }))
     .filter(({ all }) => all.length > 0)

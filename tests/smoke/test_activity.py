@@ -309,6 +309,8 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                 # under its parent) a press away.
                 await page.goto(f"http://{host}:{port}/#/runs")
                 ended = page.locator(".home-today [data-section=recent]")
+                # Its title counts what it shows: the three runs, not the delegated one it leaves out.
+                await expect(ended.locator(".home-today-count")).to_have_text("3")
                 rows = ended.locator(".activity-row:not(.home-today-more)")
                 await expect(rows).to_have_count(2)
                 await ended.locator(".home-today-more").click()
