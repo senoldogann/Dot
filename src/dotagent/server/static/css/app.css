@@ -6248,10 +6248,13 @@ dialog.lightbox img {
   }
 }
 
-/* Files attached to a message: chips with their upload state under the message box, and under a sent message. */
+/* Files attached to a message: chips with their upload state under the message box, and under a sent message. They
+   stand in one row that wraps as the box runs out of width, a photo's tile at its bottom. */
 .attach-list {
   display: flex;
+  flex-direction: row;
   flex-wrap: wrap;
+  align-items: flex-end;
   gap: 8px;
 }
 
@@ -6311,6 +6314,18 @@ button.attach-chip:hover {
   text-decoration: underline;
 }
 
+/* A file's name takes the chip's one line and is clipped when the box is narrow; its size stays beside it. */
+.attach-open > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attach-open > span.muted {
+  flex: none;
+}
+
 /* A queued message's file in the box that edits it (item 376): small, the picture itself or a file's icon, and the ×
    at its corner; no words (the name is its tooltip). */
 .attach-chip.small {
@@ -6334,7 +6349,8 @@ button.attach-chip:hover {
   object-fit: cover;
 }
 
-.attach-chip.small .attach-remove {
+.attach-chip.small .attach-remove,
+.attach-chip.picture .attach-remove {
   position: absolute;
   top: calc(-1 * var(--space-2));
   right: calc(-1 * var(--space-2));
@@ -6349,7 +6365,8 @@ button.attach-chip:hover {
 
 /* On a touch screen the × keeps the small circle it shows in a clear ring that makes it a finger's size (item 329). */
 @media (pointer: coarse) {
-  .attach-chip.small .attach-remove {
+  .attach-chip.small .attach-remove,
+  .attach-chip.picture .attach-remove {
     top: calc(-1 * var(--space-4));
     right: calc(-1 * var(--space-4));
     width: 40px;
@@ -6358,6 +6375,36 @@ button.attach-chip:hover {
     border: 9px solid transparent;
     background-clip: padding-box;
   }
+}
+
+/* A photo in the box shows itself at a thumbnail's size, the × at its corner; its name is its tooltip and the words of
+   its buttons, so no name or size stands beside it and several photos read as one row of pictures. */
+.attach-chip.picture {
+  position: relative;
+  padding: 0;
+  border-radius: var(--radius-sm);
+}
+
+.attach-chip.picture .attach-open {
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border-radius: calc(var(--radius-sm) - 1px);
+}
+
+.attach-chip.picture .attach-thumb {
+  width: 56px;
+  height: 56px;
+  border-radius: calc(var(--radius-sm) - 1px);
+  object-fit: cover;
+}
+
+/* A photo that is uploading or failed says so in its shape, the dashed or red tile, and its tooltip; a failure's alert
+   stands where the picture was. */
+.attach-chip.picture .attach-open .icon {
+  width: 20px;
+  height: 20px;
 }
 
 .attach-chip.uploading {

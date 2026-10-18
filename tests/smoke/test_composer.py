@@ -1,17 +1,20 @@
 """The composer (items 64, 104 and 115): typing ``/`` on the new chat page opens the menu of commands and skills,
 letters filter it, the arrows move, Enter picks without sending (a skill as a chip, item 318), Escape closes;
 Shift+Enter breaks a line. The bar's pills open the Model and the Options menus, and the "+" goal mode; a draft
-survives a navigation; the bar keeps one line from the desk to the phone. Wide and on a phone."""
+survives a navigation; a photo in the box shows the picture itself, its name its tooltip, in one row beside the other
+files; the bar keeps one line from the desk to the phone. Wide and on a phone."""
 
 import asyncio
+import re
 import time
+from base64 import b64decode
 from collections.abc import AsyncIterator, Callable
 from pathlib import Path
 
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, ConsoleMessage, Page, Route, async_playwright, expect
+from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -66,6 +69,16 @@ description: "Scan a product catalogue page by page and report the items."
 Read every page.
 """
 GOAL: str = "textarea[aria-label='Goal']"
+
+# Two 4x4 PNGs, enough for the browser to read a photo and lay it out at a thumbnail's size.
+_SUNSET_PNG: str = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIElEQVR4nGP8MSnoxYsXEhISL168YIKzJCQkmOAsdBkAwLAZnDmVq0MA"
+    "AAAASUVORK5CYII="
+)
+_HARBOUR_PNG: str = (
+    "iVBORw0KGgoAAAANSUhEUgAAAAQAAAAECAIAAAAmkwkpAAAAIElEQVR4nGMMmvTjxYsXEhISL168YIKzJCQkmOAsdBkAv2QZnKBSoFwA"
+    "AAAASUVORK5CYII="
+)
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -427,5 +440,100 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 await expect(options_pill).to_have_css("background-color", "rgba(0, 0, 0, 0)")
                 await page.locator(".composer-stack").screenshot(path=str(tmp_path / f"bar-{width}.png"))
                 await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_with(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """A photo attached to a message shows the picture itself, a thumbnail tall, with its name as its tooltip and as the
+    words of its buttons, where another file keeps its icon, its name and its size. The chips stand in one row at the
+    desk, and on to a second line only when the phone's box has no width left."""
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.locator(".composer input[type=file]").set_input_files(
+                [
+                    {"name": "sunset.png", "mimeType": "image/png", "buffer": b64decode(_SUNSET_PNG)},
+                    {"name": "harbour.png", "mimeType": "image/png", "buffer": b64decode(_HARBOUR_PNG)},
+                    {
+                        "name": "a-rather-long-note-of-the-evening.txt",
+                        "mimeType": "text/plain",
+                        "buffer": b"one line\n",
+                    },
+                ]
+            )
+            chips: Locator = page.locator(".composer .attach-chip")
+            await expect(chips).to_have_count(3)
+            await expect(page.locator(".composer .attach-chip.uploading")).to_have_count(0)
+            # A photo shows itself at 56 x 56, rounded, with no name or size beside it.
+            photos: Locator = page.locator(".composer .attach-chip.picture")
+            await expect(photos).to_have_count(2)
+            first: Locator = photos.first
+            await expect(first).to_have_attribute("title", "sunset.png")
+            assert (await first.text_content() or "").strip() == ""
+            drawn: dict[str, object] = await first.locator("img.attach-thumb").evaluate(
+                "(image) => { const r = image.getBoundingClientRect();"
+                " const style = getComputedStyle(image);"
+                " return { width: Math.round(r.width), height: Math.round(r.height), radius: style.borderRadius,"
+                " loaded: image.complete && image.naturalWidth > 0 }; }"
+            )
+            assert (drawn["width"], drawn["height"]) == (56, 56), drawn
+            assert drawn["radius"] not in ("", "0px"), drawn
+            assert drawn["loaded"] is True, drawn
+            # Its name is the tooltip and the words of its buttons.
+            await expect(first.get_by_role("button", name="Show sunset.png")).to_be_visible()
+            await expect(first.get_by_role("button", name="Remove sunset.png")).to_be_visible()
+            # Another file keeps its chip: an icon, its name and its size.
+            note: Locator = page.locator(".composer .attach-chip.ready").filter(has_text="a-rather-long-note")
+            await expect(note).to_have_count(1)
+            await expect(note.locator("img.attach-thumb")).to_have_count(0)
+            await expect(note).to_contain_text("9 B")
+            # One row at the desk.
+            bottoms: list[int] = await chips.evaluate_all(
+                "(chips) => chips.map((chip) => Math.round(chip.getBoundingClientRect().bottom))"
+            )
+            assert len(set(bottoms)) == 1, bottoms
+            await page.locator(".composer .attach-list").screenshot(path=str(tmp_path / "photo-chips-1280.png"))
+            # On a phone the photos stay side by side, inside the box, and another file's chip keeps its one line under
+            # them rather than growing tall with its name.
+            await page.set_viewport_size({"width": 390, "height": 844})
+            await page.wait_for_function(
+                "() => window.innerWidth === 390"
+                " && document.querySelector('.composer').getBoundingClientRect().width > 300"
+            )
+            photo_bottoms: list[int] = await photos.evaluate_all(
+                "(photos) => photos.map((photo) => Math.round(photo.getBoundingClientRect().bottom))"
+            )
+            assert len(set(photo_bottoms)) == 1, photo_bottoms
+            right: float = await page.locator(".composer").evaluate("(box) => box.getBoundingClientRect().right")
+            edges: list[float] = await chips.evaluate_all(
+                "(chips) => chips.map((chip) => chip.getBoundingClientRect().right)"
+            )
+            assert all(edge <= right for edge in edges), (right, edges)
+            # The name keeps one line, clipped by the chip rather than folded into a second.
+            assert (
+                await note.locator(".attach-open > span").first.evaluate(
+                    "(name) => name.getBoundingClientRect().height"
+                )
+                < 24
+            )
+            await page.locator(".composer .attach-list").screenshot(path=str(tmp_path / "photo-chips-390.png"))
+            await page.screenshot(path=str(tmp_path / "photo-chips-390-page.png"))
+            # A draft's photos come back as their pictures, not their names, when the page is loaded again.
+            await page.set_viewport_size({"width": 1280, "height": 900})
+            await page.reload()
+            await page.wait_for_function("() => window.innerWidth === 1280")
+            await expect(photos).to_have_count(2)
+            await expect(photos.first).to_have_attribute("title", "sunset.png")
+            assert (await photos.first.text_content() or "").strip() == ""
+            await expect(photos.first.locator("img.attach-thumb")).to_have_attribute("src", re.compile(r"^blob:"))
         finally:
             await browser.close()

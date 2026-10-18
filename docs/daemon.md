@@ -103,7 +103,9 @@ exists (its menu lists the agents with their roles), **Model** (the mark of its 
 default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
 per model) and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill
 always shows, see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
-fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no ground until the
+fill) and the round send, quiet while the box is empty. The files under the box stand in one row that wraps only when
+the frame runs out of width: a photo shows itself at a thumbnail's size, its name its tooltip and its × at its corner,
+where another file keeps its icon, its name and its size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
 the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
@@ -195,7 +197,9 @@ how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent s
 says what they did, "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it
 while it runs, "Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and
 screenshot, each call one quiet line with its icon, its result on a hairline under it once opened, while approvals,
-questions and policy notes stay in the open. The lines of how a run was set up (the
+questions and policy notes stay in the open. A click on that line opens or folds it while the run still works and
+after it ends, and the reader's choice stands for the life of the page; folded, it keeps the call under way in sight. The
+lines of how a run was set up (the
 notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
 model) are not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming
 them in short and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a
