@@ -260,8 +260,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 The shell and the file tools work in `<home>/workspace` unless a path says otherwise. Dot is told to change the text
 of a file with `edit_file` and to write a file whole with `write_file`, and to keep the shell for running things
 (tests, builds, git, formatters), one mechanical change across many files and a file that is not UTF-8 (item 382): what
-the file tools change goes into the undo journal, shows in Changes and can be undone, and what a command writes does
-not. Nothing stops a command from writing a file. Any error of a tool fails that
+the file tools change goes into the undo journal, shows in Changes and can be undone (within the journal's limits on
+a file's size and a run's copies, under [Autonomy](autonomy.md)), and what a command writes does not. Nothing stops a
+command from writing a file. Any error of a tool fails that
 call, not the run: the model reads what went wrong (for an error no tool expects, its kind and its words, while the log
 keeps its traceback) and goes on. `edit_file` changes the text it is given and nothing else: a file that breaks its
 lines with CRLF keeps them, in the new text too, and a file that is not UTF-8 text is refused, saying so, for the shell
