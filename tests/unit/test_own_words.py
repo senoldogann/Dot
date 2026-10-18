@@ -7,8 +7,9 @@ import subprocess
 from pathlib import Path
 
 _ROOT: Path = Path(__file__).resolve().parents[2]
-# The names, also split over a line break or joined with a dash or an underscore.
-_NAMES: re.Pattern[str] = re.compile(r"t3[\s_-]*(?:code|chat|tools)\b|pingdotgg", re.IGNORECASE)
+# The names, also split over a line break or joined with a dash or an underscore. They are ASCII, so a file is read as
+# bytes, whatever its encoding.
+_NAMES: re.Pattern[bytes] = re.compile(rb"t3[\s_-]*(?:code|chat|tools)\b|pingdotgg", re.IGNORECASE)
 
 
 # This file names what it looks for.
@@ -26,9 +27,6 @@ def test_no_file_of_the_repository_names_another_product() -> None:
     ).stdout
     found: list[str] = []
     for path in filter(_checked, filter(None, listed.split("\0"))):
-        try:
-            text: str = (_ROOT / path).read_text(encoding="utf-8")
-        except UnicodeDecodeError:
-            continue  # an image or a font: no words to read
-        found.extend(f"{path}:{text.count(chr(10), 0, match.start()) + 1}" for match in _NAMES.finditer(text))
+        content: bytes = (_ROOT / path).read_bytes()
+        found.extend(f"{path}:{content.count(b'\n', 0, match.start()) + 1}" for match in _NAMES.finditer(content))
     assert found == [], found

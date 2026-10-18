@@ -338,8 +338,8 @@ theme for both schemes, an orb for its own scheme only (a sun or a moon marks th
 and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper** (warm
 paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it is picked for; Dot's
 six palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and a raspberry accent),
-**Grove**, **Ocean**, **Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (its action colour, which
-paints its solid controls, is Dot's accent) and held to the rule of the looks below: a text tier or an ink
+**Grove**, **Ocean**, **Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (the colour a palette paints
+its solid controls with is Dot's accent) and held to the rule of the looks below: a text tier or an ink
 that would read under its ratio is moved in lightness until it reads, and in dark a card lies a step above the page; a
 browser test measures every theme in both schemes as the page paints it. The two picks are written on the page as
 `light-dark()` pairs (nothing when one look is picked for both) and kept with the picks, so the first paint after a
