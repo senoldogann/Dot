@@ -4790,7 +4790,9 @@ a.memory-line:hover .memory-change {
 .turn {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  /* The message, the flow of what the run did and its answer sit as close as the lines of the run's own page do
+     (`.timeline`; item 377). */
+  gap: var(--space-2);
 }
 
 /* What an earlier turn did (item 374): its tool calls, open under its message as the run's own page shows them. */
@@ -4804,6 +4806,13 @@ a.memory-line:hover .memory-change {
    answer's text column, the face's width and its gap given over on the left. */
 .turn-say {
   padding-left: calc(28px + var(--space-2));
+}
+
+/* The words a run says between its commands are short: their paragraphs sit closer than an answer's, in an earlier
+   turn's flow and on the run's own page alike (item 377). `:where` keeps the weight of `.prose > * + *`, which this
+   follows, so a list, a quote, a block of code and a rule keep the room their own rules give them. */
+:where(.turn-say, .bubble.say) .prose > * + * {
+  margin-top: var(--space-2);
 }
 
 .turn-say .prose > :first-child {

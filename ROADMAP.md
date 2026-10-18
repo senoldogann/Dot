@@ -14575,7 +14575,7 @@ the tests. The others it looked at (`test_opening`, `test_setup_card`, `test_ter
 
 ### 376. A queued message's files come into the box that edits it, and leave with the edit
 
-**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Bir diğer bug, kuyruktaki bir mesajı tekrar
+**Status: done (`f05ddc2`).** The owner's word of 2026-10-18 to a Dot run: "Bir diğer bug, kuyruktaki bir mesajı tekrar
 düzenledim, birkaç fotoğraf ekledim, tamam dedikten sonra fotoğraflar hâlâ composer'da kalmış; ayrıca bir kuyruk
 mesajında fotoğraf var ise düzenleme yaparken composer'a o fotoğraflar da gelmeli düzenleme modunda ve küçük görünmeli,
 bir çarpı işareti olmalı, text yazmasına gerek yok fotoğrafta" (I edited a queued message again and added photos; after
@@ -14585,13 +14585,34 @@ and the box's files were left out of it. Now the queue's view names each message
 `routes_queue.py`); the pencil puts them in the box with the text, small, a photo as its own picture (`GET
 /api/attachments/{id}/image`, `attachments.js` `restoreSmall`), a file as its icon, each with its × and its name as the
 tooltip; Save sends the files the box holds (`PATCH /api/queue/{id}` with `attachments`, checked as a new message's are;
-left out, they stay), and Save or Cancel takes the edit's files out of the box and gives the draft its own back
-(`queue.js`). A file gone from the workspace is left out of the view with a warning in the log, so the queue still
+left out, they stay) once they are all uploaded, as a send waits for them, and Save or Cancel takes the edit's files out
+of the box and gives the draft its own back as they stood: they wait aside while the edit lasts, a photo with its
+picture and an upload still going on among them (`queue.js`, `attachments.js` `setAside` and `putBack`). While an edit
+lasts the composer keeps no draft, so a reload does not bring the queued message back as one (`composer.js`
+`pauseDraft`). A file gone from the workspace is left out of the view with a warning in the log, so the queue still
 answers. A Dot run of the owner's built it; the review split the edit into an edit of the text and an edit with files
 (`edit_queued`, `edit_queued_with_files`) instead of a parameter that switches between them, checked the files an edit
 names, kept the queue readable past a lost file, showed the photo itself instead of an icon, gave the × a finger's ring
-on a touch screen, and split the test into an API test and a marked browser test. Tests: `tests/smoke/test_queue.py`.
-Docs: `docs/daemon.md`.
+on a touch screen, and split the test into an API test and a marked browser test; the pre-push review found that Save
+left out a file still uploading without a word, that the composer kept the queued message as the chat's draft, and that
+the draft's files came back as descriptions, a photo as a file's icon. Tests: `tests/smoke/test_queue.py`. Docs:
+`docs/daemon.md`.
+
+### 377. The lines of a chat sit closer
+
+**Status: in progress.** The owner's word of 2026-10-18 to a Dot run: "Sohbet içerisinde textler arası üstten ve alttan
+çok fazla boşluk var lütfen bunu genel uygulamalardan nasılsa default'u yani düzgün bir hale getir çok fazla alttan
+üstten boşluk olmamalı" (in the chat there is too much room above and below the texts; make it as the usual apps have
+it, without so much room). **As built (2026-10-18).** The run measured about 28 px between the lines of a turn in the
+main checkout of the time, whose flow was not yet item 374 as reviewed; on main the lines of the flow stood 8 px apart
+already. What was left: a turn's message, its flow and its answer stood 16 px apart, and now stand 8 px apart, as the
+lines of the run's own page do (`.timeline`); the paragraphs of the words a run says between its commands sit 8 px apart
+instead of 0.65 em (about 10 px), in an earlier turn's flow and on the run's own page alike, while an answer keeps its
+paragraphs' room (`app.css`). The run gave the second change to the earlier turns alone, at 4 px; the review gave it to
+the run's own page too, so a turn reads the same once it is an earlier one, and kept 8 px, so a paragraph's break is
+still told from a line's. Measured on a scripted chat in Chrome, wide and dark and on a phone in light. Tests:
+`tests/unit/test_css_tokens.py`, `tests/smoke/test_thread_turns.py`, `test_chat_scroll.py`, `test_chat_calm.py`,
+`test_sunshine.py` and `test_answer_streams.py` pass unchanged.
 
 ## Log
 
@@ -15385,3 +15406,4 @@ Docs: `docs/daemon.md`.
 - 2026-10-18 (Opus 5.5): item 367 merged as `a0b7954` (PR #367). Item 368 on `item-368-changes`: Changes in the side panel, the files a chat's runs wrote, with their diffs.
 - 2026-10-18 (Opus 5.5): item 368 merged as `299ddc4` (PR #368); the pre-push review passed it on its fifth push. Item 375 on `item-375-flaky-tests`: the smoke tests that failed under the load of `-n auto`, as a Dot run of the owner's fixed them, reviewed.
 - 2026-10-18 (Opus 5.5): item 375 merged as `601a41c` (PR #369); the pre-push review passed it with two Nits, fixed in the next push. Item 376 on `item-376-queue-files`: a queued message's files come into the box that edits it, as a Dot run of the owner's built it, reviewed.
+- 2026-10-18 (Opus 5.5): item 376 merged as `f05ddc2` (PR #370); the pre-push review blocked its first push on an Important finding (Save left out a file still uploading) and passed the next two with Nits, the last one answered. Item 377 on `item-377-chat-spacing`: the lines of a chat sit closer, on the owner's word to a Dot run.
