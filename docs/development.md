@@ -29,14 +29,16 @@ of the same name), and a mark that is not in the table fails, so a mistyped one 
 The smoke tests of the eval runner (`tests/smoke/test_evals_runner.py`) need no service at all: a scripted model
 plays the real loop, tools, policy and store.
 
-The gate runs on every pull request and every push to `main` (`.github/workflows/gate.yml`, on macOS because the package
-depends on PyObjC): the format check, the lint, mypy, the unit tests, `dotx eval check` and every smoke test that needs
-no service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not hosted"`), and
-for the desktop shell `cargo fmt --check`, clippy and `cargo test`. Each action the workflow uses is pinned by the
-commit its tag named, so a tag moved later cannot change what runs. The tests marked above stay on your Mac. Once a
-week, and when asked, `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories
-(pip-audit for `uv.lock`, cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability
-(item 217).
+The gate runs on every pull request and every push to `main` that changes more than prose (`.github/workflows/gate.yml`,
+on macOS because the package depends on PyObjC; a change to the Markdown at the root, `docs/` or the issue and pull
+request templates alone skips it): the format check, the lint, mypy, the unit tests, `dotx eval check` and every smoke
+test that needs no service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not
+hosted"`). The tests run spread over the cores with `-n auto` (pytest-xdist). When something under `desktop/` changes,
+`.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop shell. Each action the
+workflow uses is pinned by the commit its tag named, so a tag moved later cannot change what runs. The tests marked
+above stay on your Mac. Once a week, and when asked, `.github/workflows/audit.yml` checks the dependencies as locked
+against the public advisories (pip-audit for `uv.lock`, cargo audit for the desktop shell's `Cargo.lock`) and fails on a
+known vulnerability (item 217).
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](../ROADMAP.md); read it before continuing that work.

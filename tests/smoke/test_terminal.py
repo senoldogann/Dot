@@ -209,20 +209,22 @@ class _Watcher:
 async def test_a_command_in_the_background_runs_unread_and_its_end_alone_is_told(runtime: Runtime) -> None:
     """Item 229: the idle are closed, but not a command in the background while it runs; its end is told with its exit
     status, and it is kept the idle time more for what it printed to be read. A session closed by hand tells nothing."""
-    terminals: Terminals = Terminals(3, 1.0, runtime.shell_env)
+    # The idle time leaves a second of slack around each check, so a busy Mac (the tests run spread over its cores)
+    # does not let the reaper overtake one.
+    terminals: Terminals = Terminals(3, 2.0, runtime.shell_env)
     watcher: _Watcher = _Watcher()
     terminals.watch(watcher)
     try:
         idle: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), False)
-        left: TerminalSession = await terminals.open("chat", "sleep 3; echo done", (), workspace_dir(), True)
+        left: TerminalSession = await terminals.open("chat", "sleep 5; echo done", (), workspace_dir(), True)
         stopped: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), True)
         await terminals.close("chat", stopped.id)
         # The reaper looks every half of the idle time.
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(4.0)
         assert [session.id for session in terminals.sessions("chat")] == [left.id], idle.id
         assert await asyncio.wait_for(watcher.ended.get(), 10.0) == ("chat", left.id, 0)
         assert [session.id for session in terminals.sessions("chat")] == [left.id]
-        await asyncio.sleep(2.5)
+        await asyncio.sleep(4.0)
         assert terminals.sessions("chat") == []
         # Opened three times, closed by hand, closed idle twice, and one end: each was heard.
         assert watcher.changed.count("chat") >= 6, watcher.changed

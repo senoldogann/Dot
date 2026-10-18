@@ -21,15 +21,17 @@ uv sync
 
 ## The checks every change passes
 
-The gate (`.github/workflows/gate.yml`) runs these on every pull request. Run them before you push:
+The gate (`.github/workflows/gate.yml`) runs these on every pull request that changes more than prose. Run them once
+before you push; while you work, the tests of what you changed are enough. `-n auto` (pytest-xdist) spreads the tests
+over your Mac's cores:
 
 ```bash
 uv run ruff format --check src tests
 uv run ruff check src tests
 uv run mypy src
-uv run pytest tests/unit -q
+uv run pytest tests/unit -q -n auto
 uv run dotx eval check
-uv run pytest tests/smoke -q -m "not live and not browser and not internet and not desktop and not hosted"
+uv run pytest tests/smoke -q -n auto -m "not live and not browser and not internet and not desktop and not hosted"
 ```
 
 The gate leaves out the tests that need a browser or a service. Run those of them that touch your change on your Mac:
