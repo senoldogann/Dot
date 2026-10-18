@@ -67,6 +67,13 @@ def test_the_daemons_tree_has_each_process_after_its_parent_the_eldest_first() -
         process_tree(parse_ps(_PS), 999)
 
 
+# A private key in PEM, over several lines (not a real one).
+_PEM: bytes = (
+    b"-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\nBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj\n"
+    b"-----END PRIVATE KEY-----\n"
+)
+
+
 def test_the_end_of_a_log_masks_its_secrets_and_leaves_out_a_line_the_read_cut() -> None:
     data: bytes = (
         b"ing a line cut\nfirst\nAuthorization: Bearer sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789\nlast\n"
@@ -79,6 +86,16 @@ def test_the_end_of_a_log_masks_its_secrets_and_leaves_out_a_line_the_read_cut()
     # A secret Dot holds is masked word for word, whatever its form: the raw output of an MCP server may print it.
     plain: bytes = b"connecting with token=nothing-like-a-key-but-Dots-own-42\n"
     assert tail_lines(plain, False, 1, ("nothing-like-a-key-but-Dots-own-42",)) == ("connecting with token=***",)
+    # A private key printed over many lines is masked whole, whatever lines of it the end shows.
+    shown: str = "\n".join(tail_lines(b"started\n" + _PEM + b"done\n", False, 3, ()))
+    assert "MIIEvQIBADAN" not in shown and "BKcwggSjAgEA" not in shown and shown.endswith("done")
+    # A read that began inside the key holds its end without its start: what comes before the end is the key's.
+    inside: bytes = _PEM[_PEM.index(b"MIIEvQ") + 4 :]
+    shown = "\n".join(tail_lines(b"cut line\n" + inside + b"done\n", True, 10, ()))
+    assert "BKcwggSjAgEA" not in shown and "END PRIVATE KEY" not in shown and shown.endswith("done"), shown
+    # Read from its start, a log that names the end of a key alone masks nothing before it.
+    named: bytes = b"first\nthe marker -----END PRIVATE KEY----- was missing\n"
+    assert tail_lines(named, False, 10, ())[0] == "first"
 
 
 def test_a_log_is_read_by_its_name_and_any_other_name_is_refused(

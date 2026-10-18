@@ -179,9 +179,9 @@ async def test_the_agents_tab_lists_the_chats_helpers_newest_first_wide_and_on_a
                 page: Page = await _open(browser, address, latest.id, width, scheme)
                 panel: Locator = page.locator(".inspector")
                 tabs: Locator = panel.locator(".inspector-tab")
-                await expect(tabs).to_have_text(["Run", "Plan", "Agents 7", "Screen"])
+                await expect(tabs).to_have_text(["Run", "Changes", "Plan", "Agents 7", "Screen"])
                 # Every tab wears its icon.
-                await expect(panel.locator(".inspector-tab > svg.icon")).to_have_count(4)
+                await expect(panel.locator(".inspector-tab > svg.icon")).to_have_count(5)
                 agents_tab: Locator = panel.get_by_role("tab", name="Agents")
                 await agents_tab.click()
                 await expect(agents_tab).to_have_attribute("aria-selected", "true")

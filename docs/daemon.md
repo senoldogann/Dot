@@ -279,38 +279,41 @@ with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
-at the head of the conversation. The panel is one card on the composer's corner, in four tabs
-(item 203): **Run** (Details, how the run was Set up, Cost and the conversation's Files), **Plan** (its steps; the tab
-says how many are done), **Agents** (the agents of the chat) and **Screen** (Dot's computer and the screenshots, which
-the tab counts). A tab shows its sections open, on hairlines; the arrow keys, Home and End move between the tabs, and
-the tab chosen last is kept in the browser (`dot.panelTab`). Beside the conversation the panel slides in as it is shown
-and out before it hides, the conversation taking its room back once the slide is over, at once under reduced motion
-(item 220). It stands at the window's right edge, as far from it as from the top bar, and the conversation keeps
-its reading width in the room the panel leaves it (item 238). It has a size: three buttons on Dot's computer make it
-**Compact** (its own 320 px), **Wide** (half of the page) or **Full** (the conversation at its narrowest, 360 px, the
-rest for the panel), and the handle between the conversation and the panel drags it to any width between (the arrow keys
-move it a step, a double click gives it back its own width); the size is kept in the browser (`dot.computer.size`).
-While the panel is wider than its own width, the computer's view grows with the panel in its warm frame. The drawer of a
-narrow page has one width. **Dot's computer**, on the panel's Screen tab, shows the page of the run's browser as Chrome
-paints it (`GET /api/runs/{id}/screencast`, Chrome's own screencast, sent only while the view is open and the page in
-sight; a tab that does not change sends nothing). A view whose stream breaks or goes silent is made again by itself
-after a short pause, and one put out of sight (a phone that put the app away) starts again once it is back (item 276).
-The view starts by itself at the run's first browser step, and a run at work that first uses its browser opens the panel
-on the Screen tab beside the chat, unless Settings › Browser turned that off (item 354); until a frame comes it keeps
-the shape of a screen and says why, with a mark and a title (no page yet, waiting for the page, the view closed, the run
-ended, or a run in a `dotx` command, item 220). **Watch** and **Close the view** open and close it by hand; once the run
-has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the
-agent's name). Since that view shows the page, Dot's own Chrome stays in the background while a run works (`[browser]
-raise_window`, off by default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in gets the
-focus back right after Chrome starts and after a page opens a tab of its own, and switching tabs does not raise the
-window; Settings › Browser has the switch "Bring Chrome to the front while working" for the other way round. **Take
-over** holds the run at its next tool call, brings its tab to the front either way, in the Chrome the run works in (a
-campaign's session, in the campaign's), and the pill reads "You have control" (when the tab cannot be brought up, the
-run is not held): the Chrome window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control**
-lets the run go on, and the result of the tool call that waited tells the model how long you had the browser and that
-the page may have changed, so it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and
-`dotx run` prints them. A takeover is refused while `[browser] headless = true` (there is no window to use), and the run
-page keeps the last frame once the run has ended.
+at the head of the conversation. The panel is one card on the composer's corner, in five tabs
+(item 203): **Run** (Details, how the run was Set up, Cost and the conversation's Files), **Changes** (the files the
+chat's runs wrote or created with `write_file` and `edit_file`, up to this run, which the tab counts: each with what
+became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;
+`GET /api/runs/{id}/changes`, item 368), **Plan** (its steps; the tab says how many are done), **Agents** (the agents
+of the chat) and **Screen** (Dot's computer and the screenshots, which the tab counts). A tab shows its sections open,
+on hairlines; the arrow keys, Home and End move between the tabs, and the tab chosen last is kept in the browser
+(`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out before it hides, the conversation
+taking its room back once the slide is over, at once under reduced motion (item 220). It stands at the window's right
+edge, as far from it as from the top bar, and the conversation keeps its reading width in the room the panel leaves it
+(item 238). It has a size: three buttons on Dot's computer make it **Compact** (its own 320 px), **Wide** (half of the
+page) or **Full** (the conversation at its narrowest, 360 px, the rest for the panel), and the handle between the
+conversation and the panel drags it to any width between (the arrow keys move it a step, a double click gives it back
+its own width); the size is kept in the browser (`dot.computer.size`). While the panel is wider than its own width, the
+computer's view grows with the panel in its warm frame. The drawer of a narrow page has one width. **Dot's computer**,
+on the panel's Screen tab, shows the page of the run's browser as Chrome paints it (`GET /api/runs/{id}/screencast`,
+Chrome's own screencast, sent only while the view is open and the page in sight; a tab that does not change sends
+nothing). A view whose stream breaks or goes silent is made again by itself after a short pause, and one put out of
+sight (a phone that put the app away) starts again once it is back (item 276). The view starts by itself at the run's
+first browser step, and a run at work that first uses its browser opens the panel on the Screen tab beside the chat,
+unless Settings › Browser turned that off (item 354); until a frame comes it keeps the shape of a screen and says why,
+with a mark and a title (no page yet, waiting for the page, the view closed, the run ended, or a run in a `dotx`
+command, item 220). **Watch** and **Close the view** open and close it by hand; once the run has ended it keeps the last
+screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the agent's name). Since that
+view shows the page, Dot's own Chrome stays in the background while a run works (`[browser] raise_window`, off by
+default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in gets the focus back right after
+Chrome starts and after a page opens a tab of its own, and switching tabs does not raise the window; Settings › Browser
+has the switch "Bring Chrome to the front while working" for the other way round. **Take over** holds the run at its
+next tool call, brings its tab to the front either way, in the Chrome the run works in (a campaign's session, in the
+campaign's), and the pill reads "You have control" (when the tab cannot be brought up, the run is not held): the Chrome
+window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
+result of the tool call that waited tells the model how long you had the browser and that the page may have changed, so
+it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
+takeover is refused while `[browser] headless = true` (there is no window to use), and the run page keeps the last frame
+once the run has ended.
 
 What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the run's page no longer shows (item 364):
 every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are

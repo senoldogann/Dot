@@ -68,6 +68,13 @@ const SHAPES = {
     ["line", { x1: 8, x2: 16, y1: 21, y2: 21 }],
     ["line", { x1: 12, x2: 12, y1: 17, y2: 21 }],
   ],
+  // For the Changes of a chat (item 368): Lucide's file-diff, a file with a plus over a minus.
+  fileDiff: [
+    ["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }],
+    ["path", { d: "M9 10h6" }],
+    ["path", { d: "M12 13V7" }],
+    ["path", { d: "M9 17h6" }],
+  ],
   file: [
     ["path", { d: "M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z" }],
     ["path", { d: "M14 2v4a2 2 0 0 0 2 2h4" }],

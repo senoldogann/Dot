@@ -1567,6 +1567,16 @@ class Store:
             )
         return [_run(row) for row in rows]
 
+    async def chat_turns_until(self, thread_id: str, until: float, limit: int) -> list[RunRecord]:
+        """The latest ``limit`` turns of the chat ``thread_id`` (its runs that no other run delegated) that started by
+        ``until``, newest first; the runs a rewind took out of the chat (item 282) are left out."""
+        rows = await self._all(
+            "SELECT * FROM runs WHERE thread_id = ? AND parent_run_id IS NULL AND rewound_at IS NULL"
+            " AND created_at <= ? ORDER BY created_at DESC LIMIT ?",
+            (thread_id, until, limit),
+        )
+        return [_run(row) for row in rows]
+
     async def list_child_runs(self, parent_run_id: str) -> list[RunRecord]:
         """The runs started on behalf of ``parent_run_id``, oldest first."""
         rows = await self._all("SELECT * FROM runs WHERE parent_run_id = ? ORDER BY created_at", (parent_run_id,))

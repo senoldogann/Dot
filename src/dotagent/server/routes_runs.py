@@ -4,6 +4,7 @@ import asyncio
 import base64
 import binascii
 import time
+from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, Query
@@ -25,12 +26,15 @@ from dotagent.agent.rewind import (
     take_back,
 )
 from dotagent.core.errors import InvalidValueError
+from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
 from dotagent.scheduler.plans import ScheduleRequest, create_schedule
+from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.activity import current_activity
+from dotagent.server.changes import ChangesView, chat_changes, chat_runs
 from dotagent.server.context import ServerContext
 from dotagent.server.sending import send_once
 from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run, follow_screencast
@@ -211,6 +215,17 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def run_actions(run_id: str) -> RunActions:
         """What the run did and what can be undone (see ``server.actions``)."""
         return await actions(run_id)
+
+    @router.get("/runs/{run_id}/changes")
+    async def run_changes_view(run_id: str) -> ChangesView:
+        """The files the runs of the chat changed, up to this run, with their diffs (item 368, see
+        ``server.changes``)."""
+        runs: list[RunRecord] = await chat_runs(store, await store.get_run(run_id))
+        # The secrets are read from Dot's .env file off the event loop, as the journals and the files are.
+        known: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        return await asyncio.to_thread(
+            chat_changes, ctx.runtime.undo_dir, [run.id for run in runs], Path.home(), workspace_dir(), known
+        )
 
     @router.post("/runs/{run_id}/undo")
     async def undo_run_path(run_id: str, request: UndoRequest) -> RunActions:

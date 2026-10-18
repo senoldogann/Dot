@@ -14526,7 +14526,7 @@ them; under reduced motion and on a run opened after it ended, the answer is who
 
 ### 367. `@` in the composer picks an MCP server, a tool or a skill
 
-**Status: in progress.** The owner's word of 2026-10-18: "MCP ve plugin çağrılarını başa @ eklersek de filtrelesin,
+**Status: done (`a0b7954`).** The owner's word of 2026-10-18: "MCP ve plugin çağrılarını başa @ eklersek de filtrelesin,
 seçebilelim" (MCP and plugin calls: with an @ in front, they should be filtered and picked too). **As built
 (2026-10-18).** `@` at the start of a word in the composer opens the menu the slash opens, for the picks alone
 (`slash.js` `menuWord` and `pickGroups`, `composer.js`): the MCP servers by name with the number of their tools, then
@@ -14535,6 +14535,24 @@ the slash menu, and a pick is the chip the **+** makes (a tool the chip of its s
 a word, as in an e-mail address, opens nothing. The picks go with the message as before (item 318). Tests:
 `tests/smoke/test_composer_picks.py` (the menu's groups and a server's count of tools, a server and a skill picked by
 their first letters, an address typed, wide and light and on a phone and dark). Docs: `docs/daemon.md`.
+
+### 368. Changes in the side panel: the files a chat's runs wrote, with their diffs
+
+**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca yan bölüme bir Changes alanı ekleyelim … kod yazma veya
+session içerisinde oluşturmalar vs. olursa bunları görebilmek için" (add a Changes area to the side panel, to see code
+written or things created in a session). **As built (2026-10-18).** The side panel has a Changes tab, second after Run,
+which counts the files (`changes.js`, `views/run.js`): each file the chat's runs wrote or created with `write_file` and
+`edit_file`, up to the run of the page and with the runs they delegated to, the one changed last first, its name over
+its folder, "created" or "gone", and the lines added and removed; opened, the hunks of its unified diff from before the
+chat's first change to it to what is there now, each line in the tone of what it does, in a box that scrolls sideways.
+It is read on arrival, after each write or edit a run reports, and once the run ends. The daemon reads the runs'
+journals of file changes for it (`GET /api/runs/{id}/changes`, `server/changes.py`), without changing `undo/`: the copy
+the chat's first change to a file kept is the before. A file where the panel beside a chat shows no file (a hidden
+folder, an application's files, outside the home folder), a binary file, one past 512 KB, one that is gone and one whose
+first change kept no copy show why instead of a diff; the lines of a diff are masked of the secrets Dot holds. A
+command's own writes are not in the journals, so they are not in Changes. Tests: `tests/unit/test_changes.py` (a file
+two runs changed, one they made, the files without a diff, a masked key), `tests/smoke/test_changes_panel.py` (the API,
+and the tab wide and light and on a phone and dark). Docs: `docs/daemon.md`, `docs/autonomy.md`.
 
 ## Log
 
@@ -15325,3 +15343,4 @@ their first letters, an address typed, wide and light and on a phone and dark). 
 - 2026-10-18 (Opus 5.5): item 374 merged as `cf7ad72` (PR #364); the pre-push review blocked four pushes, each on a finding of its own, and the owner chose to go on until it passed. Items 365 to 368 on the owner's word of the same day, stacked one on the other: item 365 on `item-365-quiet-setup`, a chat that says nothing of how a run was set up.
 - 2026-10-18 (Opus 5.5): item 365 merged as `c3bfb97` (PR #365). Item 366 on `item-366-answer-streams`: an answer that ends a run under the reader's eyes is written in.
 - 2026-10-18 (Opus 5.5): item 366 merged as `6cb0f4a` (PR #366). Item 367 on `item-367-at-picks`: `@` in the composer picks an MCP server, a tool or a skill.
+- 2026-10-18 (Opus 5.5): item 367 merged as `a0b7954` (PR #367). Item 368 on `item-368-changes`: Changes in the side panel, the files a chat's runs wrote, with their diffs.
