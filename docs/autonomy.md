@@ -246,16 +246,16 @@ short is left out of the journal, so the run's next change is noted after it and
 panel's **Changes** tab reads the same journals (item 368): each file a chat's runs changed, diffed from the copy the
 chat's first change to it kept to what is there now. A file where the panel beside a chat shows no file (a hidden
 folder, an application's files, outside the home folder), a binary file, one past 512 KB, one that is gone and one
-whose first change kept no copy show why instead of a diff, and the lines of a diff are masked of the secrets Dot
-holds. A command's own writes are not in the journals, so they are not there.
-`dotx undo RUN_ID` shows what taking back the changes of that run and of the runs it delegated to would do: a file the
-run changed is put back as it was (`restore`), with its permissions, a file it created is deleted (`delete`), and the
-folders it created are removed once they are empty. Nothing is changed until `dotx undo RUN_ID --apply`, which exits
-with 1 when it left a file as it is. A file that changed or was deleted after the run's last change to it is a conflict
-and is left as it is; `--apply --force` takes it back too, and what changed in it since is lost. A file below a folder
-that is a link now cannot be taken back, even with `--force`: the link came after the run, and the change would be
-taken back where it points. A file larger than `undo_max_file_bytes` (10 MiB), or whose copy would bring the copies of
-the run past `undo_max_run_bytes` (100 MiB), is
+whose first change kept no copy show why instead of a diff. Each side of a diff is masked whole, before it is diffed,
+of the secrets Dot holds, so a private key over many lines is masked whatever part of it changed. A command's own writes
+are not in the journals, so they are not there. `dotx undo RUN_ID` shows what taking back the changes of that run and of
+the runs it delegated to would do: a file the run changed is put back as it was (`restore`), with its permissions, a
+file it created is deleted (`delete`), and the folders it created are removed once they are empty. Nothing is changed
+until `dotx undo RUN_ID --apply`, which exits with 1 when it left a file as it is. A file that changed or was deleted
+after the run's last change to it is a conflict and is left as it is; `--apply --force` takes it back too, and what
+changed in it since is lost. A file below a folder that is a link now cannot be taken back, even with `--force`: the
+link came after the run, and the change would be taken back where it points. A file larger than `undo_max_file_bytes`
+(10 MiB), or whose copy would bring the copies of the run past `undo_max_run_bytes` (100 MiB), is
 changed without a copy and cannot be put back; a file the run created can always be deleted again. A copy that is not
 the one the journal noted is not written back, and a folder that is now where a file was is never replaced. Only the
 file tools are in the journal (`write_file`, `edit_file` and `write_notes`): what a shell command (`rm`, `mv`,

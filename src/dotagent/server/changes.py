@@ -5,8 +5,9 @@ journals.
 
 A file shows its diff where the panel beside a chat shows files (``previews.paths.located_file``: the workspace and the
 home folder, not a hidden folder nor an application's files); elsewhere, and for a file that is gone, a binary file,
-one too large, or one whose first change kept no copy, the file is listed with why it has no diff. The lines of a diff
-go out with every secret Dot holds masked, word for word, and the forms of the others."""
+one too large, or one whose first change kept no copy, the file is listed with why it has no diff. Each side of a diff
+is masked whole before it is diffed, of every secret Dot holds, word for word, and the forms of the others, so a
+secret of many lines (a private key in PEM) is masked whatever part of it a hunk shows."""
 
 import difflib
 from collections.abc import Sequence
@@ -76,38 +77,37 @@ def _no_diff(note: str) -> _Sides:
 
 
 def _sides(root: Path, origin: RunChange, path: Path, home: Path, workspace: Path) -> _Sides:
-    """The two sides of the diff of ``path``, whose first change is ``origin``; or why it has none. Blocking."""
+    """The two sides of the diff of ``path``, whose first change is ``origin``; or why it has none. A side past
+    ``MAX_DIFF_BYTES`` is not read. Blocking."""
     try:
-        now: bytes = located_file(str(path), home, workspace).read_bytes()
+        now_path: Path = located_file(str(path), home, workspace)
     except NotFoundError:
         return _Sides(before="", after="", note="the file is not there any more", gone=True)
     except InvalidValueError as error:
         return _no_diff(f"no diff: {error.message}")
     entry = origin.entry
-    if not entry.existed:
-        before: bytes = b""
-    elif not entry.backup:
+    if entry.existed and not entry.backup:
         return _no_diff(f"no copy of what was there before was kept: {entry.skipped}")
-    else:
-        before = backup_path(run_journal(root, origin.run_id), entry.seq).read_bytes()
-    if len(before) > MAX_DIFF_BYTES or len(now) > MAX_DIFF_BYTES:
+    before_path: Path | None = backup_path(run_journal(root, origin.run_id), entry.seq) if entry.existed else None
+    before_size: int = 0 if before_path is None else before_path.stat().st_size
+    if before_size > MAX_DIFF_BYTES or now_path.stat().st_size > MAX_DIFF_BYTES:
         return _no_diff("too large to show a diff of")
-    old, new = _text(before), _text(now)
+    old = _text(b"" if before_path is None else before_path.read_bytes())
+    new = _text(now_path.read_bytes())
     if old is None or new is None:
         return _no_diff("a binary file")
     return _Sides(before=old, after=new, note=None, gone=False)
 
 
-def unified_diff(before: str, after: str, known: Sequence[str]) -> tuple[str, int, int]:
-    """The hunks of the unified diff of ``before`` to ``after`` (the row that shows them names the file), their lines
-    masked of the secrets ``known`` and the forms of the others, and the lines they add and remove."""
+def unified_diff(before: str, after: str) -> tuple[str, int, int]:
+    """The hunks of the unified diff of ``before`` to ``after`` (the row that shows them names the file), and the lines
+    they add and remove."""
     lines: list[str] = list(
         difflib.unified_diff(before.splitlines(keepends=True), after.splitlines(keepends=True), n=_CONTEXT_LINES)
     )[2:]
     added: int = sum(1 for line in lines if line.startswith("+"))
     removed: int = sum(1 for line in lines if line.startswith("-"))
-    masked: str = "".join(redact_known(line.rstrip("\n"), known) + "\n" for line in lines)
-    return masked, added, removed
+    return "".join(line if line.endswith("\n") else f"{line}\n" for line in lines), added, removed
 
 
 def chat_changes(root: Path, run_ids: Sequence[str], home: Path, workspace: Path, known: Sequence[str]) -> ChangesView:
@@ -125,10 +125,14 @@ def chat_changes(root: Path, run_ids: Sequence[str], home: Path, workspace: Path
         origin: RunChange = noted[0]
         shown: str = shown_path(Path(raw))
         sides: _Sides = _sides(root, origin, Path(raw), home, workspace)
-        if sides.note is None:
-            diff, added, removed = unified_diff(sides.before, sides.after, known)
-        else:
-            diff, added, removed = "", 0, 0
+        note: str | None = sides.note
+        diff, added, removed = "", 0, 0
+        if note is None:
+            # Each side is masked whole before the diff, so a secret of many lines (a private key in PEM) is masked
+            # whatever part of it a hunk shows.
+            diff, added, removed = unified_diff(redact_known(sides.before, known), redact_known(sides.after, known))
+            if diff == "" and sides.before != sides.after:
+                note = "the change is inside a secret, which is masked"
         files.append(
             FileChange(
                 path=shown,
@@ -137,7 +141,7 @@ def chat_changes(root: Path, run_ids: Sequence[str], home: Path, workspace: Path
                 added=added,
                 removed=removed,
                 diff=diff,
-                note=sides.note,
+                note=note,
                 changes=len(noted),
                 changed_at=noted[-1].entry.ts,
             )
@@ -153,13 +157,9 @@ CHAT_RUNS: int = 200
 
 
 async def chat_runs(store: Store, run: RunRecord) -> list[RunRecord]:
-    """The runs whose Changes the page of ``run`` shows, the oldest first: the runs of its chat up to it, each with the
-    runs it delegated to; a delegated run's own, with its own."""
+    """The runs whose Changes the page of ``run`` shows, the oldest first: the last ``CHAT_RUNS`` turns of its chat
+    up to it, each with the runs it delegated to; a delegated run's own, with its own."""
     if run.parent_run_id is not None:
         return await runs_with_children(store, run)
-    chat: list[RunRecord] = [
-        each
-        for each in reversed(await store.list_runs(CHAT_RUNS, run.thread_id))
-        if each.parent_run_id is None and each.created_at <= run.created_at
-    ]
-    return [item for each in chat for item in await runs_with_children(store, each)]
+    turns: list[RunRecord] = await store.chat_turns_until(run.thread_id, run.created_at, CHAT_RUNS)
+    return [item for each in reversed(turns) for item in await runs_with_children(store, each)]

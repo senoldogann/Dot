@@ -11,6 +11,11 @@ from dotagent.server.changes import chat_changes
 from dotagent.undo.journal import JournalTarget, note_change, run_journal
 
 _KEY: str = "sk-test-0123456789abcdefghij"
+# A private key in PEM, over several lines (not a real one).
+_PEM: bytes = (
+    b"-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\nBKcwggSjAgEAAoIBAQC7VJTUt9Us8cKj\n"
+    b"-----END PRIVATE KEY-----\n"
+)
 
 
 def _write(root: Path, run_id: str, path: Path, data: bytes, max_file_bytes: int) -> None:
@@ -86,6 +91,22 @@ def test_a_secret_dot_holds_is_masked_in_the_diff(places: tuple[Path, Path, Path
     view = chat_changes(root, ["run-1"], home, workspace, (_KEY,))
     assert _KEY not in view.files[0].diff
     assert view.files[0].added == 1
+
+
+def test_a_private_key_of_many_lines_is_masked_whatever_part_of_it_changed(places: tuple[Path, Path, Path]) -> None:
+    root, home, workspace = places
+    created = workspace / "deploy.pem"
+    _write(root, "run-1", created, _PEM, 1_000_000)
+    edited = workspace / "old.pem"
+    edited.write_bytes(_PEM)
+    _write(root, "run-1", edited, _PEM.replace(b"BKcwggSjAgEA", b"BKcwggSjAgEB"), 1_000_000)
+    view = chat_changes(root, ["run-1"], home, workspace, ())
+    by_name = {Path(file.path).name: file for file in view.files}
+    for file in by_name.values():
+        assert "MIIEvQIBADAN" not in file.diff and "BKcwggSjAgE" not in file.diff, file.diff
+    # A key the run wrote is a masked line added; a change inside a key shows no line of it, and says why.
+    assert by_name["deploy.pem"].added == 1
+    assert (by_name["old.pem"].diff, by_name["old.pem"].note) == ("", "the change is inside a secret, which is masked")
 
 
 def test_a_chat_without_journals_has_no_changes(places: tuple[Path, Path, Path]) -> None:

@@ -282,10 +282,11 @@ def list_logs(folder: Path) -> LogsView:
 def tail_lines(data: bytes, cut: bool, count: int, known: Sequence[str]) -> tuple[str, ...]:
     """The last ``count`` lines of ``data``, the end of a log, with every value of ``known`` (the secrets Dot holds)
     masked and the known forms of the others; when ``cut``, the read began inside the file and its first line is left
-    out, as it may be the end of one."""
+    out, as it may be the end of one. The end read is masked whole, before it is cut into lines, so a secret of many
+    lines (a private key in PEM) is masked whatever lines of it are shown."""
     lines: list[str] = data.decode("utf-8", errors="replace").splitlines()
     kept: list[str] = lines[1:] if cut else lines
-    return tuple(redact_known(line, known) for line in kept[-count:])
+    return tuple(redact_known("\n".join(kept), known).splitlines()[-count:])
 
 
 def read_tail(folder: Path, name: str, count: int) -> LogTail:
