@@ -233,11 +233,7 @@ class RunGate:
         rules: list[RuleRecord] = await self._store.list_rules()
         state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
-        # In a thread of its own (item 385): an owner's rule whose regular expression backtracks for long would
-        # otherwise hold the event loop, and every page and stream of the daemon with it, instead of this run alone.
-        decision: Decision = await asyncio.to_thread(
-            decide, info, self._mode, self.tainted, self._preset, rules, allowance
-        )
+        decision: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
         if decision.verdict == "allow":
             return ""
         if allowance is not None and decision is allowance and state is not None:
@@ -266,7 +262,7 @@ class RunGate:
         if decision.verdict == "allow":
             return ""
         if self._approval_mode == "yolo" and decision.source in YOLO_WAIVED_SOURCES:
-            handoff: Decision | None = await asyncio.to_thread(owner_handoff, info, rules)
+            handoff: Decision | None = owner_handoff(info, rules)
             if handoff is not None:
                 return await self._ask_user(info, handoff, "")
             return await self._waive(info, decision)

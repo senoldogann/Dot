@@ -545,6 +545,11 @@ _TERMINAL_APPS: tuple[str, ...] = (
     "wezterm",
     "ghostty",
     "hyper",
+    "xterm",
+    "tabby",
+    "termius",
+    "com.apple.terminal",
+    "com.googlecode.iterm2",
 )
 
 _PIPE_TO_SHELL: re.Pattern[str] = re.compile(
@@ -1471,7 +1476,7 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
         return _with_places(assigned, [*assigned.cwds, *(_places(operands[0], assigned) if wanted else [Path.home()])])
     if command == "ln":
         return _linked(assigned, rest[1:])
-    fetched: list[str] = _fetched_places(command, rest[1:])
+    fetched: list[str] = _fetched_places(command, rest[1:]) or _carried_download(command, rest[1:], assigned)
     if fetched:
         places: list[Path] = [
             _located(value, cwd, assigned)
@@ -1865,6 +1870,18 @@ def _fetched_places(command: str, args: list[str]) -> list[str]:
     return operands[1:2] or [Path(operands[0].rstrip("/")).name.removesuffix(".git")]
 
 
+def _carried_download(command: str, args: list[str], scope: ShellScope) -> list[str]:
+    """Where ``cp`` or ``mv`` puts a file the line downloaded, which then still counts as downloaded (item 385)."""
+    if command not in ("cp", "mv") or not scope.downloaded:
+        return []
+    words, folders = _target_folders(args)
+    operands: list[str] = _positional(words)
+    sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
+    if any(_runs_download(source, scope) for source in sources):
+        return destinations
+    return []
+
+
 def _runs_download(raw: str, scope: ShellScope) -> list[Finding]:
     """A finding when ``raw``, a script the line runs, is a file the line fetched or lies in a folder it cloned:
     downloading a script and running it is piping it into a shell in two steps (item 385)."""
@@ -2063,7 +2080,8 @@ def _assess_interpreter(command: str, args: list[str], scope: ShellScope, given:
         inline.append(given.text)
     code: str = "\n".join(inline)
     findings: list[Finding] = [
-        _finding("medium" if inline else "low", (), f"{command} runs {'inline code' if inline else 'a script'}")
+        _finding("medium" if inline else "low", (), f"{command} runs {'inline code' if inline else 'a script'}"),
+        *(_runs_download(line.operands[0], scope) if not inline and line.operands else []),
     ]
     if _NETWORK_CODE.search(code) or _NETWORK_COMMAND_CODE.search(code):
         findings.append(_fetching("medium", ("upload",), f"{command} runs code that reaches the network"))
@@ -2351,16 +2369,37 @@ def _assess_reader(command: str, args: list[str], scope: ShellScope) -> list[Fin
             return [_finding("medium", ("install",), "opens an installer package")]
         if any(target.endswith(".mobileconfig") for target in opened):
             return [_finding("high", ("system_settings",), "opens a configuration profile to install")]
-        apps: list[str] = [
-            value.casefold() for value in (*_option_values(args, "-a", ""), *_option_values(args, "-b", ""))
-        ]
-        files: list[str] = [target for target in opened if target not in apps]
-        in_terminal: bool = bool(files) and any(name in app for app in apps for name in _TERMINAL_APPS)
+        apps, files = _open_operands(args)
+        # An app named only when the line runs may be a terminal; ``-f`` hands it what the standard input brings.
+        terminal: bool = any(name in app or "$" in app for app in apps for name in _TERMINAL_APPS)
+        in_terminal: bool = terminal and (bool(files) or _has_switch(args, "f", "--stdin"))
         if in_terminal or any(target.endswith(_OPEN_RUNS) for target in files):
             # The program that runs it is not the line's own process, so Dot's sandbox does not hold it (item 385).
             return [_finding("medium", ("privilege",), "opens a script that runs as it opens, outside Dot's sandbox")]
         return [_finding("safe", (), "open")]
     return None
+
+
+def _open_operands(args: list[str]) -> tuple[list[str], list[str]]:
+    """The apps ``open`` is told to use (``-a`` and ``-b``, apart or glued, as many as given) and the files it opens,
+    each told apart by where it stands (item 385: a file named as an app is still a file), all without letter case."""
+    apps: list[str] = []
+    files: list[str] = []
+    index: int = 0
+    while index < len(args):
+        word: str = args[index]
+        index += 1
+        if word in ("-a", "-b") and index < len(args):
+            apps.append(args[index].casefold())
+            index += 1
+        elif re.fullmatch(r"-[A-Za-z]*[ab].+", word) and not word.startswith("--"):
+            letter: int = min(at for at in (word.find("a", 1), word.find("b", 1)) if at > 0)
+            apps.append(word[letter + 1 :].casefold())
+        elif word == "--args":
+            break
+        elif not word.startswith("-"):
+            files.append(word.casefold().rstrip("/"))
+    return apps, files
 
 
 def _shell_statements(script: str) -> list[str]:
