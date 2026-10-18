@@ -163,7 +163,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
 - A run of a `dotx` command (`dotx run`, `dotx resume`, `dotx chat`) is on the pages too while the daemon runs: it works
-  in the sidebar and in Activity, and its page follows it live, as it follows the daemon's own runs, though its text
+  in the sidebar, and its page follows it live, as it follows the daemon's own runs, though its text
   comes whole at each step rather than as it is written. Its Stop asks the command to stop it, which it does within a
   second. A question or an approval of it can be answered on the pages, which ends the prompt at its terminal; the first
   answer stands, wherever it was given. It takes no steering from the pages: a message sent there waits in the chat's
@@ -205,8 +205,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   Dot keeps next to it (`meta.json`, `text.txt`) gets an underscore before its name.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269), a
   file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full paths),
-  a file in the side panel's **Files** (on its Actions tab: the conversation's files, those its messages carried and
-  those its answers name) and a file the run changed, in **Actions**, open it in the side panel, which takes half of the
+  and a file in the side panel's **Files** (on its Run tab: the conversation's files, those its messages carried and
+  those its answers name) open it in the side panel, which takes half of the
   page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the daemon draws
   with Core Graphics as they come into view. A Word document, an Excel workbook and a presentation show first as macOS's
   Quick Look draws them (item 268), as Finder would: their fonts, fills, pictures and shapes, a workbook's sheets one

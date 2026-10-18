@@ -24,10 +24,10 @@ Under it hang all the runs it delegated (item 198), each saying the same while i
 once it has, behind a line that says how many there are and, while some have ended, how many work; a click on it folds
 them, and the fold is kept. Working lists too what is no chat's: a schedule about to fire, the session of a campaign
 (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
-days, and what it asks stands under **Waiting for you**. Working counts what it lists, and Activity the runs that work,
-which it shows under the run too. Folded, Working keeps the open chat in sight, and the search finds the chats at work
-too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Activity**,
-**Campaigns** and **Customize** ([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
+days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
+chat in sight, and the search finds the chats at work
+too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
+and **Customize** ([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the approvals waiting, and the connection to the daemon while it is being made or lost; what
@@ -61,9 +61,10 @@ Above the chats, two sections appear while they have rows: **Waiting for you** (
 for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run delegated
 by another, and a schedule that fires within the hour), each row with its state dot, the first words of its title on one
 line, and under it the channel it last worked in (browser, files, shell, desktop, mail) and what it needs; a row opens
-the run. **Activity** (`#/activity`) is the same in full, with the runs that ended today and a filter by kind (runs,
-campaigns, schedules); it is `GET /api/activity`. A run that ended shows how long it took and what it cost in tokens.
-Both follow the lifecycle stream, so a run moves between the sections the moment it starts, waits, is taken over or
+the run. They are `GET /api/activity`, which carries the runs that ended today too, for the home's **Today** strip; the
+Activity page that showed it all is gone (item 364), and its address leads to the home. A run that ended shows how long
+it took and what it cost in tokens. The sections and the strip follow the lifecycle stream, so a run moves between the
+sections the moment it starts, waits, is taken over or
 ends. The stream replays nothing after a break of the connection (the network dropped, the daemon restarted), so once it
 is back every page that follows it, the run's page and its queue among them, reads again what it shows; so does every
 page when the stream fell so far behind that events were lost (`resync`). A page that cannot read again keeps what it
@@ -78,7 +79,7 @@ banner floats under the bar, so nothing on the page moves, and a page left out o
 out of sight. The daemon serves the pages as it read them when it started, hidden files
 left out (item 309): files changed on disk while it runs (a merge, a batch of work ported in) wait for its next start,
 so that a page never asks the daemon's API for a field or a route only a newer daemon has. A run delegated by another
-run sits under the run that delegated it, in both the sidebar and the Activity page, with its steps so far and its
+run sits under the run that delegated it, in the sidebar, with its steps so far and its
 channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries a chip with its
 progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
 
@@ -90,9 +91,9 @@ this browser only); a greeting by the hour says your name when you gave one ther
 work on?"; "Something waits for you." when it does) and one line says what is going on ("Working on 2 runs · 1 waits for
 you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under the composer, the **Today** strip
 lists it: what waits for you, what works, what is due later today (the schedules that fire and the campaigns whose next
-session starts), what was learned today (the lessons and the day's journal) and what ended, each row as on the Activity
-page and each opening what it is about; two rows a section (a run without the runs it delegated, which the Activity page
-nests under it), then "and N more in Activity", and the page scrolls to what does not fit. A section folds on a click of
+session starts), what was learned today (the lessons and the day's journal) and what ended, each row opening what it is
+about; two rows a section (a run without the runs it delegated), then **Show N more**, which shows the section's others
+in place (item 364), and the page scrolls to what does not fit. A section folds on a click of
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
 and `due`. The composer is one frame on a 24 px corner with a soft shadow under it: the goal in a box of one line that
@@ -265,14 +266,14 @@ it (the choice is kept in the browser); open, it sits beside the conversation fr
 on a phone a sheet that rises from the foot (item 296). The run's head is the top bar itself: Dot's face and name on
 the left, the panel button on the right;
 the bar is solid with a hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the
-box stays at the bottom. Every other page names itself in the same bar (Agents, Activity, Campaigns, Settings) and opens
+box stays at the bottom. Every other page names itself in the same bar (Agents, Campaigns, Settings) and opens
 with one line of description.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
 at the head of the conversation. The panel is one card on the composer's corner, in four tabs
-(item 203): **Run** (Details and Cost), **Plan** (its steps; the tab says how many are done), **Actions** (what the run
-changed and asked, and the conversation's Files) and **Screen** (Dot's computer and the screenshots, which the tab
+(item 203): **Run** (Details, Cost and the conversation's Files), **Plan** (its steps; the tab says how many are done),
+**Agents** (the agents of the chat) and **Screen** (Dot's computer and the screenshots, which the tab
 counts). A tab shows its sections open, on hairlines; the arrow keys, Home and End move between the tabs, and the tab
 chosen last is kept in the browser (`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out
 before it hides, the conversation taking its room back once the slide is over, at once under reduced motion (item 220).
@@ -303,14 +304,14 @@ the page may have changed, so it takes a snapshot first. The timeline keeps both
 `dotx run` prints them. A takeover is refused while `[browser] headless = true` (there is no window to use), and the run
 page keeps the last frame once the run has ended.
 
-The **Actions** section of the panel's Actions tab is one view of what the run did and what can be undone: every acting
-step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are left out)
+What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the run's page no longer shows (item 364):
+every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are
+left out)
 with the channel it went through, its target and the result the model got as its evidence; every approval and question
 of the run with its decision, who decided and the note; and every file the run, or a run it delegated to, changed with
 `write_file`, `edit_file` or `write_notes`, with its undo state as `dotx undo` reads it (can be taken back, changed
-since, cannot be taken back, as before the run). A file as the run left it has a button, Restore or Delete, that takes
-that one change back once the run has ended (`POST /api/runs/{id}/undo`); the section itself is
-`GET /api/runs/{id}/actions`.
+since, cannot be taken back, as before the run). `POST /api/runs/{id}/undo` takes one change back, a file as the run
+left it, once the run has ended.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
 notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on:

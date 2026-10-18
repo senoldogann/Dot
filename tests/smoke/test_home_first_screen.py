@@ -177,12 +177,14 @@ async def test_the_greeting_and_the_composer_stand_in_the_middle_and_the_strip_i
                     side = await page.locator(".sidebar").bounding_box()
                     assert side is not None and abs(side["y"]) <= _TOLERANCE_PX, side
                     assert side["y"] + side["height"] >= height - _TOLERANCE_PX, (side, height)
-                # Two rows a section, and how many more the Activity page holds.
+                # Two rows a section, and a button that shows the others in place (item 364).
                 recent: Locator = page.locator(".home-today [data-section=recent]")
                 await expect(recent.locator(".activity-row:not(.home-today-more)")).to_have_count(_ROWS_SHOWN)
-                await expect(recent.locator(".home-today-more")).to_have_text(
-                    f"and {_ENDED - _ROWS_SHOWN} more in Activity"
-                )
+                more: Locator = recent.locator(".home-today-more")
+                await expect(more).to_have_text(f"Show {_ENDED - _ROWS_SHOWN} more")
+                await more.click()
+                await expect(recent.locator(".activity-row:not(.home-today-more)")).to_have_count(_ENDED)
+                await expect(more).to_have_count(0)
                 await page.close()
             # A section folds at its title, and stays folded on the next visit.
             page = await _open_home(browser, address, 1280, 800, "light")

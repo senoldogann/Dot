@@ -434,7 +434,8 @@ async def test_the_shell_of_the_web_app_is_served_and_the_service_worker_registe
             await app.add_init_script("Object.defineProperty(navigator, 'standalone', { get: () => true })")
             await app.goto(f"http://{host}:{port}/#/activity")
             await expect(app).to_have_url(f"http://{host}:{port}/#/runs/{run.id}")
+            # The Activity page is gone (item 364): its address leads to the home.
             await page.goto(f"http://{host}:{port}/#/activity")
-            await expect(page.locator(".activity-section")).to_have_count(3)
+            await expect(page).to_have_url(f"http://{host}:{port}/#/runs")
         finally:
             await browser.close()

@@ -1,8 +1,8 @@
-"""The side panel of a run in tabs (item 203): Run (the details and the cost), Plan, Actions and Screen, one at a time,
-each section of a tab open, the plan's steps done beside its tab; the arrows, Home and End move between the tabs, and
-the tab chosen last is kept. Beside the conversation the panel slides in and out, at once under reduced motion, and the
-Screen tab without a frame keeps the shape of a screen and says why (item 220). A scripted run with a plan, served by a
-real server, beside the conversation and as a drawer on a phone, light and dark."""
+"""The side panel of a run in tabs (item 203): Run (the details, the cost and the files), Plan, Agents and Screen, one
+at a time, each section of a tab open, the plan's steps done beside its tab; the arrows, Home and End move between the
+tabs, and the tab chosen last is kept. Beside the conversation the panel slides in and out, at once under reduced
+motion, and the Screen tab without a frame keeps the shape of a screen and says why (item 220). A scripted run with a
+plan, served by a real server, beside the conversation and as a drawer on a phone, light and dark."""
 
 import asyncio
 import time
@@ -37,7 +37,7 @@ _STEPS: tuple[str, ...] = ("Read the brief", "Draft the outline", "Write the sum
 _WAIT_COMMAND: str = "sleep 300"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
-_TABS: list[str] = ["Run", "Plan 1/3", "Actions", "Agents", "Screen"]
+_TABS: list[str] = ["Run", "Plan 1/3", "Agents", "Screen"]
 # Whether the panel is leaving, whether it is hidden, and whether the conversation keeps room for it.
 _PANEL_STATE: str = (
     "() => [document.querySelector('.inspector').dataset.leaving ?? '', document.querySelector('.inspector').hidden,"
@@ -188,13 +188,16 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                 await expect(run_tab).to_have_attribute("aria-selected", "true")
                 shown: Locator = panel.get_by_role("tabpanel")
                 await expect(shown).to_have_count(1)
-                await expect(shown.locator(".panel-section-title")).to_have_text(["Details", "Cost"])
+                # The Files card (item 364) stays hidden while the conversation has no file.
+                await expect(shown.locator(".panel-section:not([hidden]) .panel-section-title")).to_have_text(
+                    ["Details", "Cost"]
+                )
                 await expect(shown.get_by_label("Details")).to_contain_text("running")
                 # The bill under the details, label beside value as the details are, no line over it saying it again.
                 bill: Locator = shown.get_by_label("Cost of this run")
                 await expect(bill.locator("dt").first).to_have_text("Model")
                 await expect(bill).to_contain_text("Input tokens")
-                await expect(shown.locator(".panel-summary")).to_have_text(["", ""])
+                await expect(shown.locator(".panel-section:not([hidden]) .panel-summary")).to_have_text(["", ""])
                 # The drawer has its own way out; beside the conversation, the header's button closes the panel.
                 close: Locator = panel.get_by_role("button", name="Close the details")
                 if width < 960:
@@ -221,8 +224,8 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                     # WebKit does not focus a button that is clicked.
                     await plan_tab.focus()
                     await page.keyboard.press("ArrowRight")
-                    await expect(panel.get_by_role("tab", name="Actions")).to_be_focused()
-                    await expect(shown.locator(".panel-section-title").first).to_have_text("Actions")
+                    await expect(panel.get_by_role("tab", name="Agents")).to_be_focused()
+                    await expect(shown.locator(".panel-section-title").first).to_have_text("Previous agents")
                     await page.keyboard.press("End")
                     screen_tab: Locator = panel.get_by_role("tab", name="Screen")
                     await expect(screen_tab).to_have_attribute("aria-selected", "true")

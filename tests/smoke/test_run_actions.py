@@ -1,6 +1,6 @@
-"""The Actions panel of a run's page, end to end: a scripted model edits a file and writes a new one, the API lists the
-acting steps and the file changes with their undo state, and the headless UI opens the panel and takes one change back
-with its button. A real uvicorn server and a real headless Chrome are used; no model service is called.
+"""The actions of a run, end to end: a scripted model edits a file and writes a new one, and the API lists the acting
+steps and the file changes with their undo state, which ``POST /api/runs/{id}/undo`` takes back. The run's page no
+longer shows them (item 364). A real uvicorn server is used; no model service is called.
 """
 
 import asyncio
@@ -12,7 +12,6 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_default_config
@@ -25,18 +24,16 @@ from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
-from dotagent.server.links import ui_url
 from dotagent.store.models import RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
-pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 GOAL: str = "Fix the greeting in notes.txt and add made/new.txt."
 TOKEN: str = f"MARKER-{secrets.token_hex(8)}"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _TIME_LIMIT_S: float = 60.0
-_UI_TIMEOUT_MS: float = 15_000
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -137,38 +134,3 @@ async def test_the_api_lists_the_acting_steps_and_the_file_changes_with_their_un
         (str(workspace / "made/new.txt"), "ready", "delete", "write_file", 1),
         (str(workspace / "notes.txt"), "ready", "restore", "edit_file", 1),
     ]
-
-
-async def test_the_web_ui_shows_the_panel_and_its_button_takes_a_change_back(
-    served: tuple[Runtime, RunRecord, str],
-) -> None:
-    runtime, run, address = served
-    workspace: Path = runtime.workspace
-    assert (workspace / "notes.txt").read_text(encoding="utf-8") == "Hello, world\n"
-    host, port = "127.0.0.1", int(address.rpartition(":")[2])
-    async with async_playwright() as playwright:
-        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
-        try:
-            page: Page = await browser.new_page()
-            await page.goto(ui_url(host, port, TOKEN))
-            await expect(page.locator(".shell")).to_be_visible()
-            await page.goto(f"{address}/#/runs/{run.id}")
-            await page.click("button[aria-label='Run details']")
-            # The panel opens on its Run tab; the Actions tab (item 203) shows what the run changed and renders no null.
-            panel = page.locator("#panel-run-actions")
-            await expect(panel).to_be_hidden()
-            await page.get_by_role("tab", name="Actions").click()
-            await expect(panel).to_be_visible(timeout=_UI_TIMEOUT_MS)
-            assert "null" not in await page.locator(".inspector").inner_text()
-            await expect(panel.locator(".action-step")).to_have_count(2)
-            await expect(panel.locator(".action-edit[data-state='ready']")).to_have_count(2)
-            notes = panel.locator(".action-edit", has_text="notes.txt")
-            await notes.get_by_role("button", name="Restore").click()
-            await page.locator("dialog.modal button", has_text="Restore").click()
-            await expect(notes).to_have_attribute("data-state", "as_before", timeout=_UI_TIMEOUT_MS)
-            await expect(notes.get_by_role("button", name="Restore")).to_have_count(0)
-            await expect(panel.locator(".action-edit[data-state='ready']")).to_have_count(1)
-        finally:
-            await browser.close()
-    assert (workspace / "notes.txt").read_text(encoding="utf-8") == "Helo, world\n"
-    assert (workspace / "made/new.txt").is_file()

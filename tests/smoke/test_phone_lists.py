@@ -1,9 +1,9 @@
 """Dot's lists on a phone (item 332), in WebKit as the owner's iPhone and as a small one, on a served daemon with a run
 at work and a run it delegated, at work too.
 
-On a phone a card's name stands over the card, out of its surface, on Activity's sections and a service's page of
-Customize › Plugins (as in the settings' tabs, item 330); a row of Activity is its title over one line of facts, a
-delegated run's too; Team's empty line says what brings messages there. In a Mac's window the cards keep their names
+On a phone a card's name stands over the card, out of its surface, on a service's page of Customize › Plugins (as in the
+settings' tabs, item 330); a row of the home's Today strip is its title over one line of facts; Team's empty line says
+what brings messages there. In a Mac's window the cards keep their names
 inside. Before, the names were inside on a phone too, a delegated run's facts ran to three lines and Team's empty line
 named a tool. The model is a scripted one.
 """
@@ -135,18 +135,17 @@ async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_l
                 page: Page = await context.new_page()
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
 
-                await page.goto(f"{address}/#/activity")
-                child: Locator = page.locator(".activity-children .activity-row").first
-                await expect(child).to_be_visible(timeout=15_000)
-                facts: Locator = child.locator(".meta-facts")
-                await expect(facts).to_contain_text("delegated")
+                # The run at work on the home's Today strip (item 364: the Activity page is gone).
+                await page.goto(f"{address}/#/runs")
+                row: Locator = page.locator(".home-today [data-section=working] .activity-row").first
+                await expect(row).to_be_visible(timeout=15_000)
+                facts: Locator = row.locator(".meta-facts")
+                await expect(facts).to_contain_text("step")
                 lines: object = await facts.evaluate(_LINES)
                 assert isinstance(lines, int | float) and lines < _ONE_LINE, (device, lines)
-                ground: dict[str, str] = await _ground(page.locator(".activity-section").first)
-                assert ground["card"] == _CLEAR and ground["head"] == _CLEAR and ground["body"] != _CLEAR, ground
 
                 await page.goto(f"{address}/#/customize/plugins/notion")
-                ground = await _ground(page.locator(".plugin-card").first)
+                ground: dict[str, str] = await _ground(page.locator(".plugin-card").first)
                 assert ground["card"] == _CLEAR and ground["head"] == _CLEAR and ground["body"] != _CLEAR, ground
 
                 await page.goto(f"{address}/#/team")
@@ -157,8 +156,8 @@ async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_l
 
             page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")
             await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
-            await page.goto(f"{address}/#/activity")
-            ground = await _ground(page.locator(".activity-section").first)
+            await page.goto(f"{address}/#/customize/plugins/notion")
+            ground = await _ground(page.locator(".plugin-card").first)
             assert ground["card"] != _CLEAR, ground
         finally:
             await browser.close()

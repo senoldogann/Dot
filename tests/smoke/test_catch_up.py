@@ -172,15 +172,16 @@ async def _mend(page: Page, server: _Server) -> None:
 
 
 @pytest.mark.browser
-async def test_the_activity_page_lists_a_run_that_ended_while_its_connection_was_broken(
+async def test_the_home_lists_a_run_that_ended_while_its_connection_was_broken(
     login_env: dict[str, str],
 ) -> None:
     async with (
         _served(login_env, ScriptedProvider(_PROVIDER, [_FINISH] * _TURNS)) as (manager, server),
-        _page(server, "activity") as page,
+        _page(server, "runs") as page,
     ):
-        ended: Locator = page.locator(".activity-section[data-section=recent]")
-        await expect(ended).to_contain_text("No run ended today")
+        # The home's Today strip shows Ended today once a run has ended (item 364: the Activity page is gone).
+        ended: Locator = page.locator(".home-today [data-section=recent]")
+        await expect(ended).to_have_count(0)
         await _break(page, server)
         run: RunRecord = await manager.start(
             GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()

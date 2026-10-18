@@ -749,14 +749,9 @@
   display: none;
 }
 
-/* Every body sits inside the section's padding, so no text hugs the edge; the actions list draws its own rows edge to
-   edge with their own padding (item 84). */
+/* Every body sits inside the section's padding, so no text hugs the edge (item 84). */
 .panel-section-body {
   padding: 4px 16px 16px;
-}
-
-.panel-section-body:has(> .actions-list) {
-  padding: 0;
 }
 
 /* Beside the conversation the panel slides in as it is shown and out before it hides (item 220, inspector.js): the
@@ -1135,26 +1130,6 @@
 
 .file-row-where {
   grid-column: 2;
-}
-
-/* A file the run changed, in Actions, shows the file at a click. */
-.action-edit .file-link {
-  display: block;
-  max-width: 100%;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: inherit;
-  font-family: var(--mono);
-  font-size: var(--text-sm);
-  font-weight: var(--weight-label);
-  text-align: left;
-  overflow-wrap: anywhere;
-  cursor: pointer;
-}
-
-.action-edit .file-link:hover {
-  text-decoration: underline;
 }
 
 .inspector-scrim {

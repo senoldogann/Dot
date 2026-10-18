@@ -230,8 +230,9 @@ about you (see Memory): after a day with runs, one call of the review model rewr
 the section as it stands, your own lines, your notes and the day's goals, at most `[memory] owner_chars` (1500)
 characters. A night the Mac slept through is caught up once when it wakes. A daemon that was off at that time, or whose
 stop cut the reflection (a stop does not wait for one, and it records nothing until its end), reflects at the next
-`reflection_time` on everything since the last reflection. Activity lists the reflection among what ended today;
-`dotx reflect` runs one now. A reflection that fails is kept: Activity shows "The nightly review failed" with why until
+`reflection_time` on everything since the last reflection. The home's Today strip lists the reflection among what ended
+today;
+`dotx reflect` runs one now. A reflection that fails is kept: the strip shows "The nightly review failed" with why until
 one after it is done, and `dotx stats` says when the reflection was last done and the failure since. Learning does not
 stop unseen at a run's end either: lessons that could not be drawn leave `lessons_failed` with why on the run's page,
 skill work that failed `playbook_failed`, and `dotx stats` counts the runs of each.
@@ -253,5 +254,6 @@ the one the journal noted is not written back, and a folder that is now where a 
 file tools are in the journal (`write_file`, `edit_file` and `write_notes`): what a shell command (`rm`, `mv`,
 `sed -i`), the browser or the desktop changed is not. A
 run that is still working is refused; a run of `dotx run` that a crash left working ends when the daemon starts again.
-`dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days). The Actions tab of
-the run's page shows the same plan, one file at a time, with a button for each file that is as the run left it.
+`dotx prune --apply` deletes the journals whose last change is older than `undo_keep_days` (30 days).
+`GET /api/runs/{id}/actions` lists the same plan, one file at a time, and `POST /api/runs/{id}/undo` takes back a file
+that is as the run left it.
