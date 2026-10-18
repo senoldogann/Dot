@@ -13,8 +13,8 @@ its face and role, takes a message for it ("Message Scout") and lists its chats,
 home composer offers an Agent menu once an agent exists, Dot by default. A run of an agent opens its system prompt
 with the agent's own section ("You are Scout, an agent the owner made: ..." and your instructions), ahead of Dot's
 rules, which still hold; its tools are the ones the agent names plus finishing, asking you and turning tool groups on.
-The run's page wears the agent's face and name in the bar with a chip to its page; its rows on the Activity page and
-in the sidebar wear the face too. Deleting an agent leaves its chats, its lessons and its learned skills to Dot.
+The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on the
+home's Today strip wear the face too. Deleting an agent leaves its chats, its lessons and its learned skills to Dot.
 
 An agent can start from a template (item 315). Under the list, **Start from a template** shows eight: Sales
 Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health and Chief

@@ -44,7 +44,6 @@ _SCROLLER: str = "(window.innerWidth <= 720 ? document.querySelector('.run-threa
 # Every page of the interface by its hash; the run page is added once the scripted run exists.
 _PAGES: tuple[tuple[str, str], ...] = (
     ("home", "#/runs"),
-    ("activity", "#/activity"),
     ("campaigns", "#/campaigns"),
     ("agents", "#/agents"),
     ("team", "#/team"),
@@ -257,11 +256,6 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
                 await page.get_by_role("button", name="Show sidebar").click()
                 await page.wait_for_timeout(_SETTLE_MS)
             await page.evaluate("delete document.documentElement.dataset.shell")
-        if name == "activity":
-            # An empty section says what would show there (item 105).
-            await expect(page.locator(".activity-section[data-section=waiting] .empty-line")).to_contain_text(
-                "shows here"
-            )
         if name == "run":
             # From the top of a conversation taller than the window, the way down to the answer (item 96).
             await page.evaluate(f"{_SCROLLER}.scrollTo(0, 0)")

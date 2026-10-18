@@ -18,7 +18,6 @@ import { readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 import { openingCurtain, PAGE_READY_EVENT } from "./waiting.js";
-import * as activity from "./views/activity.js";
 import * as agents from "./views/agents.js";
 import * as team from "./views/team.js";
 import * as campaigns from "./views/campaigns.js";
@@ -44,6 +43,8 @@ const MOVED = new Map([
   // Customize opens on Plugins, under Plugins' own address, so that the open tab is one page with one address.
   ["/customize", "/customize/plugins"],
   ["/settings/skills", "/customize/skills"],
+  // The Activity page is gone (item 364): what it listed stands in the sidebar and on the home's Today strip.
+  ["/activity", "/runs"],
 ]);
 // `layout` is put on the page element as `data-layout`, so the style sheets can give each kind of page its own width.
 // `parent(params)` is the page a phone's Back leads to when nothing was opened before this page (item 338), or null
@@ -51,7 +52,6 @@ const MOVED = new Map([
 const ROUTES = [
   { tab: "runs", layout: "home", title: "New chat", pattern: /^\/runs$/, view: runs, parent: () => null },
   { tab: "runs", layout: "run", title: "Run", pattern: /^\/runs\/([A-Za-z0-9_-]+)$/, view: run, parent: () => null },
-  { tab: "activity", layout: "page", title: "Activity", pattern: /^\/activity$/, view: activity, parent: () => null },
   {
     tab: "campaigns",
     layout: "page",

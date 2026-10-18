@@ -304,7 +304,6 @@ async def test_every_page_on_a_phone_reads_at_a_phones_size_and_takes_a_finger(o
             ("home", "#/runs"),
             ("task", f"#/runs/{task.id}"),
             ("chat", f"#/runs/{chat.id}"),
-            ("activity", "#/activity"),
             ("agents", "#/agents"),
             ("agent", f"#/agents/{agent}"),
             ("team", "#/team"),

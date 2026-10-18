@@ -1,6 +1,6 @@
 """The home's first screen (item 124): Dot's greeting and the composer stand in the middle of the space under the top
-bar, across and down, however long the Today strip under them is; the strip shows the first two rows of each section
-with how many more the Activity page holds, the page scrolls to its end with the top bar and the sidebar in place, and
+bar, across and down, however long the Today strip under them is; the strip shows the first two rows of each section and
+a button for the others (item 364), the page scrolls to its end with the top bar and the sidebar in place, and
 a section folds at its title and stays folded on the next visit. Nine runs ended today, a journal note and a lesson,
 on the scripted model, served by a real server, at three sizes, light and dark."""
 
@@ -177,12 +177,14 @@ async def test_the_greeting_and_the_composer_stand_in_the_middle_and_the_strip_i
                     side = await page.locator(".sidebar").bounding_box()
                     assert side is not None and abs(side["y"]) <= _TOLERANCE_PX, side
                     assert side["y"] + side["height"] >= height - _TOLERANCE_PX, (side, height)
-                # Two rows a section, and how many more the Activity page holds.
+                # Two rows a section, and a button that shows the others in place (item 364).
                 recent: Locator = page.locator(".home-today [data-section=recent]")
                 await expect(recent.locator(".activity-row:not(.home-today-more)")).to_have_count(_ROWS_SHOWN)
-                await expect(recent.locator(".home-today-more")).to_have_text(
-                    f"and {_ENDED - _ROWS_SHOWN} more in Activity"
-                )
+                more: Locator = recent.locator(".home-today-more")
+                await expect(more).to_have_text(f"Show {_ENDED - _ROWS_SHOWN} more")
+                await more.click()
+                await expect(recent.locator(".activity-row:not(.home-today-more)")).to_have_count(_ENDED)
+                await expect(more).to_have_count(0)
                 await page.close()
             # A section folds at its title, and stays folded on the next visit.
             page = await _open_home(browser, address, 1280, 800, "light")

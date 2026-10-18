@@ -1,8 +1,8 @@
 """The runs of ``dotx`` commands on the pages of the daemon (item 188). The daemon relays what the run of a command
-stores, so the run works on the pages (Activity, its own page) and its page follows it live, in one stream, to its end;
-its Stop asks the command to stop it, which it does; a question of it answered on the pages reaches the command at once
-rather than at the end of its wait, and ends the prompt at the command's terminal; the queue of its chat moves on in
-the daemon once it ends, not in the command, which ends with it; and a new run on a chat closes first the run that a
+stores, so the run works on the pages (the sidebar, its own page) and its page follows it live, in one stream, to its
+end; its Stop asks the command to stop it, which it does; a question of it answered on the pages reaches the command at
+once rather than at the end of its wait, and ends the prompt at the command's terminal; the queue of its chat moves on
+in the daemon once it ends, not in the command, which ends with it; and a new run on a chat closes first the run that a
 command that died left at work there.
 
 No network and no model service is used: the scripted model plays each run, the command's in a child process that goes
@@ -212,8 +212,8 @@ async def _working(child: asyncio.subprocess.Process, relayed: Subscription) -> 
 async def test_a_command_run_works_on_the_pages_and_its_page_follows_it_live_to_its_end(
     login_env: dict[str, str],
 ) -> None:
-    """Before, the run was not active for the daemon: Activity counted nothing at work, and the stream of its page ended
-    after what was stored, so the page asked again and again."""
+    """Before, the run was not active for the daemon: the activity counted nothing at work, and the stream of its page
+    ended after what was stored, so the page asked again and again."""
     with scratch_home() as home, eval_environment(home, {}):
         async with _daemon(login_env) as (runtime, _manager, address), _api(address) as api:
             async with runtime.bus.subscribe(None) as relayed, _command(home, "yolo", "", [_WAITING, _FINISH]) as child:

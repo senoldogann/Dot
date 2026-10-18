@@ -15,7 +15,7 @@ import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
 import { CHAT_BOX_PX, composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
-import { clip, dateTimeFull, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
+import { clip, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
 import { BACKGROUND_SOURCE, backgroundNote, continuedIn, earlierTurns, loadHistory, RESUME_SOURCE } from "../history.js";
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
@@ -32,7 +32,7 @@ import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
-import { attempt, choiceDialog, confirmDialog, toast } from "../ui.js";
+import { attempt, choiceDialog, toast } from "../ui.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
 import { PHONE } from "../layout.js";
 
@@ -82,14 +82,6 @@ const HELPER_MOMENTS = new Set(["run_queued", "run_started", "run_finished"]);
 const HELPERS_SETTLE_MS = 1500;
 // How often the cost card is read again while the run works (its numbers come from a query over the run's events).
 const COST_REFRESH_MS = 10_000;
-// What the Actions panel says of a file change, by the state of its undo (see undo.restore.UndoStep).
-const EDIT_STATES = {
-  ready: { tone: "b-ok", text: "can be taken back" },
-  conflict: { tone: "b-warn", text: "changed since" },
-  cannot: { tone: "b-bad", text: "cannot be taken back" },
-  as_before: { tone: "b-muted", text: "as before the run" },
-};
-const APPROVAL_TONES = { approved: "b-ok", denied: "b-bad", expired: "b-muted", pending: "b-warn", left: "b-warn" };
 
 /** What a rewind did (item 282), said in a toast, and the files it left as they are, with why, in one of its own. */
 function tellRewound(cut) {
@@ -137,49 +129,6 @@ function planStep(step) {
  * conversation around this one; `historyProblem` is the error that kept them from loading, or null. Returns the
  * function that stops everything the page started.
  */
-function actionStep(step) {
-  return el(
-    "div",
-    { class: "list-row action-step", "data-ok": String(step.ok) },
-    el(
-      "div",
-      { class: "row-main" },
-      el("div", { class: "row-title" }, step.summary === "" ? step.tool : step.summary),
-      step.evidence === "" ? null : el("div", { class: "row-text small muted" }, step.evidence),
-      el(
-        "div",
-        { class: "row-meta" },
-        el("span", { class: "badge b-info" }, step.channel),
-        el("span", null, step.tool),
-        step.target === "" ? null : el("span", { class: "mono" }, step.target),
-        el("span", { class: `badge ${step.ok ? "b-ok" : "b-bad"}` }, step.ok ? "ok" : "failed"),
-        el("span", null, dateTimeFull(step.at)),
-      ),
-    ),
-  );
-}
-
-function approvalRow(record) {
-  return el(
-    "div",
-    { class: "list-row action-approval" },
-    el(
-      "div",
-      { class: "row-main" },
-      el("div", { class: "row-title" }, record.summary),
-      record.note === "" ? null : el("div", { class: "row-text small muted" }, record.note),
-      el(
-        "div",
-        { class: "row-meta" },
-        el("span", { class: `badge ${APPROVAL_TONES[record.status] ?? "b-muted"}` }, record.status),
-        el("span", null, record.tool),
-        record.decided_by === null ? null : el("span", null, `by ${record.decided_by}`),
-        el("span", null, dateTimeFull(record.created_at)),
-      ),
-    ),
-  );
-}
-
 function showRun({ root, ctx, signal, detail, history, historyProblem, reload }) {
   const runId = detail.run.id;
   let run = detail.run;
@@ -1100,7 +1049,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       paintWorking();
       syncControls();
       reconcile();
-      loadActions();
     }
     paintStats();
     paintHeading();
@@ -1138,111 +1086,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       : run.source === BACKGROUND_SOURCE
         ? backgroundNote(run.goal)
         : userMessage({ text: run.goal, sentAt: run.created_at, files: [], editFromHere: ownsMessages && run.rewindable ? () => editFromHere(run) : null });
-  // ------------------------------------------------------------------------------------------- actions
-  // What the run did and what can be undone: its acting steps, its approvals and its file changes (see server.actions).
-  const actionsBody = el("div", { class: "actions-list" });
-  const actionsCard = panelSection({ id: "run-actions", title: "Actions", actions: null, body: actionsBody });
-  // The paths being taken back, so that a second press does not send the same undo twice.
-  const undoing = new Set();
-
-  async function undoEdit(edit) {
-    if (undoing.has(edit.path)) {
-      return;
-    }
-    const confirmed = await confirmDialog({
-      title: edit.action === "restore" ? "Put the file back as it was?" : "Delete the file the run created?",
-      message: edit.path,
-      confirmLabel: edit.action === "restore" ? "Restore" : "Delete",
-      danger: true,
-      focusCancel: true,
-    });
-    if (!confirmed) {
-      return;
-    }
-    undoing.add(edit.path);
-    try {
-      await attempt(async () => {
-        const fresh = await api.post(`/runs/${runId}/undo`, { path: edit.path });
-        toast("ok", edit.action === "restore" ? "The file is back as it was." : "The file is deleted.");
-        paintActions(fresh);
-      });
-    } finally {
-      undoing.delete(edit.path);
-    }
-  }
-
-  function editRow(edit, ended) {
-    const state = EDIT_STATES[edit.state] ?? { tone: "b-muted", text: edit.state };
-    const button =
-      edit.state === "ready" && ended
-        ? el(
-            "button",
-            { class: "btn sm", type: "button", title: `Take back the change to ${edit.path}`, onclick: () => undoEdit(edit) },
-            icon("undo"),
-            el("span", { class: "label" }, edit.action === "restore" ? "Restore" : "Delete"),
-          )
-        : null;
-    return el(
-      "div",
-      { class: "list-row action-edit", "data-state": edit.state },
-      el(
-        "div",
-        { class: "row-main" },
-        el("button", { class: "row-title mono file-link", type: "button", title: "Show the file", dataset: { path: edit.path }, onclick: (event) => requestFile(event.currentTarget) }, edit.path),
-        edit.reason === null ? null : el("div", { class: "row-text small muted" }, edit.reason),
-        el(
-          "div",
-          { class: "row-meta" },
-          el("span", { class: `badge ${state.tone}` }, state.text),
-          el("span", null, edit.tool),
-          el("span", null, edit.changes === 1 ? "1 change" : `${edit.changes} changes`),
-          el("span", null, dateTimeFull(edit.noted_at)),
-        ),
-      ),
-      button === null ? null : el("div", { class: "row-actions" }, button),
-    );
-  }
-
-  function group(title, rows, emptyText) {
-    return el(
-      "div",
-      { class: "actions-group" },
-      el("div", { class: "small muted actions-group-title" }, title),
-      rows.length === 0 ? el("div", { class: "hint" }, emptyText) : el("div", { class: "list" }, ...rows),
-    );
-  }
-
-  function paintActions(view) {
-    const undoable = view.edits.filter((edit) => edit.state === "ready").length;
-    actionsCard.setSummary(
-      `${view.steps.length} acting, ${view.approvals.length} asked, ${view.edits.length} files` +
-        (undoable === 0 ? "" : ` (${undoable} can be taken back)`),
-    );
-    actionsBody.replaceChildren(
-      group("Acting steps", view.steps.map(actionStep), "No step changed anything."),
-      group("Approvals and questions", view.approvals.map(approvalRow), "Nothing was asked."),
-      group(
-        "Files changed",
-        view.edits.map((edit) => editRow(edit, view.ended)),
-        "No file was changed with the file tools (what the shell, the browser or the desktop changed is not noted).",
-      ),
-      ...(view.ended || view.edits.length === 0 ? [] : [el("div", { class: "hint" }, "The buttons to take a change back come once the run has ended.")]),
-    );
-  }
-
-  async function loadActions() {
-    try {
-      const view = await api.get(`/runs/${runId}/actions`);
-      if (!signal.aborted) {
-        paintActions(view);
-      }
-    } catch (error) {
-      if (!signal.aborted) {
-        actionsBody.replaceChildren(el("div", { class: "note warn" }, icon("alert"), el("span", null, `The actions could not be loaded: ${error.message}`)));
-      }
-    }
-  }
-
   // ------------------------------------------------------------------------------------------------- files
   // The files of the conversation (item 195): those its messages carried and those its answers name, in the order it
   // shows them, each opening beside it as its chip or its path does. The list follows the conversation as it grows.
@@ -1294,16 +1137,15 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   });
   // The agents of the chat: the runs its runs handed work to (item 227).
   const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
-  // The side panel (item 84), in tabs (item 203), each with its icon (item 227): the run (its details
-  // and its cost, item 96), the plan, the actions (and the files of the conversation), the agents of the chat and the
-  // screen (Dot's computer and the screenshots). The run's state is the top bar's face and the Details section's first
+  // The side panel (item 84), in tabs (item 203), each with its icon (item 227): the run (its details, its cost, item
+  // 96, and the files of the conversation), the plan, the agents of the chat and the screen (Dot's computer and the
+  // screenshots). The run's state is the top bar's face and the Details section's first
   // fact; no card at the head of the conversation (item 113).
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", icon: "info", sections: [details.element, cost.element] },
+      { id: "run", label: "Run", icon: "info", sections: [details.element, cost.element, filesCard.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
-      { id: "actions", label: "Actions", icon: "bolt", sections: [actionsCard.element, filesCard.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
       { id: "screen", label: "Screen", icon: "monitor", sections: [computer.element] },
     ],
@@ -1440,7 +1282,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   syncControls();
   paintLessons(detail.lessons);
   paintQuestions(detail.questions);
-  loadActions();
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
   thread.addEventListener("scroll", onScroll, { passive: true });

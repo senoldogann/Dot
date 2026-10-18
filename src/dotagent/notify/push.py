@@ -185,7 +185,7 @@ def notice_message(event: EventRecord) -> PushMessage | None:
         return PushMessage(
             title="Dot restarted after an unexpected stop",
             body=_cut_off(restarted.runs_cut_off),
-            route="#/activity",
+            route="#/runs",
             state="failed",
         )
     return None

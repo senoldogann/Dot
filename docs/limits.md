@@ -63,5 +63,5 @@ skill or plugin folder (discovery, `dotx skills list` and the `skill` tool ran o
 - Undo: only `write_file`, `edit_file` and `write_notes` are in the journal, not shell commands, the browser or the
   desktop. A run keeps a copy of a file at its first change to it only, within `undo_max_file_bytes` and
   `undo_max_run_bytes`. Runs that change the same file are taken back in the order their changes were noted. `dotx undo`
-  and the Actions tab of a run's page (a button for each file) need the run in the database (the journals of a deleted
+  and `POST /api/runs/{id}/undo` need the run in the database (the journals of a deleted
   chat stay until `dotx prune --apply`).

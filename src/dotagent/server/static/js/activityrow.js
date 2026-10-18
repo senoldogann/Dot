@@ -1,6 +1,6 @@
-// One row of the Activity list, as the Activity page and the home's Today strip (item 72) draw it: an icon for its
-// kind, its title, a line of facts (what it is, its channel, its detail, its steps or its cost) and, at the side, its
-// state and how long ago. The lifecycle events that change the lists are named here too.
+// One row of the activity, as the home's Today strip (item 72) draws it: an icon for its kind, its title, a line of
+// facts (what it is, its channel, its detail, its steps or its cost) and, at the side, its state and how long ago. The
+// lifecycle events that change the lists are named here too.
 
 import { ago, compact, duration, el } from "./dom.js";
 import { actorFace } from "./actors.js";

@@ -231,7 +231,7 @@ async def _pages_of(playwright: Playwright, browser: Browser, device: str, addre
     page: Page = await _phone(playwright, browser, device, address)
     iphone: bool = device.startswith("iPhone")
     found: list[str] = []
-    hashes: list[str] = ["#/activity", "#/runs", f"#/runs/{run_id}", "#/agents", "#/campaigns"]
+    hashes: list[str] = ["#/runs", f"#/runs/{run_id}", "#/agents", "#/campaigns"]
     hashes.extend(f"#/settings/{tab}" for tab in TABS)
     for where in hashes:
         await page.goto(f"{address}/{where}")

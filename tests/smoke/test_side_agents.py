@@ -1,7 +1,7 @@
 """The side menu shows every agent of a run (item 198): under a run at work, every run it delegated, those at work with
 their time and those that ended with how they ended, behind a button that says how many work and folds them; the fold
-is kept. The Activity page shows them under the run too, and counts what works; the side menu counts the chats at
-work (item 202). Scripted runs, served by a real server, wide and on a phone, light and dark."""
+is kept. The side menu counts the chats at work (item 202). Scripted runs, served by a real server, wide and on a phone,
+light and dark."""
 
 import asyncio
 import time
@@ -177,15 +177,6 @@ async def test_the_side_menu_shows_every_agent_of_a_run_and_folds_them(
                     await fold.click()
                     await expect(fold).to_have_attribute("aria-expanded", "true")
                     await expect(page.locator("#sidebar .side-children a.side-child")).to_have_count(len(_SHELVES))
-                    # The Activity page shows them under the run too, and counts what works.
-                    await page.goto(f"{address}/#/activity")
-                    card: Locator = page.locator(".activity-section[data-section=working]")
-                    await expect(card.locator(".card-head .small")).to_have_text("2")
-                    await expect(card.locator(".activity-children .activity-child")).to_have_count(len(_SHELVES))
-                    await expect(
-                        card.locator(".activity-children .activity-child").filter(has_text="done")
-                    ).to_have_count(2)
-                    await page.screenshot(path=str(tmp_path / f"activity-{width}-{scheme}.png"))
                 await page.close()
         finally:
             await browser.close()

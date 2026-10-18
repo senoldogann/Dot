@@ -1220,15 +1220,15 @@ a.pill:hover {
 }
 
 /* On a phone a card's name stands over the card, out of its surface, as a group's name over its rows: in the
-   settings' tabs (item 330), on Activity, Customize › Plugins and the agent's editor (item 332). Each such card has one body,
+   settings' tabs (item 330), on Customize › Plugins and the agent's editor (item 332). Each such card has one body,
    whose ground the card's is. */
 @media (max-width: 720px) {
-  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor):has(> .card-head) {
+  :is(.settings-pane .card, .connect-section, .agent-editor):has(> .card-head) {
     border: 0;
     background: none;
   }
 
-  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head {
+  :is(.settings-pane .card, .connect-section, .agent-editor) > .card-head {
     padding: 0 16px 8px;
     border-bottom: 0;
     color: var(--muted);
@@ -1236,11 +1236,11 @@ a.pill:hover {
     font-weight: var(--weight-text);
   }
 
-  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head > .fold-toggle {
+  :is(.settings-pane .card, .connect-section, .agent-editor) > .card-head > .fold-toggle {
     font-weight: var(--weight-text);
   }
 
-  :is(.settings-pane .card, .activity-section, .connect-section, .agent-editor) > .card-head + * {
+  :is(.settings-pane .card, .connect-section, .agent-editor) > .card-head + * {
     border: 1px solid var(--border);
     border-radius: var(--radius);
     background: var(--surface);
@@ -2147,7 +2147,7 @@ a.pill:hover {
   font-size: var(--text-sm);
 }
 
-/* The Today strip under the composer: a section per kind of thing that has rows, the rows as on the Activity page. */
+/* The Today strip under the composer: a section per kind of thing that has rows. */
 .home-today {
   grid-row: 3;
   align-self: start;
@@ -2196,10 +2196,16 @@ a.pill:hover {
   border-top: 0;
 }
 
+/* A section's "Show N more" is a row of its own, a button that opens the rest in place (item 364). */
 .home-today-more {
   justify-content: center;
+  width: 100%;
+  border: 0;
+  background: transparent;
   color: var(--muted);
+  font: inherit;
   font-size: var(--text-sm);
+  cursor: pointer;
 }
 
 /* One frame for the three composers (items 104 and 115): the box of one line that grows with its text, the attached
@@ -6148,25 +6154,7 @@ button.attach-chip:hover {
   outline-offset: 2px;
 }
 
-/* ---------- the Actions panel of a run ---------- */
-
-.actions-group + .actions-group {
-  border-top: 1px solid var(--border);
-}
-
-.actions-group-title {
-  padding: 8px 16px 0;
-}
-
-.actions-group .hint {
-  padding: 8px 16px 12px;
-}
-
-.action-edit[data-state="ready"] .row-title {
-  color: var(--text);
-}
-
-/* ---------- Activity page: one row per thing in motion ---------- */
+/* ---------- the rows of the home's Today strip: one per thing in motion ---------- */
 
 .activity-list {
   display: flex;
@@ -6672,7 +6660,7 @@ button.attach-chip:hover {
     min-width: 44px;
   }
 
-  /* Four choices of a phone's size fit the smallest phone's width (Activity's filters on an iPhone SE). */
+  /* Four choices of a phone's size fit the smallest phone's width (an iPhone SE). */
   .segmented button {
     padding-inline: 8px;
   }

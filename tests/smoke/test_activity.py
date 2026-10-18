@@ -1,7 +1,7 @@
 """Activity end to end (item 47): a run waiting for an answer, a run working and a session of a campaign in flight,
-read as ``GET /activity`` and shown in the sidebar's sections and on the Activity page, in a headless Chrome at a wide
-and at a phone width, in light and in dark. The runs are played by the scripted model, one after the other, so each
-takes the next turn of the shared script."""
+read as ``GET /activity`` and shown in the sidebar's sections, and what ended on the home's Today strip (item 364: the
+Activity page is gone), in a headless Chrome at a wide and at a phone width, in light and in dark. The runs are played
+by the scripted model, one after the other, so each takes the next turn of the shared script."""
 
 import asyncio
 import time
@@ -248,14 +248,6 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     await page.screenshot(path=str(tmp_path / f"sidebar-{width}-{scheme}.png"))
                     await sidebar.locator("[data-section=waiting] a.side-activity").click()
                     await expect(page).to_have_url(f"http://{host}:{port}/#/runs/{asking.id}")
-                    await page.goto(f"http://{host}:{port}/#/activity")
-                    await expect(page.locator(".activity-section[data-section=waiting] .activity-row")).to_have_count(1)
-                    await expect(page.locator(".activity-section[data-section=working] .activity-row")).to_have_count(3)
-                    await expect(page.locator(".activity-section[data-section=working]")).to_contain_text("Find leads")
-                    await expect(
-                        page.locator(".activity-section[data-section=working] .activity-children .activity-child")
-                    ).to_have_count(1)
-                    await page.screenshot(path=str(tmp_path / f"activity-{width}-{scheme}.png"))
                     # In the parent's chat, the delegated run's card shows its progress and opens its own page.
                     await page.goto(f"http://{host}:{port}/#/runs/{working.id}")
                     # While the parent works, its send is its Stop as long as the box is empty (item 120).
@@ -313,10 +305,17 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                 await expect(card).to_contain_text("Input tokens")
                 await expect(card).to_contain_text("Compactions")
                 await page.screenshot(path=str(tmp_path / f"run-cost-{width}-{scheme}.png"))
-                await page.goto(f"http://{host}:{port}/#/activity")
-                recent = page.locator(".activity-section[data-section=recent] .activity-row")
-                await expect(recent).to_have_count(4)
-                await expect(recent.first).to_contain_text("tokens")
+                # What ended, on the home's Today strip: two runs, and the third of the four (the delegated run stands
+                # under its parent) a press away.
+                await page.goto(f"http://{host}:{port}/#/runs")
+                ended = page.locator(".home-today [data-section=recent]")
+                # Its title counts what it shows: the three runs, not the delegated one it leaves out.
+                await expect(ended.locator(".home-today-count")).to_have_text("3")
+                rows = ended.locator(".activity-row:not(.home-today-more)")
+                await expect(rows).to_have_count(2)
+                await ended.locator(".home-today-more").click()
+                await expect(rows).to_have_count(3)
+                await expect(rows.first).to_contain_text("tokens")
                 await page.close()
         finally:
             await browser.close()

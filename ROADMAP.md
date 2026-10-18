@@ -5294,7 +5294,8 @@ list is a card with a shadow; the dark scheme's first paint after sign-in may be
 | 361 | OpenRouter's refusal for the account's privacy settings says why, and what to change   | done        | 994ab2d |
 | 362 | The lines of what ran without asking are out of a chat until turned on                 | done        | 22d1409 |
 | 363 | integrations/ carries REA and the replica skills; a plugin's server names its tools    | done        | d08dcd5 |
-| 369 | The repository names no other product; the licence notices keep what the law asks      | in progress |         |
+| 364 | No Actions tab in the side panel and no Activity page; the home shows the rest         | in progress |         |
+| 369 | The repository names no other product; the licence notices keep what the law asks      | done        | 58d0425 |
 
 ### 77. The type system: Inter and Geist Mono, seven sizes, three weights
 
@@ -14339,9 +14340,30 @@ ran `rsync --delete`, which would have deleted their `DOT.md`; it leaves it now.
 reach (`extend-exclude`), so `ruff check .` passes again. The copy installed in the owner's Dot home is the reviewed
 one. Tests: `tests/unit/test_skills.py`. Docs: `docs/extending.md`, `README.md`, and the two folders' own.
 
+### 364. No Actions tab in the side panel and no Activity page; the home shows the rest
+
+**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca sağ menüdeki Actions alanı bence gereksiz onu
+kaldıralım komple ve, Sol menüdeki activity alanı da gereksiz onu da kaldıralım komple" (the Actions area of the right
+menu is not needed, take it away completely, and the Activity of the left menu too). **As built (2026-10-18).** The side
+panel has four tabs: Run (Details, Cost and the conversation's Files, which the Actions tab held), Plan, Agents and
+Screen. The Actions card (the run's acting steps, its approvals, its file changes with a button to take one back) is
+gone with its code and styles; `GET /api/runs/{id}/actions` and `POST /api/runs/{id}/undo` stay, as `dotx undo` and a
+rewind take files back through the same plan. The sidebar has no Activity link and the Activity page is gone
+(`views/activity.js`): what it listed stands in the sidebar (Waiting for you, Working, a delegated run under its parent)
+and on the home's Today strip (due, learned, ended, and a nightly review that failed). `GET /api/activity` stays for
+them and for the desktop app's tray. A section of the strip shows two rows, then **Show N more**, which shows its others
+in place (before, "and N more in Activity" led to the page). `#/activity` leads to the home, a notification without a
+route and the push of a daemon that restarted after an unexpected stop open the home (`sw.js`, `notify/push.py`). Tests:
+`test_side_panel.py`, `test_previous_agents.py`, `test_file_panel.py` (the Files card on the Run tab),
+`test_home_first_screen.py` (Show N more), `test_activity.py`, `test_catch_up.py` (the strip reads its lists again when
+the stream is back), `test_phone_back.py` (a run opened from the strip returns to the home), `test_phone_lists.py`,
+`test_phone.py`, `test_tour.py`, `test_phone_type.py`, `test_phone_fit.py`, `test_side_agents.py`,
+`tests/unit/test_push.py`; `test_actions_panel.py` is `test_run_actions.py`, the API alone. Docs: `docs/daemon.md`,
+`docs/runs.md`, `docs/limits.md`, `docs/autonomy.md`, `docs/agents-and-campaigns.md`, `docs/phone.md`.
+
 ### 369. The repository names no other product; the licence notices keep what the law asks
 
-**Status: in progress.** The owner's word of 2026-10-18: "Ayrıca bizim kodlarımız içindeki tüm [başka bir uygulama]
+**Status: done (`58d0425`).** The owner's word of 2026-10-18: "Ayrıca bizim kodlarımız içindeki tüm [başka bir uygulama]
 etiketlerini, yorum satırlarını da kaldır lütfen, açık kaynak olarak sıkıntı yaşamayalım" (also remove every label and
 comment line in our code that names [another app], so that we have no trouble as open source), and of this roadmap,
 "Oradan da kaldır" (remove it from there too). **As built (2026-10-18).** The code, the tests, the docs, the README and
@@ -15138,3 +15160,4 @@ and the tests), whose results were checked against the repository. Tests: `tests
 - 2026-10-18 (Opus 5.5): item 361 merged as `994ab2d` (PR #356); with paid model training and Zero Data Retention turned off at OpenRouter, the owner's review model answers again. Item 362 on the owner's word of the same day, on `item-362-quiet-yolo`: the lines of what ran without asking are out of a chat until turned on.
 - 2026-10-18 (Opus 5.5): item 362 merged as `22d1409` (PR #357). Item 363 on the owner's word of the same day, on `item-363-integrations`: the owner's REA and replica-skill integrations, reviewed, with REA's release named.
 - 2026-10-18 (Opus 5.5): item 363 merged as `d08dcd5` (PR #358). Item 369 on the owner's word of the same day, on `item-369-own-words`: the repository names no other product, and the licence notices keep their names.
+- 2026-10-18 (Opus 5.5): item 369 merged as `58d0425` (PR #359). Item 364 on the owner's word of the same day, on `item-364-fewer-places`: no Actions tab in the side panel and no Activity page; the home's Today strip shows the rest in place.

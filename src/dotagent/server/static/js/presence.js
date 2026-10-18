@@ -14,8 +14,8 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, readFailed } from "./
 
 const OWNER_KEY = "dot.owner";
 export const OWNER_CHARS = 40;
-// How many rows a section of the strip shows before "and N more" points at the Activity page: two, so the strip stays
-// short under the composer (item 124).
+// How many rows a section of the strip shows before its "Show N more" (item 364): two, so the strip stays short under the
+// composer (item 124).
 const ROWS_SHOWN = 2;
 // Which sections of the strip the owner folded, kept between visits.
 const FOLDS_KEY = "dot.homeFolds";
@@ -88,15 +88,15 @@ function stripRows(activity, key) {
   return key === "working" ? activity.working.filter((row) => row.run_id !== null) : activity[key];
 }
 
-/** The sections of the Today strip that have rows: `{ key, title, count, rows, more }`. `rows` are the section's first
- * two, a run without the runs it delegated (the Activity page nests those under it); `count` is every row the section
- * holds and `more` the ones not shown. */
+/** The sections of the Today strip that have rows: `{ key, title, count, rows, rest }`. `rows` are the section's first
+ * two and `rest` the others its "Show N more" opens, each a run without the runs it delegated; `count` is how many `rows`
+ * and `rest` hold together, so the title counts what the section shows. */
 export function todaySections(activity) {
   return SECTIONS.map(({ key, title }) => ({ key, title, all: stripRows(activity, key) }))
     .filter(({ all }) => all.length > 0)
     .map(({ key, title, all }) => {
-      const rows = nestRows(all).slice(0, ROWS_SHOWN).map(({ row }) => row);
-      return { key, title, count: all.length, rows, more: all.length - rows.length };
+      const runs = nestRows(all).map(({ row }) => row);
+      return { key, title, count: runs.length, rows: runs.slice(0, ROWS_SHOWN), rest: runs.slice(ROWS_SHOWN) };
     });
 }
 
@@ -122,6 +122,8 @@ export function buildPresence() {
   let disposed = false;
   let moodTimer = 0;
   let folds = readFolds(FOLDS_KEY);
+  // The sections whose "Show N more" was pressed: they show all their rows until the page is left.
+  const opened = new Set();
 
   function expressFor(expression, ms) {
     clearTimeout(moodTimer);
@@ -148,6 +150,13 @@ export function buildPresence() {
     strip.querySelector(`[data-section="${key}"] .home-today-title`)?.focus();
   }
 
+  function openSection(key) {
+    opened.add(key);
+    paintStrip();
+    // The button that had the focus is gone: the section's first new row takes it.
+    strip.querySelectorAll(`[data-section="${key}"] .home-today-list > *`)[ROWS_SHOWN]?.focus();
+  }
+
   function paintStrip() {
     if (activity === null) {
       return;
@@ -156,7 +165,7 @@ export function buildPresence() {
     const sections = todaySections(activity);
     strip.hidden = sections.length === 0;
     strip.replaceChildren(
-      ...sections.map(({ key, title, count, rows, more }) => {
+      ...sections.map(({ key, title, count, rows, rest }) => {
         const folded = folds[key] === true;
         return el(
           "div",
@@ -177,8 +186,10 @@ export function buildPresence() {
             : el(
                 "div",
                 { class: "home-today-list" },
-                ...rows.map((row) => activityRow(row, false)),
-                more === 0 ? null : el("a", { class: "activity-row home-today-more", href: "#/activity" }, `and ${more} more in Activity`),
+                ...(opened.has(key) ? [...rows, ...rest] : rows).map((row) => activityRow(row, false)),
+                rest.length === 0 || opened.has(key)
+                  ? null
+                  : el("button", { class: "activity-row home-today-more", type: "button", onclick: () => openSection(key) }, `Show ${rest.length} more`),
               ),
         );
       }),

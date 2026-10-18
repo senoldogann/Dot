@@ -3,11 +3,11 @@ served daemon with one finished chat of the scripted model:
 
 - a tab opened from the settings' list says Back, and Back returns to the list, where the button opens the chats;
 - a service's page opened by its address says Back and leads to Plugins; one opened from a tile returns there;
-- a run opened from Activity says Back and returns to Activity;
+- a run opened from the home's Today strip says Back and returns to the home;
 - a chat opened from the sidebar has the button that opens the list of chats;
 - no page draws a link back of its own on a phone; in a Mac's window no Back shows, and a page's own link back shows
   while the sidebar is hidden;
-- a follow-up sent in a run opened from Activity goes on in the same chat, whose page keeps Back to Activity (item 345).
+- a follow-up sent in a run opened from the home goes on in the same chat, whose page keeps Back to the home (item 345).
 
 Before, the button opened the list of chats on every page, so Back from a tab, a service or a run left the page it came
 from, and a tab had its own "All settings" besides.
@@ -39,7 +39,7 @@ from dotagent.store.models import RunRecord
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "phone-back-token"
-# Links the test puts on Activity: one to an old address, one inside a part that stops its clicks, in the page.
+# Links the test puts on the home: one to an old address, one inside a part that stops its clicks, in the page.
 _LINKS: str = """() => {
   const old = document.createElement("a");
   old.id = "old-address";
@@ -108,13 +108,13 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
     await expect(page).to_have_url(f"{address}/#/customize/plugins")
-    # A run opened from Activity returns to Activity.
-    await page.goto(f"{address}/#/activity")
+    # A run opened from the home's Today strip returns to the home (item 364: the Activity page is gone).
+    await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
     await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/activity")
+    await expect(page).to_have_url(f"{address}/#/runs")
     # The browser's Forward to the run, and a reload of it, keep its Back (review B5); as Back it opens no panel and
     # says it controls none (review B8).
     await page.go_forward()
@@ -125,7 +125,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(button).to_have_attribute("aria-label", "Back")
     assert await button.get_attribute("aria-expanded") is None and await button.get_attribute("aria-controls") is None
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/activity")
+    await expect(page).to_have_url(f"{address}/#/runs")
     # A link to an old address counts for the page it leads to (review B3), and so does a link whose clicks a part of
     # the page stops, or one in a dialog outside the page (review B4).
     await page.evaluate(_LINKS)
@@ -133,13 +133,13 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(page).to_have_url(f"{address}/#/settings/memory")
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/activity")
+    await expect(page).to_have_url(f"{address}/#/runs")
     await page.evaluate(_LINKS)
     await page.locator("#stopped-link").click()
     await expect(page).to_have_url(f"{address}/#/customize/plugins/notion")
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/activity")
+    await expect(page).to_have_url(f"{address}/#/runs")
     # The page above takes the place of the page Back leaves (review B5): the browser's Back after it does not come
     # back to the tab.
     await page.goto(f"{address}/#/settings/appearance")
@@ -147,7 +147,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await button.click()
     await expect(page).to_have_url(f"{address}/#/settings")
     await page.go_back()
-    await expect(page).to_have_url(f"{address}/#/activity")
+    await expect(page).to_have_url(f"{address}/#/runs")
     # Customize has one address for its open tab.
     await page.goto(f"{address}/#/customize")
     await expect(page).to_have_url(f"{address}/#/customize/plugins")
@@ -162,9 +162,10 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
 
 async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
     """A follow-up goes on in the same chat (item 345): before, its run's page was a new entry of the history that no
-    link had opened, so the button opened the chats and Activity was two steps of the browser's Back away."""
+    link had opened, so the button opened the chats and the page it came from was two steps of the browser's Back
+    away."""
     button: Locator = page.locator(".stagebar-left button")
-    await page.goto(f"{address}/#/activity")
+    await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
     await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
     await expect(button).to_have_attribute("aria-label", "Back")
@@ -173,7 +174,7 @@ async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(page).to_have_url(re.compile(rf"#/runs/(?!{run.id}$)[^/]+$"))
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
-    await expect(page).to_have_url(f"{address}/#/activity")
+    await expect(page).to_have_url(f"{address}/#/runs")
 
 
 async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_path: Path) -> None:

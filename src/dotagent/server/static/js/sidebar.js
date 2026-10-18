@@ -365,7 +365,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   let workingNodes = [];
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
-  const activityLink = el("a", { class: "side-link", href: "#/activity", onclick: onNavigate }, icon("bolt"), el("span", null, "Activity"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
   // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns.
@@ -1127,7 +1126,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       el("span", { class: "grow" }, "New chat"),
       el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
     ),
-    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, activityLink, campaignsLink, customizeLink),
+    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, customizeLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
   );
@@ -1166,7 +1165,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     },
     setRoute({ tab, runId }) {
       mark(agentsLink, tab === "agents");
-      mark(activityLink, tab === "activity");
       mark(campaignsLink, tab === "campaigns");
       mark(settingsLink, tab === "settings");
       mark(customizeLink, tab === "customize");

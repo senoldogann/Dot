@@ -69,8 +69,8 @@ On a phone the settings open on a list of their pages in groups (item 330): Inte
 works and This Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and
 schedules there are). A row opens its page on its own, the bar naming it, and a card's name stands over the card. In a
 Mac's window the settings keep their tabs down the left side. On a phone Appearance draws the colour schemes as phones
-and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). Activity, a service's page of
-Customize › Plugins and an agent's editor name their cards the same way, a row of Activity keeps its facts to one line
+and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). A service's page of Customize ›
+Plugins and an agent's editor name their cards the same way, a row of the home's Today strip keeps its facts to one line
 that fades where it runs out of room, and Team's empty page says what brings messages there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
@@ -88,7 +88,8 @@ too). Dot's computer opens over the whole screen, with the page's address and wh
 to the side panel when it closes.
 
 The round button at the top left is the one way back (item 338). On a page opened by a link of another page (a run from
-Activity, a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on a page opened
+the home's Today strip, a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on
+a page opened
 directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;
 on a page opened from the sidebar it is the way back to the list of chats. The browser's own Back and Forward and a
 reload keep it as it was, and it is reckoned again when the phone turns. A chat that goes on at another of its runs (a

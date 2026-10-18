@@ -196,7 +196,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             PushMessage(
                 title="Dot restarted after an unexpected stop",
                 body="No run was cut off.",
-                route="#/activity",
+                route="#/runs",
                 state="failed",
             ),
         ),
@@ -206,7 +206,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             PushMessage(
                 title="Dot restarted after an unexpected stop",
                 body="1 run was cut off.",
-                route="#/activity",
+                route="#/runs",
                 state="failed",
             ),
         ),
@@ -216,7 +216,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             PushMessage(
                 title="Dot restarted after an unexpected stop",
                 body="3 runs were cut off.",
-                route="#/activity",
+                route="#/runs",
                 state="failed",
             ),
         ),
@@ -328,7 +328,7 @@ async def test_each_subscription_is_pushed_on_its_own_and_the_caller_gets_the_to
                 {
                     "title": "Dot restarted after an unexpected stop",
                     "body": "No run was cut off.",
-                    "route": "#/activity",
+                    "route": "#/runs",
                     "state": "failed",
                 },
             )
@@ -362,7 +362,7 @@ async def test_a_busy_push_service_is_asked_once_more(tmp_path: Path, monkeypatc
     subscription: PushSubscription = PushSubscription(
         endpoint="https://push.example/busy", p256dh=p256dh, auth=auth, created_at=_NOW
     )
-    message: PushMessage = PushMessage(title="t", body="b", route="#/activity", state="failed")
+    message: PushMessage = PushMessage(title="t", body="b", route="#/runs", state="failed")
     await push.send_push(keys, subscription, message)
     assert taken == ["https://push.example/busy"]
     answers.extend([503, 503])
