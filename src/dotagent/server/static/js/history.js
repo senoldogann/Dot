@@ -90,30 +90,33 @@ async function allEvents(runId, signal) {
   }
 }
 
-/** What a run said and ran, in the order it happened (item 374): its words, the calls of the stretch that followed,
- * its words again — the answer itself is the turn's message, so a line that only repeats it is left out. All its
- * events are read, so a call without a result was cut off; nothing is drawn once `signal` aborted. */
+/** What a run said and ran, read and drawn into the turn's `flow`; nothing is drawn once `signal` aborted. A failure
+ * to read or to draw it says why, with the way to the run: the turn keeps its question and its answer. */
 async function fillFlow(past, flow, signal) {
-  let events;
   try {
-    events = await allEvents(past.id, signal);
+    const events = await allEvents(past.id, signal);
+    if (events !== null && !signal.aborted) {
+      drawFlow(past, flow, events);
+    }
   } catch (error) {
-    // The turn keeps its question and its answer; what it did is on its own page.
+    console.error("what an earlier run did could not be shown", { run: past.id, error });
     flow.replaceChildren(
       el(
         "div",
         { class: "note" },
         icon("alert"),
-        el("span", null, `What this run did could not be read: ${error.message}`),
+        el("span", null, `What this run did could not be shown: ${error.message}`),
         el("a", { class: "small", href: `#/runs/${past.id}` }, "Open run"),
       ),
     );
     flow.hidden = false;
-    return;
   }
-  if (events === null || signal.aborted) {
-    return;
-  }
+}
+
+/** What a run said and ran, in the order it happened (item 374): its words, the calls of the stretch that followed,
+ * its words again — the answer itself is the turn's message, so a line that only repeats it is left out. `events`
+ * are all its events, so a call without a result was cut off. */
+function drawFlow(past, flow, events) {
   const answer = (past.result ?? "").trim();
   const blocks = [];
   let batch = null;

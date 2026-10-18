@@ -3474,11 +3474,10 @@ a.pill:hover {
   margin-right: 0;
 }
 
-/* A phone's button is a finger's width: a padding keeps its mark where the margin put it, under the bubble's edge, as
-   the button reaching past the message made the chat scroll sideways (item 360). */
+/* A phone's button is a finger's width: the room is added at its left, so its mark stays at the right edge of the
+   message, as on a wider window (items 360 and 374). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   .message-foot .btn:last-child {
-    margin-right: 0;
     padding-left: 16px;
   }
 }
