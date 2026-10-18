@@ -87,13 +87,13 @@ async def _fresh(runtime: Runtime, run: RunRecord) -> tuple[int, int]:
 
 async def test_a_chat_says_it_recalled_notes_only_when_one_is_new(runtime: Runtime, tmp_path: Path) -> None:
     for note in _NOTES:
-        await save_memory(runtime.memory, note, (), None, None, None)
+        await save_memory(runtime.memory, note, (), None, None, None, False)
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [ScriptedTurn(text="Done.", calls=())] * 12))
     manager: RunManager = RunManager(runtime)
     try:
         first: RunRecord = await _chat(manager, None)
         second: RunRecord = await _chat(manager, first.thread_id)
-        await save_memory(runtime.memory, _LATER, (), None, None, None)
+        await save_memory(runtime.memory, _LATER, (), None, None, None, False)
         third: RunRecord = await _chat(manager, first.thread_id)
         assert [await _fresh(runtime, run) for run in (first, second, third)] == [(2, 2), (2, 0), (3, 1)]
         stopping: asyncio.Event = asyncio.Event()
@@ -152,7 +152,7 @@ async def test_a_run_a_rewind_took_out_of_the_chat_no_longer_counts_its_notes(ru
     takes its place (review B6)."""
     store: Store = runtime.store
     thread: str = (await store.create_thread("Rewound", "test")).id
-    note: str = (await save_memory(runtime.memory, "The rewound chat's note.", (), None, None, None)).record.id
+    note: str = (await save_memory(runtime.memory, "The rewound chat's note.", (), None, None, None, False)).record.id
     first: RunRecord = await _stored_run(store, thread, "First message")
     await store.mark_memories_used(first.id, [note], time.time(), "start")
     await store.rewind_chat(first.id, [run.id for run in await store.runs_from(first.id)])

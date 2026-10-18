@@ -30,6 +30,7 @@ def _prompt(devtools: str | None, tools: list[str]) -> str:
             False,
             Path("/tmp/work"),
             [],
+            0,
             tools,
             [],
             0,

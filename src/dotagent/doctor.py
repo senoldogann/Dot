@@ -23,7 +23,15 @@ from dotagent.browser.keychain import KeychainMode, read_keychain_mode
 from dotagent.browser.login import CHROME_APP
 from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.profiles import profile_dir
-from dotagent.config import AppConfig, JudgeConfig, McpServerConfig, MemoryConfig, ModelsConfig, ProvidersConfig
+from dotagent.config import (
+    AppConfig,
+    JudgeConfig,
+    LessonsMode,
+    McpServerConfig,
+    MemoryConfig,
+    ModelsConfig,
+    ProvidersConfig,
+)
 from dotagent.core.errors import BrowserError, ConfigError, ProviderError, ToolExecutionError, WebError
 from dotagent.core.paths import (
     chrome_data_dir,
@@ -186,17 +194,21 @@ async def _check_model(
     return _result(f"model {role}", True, True, f"{reference} ({capabilities or 'text only'})")
 
 
-def _review_row(models: ModelsConfig) -> CheckResult:
+def _review_row(models: ModelsConfig, lessons: LessonsMode) -> CheckResult:
     """The review model checks the main model's work (goal checks, second opinions, auto approvals). A main model that
-    is its own review model is worth a warning, never a failure."""
+    is its own review model is worth a warning, never a failure; with ``lessons`` on auto the same model also approves
+    the lessons, so the warning says so."""
     if models.review.strip() == models.main.strip():
-        return _result(
-            "review model",
-            False,
-            False,
+        detail: str = (
             f"{models.review} is also the main model, so it checks its own work and independent checking is weaker; "
-            "a review model of another family is better",
+            "a review model of another family is better"
         )
+        if lessons == "auto":
+            detail += (
+                ". Lessons are approved by the run's own model; give [models] review another model for an independent "
+                "check"
+            )
+        return _result("review model", False, False, detail)
     return _result("review model", True, False, f"{models.review} is not the main model")
 
 
@@ -808,7 +820,7 @@ async def _service_checks(config: AppConfig) -> list[CheckResult]:
         results.append(await _check_memory(router, config, down))
         for role, reference in configured:
             results.append(await _check_model(router, role, reference, served, down))
-        results.append(_review_row(config.models))
+        results.append(_review_row(config.models, config.agent.lessons))
         for name, setting, models in (
             ("helpers", "[models] helpers", config.models.helpers),
             ("standby", "[models] standby", config.models.standby),

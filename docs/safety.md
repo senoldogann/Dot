@@ -125,10 +125,16 @@ change on a code host, inline code that reaches the network or runs a command of
 `allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to the run clears
 the mark. A delegated run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off,
 and the run that tells a chat that its command in the background ended as the chat's last run ended: that message is
-Dot's, not yours. A message you send starts a run unmarked.
+Dot's, not yours. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin
+(`tainted`): it is never among the notes a run starts with, is handed while it works or as a site's lessons (item
+384), a `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings › Memory
+and `dotx memory list` say of such a note that it was saved while reading outside content.
 
 **Secrets.**
 
+- The memory tools refuse a note that holds a key-like string or one of the secrets Dot holds (`memory_save`,
+  `memory_update`), and tell the model to record where the key lives, not the key. A note you write yourself, with
+  `dotx memory add` or on the Memory page, is yours and not refused.
 - In `ask` and `auto` the browser and desktop tools never type into password, one-time-code and card fields: the field
   that would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). A
   `yolo` run types into them what it can read itself (see

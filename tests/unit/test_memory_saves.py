@@ -48,8 +48,8 @@ async def test_the_same_note_saved_twice_at_once_stays_one_note_with_the_tags_of
     index: MemoryIndex = MemoryIndex(store=store, embedder=_SlowEmbedder(), config=config.memory)
     try:
         saved: tuple[SavedMemory, SavedMemory] = await asyncio.gather(
-            save_memory(index, NOTE, ["finance"], None, None, None),
-            save_memory(index, NOTE, ["paths"], None, None, None),
+            save_memory(index, NOTE, ["finance"], None, None, None, False),
+            save_memory(index, NOTE, ["paths"], None, None, None, False),
         )
         notes: list[MemoryRecord] = await store.list_memories(10, 0)
     finally:
@@ -61,7 +61,7 @@ async def test_the_same_note_saved_twice_at_once_stays_one_note_with_the_tags_of
 async def test_a_note_another_process_adds_while_a_store_opens_stays_in_the_search_index(tmp_path: Path) -> None:
     database: Path = tmp_path / "dot.db"
     store: Store = await Store.open(database, tmp_path / "images")
-    first: MemoryRecord = await store.add_memory(NOTE, ["finance"], None, None, None)
+    first: MemoryRecord = await store.add_memory(NOTE, ["finance"], None, None, None, False)
     await store.close()
     other: sqlite3.Connection = sqlite3.connect(database, isolation_level=None)
     try:

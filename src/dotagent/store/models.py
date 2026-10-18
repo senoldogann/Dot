@@ -332,7 +332,8 @@ class MemoryRecord(FrozenModel):
     agent whose lesson it is (item 94), ``None`` for Dot's, which every run may be handed; ``used_count`` and
     ``last_used_at`` say how often and when a run was handed it. ``expires_at`` is when a note saved for a while stops
     holding (item 306), ``None`` for one that holds until it is changed; ``replaced_by`` is the newer note that made it
-    outdated, when the reflection put it aside for that (item 306)."""
+    outdated, when the reflection put it aside for that (item 306). ``tainted`` says the note was written while the run
+    that saved it had read content third parties can author: a search that returns it taints the run that read it."""
 
     id: str
     content: str
@@ -345,6 +346,7 @@ class MemoryRecord(FrozenModel):
     last_used_at: float | None
     expires_at: float | None
     replaced_by: str | None
+    tainted: bool
 
 
 class MemoryScore(FrozenModel):

@@ -130,10 +130,10 @@ def _learned(kind: str, host: str, description: str) -> Playbook:
 
 async def test_a_run_that_reaches_a_site_is_handed_what_was_learned_there(runtime: Runtime, page: str) -> None:
     here: MemoryRecord = (
-        await save_memory(runtime.memory, _HERE, (LESSON_TAG, site_tag(_HOST)), "run_old", None, None)
+        await save_memory(runtime.memory, _HERE, (LESSON_TAG, site_tag(_HOST)), "run_old", None, None, False)
     ).record
     there: MemoryRecord = (
-        await save_memory(runtime.memory, _THERE, (LESSON_TAG, site_tag("example.org")), "run_old", None, None)
+        await save_memory(runtime.memory, _THERE, (LESSON_TAG, site_tag("example.org")), "run_old", None, None, False)
     ).record
     # The shop's skill fits the goal's words and is the one the instructions list; the local page's skill is not.
     listed: Playbook = _learned("check the shop page", "shop.example.com", "Check the local test page of the shop.")

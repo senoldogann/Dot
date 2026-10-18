@@ -717,6 +717,7 @@ async def _tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> Tool
         output_chars=scaffold.tool_output_chars,
         facts=lambda: facts,
         spawner=None,
+        tainted=lambda: agent.gate.tainted,
     )
 
 

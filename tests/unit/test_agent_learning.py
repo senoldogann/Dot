@@ -44,6 +44,7 @@ def _note(agent_id: str | None) -> MemoryRecord:
         last_used_at=None,
         expires_at=None,
         replaced_by=None,
+        tainted=False,
     )
 
 
@@ -123,8 +124,8 @@ async def test_the_store_keeps_an_agents_lessons_and_scores_them_by_its_own_runs
     try:
         scout: AgentRecord = await store.create_agent("Scout", "Finds sources", "", "", None, None, [], None, None)
         thread: ThreadRecord = await store.create_thread("t", "test")
-        lesson: MemoryRecord = await store.add_memory("Log in first.", ["lesson"], "run_1", scout.id, None)
-        dots: MemoryRecord = await store.add_memory("Dot's note.", [], None, None, None)
+        lesson: MemoryRecord = await store.add_memory("Log in first.", ["lesson"], "run_1", scout.id, None, False)
+        dots: MemoryRecord = await store.add_memory("Dot's note.", [], None, None, None, False)
         assert lesson.agent_id == scout.id and dots.agent_id is None
         assert await store.agent_memories(scout.id, 10) == [lesson]
         assert (await store.get_memory(lesson.id)).agent_id == scout.id
@@ -156,17 +157,21 @@ async def test_a_text_saved_again_merges_only_into_a_note_the_saver_is_handed(tm
         scout: AgentRecord = await store.create_agent("Scout", "Finds sources", "", "", None, None, [], None, None)
         clerk: AgentRecord = await store.create_agent("Clerk", "Files things", "", "", None, None, [], None, None)
         theirs: SavedMemory = await save_memory(
-            index, "Log in before the search.", ("lesson",), "run_1", scout.id, None
+            index, "Log in before the search.", ("lesson",), "run_1", scout.id, None, False
         )
-        dots: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_2", None, None)
+        dots: SavedMemory = await save_memory(
+            index, "Log in before the search.", ("lesson",), "run_2", None, None, False
+        )
         others: SavedMemory = await save_memory(
-            index, "Log in before the search.", ("lesson",), "run_3", clerk.id, None
+            index, "Log in before the search.", ("lesson",), "run_3", clerk.id, None, False
         )
         assert theirs.created and dots.created and not others.created
         assert (theirs.record.agent_id, dots.record.agent_id) == (scout.id, None)
         assert others.record.id == dots.record.id
         # The agent's own note comes first when it and Dot both have the text.
-        again: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_4", scout.id, None)
+        again: SavedMemory = await save_memory(
+            index, "Log in before the search.", ("lesson",), "run_4", scout.id, None, False
+        )
         assert again.record.id == theirs.record.id
     finally:
         await store.close()
@@ -177,10 +182,14 @@ async def test_a_resting_lesson_saved_again_is_awake(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
     index: MemoryIndex = MemoryIndex(store=store, embedder=None, config=load_default_config().memory)
     try:
-        first: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_1", None, None)
+        first: SavedMemory = await save_memory(
+            index, "Log in before the search.", ("lesson",), "run_1", None, None, False
+        )
         await store.set_memory_tags(first.record.id, ("lesson", REST_TAG))
         before: float = time.time()
-        again: SavedMemory = await save_memory(index, "Log in before the search.", ("lesson",), "run_2", None, None)
+        again: SavedMemory = await save_memory(
+            index, "Log in before the search.", ("lesson",), "run_2", None, None, False
+        )
         assert again.record.id == first.record.id and not again.created
         assert again.record.tags == ("lesson",) and again.record.updated_at >= before
     finally:

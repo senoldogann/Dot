@@ -300,6 +300,7 @@ def _prompt(tool_names: tuple[str, ...]) -> str:
             False,
             Path("/tmp"),
             (),
+            0,
             tool_names,
             (),
             0,

@@ -75,6 +75,18 @@ dotx memory reindex      # embed every note again, for example after changing [m
   words that start with its first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`).
 - Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
   outdated.
+- A note a run saves while it has read content third parties can author is marked "saved while reading outside content"
+  (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:
+  the run is tainted, so its next save asks unless the approval mode answers that question itself, and the note it
+  writes keeps the mark (`yolo` removes the approval, not the origin). Such a note is never among the notes a run
+  starts with, is handed while it works or is handed as a site's lessons when it reaches the site, nor among the notes
+  the model that writes lessons is shown (item 384): those are handed as trusted data, with no reader in between, so
+  only `memory_search` finds it, and the start says in one sentence how many notes were left out so. A lesson drawn
+  from such a run, and the reflection's journal that names it, carry the mark too; a lesson you save yourself does
+  not. The same words saved again leave a note's mark as it was. Your own rewrite of a note, on the Memory page, takes
+  the mark off: you vouch for its text. A note that holds an API key or one of the
+  secrets Dot holds is refused, and the model is told to record where the key lives, not the key; the notes you write
+  yourself are not refused.
 - The default embedding model, `bge-m3`, is multilingual: English and Turkish notes are found by meaning (on a small
   hand-written set, the right note came first for 15 of 17 Turkish questions, against 10 with the English-centric
   `mxbai-embed-large`). `min_similarity` and `inject_min_similarity` are set for its scores. For another Ollama model

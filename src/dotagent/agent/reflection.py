@@ -461,10 +461,12 @@ async def _asked_already(store: Store, run_id: str) -> bool:
     return False
 
 
-async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRecord]) -> list[str]:
+async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRecord]) -> tuple[list[str], bool]:
     """The lessons the reflection drew from ``runs``: the ones the loop did not ask about, with their ending as one
-    more signal when they did not reach their goal."""
+    more signal when they did not reach their goal; and whether one of them came from a run that had read content
+    third parties can author, which the journal that names them then carries too (item 384)."""
     written: list[str] = []
+    tainted: bool = False
     for run in runs:
         if await _asked_already(runtime.store, run.id):
             continue
@@ -477,8 +479,10 @@ async def _learn(runtime: Runtime, deciding: asyncio.Lock, runs: Sequence[RunRec
         signals: tuple[str, ...] = (*await stored_signals(runtime.store, case), *(() if ending is None else (ending,)))
         if not signals:
             continue
-        written.extend((await learn_from(runtime, deciding, case, signals)).lessons)
-    return written
+        drawn: tuple[str, ...] = tuple((await learn_from(runtime, deciding, case, signals)).lessons)
+        written.extend(drawn)
+        tainted = tainted or (case.tainted and bool(drawn))
+    return written, tainted
 
 
 async def merge_duplicates(
@@ -624,7 +628,9 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
         for run in await store.runs_finished_since(since)
         if wants_reflection(run) and run.finished_at is not None and run.finished_at < now
     ]
-    lessons: list[str] = await _learn(runtime, deciding, runs) if runtime.config.agent.lessons != "off" and runs else []
+    lessons, lessons_tainted = (
+        await _learn(runtime, deciding, runs) if runtime.config.agent.lessons != "off" and runs else ([], False)
+    )
     own: list[MemoryRecord] = _own(await store.memories_with_tag(LESSON_TAG, _LESSON_NOTES))
     owner_saved: set[str] = await store.owner_saved_memory_ids()
     vectors: dict[str, Vector] = dict(await store.all_memory_vectors()) if runtime.memory.embedder is not None else {}
@@ -637,7 +643,9 @@ async def reflect(runtime: Runtime, deciding: asyncio.Lock, now: float) -> Refle
     if runs or merged or retired or outdated:
         span: str = journal_span(since, now, runtime.schedule_zone)
         text: str = journal_text(span, runs, lessons, merged, retired, outdated, runtime.config.memory.max_chars)
-        saved: SavedMemory = await save_memory(runtime.memory, text, (JOURNAL_TAG,), REFLECTION_SOURCE, None, None)
+        saved: SavedMemory = await save_memory(
+            runtime.memory, text, (JOURNAL_TAG,), REFLECTION_SOURCE, None, None, lessons_tainted
+        )
         journal = saved.record.id
     reflection: Reflection = Reflection(
         at=now,

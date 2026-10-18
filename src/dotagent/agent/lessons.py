@@ -322,9 +322,12 @@ async def draw_lessons(runtime: Runtime, case: LessonCase, signals: tuple[str, .
     agent is handed already says (another agent's lesson is not the run's to know). A review model or an embedding
     service that fails raises its error."""
     agent_id: str | None = await _agent_of(runtime.store, case.run_id)
+    # A note saved while reading outside content is not shown to the model that writes the lessons (item 384), so its
+    # words cannot pass into a lesson of a clean run, which would be saved unmarked.
     known: tuple[str, ...] = tuple(
         redact_secrets(hit.record.content)
         for hit in await recall_for(runtime.memory, case.goal, _KNOWN_NOTES, agent_id)
+        if not hit.record.tainted
     )
     writer: LessonWriter = lesson_writer_for(
         runtime.router,
@@ -430,6 +433,7 @@ async def _decide_all(
                 await _emit_dismissed(runtime, case.run_id, index, "auto", why)
                 continue
             try:
+                # A lesson of a run that had read outside content keeps that origin, as a note it saved would.
                 saved: SavedMemory = await save_memory(
                     runtime.memory,
                     lesson,
@@ -437,6 +441,7 @@ async def _decide_all(
                     case.run_id,
                     agent_id,
                     None,
+                    case.tainted,
                 )
             except DotError as error:
                 return await _failed(runtime, case.run_id, error, "A lesson could not be saved")
@@ -609,6 +614,7 @@ async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, ind
         lesson: LessonView = await _lesson_of(runtime.store, run_id, index)
         if lesson.state == "saved" or (lesson.state == "dismissed" and lesson.by != "auto"):
             raise _conflict(lesson, run_id)
+        # The owner read the lesson and chose to save it: they vouch for its text, whatever the run had read.
         saved: SavedMemory = await save_memory(
             runtime.memory,
             lesson.text,
@@ -616,6 +622,7 @@ async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, ind
             run_id,
             await _agent_of(runtime.store, run_id),
             None,
+            False,
         )
         await _emit_saved(runtime, run_id, index, saved, "owner")
     return saved

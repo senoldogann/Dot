@@ -142,7 +142,8 @@ CREATE TABLE IF NOT EXISTS push_subscriptions (
 );
 CREATE TABLE IF NOT EXISTS memories (
     id TEXT PRIMARY KEY, content TEXT NOT NULL, tags TEXT NOT NULL,
-    created_at REAL NOT NULL, updated_at REAL NOT NULL, source_run TEXT
+    created_at REAL NOT NULL, updated_at REAL NOT NULL, source_run TEXT,
+    tainted INTEGER NOT NULL DEFAULT 0
 );
 CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
     id UNINDEXED, content, tags, tokenize = 'unicode61 remove_diacritics 2'
@@ -589,6 +590,7 @@ def _memory(row: aiosqlite.Row) -> MemoryRecord:
         last_used_at=row["last_used_at"],
         expires_at=row["expires_at"],
         replaced_by=row["replaced_by"],
+        tainted=bool(row["tainted"]),
     )
 
 
@@ -669,6 +671,8 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     # Item 306: notes held until they were changed, and none was put aside for a newer one.
     ("expires_at", "REAL"),
     ("replaced_by", "TEXT"),
+    # The note was saved while its run had read content third parties can author; an older note was not.
+    ("tainted", "INTEGER NOT NULL DEFAULT 0"),
 )
 # Columns of ``schedules`` added later: NULL means "what the configuration says when the schedule fires", which is how
 # the schedules of an older database ran.
@@ -2490,9 +2494,11 @@ class Store:
         source_run: str | None,
         agent_id: str | None,
         vector: Sequence[float] | None,
+        tainted: bool,
     ) -> MemoryRecord:
-        """Add a note that holds until it is changed."""
-        record: MemoryRecord = await self._insert_memory(content, tags, source_run, agent_id, vector, None)
+        """Add a note that holds until it is changed; ``tainted`` says its run had read content third parties can
+        author."""
+        record: MemoryRecord = await self._insert_memory(content, tags, source_run, agent_id, vector, None, tainted)
         await self._db.commit()
         return record
 
@@ -2504,18 +2510,22 @@ class Store:
         agent_id: str | None,
         vector: Sequence[float] | None,
         expires_at: float | None,
+        tainted: bool,
     ) -> tuple[MemoryRecord, bool]:
         """Add a note unless one that a run of ``agent_id`` is handed has this text already (saved meanwhile, in this
         process or another; :meth:`find_memory_by_content`): the look and the add are one transaction. Returns the note
-        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never. A unit
-        tried again after a lock returns what its last try stored (item 351: the first try's note, rolled back, came
-        back)."""
+        with the text and whether it was added. ``expires_at`` is when it stops holding, ``None`` for never;
+        ``tainted`` says the saving run had read content third parties can author. A unit tried again after a lock
+        returns what its last try stored (item 351: the first try's note, rolled back, came back)."""
 
         async def statements() -> tuple[MemoryRecord, bool]:
             row: aiosqlite.Row | None = await self._one(_SAME_TEXT, (content, agent_id))
             if row is not None:
                 return _memory(row), False
-            return await self._insert_memory(content, tags, source_run, agent_id, vector, expires_at), True
+            return (
+                await self._insert_memory(content, tags, source_run, agent_id, vector, expires_at, tainted),
+                True,
+            )
 
         return await self._unit(statements)
 
@@ -2527,6 +2537,7 @@ class Store:
         agent_id: str | None,
         vector: Sequence[float] | None,
         expires_at: float | None,
+        tainted: bool,
     ) -> MemoryRecord:
         """The statements that add a note, in the caller's transaction."""
         now: float = time.time()
@@ -2542,12 +2553,13 @@ class Store:
             last_used_at=None,
             expires_at=expires_at,
             replaced_by=None,
+            tainted=tainted,
         )
         tag_text: str = ",".join(record.tags)
         await self._db.execute(
-            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
-            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at),
+            "INSERT INTO memories(id, content, tags, created_at, updated_at, source_run, agent_id, expires_at,"
+            " tainted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (record.id, content, tag_text, now, now, source_run, agent_id, expires_at, int(tainted)),
         )
         await self._db.execute(
             "INSERT INTO memories_fts(id, content, tags) VALUES(?, ?, ?)",
@@ -2568,12 +2580,41 @@ class Store:
         tags: Sequence[str],
         vector: Sequence[float] | None,
         source_run: str | None,
+        tainted: bool,
     ) -> MemoryRecord:
-        """Rewrite a memory's text and tags, written now by ``source_run`` (``None`` for the user)."""
+        """Rewrite a memory's text and tags, written now by ``source_run``. A tainted run's rewrite marks the note
+        tainted; a clean one leaves the mark a note had."""
+        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "MAX(tainted, ?)", int(tainted))
+
+    @_writing
+    async def update_memory_vouched(
+        self,
+        memory_id: str,
+        content: str,
+        tags: Sequence[str],
+        vector: Sequence[float] | None,
+        source_run: str | None,
+    ) -> MemoryRecord:
+        """The user's rewrite of a memory's text and tags, as :meth:`update_memory`; in the same write the mark of
+        having been saved while reading outside content comes off, as the user vouches for the text they save (item
+        384)."""
+        return await self._rewrite_memory(memory_id, content, tags, vector, source_run, "?", 0)
+
+    async def _rewrite_memory(
+        self,
+        memory_id: str,
+        content: str,
+        tags: Sequence[str],
+        vector: Sequence[float] | None,
+        source_run: str | None,
+        mark: Literal["MAX(tainted, ?)", "?"],
+        tainted: int,
+    ) -> MemoryRecord:
+        """The statements of a rewrite, committed together; ``mark`` is how the note's mark is set from ``tainted``."""
         tag_text: str = ",".join(tags)
         await self._db.execute(
-            "UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ? WHERE id = ?",
-            (content, tag_text, time.time(), source_run, memory_id),
+            f"UPDATE memories SET content = ?, tags = ?, updated_at = ?, source_run = ?, tainted = {mark} WHERE id = ?",
+            (content, tag_text, time.time(), source_run, tainted, memory_id),
         )
         await self._db.execute("DELETE FROM memories_fts WHERE id = ?", (memory_id,))
         await self._db.execute(

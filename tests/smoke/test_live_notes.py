@@ -92,9 +92,11 @@ async def test_a_running_run_is_handed_the_changed_notes_it_may_be_handed_within
         runtime: Runtime = await open_runtime(config, login_env)
         try:
             # Before the run: a lesson of Dot's and a lesson of another agent.
-            old: MemoryRecord = (await save_memory(runtime.memory, OLD_LESSON, [], "run_before", None, None)).record
+            old: MemoryRecord = (
+                await save_memory(runtime.memory, OLD_LESSON, [], "run_before", None, None, False)
+            ).record
             theirs: MemoryRecord = (
-                await save_memory(runtime.memory, THEIR_LESSON, [], "run_printer", OTHER_AGENT, None)
+                await save_memory(runtime.memory, THEIR_LESSON, [], "run_printer", OTHER_AGENT, None, False)
             ).record
 
             async def change() -> None:
@@ -102,10 +104,10 @@ async def test_a_running_run_is_handed_the_changed_notes_it_may_be_handed_within
                 await runtime.store.set_memory_tags(old.id, (*old.tags, REST_TAG))
                 await runtime.store.set_memory_tags(theirs.id, (*theirs.tags, "printer"))
                 # The other agent learns a new lesson, the owner writes a note, and another run of Dot saves many.
-                await save_memory(runtime.memory, THEIR_NEW_LESSON, [], "run_printer_2", OTHER_AGENT, None)
-                await save_memory(runtime.memory, OWNER_NOTE, [], None, None, None)
+                await save_memory(runtime.memory, THEIR_NEW_LESSON, [], "run_printer_2", OTHER_AGENT, None, False)
+                await save_memory(runtime.memory, OWNER_NOTE, [], None, None, None, False)
                 for number in range(1, FACTS + 1):
-                    await save_memory(runtime.memory, _fact(number), [], "run_archive", None, None)
+                    await save_memory(runtime.memory, _fact(number), [], "run_archive", None, None, False)
 
             model: NotesChangeMidRun = NotesChangeMidRun(ScriptedProvider(_PROVIDER, TURNS), change)
             await runtime.router.register(_PROVIDER, model)

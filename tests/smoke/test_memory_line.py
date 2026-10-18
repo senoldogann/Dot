@@ -102,9 +102,9 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, Run
     ``_turns`` once let go, served at the address it yields."""
     runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
     try:
-        report: MemoryRecord = (await save_memory(runtime.memory, REPORT, [], None, None, None)).record
-        office: MemoryRecord = (await save_memory(runtime.memory, OFFICE, [], None, None, None)).record
-        await save_memory(runtime.memory, KEPT, [], None, None, None)
+        report: MemoryRecord = (await save_memory(runtime.memory, REPORT, [], None, None, None, False)).record
+        office: MemoryRecord = (await save_memory(runtime.memory, OFFICE, [], None, None, None, False)).record
+        await save_memory(runtime.memory, KEPT, [], None, None, None, False)
         held: Held = Held(_turns(report.id, office.id))
         await runtime.router.register(_PROVIDER, held)
         manager: RunManager = RunManager(runtime)

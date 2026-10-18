@@ -106,7 +106,9 @@ async def test_a_note_handed_while_a_write_is_part_way_waits_for_it_and_commits_
     assert isinstance(store, _CutShort)
     try:
         _, run_id = await _runs_and_thread(store)
-        note: MemoryRecord = await store.add_memory("The invoices are in the shared folder.", (), None, None, None)
+        note: MemoryRecord = await store.add_memory(
+            "The invoices are in the shared folder.", (), None, None, None, False
+        )
         changed: asyncio.Event = asyncio.Event()
         write: asyncio.Task[None] = asyncio.create_task(store.change_then_wait(run_id, changed))
         await changed.wait()
@@ -178,7 +180,9 @@ async def test_a_note_added_once_after_a_locked_commit_is_the_one_stored(
             await commit()
 
         monkeypatch.setattr(store._db, "commit", locked_once)
-        record, created = await store.add_memory_once("The owner prefers short answers.", (), None, None, None, None)
+        record, created = await store.add_memory_once(
+            "The owner prefers short answers.", (), None, None, None, None, False
+        )
         monkeypatch.undo()
         stored: MemoryRecord = await store.get_memory(record.id)
         assert created and stored.content == "The owner prefers short answers."

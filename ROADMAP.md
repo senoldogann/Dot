@@ -14701,7 +14701,7 @@ modules preloaded), `tests/smoke/test_offline_page.py`, `test_phone_return.py`. 
 
 ### 382. A file's text is changed with the file tools, and the shell runs things
 
-**Status: in progress.** The owner's word of 2026-10-18, after Dot's code changes made with shell commands showed
+**Status: done (`e6f0115`).** The owner's word of 2026-10-18, after Dot's code changes made with shell commands showed
 nowhere in Changes: Dot should change files with edit_file and write_file and run commands with the shell, as a
 direction only, refusing nothing. **As built (2026-10-18).** Both styles of the system prompt (`agent/prompt.py`) say to
 change the text of a file with `edit_file` and to write a file whole with `write_file`, not with sed, a heredoc or a
@@ -14712,6 +14712,30 @@ and keeps preferring itself to the GUI (`tools/shell.py`); `edit_file` and `writ
 the undo journal, shows in Changes and can be undone (`tools/files.py`). The policy, the shell guard and the approvals
 are as they were: a command that writes a file is not refused. Tests: `tests/unit/test_lean_prompt.py` (both prompts and
 the shell's description carry the direction). Docs: `docs/runs.md`.
+
+### 384. A note keeps where it came from, a secret is not saved, and a review model of the run's own is named
+
+**Status: in progress.** The owner's plan of 2026-10-18 (its first pull request on the trust of memory), built by an
+agent of the owner's on `plan/memory-trust-1`, and the owner's word of 2026-10-19 on its open question: (A), a note
+saved while reading outside content never enters the notes a run starts with. **As built (2026-10-19).** A note a run
+saves or rewrites while it has read content third parties can author is marked (`memories.tainted`, added to the store's
+columns), and keeps the mark; a lesson drawn from such a run and the reflection's journal that names it carry it too,
+while a lesson the owner saves and the notes the owner writes do not, and the owner's own rewrite of a note on the
+Memory page takes the mark off. A marked note is never among the notes a run starts with, is handed while it works or is
+handed as a site's lessons when it reaches the site (`prompt_memories`, `live_memories`, `site_lessons`), nor among the
+notes the model that writes lessons is shown: `memory_search` alone finds it, and what it returns counts as outside
+content, so the run's next save asks unless its approvals answer that themselves; the start says in one sentence how
+many notes were left out so. The memory tools refuse a note that holds a key-like string or one of the secrets Dot
+holds, and tell the model to record where the key lives (the secrets read off the event loop). The Memory page and `dotx
+memory list` name a marked note; the doctor warns when lessons are approved by the run's own model (`[models] review`
+the same as `main` with `agent.lessons = "auto"`). The review made the mark a required argument wherever a note is
+written, which brought in the lessons and the journal the agent's change had left unmarked; left an existing note's mark
+as it was when the same words are saved again, which the agent's change marked, so that a note of the owner's could have
+dropped out of the start; let the owner's rewrite take the mark off, in the same write as the text; kept marked notes
+from a site's lessons and from the lesson writer, which the start and the live notes alone had left out; read the
+secrets in a thread; and shortened the memory tools' descriptions, which the model reads at every call. Tests:
+`tests/unit/test_memory_taint.py`, `tests/smoke/test_memory_taint.py`, `tests/unit/test_doctor.py`. Docs:
+`docs/memory-and-schedules.md`, `docs/safety.md`, `docs/models.md`.
 
 ## Log
 
@@ -15511,3 +15535,4 @@ the shell's description carry the direction). Docs: `docs/runs.md`.
 - 2026-10-18 (Opus 5.5): item 379 merged as `b86a996` (PR #373); the pre-push review blocked its first push on two Important findings (no schedule's row was drawn, and following SearXNG's redirects went past the address gate) and passed the next with a Nit, answered. Item 380 on `item-380-one-chat-back`: a chat's page leads to no other, and a page under another keeps its link back, as a Dot run of the owner's made them, reviewed.
 - 2026-10-18 (Opus 5.5): item 380 merged as `9fbd11b` (PR #374). Item 381 on `item-381-load-and-pwa`: the pages load lighter and the app installs whole, as an agent of the owner's built them from the owner's plan, reviewed.
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
+- 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).

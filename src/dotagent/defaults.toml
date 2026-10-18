@@ -594,6 +594,10 @@ inject_min_similarity = 0.55
 # A new note this close to an existing one is reported to the model, which decides whether the old one is outdated.
 similar_threshold = 0.85
 max_chars = 600
+# A note a run saves while it has read content third parties can author is marked "saved while reading outside content"
+# (the Memory page, `dotx memory list`), and a search that returns one taints the run that read it, so its next save
+# asks; yolo removes the approval, not the origin. A note that holds an API key or one of Dot's own secrets is refused:
+# record where the key lives, not the key.
 # A search lifts the agent's notes that a run was handed lately (a use a moment ago is worth a first place; the lift
 # halves every use_half_life_days), so the notes that help overtake the ones first written. An agent's note that no run
 # was handed for rest_days, since it was last handed or written, rests: the Memory page lists it under "Resting", a

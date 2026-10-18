@@ -61,6 +61,7 @@ def _note(content: str) -> MemoryRecord:
         last_used_at=None,
         expires_at=None,
         replaced_by=None,
+        tainted=False,
     )
 
 

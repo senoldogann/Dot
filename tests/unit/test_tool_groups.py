@@ -149,6 +149,7 @@ def _inputs(tool_names: list[str]) -> PromptInputs:
         False,
         Path("/tmp/work"),
         [],
+        0,
         tool_names,
         [],
         0,

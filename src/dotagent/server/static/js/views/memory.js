@@ -149,6 +149,13 @@ function memoryRow({ record, similarity, score }, actions) {
           { class: "row-meta note-meta" },
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
           match,
+          record.tainted
+            ? el(
+                "span",
+                { class: "badge b-warn", title: "The run that saved it had read content third parties can author." },
+                "Saved while reading outside content",
+              )
+            : null,
           el(
             "span",
             { class: "when-line" },

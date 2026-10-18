@@ -53,6 +53,7 @@ def _note(
         last_used_at=last_used_at,
         expires_at=None,
         replaced_by=None,
+        tainted=False,
     )
 
 

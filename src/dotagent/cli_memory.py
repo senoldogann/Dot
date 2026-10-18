@@ -53,14 +53,16 @@ async def cmd_memory_list(command: MemoryListCommand) -> int:
         records: list[MemoryRecord] = await index.store.list_memories(command.limit, 0)
         total: int = await index.store.count_memories()
     for record in records:
-        sys.stdout.write(f"{render_note(record)}\n")
+        mark: str = " — saved while reading outside content" if record.tainted else ""
+        sys.stdout.write(f"{render_note(record)}{mark}\n")
     sys.stderr.write(f"{len(records)} of {total} notes\n")
     return 0
 
 
 async def cmd_memory_add(command: MemoryAddCommand) -> int:
     async with _memory_index(load_user_config()) as index:
-        saved: SavedMemory = await save_memory(index, " ".join(command.text), command.tags, None, None, None)
+        # The owner's own note: they vouch for its text.
+        saved: SavedMemory = await save_memory(index, " ".join(command.text), command.tags, None, None, None, False)
     sys.stdout.write(f"{'Saved' if saved.created else 'Already saved'}: {render_note(saved.record)}\n")
     if saved.similar:
         sys.stdout.write("These notes say nearly the same; remove an outdated one with 'dotx memory forget <id>':\n")

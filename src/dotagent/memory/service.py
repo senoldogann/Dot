@@ -177,13 +177,15 @@ async def save_memory(
     run_id: str | None,
     agent_id: str | None,
     expires_at: float | None,
+    tainted: bool,
 ) -> SavedMemory:
     """Save a note, Dot's or, with ``agent_id``, an agent's own (:func:`visible_to`), holding until ``expires_at``
     (``None``: until it is changed). The same text twice stays one note (the tags are merged, the owner kept, the time
     it holds is the latest save's), saved one after the other or at once, as long as the saver is handed the note that
-    has it (another agent's note is not merged into); a resting note saved again is awake. A new note comes back with
-    the existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are
-    outdated."""
+    has it (another agent's note is not merged into); a resting note saved again is awake. A run that had read content
+    third parties can author saves a tainted note (``tainted``): a note keeps where it came from. A note that had the
+    text already keeps the mark it had, since the same words bring nothing new in. A new note comes back with the
+    existing notes the saver is handed that are nearly the same, so the caller can retire the ones that are outdated."""
     text: str = _checked_text(content, index.config.max_chars)
     clean_tags: tuple[str, ...] = normalize_tags(tags)
     existing: MemoryRecord | None = await index.store.find_memory_by_content(text, agent_id)
@@ -195,7 +197,7 @@ async def save_memory(
         await backfill(index)
         vector = (await index.embedder.embed([text]))[0]
         similar = tuple(hit for hit in await _similar_notes(index, vector) if visible_to(hit.record, agent_id))
-    record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector, expires_at)
+    record, created = await index.store.add_memory_once(text, clean_tags, run_id, agent_id, vector, expires_at, tainted)
     if not created:
         # Another save of the text, by another run or process, added it meanwhile.
         return await _saved_again(index.store, record, clean_tags, expires_at)
@@ -203,7 +205,10 @@ async def save_memory(
 
 
 async def _saved_again(
-    store: Store, existing: MemoryRecord, tags: tuple[str, ...], expires_at: float | None
+    store: Store,
+    existing: MemoryRecord,
+    tags: tuple[str, ...],
+    expires_at: float | None,
 ) -> SavedMemory:
     """The note ``existing``, whose text was saved again with ``tags``, holding until ``expires_at``: the tags are
     merged into its own, and a note the reflection rested (tagged ``rest``), or whose time ran out or changes, is
@@ -371,10 +376,13 @@ def owner_prompt_lines(section: OwnerSection) -> tuple[str, ...]:
 
 
 class Remembered(FrozenModel):
-    """The notes a run starts with and the tokens they are estimated to take."""
+    """The notes a run starts with, the tokens they are estimated to take, and how many of the notes that matched it
+    were left out as saved while reading outside content, whether or not they would have fit (``tainted_left_out``,
+    item 384)."""
 
     records: tuple[MemoryRecord, ...]
     tokens: int
+    tainted_left_out: int
 
 
 class LiveNotes(FrozenModel):
@@ -439,7 +447,10 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
     (tagged ``core``, newest first), the ones the user wrote (closest to ``query`` first), the agent's own lessons and
     then Dot's notes related to ``query`` (the goal and the earlier goals of its thread; by fit and the agent's own
     scores) that do not rest (:func:`resting`). Only the notes the run may be handed are among them
-    (:func:`visible_to`); a note that does not fit is left to ``memory_search``.
+    (:func:`visible_to`); a note that does not fit is left to ``memory_search``. A note saved while reading outside
+    content (``tainted``) is never among them (item 384): the start notes are handed as trusted data, with no reader in
+    between, so it is left to ``memory_search``, whose answer counts as outside content, and the notes left out so are
+    counted (``tainted_left_out``).
 
     A goal is full of everyday words that match unrelated notes, so when embeddings are on only the notes whose
     meaning clearly fits the query are taken; ``memory_search`` still finds the others, and the resting ones."""
@@ -480,19 +491,21 @@ async def prompt_memories(index: MemoryIndex, query: str, budget: int, agent_id:
     ]
     own: list[MemoryRecord] = [record for record in fresh if record.agent_id is not None]
     shared: list[MemoryRecord] = [record for record in fresh if record.agent_id is None]
-    taken, spent = fit_groups((standing, users, own, shared), budget)
-    return Remembered(records=tuple(taken), tokens=spent)
+    groups: tuple[list[MemoryRecord], ...] = (standing, users, own, shared)
+    tainted: int = sum(1 for group in groups for record in group if record.tainted)
+    taken, spent = fit_groups(tuple([record for record in group if not record.tainted] for group in groups), budget)
+    return Remembered(records=tuple(taken), tokens=spent, tainted_left_out=tainted)
 
 
 async def live_memories(
     index: MemoryIndex, changed: Sequence[MemoryRecord], budget: int, agent_id: str | None
 ) -> LiveNotes:
     """Of the notes ``changed`` while a run of the agent ``agent_id`` works, the ones it would be handed at its start
-    (item 157): those it may be handed (:func:`visible_to`) that do not rest (:func:`resting`), in their order, as many
-    as fit ``budget`` tokens (:func:`fit_notes`)."""
+    (item 157): those it may be handed (:func:`visible_to`) that do not rest (:func:`resting`) and were not saved while
+    reading outside content (item 384), in their order, as many as fit ``budget`` tokens (:func:`fit_notes`)."""
     config: MemoryConfig = index.config
     now: float = time.time()
-    visible: list[MemoryRecord] = [record for record in changed if visible_to(record, agent_id)]
+    visible: list[MemoryRecord] = [record for record in changed if visible_to(record, agent_id) and not record.tainted]
     balances: dict[str, MemoryScore] = await recent_scores_for(index, [record.id for record in visible], now, agent_id)
     fresh: list[MemoryRecord] = [
         record
@@ -505,28 +518,30 @@ async def live_memories(
 
 async def update_memory_note(index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str]) -> MemoryRecord:
     """The user's rewrite of a note in place (text and tags): it keeps its id, its author and its use count and is
-    embedded again."""
+    embedded again. The user vouches for the text they saved, so a note saved while reading outside content no longer
+    counts as such, and goes back among the notes a run starts with (item 384)."""
     existing: MemoryRecord = await index.store.get_memory(memory_id)
-    return await _rewritten(index, memory_id, content, tags, existing.source_run)
+    text, vector = await _embedded(index, content)
+    return await index.store.update_memory_vouched(memory_id, text, normalize_tags(tags), vector, existing.source_run)
 
 
 async def rewrite_memory_note(
-    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], run_id: str
+    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], run_id: str, tainted: bool
 ) -> MemoryRecord:
     """A run's rewrite of a note in place, as :func:`update_memory_note`, except that the run becomes its author: the
-    text is the model's now, so a note the user wrote no longer reads as theirs (item 157)."""
+    text is the model's now, so a note the user wrote no longer reads as theirs (item 157). A run that had read content
+    third parties can author leaves the note tainted, and a clean one leaves the mark a note had."""
     await index.store.get_memory(memory_id)
-    return await _rewritten(index, memory_id, content, tags, run_id)
+    text, vector = await _embedded(index, content)
+    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, run_id, tainted)
 
 
-async def _rewritten(
-    index: MemoryIndex, memory_id: str, content: str, tags: Sequence[str], source_run: str | None
-) -> MemoryRecord:
+async def _embedded(index: MemoryIndex, content: str) -> tuple[str, Vector | None]:
+    """A note's text, checked, and its embedding, or ``None`` when embeddings are off."""
     text: str = _checked_text(content, index.config.max_chars)
-    vector: Vector | None = None
-    if index.embedder is not None:
-        vector = (await index.embedder.embed([text]))[0]
-    return await index.store.update_memory(memory_id, text, normalize_tags(tags), vector, source_run)
+    if index.embedder is None:
+        return text, None
+    return text, (await index.embedder.embed([text]))[0]
 
 
 async def forget_memory(index: MemoryIndex, memory_id: str) -> MemoryRecord:

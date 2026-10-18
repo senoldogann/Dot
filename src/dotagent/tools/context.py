@@ -27,6 +27,11 @@ class Gate(Protocol):
     def add_instruction(self, text: str) -> None: ...
 
 
+def _untainted() -> bool:
+    """A context outside a run of the loop, which has read nothing third parties can author."""
+    return False
+
+
 @dataclass(frozen=True)
 class DelegateOutcome:
     """A delegated run that has ended, and whether it read content that third parties can author."""
@@ -53,7 +58,9 @@ class ToolContext:
     to fit it, so nothing is cut from the middle of a page. ``approvals`` is the run's approval mode, which decides
     what happens at a field that takes a secret and where the run's processes start (:func:`run_sandbox`);
     ``questions`` is what ``ask_user`` does in the run. ``facts``
-    gives what the run's calls did so far, as the harness measured it, for a tool that has a claim checked."""
+    gives what the run's calls did so far, as the harness measured it, for a tool that has a claim checked.
+    ``tainted`` says whether the run has read content third parties can author as it stands; a tool that writes
+    something lasting reads it when it runs, as the run may have read such content after the context was made."""
 
     runtime: "Runtime"
     # The browser session this run works in: the daemon's, or the one of the mode its campaign asked for.
@@ -71,6 +78,9 @@ class ToolContext:
     output_chars: int
     facts: Callable[[], "RunFacts"]
     spawner: Spawner | None = None
+    # Whether the run has read content third parties can author as it stands (the gate's ``tainted``), read when a tool
+    # that writes something lasting asks: the memory tools mark the notes they save with it.
+    tainted: Callable[[], bool] = _untainted
     # The names of the tools the run was given, which bound the agents it makes (item 307); ``None`` outside a run of
     # the loop, which makes no agent.
     run_tools: frozenset[str] | None = None
