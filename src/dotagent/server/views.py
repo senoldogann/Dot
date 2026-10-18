@@ -570,10 +570,13 @@ class LearnedSkillView(FrozenModel):
 
 class LearningHealthView(FrozenModel):
     """``GET /api/memories/learning``: how Dot's learning fares (:mod:`dotagent.agent.learning_health`, review O25):
-    the record, ``None`` before the first outcome, and why learning has stopped (``None`` while it works)."""
+    the record, ``None`` before the first outcome, why learning has stopped (``None`` while it works), and whether the
+    harness's nightly step is set to run (``[harness] step_time``, item 391), so that a step that never ran reads as
+    off, not as failing."""
 
     health: LearningHealth | None
     stalled: str | None
+    harness_on: bool
 
 
 class HarnessView(FrozenModel):

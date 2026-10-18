@@ -50,6 +50,11 @@ from dotagent.store.models import (
     DraftRecord,
     DraftStatus,
     EventRecord,
+    HarnessExperience,
+    HarnessProbe,
+    HarnessState,
+    HarnessStep,
+    HarnessStepState,
     HarnessVersion,
     MemoryRecord,
     MemoryScore,
@@ -190,6 +195,22 @@ CREATE TABLE IF NOT EXISTS harness_versions (
     adopted_at REAL, retired_at REAL
 );
 CREATE INDEX IF NOT EXISTS harness_versions_state ON harness_versions(state, created_at);
+CREATE TABLE IF NOT EXISTS harness_steps (
+    id TEXT PRIMARY KEY, started_at REAL NOT NULL, ended_at REAL, from_run TEXT, base_version TEXT,
+    state TEXT NOT NULL, outcome TEXT NOT NULL, error TEXT
+);
+CREATE TABLE IF NOT EXISTS harness_probes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, step_id TEXT NOT NULL, version_id TEXT, label TEXT NOT NULL,
+    task_id TEXT NOT NULL, attempt INTEGER NOT NULL, passed INTEGER NOT NULL, status TEXT NOT NULL, cut TEXT NOT NULL,
+    steps INTEGER NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL, tool_errors INTEGER NOT NULL,
+    seconds REAL NOT NULL, created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS harness_probes_step ON harness_probes(step_id);
+CREATE INDEX IF NOT EXISTS harness_probes_version ON harness_probes(version_id);
+CREATE TABLE IF NOT EXISTS harness_experiences (
+    id TEXT PRIMARY KEY, step_id TEXT NOT NULL, version_id TEXT, cue TEXT NOT NULL, lesson TEXT NOT NULL,
+    evidence TEXT NOT NULL, confidence TEXT NOT NULL, created_at REAL NOT NULL
+);
 """
 
 _EXTENSIONS: dict[str, str] = {
@@ -433,6 +454,52 @@ def _harness_version(row: aiosqlite.Row) -> HarnessVersion:
         created_at=row["created_at"],
         adopted_at=row["adopted_at"],
         retired_at=row["retired_at"],
+    )
+
+
+def _harness_step(row: aiosqlite.Row) -> HarnessStep:
+    return HarnessStep(
+        id=row["id"],
+        started_at=row["started_at"],
+        ended_at=row["ended_at"],
+        from_run=row["from_run"],
+        base_version=row["base_version"],
+        state=row["state"],
+        outcome=row["outcome"],
+        error=row["error"],
+    )
+
+
+def _harness_probe(row: aiosqlite.Row) -> HarnessProbe:
+    return HarnessProbe(
+        id=row["id"],
+        step_id=row["step_id"],
+        version_id=row["version_id"],
+        label=row["label"],
+        task_id=row["task_id"],
+        attempt=row["attempt"],
+        passed=bool(row["passed"]),
+        status=row["status"],
+        cut=row["cut"],
+        steps=row["steps"],
+        input_tokens=row["input_tokens"],
+        output_tokens=row["output_tokens"],
+        tool_errors=row["tool_errors"],
+        seconds=row["seconds"],
+        created_at=row["created_at"],
+    )
+
+
+def _harness_experience(row: aiosqlite.Row) -> HarnessExperience:
+    return HarnessExperience(
+        id=row["id"],
+        step_id=row["step_id"],
+        version_id=row["version_id"],
+        cue=row["cue"],
+        lesson=row["lesson"],
+        evidence=row["evidence"],
+        confidence=row["confidence"],
+        created_at=row["created_at"],
     )
 
 
@@ -1056,6 +1123,136 @@ class Store:
         """Record the version of the harness the run ``run_id`` took as it started."""
         await self._db.execute("UPDATE runs SET harness_version = ? WHERE id = ?", (version_id, run_id))
         await self._db.commit()
+
+    @_writing
+    async def set_harness_state(self, version_id: str, state: HarnessState) -> HarnessVersion:
+        """Mark a version ``probed`` or ``candidate``; adopting and retiring are :meth:`adopt_harness`'s and
+        :meth:`retire_harness`'s, which keep the adopted key with the state."""
+        if state in ("adopted", "retired"):
+            raise InvalidValueError("adopt_harness and retire_harness set these states", {"state": state})
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_versions SET state = ? WHERE id = ?", (state, version_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("harness version not found", {"version_id": version_id})
+        return await self.get_harness_version(version_id)
+
+    @_writing
+    async def set_harness_notes(self, version_id: str, notes: str) -> None:
+        """Replace a version's notes: what a probe showed of it, the decisions behind it."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_versions SET notes = ? WHERE id = ?", (notes, version_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("harness version not found", {"version_id": version_id})
+
+    @_writing
+    async def create_harness_step(
+        self, started_at: float, from_run: str | None, base_version: str | None
+    ) -> HarnessStep:
+        """Store the start of a step of the improvement loop (item 391), as failed until :meth:`finish_harness_step`
+        says how it ended: a step the daemon's stop cut off reads so."""
+        step: HarnessStep = HarnessStep(
+            id=new_id("hst"),
+            started_at=started_at,
+            ended_at=None,
+            from_run=from_run,
+            base_version=base_version,
+            state="failed",
+            outcome="{}",
+            error="the step did not end",
+        )
+        await self._db.execute(
+            "INSERT INTO harness_steps(id, started_at, ended_at, from_run, base_version, state, outcome, error)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            (step.id, step.started_at, None, step.from_run, step.base_version, step.state, step.outcome, step.error),
+        )
+        await self._db.commit()
+        return step
+
+    @_writing
+    async def finish_harness_step(
+        self, step_id: str, ended_at: float, state: HarnessStepState, outcome: str, error: str | None
+    ) -> HarnessStep:
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_steps SET ended_at = ?, state = ?, outcome = ?, error = ? WHERE id = ?",
+            (ended_at, state, outcome, error, step_id),
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("harness step not found", {"step_id": step_id})
+        return await self.get_harness_step(step_id)
+
+    async def get_harness_step(self, step_id: str) -> HarnessStep:
+        row: aiosqlite.Row | None = await self._one("SELECT * FROM harness_steps WHERE id = ?", (step_id,))
+        if row is None:
+            raise NotFoundError("harness step not found", {"step_id": step_id})
+        return _harness_step(row)
+
+    async def list_harness_steps(self, limit: int) -> list[HarnessStep]:
+        """The newest ``limit`` steps, the newest first."""
+        rows = await self._all("SELECT * FROM harness_steps ORDER BY started_at DESC, id DESC LIMIT ?", (limit,))
+        return [_harness_step(row) for row in rows]
+
+    @_writing
+    async def add_harness_probes(
+        self, step_id: str, version_id: str | None, label: str, cards: Sequence[tuple[object, ...]], created_at: float
+    ) -> None:
+        """Keep the attempts of a probe: each of ``cards`` is ``(task_id, attempt, passed, status, cut, steps,
+        input_tokens, output_tokens, tool_errors, seconds)``."""
+        await self._db.executemany(
+            "INSERT INTO harness_probes(step_id, version_id, label, task_id, attempt, passed, status, cut, steps,"
+            " input_tokens, output_tokens, tool_errors, seconds, created_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [(step_id, version_id, label, *card, created_at) for card in cards],
+        )
+        await self._db.commit()
+
+    async def harness_probes_of(self, step_id: str) -> list[HarnessProbe]:
+        rows = await self._all("SELECT * FROM harness_probes WHERE step_id = ? ORDER BY id", (step_id,))
+        return [_harness_probe(row) for row in rows]
+
+    async def harness_probes_of_version(self, version_id: str) -> list[HarnessProbe]:
+        rows = await self._all("SELECT * FROM harness_probes WHERE version_id = ? ORDER BY id", (version_id,))
+        return [_harness_probe(row) for row in rows]
+
+    @_writing
+    async def add_harness_experience(
+        self, step_id: str, version_id: str | None, cue: str, lesson: str, evidence: str, confidence: str
+    ) -> HarnessExperience:
+        record: HarnessExperience = HarnessExperience(
+            id=new_id("hxp"),
+            step_id=step_id,
+            version_id=version_id,
+            cue=cue,
+            lesson=lesson,
+            evidence=evidence,
+            confidence=confidence,
+            created_at=time.time(),
+        )
+        await self._db.execute(
+            "INSERT INTO harness_experiences(id, step_id, version_id, cue, lesson, evidence, confidence, created_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.step_id,
+                record.version_id,
+                record.cue,
+                record.lesson,
+                record.evidence,
+                record.confidence,
+                record.created_at,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def list_harness_experiences(self, limit: int) -> list[HarnessExperience]:
+        """The newest ``limit`` experiences, the newest first."""
+        rows = await self._all("SELECT * FROM harness_experiences ORDER BY created_at DESC, id DESC LIMIT ?", (limit,))
+        return [_harness_experience(row) for row in rows]
 
     async def run_harness(self, run_id: str) -> str | None:
         """The version of the harness the run took, ``None`` with none adopted then or for a run from before."""

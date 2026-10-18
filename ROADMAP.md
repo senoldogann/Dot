@@ -14834,6 +14834,37 @@ build notes: charters of owns / done looks like / stops at, and "a figure withou
 the desk it came from", kept as the first example habits and as a candidate check for the page's "keep this run as a
 test".
 
+### 391. The harness: the probe and the nightly step
+
+**Status: done (2026-10-19), on `harness-3`, stacked on `harness-2`.** The third layer (Loops). A probe
+(`harness/probe.py`) plays one text on the scoring set: each task a run in a throw-away home with the exclusions of an
+eval, the text adopted in the attempt's own store before its run starts (`play(..., harness)` in the eval runner), a
+scorecard per attempt (passed, ending, cut, steps, tokens, tool errors, seconds), and a stop before the attempt that
+would pass the budget of minutes or tokens, the next attempt taken to cost what the earlier ones did; a process that
+outlives its budget is ended and counts as cut short, and ended too when the daemon stops (SIGTERM, which the probe
+answers by cancelling its play so that the commands it started end with it; SIGKILL after a grace). A probe runs in a
+process of its own (`dotx harness probe --ask FILE`, JSON in and out): an attempt switches the process's Dot home, which
+the daemon must never see. The contrast (`harness/contrast.py`) says per task whether a candidate passed more, as often
+or less than the base, and in all better (more on a task, less on none), same, worse or unclear (a probe cut short); the
+candidate better on the most tasks, then the cheapest, survives. The step (`harness/step.py`) learns from the newest run
+of the owner's that ended since the last step, proposes in each scope, probes the base and the candidates within the
+budget, keeps the survivor as `probed` (two that both did better are merged by the composer and the merge is played in
+its turn; it survives when it did better, else the best candidate does), retires the rest with their contrasts, writes
+what each edit did and an experience when one helped or hurt (`harness_experiences`), records itself (`harness_steps`,
+`harness_probes`), and adopts on its own only with `[harness] adopt = "auto"` and two repeats, never from a run that had
+read content third parties can author; a composer or experience writer that fails leaves the step failed with the error,
+the survivor probed all the same, and a scripted check does not move the next step's window. The scheduler runs it at
+`[harness] step_time` ("off" by default: every run of a probe spends the main model's tokens; the eight small tasks
+twice under three texts are about fifty runs), timed and recorded like the reflection, under learning health's new work
+`harness`; `dotx harness step` runs it by hand and `--scripted` plays the references through the scripted model, the
+whole loop at no cost, which the smoke test does. `dotx harness final` plays the final set once under the adopted
+version and keeps the report in the version's notes. **Decisions.** Score first, composer second: the best by the
+scoring set survives; the composer merges only two winners. Probes apart from the daemon, not in it: `eval_environment`
+is process-wide. The default is off until the owner chooses a budget; the page (item 393) will carry the switch. **Left
+for later.** A scoring set with headroom: the first step with a real model (Claude Haiku 5.5) passed the eight tasks 2/2
+under the base and the candidate alike, so the loop can only keep until the set holds tasks the main model fails
+sometimes; and a secondary signal (steps, tokens) when pass rates tie.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15637,3 +15668,4 @@ test".
 - 2026-10-19 (Fable 5.1): item 388 on `js-gate`, on the owner's word of the same day after the interface review of 2026-10-18: the web interface gets checks of its own (Biome, `tsc` over the JSDoc, `node --test`), an export nothing imports fails the gate, and the pages that are not the chat or the home load on demand. Done, awaiting the owner's push.
 - 2026-10-19 (Fable 5.1): item 388's whole gate ran: 705 passed, the 17 browser tests that failed under `-n auto` passed serially, as they do on main. Item 389 on `harness-1`, stacked on `js-gate`: the harness's first layer, versions of the texts a run's prompt takes, written, adopted and retired by the owner (docs/harness.md); the method of Harness² (arXiv 2610.14224) adopted, its code not.
 - 2026-10-19 (Fable 5.1): item 389 committed on `harness-1`; item 390 on `harness-2`: the four roles of the step and `dotx harness propose`.
+- 2026-10-19 (Fable 5.1): item 390 committed on `harness-2`; item 391 on `harness-3`: the probe apart from the daemon, the contrast, the step and its schedule, `dotx harness step|probe|final`.

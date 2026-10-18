@@ -3,6 +3,7 @@ version is written (by the owner, later by the improvement loop), adopted, which
 retired; adopting an earlier version again takes a change back."""
 
 import difflib
+import json
 from collections.abc import Sequence
 
 from pydantic import JsonValue
@@ -20,7 +21,7 @@ from dotagent.harness.components import (
     unprintable,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessVersion
+from dotagent.store.models import HarnessStep, HarnessVersion
 
 log = get_logger(__name__)
 # A version's summary: one line of at most this many characters (what the API's HarnessRequest bounds it to).
@@ -130,3 +131,38 @@ def diff_text(before: HarnessText, after: HarnessText, before_name: str, after_n
         if lines:
             parts.append("\n".join(lines))
     return "\n".join(parts)
+
+
+def _parsed_notes(notes: str, where: dict[str, JsonValue]) -> dict[str, JsonValue]:
+    if notes == "":
+        return {}
+    try:
+        parsed: object = json.loads(notes)
+    except json.JSONDecodeError as exc:
+        raise InvalidValueError("the notes are not JSON", where) from exc
+    if not isinstance(parsed, dict):
+        raise InvalidValueError("the notes are not a JSON object", where)
+    return parsed
+
+
+def notes_of(version: HarnessVersion) -> dict[str, JsonValue]:
+    """A version's notes as the JSON object Dot writes them as (``{}`` for none: a version of the owner's). Notes that
+    are not one are a fault, raised as :class:`InvalidValueError`, never read around."""
+    return _parsed_notes(version.notes, {"version": version.id})
+
+
+def notes_with(notes: str, more: dict[str, JsonValue]) -> str:
+    """A version's ``notes`` (JSON, or none) with ``more`` added."""
+    return json.dumps({**_parsed_notes(notes, {"notes": notes[:80]}), **more}, ensure_ascii=False)
+
+
+def step_facts(step: HarnessStep) -> dict[str, JsonValue]:
+    """What a step did, as the JSON object :func:`dotagent.harness.step.run_step` writes (``{}`` while it runs);
+    anything else is a fault, raised as :class:`InvalidValueError`, never read around."""
+    try:
+        facts: object = json.loads(step.outcome)
+    except json.JSONDecodeError as exc:
+        raise InvalidValueError("a step's outcome is not JSON", {"step": step.id}) from exc
+    if not isinstance(facts, dict):
+        raise InvalidValueError("a step's outcome is not a JSON object", {"step": step.id})
+    return facts

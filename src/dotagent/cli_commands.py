@@ -176,6 +176,29 @@ class HarnessProposeCommand(FrozenModel):
     scope: Literal["invariant", "domain"]
 
 
+class HarnessStepCommand(FrozenModel):
+    """One step of the improvement loop now (item 391): from ``run_id``, or the newest run that ended; ``scripted``
+    plays the references through the scripted model, a check of the step without a model's cost."""
+
+    name: Literal["harness-step"]
+    run_id: str | None
+    scripted: bool
+
+
+class HarnessProbeCommand(FrozenModel):
+    """A probe in a process of its own (item 391): the ask read from the file ``ask``, the report printed as JSON."""
+
+    name: Literal["harness-probe"]
+    ask: str
+
+
+class HarnessFinalCommand(FrozenModel):
+    """The final set played once under the adopted version, or ``version_id`` (item 391)."""
+
+    name: Literal["harness-final"]
+    version_id: str | None
+
+
 class BrowserImportChromeCommand(FrozenModel):
     name: Literal["browser-import-chrome"]
     profile: str
@@ -359,6 +382,9 @@ type Command = Annotated[
     | HarnessAdoptCommand
     | HarnessRetireCommand
     | HarnessProposeCommand
+    | HarnessStepCommand
+    | HarnessProbeCommand
+    | HarnessFinalCommand
     | BrowserLoginCommand
     | BrowserImportChromeCommand
     | BrowserAttachCommand

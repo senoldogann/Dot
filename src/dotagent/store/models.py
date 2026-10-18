@@ -468,3 +468,58 @@ class HarnessVersion(FrozenModel):
     created_at: float
     adopted_at: float | None
     retired_at: float | None
+
+
+type HarnessStepState = Literal["done", "keep", "skipped", "failed"]
+
+
+class HarnessStep(FrozenModel):
+    """One step of the improvement loop (item 391, docs/harness.md): the run it learned from (``from_run``, ``None``
+    when none was there to learn from), the version the probes compared against (``base_version``, ``None`` for Dot's
+    own text alone), how it ended (``state``: ``done`` with a probed version written, ``keep`` with the base kept,
+    ``skipped`` with nothing to learn from, ``failed``), what it did as JSON (``outcome``: the candidates, the probes'
+    contrasts, the decision, the probed version) and ``error`` when it failed."""
+
+    id: str
+    started_at: float
+    ended_at: float | None
+    from_run: str | None
+    base_version: str | None
+    state: HarnessStepState
+    outcome: str
+    error: str | None
+
+
+class HarnessProbe(FrozenModel):
+    """One attempt of a probe (item 391): the step it was part of, the version played (``None`` for Dot's own text
+    alone) and its ``label``, the task and the attempt, and what the attempt came to."""
+
+    id: int
+    step_id: str
+    version_id: str | None
+    label: str
+    task_id: str
+    attempt: int
+    passed: bool
+    status: RunStatus
+    cut: str
+    steps: int
+    input_tokens: int
+    output_tokens: int
+    tool_errors: int
+    seconds: float
+    created_at: float
+
+
+class HarnessExperience(FrozenModel):
+    """An experience the loop kept (item 391): the shape of situation it applies to (``cue``), the lesson, the
+    evidence it rests on, how sure the writer was, and the step and version it came from."""
+
+    id: str
+    step_id: str
+    version_id: str | None
+    cue: str
+    lesson: str
+    evidence: str
+    confidence: str
+    created_at: float

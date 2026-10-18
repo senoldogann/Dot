@@ -533,6 +533,10 @@ export function mount(root, _ctx) {
             learningLine("The nightly reflection", view.health.reflection),
             learningLine("Lessons from runs", view.health.lessons),
             learningLine("Skills from runs", view.health.playbooks),
+            // A step that [harness] step_time keeps from running, with no record yet, is off, not failing.
+            !view.harness_on && view.health.harness.last_success === null && view.health.harness.last_failure === null
+              ? el("li", null, "The harness's nightly step: off. ", el("span", { class: "faint" }, "In the config file: [harness] step_time."))
+              : learningLine("The harness's nightly step", view.health.harness),
           ]),
     );
     learningHint.textContent = view.stalled === null ? "" : `Learning has stopped: ${view.stalled}`;
