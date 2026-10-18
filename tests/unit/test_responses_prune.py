@@ -2,7 +2,15 @@
 goes back whole; before, only the last of them was kept, and the thinking of the others was lost to the next step."""
 
 from dotagent.core.types import JsonObject
-from dotagent.llm.codec_responses import prune_unpaired
+from dotagent.llm.codec_responses import (
+    ResponsesOptions,
+    ResponsesState,
+    encode_input,
+    initial_responses_state,
+    prune_unpaired,
+    responses_reply,
+)
+from dotagent.llm.types import Message, ModelReply, assistant_from_reply, tool_message
 
 
 def _reasoning(identifier: str) -> JsonObject:
@@ -39,3 +47,27 @@ def test_a_run_of_reasoning_before_a_call_or_a_message_is_kept_whole() -> None:
         _reasoning("rs_4"),
         message,
     ]
+
+
+def test_a_call_whose_id_is_empty_or_given_twice_gets_one_of_its_own_and_its_result_answers_it() -> None:
+    """Every call of a reply has an id of its own, as the chat codec gives one (item 386), in the items the next
+    request sends back as they are too, so that each result answers its call and none is pruned as unpaired."""
+    calls: tuple[JsonObject, ...] = (
+        {"type": "function_call", "call_id": "", "name": "list_dir", "arguments": "{}"},
+        {"type": "function_call", "call_id": "call_1", "name": "read_file", "arguments": '{"path": "a.txt"}'},
+        {"type": "function_call", "call_id": "call_1", "name": "read_file", "arguments": '{"path": "b.txt"}'},
+    )
+    state: ResponsesState = initial_responses_state("gpt-test").model_copy(update={"final_output": calls})
+    reply: ModelReply = responses_reply(state)
+    ids: list[str] = [call.id for call in reply.tool_calls]
+    assert ids[1] == "call_1" and len(set(ids)) == 3 and all(ids)
+    messages: list[Message] = [
+        assistant_from_reply(reply, "responses"),
+        *(tool_message(call, f"result {index}", ()) for index, call in enumerate(reply.tool_calls)),
+    ]
+    sent: list[JsonObject] = encode_input(
+        messages, "responses", ResponsesOptions(image_detail="auto", tool_output_images=False)
+    )
+    asked: list[str] = [str(item["call_id"]) for item in sent if item.get("type") == "function_call"]
+    answered: list[str] = [str(item["call_id"]) for item in sent if item.get("type") == "function_call_output"]
+    assert asked == ids and answered == ids

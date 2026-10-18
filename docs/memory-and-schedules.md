@@ -154,7 +154,8 @@ creates takes its chat's choices, which are yours: the model of a run cannot pic
   is skipped and waits for the next; you are told, as you are when a firing's run cannot start (see the notifications
   under the web UI). A one-time schedule has no next time and is never dropped: overdue, it fires late, and its run
   reads first when it was due and when it starts. One whose run could not start stays due and is tried again a minute
-  later, then after twice as long each time, an hour at the most.
+  later, then after twice as long each time, an hour at the most. One whose firing a crash cut before its run was under
+  way is due again at the time it fired once the scheduler starts, unless its run had been made (item 386).
 - The scheduler goes on past a failure: the schedules, the campaigns and the nightly reflection are each looked at on
   their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick tries again. Only
   20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an
