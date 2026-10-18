@@ -584,6 +584,7 @@ async def test_the_plus_menu_picks_plugins_skills_and_plan_first_as_chips_that_g
                 await browser.close()
 
 
+@pytest.mark.browser
 async def test_an_at_word_picks_a_server_or_a_skill_by_its_name(login_env: dict[str, str], tmp_path: Path) -> None:
     """`@` at the start of a word opens the menu of the picks alone (item 367): the MCP servers by name with the number
     of their tools, then the skills and the servers' tools, filtered by the letters after it; Enter makes the chip and

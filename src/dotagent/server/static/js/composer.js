@@ -64,10 +64,11 @@ function loadPalette() {
 
 /** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`), autosize up to `maxPx`, the slash
  * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer), the at menu
- * of the MCP servers, their tools and the skills (item 367) and the markdown it holds shown under it; `edited()` runs after a pick of the menu changed the text, as the input event does
- * after typing, and `picked(pick)` after a skill or a tool was picked for the message (`{ kind, name }`, item 318).
- * Returns the menu element and the box's field (the box with its markdown under it) to place in the composer's frame,
- * `autosize()`, to call after any change of the text, and `dispose()`. */
+ * of the MCP servers, their tools and the skills (item 367) and the markdown it holds shown under it; `edited()` runs
+ * after a pick of the menu changed the text, as the input event does after typing, and `picked(pick)` after a skill or
+ * a tool was picked for the message (`{ kind, name }`, item 318). Returns the menu element and the box's field (the box
+ * with its markdown under it) to place in the composer's frame, `autosize()`, to call after any change of the text, and
+ * `dispose()`. */
 export function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
   const menu = el("div", { class: "slash-menu", role: "listbox", id: `slash-${Math.random().toString(36).slice(2, 8)}`, hidden: true });
   textarea.setAttribute("aria-controls", menu.id);
@@ -121,7 +122,8 @@ export function wireComposer(textarea, { maxPx, send, commands, edited, picked }
       menu.append(el("div", { class: "slash-note" }, `Skills and MCP tools could not be loaded: ${problem}`));
     }
     if (shown.length === 0 && problem === null) {
-      // The at menu holds nothing but what the palette lists: until it is read, it says so rather than that nothing matches.
+      // The at menu holds nothing but what the palette lists: until it is read, it says so rather than that nothing
+      // matches.
       const loading = palette === null && range.trigger === "@";
       menu.append(el("div", { class: "slash-note" }, loading ? "Reading the MCP servers and skills…" : `Nothing matches ${range.trigger}${range.word}.`));
     }
