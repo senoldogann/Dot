@@ -80,7 +80,8 @@ export function sentFiles(files) {
  * them (`{ id, name, size }`) for a draft and `restore(files)` lists them again from one, `restoreSmall(files)` lists a
  * queued message's files small in the box that edits it (`{ id, name, size, kind }`, item 376), `count()` counts the
  * files listed, whatever their state, `busy()` is true while one is still uploading, `clear()` empties the list after
- * the message went, and `onChange()` runs after every change.
+ * the message went, `setAside()` takes the files out of the list as they stand and `putBack(kept)` lists them again
+ * (the box that edits a queued message borrows the list, item 376), and `onChange()` runs after every change.
  */
 export function createAttachments({ dropTarget, input, onChange }) {
   const entries = [];
@@ -290,6 +291,22 @@ export function createAttachments({ dropTarget, input, onChange }) {
       for (const entry of [...entries]) {
         remove(entry);
       }
+    },
+    // Out of the list and back as they were: a photo keeps its picture, a long paste its way back into the box.
+    setAside: () => {
+      const kept = entries.splice(0, entries.length);
+      for (const entry of kept) {
+        entry.node.remove();
+      }
+      paint();
+      return kept;
+    },
+    putBack: (kept) => {
+      for (const entry of kept) {
+        entries.push(entry);
+        list.append(entry.node);
+      }
+      paint();
     },
   };
 }

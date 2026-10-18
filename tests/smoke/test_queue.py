@@ -483,7 +483,8 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
 ) -> None:
     """The box puts the files of the queued message it edits back (item 376): small, the photo's own picture and the
     text file's icon, no words, each with its ×; a file added to the edit goes with it once uploaded, Save waiting for
-    it as a send does; the message the box holds is not kept as the chat's draft; and the files leave with the edit."""
+    it as a send does; the message the box holds is not kept as the chat's draft; and the files leave with the edit,
+    the draft's own photo coming back as it was."""
     model: _GatedModel = _GatedModel()
     async with _served(login_env, model) as (runtime, manager, address):
         first, message, photo, note = await _queued_with_photo(runtime, manager)
@@ -495,6 +496,11 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/runs/{first.id}")
+                # The chat's draft holds a photo of its own, which waits aside while the edit lasts.
+                await page.locator(".dock input[type=file]").set_input_files(
+                    {"name": "draft.png", "mimeType": "image/png", "buffer": b64decode(_PIXEL_PNG)}
+                )
+                await expect(page.locator(".dock .attach-chip.ready")).to_have_count(1)
                 row: Locator = page.locator(".dock .queue .queue-row").first
                 await row.get_by_role("button", name="Edit queued message").click()
                 chips: Locator = page.locator(".dock .attach-chip.small")
@@ -535,8 +541,11 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 await expect(page.locator(".dock .attach-chip.ready")).to_have_count(3)
                 await page.unroute_all(behavior="ignoreErrors")
                 await page.locator(".dock .btn.send").click()
-                await expect(every_chip).to_have_count(0)
+                await expect(chips).to_have_count(0)
                 await expect(row).to_have_count(1)
+                # The draft's photo is back as it was, its own picture on its chip.
+                await expect(every_chip).to_have_count(1)
+                await expect(every_chip.locator("img.attach-thumb")).to_have_attribute("src", re.compile(r"^blob:"))
                 saved: QueuedMessage = (await runtime.store.list_queued(first.thread_id))[0]
                 assert (saved.text, len(saved.attachments)) == (SHORT_SUMMARY, 3)
             finally:
