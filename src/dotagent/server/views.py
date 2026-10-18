@@ -581,13 +581,20 @@ class LearningHealthView(FrozenModel):
 
 class HarnessView(FrozenModel):
     """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
-    own text alone, every version the newest first, and the bounds a component keeps to."""
+    own text alone, every version the newest first, the bounds a component keeps to, and how the nightly step is set
+    (item 393): when it runs ("off" never), the scoring and final sets, the repeats, and who adopts a version the probe
+    showed better."""
 
     adopted: HarnessVersion | None
     versions: tuple[HarnessVersion, ...]
     habits_chars: int
     tool_guidance_chars: int
     component_lines: int
+    step_time: str
+    scoring_tasks: tuple[str, ...]
+    final_tasks: tuple[str, ...]
+    step_repeats: int
+    adopt: Literal["owner", "auto"]
 
 
 class HarnessRequest(FrozenModel):

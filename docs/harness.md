@@ -160,8 +160,21 @@ writes a candidate. An experience written in a step that learned from a run whic
 author is kept marked (`tainted`, said on the page) and never shown to the proposer, as a tainted note is never shown to
 the lesson writer: its words cannot pass into a clean run's candidate unmarked.
 
+## The page
+
+Settings › Harness is where you read and decide. *In use* shows the adopted version's texts, or that Dot's own text
+alone is in use. *Write a version* takes habits and tool guidance (prefilled from the adopted version) and a summary,
+and saves them as a candidate or adopts them at once; what cannot be a component is refused with why. *Versions* lists
+every version, the newest first, with its state, who made it and when, its texts and notes (the scope and the moments
+of a proposal, the contrast of a probe, the decisions of a composition) under *Texts and notes*, and Adopt and Retire;
+retiring the version in use asks first. *Steps of the loop* and *Experiences* list the newest of each, a step with the
+run it learned from and what it decided. *The nightly step* says when the step runs (or that it is off, and which
+setting turns it on), the scoring and final sets, who adopts, and the bounds. On a phone the page is a row of the
+settings list under *How Dot works*.
+
 ## What is built so far
 
 Item 389 built the versions, their components, the prompt's reading of the adopted one, the command line and the API.
 Item 390 built the roles and `dotx harness propose`. Item 391 built the probe, the step and its schedule. Item 392
-built the provenance graph, the lineage and the library's reading. The page follows; this page grows with it.
+built the provenance graph, the lineage and the library's reading. Item 393 built the page. Left for later: a run of
+yours kept as a test of the scoring set from its page, the step started from the page, and the graph drawn on it.
