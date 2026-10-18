@@ -178,7 +178,9 @@ async def test_a_note_added_once_after_a_locked_commit_is_the_one_stored(
             await commit()
 
         monkeypatch.setattr(store._db, "commit", locked_once)
-        record, created = await store.add_memory_once("The owner prefers short answers.", (), None, None, None, None)
+        record, created = await store.add_memory_once(
+            "The owner prefers short answers.", (), None, None, None, None, False
+        )
         monkeypatch.undo()
         stored: MemoryRecord = await store.get_memory(record.id)
         assert created and stored.content == "The owner prefers short answers."

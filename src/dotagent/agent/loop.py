@@ -1646,6 +1646,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 splits_work(run.once),
                 runtime.workspace,
                 [render_note(record) for record in remembered],
+                recalled.tainted_left_out,
                 tools_in_order(specs, query),
                 listing.skills,
                 listing.left,

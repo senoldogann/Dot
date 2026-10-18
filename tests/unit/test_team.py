@@ -52,6 +52,7 @@ def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
             False,
             Path("/tmp/work"),
             [],
+            0,
             tool_names,
             [],
             0,

@@ -1,6 +1,7 @@
 """A note keeps where it came from: the run that saves it while it has read content third parties can author marks it
-(``tainted``), a clean run does not, and a correction leaves the mark it found. Real SQLite, no embedder: the words are
-enough to find the notes these tests use.
+(``tainted``), a clean run does not, and a run's correction leaves the mark it found. A marked note is not among the
+notes a run starts with or is handed while it works, which say how many were left out; the owner's own rewrite takes
+the mark off (item 384). Real SQLite, no embedder: the words are enough to find the notes these tests use.
 """
 
 from collections.abc import AsyncIterator
@@ -10,10 +11,19 @@ from types import SimpleNamespace
 
 import pytest
 
+from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import AppConfig, load_config
 from dotagent.core.types import JsonObject
-from dotagent.memory.service import MemoryIndex
+from dotagent.memory.service import (
+    LiveNotes,
+    MemoryIndex,
+    Remembered,
+    live_memories,
+    prompt_memories,
+    update_memory_note,
+)
 from dotagent.store.db import Store
+from dotagent.store.models import MemoryRecord
 from dotagent.tools.base import RegisteredTool, ToolResult
 from dotagent.tools.memory import build_memory_tools
 
@@ -93,3 +103,59 @@ async def test_a_correction_leaves_the_mark_a_note_had(tmp_path: Path, monkeypat
         moved: str = "The user's receipts are scanned on Fridays at noon."
         await _call("memory_update", _context(index, True), {"memory_id": clean.id, "content": moved, "tags": []})
         assert (await index.store.get_memory(clean.id)).tainted
+
+
+async def test_a_marked_note_is_left_out_of_the_start_and_the_prompt_says_how_many(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with _index(tmp_path, monkeypatch) as index:
+        await _call("memory_save", _context(index, False), {"content": NOTE, "tags": ["core"]})
+        await _call("memory_save", _context(index, True), {"content": OTHER, "tags": ["core"]})
+        start: Remembered = await prompt_memories(index, "invoices receipts", 4000, None)
+        changed: list[MemoryRecord] = await index.store.list_memories(10, 0)
+        live: LiveNotes = await live_memories(index, changed, 4000, None)
+    assert [note.content for note in start.records] == [NOTE]
+    assert start.tainted_left_out == 1
+    assert [note.content for note in live.records] == [NOTE]
+    prompt: str = build_system_prompt(
+        collect_prompt_inputs(
+            "task",
+            "cli",
+            "aggressive",
+            "ask",
+            "wait",
+            False,
+            False,
+            tmp_path,
+            [NOTE],
+            start.tainted_left_out,
+            [],
+            [],
+            0,
+            None,
+            [],
+            None,
+            (),
+            (),
+            None,
+            "full",
+        )
+    )
+    assert "1 note was left out: saved while reading outside content" in prompt
+    assert OTHER not in prompt
+
+
+async def test_the_owners_rewrite_takes_the_mark_off_and_a_resave_of_the_same_words_leaves_it(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    async with _index(tmp_path, monkeypatch) as index:
+        await _call("memory_save", _context(index, False), {"content": NOTE, "tags": []})
+        # The same words saved again by a run that read outside content bring nothing new: the note stays clean.
+        await _call("memory_save", _context(index, True), {"content": NOTE, "tags": []})
+        kept = await index.store.find_memory_by_content(NOTE, None)
+        assert kept is not None and not kept.tainted
+        await _call("memory_save", _context(index, True), {"content": OTHER, "tags": []})
+        marked = await index.store.find_memory_by_content(OTHER, None)
+        assert marked is not None and marked.tainted
+        vouched: MemoryRecord = await update_memory_note(index, marked.id, OTHER, ["checked"])
+        assert not vouched.tainted

@@ -208,7 +208,8 @@ def memories_router(ctx: ServerContext) -> APIRouter:
 
     @router.post("/memories", status_code=201)
     async def add_memory(request: MemoryRequest) -> SavedMemory:
-        return await save_memory(index, request.content, request.tags, None, None, None)
+        # The owner's own note, from the Memory page: they vouch for its text.
+        return await save_memory(index, request.content, request.tags, None, None, None, False)
 
     @router.patch("/memories/{memory_id}")
     async def edit_memory(memory_id: str, request: MemoryRequest) -> MemoryRecord:

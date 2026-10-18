@@ -294,7 +294,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
 
     # The agent learns for itself (item 94): a lesson of its run and a skill of its own reach its next run, in the
     # prompt's notes and under Skills, and not Dot's run; its page lists them, scored by its own runs.
-    await save_memory(runtime.memory, LESSON, ("lesson",), run_id, agent_id, None)
+    await save_memory(runtime.memory, LESSON, ("lesson",), run_id, agent_id, None, False)
     await asyncio.to_thread(write_playbook, playbooks_dir(), _skill(agent_id))
     MODEL.script = ScriptedProvider(_PROVIDER, [FINISH, FINISH])
     second_id: str = await _finished(client, manager, {"goal": "Find two sources on the matter", "agent_id": agent_id})

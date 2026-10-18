@@ -26,6 +26,7 @@ def _prompt(split: bool, tool_names: list[str]) -> str:
             split,
             Path("/tmp/work"),
             [],
+            0,
             tool_names,
             [],
             0,

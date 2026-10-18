@@ -50,6 +50,7 @@ def _prompt(style: PromptStyle, approvals: ApprovalMode) -> str:
             False,
             Path("/tmp/work"),
             [],
+            0,
             [],
             [],
             0,

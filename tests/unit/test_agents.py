@@ -28,6 +28,7 @@ def _prompt(agent: AgentBrief | None) -> str:
             False,
             Path("/tmp/work"),
             [],
+            0,
             [],
             [],
             0,

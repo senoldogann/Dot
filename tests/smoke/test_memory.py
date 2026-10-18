@@ -145,7 +145,7 @@ BUDGET: int = 2000
 
 async def _save_all(index: MemoryIndex, notes: list[str]) -> None:
     for note in notes:
-        await save_memory(index, note, [], None, None, None)
+        await save_memory(index, note, [], None, None, None, False)
 
 
 async def _best(index: MemoryIndex, query: str) -> str:
@@ -173,8 +173,8 @@ async def test_a_query_that_fits_nothing_finds_nothing(memory: MemoryIndex) -> N
 
 @requires_embedder
 async def test_the_same_text_stays_one_note_and_its_tags_merge(memory: MemoryIndex) -> None:
-    first = await save_memory(memory, DARK_MODE, [], "run-1", None, None)
-    again = await save_memory(memory, f"  {DARK_MODE}\n", ["Editor"], "run-2", None, None)
+    first = await save_memory(memory, DARK_MODE, [], "run-1", None, None, False)
+    again = await save_memory(memory, f"  {DARK_MODE}\n", ["Editor"], "run-2", None, None, False)
     assert first.created and not again.created
     assert again.record.id == first.record.id
     assert again.record.tags == ("editor",)
@@ -184,12 +184,12 @@ async def test_the_same_text_stays_one_note_and_its_tags_merge(memory: MemoryInd
 @requires_embedder
 async def test_a_note_that_says_nearly_the_same_comes_back_with_the_old_one(memory: MemoryIndex) -> None:
     await _save_all(memory, ["The user lives in Istanbul.", DOG])
-    moved = await save_memory(memory, "The user lives in Ankara.", [], None, None, None)
+    moved = await save_memory(memory, "The user lives in Ankara.", [], None, None, None, False)
     assert moved.created
     assert [hit.record.content for hit in moved.similar] == ["The user lives in Istanbul."]
     assert moved.similar[0].similarity is not None
     assert moved.similar[0].similarity >= memory.config.similar_threshold
-    assert (await save_memory(memory, LAPTOP, [], None, None, None)).similar == ()
+    assert (await save_memory(memory, LAPTOP, [], None, None, None, False)).similar == ()
 
 
 @requires_embedder
@@ -217,10 +217,10 @@ async def test_reindex_embeds_every_note_again(memory: MemoryIndex) -> None:
 @requires_embedder
 async def test_a_run_starts_with_the_standing_notes_and_the_ones_that_fit_its_goal(memory: MemoryIndex) -> None:
     standing: str = "Always answer the user in Turkish."
-    await save_memory(memory, standing, ["core"], None, None, None)
+    await save_memory(memory, standing, ["core"], None, None, None, False)
     # Notes an earlier run saved: only the ones that fit the goal come along.
     for note in [DOG, LAPTOP, DARK_MODE]:
-        await save_memory(memory, note, [], AGENT_RUN, None, None)
+        await save_memory(memory, note, [], AGENT_RUN, None, None, False)
     related_records: tuple[MemoryRecord, ...] = (
         await prompt_memories(memory, "Take Biscuit the dog to the vet.", BUDGET, None)
     ).records
@@ -241,8 +241,8 @@ async def test_a_run_starts_with_the_standing_notes_and_the_ones_that_fit_its_go
 
 @requires_embedder
 async def test_a_note_the_user_wrote_reaches_every_run_even_when_its_goal_is_unrelated(memory: MemoryIndex) -> None:
-    await save_memory(memory, DOG, [], AGENT_RUN, None, None)
-    await save_memory(memory, CITY, ["aboutme"], None, None, None)
+    await save_memory(memory, DOG, [], AGENT_RUN, None, None, False)
+    await save_memory(memory, CITY, ["aboutme"], None, None, None, False)
     given: list[str] = [
         r.content for r in (await prompt_memories(memory, "Find a recipe for sourdough bread.", BUDGET, None)).records
     ]
@@ -266,9 +266,10 @@ async def test_a_lesson_that_fits_the_goal_reaches_the_run_however_many_notes_th
             None,
             None,
             None,
+            False,
         )
     lesson: str = "Convert invoices to text with pdftotext -layout, so that their tables keep the columns."
-    await save_memory(words_only, lesson, ["lesson"], AGENT_RUN, None, None)
+    await save_memory(words_only, lesson, ["lesson"], AGENT_RUN, None, None, False)
     given: list[str] = [
         r.content for r in (await prompt_memories(words_only, "Convert the invoices to text.", BUDGET, None)).records
     ]
@@ -290,7 +291,7 @@ async def test_a_failing_embedder_fails_the_call_instead_of_saving_without_meani
     )
     async with _opened(tmp_path, broken) as index:
         with pytest.raises(ProviderTransportError):
-            await save_memory(index, DOG, [], None, None, None)
+            await save_memory(index, DOG, [], None, None, None, False)
         assert await index.store.count_memories() == 0
 
 
@@ -372,7 +373,7 @@ async def test_the_real_openai_api_refuses_a_made_up_key_with_a_typed_error(
 
 
 async def test_without_embeddings_only_the_words_are_searched(words_only: MemoryIndex) -> None:
-    saved = await save_memory(words_only, DOG, [], None, None, None)
+    saved = await save_memory(words_only, DOG, [], None, None, None, False)
     await _save_all(words_only, [LAPTOP, CITY])
     assert saved.similar == ()
     assert await words_only.store.all_memory_vectors() == []
@@ -390,20 +391,24 @@ async def test_a_note_whose_time_ran_out_is_neither_handed_nor_found_until_it_is
     without it and a search no longer finds it; saved again (it holds again) it is back."""
     trip: str = "The user is in Helsinki for a conference until Friday."
     now: float = time.time()
-    held = await save_memory(words_only, trip, [], AGENT_RUN, None, now + 3 * 86400.0)
+    held = await save_memory(words_only, trip, [], AGENT_RUN, None, now + 3 * 86400.0, False)
     assert [hit.record.content for hit in await recall(words_only, "Helsinki conference", 5)] == [trip]
     assert trip in [record.content for record in (await prompt_memories(words_only, "Helsinki", BUDGET, None)).records]
     await words_only.store.wake_memory(held.record.id, held.record.tags, now, now - 1.0)
     assert await recall(words_only, "Helsinki conference", 5) == []
     assert (await prompt_memories(words_only, "Helsinki", BUDGET, None)).records == ()
-    again = await save_memory(words_only, trip, [], AGENT_RUN, None, None)
+    again = await save_memory(words_only, trip, [], AGENT_RUN, None, None, False)
     assert not again.created and again.record.expires_at is None
     assert [hit.record.content for hit in await recall(words_only, "Helsinki conference", 5)] == [trip]
 
 
 async def test_a_note_a_run_was_handed_lately_comes_before_one_no_run_built_on(words_only: MemoryIndex) -> None:
-    await save_memory(words_only, "The user's dog Biscuit eats at seven in the morning.", [], AGENT_RUN, None, None)
-    await save_memory(words_only, "The user's dog Biscuit sleeps in the kitchen at night.", [], AGENT_RUN, None, None)
+    await save_memory(
+        words_only, "The user's dog Biscuit eats at seven in the morning.", [], AGENT_RUN, None, None, False
+    )
+    await save_memory(
+        words_only, "The user's dog Biscuit sleeps in the kitchen at night.", [], AGENT_RUN, None, None, False
+    )
     before: list[str] = [hit.record.id for hit in await recall(words_only, "Biscuit", 5)]
     assert len(before) == 2
     await words_only.store.mark_memories_used(AGENT_RUN, [before[-1]], time.time(), "start")
@@ -426,8 +431,8 @@ def _backdate(database: Path, memory_id: str, created_at: float) -> None:
 async def test_an_agent_note_no_run_was_handed_for_long_rests_while_the_users_notes_never_do(
     words_only: MemoryIndex, tmp_path: Path
 ) -> None:
-    old_agent: SavedMemory = await save_memory(words_only, DOG, [], AGENT_RUN, None, None)
-    old_user: SavedMemory = await save_memory(words_only, CITY, [], None, None, None)
+    old_agent: SavedMemory = await save_memory(words_only, DOG, [], AGENT_RUN, None, None, False)
+    old_user: SavedMemory = await save_memory(words_only, CITY, [], None, None, None, False)
     long_ago: float = time.time() - (words_only.config.rest_days + 1) * 86400.0
     _backdate(tmp_path / "dot.db", old_agent.record.id, long_ago)
     _backdate(tmp_path / "dot.db", old_user.record.id, long_ago)
@@ -454,9 +459,9 @@ async def test_a_word_found_in_most_notes_does_not_make_a_match(words_only: Memo
 
 async def test_a_note_must_be_a_single_short_fact(words_only: MemoryIndex) -> None:
     with pytest.raises(StoreError, match="empty"):
-        await save_memory(words_only, " \n ", [], None, None, None)
+        await save_memory(words_only, " \n ", [], None, None, None, False)
     with pytest.raises(StoreError, match=str(words_only.config.max_chars)):
-        await save_memory(words_only, "word " * 200, [], None, None, None)
+        await save_memory(words_only, "word " * 200, [], None, None, None, False)
     assert await words_only.store.count_memories() == 0
 
 
@@ -541,7 +546,7 @@ async def test_the_model_can_save_search_and_forget_notes(runtime: Runtime) -> N
 
 @requires_embedder
 async def test_a_note_the_owner_wrote_becomes_the_runs_once_a_run_rewrites_it(runtime: Runtime) -> None:
-    owners: SavedMemory = await save_memory(runtime.memory, DENTIST, [], None, None, None)
+    owners: SavedMemory = await save_memory(runtime.memory, DENTIST, [], None, None, None, False)
     assert owners.record.source_run is None
     rewritten: str = "The user's dentist is now Dr. Korhonen, near the station."
     updated, _ = await _call(

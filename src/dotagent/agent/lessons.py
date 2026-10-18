@@ -430,6 +430,7 @@ async def _decide_all(
                 await _emit_dismissed(runtime, case.run_id, index, "auto", why)
                 continue
             try:
+                # A lesson of a run that had read outside content keeps that origin, as a note it saved would.
                 saved: SavedMemory = await save_memory(
                     runtime.memory,
                     lesson,
@@ -437,6 +438,7 @@ async def _decide_all(
                     case.run_id,
                     agent_id,
                     None,
+                    case.tainted,
                 )
             except DotError as error:
                 return await _failed(runtime, case.run_id, error, "A lesson could not be saved")
@@ -609,6 +611,7 @@ async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, ind
         lesson: LessonView = await _lesson_of(runtime.store, run_id, index)
         if lesson.state == "saved" or (lesson.state == "dismissed" and lesson.by != "auto"):
             raise _conflict(lesson, run_id)
+        # The owner read the lesson and chose to save it: they vouch for its text, whatever the run had read.
         saved: SavedMemory = await save_memory(
             runtime.memory,
             lesson.text,
@@ -616,6 +619,7 @@ async def save_lesson(runtime: Runtime, deciding: asyncio.Lock, run_id: str, ind
             run_id,
             await _agent_of(runtime.store, run_id),
             None,
+            False,
         )
         await _emit_saved(runtime, run_id, index, saved, "owner")
     return saved

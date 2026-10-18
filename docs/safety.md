@@ -126,8 +126,9 @@ change on a code host, inline code that reaches the network or runs a command of
 the mark. A delegated run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off,
 and the run that tells a chat that its command in the background ended as the chat's last run ended: that message is
 Dot's, not yours. A message you send starts a run unmarked. A note a run saved while it was marked keeps that origin
-(`tainted`): a `memory_search` that returns one marks the run that read it, so its next save asks again, and Settings ›
-Memory and `dotx memory list` say of such a note that it was saved while reading outside content.
+(`tainted`): it is never among the notes a run starts with or is handed while it works (item 384), a `memory_search`
+that returns one marks the run that read it, so its next save asks again, and Settings › Memory and `dotx memory list`
+say of such a note that it was saved while reading outside content.
 
 **Secrets.**
 

@@ -6,6 +6,7 @@ untrusted content. A note saved then keeps that origin (``tainted``), and a sear
 such content again. A note that holds a key or a secret Dot holds is refused: record where the key lives, not the key.
 """
 
+import asyncio
 import time
 
 from pydantic import Field
@@ -66,11 +67,14 @@ def _write_action(tool: str, summary: str, flags: tuple[Flag, ...]) -> ActionInf
     )
 
 
-def _secret_refusal(content: str) -> ToolResult | None:
+async def _secret_refusal(content: str) -> ToolResult | None:
     """The refused note when ``content`` holds a secret, like a key Dot holds or something that looks like a key;
-    ``None`` when it holds none. The model is told where the key lives instead."""
-    if not looks_like_key(content) and not any(secret in content for secret in known_secrets()):
-        return None
+    ``None`` when it holds none. The model is told where the key lives instead. The secrets Dot holds are read from
+    ``<home>/.env``, so in a thread of their own, off the event loop."""
+    if not looks_like_key(content):
+        held: tuple[str, ...] = await asyncio.to_thread(known_secrets)
+        if not any(secret in content for secret in held):
+            return None
     return fail(
         "Not saved: this note holds a secret, an API key, a token or a password. Record where the key lives, not the "
         "key: for example 'The OpenAI key is saved with dotx auth set OPENAI_API_KEY.'"
@@ -135,7 +139,7 @@ def _save_tool() -> RegisteredTool:
         return _write_action("memory_save", f"Remember: {args.content}", flags)
 
     async def run(args: SaveArgs, ctx: ToolContext) -> ToolResult:
-        refused: ToolResult | None = _secret_refusal(args.content)
+        refused: ToolResult | None = await _secret_refusal(args.content)
         if refused is not None:
             return refused
         # A note a run saves is Dot's, for every run; only lessons are an agent's own (item 94). A run that had read
@@ -150,9 +154,8 @@ def _save_tool() -> RegisteredTool:
         name="memory_save",
         description=(
             "Save one durable fact for future runs: a preference, a correction, a detail about the user or their Mac, "
-            "a convention that will apply again. One fact per call. Do not save secrets, progress on the current "
-            "task, or what is easy to look up again. A note that holds a key or a secret Dot holds is refused: record "
-            "where the key lives, not the key."
+            "a convention that will apply again. One fact per call. Do not save secrets (one that holds a key is "
+            "refused: record where the key lives), progress on the current task, or what is easy to look up again."
         ),
         args_model=SaveArgs,
         modes=ALL_MODES,
@@ -249,7 +252,7 @@ def _update_tool() -> RegisteredTool:
         return _write_action("memory_update", f"Change “{record.content}” to “{args.content}”", flags)
 
     async def run(args: UpdateArgs, ctx: ToolContext) -> ToolResult:
-        refused: ToolResult | None = _secret_refusal(args.content)
+        refused: ToolResult | None = await _secret_refusal(args.content)
         if refused is not None:
             return refused
         updated: MemoryRecord = await rewrite_memory_note(
@@ -261,8 +264,7 @@ def _update_tool() -> RegisteredTool:
         name="memory_update",
         description=(
             "Rewrite a saved note whose fact has changed or was wrong, keeping its id. Prefer it over forgetting and "
-            "saving again. A note that holds a key or a secret Dot holds is refused: record where the key lives, not "
-            "the key."
+            "saving again."
         ),
         args_model=UpdateArgs,
         modes=ACTING_MODES,

@@ -56,6 +56,7 @@ def _prompt(source: str) -> str:
             False,
             Path("/tmp/work"),
             [],
+            0,
             [],
             [],
             0,

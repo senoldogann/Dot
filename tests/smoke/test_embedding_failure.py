@@ -175,7 +175,7 @@ async def test_a_run_whose_embeddings_fail_finds_its_notes_and_skills_by_their_w
         )
         runtime: Runtime = await open_runtime(config, login_env)
         try:
-            note, _ = await runtime.store.add_memory_once(NOTE, [], None, None, None, None)
+            note, _ = await runtime.store.add_memory_once(NOTE, [], None, None, None, None, False)
             await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [_FINISH]))
             manager: RunManager = RunManager(runtime)
             try:

@@ -48,8 +48,8 @@ async def test_the_same_note_saved_twice_at_once_stays_one_note_with_the_tags_of
     index: MemoryIndex = MemoryIndex(store=store, embedder=_SlowEmbedder(), config=config.memory)
     try:
         saved: tuple[SavedMemory, SavedMemory] = await asyncio.gather(
-            save_memory(index, NOTE, ["finance"], None, None, None),
-            save_memory(index, NOTE, ["paths"], None, None, None),
+            save_memory(index, NOTE, ["finance"], None, None, None, False),
+            save_memory(index, NOTE, ["paths"], None, None, None, False),
         )
         notes: list[MemoryRecord] = await store.list_memories(10, 0)
     finally:
