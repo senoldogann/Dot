@@ -150,7 +150,8 @@ def decide(
 ) -> Decision:
     """Combine every policy layer into one decision, strictest layer first. ``allowance`` is the question a
     pre-approved spend asks instead of the money hand-off (:mod:`dotagent.policy.spend`), ``None`` for any other
-    action; it takes the hand-off's place and no later layer loosens it."""
+    action; it takes the hand-off's place, and only a rule of the owner's that hands the step off is stricter (item
+    385): the allowance stands in for the money hand-off, not for the owner's rules."""
     refusal: Decision | None = auto_review(info)
     if refusal is not None:
         return refusal
@@ -160,9 +161,16 @@ def decide(
     stopped: Decision | None = hard_stop(info, allowance)
     if stopped is not None:
         return stopped
-    if allowance is not None:
-        return allowance
     rule: RuleRecord | None = match_rule(info, rules)
+    if allowance is not None:
+        if rule is not None and rule.behavior == "handoff":
+            return Decision(
+                verdict="handoff",
+                source="rule",
+                reason=rule.description or f"rule {rule.id}",
+                rule_id=rule.id,
+            )
+        return allowance
     if rule is not None:
         verdict: Verdict = _BEHAVIOR_VERDICT[rule.behavior]
         if verdict == "allow" and rule.behavior == "allow" and tainted and _escalates_on_taint(info):

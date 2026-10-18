@@ -61,8 +61,9 @@ the Mac: the aggressive preset allows it, balanced and cautious ask, a research 
 into the field is still what the approval mode allows (only `yolo` types one-time codes).
 
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
-per_day = 50 }`. Dot reads the amount of a payment step from the control's label ("Pay €19.90") or from the total on the
-page, the largest where several stand, so that a misread errs towards the hand-off; under both caps the step is a
+per_day = 50 }`. Dot reads the amount of a payment step from the labels of its controls ("Pay €19.90") and from the
+total on the page, and takes the largest (item 385: a coupon or a basket line in the same step cannot stand for the
+payment), so that a misread errs towards the hand-off; under both caps the step is a
 question instead of a hand-off (a `yolo` run goes on, `auto` lets the review model answer, `ask` asks you once), it
 is recorded with its amount, shown in the timeline, and counts against the site's day.
 The payments of a site are decided one at a time, each from what the ones before it spent, so two runs paying at once
@@ -76,7 +77,8 @@ currency, so list sites that bill in one currency. Empty by default.
    configured.
 2. The *run mode* denies what a research run may not do.
 3. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
-   yourself. A payment under the pre-approved caps of its site (below) is a question instead of a hand-off.
+   yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
+   one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
 4. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
@@ -110,7 +112,9 @@ name (not `cp -n`), `ln -f`, `tee` without `-a`, `dd` without `conv=notrunc`. Th
 replaces, unlike the file tools, whose changes `dotx undo` writes back.
 
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The first three steps above hold in every mode.
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The second step and your hand-off rules
+hold in every mode; the refusals of the first step and the hand-offs of the third are what a `yolo` run waives, and it
+records each.
 
 **Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
 with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,

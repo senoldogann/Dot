@@ -1,8 +1,11 @@
 """Pre-approved spending (item 33): amounts read from labels and pages, the caps, and the policy's decision."""
 
+from types import SimpleNamespace
+
 import pytest
 
 from dotagent.config import SpendCap
+from dotagent.policy.elements import Element
 from dotagent.policy.engine import decide
 from dotagent.policy.spend import (
     SpendState,
@@ -14,6 +17,8 @@ from dotagent.policy.spend import (
     total_on_page,
 )
 from dotagent.policy.types import ActionInfo, Amount, Decision
+from dotagent.store.models import RuleRecord
+from dotagent.tools.browser import _payment_amount
 
 CAPS: dict[str, SpendCap] = {"shop.example": SpendCap(per_purchase=20.0, per_day=30.0)}
 URL: str = "https://www.shop.example/checkout"
@@ -97,3 +102,55 @@ def test_the_allowance_replaces_the_money_hand_off_but_not_a_credential_one() ->
     assert decide(_payment(amount), "task", False, "aggressive", [], None).source == "hard_stop"
     with_secret: ActionInfo = _payment(amount, ("financial", "credential"))
     assert decide(with_secret, "task", False, "aggressive", [], allowance).verdict == "handoff"
+
+
+def test_a_rule_of_the_owners_that_hands_a_payment_off_holds_over_the_allowance() -> None:
+    """The allowance stands in for the money hand-off, not for the owner's rules (item 385): a rule that hands the
+    step off still does; one that only asks leaves the allowance its place."""
+    amount: Amount = Amount(value=12.0, currency="€")
+    state: SpendState = SpendState(host="shop.example", amount=amount, cap=CAPS["shop.example"], spent_today=0.0)
+    allowance: Decision | None = spend_allowance(state)
+    assert allowance is not None
+    handing: RuleRecord = RuleRecord(
+        id="rule_handoff",
+        position=0,
+        enabled=True,
+        behavior="handoff",
+        tool_glob="browser_act",
+        match_regex="",
+        description="Payments are mine.",
+        created_at=0.0,
+    )
+    decision: Decision = decide(_payment(amount), "task", False, "aggressive", [handing], allowance)
+    assert (decision.verdict, decision.source, decision.rule_id) == ("handoff", "rule", handing.id)
+    asking: RuleRecord = RuleRecord(
+        id="rule_ask",
+        position=0,
+        enabled=True,
+        behavior="ask",
+        tool_glob="browser_act",
+        match_regex="",
+        description="",
+        created_at=0.0,
+    )
+    assert decide(_payment(amount), "task", False, "aggressive", [asking], allowance) is allowance
+
+
+async def test_a_payment_steps_amount_is_the_largest_its_labels_and_its_page_name() -> None:
+    """A coupon or a basket line in the same batch cannot stand for the payment (item 385): the largest amount of the
+    labels and of the page's total is the one the caps read."""
+    page: SimpleNamespace = SimpleNamespace(text="Basket\nOrder total: €499.00")
+
+    async def read_text(thread_id: str, ref: None, offset: int, limit: int) -> SimpleNamespace:
+        return page
+
+    ctx: SimpleNamespace = SimpleNamespace(thread_id="thread_1", browser=SimpleNamespace(read_text=read_text))
+    labels: list[Element | None] = [
+        Element(role="button", name="Apply −€5 coupon"),
+        None,
+        Element(role="button", name="Pay €480.00"),
+    ]
+    assert await _payment_amount(ctx, labels) == Amount(value=499.0, currency="€")  # type: ignore[arg-type]
+    page.text = "Nothing to pay here"
+    assert await _payment_amount(ctx, labels) == Amount(value=480.0, currency="€")  # type: ignore[arg-type]
+    assert await _payment_amount(ctx, [None]) is None  # type: ignore[arg-type]

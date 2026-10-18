@@ -344,16 +344,20 @@ def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretField
 
 
 async def _payment_amount(ctx: ToolContext, elements: list[Element | None]) -> Amount | None:
-    """What a payment step moves: the amount in a control's label, else the total on the page; ``None`` when neither
-    says (the money hand-off then holds). Read for the pre-approved caps of ``[policy.spend]``."""
-    for element in elements:
-        if element is None:
-            continue
-        named: Amount | None = amount_in_label(element.name)
-        if named is not None:
-            return named
+    """What a payment step moves: the largest of the amounts in the labels of its controls and the total on the page,
+    so that a coupon or a basket line beside the payment cannot stand for it and a misread errs towards the hand-off
+    (item 385); ``None`` when none says (the money hand-off then holds). Read for the caps of ``[policy.spend]``."""
+    named: list[Amount] = [
+        amount
+        for element in elements
+        if element is not None
+        for amount in (amount_in_label(element.name),)
+        if amount is not None
+    ]
     page: TextView = await ctx.browser.read_text(ctx.thread_id, None, 0, _AMOUNT_PAGE_CHARS)
-    return total_on_page(page.text)
+    total: Amount | None = total_on_page(page.text)
+    amounts: list[Amount] = [*named, *([] if total is None else [total])]
+    return max(amounts, key=lambda amount: amount.value) if amounts else None
 
 
 async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> PageCheck | None:
