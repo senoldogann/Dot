@@ -23,7 +23,7 @@ const NETWORK_WAIT_MS = 200;
 const NEWER_WAIT_MS = 5000;
 const API_PREFIX = "/api";
 const PAGES_PREFIX = "/pages/";
-// The page answered when the phone cannot reach the Mac at all (finding 40), with the sheets it is drawn with, kept
+// The page answered when the phone cannot reach the Mac at all (item 381), with the sheets it is drawn with, kept
 // when this worker installs: it is there before any page of Dot was kept, so it answers the first opening without a
 // network too.
 const OFFLINE_CACHE = "dot-offline";
@@ -196,7 +196,8 @@ function pushed(event) {
   }
   try {
     return event.data.json();
-  } catch {
+  } catch (error) {
+    console.warn("Dot: a push whose payload is not JSON, shown as the general notification", error);
     return {};
   }
 }

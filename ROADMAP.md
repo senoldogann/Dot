@@ -14663,22 +14663,41 @@ not, so no schedule's row was drawn. Tests: `tests/unit/test_search_ladder.py` (
 
 ### 380. A chat's page leads to no other, and a page under another keeps its link back
 
-**Status: in progress.** The owner's words of 2026-10-18 to a Dot run: "Bu olayida kaldirsak ? tüm yazismalar 1 sohbette
-olsa olmaz mi eger bunu kaldirirsak bir sey bozulmaz ise kaldiralim cok sacma birsey. Sürekli bas bas diger sohbete git
-fln." (shall we remove this too? can't all the messages be in one chat? if nothing breaks, remove it; always "go to the
-other chat"), and "diagnostic ve open source sayfalarina gittigimizde geri butonuda olsun. böyle sayfalar varsa hespine
-geri butonu ekle" (the Diagnostics and Open source pages should have a back button; give one to all such pages). **As
-built (2026-10-18).** The line "The conversation continues" under an earlier run's page, which sent the reader on to the
-run after it, is gone (`history.js`, `views/run.js`): a chat's page shows its turns as one flow (item 374), and the
-sidebar's chat opens its newest run; the history no longer reads the runs after the page's own. A page under another
-(Diagnostics and Open source licences under System, an agent's or a campaign's page, Team, a service's page) keeps its
-link back in a wide window with the sidebar beside it too, since the sidebar names the list it is under, not the page; a
-chat's page still shows none beside the sidebar (`shell.css`). A Dot run of the owner's made both; the review made the
-links back show on the pages that hold theirs inside a bar of their own (an agent's, a service's), which the run's rule
-left hidden, with one rule instead of a rule and its exception. The run's list of what a run changed in the Files card
-is not in this item: the side panel's Changes tab (item 368) lists the same files, with their diffs. Tests:
-`tests/smoke/test_phone_back.py` (a service's page and Diagnostics show their link back beside the sidebar and without
-it). Docs: `docs/daemon.md`.
+**Status: done (`9fbd11b`).** The owner's words of 2026-10-18 to a Dot run: "Bu olayida kaldirsak ? tüm yazismalar 1
+sohbette olsa olmaz mi eger bunu kaldirirsak bir sey bozulmaz ise kaldiralim cok sacma birsey. Sürekli bas bas diger
+sohbete git fln." (shall we remove this too? can't all the messages be in one chat? if nothing breaks, remove it; always
+"go to the other chat"), and "diagnostic ve open source sayfalarina gittigimizde geri butonuda olsun. böyle sayfalar
+varsa hespine geri butonu ekle" (the Diagnostics and Open source pages should have a back button; give one to all such
+pages). **As built (2026-10-18).** The line "The conversation continues" under an earlier run's page, which sent the
+reader on to the run after it, is gone (`history.js`, `views/run.js`): a chat's page shows its turns as one flow (item
+374), and the sidebar's chat opens its newest run; the history no longer reads the runs after the page's own. A page
+under another (Diagnostics and Open source licences under System, an agent's or a campaign's page, Team, a service's
+page) keeps its link back in a wide window with the sidebar beside it too, since the sidebar names the list it is under,
+not the page; a chat's page still shows none beside the sidebar (`shell.css`). A Dot run of the owner's made both; the
+review made the links back show on the pages that hold theirs inside a bar of their own (an agent's, a service's), which
+the run's rule left hidden, with one rule instead of a rule and its exception. The run's list of what a run changed in
+the Files card is not in this item: the side panel's Changes tab (item 368) lists the same files, with their diffs.
+Tests: `tests/smoke/test_phone_back.py` (a service's page and Diagnostics show their link back beside the sidebar and
+without it). Docs: `docs/daemon.md`.
+
+### 381. The pages load lighter, the app installs whole, and a phone out of reach is told so
+
+**Status: in progress.** The owner's plan of 2026-10-18 (its first pull request: the pages' load and the app on a
+phone), built by an agent of the owner's on `plan/now-1-loading-and-pwa`. **As built (2026-10-18).** The daemon answers
+with gzip what a browser asks it for that way, through Starlette's own middleware, which a request for an event stream
+goes around (`compress.py`): the pages' scripts and sheets and the API's answers past 1 KiB, while the event streams go
+as they are written and the fonts and images, compressed already, as they are; a body past 128 KiB is compressed off the
+event loop. The page names each of the modules its script reaches with `modulepreload` (`index.html`), and a test walks
+the imports to keep the list whole and current. The manifest has an `id`, the light scheme's ground as its colours, a
+512 px maskable icon and two shortcuts, New chat and Settings. A page opened when the network fails and no copy of it is
+kept is answered with `offline.html`, which the service worker keeps when it installs, with the two sheets it is drawn
+with (`sw.js`); a push whose payload is not JSON shows the general notification and says so in the worker's console. The
+review replaced the agent's own gzip middleware, which compressed fonts and images too and every body on the event loop
+(3 MiB of a PNG cost 45 ms and saved nothing), with Starlette's (and around it the event streams, whose start Starlette
+holds until their first frame, a keepalive 15 s on for a quiet one), logged the push that is not JSON instead of passing
+it in silence, removed a test that pinned the worker's text rather than its behaviour, and named this item instead of
+the plan's finding numbers. Tests: `tests/unit/test_compression.py`, `test_manifest.py`, `test_static_ui.py` (the
+modules preloaded), `tests/smoke/test_offline_page.py`, `test_phone_return.py`. Docs: `docs/phone.md`.
 
 ## Log
 
@@ -15476,3 +15495,4 @@ it). Docs: `docs/daemon.md`.
 - 2026-10-18 (Opus 5.5): item 377 merged as `8cf9f06` (PR #371); the pre-push review blocked its first push on an Important finding (the rule's weight beat the room of lists and code) and passed the next with a Nit, fixed. Item 378 on `item-378-system-design`: Settings › System and Browser read in groups, as a Dot run of the owner's designed them, reviewed.
 - 2026-10-18 (Opus 5.5): item 378 merged as `94ca713` (PR #372); the pre-push review passed its three pushes, the first two with Nits, fixed. Item 379 on `item-379-findings`: the findings a Dot run of the owner's checked, fixed as reviewed.
 - 2026-10-18 (Opus 5.5): item 379 merged as `b86a996` (PR #373); the pre-push review blocked its first push on two Important findings (no schedule's row was drawn, and following SearXNG's redirects went past the address gate) and passed the next with a Nit, answered. Item 380 on `item-380-one-chat-back`: a chat's page leads to no other, and a page under another keeps its link back, as a Dot run of the owner's made them, reviewed.
+- 2026-10-18 (Opus 5.5): item 380 merged as `9fbd11b` (PR #374). Item 381 on `item-381-load-and-pwa`: the pages load lighter and the app installs whole, as an agent of the owner's built them from the owner's plan, reviewed.

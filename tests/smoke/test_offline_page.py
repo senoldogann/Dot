@@ -1,4 +1,4 @@
-"""The page a phone shows when it cannot reach the Mac at all (finding 40): the service worker keeps ``offline.html``
+"""The page a phone shows when it cannot reach the Mac at all (item 381): the service worker keeps ``offline.html``
 when it installs, and a page opened while the network fails and no copy of it is kept is answered with that page, rather
 than with the browser's own error. A real server and a real headless Chrome, which is sent offline once the worker has
 installed."""

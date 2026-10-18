@@ -1,4 +1,4 @@
-"""The web app manifest (finding 39): the identity a phone keeps for Dot once it is added to the home screen, the
+"""The web app manifest (item 381): the identity a phone keeps for Dot once it is added to the home screen, the
 colours it shows while Dot opens, the icons it draws (one maskable, for a launcher that rounds or crops them), and the
 two shortcuts of its long press. These tests read the packaged files the way the platform does, with no runtime and no
 image library: a PNG's size is in its IHDR header."""

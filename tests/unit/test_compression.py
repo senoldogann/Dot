@@ -1,5 +1,6 @@
-"""gzip on what the daemon serves: the files of the UI and what the API says, a chunk at a time, and the event streams
-that stay as they are written. The real application on a real runtime, asked through ASGI."""
+"""gzip on what the daemon serves (item 381): the files of the UI and what the API says, while the event streams stay as
+they are written and what is compressed already (fonts, images) goes as it is. The real application on a real runtime,
+asked through ASGI."""
 
 import asyncio
 import contextlib
@@ -13,13 +14,12 @@ import pytest
 import pytest_asyncio
 from fastapi import FastAPI
 from starlette.datastructures import Headers
-from starlette.types import ASGIApp, Message, Receive, Scope, Send
+from starlette.types import ASGIApp, Message, Scope
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import STATIC_DIR, create_app
-from dotagent.server.compress import GzipCompression, compressible
 from dotagent.server.context import ServerContext
 from dotagent.store.models import ThreadRecord
 
@@ -27,9 +27,6 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 
 TOKEN: str = "compression-token"
 PORT: int = 18766
-# A frame of an event stream longer than gzip is worth, so that a middleware that did not leave the stream alone would
-# have compressed it.
-_FRAME: bytes = b"data: " + b"x" * 2048 + b"\n\n"
 # Long enough to start the lifecycle stream of a server that answers at once, short enough not to wait for its
 # keepalive (15 s).
 _STREAM_START_S: float = 5.0
@@ -90,6 +87,12 @@ def _headers_of_request(accept_encoding: str | None) -> dict[str, str]:
     return headers
 
 
+def _headers_of_stream_request() -> dict[str, str]:
+    """What the page sends for an event stream (`api.js`): gzip accepted, as a browser always does, and the stream asked
+    for by its type."""
+    return {**_headers_of_request("gzip"), "accept": "text/event-stream"}
+
+
 async def _messages(app: ASGIApp, path: str, *, accept_encoding: str | None = "gzip") -> list[Message]:
     """Every message the application sends for one request, in order."""
     sent: list[Message] = []
@@ -118,7 +121,7 @@ async def test_a_script_of_the_interface_comes_back_gzipped_and_whole(served: tu
     status, headers, body = await _whole_answer(served[0], "/js/main.js")
     assert status == 200
     assert headers["content-encoding"] == "gzip"
-    assert "content-length" not in headers
+    assert headers.get("content-length") in (None, str(len(body)))
     assert "accept-encoding" in headers.get("vary", "").lower()
     assert gzip.decompress(body) == (STATIC_DIR / "js" / "main.js").read_bytes()
 
@@ -170,76 +173,22 @@ async def test_an_answer_smaller_than_gzip_is_worth_goes_as_it_is(served: tuple[
     assert body == (STATIC_DIR / "favicon.svg").read_bytes()
 
 
-async def test_the_frames_of_an_event_stream_go_through_whole() -> None:
-    """The decision leaves an event stream alone, and a stream longer than gzip is worth, sent through the middleware
-    itself, comes out with its headers and its frames as they were written."""
-    assert compressible("GET", "gzip", 200, Headers({"content-type": "text/event-stream; charset=utf-8"})) is False
-    assert compressible("GET", "gzip", 200, Headers({"content-type": "application/json"})) is True
-
-    async def stream(scope: Scope, receive: Receive, send: Send) -> None:
-        await send(
-            {
-                "type": "http.response.start",
-                "status": 200,
-                "headers": [
-                    (b"content-type", b"text/event-stream; charset=utf-8"),
-                    (b"content-length", str(len(_FRAME)).encode()),
-                ],
-            }
-        )
-        await send({"type": "http.response.body", "body": _FRAME})
-
-    status, headers, body = await _whole_answer(GzipCompression(stream), "/api/stream")
-    assert status == 200
-    assert headers["content-type"].startswith("text/event-stream")
-    assert "content-encoding" not in headers
-    assert headers["content-length"] == str(len(_FRAME))
-    assert body == _FRAME
-
-
-async def test_a_body_that_comes_in_chunks_is_compressed_as_it_goes() -> None:
-    """The chunks of an answer are compressed as they arrive, not gathered first: the first chunks are held only until
-    they say the answer is worth gzip, and from then on the client has each one before the application writes the
-    next."""
-    received: list[Message] = []
-    held_then: list[bool] = []
-    sent_while_writing: list[bool] = []
-    chunks: tuple[bytes, ...] = (b"a" * 700, b"b" * 700, b"c" * 700)
-
-    async def chunked(scope: Scope, receive: Receive, send: Send) -> None:
-        await send(
-            {"type": "http.response.start", "status": 200, "headers": [(b"content-type", b"application/octet-stream")]}
-        )
-        for number, chunk in enumerate(chunks):
-            await send({"type": "http.response.body", "body": chunk, "more_body": number < len(chunks) - 1})
-            if number == 0:
-                # Not enough yet to tell whether the answer is worth gzip: nothing has gone to the client.
-                held_then.append(any(message["type"] == "http.response.start" for message in received))
-            if number == 1:
-                # Enough: the client already has the head of the answer while the application still writes.
-                sent_while_writing.append(any(message["type"] == "http.response.body" for message in received))
-
-    async def send(message: Message) -> None:
-        received.append(message)
-
-    async def receive() -> Message:
-        return {"type": "http.request", "body": b"", "more_body": False}
-
-    await GzipCompression(chunked)(_scope("GET", "/files/a.bin", _headers_of_request("gzip")), receive, send)
-    start: Message = next(message for message in received if message["type"] == "http.response.start")
-    headers: Headers = Headers(raw=start["headers"])
-    body: bytes = b"".join(
-        message.get("body") or b"" for message in received if message["type"] == "http.response.body"
-    )
-    assert headers["content-encoding"] == "gzip"
-    assert held_then == [False]
-    assert sent_while_writing == [True]
-    assert gzip.decompress(body) == b"".join(chunks)
+async def test_a_font_and_an_image_go_as_they_are(served: tuple[FastAPI, ServerContext]) -> None:
+    """What is compressed already is not compressed again: gzip would spend the event loop's time on it for nothing."""
+    for path, file in (
+        ("/fonts/InterVariable.woff2", "fonts/InterVariable.woff2"),
+        ("/icons/icon-512.png", "icons/icon-512.png"),
+    ):
+        status, headers, body = await _whole_answer(served[0], path)
+        assert status == 200
+        assert "content-encoding" not in headers, path
+        assert body == (STATIC_DIR / file).read_bytes()
 
 
 async def test_the_lifecycle_stream_of_the_server_is_not_compressed(served: tuple[FastAPI, ServerContext]) -> None:
-    """The real ``/api/stream`` route, asked with gzip accepted: it starts at once, saying what it is, and nothing about
-    it is compressed. It ends when the daemon starts to stop, which this test does once its answer has begun."""
+    """The real ``/api/stream`` route, asked as the page asks for it, gzip accepted: it starts at once, saying what it
+    is, though its first frame is a keepalive 15 s on, and nothing about it is compressed. It ends when the daemon
+    starts to stop, which this test does once its answer has begun."""
     app, context = served
     sent: asyncio.Queue[Message] = asyncio.Queue()
 
@@ -251,7 +200,7 @@ async def test_the_lifecycle_stream_of_the_server_is_not_compressed(served: tupl
         await sent.put(message)
 
     serving: asyncio.Task[None] = asyncio.create_task(
-        app(_scope("GET", "/api/stream", _headers_of_request("gzip")), receive, send)
+        app(_scope("GET", "/api/stream", _headers_of_stream_request()), receive, send)
     )
     try:
         first: Message = await asyncio.wait_for(sent.get(), timeout=_STREAM_START_S)

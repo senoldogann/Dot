@@ -915,7 +915,8 @@ async def test_an_open_stream_ends_with_the_server_instead_of_holding_up_its_shu
             httpx.AsyncClient(
                 base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}, timeout=SSE_TIMEOUT_S
             ) as http,
-            http.stream("GET", "/api/stream") as response,
+            # Asked for by its type, as the page and any event-stream client ask (item 381).
+            http.stream("GET", "/api/stream", headers={"Accept": "text/event-stream"}) as response,
         ):
             assert response.status_code == 200
             server.should_exit = True
