@@ -84,7 +84,8 @@ currency, so list sites that bill in one currency. Empty by default.
    did it, the run goes on from there). The expression is searched, case-insensitive, in the action's one-line summary
    (a shell command's starts with `Run: `), a line break and its target (the command, the path, the address). A rule
    reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
-   is managed there or through `/api/rules`. It can also be said in your own words ("let Dot run git status and git
+   is managed there or through `/api/rules`; the page lists the rules in the order they are checked and **New rule**
+   opens the two ways to write one. It can also be said in your own words ("let Dot run git status and git
    diff without asking me"): the review model drafts its parts, the tool, the answer and the commands or words the
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
    run alone with plain arguments (after a `cd` at most; nothing chained to it, substituted into it or sent on with
@@ -193,10 +194,10 @@ Dot's, not yours. A message you send starts a run unmarked.
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a
 label they do not know (Mastodon's "Boost", the German "Teilen") passes as an ordinary click. With `[judge] provider =
-"typesafe"` (the switch "Typed judge (Jev)" on the row of the key in Settings › API keys writes it and switches the
+"typesafe"` (the switch "Typed judge (Jev)" on the page of TypeSafe in Settings › Providers writes it and switches the
 judge from the next judgment on, with no restart; item 255) and `TYPESAFE_API_KEY` saved (made at console.typesafe.ai;
-Settings › API keys, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in four
-yes/no questions (does it publish,
+Settings › Providers, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in
+four yes/no questions (does it publish,
 send, pay or delete?) over the label, the role and the page's address (without its query and fragment). A probability of
 at least `public_action_threshold` (0.45: below each yes measured; a wrong flag only asks) gives the click that flag, so
 the policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`.

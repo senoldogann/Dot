@@ -3,7 +3,7 @@
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
-import { clip, debounce, el, modelName, switchRow } from "../dom.js";
+import { clip, debounce, el, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented } from "../panels.js";
@@ -97,18 +97,19 @@ function optionChips(record) {
   const approvals = options.approvals ?? now.approvals;
   const goalMode = options.goal_mode ?? now.goalMode;
   const model = options.model ?? now.model;
-  const fromDefault = (value) => (value === null ? " (default)" : "");
+  // Only what this schedule chose for itself: the defaults it takes are the ones every run takes, and saying them on
+  // every row buries what is its own (item 373).
   return [
     el("span", { class: "chip", title: "Mode" }, record.mode),
-    approvals === null
+    options.approvals === null
       ? null
       : el(
           "span",
           { class: approvals === "yolo" ? "badge b-warn" : "chip", title: "Who answers the safety policy's questions" },
-          `Approvals: ${approvalLabel(approvals)}${fromDefault(options.approvals)}`,
+          `Approvals: ${approvalLabel(approvals)}`,
         ),
-    goalMode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}${fromDefault(options.goal_mode)}`),
-    model === null ? null : el("span", { class: "chip", title: model }, `${modelName(model)}${fromDefault(options.model)}`),
+    options.goal_mode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}`),
+    options.model === null ? null : el("span", { class: "chip", title: model }, modelName(model)),
     options.effort === null ? null : el("span", { class: "chip" }, `Reasoning ${levelLabel(options.effort)}`),
     options.speed === "fast" ? el("span", { class: "chip", title: "Its runs start in fast mode" }, "Fast") : null,
     options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
@@ -166,18 +167,33 @@ function scheduleRow(view, handlers) {
       el("div", { class: "row" }, el("span", { class: "row-title" }, record.name)),
       el("div", { class: "row-meta" }, optionChips(record)),
       goalText(record.goal),
+      // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
       el(
         "div",
-        { class: "row-meta" },
-        el("span", { class: "mono" }, view.when),
-        next,
-        last,
-        lastStatusBadge(record.last_status),
-        el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
+        { class: "row-meta when-line" },
+        ...spread(
+          el("span", { class: "mono", title: "When it runs" }, view.when),
+          next,
+          last,
+          lastStatusBadge(record.last_status),
+          view.zone === localZone()
+            ? null
+            : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
+        ),
       ),
     ),
     el("div", { class: "row-actions" }, edit, remove),
   );
+}
+
+/** The parts of a line that are not null, each after a dot. */
+function spread(...parts) {
+  return parts.filter((part) => part !== null).flatMap((part, index) => (index === 0 ? [part] : [" · ", part]));
+}
+
+/** This Mac's time zone, as the browser names it. */
+function localZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 function select(label, entries, value) {
@@ -447,6 +463,18 @@ export function mount(root, ctx) {
   // The id of the schedule whose form is open, or null.
   let editing = null;
   const holder = el("div", null, loadingPanel());
+  const count = el("span", { class: "hint" });
+  // The form that adds a schedule stays away until New schedule asks for it; the list is what this page is for.
+  const formSlot = el("div", { class: "schedule-form-slot", hidden: true });
+  const addButton = el("button", { class: "btn primary sm", type: "button" }, icon("plus"), "New schedule");
+  addButton.addEventListener("click", () => {
+    formSlot.hidden = !formSlot.hidden;
+    addButton.lastChild.textContent = formSlot.hidden ? "New schedule" : "Close";
+    if (!formSlot.hidden) {
+      formSlot.scrollIntoView({ block: "nearest" });
+      formSlot.querySelector("input")?.focus();
+    }
+  });
   const schedulerNote = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span", null, "The scheduler is not running, so nothing fires until the daemon restarts."));
 
   function paint() {
@@ -454,7 +482,7 @@ export function mount(root, ctx) {
       return;
     }
     if (views.length === 0) {
-      holder.replaceChildren(emptyPanel("No schedules yet", "Add one above and Dot will run it by itself."));
+      holder.replaceChildren(emptyPanel("No schedules yet", "Add one with New schedule and Dot will run it by itself."));
       return;
     }
     const handlers = {
@@ -462,7 +490,8 @@ export function mount(root, ctx) {
       onDelete: (record) => attempt(() => remove(record)),
       onEdit: (view) => startEditing(view),
     };
-    holder.replaceChildren(el("div", { class: "card" }, views.map((view) => scheduleRow(view, handlers))));
+    holder.replaceChildren(el("div", { class: "schedule-list" }, views.map((view) => scheduleRow(view, handlers))));
+    count.textContent = plural(views.length, "schedule", "schedules");
   }
 
   async function reload() {
@@ -542,7 +571,19 @@ export function mount(root, ctx) {
 
   const status = getSnapshot().status;
   schedulerNote.hidden = status === null || status.scheduler_running;
-  const form = scheduleForm({ view: null, onSaved: reload, onCancel: null });
+  const closeForm = () => {
+    formSlot.hidden = true;
+    addButton.lastChild.textContent = "New schedule";
+  };
+  const form = scheduleForm({
+    view: null,
+    onSaved: async () => {
+      closeForm();
+      await reload();
+    },
+    onCancel: closeForm,
+  });
+  formSlot.append(form.element);
   root.append(
     paneHead("Goals that Dot runs by itself, once or on a repeating schedule.", null),
     el(
@@ -552,9 +593,13 @@ export function mount(root, ctx) {
       el("span", null, "Schedules fire only while the daemon runs and this Mac is awake. A firing that was missed while the daemon was down is skipped, not replayed."),
     ),
     schedulerNote,
-    form.element,
-    el("div", { class: "section-label" }, "Your schedules"),
-    holder,
+    formSlot,
+    el(
+      "section",
+      { class: "memory-panel notes-panel schedule-panel" },
+      el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "Your schedules"), count, el("span", { class: "spacer" }), addButton),
+      holder,
+    ),
     zoneList(),
   );
   const stopLifecycle = onLifecycle((event) => {

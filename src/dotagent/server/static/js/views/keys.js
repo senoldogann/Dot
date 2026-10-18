@@ -1,12 +1,15 @@
-// API keys: the key each model provider takes, saved from here in Dot's own .env file. The page never receives a key
-// back from the daemon: only where the one in use comes from and its last four characters.
+// Providers: the model providers Dot signs in with and the typed judge's service (item 373): the providers down the
+// left side, each with its mark, its name and the state of its key; the one chosen on the right, with the key it takes,
+// the models it brings and, for TypeSafe, the judge's switch. The page never receives a key back from the daemon: only
+// where the one in use comes from and its last four characters.
 
 import { api } from "../api.js";
-import { el } from "../dom.js";
+import { el, modelName } from "../dom.js";
 import { icon } from "../icons.js";
+import { PHONE } from "../layout.js";
 import { errorPanel, loadingPanel, paneHead, switchSetting } from "../panels.js";
 import { providerLabel, providerOf } from "../providers.js";
-import { forgetModels, getSnapshot, onChange, refresh } from "../state.js";
+import { forgetModels, getSnapshot, loadModels, onChange, refresh } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 // What the key of each provider is for and where it is made. `needed`: the models of the provider work only with a key
@@ -43,7 +46,7 @@ const PROVIDERS = {
     needed: false,
   },
   typesafe: {
-    use: "Optional: the typed judge, which reads click labels no rule knows and campaign claims; the switch on this row turns it on. Check sends one small judgment.",
+    use: "Optional: the typed judge, which reads click labels no rule knows and campaign claims; the switch here turns it on. Check sends one small judgment.",
     page: "https://console.typesafe.ai",
     site: "console.typesafe.ai",
     needed: false,
@@ -66,6 +69,21 @@ const KEY_CHARS = 1000;
 const JUDGE_SERVICE = "typesafe";
 // The typed judge as the daemon last reported it (item 255): `{ provider, key_name, key_set }`, read with the keys.
 let judge = null;
+// The models of every provider as the daemon last listed them (item 373), read with the keys and again after a key is
+// saved or removed: a provider without a key answers with its error instead. `modelsProblem` is why the list could not
+// be read, null once it was.
+let models = [];
+let modelsProblem = null;
+
+/** Reads the models of every provider again; a list that cannot be read is said on each provider's page. */
+async function readModels() {
+  try {
+    models = await loadModels();
+    modelsProblem = null;
+  } catch (error) {
+    modelsProblem = error.message;
+  }
+}
 
 function aboutProvider(provider) {
   const about = PROVIDERS[provider];
@@ -75,13 +93,20 @@ function aboutProvider(provider) {
   return { ...about, label: providerLabel(provider) };
 }
 
+/** The mark of a provider: its own logo as a mask, the generic one for a service that has none. */
+function providerMark(provider, size) {
+  const mark = el("span", { class: size === "large" ? "provider-mark provider-mark-lg" : "provider-mark" });
+  mark.dataset.provider = provider;
+  return mark;
+}
+
 /** The roles of the configured models that run on `provider`, read from the daemon status (none before it arrives). */
 function rolesOn(provider) {
   const status = getSnapshot().status;
   if (status === null) {
     return [];
   }
-  return ROLES.filter((role) => typeof status.models[role.id] === "string" && providerOf(status.models[role.id]) === provider);
+  return ROLES.filter((role) => providerOf(status.models[role.id] ?? "") === provider);
 }
 
 /**
@@ -188,33 +213,122 @@ function buildForm(label, save, cancel) {
   };
 }
 
+/** The models a provider answered with and how many there are; the error it answered with when it has none. */
+function modelsOf(provider) {
+  return models.find((each) => each.provider === provider) ?? null;
+}
+
+// The word under a provider's name in the list: where its key stands, in the few words a row has room for.
+function keyLine(view) {
+  if (!view.saved) {
+    return aboutProvider(view.provider).needed ? "No key yet" : "Optional · no key";
+  }
+  return `Authenticated · key ••••${view.tail}`;
+}
+
 /**
- * One provider: whether its key is set and where from, the buttons that add, check and remove it, and the result of the
- * last check. `paint()` shows the state again, without touching a form that is open or a check that is shown.
+ * One provider: the row that stands for it in the list and the panel that opens beside it. `paint()` shows the state
+ * again, without touching a form that is open or a check that is shown.
  */
-function buildKeyRow(initial, isDisposed) {
+function buildProvider(initial, isDisposed, host) {
   let view = initial;
   const about = aboutProvider(view.provider);
-  const badge = el("span", { class: "badge" });
-  const roles = el("span", { class: "cluster" });
-  const facts = el("div", { class: "row-meta" });
+
+  // ---- the row down the left side
+  const dot = el("span", { class: "provider-dot" });
+  const line = el("span", { class: "provider-line" });
+  const element = el(
+    "button",
+    {
+      class: "provider-item",
+      type: "button",
+      role: "option",
+      "aria-selected": "false",
+      onclick: () => host.choose(view.provider),
+    },
+    providerMark(view.provider),
+    el("span", { class: "provider-text" }, el("span", { class: "provider-name" }, about.label), line),
+    dot,
+  );
+
+  // ---- the panel beside it
+  const stateLine = el("p", { class: "provider-line" });
+  const back = el(
+    "button",
+    { class: "provider-back", type: "button", "aria-label": "Back to the providers", onclick: () => host.back() },
+    icon("chevronLeft"),
+  );
+  const check = el(
+    "button",
+    {
+      class: "btn ghost sm icon-only provider-check",
+      type: "button",
+      "aria-label": `Check the ${about.label} key`,
+      title: `Ask ${about.label} whether the key works`,
+      onclick: () => attempt(runCheck),
+    },
+    icon("refresh"),
+  );
+  const head = el(
+    "header",
+    { class: "provider-head" },
+    back,
+    providerMark(view.provider, "large"),
+    el("div", { class: "provider-ident" }, el("h2", { class: "provider-title" }, about.label), stateLine),
+    check,
+  );
+
+  // The key in use: its name in the environment, its last characters and where it comes from.
+  const facts = el("div", { class: "provider-facts" });
   const shadow = el("div", { class: "note warn", hidden: true }, icon("alert"), el("span"));
   const outcome = el("div", { class: "note", hidden: true, role: "status" });
-  const check = el("button", { class: "btn sm", type: "button", title: "Ask the provider whether it takes this key" }, icon("check"), "Check");
-  const edit = el("button", { class: "btn sm", type: "button" });
+  const form = buildForm(about.label, saveKey, () => {
+    form.close();
+    paint();
+    edit.focus();
+  });
+
+  const edit = el("button", { class: "btn primary sm", type: "button" }, icon("plus"));
   const remove = el(
     "button",
     {
-      class: "btn ghost sm icon-only",
+      class: "btn ghost sm",
       type: "button",
-      title: "Remove the key saved in Dot",
       "aria-label": `Remove the ${about.label} key saved in Dot`,
+      onclick: () => attempt(removeKey),
     },
     icon("trash"),
+    "Remove",
   );
-  const form = buildForm(about.label, (value) => saveKey(value), () => closeForm());
-  // The switch of the typed judge sits on the row of its service's key (item 255): on, TypeSafe answers from the next
-  // judgment on; off, the patterns and the goal checker decide alone. It needs the key the daemon started with.
+  const actions = el("div", { class: "provider-actions" }, edit, remove);
+
+  const auth = el(
+    "section",
+    { class: "provider-section" },
+    el("h3", { class: "provider-section-title" }, "Authentication"),
+    el("p", { class: "provider-use" }, about.use),
+    el(
+      "a",
+      { class: "provider-docs", href: about.page, target: "_blank", rel: "noopener noreferrer" },
+      `Get a key at ${about.site}`,
+      icon("external"),
+    ),
+    facts,
+    actions,
+    form.element,
+    shadow,
+    outcome,
+  );
+
+  // The models this provider brings, named as the pickers name them, with what each one takes; the judge's service
+  // brings none.
+  const modelCount = el("span", { class: "provider-count" });
+  const modelBox = el("div", { class: "provider-models" });
+  const modelsSection =
+    view.provider === JUDGE_SERVICE
+      ? null
+      : el("section", { class: "provider-section" }, el("h3", { class: "provider-section-title" }, "Models", modelCount), modelBox);
+
   const judgeSwitch =
     view.provider !== JUDGE_SERVICE
       ? null
@@ -224,33 +338,19 @@ function buildKeyRow(initial, isDisposed) {
           read: () => judge !== null && judge.provider === "typesafe",
           write: async (on) => {
             judge = await api.put("/judge", { provider: on ? "typesafe" : "none" });
-            toast("ok", on ? "The typed judge answers from the next judgment on." : "The typed judge is off; the patterns and the goal checker decide alone.");
+            toast(
+              "ok",
+              on ? "The typed judge answers from the next judgment on." : "The typed judge is off; the patterns and the goal checker decide alone.",
+            );
           },
           onToggled: () => judgeSwitch.paint(),
         });
-  const element = el(
-    "div",
-    { class: "list-row key-row" },
-    el("span", { class: "key-mark" }, icon("key")),
-    el(
-      "div",
-      { class: "row-main" },
-      el("div", { class: "row key-head" }, el("span", { class: "row-title" }, about.label), badge, roles),
-      el("div", { class: "row-text muted" }, about.use),
-      facts,
-      shadow,
-      outcome,
-      form.element,
-      judgeSwitch === null ? null : judgeSwitch.element,
-      el(
-        "a",
-        { class: "key-page", href: about.page, target: "_blank", rel: "noopener noreferrer" },
-        `Get a key at ${about.site}`,
-        icon("external"),
-      ),
-    ),
-    el("div", { class: "row-actions" }, check, edit, remove),
-  );
+  const judgeSection =
+    judgeSwitch === null
+      ? null
+      : el("section", { class: "provider-section" }, el("h3", { class: "provider-section-title" }, "Typed judge"), judgeSwitch.element);
+
+  const panel = el("div", { class: "provider-panel" }, head, auth, modelsSection, judgeSection);
 
   function show(ok, detail) {
     outcome.className = ok ? "note ok" : "note bad";
@@ -261,26 +361,66 @@ function buildKeyRow(initial, isDisposed) {
     outcome.hidden = false;
   }
 
+  function paintModels() {
+    if (modelsSection === null) {
+      return;
+    }
+    const entry = modelsOf(view.provider);
+    if (entry === null) {
+      modelCount.textContent = "";
+      modelBox.replaceChildren(
+        modelsProblem === null
+          ? el("div", { class: "small muted" }, "Reading the models…")
+          : el("div", { class: "note bad" }, icon("alert"), el("span", null, `The models could not be read: ${modelsProblem}`)),
+      );
+      return;
+    }
+    modelCount.textContent = ` ${entry.models.length}`;
+    if (entry.models.length === 0) {
+      modelBox.replaceChildren(
+        el("div", { class: "note" }, icon("info"), el("span", null, entry.error ?? "This provider named no models.")),
+      );
+      return;
+    }
+    const main = getSnapshot().status?.models.main ?? "";
+    const roleOf = (ref) => ROLES.find((role) => getSnapshot().status?.models[role.id] === ref);
+    modelBox.replaceChildren(
+      ...entry.models.map((model) => {
+        const chips = [
+          roleOf(model.ref) === undefined ? null : el("span", { class: "chip b-accent" }, roleOf(model.ref).label),
+          model.vision ? el("span", { class: "chip" }, "vision") : null,
+          model.tools ? null : el("span", { class: "chip" }, "no tools"),
+          model.free ? el("span", { class: "chip" }, "free") : null,
+          model.ref === main ? el("span", { class: "chip" }, "chosen") : null,
+        ].filter((chip) => chip !== null);
+        return el(
+          "div",
+          { class: "provider-model" },
+          el("span", { class: "provider-model-name" }, modelName(model.ref)),
+          el("span", { class: "provider-model-chips" }, chips),
+        );
+      }),
+    );
+  }
+
   function paint() {
     const set = view.source !== null;
     const using = about.needed ? rolesOn(view.provider) : [];
     element.dataset.state = set ? "set" : "unset";
-    if (set) {
-      badge.className = "badge b-ok";
-      badge.textContent = "in use";
-    } else if (using.length > 0) {
-      badge.className = "badge b-bad";
-      badge.textContent = "missing";
-    } else {
-      badge.className = "badge b-muted";
-      badge.textContent = "not set";
-    }
-    roles.replaceChildren(...using.map((role) => el("span", { class: "chip", title: `Your ${role.label} runs on ${about.label}` }, role.label)));
+    line.textContent = keyLine(view);
+    stateLine.textContent = set ? `Authenticated · ${SOURCES[view.source] ?? view.source}` : about.needed ? "No key yet" : "Optional";
+    dot.dataset.tone = set ? "ok" : using.length > 0 ? "bad" : "off";
     facts.replaceChildren(
-      el("code", { class: "mono" }, view.name),
+      el("code", { class: "mono provider-var" }, view.name),
       ...(set
-        ? [el("span", { class: "key-secret", title: "The last characters of the key in use" }, `••••${view.tail}`), el("span", null, SOURCES[view.source])]
+        ? [
+            el("span", { class: "key-secret mono", title: "The last characters of the key in use" }, `••••${view.tail}`),
+            el("span", { class: "provider-source" }, SOURCES[view.source]),
+          ]
         : []),
+      ...using.map((role) =>
+        el("span", { class: "chip", title: `Your ${role.label} runs on ${about.label}` }, role.label),
+      ),
     );
     shadow.hidden = view.source !== "environment";
     shadow.lastChild.textContent = view.saved
@@ -295,6 +435,7 @@ function buildKeyRow(initial, isDisposed) {
     edit.replaceChildren(icon(set ? "pencil" : "plus"), set ? "Replace" : "Add key");
     edit.hidden = form.isOpen();
     remove.hidden = !view.saved;
+    paintModels();
   }
 
   // The button that opened the form shows again in its place, and the focus goes back to it.
@@ -335,6 +476,7 @@ function buildKeyRow(initial, isDisposed) {
     form.close();
     paint();
     toast("ok", `${about.label} key saved.`);
+    void readModels().then(paint);
     await runCheck();
   }
 
@@ -358,25 +500,54 @@ function buildKeyRow(initial, isDisposed) {
     outcome.hidden = true;
     paint();
     toast("ok", `${about.label} key removed.`);
+    void readModels().then(paint);
   }
 
-  check.addEventListener("click", () => attempt(runCheck));
   edit.addEventListener("click", () => {
     outcome.hidden = true;
     form.open();
     paint();
   });
-  remove.addEventListener("click", () => attempt(removeKey));
   paint();
-  return { element, paint };
+  return { id: view.provider, element, panel, paint, closeForm };
 }
 
 /** The key of each provider, the form that saves one, and where the keys are kept. */
 export function mount(root, ctx) {
   let disposed = false;
-  let rows = [];
+  let entries = [];
+  let chosen = null;
   const holder = el("div", null, loadingPanel());
   const kept = el("span");
+  const list = el("div", { class: "providers-list", role: "listbox", "aria-label": "Providers" });
+  const detail = el("div", { class: "providers-detail" });
+  const layout = el("div", { class: "providers-layout" }, list, detail);
+  layout.dataset.open = "false";
+
+  function choose(id) {
+    const previous = entries.find((entry) => entry.id === chosen);
+    if (previous !== undefined && previous.id !== id) {
+      previous.closeForm();
+    }
+    chosen = id;
+    layout.dataset.open = "true";
+    entries.forEach((entry) => entry.element.setAttribute("aria-selected", String(entry.id === id)));
+    const entry = entries.find((each) => each.id === id);
+    if (entry !== undefined) {
+      detail.replaceChildren(entry.panel);
+      entry.paint();
+    }
+  }
+
+  function back() {
+    chosen = null;
+    layout.dataset.open = "false";
+    entries.forEach((entry) => entry.element.setAttribute("aria-selected", "false"));
+    const first = entries[0];
+    if (first !== undefined) {
+      first.element.focus();
+    }
+  }
 
   async function load() {
     let found;
@@ -391,9 +562,16 @@ export function mount(root, ctx) {
     if (disposed) {
       return;
     }
-    rows = found.keys.map((view) => buildKeyRow(view, () => disposed));
+    entries = found.keys.map((view) => buildProvider(view, () => disposed, { choose, back }));
+    list.replaceChildren(...entries.map((entry) => entry.element));
     kept.replaceChildren("Keys saved here go to ", el("code", { class: "mono" }, found.env_file), ", which only your user can read.");
-    holder.replaceChildren(el("section", { class: "card" }, rows.map((row) => row.element)));
+    holder.replaceChildren(layout);
+    if (!PHONE.matches && entries.length > 0) {
+      choose(entries[0].id);
+    }
+    // The models of every provider are read after the page stands: one provider that answers slowly does not hold the
+    // list and the keys back.
+    void readModels().then(() => entries.forEach((entry) => entry.paint()));
   }
 
   async function retry() {
@@ -402,7 +580,10 @@ export function mount(root, ctx) {
   }
 
   root.append(
-    paneHead("The keys Dot signs in to the model providers and the typed judge with. The page never shows a whole key.", null),
+    paneHead(
+      "The providers Dot signs in to its models with: the key each one takes, the models it brings and where the key is kept. The page never shows a whole key.",
+      null,
+    ),
     holder,
     el(
       "div",
@@ -422,7 +603,7 @@ export function mount(root, ctx) {
       ),
     ),
   );
-  const stop = onChange(() => rows.forEach((row) => row.paint()));
+  const stop = onChange(() => entries.forEach((entry) => entry.paint()));
   attempt(refresh);
   attempt(load);
   return () => {

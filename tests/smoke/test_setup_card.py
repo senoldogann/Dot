@@ -168,16 +168,22 @@ async def test_each_way_of_the_card_leads_to_a_model(own_home: Path) -> None:
 
                 await card.get_by_role("link", name="Add a key").click()
                 await expect(page).to_have_url(re.compile(r"#/settings/keys$"))
-                row: Locator = page.locator(".key-row").filter(has=page.locator(".row-title", has_text="OpenAI"))
-                await row.get_by_role("button", name="Add key").click()
-                await row.get_by_label("OpenAI API key").fill(KEY)
-                await row.get_by_role("button", name="Save").click()
+                row: Locator = page.locator(".provider-item").filter(
+                    has=page.locator(".provider-name", has_text="OpenAI")
+                )
+                await row.click()
+                await page.get_by_role("button", name="Add key").click()
+                await page.get_by_label("OpenAI API key").fill(KEY)
+                await page.get_by_role("button", name="Save").click()
                 await expect(row).to_have_attribute("data-state", "set")
                 card = await _home(page, address, "ready")
                 await expect(card).to_be_hidden()
 
                 await page.goto(f"{address}/#/settings/keys")
-                await row.get_by_role("button", name="Remove the OpenAI key saved in Dot").click()
+                await (
+                    page.locator(".provider-item").filter(has=page.locator(".provider-name", has_text="OpenAI")).click()
+                )
+                await page.get_by_role("button", name="Remove the OpenAI key saved in Dot").click()
                 await page.get_by_role("dialog").get_by_role("button", name="Remove").click()
                 await expect(row).to_have_attribute("data-state", "unset")
                 card = await _home(page, address, "needed")

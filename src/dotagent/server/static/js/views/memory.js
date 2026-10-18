@@ -28,6 +28,11 @@ function parseTags(text) {
   return tags;
 }
 
+/** The nodes that are there, each after a dot: one line of words that wraps, not a row of chips. */
+function dotted(parts) {
+  return parts.filter((part) => part !== null && part !== "").flatMap((part, index) => (index === 0 ? [part] : [" · ", part]));
+}
+
 /** The words of a note; a long note shows its beginning, with a button to read the rest. */
 function noteText(text) {
   const preview = `${text.slice(0, PREVIEW_CHARS)}…`;
@@ -62,13 +67,13 @@ let agentNames = {};
 
 /** Who wrote a note, whose lesson it is and how often runs used it. */
 function provenance(record) {
-  const whose = record.agent_id === null ? null : el("span", { class: "chip" }, `${agentNames[record.agent_id] ?? "An agent"}'s`);
+  const whose = record.agent_id === null ? null : el("span", null, `${agentNames[record.agent_id] ?? "An agent"}'s`);
   const author =
     record.source_run === "reflection"
-      ? el("span", { class: "chip" }, "Written by the nightly reflection")
+      ? el("span", null, "Written by the nightly reflection")
       : record.source_run
         ? el("a", { href: `#/runs/${record.source_run}` }, "Saved by a run")
-        : el("span", { class: "chip" }, "You wrote it");
+        : el("span", null, "You wrote it");
   const used =
     record.used_count > 0
       ? el("span", { title: dateTimeFull(record.last_used_at) }, `Used ${plural(record.used_count, "time", "times")}, last ${ago(record.last_used_at)}`)
@@ -146,13 +151,19 @@ function memoryRow({ record, similarity, score }, actions) {
         noteText(record.content),
         el(
           "div",
-          { class: "row-meta" },
-          match,
+          { class: "row-meta note-meta" },
           record.tags.map((tag) => el("span", { class: "chip" }, tag)),
-          el("span", { title: dateTimeFull(record.created_at) }, `Saved ${ago(record.created_at)}`),
-          lifespan(record),
-          provenance(record),
-          scoreLine(score),
+          match,
+          el(
+            "span",
+            { class: "when-line" },
+            ...dotted([
+              el("span", { title: dateTimeFull(record.created_at) }, `Saved ${ago(record.created_at)}`),
+              ...lifespan(record),
+              ...provenance(record),
+              scoreLine(score),
+            ]),
+          ),
         ),
       ),
       el("div", { class: "row-actions" }, edit, forget),
@@ -230,7 +241,7 @@ export function mount(root, ctx) {
     autocomplete: "off",
     spellcheck: "false",
     maxlength: "500",
-    placeholder: "Search by meaning or by words…",
+    placeholder: "Search notes…",
     "aria-label": "Search notes",
   });
   const count = el("div", { class: "hint" });
@@ -532,31 +543,50 @@ export function mount(root, ctx) {
     paneHead("Notes that Dot keeps between runs. It recalls the ones that fit the task at hand.", null),
     asked,
     el(
-      "section",
-      { class: "card card-pad stack" },
-      el("div", { class: "row" }, el("div", { class: "section-label grow" }, "What Dot knows about you"), ownerHint),
-      dotLines,
-      field("Your lines", ownLines, "Corrections and facts in your own words; Dot's lines above never contradict them."),
-      el("div", { class: "row" }, el("span", { class: "spacer" }), saveOwn),
+      "div",
+      { class: "memory-layout" },
+      el(
+        "div",
+        { class: "memory-side" },
+        el(
+          "section",
+          { class: "memory-panel" },
+          el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "What Dot knows about you")),
+          dotLines,
+          field("Your lines", ownLines, "Corrections and facts in your own words; Dot's lines above never contradict them."),
+          el("div", { class: "panel-foot" }, ownerHint, el("span", { class: "spacer" }), saveOwn),
+        ),
+        el(
+          "section",
+          { class: "memory-panel" },
+          el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "Remember something")),
+          field("Note", content, "One fact, preference or instruction per note."),
+          field("Tags", tags, "Optional, separated by commas."),
+          el("div", { class: "panel-foot" }, el("span", { class: "hint" }, "⌘ / Ctrl + Enter"), el("span", { class: "spacer" }), add),
+          outcome,
+        ),
+        el(
+          "section",
+          { class: "memory-panel learning-panel", "data-learning": "" },
+          el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "How learning fares"), el("span", { class: "spacer" }), learningHint),
+          learningLines,
+        ),
+      ),
+      el(
+        "section",
+        { class: "memory-panel notes-panel" },
+        el(
+          "div",
+          { class: "panel-head" },
+          el("h2", { class: "panel-title" }, "Notes"),
+          count,
+          el("span", { class: "spacer" }),
+          search,
+        ),
+        holder,
+        el("div", { class: "panel-foot" }, more),
+      ),
     ),
-    el(
-      "section",
-      { class: "card card-pad stack", "data-learning": "" },
-      el("div", { class: "row" }, el("div", { class: "section-label grow" }, "How learning fares"), learningHint),
-      learningLines,
-    ),
-    el(
-      "section",
-      { class: "card card-pad stack" },
-      field("Remember something", content, "One fact, preference or instruction per note."),
-      field("Tags", tags, "Optional, separated by commas."),
-      el("div", { class: "row" }, el("span", { class: "spacer" }), el("span", { class: "hint" }, "⌘ / Ctrl + Enter"), add),
-      outcome,
-    ),
-    el("div", { class: "row section-head" }, el("div", { class: "section-label grow" }, "Notes"), count),
-    search,
-    holder,
-    el("div", { class: "cluster" }, more),
   );
   attempt(reload);
   attempt(loadAsked);

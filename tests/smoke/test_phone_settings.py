@@ -48,7 +48,7 @@ _TABS: dict[str, str] = {
     "general": "General",
     "appearance": "Appearance",
     "models": "Models",
-    "keys": "API keys",
+    "keys": "Providers",
     "rules": "Rules",
     "memory": "Memory",
     "schedules": "Schedules",

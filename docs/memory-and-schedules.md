@@ -4,8 +4,9 @@
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
-UI, where Settings › Memory lists the notes changed last first, 30 at a time with **Load more** for the next, in a
-box that keeps its size and scrolls inside past its first notes (item 218); forgetting, correcting or adding a note
+UI, where Settings › Memory keeps your own lines and the box that adds a note in a column of their own at the left and
+lists the notes changed last first at the right, 30 at a time with **Load more** for the next, its search in the head of
+the list (item 373); forgetting, correcting or adding a note
 keeps the notes read and the list where it was, and a correction open on another note stays open (item 204). In a
 run's conversation, a note the run saves, corrects (`memory_update`) or forgets leaves a quiet line where it happened,
 what changed and the first words of the note: "Saved to memory", "Updated memory" or "Removed from memory" (item 313,
@@ -128,12 +129,12 @@ mode and goal mode; item 291). `/loop 30m <message>` in the box of a run makes s
 281; see [Runs](runs.md)). The scheduler also fires the nightly reflection at `[agent] reflection_time` (see Reflection
 above); it is not a schedule and does not count against `max_schedules`.
 
-On Settings › Schedules a schedule is created and edited whole: its name, goal, repetition (cron or one moment), time
-zone, kind of run (task, chat, research), model, reasoning level, approval mode, goal mode, the earlier runs it knows,
-whether it keeps its chat and whether it is on (`history_runs`, `same_chat` and `speed` in `POST` and `PATCH
-/api/schedules`, left out for the configured ones and the standard speed). Options left on "default" take the
-configured value when the schedule fires. A schedule the agent creates takes its chat's choices, which are yours: the
-model of a run cannot pick another approval mode for it.
+On Settings › Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
+whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
+level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat and whether it is on
+(`history_runs`, `same_chat` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the
+standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
+creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it.
 
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)

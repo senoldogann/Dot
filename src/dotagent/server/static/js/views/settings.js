@@ -23,7 +23,7 @@ const TABS = [
   { id: "general", label: "General", icon: "sliders", mount: mountGeneral },
   { id: "appearance", label: "Appearance", icon: "palette", mount: appearance.mount },
   { id: "models", label: "Models", icon: "layers", mount: mountModels },
-  { id: "keys", label: "API keys", icon: "key", mount: keys.mount },
+  { id: "keys", label: "Providers", icon: "key", mount: keys.mount },
   { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },
   { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },

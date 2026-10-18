@@ -233,7 +233,7 @@ OpenRouter key (`OPENROUTER_API_KEY`) at openrouter.ai/settings/keys. The
 Ollama models, local or `:cloud` through the signed-in local server, need no key. A running daemon picks up a key added
 later when a run first uses that provider, without a restart.
 
-Settings › API keys in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows where
+Settings › Providers in the web UI does what `dotx auth set` does for the key of each provider, and more: it shows where
 the key in use comes from (the daemon's environment, Dot's `.env` file or the Keychain) and, for a key of 16 characters
 or more, its last four characters; a key never comes back from the daemon whole. **Check** asks the provider whether it
 takes the key in use: the model listing of OpenAI and Anthropic, the subscription of OpenCode Go and the key's own page
