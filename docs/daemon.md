@@ -338,7 +338,9 @@ one; a provider without a key, or whose key was refused (HTTP 401), says so and 
 access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in with, each with its key and the
 models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
 with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
-**Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches Dot at and a pairing code for its
+**Memory**, **Skills**, **Schedules**, **Harness** (what Dot improves around its model: the version in use, a form for
+one of your own, every version with Adopt and Retire, the steps of the loop, the experiences and how the nightly step is
+set; see [The harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its
 home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, its facts in four
 groups each named over its rows of a label and a value, item 378: this Dot, how it acts, what it works with and its
 models; the emergency stop and the health checks in a fold, closed, with the number of failures on its line, and the

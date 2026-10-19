@@ -65,13 +65,14 @@ composer's round buttons keep their look in a clear ring that makes them so, and
 such a box (item 337); a tap anywhere on a setting's row turns its switch, and a step's duration shows without a hover. An iPad and a Mac keep their
 sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
 
-On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot
-works and This Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and
-schedules there are). A row opens its page on its own, the bar naming it, and a card's name stands over the card. In a
-Mac's window the settings keep their tabs down the left side. On a phone Appearance draws the colour schemes as phones
-and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). A service's page of Customize ›
-Plugins and an agent's editor name their cards the same way, a row of the home's Today strip keeps its facts to one line
-that fades where it runs out of room, and Team's empty page says what brings messages there (item 332).
+On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot works and This
+Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and schedules there
+are, whether a version of the harness is in use). A row opens its page on its own, the bar naming it, and a card's name
+stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone Appearance draws the
+colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). A
+service's page of Customize › Plugins and an agent's editor name their cards the same way, a row of the home's Today
+strip keeps its facts to one line that fades where it runs out of room, and Team's empty page says what brings messages
+there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under

@@ -14879,6 +14879,19 @@ content third parties can author is kept marked `tainted` and never shown to it 
 `composed_of`, the steps' outcome, the probes and experiences by version), not from an edge table of its own: one source
 of truth, nothing to keep in step.
 
+### 393. The harness: the page
+
+**Status: done (2026-10-19), on `harness-5`, stacked on `harness-4`.** The fifth layer (Harness). Settings › Harness
+(`views/harness.js`, a tab under How Dot works, a row of the phone's list): the version in use and its texts, a form
+for a version of the owner's (habits, tool guidance prefilled from the adopted version, a summary; saved as a
+candidate or adopted at once, refused with why when a text cannot be a component), every version with its state, who
+made it, when, its texts and notes under a fold, Adopt and Retire (retiring the version in use asks first), the newest
+steps with the run each learned from and what it decided, the experiences, and how the nightly step is set (when, the
+scoring and final sets, who adopts, the bounds; `GET /api/harness` says them now). A browser test writes, adopts,
+retires and adopts again on the page, and opens the row on a phone. **Left for later** (docs/harness.md): a run of
+the owner's kept as a test of the scoring set from its page, a step started from the page, the graph drawn on it, and
+the switch of `step_time` from the page, which needs the settings writer to learn `[harness]`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15684,3 +15697,4 @@ of truth, nothing to keep in step.
 - 2026-10-19 (Fable 5.1): item 389 committed on `harness-1`; item 390 on `harness-2`: the four roles of the step and `dotx harness propose`.
 - 2026-10-19 (Fable 5.1): item 390 committed on `harness-2`; item 391 on `harness-3`: the probe apart from the daemon, the contrast, the step and its schedule, `dotx harness step|probe|final`.
 - 2026-10-19 (Fable 5.1): item 391 committed on `harness-3`; item 392 on `harness-4`: the provenance graph, the lineage, the library read by the proposer.
+- 2026-10-19 (Fable 5.1): item 392 committed on `harness-4`; item 393 on `harness-5`: Settings › Harness.

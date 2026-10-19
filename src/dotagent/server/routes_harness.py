@@ -32,6 +32,11 @@ def harness_router(ctx: ServerContext) -> APIRouter:
             habits_chars=limits.habits_chars,
             tool_guidance_chars=limits.tool_guidance_chars,
             component_lines=limits.component_lines,
+            step_time=limits.step_time,
+            scoring_tasks=tuple(limits.scoring_tasks),
+            final_tasks=tuple(limits.final_tasks),
+            step_repeats=limits.step_repeats,
+            adopt=limits.adopt,
         )
 
     @router.get("/harness")
