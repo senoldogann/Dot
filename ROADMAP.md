@@ -14892,6 +14892,29 @@ retires and adopts again on the page, and opens the row on a phone. **Left for l
 the owner's kept as a test of the scoring set from its page, a step started from the page, the graph drawn on it, and
 the switch of `step_time` from the page, which needs the settings writer to learn `[harness]`.
 
+### 394. A campaign is stopped, marked achieved or deleted from its row
+
+**Status: done (2026-10-19), on `item-394-campaign-cards`.** The owner's word of 2026-10-19: "Campaigns sayfasinda bir
+campaigns stop yada mark achieved yapmak icin icine girmek gerekiyor, ona gerek kalmadan bu ikonlari svg olarak direk
+kartlara ekle. ve campaigns silme butonuda ekle dinamik olarak." (on the Campaigns page, a campaign is stopped or marked
+achieved only from inside it; put those icons on the cards as SVG instead, and add a button that deletes a campaign, as
+its state allows). **As built (2026-10-19).** A row of Campaigns has icon buttons, the shapes of `icons.js` the
+campaign's page uses (`views/campaigns.js` `rowActions`): Stop while the campaign is active, Mark achieved until it is
+achieved, and Delete once it is not active and none of its sessions works. Each asks as the campaign's page asks, from
+the same functions, and the list repaints the row where it is; the campaign's page has Delete too, on the same terms,
+beside Go on and Mark achieved, and goes back to the list after it. `DELETE /api/campaigns/{id}` (`routes_campaigns.py`,
+`Store.delete_campaign_with_sessions`) deletes in one transaction the campaign, its ledger and the threads of its
+sessions after the first with all they hold, through the deletes of a chat (`_delete_chats`, which `delete_threads`
+shares now). The conversation the campaign started in stays a chat: its runs are no longer the campaign's, so the run's
+page and the home's rows ask for no campaign that is gone, and the questions they left for the owner expire, since no
+brief reads their answers and an answer would otherwise start a run in the conversation. It is refused (409) while the
+campaign is active and while a run works in one of its chats, checked in the transaction of the deletes, and no run
+starts on those chats meanwhile (`deleting_threads`). `Store.delete_campaign`, which forgets a campaign whose opening
+session never started, is as it was. Tests: `tests/smoke/test_campaigns.py` (deleted with the thread of its later
+session, its conversation kept as a chat and its question expired, refused while active; refused while its session
+works, deleted once it has ended), `tests/smoke/test_campaign_rows.py` (the buttons of each state, each asking first
+and changing its row in place, and the rows on a phone). Docs: `docs/agents-and-campaigns.md`.
+
 ### 395. The model menu's search looks through the provider shown
 
 **Status: done (2026-10-19), on `item-395-model-search`.** The owner's word of 2026-10-19: "bir provider secip search
@@ -15714,4 +15737,5 @@ Docs: `docs/daemon.md`.
 - 2026-10-19 (Fable 5.1): item 390 committed on `harness-2`; item 391 on `harness-3`: the probe apart from the daemon, the contrast, the step and its schedule, `dotx harness step|probe|final`.
 - 2026-10-19 (Fable 5.1): item 391 committed on `harness-3`; item 392 on `harness-4`: the provenance graph, the lineage, the library read by the proposer.
 - 2026-10-19 (Fable 5.1): item 392 committed on `harness-4`; item 393 on `harness-5`: Settings › Harness.
+- 2026-10-19 (Opus 5.5): items 394 to 397 on the owner's words of the same day, each on a branch of its own from `main`, while other agents of the owner's work on items 385 to 393; item 394 on `item-394-campaign-cards`: a campaign is stopped, marked achieved or deleted from its row.
 - 2026-10-19 (Opus 5.5): item 395 on the owner's word of the same day, on `item-395-model-search` from `main`, while other agents of the owner's work on items 385 to 393: the model menu's search looks through the provider shown.
