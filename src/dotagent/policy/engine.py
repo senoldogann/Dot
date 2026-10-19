@@ -1,8 +1,7 @@
-"""Decision engine: auto-review, run-mode gate, hard stops, custom rules, presets and taint escalation; and the route
-a question takes to its answerer."""
+"""Decision engine: auto-review, run-mode gate, Dot's own files, hard stops, custom rules, presets and taint
+escalation; Supervised's question before a change; and the route a question takes to its answerer."""
 
 import fnmatch
-from typing import Literal
 
 import regex
 
@@ -11,6 +10,7 @@ from dotagent.policy.types import (
     RESEARCH_KINDS,
     TAINT_ESCALATION_FLAGS,
     ActionInfo,
+    ActionKind,
     ApprovalMode,
     Decision,
     DecisionSource,
@@ -26,9 +26,17 @@ _DENY_FLAGS: frozenset[Flag] = frozenset({"secret_access", "exfiltration"})
 RULE_MATCH_TIMEOUT_S: float = 0.25
 # Why an allowed action asks once untrusted content is in context; a yolo run reads it in the line of what it did.
 _TAINT_REASON: str = "untrusted content is in context and this action reaches outside the Mac"
-# What a yolo run lets through as well: the always-on refusals and the hand-offs of money and credentials, unless a
-# hand-off rule of the user matches the action (:func:`owner_handoff`). A research run stays read-only (``mode``).
-YOLO_WAIVED_SOURCES: frozenset[DecisionSource] = frozenset({"auto_review", "hard_stop"})
+# What a yolo run lets through as well: the always-on refusals, the changes of Dot's own files and the hand-offs of
+# money and credentials, unless a hand-off rule of the user matches the action (:func:`owner_handoff`). A research run
+# stays read-only (``mode``).
+YOLO_WAIVED_SOURCES: frozenset[DecisionSource] = frozenset({"auto_review", "own_files", "hard_stop"})
+# Why a change of Dot's own files waits for the user (item 398).
+_OWN_FILES_REASON: str = "only the user lets a run change Dot's own files"
+# What Supervised lets through without a question: what only observes, and the run's own notes and memory notes, as a
+# research run may keep them; a command only when the shell guard reads it as reading (``safe``).
+_UNSUPERVISED_KINDS: frozenset[ActionKind] = RESEARCH_KINDS
+# The run's own notes and memory notes, which shape later runs as well but are its own to keep, as in a research run.
+_OWN_NOTE_KINDS: frozenset[ActionKind] = frozenset({"notes_write", "memory_write"})
 _HARD_HANDOFF_FLAGS: frozenset[Flag] = frozenset({"financial", "credential"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset({"privilege", "system_settings", "public_post", "external_send"})
 _BALANCED_ASK_FLAGS: frozenset[Flag] = frozenset(
@@ -69,6 +77,15 @@ def mode_gate(info: ActionInfo, mode: RunMode) -> Decision | None:
             reason=f"research runs only observe and keep notes; {info.kind} actions are not allowed",
             rule_id=None,
         )
+    return None
+
+
+def own_files(info: ActionInfo) -> Decision | None:
+    """A change of Dot's own files (``self_change``: its code, plugins, skills and playbooks, or its emergency stop) is
+    the user's to allow, in every approval mode but yolo (item 398): a question that never goes to the review model,
+    and that no rule answers in the user's place. Allowed, the run makes the change itself."""
+    if "self_change" in info.flags:
+        return Decision(verdict="ask", source="own_files", reason=_OWN_FILES_REASON, rule_id=None)
     return None
 
 
@@ -170,6 +187,9 @@ def decide(
     gated: Decision | None = mode_gate(info, mode)
     if gated is not None:
         return gated
+    own: Decision | None = own_files(info)
+    if own is not None:
+        return own
     stopped: Decision | None = hard_stop(info, allowance)
     if stopped is not None:
         return stopped
@@ -197,10 +217,32 @@ def decide(
     return Decision(verdict=preset_choice, source="preset", reason=reason, rule_id=None)
 
 
-def route_for(verdict: Literal["ask", "handoff"], mode: ApprovalMode) -> Route:
+def changes_something(info: ActionInfo) -> bool:
+    """Whether Supervised asks before the action (item 398): it changes a file, runs a command that does more than
+    read, types or clicks in a page or an app, sends a message, calls a tool of an MCP server, or shapes later runs
+    (``persistence``: a schedule, a lasting teammate, a campaign's targets, ledger or next session), but for the run's
+    own notes and memory notes."""
+    if info.kind == "shell":
+        return info.risk != "safe"
+    if "persistence" in info.flags and info.kind not in _OWN_NOTE_KINDS:
+        return True
+    return info.kind not in _UNSUPERVISED_KINDS
+
+
+def supervised(decision: Decision, info: ActionInfo) -> Decision:
+    """What a run in Supervised makes of ``decision`` (item 398): an action the preset lets through still asks the user
+    when it changes something (:func:`changes_something`). A rule of the user that allows the action stands, as the
+    user's own answer."""
+    if decision.verdict != "allow" or decision.source != "preset" or not changes_something(info):
+        return decision
+    return Decision(verdict="ask", source="supervised", reason="Supervised asks before every change", rule_id=None)
+
+
+def route_for(decision: Decision, mode: ApprovalMode) -> Route:
     """Who answers a question the engine raised. A hand-off is the user's: money and credentials never go to a
-    reviewer (a yolo run does them without asking, before any route is chosen). A plain question follows the mode."""
-    if verdict == "handoff":
+    reviewer (a yolo run does them without asking, before any route is chosen), and neither does a change of Dot's own
+    files (item 398). A plain question follows the mode."""
+    if decision.verdict == "handoff" or decision.source == "own_files":
         return "user"
     if mode == "auto":
         return "reviewer"

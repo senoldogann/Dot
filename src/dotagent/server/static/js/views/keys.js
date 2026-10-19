@@ -46,7 +46,10 @@ const PROVIDERS = {
     needed: false,
   },
   typesafe: {
-    use: "Optional: the typed judge, which reads click labels no rule knows and campaign claims; the switch here turns it on. Check sends one small judgment.",
+    use:
+      "Optional: the typed judge, which reads click labels no rule knows and campaign claims; the switch here turns it on. " +
+      "The saved key alone gives runs the judge_items tool and a campaign's post checks, the switch on or off; remove the key to stop those. " +
+      "Check sends one small judgment.",
     page: "https://console.typesafe.ai",
     site: "console.typesafe.ai",
     needed: false,
@@ -527,7 +530,7 @@ function buildProvider(initial, isDisposed, host) {
 }
 
 /** The key of each provider, the form that saves one, and where the keys are kept. */
-export function mount(root, ctx) {
+export function mount(root, _ctx) {
   let disposed = false;
   let entries = [];
   let chosen = null;
@@ -545,7 +548,9 @@ export function mount(root, ctx) {
     }
     chosen = id;
     layout.dataset.open = "true";
-    entries.forEach((entry) => entry.element.setAttribute("aria-selected", String(entry.id === id)));
+    for (const entry of entries) {
+      entry.element.setAttribute("aria-selected", String(entry.id === id));
+    }
     const entry = entries.find((each) => each.id === id);
     if (entry !== undefined) {
       detail.replaceChildren(entry.panel);
@@ -556,7 +561,9 @@ export function mount(root, ctx) {
   function back() {
     chosen = null;
     layout.dataset.open = "false";
-    entries.forEach((entry) => entry.element.setAttribute("aria-selected", "false"));
+    for (const entry of entries) {
+      entry.element.setAttribute("aria-selected", "false");
+    }
     const first = entries[0];
     if (first !== undefined) {
       first.element.focus();
@@ -585,7 +592,11 @@ export function mount(root, ctx) {
     }
     // The models of every provider are read after the page stands: one provider that answers slowly does not hold the
     // list and the keys back.
-    void readModels().then(() => entries.forEach((entry) => entry.paint()));
+    void readModels().then(() => {
+      for (const entry of entries) {
+        entry.paint();
+      }
+    });
   }
 
   async function retry() {
@@ -617,7 +628,11 @@ export function mount(root, ctx) {
       ),
     ),
   );
-  const stop = onChange(() => entries.forEach((entry) => entry.paint()));
+  const stop = onChange(() => {
+    for (const entry of entries) {
+      entry.paint();
+    }
+  });
   attempt(refresh);
   attempt(load);
   return () => {

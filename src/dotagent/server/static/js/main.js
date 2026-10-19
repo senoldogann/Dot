@@ -18,16 +18,8 @@ import { readPref, writePref } from "./prefs.js";
 import { applyStoredScheme, applyStoredTheme, followBarColour } from "./theme.js";
 import { attempt, toast } from "./ui.js";
 import { openingCurtain, PAGE_READY_EVENT } from "./waiting.js";
-import * as agents from "./views/agents.js";
-import * as team from "./views/team.js";
-import * as campaigns from "./views/campaigns.js";
-import * as controls from "./views/controls.js";
-import * as diagnostics from "./views/diagnostics.js";
-import * as licences from "./views/licences.js";
-import * as customize from "./views/customize.js";
 import * as run from "./views/run.js";
 import * as runs from "./views/runs.js";
-import * as settings from "./views/settings.js";
 
 const DEFAULT_ROUTE = "/runs";
 // The chat screen the owner was on last, a run's page or New chat: Dot opens there (item 286).
@@ -48,6 +40,9 @@ const MOVED = new Map([
   // The Activity page is gone (item 364): what it listed stands in the sidebar and on the home's Today strip.
   ["/activity", "/runs"],
 ]);
+// The chat and the home are what every opening needs and come with main.js; every other page is loaded when it is
+// first asked for (`load`), and fetched once the browser is idle after the first page, so that it opens at once later
+// and the service worker keeps a copy of it.
 // `layout` is put on the page element as `data-layout`, so the style sheets can give each kind of page its own width.
 // `parent(params)` is the page a phone's Back leads to when nothing was opened before this page (item 338), or null
 // for a page whose way back is the list of chats.
@@ -59,7 +54,7 @@ const ROUTES = [
     layout: "page",
     title: "Campaigns",
     pattern: /^\/campaigns(?:\/([A-Za-z0-9_-]+))?$/,
-    view: campaigns,
+    load: () => import("./views/campaigns.js"),
     parent: ([id]) => (id === undefined ? null : "/campaigns"),
   },
   {
@@ -67,16 +62,16 @@ const ROUTES = [
     layout: "page",
     title: "Agents",
     pattern: /^\/agents(?:\/([A-Za-z0-9_-]+))?$/,
-    view: agents,
+    load: () => import("./views/agents.js"),
     parent: ([id]) => (id === undefined ? null : "/agents"),
   },
-  { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, view: team, parent: () => "/agents" },
+  { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
   {
     tab: "customize",
     layout: "page",
     title: "Customize",
     pattern: /^\/customize(?:\/(plugins|skills))?(?:\/([a-z0-9-]+))?$/,
-    view: customize,
+    load: () => import("./views/customize.js"),
     parent: ([, id]) => (id === undefined ? null : "/customize/plugins"),
   },
   {
@@ -84,15 +79,15 @@ const ROUTES = [
     layout: "page",
     title: "Settings",
     pattern: /^\/settings(?:\/([a-z]+))?$/,
-    view: settings,
+    load: () => import("./views/settings.js"),
     // On a phone a tab is a page of the list of the settings (item 330); in a wider window the tabs are the page.
     parent: ([tab]) => (tab === undefined || !PHONE.matches ? null : "/settings"),
   },
   // Settings › System's Diagnostics (item 370) and Open source licences (item 371), pages of their own under it.
-  { tab: "settings", layout: "page", title: "Diagnostics", pattern: /^\/diagnostics$/, view: diagnostics, parent: () => "/settings/system" },
-  { tab: "settings", layout: "page", title: "Open source licences", pattern: /^\/licences$/, view: licences, parent: () => "/settings/system" },
+  { tab: "settings", layout: "page", title: "Diagnostics", pattern: /^\/diagnostics$/, load: () => import("./views/diagnostics.js"), parent: () => "/settings/system" },
+  { tab: "settings", layout: "page", title: "Open source licences", pattern: /^\/licences$/, load: () => import("./views/licences.js"), parent: () => "/settings/system" },
   // Every control of the interface on one page, for checking a look; not linked from the sidebar.
-  { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, view: controls, parent: () => null },
+  { tab: "settings", layout: "page", title: "Controls", pattern: /^\/controls$/, load: () => import("./views/controls.js"), parent: () => null },
 ];
 
 // The build a tab loaded again for as it opened, its pages being of another build than the daemon's (the service worker
@@ -382,7 +377,7 @@ function beginSession() {
     (event) => {
       const link = event.target instanceof Element ? event.target.closest("a[href^='#/']") : null;
       const plain = event.button === 0 && !event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey;
-      if (link !== null && link.target === "" && plain && link.closest("#sidebar") === null) {
+      if (link instanceof HTMLAnchorElement && link.target === "" && plain && link.closest("#sidebar") === null) {
         const path = link.getAttribute("href").slice(1).split("?")[0];
         // A link to an old address counts for the page it leads to.
         linkedTo = MOVED.get(path) ?? path;
@@ -423,7 +418,10 @@ function beginSession() {
     }
   });
 
-  function show() {
+  // Which page was asked for last: a page whose script came after another was asked for is not opened.
+  let asked = 0;
+
+  async function show() {
     disposeView();
     disposeView = () => undefined;
     shell.main.replaceChildren();
@@ -463,7 +461,7 @@ function beginSession() {
       // the page was reached. A phone's Back still leads where it led (to Activity, for a run opened there), and the
       // browser's Back skips the run the chat went on from.
       goOnAt: (target) => {
-        const linked = current !== null && current.linked;
+        const linked = current?.linked;
         history.replaceState(linked ? { dotPath: target, dotLinked: true } : null, "", `${location.pathname}${location.search}#${target}`);
         // Once the caller's own work is done, as the event of a new address would come.
         setTimeout(show, 0);
@@ -472,14 +470,40 @@ function beginSession() {
         setPageTitle(`${text} · Dot`);
       },
     };
+    const ticket = ++asked;
     try {
-      disposeView = found.route.view.mount(shell.main, ctx);
+      const view = found.route.view ?? (await found.route.load());
+      if (ticket !== asked) {
+        return;
+      }
+      disposeView = view.mount(shell.main, ctx);
     } catch (error) {
       console.error("page failed to open", error);
+      // The error of a page asked for earlier never covers the page asked for since, which holds the ticket now.
+      if (ticket !== asked) {
+        return;
+      }
       shell.main.replaceChildren(el("div", { class: "card empty" }, icon("alert"), el("div", null, `This page failed to open: ${error.message}`)));
       liftCurtain();
     }
     liftWhenShown(found.route.layout);
+  }
+
+  // The scripts of the pages that load on demand are fetched once the browser is idle, so that the first one asked for
+  // opens at once; a fetch that fails is left to the page that asks for it, which then says so.
+  function warmUpPages() {
+    const warm = () => {
+      for (const route of ROUTES) {
+        if (route.load !== undefined) {
+          route.load().catch(() => undefined);
+        }
+      }
+    };
+    if ("requestIdleCallback" in window) {
+      window.requestIdleCallback(warm, { timeout: 4000 });
+    } else {
+      setTimeout(warm, 1500);
+    }
   }
 
   // A page that Dot's update left out of date loads again once it is out of sight, so that it is the new version when
@@ -500,6 +524,7 @@ function beginSession() {
     history.replaceState(null, "", `${location.pathname}${location.search}#${startPath()}`);
   }
   show();
+  warmUpPages();
 
   runLifecycle(controller.signal, () => handleAuthLost()).catch((error) => {
     console.error("the event stream ended", error);
@@ -587,7 +612,11 @@ onAuthLost(handleAuthLost);
 wireConversationCopy(document);
 // A file asked for on a page without the panel beside the conversation shows in a dialog (item 269); a conversation's
 // page shows it in its panel and keeps the request to itself.
-document.addEventListener(OPEN_FILE_EVENT, (event) => fileDialog(event.detail, event.target));
+document.addEventListener(OPEN_FILE_EVENT, (event) => {
+  if (event instanceof CustomEvent) {
+    fileDialog(event.detail, event.target);
+  }
+});
 
 window.addEventListener("unhandledrejection", (event) => {
   const reason = event.reason;

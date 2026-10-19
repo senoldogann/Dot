@@ -9,12 +9,12 @@ import { icon } from "./icons.js";
 import { readPref, writePref } from "./prefs.js";
 
 const SIZE_KEY = "dot.computer.size";
-export const COMPACT_PX = 320;
+const COMPACT_PX = 320;
 // What the conversation keeps beside a dragged panel, the column of the handle, and a step of the arrow keys.
 const CHAT_MIN_PX = 360;
 const HANDLE_PX = 28;
 const STEP_PX = 32;
-export const STAGE_SIZES = [
+const STAGE_SIZES = [
   { id: "compact", label: "Compact", hint: "The panel at its own width", icon: "panelRight" },
   { id: "wide", label: "Wide", hint: "Half of the page for the panel", icon: "columns" },
   { id: "full", label: "Full", hint: "The conversation at its narrowest, the rest for the panel", icon: "maximize" },
@@ -22,7 +22,7 @@ export const STAGE_SIZES = [
 
 /** The size kept in this browser: `{ size, px }`, `size` one of the three (compact while none was chosen) or "custom"
  * with `px` the width dragged. */
-export function savedStageSize() {
+function savedStageSize() {
   const stored = readPref(SIZE_KEY);
   if (stored === null || STAGE_SIZES.some((option) => option.id === stored)) {
     return { size: stored ?? "compact", px: null };

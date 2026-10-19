@@ -32,7 +32,7 @@ import {
   WRAP_CODE,
   accepts,
   setValue,
-  valueOf,
+  settingValue,
 } from "../appearance/settings.js";
 import { el } from "../dom.js";
 import { icon } from "../icons.js";
@@ -417,7 +417,7 @@ function onOffSetting({ label, hint, setting }) {
   const toggle = switchSetting({
     label,
     hint,
-    read: () => valueOf(setting) === "on",
+    read: () => settingValue(setting) === "on",
     write: (on) => setValue(setting, on ? "on" : "off"),
     onToggled: () => toggle.paint(),
   });
@@ -433,7 +433,7 @@ function rangeOf({ label, hint, setting, min, max, step, unit }) {
     max,
     step,
     format: (value) => `${value}${unit}`,
-    read: () => valueOf(setting),
+    read: () => settingValue(setting),
     write: (value) => setValue(setting, value),
   });
 }
@@ -458,7 +458,7 @@ function familySetting({ label, hint, setting, stacks }) {
   const note = el("div", { class: "hint family-note" }, hint);
   const offered = (value) => stacks.some((stack) => stack.id === value);
   function paint() {
-    const value = valueOf(setting);
+    const value = settingValue(setting);
     select.value = offered(value) ? value : ANOTHER;
     field.hidden = offered(value);
     field.value = offered(value) ? "" : value;
@@ -530,7 +530,7 @@ function interfaceCard() {
       { id: "wide", label: "Wide", hint: "1152 px." },
       { id: "full", label: "Full", hint: "As wide as the window." },
     ],
-    selected: valueOf(CHAT_WIDTH),
+    selected: settingValue(CHAT_WIDTH),
     onSelect: (id) => setValue(CHAT_WIDTH, id),
   });
   const density = choiceSetting({
@@ -665,7 +665,7 @@ function typeCard() {
       { id: "interface", label: "Interface", hint: "The interface's font in every theme." },
       { id: "serif", label: "Serif", hint: "A serif in every theme." },
     ],
-    selected: valueOf(ANSWER_FONT),
+    selected: settingValue(ANSWER_FONT),
     onSelect: (id) => setValue(ANSWER_FONT, id),
   });
   const composerFont = familySetting({

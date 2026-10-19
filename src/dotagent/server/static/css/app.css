@@ -911,6 +911,11 @@ a.pill:hover {
   width: 8.5rem;
 }
 
+/* The model an address asked for (?model=, the context meter's link, item 396) stands out among the others. */
+.table.wide tr[data-asked] > td {
+  background: var(--accent-weak);
+}
+
 /* The row that says what a model's context size does. Its text wraps; on a narrow window the table scrolls sideways
    and the text stays in sight, no wider than the part of the table in sight (the scroll box's width, less the cell's
    padding on each side), so that it can keep its place however far the table is scrolled. */
@@ -2619,6 +2624,16 @@ a.pill:hover {
   font-size: var(--text-sm);
 }
 
+/* Under the meter's words, the way to the model's context size in Settings › Models (item 396). */
+.context-meter-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
+}
+
 /* The model's pill is the one that gives way when the bar is short. */
 .composer-pill[data-pill="model"] {
   flex: 0 1 auto;
@@ -2787,7 +2802,7 @@ a.pill:hover {
   gap: 4px;
   width: 320px;
   max-width: calc(100% - 16px);
-  max-height: 360px;
+  max-height: min(360px, var(--room-above, 360px));
   overflow-y: auto;
   padding: 8px;
   border-radius: var(--radius);
@@ -2795,6 +2810,12 @@ a.pill:hover {
   background: var(--surface);
   box-shadow: var(--shadow-float);
   animation: fade-in var(--motion-quick) var(--ease);
+}
+
+/* The Options menu: the four approval modes with what each does, and YOLO's warning once it is chosen (item 398), whole
+   where the window has the room. */
+.composer-popover:has(.approval-list) {
+  max-height: min(480px, var(--room-above, 480px));
 }
 
 .pop-option {
@@ -2889,6 +2910,19 @@ a.pill:hover {
 .provider-mark[data-provider="generic"],
 .provider-mark[data-provider="typesafe"] {
   mask-image: url("../icons/providers/generic.svg");
+}
+
+/* The approval modes of the Options menu (item 398), strictest first; YOLO chosen in the warning ink, so a run that asks
+   nobody is never started by accident. */
+.approval-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-list[data-mode="yolo"] .pop-option[aria-selected="true"] {
+  background: var(--warn-weak);
+  box-shadow: inset 0 0 0 1px var(--warn-border);
+  color: var(--warn);
 }
 
 /* A row of the Options menu: the caption on the left, its control on the right. */
@@ -6851,7 +6885,8 @@ button.attach-chip:hover {
   .menu-item,
   .tool-head,
   .steps-head,
-  .helpers-head {
+  .helpers-head,
+  .context-meter-link {
     min-height: 44px;
   }
 

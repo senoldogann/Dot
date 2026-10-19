@@ -101,9 +101,11 @@ grows with it, the files attached and the picks under it, then one bar that neve
 Chat or Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent
 exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
 default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
-per model) and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill
-always shows, see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
-fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no ground until the
+per model) and **Options** (the approval mode, which the pill always shows by its icon and a short name: a lock for
+Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock for YOLO, in the warn ink, on no
+fill; its menu lists the four modes with what each does, item 398, see
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)) and the round send, quiet while the box is
+empty. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
 the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
@@ -111,14 +113,17 @@ least 16 px on a touch screen other than an iPhone's or an iPad's, which would z
 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
 or a click outside closes it. The model's menu (item 208) has a rail on its left, a star for the
 favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the models
-of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model a star
+of the view shown (item 395), as its placeholder and its label say, which keeps its words when the rail shows another
+view, has the keys as the menu opens and reads names, providers and "free"; and on each model a star
 that keeps it among the favourites in that browser, where the menu opens once there are any. The arrows and Enter pick a
 model, ⌘1 to ⌘9 the rows that show those keys, and ⌘D stars the row the keys are on. The default's row, the first of
 every view, has **Change** (item 209): the list then chooses the model new chats start on, a bar under the search says
 so and the default has the tick, and the model picked (by a click, Enter or ⌘1 to ⌘9) becomes the default, as in
 Settings › Models; the menu goes back to the chat's model and stays open. A chat that has a model of its own keeps it,
 and one that follows the default moves with it. Escape or Cancel goes back without a change. What you typed and attached
-and did not send is kept in this browser and is there again when you come back (so is the box of each run). Dot's face
+and did not send is kept in this browser and is there again when you come back (so is the box of each run), and so are
+the mode, the model, the agent, Keep going and a choice for one message picked for it (item 397), until a message goes:
+a new chat after that starts on Task, the default model, Dot and Keep going off. Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
 ⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
 browser (item 230). The markdown in the box shows as it reads (item 207):
@@ -128,12 +133,12 @@ links in the colour of links; the box is still a text field, with its caret, sel
 sent is the text as typed. A message whose answer was lost on its way back (the page says the sending failed and keeps
 the message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a
 key of its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of
-a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` here; `/btw` and
-`/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools, read from
-the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape
-closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the slash
-word goes; a command does its work. `@` at the start of a word opens the same menu for the picks alone (item 367): the
-MCP servers by name with the number of their tools, then the skills and each server's tools, filtered by the letters
+a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` and `/loop` here;
+`/btw` and `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools,
+read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
+Escape closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the
+slash word goes; a command does its work. `@` at the start of a word opens the same menu for the picks alone (item 367):
+the MCP servers by name with the number of their tools, then the skills and each server's tools, filtered by the letters
 after it; a pick is a chip and the at word goes. An `@` inside a word, as in an address, opens nothing. A run that waits
 for your approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
@@ -256,12 +261,13 @@ of the daemon or a run moved to a standby model leaves them as they are (a chat 
 next run starts). They are not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run
 under way keeps its own: while it works, the pills step back and say that they wait for the next follow-up. Beside the
 send, a ring shows how much of the run's context budget its last step filled (item 222): the tokens that
-step sent the model against the run's budget (`context_tokens` or the model's own context size, or three quarters of
-the window when that is less); it turns to the warning colour past 80 % and to the danger colour past the budget, and a
+step sent the model against the run's budget (the model's own context size or Dot's default, the most of the window,
+item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a
 click shows the figures, the point past which Dot summarizes the older part of the run, the model's window, and why
 the budget is smaller than the window (each step sends the model the whole run again, so a run kept within it is
 answered sooner and costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen
-for the model in Settings › Models, which the timeline notes too. It
+for the model in Settings › Models, which the timeline notes too; **Change context size** under them opens that
+setting at the run's model (item 396). It
 reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut off offers
 **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the model and
 its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool calls (with
@@ -338,7 +344,9 @@ one; a provider without a key, or whose key was refused (HTTP 401), says so and 
 access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in with, each with its key and the
 models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
 with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
-**Memory**, **Skills**, **Schedules**, **Phone** (the addresses a phone reaches Dot at and a pairing code for its
+**Memory**, **Skills**, **Schedules**, **Harness** (what Dot improves around its model: the version in use, a form for
+one of your own, every version with Adopt and Retire, the steps of the loop, the experiences and how the nightly step is
+set; see [The harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its
 home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, its facts in four
 groups each named over its rows of a label and a value, item 378: this Dot, how it acts, what it works with and its
 models; the emergency stop and the health checks in a fold, closed, with the number of failures on its line, and the
@@ -540,9 +548,9 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
-| `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
+| `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
-| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
+| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |

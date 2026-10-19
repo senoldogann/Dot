@@ -1,6 +1,7 @@
 """The context size of a model's runs (item 250): how much of a run each step of the model sends before the older part
-is summarised, where the owner chose one for the model instead of ``[agent] context_tokens``. ``[models.context]`` names
-them, and Settings › Models sets them while the daemon runs, which the config file keeps too."""
+is summarised, where the owner chose one for the model instead of the default ``[agent] context_tokens`` gives.
+``[models.context]`` names them, and Settings › Models sets them while the daemon runs, which the config file keeps
+too."""
 
 from collections.abc import Mapping
 
@@ -22,13 +23,13 @@ class ContextSizes:
         return dict(self._sizes)
 
     def of(self, model: str) -> int | None:
-        """The size chosen for ``model`` (``provider:model``), ``None`` when its runs have ``[agent]
-        context_tokens``."""
+        """The size chosen for ``model`` (``provider:model``), ``None`` when its runs have the default one ``[agent]
+        context_tokens`` gives."""
         return self._sizes.get(model)
 
     def choose(self, model: str, tokens: int | None) -> None:
-        """Give the runs of ``model`` a context size of ``tokens`` from the next one on, or ``[agent] context_tokens``
-        for ``None``; the runs under way keep theirs."""
+        """Give the runs of ``model`` a context size of ``tokens`` from the next one on, or the default one ``[agent]
+        context_tokens`` gives for ``None``; the runs under way keep theirs."""
         if tokens is None:
             self._sizes.pop(model, None)
         else:
