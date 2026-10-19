@@ -537,15 +537,20 @@ dotx service uninstall   # stop the daemon and remove the job
     Return, choose **Open** and switch it on.
 
   A running process keeps what it had when it started, so after you switched a permission on run `dotx service install`
-  (it restarts the daemon) and then `dotx service permissions` again for the next one. The command ends with
-  "The service has everything the desktop needs." and exit code 0 once the daemon has accessibility, input events and
-  screen recording. Measured through the service with all three granted: the model opened the fixture app, typed a
-  name, pressed a button twice and ticked a checkbox in 4 steps and 13 seconds.
-- The job does not see the environment of your shell. Give it its API keys through `dotx auth set` or the Keychain.
-- When Dot's files are under Desktop, Documents or Downloads, the first start of the job waits for you: macOS asks once
-  whether Dot may use that folder, and `service install` waits up to 60 seconds for the answer. Measured on an
-  Apple-silicon Mac, with the Python job: 42 seconds with a person answering the dialog, then about 1.2 seconds for
-  every later start.
+  (it restarts the daemon) and then `dotx service permissions` again for the next one. The command ends with "The
+  service has everything the desktop needs." and exit code 0 once the daemon has accessibility, input events and screen
+  recording. Settings › System › **Permissions** in the web UI does the same from the page (item 409): the three
+  permissions as macOS reports them for the daemon (`GET /api/desktop/permissions`, no dialog), **Ask macOS** (`POST`,
+  which also puts the program in the panes' lists), **Open** for the pane of each permission missing (`POST
+  /api/desktop/permissions/open`), and, when the daemon is the service's own process, **Restart Dot** (`POST
+  /api/system/restart`): the daemon stops with an exit launchd does not count as clean, so the job starts it again, with
+  what was granted meanwhile; a daemon run by hand is refused the restart. The SnapShots page offers the Accessibility
+  pane the same way. Measured through the service with all three granted: the model opened the fixture app, typed a
+  name, pressed a button twice and ticked a checkbox in 4 steps and 13 seconds. - The job does not see the environment
+  of your shell. Give it its API keys through `dotx auth set` or the Keychain. - When Dot's files are under Desktop,
+  Documents or Downloads, the first start of the job waits for you: macOS asks once whether Dot may use that folder, and
+  `service install` waits up to 60 seconds for the answer. Measured on an Apple-silicon Mac, with the Python job: 42
+  seconds with a person answering the dialog, then about 1.2 seconds for every later start.
 
 The REST API (all under `/api`; bodies and replies are JSON, event streams are server-sent events):
 
@@ -588,7 +593,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
 | `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | SnapShots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
-| `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
+| `GET /desktop/permissions`, `POST /desktop/permissions`, `POST /desktop/permissions/open` (`{"pane": "screen_recording"}`), `POST /system/restart` | the desktop permissions as macOS reports them, make macOS ask for the missing ones, show a pane, start the service's daemon again (item 409) |
 
 `POST /runs`, `POST /runs/{id}/steer` and `POST /threads/{id}/queue` take a `key` of the caller's own (16 to 64 letters,
 digits and dashes), which the pages send with each new message. The same message sent again with its key is not done

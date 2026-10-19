@@ -33,6 +33,7 @@ from dotagent.core.errors import (
     OpenCodeMissing,
     ProviderAccessError,
     ProviderAuthError,
+    ServiceError,
 )
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import (
@@ -44,7 +45,13 @@ from dotagent.core.paths import (
     screenshots_dir,
     skills_dir,
 )
-from dotagent.desktop.perms import missing_panes, request_permissions, responsible_program
+from dotagent.desktop.perms import (
+    check_permissions,
+    missing_panes,
+    open_settings,
+    request_permissions,
+    responsible_program,
+)
 from dotagent.desktop.types import Permissions
 from dotagent.doctor import CheckResult, run_quick_checks
 from dotagent.help.added import (
@@ -64,6 +71,7 @@ from dotagent.help.elsewhere import (
     FoundSkill,
     found_elsewhere,
 )
+from dotagent.launchd import JobState, inspect_job
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
@@ -91,6 +99,7 @@ from dotagent.server.views import (
     MainModelRequest,
     ModelOption,
     PaletteView,
+    PaneRequest,
     PermissionsView,
     ProofQuery,
     ProofView,
@@ -98,6 +107,7 @@ from dotagent.server.views import (
     ProviderProblem,
     PushKeyView,
     PushSubscribeRequest,
+    RestartView,
     ResumeRequest,
     ResumeView,
     RoleModelRequest,
@@ -502,18 +512,48 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         judge_config: JudgeConfig = config.judge.model_copy(update={"provider": ctx.runtime.judge.provider})
         return await run_quick_checks(config.model_copy(update={"models": models_now(), "judge": judge_config}))
 
-    @router.post("/desktop/permissions")
-    async def ask_for_desktop_permissions() -> PermissionsView:
-        """Make macOS ask, in the name of the program it holds responsible for this daemon, for what the desktop is
-        missing."""
-        granted: Permissions = await asyncio.to_thread(request_permissions)
+    async def _as_service() -> bool:
+        """Whether this daemon is the service's own process: a stop then has launchd start it again."""
+        try:
+            job: JobState | None = await inspect_job(os.getuid())
+        except ServiceError:
+            return False
+        return job is not None and job.pid == os.getpid()
+
+    async def _permissions_view(granted: Permissions) -> PermissionsView:
         return PermissionsView(
             program=str(responsible_program()),
             accessibility=granted.accessibility,
             input_events=granted.post_event,
             screen_recording=granted.screen_recording,
             panes=list(missing_panes(granted)),
+            service=await _as_service(),
         )
+
+    @router.get("/desktop/permissions")
+    async def desktop_permissions() -> PermissionsView:
+        """What macOS has granted the program it holds responsible for this daemon, asked without a prompt (item
+        409)."""
+        return await _permissions_view(await asyncio.to_thread(check_permissions))
+
+    @router.post("/desktop/permissions")
+    async def ask_for_desktop_permissions() -> PermissionsView:
+        """Make macOS ask, in the name of the program it holds responsible for this daemon, for what the desktop is
+        missing; the asking puts the program in the panes' lists."""
+        return await _permissions_view(await asyncio.to_thread(request_permissions))
+
+    @router.post("/desktop/permissions/open")
+    async def open_permission_pane(request: PaneRequest) -> PermissionsView:
+        """Show the pane of System Settings where ``pane`` is switched on (item 409)."""
+        await asyncio.to_thread(open_settings, request.pane)
+        return await _permissions_view(await asyncio.to_thread(check_permissions))
+
+    @router.post("/system/restart")
+    async def restart_daemon() -> RestartView:
+        """Stop the daemon so that its service starts it again (item 409): a running process keeps the permissions it
+        had when it started. Refused when nothing would start it again."""
+        ctx.restart()
+        return RestartView(restarting=True)
 
     @router.get("/failsafe")
     async def failsafe_state() -> FailsafeView:

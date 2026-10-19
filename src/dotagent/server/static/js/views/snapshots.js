@@ -28,7 +28,22 @@ export function mount(root, _ctx) {
       return el("p", { class: "hint" }, "Off: the Command key is not watched.");
     }
     if (view.problem !== null) {
-      return el("p", { class: "hint snapshots-problem" }, icon("alert"), el("span", null, ` ${view.problem}`));
+      // The pane a press away (item 409); the watch starts by itself once the permission is granted.
+      return el(
+        "div",
+        { class: "stack tight" },
+        el("p", { class: "hint snapshots-problem" }, icon("alert"), el("span", null, ` ${view.problem}`)),
+        el(
+          "div",
+          { class: "cluster" },
+          el(
+            "button",
+            { class: "btn sm", type: "button", onclick: () => attempt(() => api.post("/desktop/permissions/open", { pane: "accessibility" })) },
+            icon("external"),
+            "Open System Settings",
+          ),
+        ),
+      );
     }
     return el("p", { class: "hint" }, view.listening ? `Listening for ${view.shortcut}.` : "Starting the watch of the key…");
   }

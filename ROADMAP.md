@@ -15261,6 +15261,22 @@ search with nothing), Plugins (nothing connected; a search with nothing), a run 
 Dot's computer is quiet. Tests: `tests/smoke/test_phone_lists.py` (Team's empty page: the mark, the title and the line).
 Docs: `docs/daemon.md`.
 
+### 409. The desktop's permissions granted from Settings › System, and the service started again from there
+
+**Status: done (2026-10-19), on `item-409-permissions`.** The owner's word of 2026-10-19, with the daemon's own words in
+hand ("macOS has not granted Screen Recording to the app that runs Dot… `dotx desktop setup` opens the pane; for the
+service use `dotx service permissions`"): let the permission be granted easily from the system. **As built
+(2026-10-19).** Settings › System has a **Permissions** card: Accessibility, Input events and Screen Recording as macOS
+reports them for the program that runs the daemon (`GET /api/desktop/permissions`, `check_permissions`, no dialog), the
+program's path, the steps in words, **Ask macOS** (the `POST` of item 251, which also puts the program in the panes'
+lists), **Open <pane>** for each permission missing (`POST /api/desktop/permissions/open`, `perms.open_settings`), and
+**Restart Dot** when the daemon is the service's own process (`inspect_job`'s pid is ours): `POST /api/system/restart`
+has the daemon stop and `run_daemon` return `RESTART_CODE` (75), an exit launchd does not count as clean, so the job
+(`KeepAlive` `SuccessfulExit: false`) starts it again with what was granted meanwhile; a daemon run by hand is refused
+(`ServerContext.restart`, `no_restart` by default). The SnapShots page's problem line got the same **Open System
+Settings**, and the hint in the errors names the card. Tests: `tests/smoke/test_server.py` (the read, the pane, the
+refusal). Docs: `docs/daemon.md`, `docs/browser-and-computer-use.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16095,3 +16111,5 @@ Docs: `docs/daemon.md`.
 - 2026-10-19 (Fable 5.1): item 405 on `item-405-snapshots` from `main`, on the owner's word of the same day: SnapShots,
   a double tap of ⌘ in any application that captures the window in front, with its text, into the open chat's box; the
   flash and a shortcut of one's own left for later.
+- 2026-10-19 (Fable 5.1): item 409 on `item-409-permissions` from `main`, on the owner's word of the same day: the
+  desktop's permissions read, asked, their panes opened and the service started again from Settings › System.

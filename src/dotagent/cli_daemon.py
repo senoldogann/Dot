@@ -181,8 +181,7 @@ async def cmd_daemon(command: DaemonCommand) -> int:
         f"Dot daemon on {base_url(config.server.host, config.server.port)}; log: {log_dir() / 'dotx.log'}. "
         "Open the UI with 'dotx open' from another terminal; stop with Ctrl-C.\n"
     )
-    await run_daemon(config)
-    return 0
+    return await run_daemon(config)
 
 
 async def cmd_open(command: OpenCommand) -> int:

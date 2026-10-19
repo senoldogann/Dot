@@ -130,8 +130,9 @@ def grant_hint(pane: Pane) -> str:
     """What to switch on, and where, naming the program macOS asks for (``responsible_program``)."""
     return (
         f"Open System Settings > Privacy & Security > {_PANE_TITLES[pane]} and switch on "
-        f"{program_name(responsible_program())}, then start it again. `dotx desktop setup` opens the pane; "
-        "for the service use `dotx service permissions`."
+        f"{program_name(responsible_program())}, then start it again. Settings › System › Permissions in the web UI "
+        "asks macOS, opens the pane and starts the service again; `dotx desktop setup` opens the pane in a terminal, "
+        "`dotx service permissions` for the service."
     )
 
 
