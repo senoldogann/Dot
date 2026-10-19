@@ -10,6 +10,7 @@ import time
 from collections.abc import Callable, Sequence
 from typing import Literal
 
+from dotagent.core.errors import DesktopError
 from dotagent.core.logs import get_logger
 from dotagent.desktop import apps, screen
 from dotagent.desktop.flight import Frame
@@ -127,6 +128,18 @@ def _run(arguments: list[str], timeout_s: float) -> subprocess.CompletedProcess[
     return subprocess.run(arguments, capture_output=True, text=True, timeout=timeout_s, check=False)
 
 
+def _open(arguments: list[str]) -> None:
+    """``open`` with ``arguments``; a DesktopError when it fails or does not answer in time, whose context names the
+    arguments without the fragment of an address, where the UI's token travels."""
+    shown: str = " ".join(argument.split("#", 1)[0] for argument in arguments)
+    try:
+        done: subprocess.CompletedProcess[str] = _run([_OPEN, *arguments], _OPEN_TIMEOUT_S)
+    except subprocess.TimeoutExpired as error:
+        raise DesktopError("open did not answer in time", {"arguments": shown}) from error
+    if done.returncode != 0:
+        raise DesktopError("open could not bring Dot forward", {"arguments": shown, "error": done.stderr.strip()[:300]})
+
+
 type TabFound = Literal["found", "none", "unasked"]
 
 
@@ -146,12 +159,13 @@ def _choose_tab(bundle: str, addresses: Sequence[str]) -> TabFound:
     return "found" if done.stdout.strip() == "found" else "none"
 
 
-def _front_frame(pid: int | None) -> Frame | None:
-    """The frame of the window in front once the application ``pid`` (any, for None) has it, None when none came."""
+def _front_frame(pid: int | None, before: int | None) -> Frame | None:
+    """The frame of the window in front once the application ``pid`` has it, or, for None, any application but
+    ``before`` (the one in front before Dot was asked for, the one just captured); None when none came."""
     deadline: float = time.monotonic() + _FRONT_WITHIN_S
     while True:
         front: int | None = apps.frontmost_pid()
-        if front is not None and (pid is None or front == pid):
+        if front is not None and (front == pid if pid is not None else front != before):
             windows: tuple[WindowInfo, ...] = screen.windows_on_screen()
             window: WindowInfo | None = next(
                 (one for one in windows if one.pid == front and one.layer == 0 and one.bounds.width > 1), None
@@ -169,28 +183,29 @@ def show_dot(addresses: Sequence[str], fallback_url: str, agent: str | None) -> 
     of the page's User-Agent ``agent`` first), else ``fallback_url`` opened in the default browser. Returns the frame
     of the window that came to the front, None when none did."""
     running: dict[str, AppInfo] = {app.bundle_id: app for app in apps.list_apps() if app.bundle_id is not None}
+    before: int | None = apps.frontmost_pid()
     if DESKTOP_APP in running:
-        _run([_OPEN, "-b", DESKTOP_APP], _OPEN_TIMEOUT_S)
-        return _front_frame(running[DESKTOP_APP].pid)
+        _open(["-b", DESKTOP_APP])
+        return _front_frame(running[DESKTOP_APP].pid, before)
     if agent is not None and "Firefox/" in agent and _FIREFOX in running:
         # Firefox has no words for its tabs: it comes to the front as it is, Dot's tab most likely the one it shows.
-        _run([_OPEN, "-b", _FIREFOX], _OPEN_TIMEOUT_S)
-        return _front_frame(running[_FIREFOX].pid)
+        _open(["-b", _FIREFOX])
+        return _front_frame(running[_FIREFOX].pid, before)
     unasked: list[str] = []
     for bundle in browsers_first(agent, list(running)):
         found: TabFound = _choose_tab(bundle, addresses)
         if found == "found":
-            return _front_frame(running[bundle].pid)
+            return _front_frame(running[bundle].pid, before)
         if found == "unasked":
             unasked.append(bundle)
     if unasked:
         # A browser that could not be asked may well show Dot: it comes to the front as it is, rather than Dot opening
         # anew at every capture.
-        _run([_OPEN, "-b", unasked[0]], _OPEN_TIMEOUT_S)
-        return _front_frame(running[unasked[0]].pid)
+        _open(["-b", unasked[0]])
+        return _front_frame(running[unasked[0]].pid, before)
     log.info("dot_tab_opened", reason="no browser showed Dot's pages")
-    _run([_OPEN, fallback_url], _OPEN_TIMEOUT_S)
-    return _front_frame(None)
+    _open([fallback_url])
+    return _front_frame(None, before)
 
 
 type Shower = Callable[[str | None], Frame | None]

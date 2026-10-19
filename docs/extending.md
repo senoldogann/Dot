@@ -19,7 +19,7 @@ A service none of whose ways was tried says **Not tried yet** and offers no step
 let in approved clients only; Canva refused Dot's on 2026-10-19), and Asana and Box (clients registered by hand). Figma
 reads through Framelink's server with your access token instead of Figma's own, which refused Dot's registration, and
 Atlassian either through its own server, signed in (your organization's admin may have to let it in), or through
-`mcp-atlassian` with an API token (item 415). Google and Slack work in Dot's browser; their pages name their MCP servers
+`mcp-atlassian` with an API token (item 413). Google and Slack work in Dot's browser; their pages name their MCP servers
 as not tried, since they sign in only clients registered by hand. Any MCP server can still be added by its address
 (below).
 
@@ -46,7 +46,7 @@ The ways a service connects:
   in** until its cookie expires.
 - **MCP server** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
   Supabase and monday.com too (item 408), and GitLab, PostHog, Zapier, Webflow, ClickUp, Postman, Netlify, Apify, Miro,
-  Heroku and Atlassian (item 415: Dot's own client registered with each and each opened its sign-in page to it on
+  Heroku and Atlassian (item 413: Dot's own client registered with each and each opened its sign-in page to it on
   2026-10-19), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs and Jina, open to all, and the services that
   take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix, Firecrawl and Tavily;
   a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to over standard input

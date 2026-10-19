@@ -172,6 +172,24 @@ async def test_a_capture_waits_for_the_composer_that_claims_it_and_the_pages_hea
     assert asked[-1] is True and set(asked[:-1]) == {False}
 
 
+async def test_a_capture_kept_stays_kept_when_dot_cannot_be_brought_forward() -> None:
+    """Item 414's review: what keeps Dot from the front (no application in front, open that did not answer) is logged;
+    the capture is in the box all the same, told as taken and not as failed, and its card lands in the corner."""
+    bus: _Bus = _Bus()
+
+    def refusing_shower(_agent: str | None) -> Frame | None:
+        raise DesktopError("open did not answer in time", {})
+
+    config = load_default_config().snapshots.model_copy(update={"sound": "off", "enabled": False})
+    service: SnapshotService = SnapshotService(config, bus)  # type: ignore[arg-type]
+    overlay: _Overlay = _Overlay()
+    await service.start(lambda _with_text: _kept("Notes"), refusing_shower, overlay)
+    taken: SnapshotTaken = await service.take()
+    assert taken.app == "Notes" and service.pending() == [taken]
+    assert [kind for _, kind, _, _ in bus.emitted] == [SNAPSHOT_EVENT]
+    assert [(command.op, command.frame) for command in overlay.sent] == [("begin", _WINDOW), ("land", None)]
+
+
 async def test_a_capture_that_fails_tells_the_pages_why_and_raises() -> None:
     bus: _Bus = _Bus()
 

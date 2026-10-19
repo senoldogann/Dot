@@ -426,10 +426,12 @@ class SnapshotService:
     async def take(self) -> SnapshotTaken:
         """Capture the window in front now: the files are kept for the composer to claim, the sound plays, the window
         flashes and its card lifts off it, the pages hear of it, and Dot's window comes to the front, where the card
-        lands (item 414). A capture that fails tells the pages why and raises."""
+        lands (item 414). A capture that fails tells the pages why and raises; once it is kept, what brings Dot forward
+        cannot undo it (:meth:`_show`)."""
         if self._taker is None or self._shower is None or self._overlay is None:
             raise DesktopError("SnapShots are not started", {})
         taker: Taker = self._taker
+        overlay: Overlay = self._overlay
         async with self._taking:
             try:
                 kept: Kept = await asyncio.to_thread(taker, self.app_text)
@@ -447,7 +449,7 @@ class SnapshotService:
                 begin: FlightCommand = FlightCommand(
                     op="begin", frame=kept.frame, picture=kept.picture, flash=self.flash, fly=self.animations
                 )
-                await self._overlay.send(begin)
+                await overlay.send(begin)
             self._pending.append(taken)
             log.info("snapshot_taken", app=taken.app, files=len(taken.files))
             await self._bus.emit(
@@ -456,10 +458,23 @@ class SnapshotService:
                 {**taken.model_dump(), "animations": self.animations, "open": self.open_dot},
                 False,
             )
-            target: Frame | None = await asyncio.to_thread(self._shower, self.agent) if self.open_dot else None
-            if self.animations:
-                await self._overlay.send(FlightCommand(op="land", frame=target, picture=None, flash=False, fly=True))
-            return taken
+        # Out of the lock: macOS may ask whether Dot may drive the browser, which the next capture does not wait for.
+        await self._show(overlay)
+        return taken
+
+    async def _show(self, overlay: Overlay) -> None:
+        """Bring Dot's window to the front for the capture just kept, and land its card there (or in the corner of the
+        screen). The capture is in the box whatever happens here: what keeps Dot from the front is logged, not told
+        as a failed capture."""
+        target: Frame | None = None
+        if self.open_dot and self._shower is not None:
+            try:
+                target = await asyncio.to_thread(self._shower, self.agent)
+            except (DesktopError, OSError) as error:
+                reason: str = error.message if isinstance(error, DotError) else f"{type(error).__name__}: {error}"
+                log.warning("snapshot_dot_not_shown", error=reason)
+        if self.animations:
+            await overlay.send(FlightCommand(op="land", frame=target, picture=None, flash=False, fly=True))
 
     def claim(self, agent: str | None) -> list[SnapshotTaken]:
         """The captures not yet claimed, for the composer that asks first, whose page runs in the browser ``agent``

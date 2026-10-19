@@ -7,7 +7,7 @@ server's headers or environment refer to it as ``${...}``, so the value never si
 
 Checked on 2026-10-15 in each authorization server's own metadata: every service here that signs in offers dynamic
 client registration and a client without a secret (``none``); Supabase and monday.com say so in their docs
-(2026-10-19). The services item 415 added were checked on 2026-10-19 by Dot's own client: it registered with each and
+(2026-10-19). The services item 413 added were checked on 2026-10-19 by Dot's own client: it registered with each and
 each opened its sign-in page to it. The addresses, the keys they take and the commands are as the services' own docs
 and package registries read on 2026-10-19. Left out, as Dot cannot connect to them: Asana, Slack, Google, Box, Render,
 HubSpot and Square (clients registered by hand), Vercel and Canva (approved clients only: Canva refused Dot's), Figma's

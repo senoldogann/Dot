@@ -1121,7 +1121,7 @@ class McpServerView(FrozenModel):
 
 class ServiceSecretView(FrozenModel):
     """A secret a service asks the owner for on the page (item 408): its name, its label and where to get one (None
-    for a value the owner knows, such as a site's address, item 415)."""
+    for a value the owner knows, such as a site's address, item 413)."""
 
     name: str
     label: str
