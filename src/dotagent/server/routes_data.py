@@ -195,7 +195,9 @@ def memories_router(ctx: ServerContext) -> APIRouter:
         health: LearningHealth | None = await read_learning_health(ctx.runtime.store)
         quiet_s: float | None = quiet_limit(ctx.runtime.config.agent.reflection_time)
         stalled: str | None = None if health is None else stall_reason(health, time.time(), quiet_s)
-        return LearningHealthView(health=health, stalled=stalled)
+        return LearningHealthView(
+            health=health, stalled=stalled, harness_on=ctx.runtime.config.harness.step_time != "off"
+        )
 
     @router.get("/memories/search")
     async def search_memories(query: Annotated[SearchQuery, Query()]) -> list[MemoryHit]:

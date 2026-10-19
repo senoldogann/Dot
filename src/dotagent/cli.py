@@ -62,6 +62,9 @@ _FAMILIES: dict[str, str] = {
     "harness-adopt": "dotagent.cli_harness",
     "harness-retire": "dotagent.cli_harness",
     "harness-propose": "dotagent.cli_harness",
+    "harness-step": "dotagent.cli_harness",
+    "harness-probe": "dotagent.cli_harness",
+    "harness-final": "dotagent.cli_harness",
     "schedule-list": "dotagent.cli_schedule",
     "schedule-add": "dotagent.cli_schedule",
     "schedule-delete": "dotagent.cli_schedule",
@@ -294,6 +297,25 @@ def build_parser() -> argparse.ArgumentParser:
         default="invariant",
         help="how the agent works (invariant, the default) or what a practitioner knows (domain)",
     )
+    harness_step = harness_commands.add_parser(
+        "step",
+        help=(
+            "one step of the improvement loop now: propose, probe the scoring set apart, keep the best, write the"
+            " experience (the daemon does it at [harness] step_time)"
+        ),
+    )
+    harness_step.add_argument("--run", dest="run_id", default=None, help="the run to learn from; the newest by default")
+    harness_step.add_argument(
+        "--scripted", action="store_true", help="play the references through the scripted model: a check, no model cost"
+    )
+    harness_probe = harness_commands.add_parser("probe", help="a probe in a process of its own (the step starts these)")
+    harness_probe.add_argument(
+        "--ask", required=True, help="a JSON file with what to play; the report is printed as JSON"
+    )
+    harness_final = harness_commands.add_parser(
+        "final", help="play the final set once under the adopted version and report it as it comes out"
+    )
+    harness_final.add_argument("version_id", nargs="?", default=None, help="a version other than the adopted one")
 
     schedule = commands.add_parser("schedule", help="goals that Dot runs later or on a rhythm, while the daemon runs")
     schedule_commands = schedule.add_subparsers(dest="schedule_action", required=True)

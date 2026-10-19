@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from dotagent.agent.learning_health import (
     LEARNED,
+    SKIPPED,
     LearningOutcome,
     check_learning,
     failed_with,
@@ -15,12 +16,14 @@ from dotagent.agent.learning_health import (
 )
 from dotagent.agent.manager import RunManager, thread_title
 from dotagent.agent.reflection import last_reflection, record_reflection_failure, reflection_due
-from dotagent.agent.reflection_record import Reflection, summary_line
+from dotagent.agent.reflection_record import REFLECTION_OFF, Reflection, summary_line
 from dotagent.config import SchedulerConfig
 from dotagent.core.errors import DotError, NotFoundError, RunConflict, StoreError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
+from dotagent.harness.probe import probe_apart
+from dotagent.harness.step import run_step
 from dotagent.runtime import Runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE, ScheduleMissed
 from dotagent.scheduler.failures import (
@@ -34,7 +37,7 @@ from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, histor
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
 from dotagent.store.db import Store
-from dotagent.store.models import RunRecord, ScheduleRecord, ThreadRecord
+from dotagent.store.models import HarnessStep, RunRecord, ScheduleRecord, ThreadRecord
 
 log = get_logger(__name__)
 
@@ -88,6 +91,9 @@ class Scheduler:
         self._loop: asyncio.Task[None] | None = None
         self._reflected_from: float = time.time()
         self._reflecting: asyncio.Task[None] | None = None
+        # The step of the harness (item 391), timed like the reflection.
+        self._stepped_from: float = time.time()
+        self._stepping: asyncio.Task[None] | None = None
 
     async def start(self) -> asyncio.Task[None]:
         """Begin ticking in the background; what an earlier process left unfinished (a schedule starting or running a
@@ -129,6 +135,9 @@ class Scheduler:
         reflecting: asyncio.Task[None] | None = self._reflecting
         if reflecting is not None:
             reflecting.cancel()
+        stepping: asyncio.Task[None] | None = self._stepping
+        if stepping is not None:
+            stepping.cancel()
         loop: asyncio.Task[None] | None = self._loop
         if loop is None:
             return
@@ -144,6 +153,8 @@ class Scheduler:
             await asyncio.wait(set(self._watchers))
         if self._reflecting is not None:
             await asyncio.wait({self._reflecting})
+        if self._stepping is not None:
+            await asyncio.wait({self._stepping})
 
     def reflecting(self) -> bool:
         """Whether a reflection is under way."""
@@ -158,7 +169,13 @@ class Scheduler:
         parts are done each on its own: one that fails is logged where it failed and keeps the others from nothing, and
         the failures are raised together at the end, as an ``ExceptionGroup``."""
         failures: list[Exception] = []
-        for part in (self._fire_due, self._start_due_sessions, self._reflect_if_due, self._check_learning):
+        for part in (
+            self._fire_due,
+            self._start_due_sessions,
+            self._reflect_if_due,
+            self._step_if_due,
+            self._check_learning,
+        ):
             try:
                 await part(now)
             except Exception as exc:
@@ -190,6 +207,50 @@ class Scheduler:
             return
         self._reflected_from = now
         self._reflecting = asyncio.create_task(self._reflect(now), name="reflection")
+
+    def stepping(self) -> bool:
+        """Whether a step of the harness is under way."""
+        return self._stepping is not None and not self._stepping.done()
+
+    async def _step_if_due(self, now: float) -> None:
+        """Start the step of the harness (item 391) in a task when its daily time has passed since the last one (or the
+        last attempt); never while one is under way, and never with ``[harness] step_time`` off."""
+        if self.stepping():
+            return
+        step_time: str = self._runtime.config.harness.step_time
+        if step_time == REFLECTION_OFF:
+            return
+        last: list[HarnessStep] = await self._runtime.store.list_harness_steps(1)
+        anchor: float = max(self._stepped_from, last[0].started_at if last else 0.0)
+        if not reflection_due(step_time, anchor, now, self._zone):
+            return
+        self._stepped_from = now
+        self._stepping = asyncio.create_task(self._step(now), name="harness-step")
+
+    async def _step(self, now: float) -> None:
+        """Task body of a step of the harness, and the one place its errors end: its outcome is logged and kept in the
+        record of how learning fares, as the reflection's is; the probes run in processes of their own."""
+        try:
+            step: HarnessStep = await run_step(self._runtime, now, None, probe_apart, False)
+        except DotError as exc:
+            log.error("harness_step_failed", error=exc.message, context=exc.context)
+            outcome: LearningOutcome = failed_with(exc.message)
+        except Exception as exc:
+            log.exception("harness step crashed")
+            outcome = failed_with(f"{type(exc).__name__}: {exc}")
+        else:
+            log.info("harness_step_fired", step=step.id, state=step.state)
+            if step.state == "skipped":
+                outcome = SKIPPED
+            elif step.state == "failed":
+                outcome = failed_with(step.error or "the step failed")
+            else:
+                outcome = LEARNED
+        quiet_s: float | None = quiet_limit(self._runtime.config.agent.reflection_time)
+        try:
+            await record_learning(self._runtime.store, self._runtime.bus, "harness", now, outcome, quiet_s)
+        except StoreError as error:
+            log.error("learning_not_recorded", work="harness", state=outcome.state, error=error.message)
 
     async def _check_learning(self, now: float) -> None:
         """Tell the owner when no reflection went well for too long, though none ended since

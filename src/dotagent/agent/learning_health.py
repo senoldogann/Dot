@@ -33,12 +33,13 @@ FAILURES_TO_TELL: int = 3
 REFLECTION_SILENCE_S: float = 48 * 3600.0
 _ERROR_CHARS: int = 300
 
-type LearningWork = Literal["reflection", "lessons", "playbooks"]
-LEARNING_WORKS: tuple[LearningWork, ...] = ("reflection", "lessons", "playbooks")
+type LearningWork = Literal["reflection", "lessons", "playbooks", "harness"]
+LEARNING_WORKS: tuple[LearningWork, ...] = ("reflection", "lessons", "playbooks", "harness")
 WORK_NAMES: dict[LearningWork, str] = {
     "reflection": "The nightly reflection",
     "lessons": "Drawing lessons from runs",
     "playbooks": "Writing skills from runs",
+    "harness": "The harness's nightly step",
 }
 
 
@@ -80,6 +81,8 @@ class LearningHealth(FrozenModel):
     lessons: WorkHealth
     playbooks: WorkHealth
     told_at: float | None
+    # The step of the harness (item 391); a record written before it has none.
+    harness: WorkHealth = _NEVER
 
 
 class LearningStalled(FrozenModel):
@@ -89,7 +92,7 @@ class LearningStalled(FrozenModel):
 
 
 def new_health(at: float) -> LearningHealth:
-    return LearningHealth(since=at, reflection=_NEVER, lessons=_NEVER, playbooks=_NEVER, told_at=None)
+    return LearningHealth(since=at, reflection=_NEVER, lessons=_NEVER, playbooks=_NEVER, told_at=None, harness=_NEVER)
 
 
 def work_health(health: LearningHealth, work: LearningWork) -> WorkHealth:
@@ -100,6 +103,8 @@ def work_health(health: LearningHealth, work: LearningWork) -> WorkHealth:
             return health.lessons
         case "playbooks":
             return health.playbooks
+        case "harness":
+            return health.harness
 
 
 def with_outcome(health: LearningHealth, work: LearningWork, at: float, outcome: LearningOutcome) -> LearningHealth:

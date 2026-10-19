@@ -44,4 +44,8 @@ can be resumed too.
 `dotx harness` manages the versions of what a run's prompt takes from the harness, which [The harness](harness.md)
 describes: `list`, `show [ID]`, `diff ID [--against ID]`, `set --summary TEXT [--habits FILE] [--tool-guidance FILE]
 [--adopt]` (a component from a file, `-` for standard input, the other kept from the adopted version), `adopt ID` and
-`retire ID`. The daemon reads the adopted version as each run starts, so none of them needs a restart.
+`retire ID`. The daemon reads the adopted version as each run starts, so none of them needs a restart. `propose RUN_ID
+[--scope invariant|domain]` asks the proposer for a candidate from one run; `step [--run ID] [--scripted]` runs one step
+of the improvement loop now, its probes in processes of their own (`probe --ask FILE`, which the step starts), and
+`final [ID]` plays the final set once under the adopted version; `--scripted` plays the references through the scripted
+model and has the roles answer from a script, a check of the loop at no model's cost.

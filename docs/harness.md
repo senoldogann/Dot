@@ -81,10 +81,13 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    the edit helped, changed nothing, or hurt. A probe says how a candidate behaved, not that it is right: runs vary,
    and the models share their blind spots.
 3. **Compose.** A composer reads the candidates, their diffs and the contrasts, and keeps, revises or drops each edit,
-   each decision tied to an observation; or it keeps the current harness. The composed version is a candidate marked
-   `probed`, with the decisions and the evidence in its notes.
-4. **Adopt.** You adopt it, or not, on the harness page or with `dotx harness adopt`. `[harness] adopt = "auto"`
-   (off by default; a later item) adopts on its own only a version the probe showed better on every task.
+   each decision tied to an observation; or it keeps the current harness. The composed version is played on the scoring
+   set in its turn and survives, as `probed`, when it did better than the base, with the decisions and the evidence in
+   its notes; else the best candidate does.
+4. **Adopt.** You adopt it, or not, on the harness page or with `dotx harness adopt`. `[harness] adopt = "auto"` (off by
+   default) adopts on its own only a version its own probe showed better on a task and worse on none, with two repeats,
+   and never one written from a run that had read content third parties can author: that decision is yours.
+
 5. **Reflect.** After the step, a reflector writes what each edit did (helped, hurt, no observed effect, confounded)
    and, when the evidence supports one, an *experience*: the cue (the shape of situation), the lesson, the evidence
    and its confidence. Experiences go to a library the proposer reads first next time; a step whose evidence shows no
@@ -110,8 +113,39 @@ experience with no effect behind it) is asked once more with what was wrong, the
 `dotx harness propose RUN_ID [--scope invariant|domain]` asks the proposer about one run by hand and writes its
 candidate, whose notes keep the scope and the moments; `keep` writes nothing.
 
+## The step, as built
+
+`[harness] step_time` (a time of day; `off` by default) has the daemon run one step a night, and `dotx harness step
+[--run ID] [--scripted]` runs one by hand. The step reads the newest run of yours that ended since the last step (a task
+or research run of its own, as the reflection reads them), asks the proposer for a candidate in each scope of
+`step_candidates`, then plays the scoring set (`scoring_tasks`, eval task ids) `step_repeats` times under the adopted
+texts and under each candidate. Each probe is a process of its own (`dotx harness probe`), because an attempt switches
+the process's Dot home to its throw-away one, which the daemon and your runs must never see; the step reads the report
+back. A candidate that passed more on a task and less on none survives; two that both did are merged by the composer,
+and the merge is played in its turn: it survives when it did better than the base, else the best candidate does. The
+survivor is written as `probed`, with its contrast and the decisions in its notes, and the others are retired with
+theirs. The experience writer then says what each edit did, and an experience is kept when an edit helped or hurt with
+evidence. The step stops before the attempt that would pass `step_minutes` or `step_tokens` of the model under test (the
+next attempt is taken to cost what the earlier ones did; a probe with nothing left plays nothing, one that outlives its
+budget is ended, and a probe cut short leaves its candidate `unclear`, which never survives), records what it did (`dotx
+harness step` prints it), and counts in how learning fares with the reflection. `adopt = "auto"` adopts the survivor on
+its own when it did better on a task and worse on none with `step_repeats` of at least 2, and never from a run that had
+read content third parties can author; `"owner"`, the default, leaves it to you. A role that fails after the probes (the
+composer, the experience writer) leaves the step `failed` with the error, the survivor probed all the same, and how
+learning fares counts the failure; a scripted check is recorded and marked `scripted`, and does not move the window the
+next step learns from. `--scripted` plays the references through the scripted model and has the roles answer from a
+script (the proposer proposes one habit and keeps the other scopes, the experience writer saw no effect): the whole
+step, at no model's cost, as a check of the loop.
+
+`dotx harness final [ID]` plays the final set (`final_tasks`) once under the adopted version, or the one named, apart
+from the daemon, keeps the report in the version's notes (the end of `dotx harness show`), and prints it as it comes
+out. What the first step with a real model showed (2026-10-19, Claude Haiku 5.5): the eight scoring tasks are passed 2/2
+under any text by a capable model, so a candidate can come out worse on them but never better, and the loop keeps;
+before the step can adopt on evidence, the scoring set needs tasks with headroom (ones the main model fails sometimes),
+which is left for later, as is a secondary signal (steps, tokens) when pass rates tie.
+
 ## What is built so far
 
 Item 389 built the versions, their components, the prompt's reading of the adopted one, the command line and the API.
-Item 390 built the roles and `dotx harness propose`. The probe and the nightly step, the provenance graph and the page
-follow, one item each; this page grows with them.
+Item 390 built the roles and `dotx harness propose`. Item 391 built the probe, the step and its schedule. The
+provenance graph and the page follow, one item each; this page grows with them.

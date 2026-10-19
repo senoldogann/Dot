@@ -2,32 +2,57 @@
 show and diff them, write one of the owner's own, adopt or retire one."""
 
 import asyncio
+import json
+import signal
 import sys
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from pydantic import JsonValue
+
 from dotagent.cli_commands import (
     Command,
     HarnessAdoptCommand,
     HarnessDiffCommand,
+    HarnessFinalCommand,
     HarnessListCommand,
+    HarnessProbeCommand,
     HarnessProposeCommand,
     HarnessRetireCommand,
     HarnessSetCommand,
     HarnessShowCommand,
+    HarnessStepCommand,
 )
-from dotagent.config import load_user_config
+from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import db_path, screenshots_dir
+from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedTurn
 from dotagent.harness.components import COMPONENTS, NO_HARNESS, HarnessText
+from dotagent.harness.contrast import scores_of
+from dotagent.harness.probe import ProbeAsk, ProbeReport, ask_from_file, probe_apart, probe_here, report_json
 from dotagent.harness.propose import propose_from_run
-from dotagent.harness.service import OWNER, adopt, adopted, create_version, diff_text, retire, text_of
+from dotagent.harness.roles import ROLE_NAMES
+from dotagent.harness.service import (
+    OWNER,
+    adopt,
+    adopted,
+    create_version,
+    diff_text,
+    notes_with,
+    retire,
+    step_facts,
+    text_of,
+)
+from dotagent.harness.step import run_step, scripted_role_turns
+from dotagent.llm.router import parse_model_ref
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.secrets import known_secrets
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessVersion
+from dotagent.store.models import HarnessStep, HarnessVersion
 
 # What a version's line names in place of a text: Dot's own text, which a run takes while none is adopted.
 OWN_TEXT: str = "Dot's own text"
@@ -168,6 +193,112 @@ async def cmd_harness_propose(command: HarnessProposeCommand) -> int:
     return 0
 
 
+def render_step(step: HarnessStep) -> list[str]:
+    """How a step ended, and what it did."""
+    facts: dict[str, object] = json.loads(step.outcome) if step.outcome else {}
+    lines: list[str] = [f"Step {step.id}: {step.state}" + (f" ({step.error})" if step.error else "")]
+    for key in ("from_run", "candidates", "decision", "probed", "adopted", "reason", "tokens"):
+        if key in facts:
+            lines.append(f"  {key}: {facts[key]}")
+    contrasts: object = facts.get("contrasts")
+    if isinstance(contrasts, dict):
+        for label, text in contrasts.items():
+            lines.append(f"  {label}: {text}")
+    return lines
+
+
+async def cmd_harness_step(command: HarnessStepCommand) -> int:
+    """One step now, its probes in processes of their own, as the daemon runs it at [harness] step_time. ``--scripted``
+    plays the probes' references through the scripted model and has the roles answer from a script
+    (:func:`scripted_role_turns`): the whole step at no model's cost."""
+    config: AppConfig = load_user_config()
+    if command.scripted:
+        config = config.model_copy(
+            update={"harness": config.harness.model_copy(update=dict.fromkeys(ROLE_NAMES, SCRIPTED_MODEL))}
+        )
+    runtime: Runtime = await build_runtime(config)
+    try:
+        if command.scripted:
+            provider: str = parse_model_ref(SCRIPTED_MODEL).provider
+            turns: tuple[ScriptedTurn, ...] = scripted_role_turns(len(config.harness.step_candidates))
+            await runtime.router.register(provider, ScriptedProvider(provider, turns))
+        step: HarnessStep = await run_step(runtime, time.time(), command.run_id, probe_apart, command.scripted)
+    finally:
+        await close_runtime(runtime)
+    sys.stdout.write("\n".join(render_step(step)) + "\n")
+    facts: dict[str, JsonValue] = step_facts(step)
+    if "probed" in facts:
+        sys.stdout.write(
+            "The probed version is adopted: the runs that start from now on take it.\n"
+            if facts.get("adopted") is True
+            else "Adopt the probed version with 'dotx harness adopt ID', or see it with 'dotx harness diff ID'.\n"
+        )
+    return 0
+
+
+async def cmd_harness_probe(command: HarnessProbeCommand) -> int:
+    """A probe in this process, which runs nothing else: the report goes to standard output as JSON. SIGTERM (the step
+    that asked ending, the daemon stopping) cancels the play, so that the attempt under way, its runtime and the
+    commands it started end with it."""
+    ask: ProbeAsk = ask_from_file(Path(command.ask))
+    loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
+    task: asyncio.Task[object] | None = asyncio.current_task()
+    if task is not None:
+        loop.add_signal_handler(signal.SIGTERM, task.cancel)
+    try:
+        report: ProbeReport = await probe_here(ask)
+    finally:
+        if task is not None:
+            loop.remove_signal_handler(signal.SIGTERM)
+    sys.stdout.write(report_json(report) + "\n")
+    return 0
+
+
+def render_report(report: ProbeReport) -> list[str]:
+    scores = scores_of(report)
+    lines: list[str] = [
+        f"{report.label}: {sum(card.passed for card in report.cards)} of {len(report.cards)} attempts passed, "
+        f"{report.tokens} tokens, {report.seconds:.0f} s"
+        + (f", cut short by {report.cut_short}" if report.cut_short else "")
+    ]
+    lines.extend(
+        f"  {score.task_id}: {score.passes}/{score.attempts} passed, {score.steps:.1f} steps"
+        for score in scores.values()
+    )
+    return lines
+
+
+async def cmd_harness_final(command: HarnessFinalCommand) -> int:
+    """The final set, once, under the adopted version or the one named; the report is kept in the version's notes
+    (`dotx harness show` prints them) and printed as it comes out: what it says is never optimized against."""
+    config = load_user_config()
+    async with _store() as store:
+        version: HarnessVersion | None = (
+            await adopted(store) if command.version_id is None else await store.get_harness_version(command.version_id)
+        )
+        if version is None:
+            raise InvalidValueError("no version is adopted; name one to play the final set under", {})
+        text: HarnessText = text_of(version)
+    ask: ProbeAsk = ProbeAsk(
+        label=version.id,
+        text=text,
+        tasks=tuple(config.harness.final_tasks),
+        repeats=1,
+        model=config.models.main,
+        scripted=False,
+        max_minutes=config.harness.step_minutes,
+        max_tokens=config.harness.step_tokens,
+    )
+    report: ProbeReport = await probe_apart(ask)
+    async with _store() as store:
+        current: HarnessVersion = await store.get_harness_version(version.id)
+        await store.set_harness_notes(
+            version.id, notes_with(current.notes, {"final": json.loads(report_json(report)), "final_at": time.time()})
+        )
+    sys.stdout.write("\n".join(render_report(report)) + "\n")
+    return 0
+
+
 async def dispatch(command: Command) -> int:
     """Carry out one of this module's commands."""
     match command:
@@ -185,5 +316,11 @@ async def dispatch(command: Command) -> int:
             return await cmd_harness_retire(command)
         case HarnessProposeCommand():
             return await cmd_harness_propose(command)
+        case HarnessStepCommand():
+            return await cmd_harness_step(command)
+        case HarnessProbeCommand():
+            return await cmd_harness_probe(command)
+        case HarnessFinalCommand():
+            return await cmd_harness_final(command)
         case _:
             raise InvalidValueError("not a command of this module", {"name": command.name})

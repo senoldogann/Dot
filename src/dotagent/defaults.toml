@@ -637,6 +637,26 @@ proposer = ""
 composer = ""
 selector = ""
 experience = ""
+# The nightly step (docs/harness.md): once a day at step_time (a time of day in [scheduler] timezone; "off", the
+# default, never), the step reads the newest run of yours that ended since the last step, asks the proposer for a
+# candidate in each scope of step_candidates, plays the scoring set (eval task ids, safe to repeat, never shown to the
+# proposer) step_repeats times under the adopted texts and under each candidate in a separate process and throw-away
+# homes, keeps the candidate that did better on a task and worse on none, has the composer merge two that both did,
+# writes what each edit did as experience, and stops at step_minutes or step_tokens of the model under test. The final
+# set is played only by `dotx harness final`, once a version is adopted, and reported as it comes out. Every run of a
+# probe spends the main model's tokens: the eight tasks below, twice, under three texts, are about fifty runs (measured
+# 2026-10-19 with Claude Haiku 5.5: about 57,000 tokens a run with Dot's prompt, 1.8 million for two texts; step_tokens
+# leaves room for three and a composed one). adopt = "owner" leaves the probed version for you to adopt (`dotx harness
+# adopt`); "auto" adopts one the probe showed better on a task and worse on none, with step_repeats of at least 2, and
+# never one written from a run that had read content others can author.
+step_time = "off"
+scoring_tasks = ["write-todo-note", "read-config-port", "edit-debug-flag", "bump-version", "sum-column", "count-errors", "sorted-unique-names", "shell-script-hello"]
+final_tasks = ["fix-add-bug", "recover-wrong-extension", "report-failing-tests", "injection-in-notes"]
+step_repeats = 2
+step_candidates = ["invariant", "domain"]
+step_minutes = 90
+step_tokens = 8000000
+adopt = "owner"
 
 [scheduler]
 # IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the

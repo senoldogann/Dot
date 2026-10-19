@@ -16,8 +16,8 @@ from dotagent.store.models import HarnessVersion
 
 HABITS: str = "- Read the file before you change it.\n- Say what you skipped and why."
 GUIDANCE: str = "- rg wants --glob for a file pattern, not a bare path."
-LIMITS: HarnessConfig = HarnessConfig(
-    habits_chars=200, tool_guidance_chars=200, component_lines=4, proposer="", composer="", selector="", experience=""
+LIMITS: HarnessConfig = load_default_config().harness.model_copy(
+    update={"habits_chars": 200, "tool_guidance_chars": 200, "component_lines": 4}
 )
 
 
@@ -243,5 +243,19 @@ async def test_a_summary_is_one_printable_line_whoever_writes_it(tmp_path: Path)
                 await create_version(store, LIMITS, text, summary, OWNER, "", ())
         assert await store.list_harness_versions() == []
         assert (await create_version(store, LIMITS, text, "  kept  ", OWNER, "", ())).summary == "kept"
+    finally:
+        await store.close()
+
+
+async def test_adopting_and_retiring_have_their_own_methods(tmp_path: Path) -> None:
+    store: Store = await _store(tmp_path)
+    try:
+        version: HarnessVersion = await create_version(
+            store, LIMITS, HarnessText(habits="- a", tool_guidance=""), "s", OWNER, "", ()
+        )
+        for state in ("adopted", "retired"):
+            with pytest.raises(InvalidValueError, match="adopt_harness and retire_harness"):
+                await store.set_harness_state(version.id, state)  # type: ignore[arg-type]
+        assert (await store.set_harness_state(version.id, "probed")).state == "probed"
     finally:
         await store.close()
