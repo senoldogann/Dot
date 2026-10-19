@@ -175,10 +175,11 @@ class TerminalSession:
         self._arrived.set()
         return bool(data)
 
-    def release_follower(self) -> None:
+    async def release_follower(self) -> None:
         """Once the program has exited: take what it printed last, then close Dot's copy of the terminal's other end,
         so that the read side comes to the end once nothing else holds it. A session closed by hand takes nothing
-        more: its terminal is gone or going."""
+        more. The close runs off the event loop: a last close of that end with output still waiting is held by macOS
+        until the output is read, which the loop goes on doing meanwhile."""
         if self._follower is None:
             return
         if not self.closing:
@@ -186,12 +187,9 @@ class TerminalSession:
             for _ in range(_KEPT_CHARS // _READ_BYTES + 1):
                 if self.ended or not self._take():
                     break
-        self._close_follower()
-
-    def _close_follower(self) -> None:
-        if self._follower is not None:
-            os.close(self._follower)
-            self._follower = None
+        follower: int = self._follower
+        self._follower = None
+        await asyncio.to_thread(os.close, follower)
 
     def _ended_error(self) -> ToolExecutionError:
         return ToolExecutionError(
@@ -306,8 +304,11 @@ class TerminalSession:
                 asyncio.get_running_loop().remove_reader(self._master)
                 self.ended = True
             self.finished.set()
-            self._close_follower()
+            # The terminal's own end first: once it is closed, a close of the other end waits for no reader.
             os.close(self._master)
+            if self._follower is not None:
+                os.close(self._follower)
+                self._follower = None
 
 
 class TerminalWatcher(Protocol):
@@ -434,7 +435,7 @@ class Terminals:
         tells nothing more. A watcher that fails is logged: nothing awaits this."""
         try:
             await session.exit_code()
-            session.release_follower()
+            await session.release_follower()
             await session.finished.wait()
             if session.closing:
                 return

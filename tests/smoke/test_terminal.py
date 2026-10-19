@@ -283,6 +283,23 @@ async def test_a_program_that_ends_at_once_leaves_what_it_printed_and_its_sessio
         await terminals.aclose()
 
 
+async def test_a_session_closed_while_its_program_prints_on_its_way_out_closes_in_time(runtime: Runtime) -> None:
+    """A program that prints a lot as it is told to stop (a server logging its shutdown): its session closes, and no
+    close of the terminal waits on output that nobody reads any more."""
+    terminals: Terminals = Terminals(1, 60.0, runtime.shell_env)
+    try:
+        talker: TerminalSession = await terminals.open(
+            "chat", "trap 'yes stopping | head -c 400000; exit 0' TERM; sleep 30", (), workspace_dir(), False
+        )
+        # Let the shell set its trap first.
+        await asyncio.sleep(0.5)
+        await asyncio.wait_for(terminals.close("chat", talker.id), 10.0)
+        assert talker.finished.is_set() and talker.ended
+        assert terminals.sessions("chat") == []
+    finally:
+        await terminals.aclose()
+
+
 async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime) -> None:
     """Item 229: a delegated run opens no command in the background, since no chat of its own would hear of its end;
     nor does a process whose chats hear of no command's end, as a dotx command's, which ends with its run."""
