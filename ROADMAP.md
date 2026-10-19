@@ -14892,6 +14892,24 @@ retires and adopts again on the page, and opens the row on a phone. **Left for l
 the owner's kept as a test of the scoring set from its page, a step started from the page, the graph drawn on it, and
 the switch of `step_time` from the page, which needs the settings writer to learn `[harness]`.
 
+### 399. A path is classified by the place it names, through the Data volume too
+
+**Status: done (2026-10-19), on `item-399-kernel-paths`, for the owner to merge (it changes `src/dotagent/policy/`).**
+Found by the `/security-review` of item 398, as a finding older than that item: macOS joins its Data volume to the
+system volume with firmlinks, so `/System/Volumes/Data/Users/<owner>/.ssh/id_rsa` is `~/.ssh/id_rsa` and
+`/System/Volumes/Data/private/tmp/…` is `/tmp/…`, and `realpath` follows links, not firmlinks; spelled so, a path
+escaped its class: a protected file read as a `system` one, with neither the refusal of a secret nor a question, and a
+file of Dot's own was no `dot` path. **As built.** `policy/paths.kernel_path` names a path as the kernel does: the
+deepest folder on it that the daemon can open is opened for its events alone (`O_EVTONLY`, which reads nothing of it,
+with `O_DIRECTORY | O_NOFOLLOW`, so that a file, a pipe, a device or a link is never opened: a pipe nobody writes to
+would hold the open, and opening a device can wake it) and asked its path (`F_GETPATH`); the rest of the path follows.
+`expand_path` (every path a tool, the shell guard or OpenCode's permissions name), `expand_protected` (the protected
+locations and Dot's own paths) and the workspace in `classify_path` go through it, so both sides of a comparison name
+places the same way; letter case was already set aside (`within`, item 116). Tests: `tests/unit/test_kernel_paths.py` (a
+protected file through the Data volume is protected and its read refused, a new file in Dot's own folder is `dot`, a
+missing place keeps its name after the folder the kernel names, a pipe nobody writes to is named at once, a folder
+closed to reading through the folder it is in). Docs: `docs/safety.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15698,3 +15716,4 @@ the switch of `step_time` from the page, which needs the settings writer to lear
 - 2026-10-19 (Fable 5.1): item 390 committed on `harness-2`; item 391 on `harness-3`: the probe apart from the daemon, the contrast, the step and its schedule, `dotx harness step|probe|final`.
 - 2026-10-19 (Fable 5.1): item 391 committed on `harness-3`; item 392 on `harness-4`: the provenance graph, the lineage, the library read by the proposer.
 - 2026-10-19 (Fable 5.1): item 392 committed on `harness-4`; item 393 on `harness-5`: Settings › Harness.
+- 2026-10-19 (Opus 5.5): item 399 on `item-399-kernel-paths` from `main`, found by the `/security-review` of item 398: a path spelled through the Data volume is classified by the place it names; for the owner to merge.
