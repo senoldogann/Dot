@@ -15222,6 +15222,19 @@ same route (`POST /api/runs/{id}/skill`); `addMenuItems` and the composer's popo
 (item 401) no longer makes room for it. Tests: `tests/smoke/test_file_panel.py` (the file after a message),
 `test_composer.py` and `test_composer_picks.py` (no More). Docs: `docs/daemon.md`, `docs/extending.md`.
 
+### 407. An empty page stands its mark, a title and one line in the middle
+
+**Status: done (2026-10-19), on `item-407-empty-states`.** The owner's word of 2026-10-19: a page with no data should
+show a better empty page, an SVG icon in the middle with a "no data" text, on every page ("tüm sayfalara uygula"). **As
+built (2026-10-19).** `emptyPanel(mark, title, text)` (panels.js) is the one empty state: a Lucide mark in a quiet ring,
+a title and one line that says what brings something there, centred in its place (`.empty-state`, after the Screen tab's
+quiet panel of item 401), in place of the one muted line of item 79. Every empty place takes it with a mark of its own:
+Schedules (calendar), Rules (shield), Campaigns (target), Memory (brain; a search with nothing, search), Harness (its
+versions, steps and experiences), Agents and an agent's chats, Team, Skills (yours, and what other agents set up; a
+search with nothing), Plugins (nothing connected; a search with nothing), a run not found, and the Screen tab while
+Dot's computer is quiet. Tests: `tests/smoke/test_phone_lists.py` (Team's empty page: the mark, the title and the line).
+Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16051,3 +16064,5 @@ same route (`POST /api/runs/{id}/skill`); `addMenuItems` and the composer's popo
   405 (SnapShots) follow on branches of their own.
 - 2026-10-19 (Fable 5.1): item 406 on `item-406-panel-composer` from `main`, on the owner's word of the same day: the
   file beside the conversation stays as the chat goes on at its next run; the box's More menu and Save skill go.
+- 2026-10-19 (Fable 5.1): item 407 on `item-407-empty-states` from `main` (on item 406's tree until it merged), on the
+  owner's word of the same day: every empty page stands its mark, a title and one line in the middle.

@@ -294,18 +294,18 @@ export function mount(root, _ctx) {
     };
     versionsHolder.replaceChildren(
       view.versions.length === 0
-        ? emptyPanel("No version yet", "Every run takes Dot's own text. Write a version above, or run a step.")
+        ? emptyPanel("squarePen", "No version yet", "Every run takes Dot's own text. Write a version above, or run a step.")
         : el("div", { class: "rule-list" }, view.versions.map((version) => versionRow(version, handlers))),
     );
     versionsCount.textContent = plural(view.versions.length, "version", "versions");
     stepsHolder.replaceChildren(
       steps.length === 0
-        ? emptyPanel("No step yet", "dotx harness step runs one; a time of day in the config file (its key is [harness] step_time) has the daemon run one a night.")
+        ? emptyPanel("bolt", "No step yet", "dotx harness step runs one; a time of day in the config file (its key is [harness] step_time) has the daemon run one a night.")
         : el("div", { class: "rule-list" }, steps.map(stepRow)),
     );
     experiencesHolder.replaceChildren(
       experiences.length === 0
-        ? emptyPanel("No experience yet", "A step writes one when an edit helped or hurt with evidence.")
+        ? emptyPanel("sparkle", "No experience yet", "A step writes one when an edit helped or hurt with evidence.")
         : el("div", { class: "rule-list" }, experiences.map(experienceRow)),
     );
     facts.replaceChildren(...loopFacts(view));

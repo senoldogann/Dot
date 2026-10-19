@@ -71,7 +71,7 @@ export function mount(root) {
       }
       holder.replaceChildren(
         view.messages.length === 0
-          ? emptyPanel("No messages today", "Ask Dot to bring one of your agents into a task, and what they say to each other shows here.")
+          ? emptyPanel("message", "No messages today", "Ask Dot to bring one of your agents into a task, and what they say to each other shows here.")
           : el("div", { class: "card" }, view.messages.map(messageRow)),
       );
     } catch (error) {
