@@ -15188,6 +15188,25 @@ Docs: `docs/daemon.md`. **Review (2026-10-19).** The pre-push review's Important
 every tool but an MCP server's and kept a call's arguments as its words, so a write and a read of one file, or two steps
 in one app, read the same; now only a command, whose mark says what it is, stands alone.
 
+### 403. The chat keeps a message's files, opens a live run at its end, marks a call by its kind, and copies tables and documents
+
+**Status: done (2026-10-19), on `item-403-chat-fixes`.** The owner's word of 2026-10-19, in one message with four
+asks: the long texts and pictures they add to a message vanish from the chat once the next message is sent, is that
+right?; sending with Enter throws the chat up and they scroll back down by hand; the cross and the tick on failed and
+successful calls are needless; a copy button for the documents the side panel opens and for the tables an answer
+holds. **As built (2026-10-19).** The vanishing was a fault: an earlier turn drew its message with no files
+(`history.js` `turn`) and read only the `assistant`, `tool_call` and `tool_result` events of its run, so the
+`attachments`, `picks` and `steer` events the daemon kept were never drawn; now the files and picks go under the
+turn's message and a message that steered the run stands where it came, as on the run's own page. The jump: a
+follow-up is a new run, and its page was built at the top and moved to its end only with the first event, which came
+seconds later; a live run's page now opens at its end. A failed call shows the mark of its kind in the failure's
+colour, no cross; a group of calls without a kind shows a wrench, not a check. A table in a message or an answer has
+**Copy the table** over its right edge (markdown, through `clipboard.js`'s table), and the file panel's head has
+**Copy the text** for a text or Markdown file, a PDF (its text read with PDFKit, page by page, up to `TEXT_BYTES`,
+new in `PdfPreview`), a Word document or a presentation; the copy button of item 205 moved to `copybutton.js` for all
+of them. Tests: `tests/unit/test_previews.py` (a PDF's text), `tests/smoke/test_message_feet.py` (the earlier turn's
+files), `test_thread_turns.py` (no cross), `test_markdown_copy.py` (the table's copy), `test_file_panel.py` (the
+panel's copy). Docs: `docs/daemon.md`, `docs/runs.md`.
 ### 405. SnapShots: a double tap of ⌘ captures the window in front into the open chat's box
 
 **Status: done (2026-10-19), on `item-405-snapshots`.** The owner's word of 2026-10-19, with a picture of another coding
@@ -16038,6 +16057,10 @@ own, and the capture of one window alone (`SCContentFilter`) where the rectangle
   and local branches deleted. `tests/unit/test_rule_timeout.py` measures wall time and fails on a loaded Mac (5 s at a load
   of 70, 0.25 s alone); it passes on CI and is left for a later item.
 - 2026-10-19 (Opus 5.5): item 402 on the owner's word of the same day, on `item-402-step-rows` from `main`: a group's calls in line with its head, each the command itself.
+- 2026-10-19 (Fable 5.1): item 403 on `item-403-chat-fixes` from `main`, on the owner's word of the same day: an earlier
+  turn keeps its message's files and picks and its steers (a fault since item 374), a live run's page opens at its end,
+  no cross or check on calls, a copy for tables and for the panel's documents. Items 404 (the first answer's delay) and
+  405 (SnapShots) follow on branches of their own.
 - 2026-10-19 (Fable 5.1): item 405 on `item-405-snapshots` from `main`, on the owner's word of the same day: SnapShots,
   a double tap of ⌘ in any application that captures the window in front, with its text, into the open chat's box; the
   flash and a shortcut of one's own left for later.

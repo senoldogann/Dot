@@ -215,6 +215,12 @@ async def test_the_messages_have_their_time_a_copy_and_edit_from_here_once_answe
             assert re.search(r"\d{4}", await sent.get_attribute("title") or ""), "no full date where the pointer rests"
             await expect(earlier.get_by_role("button", name="Copy the message")).to_be_visible()
             await expect(earlier.get_by_role("button", name="Edit from here")).to_be_visible()
+            # Its files stand under it in the earlier turn too (item 403), over its foot.
+            await expect(earlier.locator(".attach-list.sent")).to_contain_text("beds.txt")
+            earlier_parts: list[str] = await earlier.evaluate(
+                "node => [...node.children].map((child) => child.className)"
+            )
+            assert earlier_parts == ["bubble user", "attach-list sent", "message-foot"], earlier_parts
             # Its answer shows a copy and when it came; how long the run took waits for the pointer.
             answer: Locator = page.locator(".history article.answer")
             await expect(answer.get_by_role("button", name="Copy the answer")).to_be_visible()

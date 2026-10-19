@@ -334,6 +334,9 @@ async def test_an_earlier_turn_says_what_failed_and_shows_a_finish_that_was_refu
             await expect(stretch.locator(".steps-head .badge")).to_have_text("2 failed")
             await expect(stretch.locator(".tool-name")).to_have_text(["shell", FINISH_TOOL])
             await expect(stretch.locator(".tool-state.bad")).to_have_count(2)
+            # A failed call keeps the mark of its kind, in the failure's colour: no cross (item 403).
+            await expect(stretch.locator(".tool-state [data-icon='x']")).to_have_count(0)
+            await expect(stretch.locator(".tool-state [data-icon='terminal']")).to_have_count(1)
             await page.screenshot(path=str(tmp_path / "chat-failed-turn.png"))
             await page.context.close()
         finally:

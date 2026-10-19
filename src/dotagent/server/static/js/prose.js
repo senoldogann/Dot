@@ -2,6 +2,8 @@
 // become anchors, and the path of a file in code a button that shows the file beside the conversation (item 195). A
 // heading is drawn one level down and keeps the level it was written at in `data-level`, for a copy (item 206).
 
+import { table as tableMarkdown } from "./clipboard.js";
+import { copyButton } from "./copybutton.js";
 import { el, requestFile } from "./dom.js";
 import { parseBlocks } from "./markdown.js";
 
@@ -57,13 +59,17 @@ export function blockNode(block) {
         null,
         block.items.map((item) => el("li", null, inlineNodes(item))),
       );
-    case "table":
-      return el(
+    case "table": {
+      const table = el(
         "table",
         null,
         el("thead", null, cellRow("th", block.header)),
         el("tbody", null, block.rows.map((row) => cellRow("td", row))),
       );
+      // A table has a copy of itself as markdown a press away (item 403), on a line over its right edge, so that the
+      // table scrolls sideways under it untouched.
+      return el("div", { class: "prose-table" }, el("div", { class: "prose-table-bar" }, copyButton(() => tableMarkdown(table), "Copy the table")), table);
+    }
     case "quote":
       return el("blockquote", null, inlineNodes(block.inline));
     case "rule":

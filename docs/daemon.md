@@ -175,72 +175,69 @@ start, agent, model, approval mode, goal mode and campaign) are in the panel's D
 first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
 answer does: its headings, lists, tables, code, quotes and emphasis (item 206). Under each of your messages, once its
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
-rests) and a copy of it as you wrote it (item 205); the files a message came with stand between it and
-that line. Under a message that opened a turn stands **Edit from here** too (item 282), which asks
-whether to "rewind chat to before this message". **Revert and keep changes** takes that turn and the ones after it out
-of the chat (they still count in what Dot spent, and a question they left for you waits no more) and ends the history
-the model reads where it ended before the message, a summary made since included; the message comes back into the box of
-the turn before it with its files, to be changed and sent again, or into a new chat's box when it was the first.
-**Revert files too** also takes back what those turns, and their helpers, changed with the file tools, each file that is
-as they left it; a file changed since is left and named, and what a command changed stays. A message sent before Dot
-kept the place of each message in its chat has no Edit from here, nor has one that steered a turn at work, and a chat is
-not rewound while a run works on it or messages wait in its queue.
-A delegated run is a row: the face with its state at the corner (turning while it works, amber while it waits for
-you, green with a check when it is done, red when it failed), its goal over the last thing it did and, once it ended,
-the start of its answer (item 245), the time it has taken (counting on every second while it works), the way to its own
-page and a chevron that opens its steps. Rows that follow each other gather in one group:
-its head shows their faces, how many they are and how they stand ("3 helpers", "1 working · 2 done"), the
-time from the first one's start to the last one's end and a chevron that folds the rows away; an approval a helper asks
-for opens the group. The row is closed from the start; an approval the run asks for
-opens it until you have decided, and a row you never opened or closed yourself closes again. Resting the pointer on a
-row, or moving the focus to it, shows its card (item 226): the whole goal, the model with its reasoning
-level, how the run stands and for how long, counting on while it works, and what it does now or did last; the pointer
-leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own page names the
-parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the box would be,
-which stays at the window's foot as the conversation scrolls (item 244): the model,
-how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not),
-"Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that
-says what they did, "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it
-while it runs, "Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and
-screenshot, each call one line in line with the group's head (item 402): its mark (a spinner while it runs, then the
-mark of its kind, a cross when it failed), what it did (a command is the command itself, the policy's words its
+rests) and a copy of it as you wrote it (item 205); the files a message came with stand between it and that line, in the
+earlier turns of the chat as under the latest message (item 403). Under a message that opened a turn stands **Edit from
+here** too (item 282), which asks whether to "rewind chat to before this message". **Revert and keep changes** takes
+that turn and the ones after it out of the chat (they still count in what Dot spent, and a question they left for you
+waits no more) and ends the history the model reads where it ended before the message, a summary made since included;
+the message comes back into the box of the turn before it with its files, to be changed and sent again, or into a new
+chat's box when it was the first. **Revert files too** also takes back what those turns, and their helpers, changed with
+the file tools, each file that is as they left it; a file changed since is left and named, and what a command changed
+stays. A message sent before Dot kept the place of each message in its chat has no Edit from here, nor has one that
+steered a turn at work, and a chat is not rewound while a run works on it or messages wait in its queue. A delegated run
+is a row: the face with its state at the corner (turning while it works, amber while it waits for you, green with a
+check when it is done, red when it failed), its goal over the last thing it did and, once it ended, the start of its
+answer (item 245), the time it has taken (counting on every second while it works), the way to its own page and a
+chevron that opens its steps. Rows that follow each other gather in one group: its head shows their faces, how many they
+are and how they stand ("3 helpers", "1 working · 2 done"), the time from the first one's start to the last one's end
+and a chevron that folds the rows away; an approval a helper asks for opens the group. The row is closed from the start;
+an approval the run asks for opens it until you have decided, and a row you never opened or closed yourself closes
+again. Resting the pointer on a row, or moving the focus to it, shows its card (item 226): the whole goal, the model
+with its reasoning level, how the run stands and for how long, counting on while it works, and what it does now or did
+last; the pointer leaving, a click or Escape puts it away, and on a touch screen a tap opens the row as before. Its own
+page names the parent in the top bar as a breadcrumb (the parent's goal, a link, then its own) and has a pill where the
+box would be, which stays at the window's foot as the conversation scrolls (item 244): the model, how long it took
+("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not), "Open parent"
+and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that says what they did,
+"Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it while it runs,
+"Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and screenshot, each call one
+line in line with the group's head (item 402): its mark (a spinner while it runs, then the mark of its kind, in the
+failure's colour when it failed; item 403), what it did (a command is the command itself, the policy's words its
 tooltip; another call, whose mark several tools share, keeps its tool's name and the policy's words, "Read notes.txt")
-and a chevron, a failure's first line its tooltip and its
-result on a hairline under it once opened; a group that is over wears the mark of the kind its words start with (the
-terminal's for "Ran 2 commands"), and the model's thinking is a line of the same column with the brain. Approvals,
-questions and policy notes stay in the open. A click on that line opens or folds it while the run still works and
-after it ends, and the reader's choice stands for the life of the page; folded, it keeps the call under way in sight (on a phone, only the count).
-The lines of how a run was set up (the
-notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
-model) are not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming
-them in short and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a
-line that warns in amber (the embedding service failed, so the notes were found by their words alone); a delegated
-run's lines are on its own page. What the model thought
-in a step is a line of its own there, before the step's calls (item 246), or out of the fold before the
-message the step writes or the answer it ends the run with: a brain where a call has its icon, "Thinking…" while the
-model thinks
-and "Thought" once it is done, the start of the thought beside it; opened, the whole thought: up to 12,000 characters
-of it, of a longer one its start and its end, its secrets masked; it is there when the page is loaded again. A step
-asked again from its start drops what its failed try streamed. A message streams as it will stay (item 274): formatted
-as it comes, drawn at most once a frame with the parts already written left as they are, its caret at the end of its
-text, so that its end moves nothing. An answer that ends a run while its page is open is written in the same way
-(item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands on it as it
-will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a
-reply that streamed already and reduced motion show it at once. The answer of the run is the last message, with a copy
-button (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how
-long the run took shows where the pointer rests on it (on a touch screen it always shows). A copy out of the
-conversation keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as
-the markdown it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy
-alongside for the applications that read it; the line under a message or an answer stays out, and a copy within a block
-of code is its code. The box stands at the foot of the window from the first message, the conversation filling the space
-above it from the top, and is the same frame as the home's, with the attach button and the send in its bar; what you
-typed there and did not send waits for you. While the end of the conversation, or its answer, is below the window, a
-round arrow just above the composer leads there; it stays away while the page follows a working run down, as the page
-does until you scroll up. At the left of the conversation a column of short marks stands for your messages, one mark for
-each, top to bottom (item 201): resting the pointer on it shows the message nearest to it and the start of its answer, a
-click goes to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in
-sight are darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there,
-the conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Run details),
+and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened; a group that is
+over wears the mark of the kind its words start with (the terminal's for "Ran 2 commands"), and the model's thinking is
+a line of the same column with the brain. Approvals, questions and policy notes stay in the open. A click on that line
+opens or folds it while the run still works and after it ends, and the reader's choice stands for the life of the page;
+folded, it keeps the call under way in sight (on a phone, only the count). The lines of how a run was set up (the notes
+and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another model) are
+not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming them in short
+and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a line that warns
+in amber (the embedding service failed, so the notes were found by their words alone); a delegated run's lines are on
+its own page. What the model thought in a step is a line of its own there, before the step's calls (item 246), or out of
+the fold before the message the step writes or the answer it ends the run with: a brain where a call has its icon,
+"Thinking…" while the model thinks and "Thought" once it is done, the start of the thought beside it; opened, the whole
+thought: up to 12,000 characters of it, of a longer one its start and its end, its secrets masked; it is there when the
+page is loaded again. A step asked again from its start drops what its failed try streamed. A message streams as it will
+stay (item 274): formatted as it comes, drawn at most once a frame with the parts already written left as they are, its
+caret at the end of its text, so that its end moves nothing. An answer that ends a run while its page is open is written
+in the same way (item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands
+on it as it will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a reply
+that streamed already and reduced motion show it at once. The answer of the run is the last message, with a copy button
+(its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
+the run took shows where the pointer rests on it (on a touch screen it always shows). A copy out of the conversation
+keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
+it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy alongside for the
+applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its
+code. A table in a message or an answer has a copy of its own over its right edge, which takes it as markdown (item
+403). The box stands at the foot of the window from the first message, the conversation filling the space above it from
+the top, and is the same frame as the home's, with the attach button and the send in its bar; what you typed there and
+did not send waits for you. While the end of the conversation, or its answer, is below the window, a round arrow just
+above the composer leads there; it stays away while the page follows a working run down, as the page does until you
+scroll up. At the left of the conversation a column of short marks stands for your messages, one mark for each, top to
+bottom (item 201): resting the pointer on it shows the message nearest to it and the start of its answer, a click goes
+to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are
+darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there, the
+conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Run details),
 under Details on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
 minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the
 share the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs
@@ -252,48 +249,46 @@ danger colour with a square) and cancels it; a word typed turns it back into the
 in the chat's queue (see [How a run works](runs.md#how-a-run-works)), shown above the box: a sheet whose head (Queued
 and the count) folds it, with a row per message: a handle to drag it to another place or move it with the arrow keys,
 its text on one line (all of it in the tooltip), a pencil that edits it in the box (the send says Save; Escape or Cancel
-gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its
-own picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the
-message's), **Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run
-with what the box holds, past the queue, or with the queue's next message when the box is empty. Settings › General ›
-Composer can have a message steer the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the
-box holds in the queue. A held queue says it is paused, with **Resume**, and a queue the page could not read says why,
-with **Read again**. A line over the box (items 352 and 360) says in a few quiet words how long the run has worked,
-or that it waits for you, how its helpers stand and how many messages are queued; each part opens what it tells of, and
-the line comes while one of its parts has something to say and goes when none has. It does not say what the run does
-now, which the conversation shows, nor count the commands at work in the chat, which stand right under it. When the run
-ends done, the next message starts and the page follows it; every open page shows the queue as it
-changes. In a campaign's chat the message steers the session. The box wears the home's pills too:
-the mode, the model with its reasoning and the Options (approvals and goal mode) of the chat, and a follow-up
-or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199):
-those its first run started with, then each one chosen in the box, at once and for every browser, so a reload, a restart
-of the daemon or a run moved to a standby model leaves them as they are (a chat from before has the open run's until its
-next run starts). They are not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run
-under way keeps its own: while it works, the pills step back and say that they wait for the next follow-up. Beside the
-send, a ring shows how much of the run's context budget its last step filled (item 222): the tokens that
-step sent the model against the run's budget (the model's own context size or Dot's default, the most of the window,
-item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a
-click shows the figures, the point past which Dot summarizes the older part of the run, the model's window, and why
-the budget is smaller than the window (each step sends the model the whole run again, so a run kept within it is
-answered sooner and costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen
-for the model in Settings › Models, which the timeline notes too; **Change context size** under them opens that
-setting at the run's model (item 396). It
-reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut off offers
-**Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the model and
-its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool calls (with
-the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as compactions, reviews
-and the goal check), the duration, the start and the run id; its other tabs hold the plan, the actions, the agents of
-the chat and the latest screenshots. Each tab wears its icon, and where the strip has no room for every name, the tabs
-not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs the chat's runs
-handed work to: five at first and the rest on **Show N more**, each with its face and
-goal, its provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how
-long it took, and a row opens its page (item 296). It stays closed until the panel button in the head of the run opens
-it (the choice is kept in the browser); open, it sits beside the conversation from 960 px, is a drawer below that, and
-on a phone a sheet that rises from the foot (item 296). The run's head is the top bar itself: Dot's face and name on
-the left, the panel button on the right;
-the bar is solid with a hairline under it, so nothing scrolls under a blur, the panel stays in place under it, and the
-box stays at the bottom. Every other page names itself in the same bar (Agents, Campaigns, Settings) and opens
-with one line of description.
+gives the box its draft back; item 376: the message's files come into the box with its text, small, a photo as its own
+picture and each file with its ×, its name the tooltip, and the files the box holds when it is saved are the message's),
+**Steer**, which sends it to the run now, and × to take it out. ⌘⇧Enter steers the run with what the box holds, past the
+queue, or with the queue's next message when the box is empty. Settings › General › Composer can have a message steer
+the run instead (item 230): the send then says **Steer**, and ⌘⇧Enter puts what the box holds in the queue. A held queue
+says it is paused, with **Resume**, and a queue the page could not read says why, with **Read again**. A line over the
+box (items 352 and 360) says in a few quiet words how long the run has worked, or that it waits for you, how its helpers
+stand and how many messages are queued; each part opens what it tells of, and the line comes while one of its parts has
+something to say and goes when none has. It does not say what the run does now, which the conversation shows, nor count
+the commands at work in the chat, which stand right under it. When the run ends done, the next message starts and the
+page follows it; every open page shows the queue as it changes. In a campaign's chat the message steers the session. The
+box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal mode) of the
+chat, and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat
+keeps them (item 199): those its first run started with, then each one chosen in the box, at once and for every browser,
+so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a chat from before has
+the open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a
+new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
+next follow-up. Beside the send, a ring shows how much of the run's context budget its last step filled (item 222): the
+tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
+window, item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows
+the figures, the point past which Dot summarizes the older part of the run, the model's window, and why the budget is
+smaller than the window (each step sends the model the whole run again, so a run kept within it is answered sooner and
+costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen for the model in
+Settings › Models, which the timeline notes too; **Change context size** under them opens that setting at the run's
+model (item 396). It reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut
+off offers **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the
+model and its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool
+calls (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as
+compactions, reviews and the goal check), the duration, the start and the run id; its other tabs hold the plan, the
+actions, the agents of the chat and the latest screenshots. Each tab wears its icon, and where the strip has no room for
+every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
+the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
+provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how long it
+took, and a row opens its page (item 296). It stays closed until the panel button in the head of the run opens it (the
+choice is kept in the browser); open, it sits beside the conversation from 960 px, is a drawer below that, and on a
+phone a sheet that rises from the foot (item 296). The run's head is the top bar itself: Dot's face and name on the
+left, the panel button on the right; the bar is solid with a hairline under it, so nothing scrolls under a blur, the
+panel stays in place under it, and the box stays at the bottom. Every other page names itself in the same bar (Agents,
+Campaigns, Settings) and opens with one line of description. A live run's page opens at its end, where its next words
+come, and stays there as the earlier turns fill in above (item 403).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it

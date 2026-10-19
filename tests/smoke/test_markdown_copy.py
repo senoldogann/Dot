@@ -227,6 +227,16 @@ async def test_the_owners_messages_read_as_markdown_and_a_copy_of_the_conversati
                 await expect(first.locator("li")).to_have_count(2)
                 await expect(first.locator("strong")).to_have_text("bed 3")
                 await expect(first.locator("code")).to_have_text("06:00")
+                # The table has a copy of itself as markdown over its right edge (item 403); the button is found by its
+                # place, as its name changes while it says the copy was taken.
+                table_copy: Locator = first.locator(".prose-table-bar button")
+                await expect(table_copy).to_have_attribute("aria-label", "Copy the table")
+                await table_copy.click()
+                await expect(table_copy).to_have_attribute("aria-label", "Copied")
+                if browser.browser_type.name == "chromium":
+                    copied_table: str = await page.evaluate("navigator.clipboard.readText()")
+                    assert copied_table.startswith("| Bed | Sun |\n| --- | --- |\n"), copied_table
+                await expect(table_copy).to_have_attribute("aria-label", "Copy the table", timeout=5000)
                 await expect(bubbles.nth(1).locator("strong")).to_have_text("beans")
                 await expect(page.locator(".answer h2[data-level='1']")).to_have_text("Plan")
 
