@@ -343,3 +343,20 @@ async def test_the_qr_codes_open_tailscales_download_page_and_dots_address_once_
         dot = await client.get("/phone/qr/dot")
         assert dot.status_code == 200, dot.text
         assert _read_qr(dot.content) == [f"https://{_NAME}/"]
+
+
+@pytest.mark.browser
+async def test_what_tailscale_says_while_it_runs_is_shown_in_the_guide(stand_ins: Path) -> None:
+    """Tailscale runs signed in, but what it serves cannot be read: the step that serves Dot says what it said."""
+    (stand_ins / "serve.json").write_text("not json", encoding="utf-8")
+    async with _daemon([]) as (_runtime, address), async_playwright() as playwright:
+        chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await (await chromium.new_context(reduced_motion="reduce")).new_page()
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/settings/phone")
+            steps: Locator = page.get_by_role("list", name="Steps on this Mac")
+            await expect(steps).to_contain_text(f"This Mac is {_NAME} on your tailnet.")
+            await expect(steps).to_contain_text("Tailscale said: what Tailscale serves could not be read")
+        finally:
+            await chromium.close()

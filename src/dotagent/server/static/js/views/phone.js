@@ -57,8 +57,8 @@ function step(number, title, done, text, ...offers) {
 
 export function mount(root, _ctx) {
   let disposed = false;
-  // True while an action of the guide waits for its answer: the guide is not read again under it.
-  let busy = false;
+  // How many actions of the guide wait for their answer: the guide is not drawn again under one.
+  let busy = 0;
   let following = null;
   // The page Tailscale named to turn on HTTPS for the tailnet, after a Set up it refused for want of it.
   let httpsLink = null;
@@ -95,11 +95,11 @@ export function mount(root, _ctx) {
     button.addEventListener("click", () =>
       attempt(async () => {
         button.disabled = true;
-        busy = true;
+        busy += 1;
         try {
           await action();
         } finally {
-          busy = false;
+          busy -= 1;
           button.disabled = false;
         }
       }),
@@ -134,16 +134,21 @@ export function mount(root, _ctx) {
   }
 
   async function restart() {
-    const running = getSnapshot().status?.active_runs.length ?? 0;
+    // The runs going on, or null while the daemon's status is not known yet.
+    const status = getSnapshot().status;
+    const running = status === null ? null : status.active_runs.length;
+    const stops =
+      running === null
+        ? " Any run going on now stops too."
+        : running === 0
+          ? ""
+          : ` The ${running === 1 ? "run" : `${running} runs`} going on now stop too.`;
     const confirmed = await confirmDialog({
       title: "Restart Dot?",
-      message:
-        running === 0
-          ? "Dot stops and the service starts it again, with the name of your tailnet."
-          : `Dot stops and the service starts it again, with the name of your tailnet. The ${running === 1 ? "run" : `${running} runs`} going on now stop too.`,
+      message: `Dot stops and the service starts it again, with the name of your tailnet.${stops}`,
       confirmLabel: "Restart",
-      danger: running > 0,
-      focusCancel: running > 0,
+      danger: running !== 0,
+      focusCancel: running !== 0,
     });
     if (!confirmed) {
       return;
@@ -191,6 +196,7 @@ export function mount(root, _ctx) {
             : httpsLink === null
               ? "Set up has Tailscale serve Dot to your tailnet over HTTPS, and writes this Mac's name into Dot's config."
               : "Tailscale needs HTTPS on for your tailnet: turn it on, then Set up again.",
+          onMac ? said : null,
           https,
           onMac ? offer("Set up", "plug", httpsLink === null, setUp) : null,
         );
@@ -315,7 +321,7 @@ export function mount(root, _ctx) {
       if (disposed) {
         return;
       }
-      if (busy || document.visibilityState !== "visible") {
+      if (busy > 0 || document.visibilityState !== "visible") {
         follow(phone);
         return;
       }
@@ -338,7 +344,7 @@ export function mount(root, _ctx) {
       if (disposed) {
         return;
       }
-      if (busy) {
+      if (busy > 0) {
         // An action of the guide answers and paints; the guide goes on following meanwhile.
         follow(next);
         return;
