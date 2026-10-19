@@ -15432,12 +15432,12 @@ Docs: `docs/daemon.md`.
 rea-mcp picked for a message to the agent Reviewer was refused as "not connected, or none of its tools is open to this
 run (the servers it can use: none)", though rea-mcp was ready with 30 tools. The agent's `tools` named no MCP tool, so
 its bounds held no server, and the words blamed the connection. **As built (2026-10-19).** The owner's pick widens the
-agent's bounds for the run (`owner_server_groups`): the servers picked for its message, and the MCP servers the chat
-used, which a pick of an earlier message opened, as the check before the run (`_check_picks`) and the loop agree; the
-loop reads the chat before it bounds the tools. A refusal names its cause: a server not connected (with those that are),
-or one with no tool a run of its mode may use (a chat, whose servers' acting tools it cannot use: send it as a task).
-Tests: `tests/unit/test_picks.py`, `tests/smoke/test_composer_picks.py` (a bounded agent's run starts with the picked
-server's tools and still without the ones it does not name). Docs: `docs/daemon.md`.
+agent's bounds for the run (`owner_server_groups`): the servers picked for its message, and the MCP servers picked for
+an earlier message of the chat (`picked_servers`, from the runs' picks events: a server the model only called opens
+nothing), as the check before the run (`_check_picks`) and the loop agree. A refusal names its cause: a server not
+connected (with those that are), or one with no tool a run of its mode may use (a chat, whose servers' acting tools it
+cannot use: send it as a task). Tests: `tests/unit/test_picks.py`, `tests/smoke/test_composer_picks.py` (a bounded
+agent's run starts with the picked server's tools and still without the ones it does not name). Docs: `docs/daemon.md`.
 
 ## Log
 

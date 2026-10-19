@@ -24,11 +24,12 @@ def picked_groups(picks: RunPicks) -> frozenset[str]:
     return frozenset(plugin_group(server) for server in picks.plugins)
 
 
-def owner_server_groups(picks: RunPicks, used: frozenset[str]) -> frozenset[str]:
+def owner_server_groups(picks: RunPicks, picked_before: frozenset[str]) -> frozenset[str]:
     """The MCP servers' groups the owner opened to a run whatever its agent's bounds (item 415): the ones picked for
-    its message, and of the groups its chat used (``used``), the MCP servers', which a pick of an earlier message
-    opened."""
-    return picked_groups(picks) | frozenset(group for group in used if group.startswith(PREFIX))
+    its message, and the ones picked for an earlier message of its chat (``picked_before``, as the chat's picks events
+    recorded them). A server the model called is not among them unless the owner picked it: a page that made the model
+    call one would otherwise open it to the next run."""
+    return picked_groups(picks) | frozenset(plugin_group(server) for server in picked_before)
 
 
 def picks_problems(

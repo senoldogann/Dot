@@ -21,7 +21,9 @@ def test_a_picked_server_is_refused_for_what_keeps_it_out_not_always_as_not_conn
     ]
 
 
-def test_the_servers_open_to_an_agent_are_the_picked_ones_and_the_ones_the_chat_used() -> None:
-    used: frozenset[str] = frozenset({"core", "shell", "mcp__rea-mcp"})
-    assert owner_server_groups(_picks("deepwiki"), used) == frozenset({"mcp__deepwiki", "mcp__rea-mcp"})
-    assert owner_server_groups(_picks(), frozenset({"shell"})) == frozenset()
+def test_the_servers_open_to_an_agent_are_the_ones_the_owner_picked_now_or_earlier_in_the_chat() -> None:
+    """The review's finding: a server the model called is no pick; only the owner's picks open one."""
+    assert owner_server_groups(_picks("deepwiki"), frozenset({"rea-mcp"})) == frozenset(
+        {"mcp__deepwiki", "mcp__rea-mcp"}
+    )
+    assert owner_server_groups(_picks(), frozenset()) == frozenset()

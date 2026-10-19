@@ -162,14 +162,15 @@ starts: a server that is not connected, or none of whose tools a run of its mode
 tools all act), each in its own words, a skill it is not offered, Plan first in a chat or under YOLO (a YOLO run does
 not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is OpenCode's own agent. A
 server picked for a message is open to its run whatever the agent's tools are (item 415): the owner's word for the
-message widens the agent's bounds, and an MCP server the chat used stays open to the agent's later runs in it; before, a
-pick for an agent whose tools named no MCP tool was refused as if the server were not connected. A run that goes on from
-another (Resume, or an answer that came after its run ended) starts without the picks: the first message, with their
-lines and skills, stays in the chat, and with grouped tools `use_tools` turns a picked server's group on. **Save from a
-chat**, on the Skills page (`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's last run as a
-learned skill, as one is written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is
-refused while learned skills are off, and for a run that did not end done or took no acting step, a delegated run, an
-eval's and one of OpenCode's agent. The box of a run held it as **Save skill**, under a **More** button, until item 406.
+message widens the agent's bounds, and a server picked for an earlier message of the chat stays open to the agent's
+later runs in it (the runs' picks events say which; a server the model only called opens nothing); before, a pick for an
+agent whose tools named no MCP tool was refused as if the server were not connected. A run that goes on from another
+(Resume, or an answer that came after its run ended) starts without the picks: the first message, with their lines and
+skills, stays in the chat, and with grouped tools `use_tools` turns a picked server's group on. **Save from a chat**, on
+the Skills page (`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's last run as a learned
+skill, as one is written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is refused
+while learned skills are off, and for a run that did not end done or took no acting step, a delegated run, an eval's and
+one of OpenCode's agent. The box of a run held it as **Save skill**, under a **More** button, until item 406.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it

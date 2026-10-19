@@ -1,9 +1,10 @@
 // SnapShots on the page (item 405): the composer on screen takes the captures the daemon keeps for it, as they come (a
 // lifecycle event) and when the composer is made (the ones that waited), and the page says why one failed. Only the
 // pages of this Mac take them (item 414): a capture is made here, and a phone's page, reached through [server] reach,
-// would take it away from the Mac's box. A capture taken while the page is hidden, Dot's tab coming to the front, is
-// handed to the box once the page is seen, so its spring is seen too; and a page of this Mac with no box goes to the
-// new chat, whose box takes it, when the daemon brought it to the front for the capture.
+// would take it away from the Mac's box. A page claims a capture only once it is in sight, so that the tab the daemon
+// brings to the front takes it rather than a hidden one, and its spring is seen; and a page of this Mac with no box goes
+// to the new chat, whose box takes it, only when it is the page brought to the front for the capture (it comes into
+// sight, or into focus, within a few seconds), never a page the reader has in sight elsewhere.
 
 import { api } from "./api.js";
 import { onLifecycle } from "./state.js";
@@ -63,24 +64,43 @@ function deliver() {
   }
 }
 
-/** The daemon brings Dot's tab to the front with a capture: a page with no box goes to the new chat, whose box takes
- * it, if it is the page that came to the front; the others stay as they are. */
-function goToABox() {
-  const go = () => {
-    if (current === null && document.visibilityState === "visible") {
-      location.hash = "#/";
+/** Run `then` once the page is brought to the front: it comes into sight (it was hidden) or into focus (it was in
+ * sight in a window that had not the focus) within a few seconds; never for a page the reader has in focus now. */
+function whenBroughtForward(then) {
+  if (document.visibilityState === "visible" && document.hasFocus()) {
+    return;
+  }
+  const brought = () => {
+    if (document.visibilityState === "visible") {
+      stop();
+      then();
     }
   };
+  const stop = () => {
+    clearTimeout(late);
+    document.removeEventListener("visibilitychange", brought);
+    window.removeEventListener("focus", brought);
+  };
+  const late = setTimeout(stop, SHOWN_WITHIN_MS);
+  document.addEventListener("visibilitychange", brought);
+  window.addEventListener("focus", brought);
+}
+
+/** Claim the captures once the page is in sight: a hidden tab leaves them to the one the daemon brings forward. */
+function claimInSight() {
   if (document.visibilityState === "visible") {
-    go();
+    void claim();
     return;
   }
   const seen = () => {
-    clearTimeout(late);
-    go();
+    if (document.visibilityState === "visible") {
+      document.removeEventListener("visibilitychange", seen);
+      if (current !== null) {
+        void claim();
+      }
+    }
   };
-  const late = setTimeout(() => document.removeEventListener("visibilitychange", seen), SHOWN_WITHIN_MS);
-  document.addEventListener("visibilitychange", seen, { once: true });
+  document.addEventListener("visibilitychange", seen);
 }
 
 function wire() {
@@ -95,9 +115,13 @@ function wire() {
       }
       // Only a page with a box claims: with none, the daemon keeps the capture until a box is made.
       if (current !== null) {
-        void claim();
+        claimInSight();
       } else if (event.data.open === true) {
-        goToABox();
+        whenBroughtForward(() => {
+          if (current === null) {
+            location.hash = "#/";
+          }
+        });
       }
     } else if (event.kind === "snapshot_failed") {
       toast("error", `SnapShots: ${event.data.reason}.`);

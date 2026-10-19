@@ -1588,12 +1588,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
-    # The chat so far, read before the agent's bounds, which take in the MCP servers it used.
-    history: list[Message] = repair_history(
-        await runtime.store.load_messages(run.thread_id, config.keep_recent_screenshots)
-    )
     # The agent the run belongs to (item 86) bounds its tools: the ones it names, the core tools in any case, and the
-    # MCP servers the owner opened to it (item 415): the ones picked for its message, and the ones the chat used.
+    # MCP servers the owner opened to it (item 415): the ones picked for its message or an earlier one of its chat.
     agent_record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
     # The team (item 87): the other agents, whom the run may message.
     team: tuple[AgentRecord, ...] = tuple(
@@ -1601,7 +1597,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     if agent_record is not None and agent_record.tools:
         agent_tools: frozenset[str] = frozenset(agent_record.tools) | frozenset(AGENT_CORE_TOOLS)
-        owner_servers: frozenset[str] = owner_server_groups(opening.picks, used_groups(history))
+        picked_before: frozenset[str] = await runtime.store.picked_servers(run.thread_id, PICKS_EVENT)
+        owner_servers: frozenset[str] = owner_server_groups(opening.picks, picked_before)
         specs = tuple(spec for spec in specs if spec.name in agent_tools or group_of(spec.name) in owner_servers)
     # Settings › Browser may keep every run off the browser (item 354).
     if not runtime.browser.config.enabled:
@@ -1728,6 +1725,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # Every tool of the run counts, also the ones of groups that are off: a group the run turns on later must fit too.
     require_room(scaffold, estimate_tokens([system], specs))
     candidates: tuple[_Candidate, ...] = await _routing(agent, ref, bool(specs), estimate_tokens([system], specs))
+    history: list[Message] = repair_history(
+        await runtime.store.load_messages(run.thread_id, config.keep_recent_screenshots)
+    )
     # The tool groups that are on; they only grow. A grouped run starts with core, the groups its thread used and the
     # servers the owner picked for its message (item 318).
     on: frozenset[str] = (

@@ -53,6 +53,12 @@ def test_both_command_keys_pressed_together_are_a_capture_and_let_a_double_tap_b
     # A press soon after does not finish a double tap with the pair's first press: the pair let it go.
     assert keys.command(True, 0.5) is False and keys.sides(True, False) is False
     assert keys.command(False, 0.55) is False and keys.sides(False, False) is False
+    # A double tap, then the other key while the first is still held: one gesture, one capture.
+    assert keys.command(True, 6.0) is False and keys.sides(True, False) is False
+    assert keys.command(False, 6.1) is False and keys.sides(False, False) is False
+    assert keys.command(True, 6.2) is True and keys.sides(True, False) is False
+    assert keys.command(True, 6.3) is False and keys.sides(True, True) is False
+    assert keys.command(False, 6.5) is False and keys.sides(False, False) is False
     # ⌘C held, then the other Command key: a shortcut, not a capture.
     assert keys.command(True, 3.0) is False and keys.sides(True, False) is False
     keys.key()

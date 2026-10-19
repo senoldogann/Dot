@@ -94,6 +94,8 @@ class TapDetector:
         self._held: bool = False
         self._keyed: bool = False
         self._both: bool = False
+        # A double tap just captured while the key is still held: the other key pressed now is the same gesture.
+        self._captured: bool = False
 
     def command(self, down: bool, now: float) -> bool:
         """The Command key went ``down`` (or up) at ``now``; whether that completes a double tap."""
@@ -103,11 +105,13 @@ class TapDetector:
             self._held = True
             if self._first is not None and not self._keyed and now - self._first <= self._within_s:
                 self._first = None
+                self._captured = True
                 return True
             self._first = now
             self._keyed = False
             return False
         self._held = False
+        self._captured = False
         if self._keyed:
             self._first = None
         return False
@@ -121,7 +125,7 @@ class TapDetector:
         with no other key pressed since the first did (item 414). A double tap begun is let go, so it does not
         capture again."""
         both: bool = left and right
-        fired: bool = both and not self._both and not self._keyed
+        fired: bool = both and not self._both and not self._keyed and not self._captured
         self._both = both
         if fired:
             self._first = None

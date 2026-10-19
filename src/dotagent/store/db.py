@@ -2190,6 +2190,22 @@ class Store:
             raise StoreError("event insert returned no row id", {"run_id": run_id, "kind": kind})
         return EventRecord(id=cursor.lastrowid, run_id=run_id, ts=now, kind=kind, data=data)
 
+    async def picked_servers(self, thread_id: str, event_kind: str) -> frozenset[str]:
+        """The MCP servers the owner picked for the messages of the chat ``thread_id`` (item 415), as the runs' events
+        of ``event_kind`` (the picks event) recorded them: what a run's tools may take in by the owner's word, never
+        by what a model called."""
+        rows = await self._all(
+            "SELECT data FROM events WHERE kind = ? AND run_id IN "
+            "(SELECT id FROM runs WHERE thread_id = ? AND rewound_at IS NULL)",
+            (event_kind, thread_id),
+        )
+        servers: set[str] = set()
+        for row in rows:
+            plugins: object = parse_json_object(str(row["data"]), "picks event").get("plugins")
+            if isinstance(plugins, list):
+                servers.update(name for name in plugins if isinstance(name, str))
+        return frozenset(servers)
+
     async def list_events(self, run_id: str, after_id: int, limit: int) -> list[EventRecord]:
         rows = await self._all(
             "SELECT * FROM events WHERE run_id = ? AND id > ? ORDER BY id LIMIT ?", (run_id, after_id, limit)
