@@ -1,6 +1,7 @@
 // Campaigns: goals that Dot keeps working on in sessions, also while you are away, until a check confirms the outcome or
-// you stop it. The list shows where each campaign stands; a campaign's page shows its targets, the questions its sessions
-// left for you, its ledger and its sessions, with the controls to stop it, let it go on or mark it achieved.
+// you stop it. The list shows where each campaign stands, with buttons to stop it, mark it achieved or delete it; a
+// campaign's page shows its targets, the questions its sessions left for you, its ledger and its sessions, with the
+// controls to stop it, let it go on, mark it achieved or delete it.
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
@@ -79,9 +80,76 @@ function followUpdates(reload, isWorking) {
   };
 }
 
+// ------------------------------------------------------------------------------------------------- what you do to one
+
+// Each asks first, says how it went, and then calls `done`, which shows the campaign as it is now.
+
+async function stopCampaign(campaignId, done) {
+  const confirmed = await confirmDialog({
+    title: "Stop this campaign?",
+    message: "No session starts after this, and a session that is working now is stopped. You can let it go on later.",
+    confirmLabel: "Stop",
+    danger: true,
+    focusCancel: true,
+  });
+  if (confirmed) {
+    await api.post(`/campaigns/${campaignId}/stop`, null);
+    toast("ok", "Campaign stopped.");
+    await done();
+  }
+}
+
+async function markAchieved(campaignId, done) {
+  const confirmed = await confirmDialog({
+    title: "Mark this campaign achieved?",
+    message: "Nothing checks it: your word closes the campaign, and a session that is working now is stopped.",
+    confirmLabel: "Mark achieved",
+    danger: false,
+    focusCancel: false,
+  });
+  if (confirmed) {
+    await api.post(`/campaigns/${campaignId}/achieved`, null);
+    toast("ok", "Campaign marked achieved.");
+    await done();
+  }
+}
+
+async function deleteCampaign(record, done) {
+  const confirmed = await confirmDialog({
+    title: "Delete this campaign?",
+    message: `“${clip(record.title, TITLE_CHARS)}” is deleted with its ledger and its sessions after the first, with all they hold. The conversation it started in stays in your chats. This cannot be undone.`,
+    confirmLabel: "Delete",
+    danger: true,
+    focusCancel: true,
+  });
+  if (confirmed) {
+    await api.del(`/campaigns/${record.id}`);
+    toast("ok", "Campaign deleted.");
+    await done();
+  }
+}
+
 // ------------------------------------------------------------------------------------------------- the list
 
-function campaignRow(summary) {
+function rowButton(shape, title, label, action) {
+  return el("button", { class: "btn ghost sm icon-only", type: "button", title, "aria-label": label, onclick: () => attempt(action) }, icon(shape));
+}
+
+/** A campaign's buttons in the list: Stop while it is active, Mark achieved until it is achieved, and Delete once it is
+ * not active and none of its sessions works. `done` repaints the list. */
+function rowActions(summary, done) {
+  const { record } = summary;
+  const name = clip(record.title, TITLE_CHARS);
+  return el(
+    "div",
+    { class: "row-actions" },
+    record.status === "active" ? rowButton("stop", "Stop the campaign", `Stop ${name}`, () => stopCampaign(record.id, done)) : null,
+    record.status === "achieved" ? null : rowButton("check", "Mark the campaign achieved", `Mark ${name} achieved`, () => markAchieved(record.id, done)),
+    record.status === "active" || summary.working !== null ? null : rowButton("trash", "Delete the campaign", `Delete ${name}`, () => deleteCampaign(record, done)),
+  );
+}
+
+function campaignRow(summary, done) {
   const { record, progress } = summary;
   return el(
     "div",
@@ -101,6 +169,7 @@ function campaignRow(summary) {
             numberChips(progress.numbers),
           ),
     ),
+    rowActions(summary, done),
   );
 }
 
@@ -121,7 +190,7 @@ function mountList(root) {
       holder.replaceChildren(
         summaries.length === 0
           ? emptyPanel("No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the outcome is verified.")
-          : el("div", { class: "card" }, summaries.map(campaignRow)),
+          : el("div", { class: "card" }, summaries.map((summary) => campaignRow(summary, reload))),
       );
     } catch (error) {
       if (!disposed && mine === ticket) {
@@ -248,36 +317,10 @@ function mountPage(root, ctx, campaignId) {
   let painted = "";
   let head = null;
 
-  async function act(path, done) {
-    await api.post(`/campaigns/${campaignId}/${path}`, null);
-    toast("ok", done);
+  async function goOn() {
+    await api.post(`/campaigns/${campaignId}/resume`, null);
+    toast("ok", "The campaign goes on.");
     await reload();
-  }
-
-  async function stop() {
-    const confirmed = await confirmDialog({
-      title: "Stop this campaign?",
-      message: "No session starts after this, and a session that is working now is stopped. You can let it go on later.",
-      confirmLabel: "Stop",
-      danger: true,
-      focusCancel: true,
-    });
-    if (confirmed) {
-      await act("stop", "Campaign stopped.");
-    }
-  }
-
-  async function markAchieved() {
-    const confirmed = await confirmDialog({
-      title: "Mark this campaign achieved?",
-      message: "Nothing checks it: your word closes the campaign, and a session that is working now is stopped.",
-      confirmLabel: "Mark achieved",
-      danger: false,
-      focusCancel: false,
-    });
-    if (confirmed) {
-      await act("achieved", "Campaign marked achieved.");
-    }
   }
 
   function controls(record) {
@@ -287,7 +330,13 @@ function mountPage(root, ctx, campaignId) {
       record.status === "active"
         ? el(
             "button",
-            { class: "btn danger", type: "button", title: "Stop the campaign", "aria-label": "Stop the campaign", onclick: () => attempt(stop) },
+            {
+              class: "btn danger",
+              type: "button",
+              title: "Stop the campaign",
+              "aria-label": "Stop the campaign",
+              onclick: () => attempt(() => stopCampaign(campaignId, reload)),
+            },
             icon("stop"),
             el("span", { class: "label" }, "Stop"),
           )
@@ -298,7 +347,7 @@ function mountPage(root, ctx, campaignId) {
               type: "button",
               title: "Let the campaign go on: its next session starts within a minute",
               "aria-label": "Let the campaign go on",
-              onclick: () => attempt(() => act("resume", "The campaign goes on.")),
+              onclick: () => attempt(goOn),
             },
             icon("arrowRight"),
             el("span", { class: "label" }, "Go on"),
@@ -307,9 +356,29 @@ function mountPage(root, ctx, campaignId) {
         ? null
         : el(
             "button",
-            { class: "btn", type: "button", title: "Mark the campaign achieved", "aria-label": "Mark the campaign achieved", onclick: () => attempt(markAchieved) },
+            {
+              class: "btn",
+              type: "button",
+              title: "Mark the campaign achieved",
+              "aria-label": "Mark the campaign achieved",
+              onclick: () => attempt(() => markAchieved(campaignId, reload)),
+            },
             icon("check"),
             el("span", { class: "label" }, "Mark achieved"),
+          ),
+      record.status === "active"
+        ? null
+        : el(
+            "button",
+            {
+              class: "btn danger",
+              type: "button",
+              title: "Delete the campaign",
+              "aria-label": "Delete the campaign",
+              onclick: () => attempt(() => deleteCampaign(record, () => ctx.navigate("/campaigns"))),
+            },
+            icon("trash"),
+            el("span", { class: "label" }, "Delete"),
           ),
     );
   }

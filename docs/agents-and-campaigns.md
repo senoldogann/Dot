@@ -122,12 +122,18 @@ evidence of its steps, what the session's own calls measured and the session's e
 the checker's reason and the session goes on (one the checker finds out of reach asks you how to go on); accepted, the
 campaign is achieved and you are told (the notifications under the web UI and the phone's pushes), as you are when the
 emergency stop or `campaign_max_sessions` stops it.
-- **Only you stop it.** Campaigns, in the sidebar, lists them; a campaign's page shows its targets, the questions
-  waiting for you, its ledger and its sessions, with Stop (which also stops a session working then), Go on and Mark
-  achieved. The emergency stop (its button, or the pointer in the top-left corner during a desktop step) stops the
-  campaign of the session it ends, and while the stop is engaged no session starts. `dotx campaign` changes the
-  campaign without the daemon, so a session working then goes on until it ends (Stop on its run page ends it).
-  `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on gives it one more.
+- **Only you stop it.** Campaigns, in the sidebar, lists them, and a row has buttons for what you can do to its campaign
+  without opening it: Stop while it is active, Mark achieved until it is achieved, and Delete once it is not active and
+  none of its sessions works; each asks first. A campaign's page shows its targets, the questions waiting for you, its
+  ledger and its sessions, with Stop (which also stops a session working then), Go on, Mark achieved and Delete. The
+  emergency stop (its button, or the pointer in the top-left corner during a desktop step) stops the campaign of the
+  session it ends, and while the stop is engaged no session starts. `dotx campaign` changes the campaign without the
+  daemon, so a session working then goes on until it ends (Stop on its run page ends it). `campaign_max_sessions` (0: no
+  limit) stops a campaign after that many sessions; Go on gives it one more.
+- **Deleting one** (`DELETE /api/campaigns/{id}`) deletes its ledger and the threads of its sessions after the first,
+  with all they hold, as deleting those chats would. The conversation it started in stays a chat, with the first
+  session as a run of that chat, and the questions its runs left for you expire, as no session reads the answers any
+  more. It is refused while the campaign is active, so stop it first, and while a run works in one of its chats.
 - **Posts, judged before they are answered.** With `TYPESAFE_API_KEY` saved, a session also has three tools on
   TypeSafe's typed judgments for a campaign on X or another feed. `rank_posts` asks three yes/no questions about every
   post it could answer, in one request (on the account's topic; written by a person, not a bot, a brand or spam; worth a

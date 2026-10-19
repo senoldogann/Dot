@@ -14753,6 +14753,29 @@ schedule whose firing a crash cut before its run was under way is due again at t
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
 
+### 394. A campaign is stopped, marked achieved or deleted from its row
+
+**Status: done (2026-10-19), on `item-394-campaign-cards`.** The owner's word of 2026-10-19: "Campaigns sayfasinda bir
+campaigns stop yada mark achieved yapmak icin icine girmek gerekiyor, ona gerek kalmadan bu ikonlari svg olarak direk
+kartlara ekle. ve campaigns silme butonuda ekle dinamik olarak." (on the Campaigns page, a campaign is stopped or marked
+achieved only from inside it; put those icons on the cards as SVG instead, and add a button that deletes a campaign, as
+its state allows). **As built (2026-10-19).** A row of Campaigns has icon buttons, the shapes of `icons.js` the
+campaign's page uses (`views/campaigns.js` `rowActions`): Stop while the campaign is active, Mark achieved until it is
+achieved, and Delete once it is not active and none of its sessions works. Each asks as the campaign's page asks, from
+the same functions, and the list repaints the row where it is; the campaign's page has Delete too, beside Go on and
+Mark achieved, and goes back to the list after it. `DELETE /api/campaigns/{id}` (`routes_campaigns.py`,
+`Store.delete_campaign_with_sessions`) deletes in one transaction the campaign, its ledger and the threads of its
+sessions after the first with all they hold, through the deletes of a chat (`_delete_chats`, which `delete_threads`
+shares now). The conversation the campaign started in stays a chat: its runs are no longer the campaign's, so the run's
+page and the home's rows ask for no campaign that is gone, and the questions they left for the owner expire, since no
+brief reads their answers and an answer would otherwise start a run in the conversation. It is refused (409) while the
+campaign is active and while a run works in one of its chats, checked in the transaction of the deletes, and no run
+starts on those chats meanwhile (`deleting_threads`). `Store.delete_campaign`, which forgets a campaign whose opening
+session never started, is as it was. Tests: `tests/smoke/test_campaigns.py` (deleted with the thread of its later
+session, its conversation kept as a chat and its question expired, refused while active; refused while its session
+works, deleted once it has ended), `tests/smoke/test_campaign_rows.py` (the buttons of each state, each asking first
+and changing its row in place, and the rows on a phone). Docs: `docs/agents-and-campaigns.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15553,3 +15576,4 @@ starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Opus 5.5): items 394 to 397 on the owner's words of the same day, each on a branch of its own from `main`, while other agents of the owner's work on items 385 to 393; item 394 on `item-394-campaign-cards`: a campaign is stopped, marked achieved or deleted from its row.

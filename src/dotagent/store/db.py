@@ -1039,16 +1039,28 @@ class Store:
         works on one of the chats, itself or through a run it delegated to: ``RunConflict`` names the chats and the
         runs. The check is made in the transaction of the deletes, which holds the write lock from its start."""
         named: tuple[str, ...] = tuple(thread_ids)
+        await self._db.execute("BEGIN IMMEDIATE")
+        await self._refuse_working_chats(named, "chats with a run under way cannot be deleted")
+        found: list[aiosqlite.Row] = await self._all(
+            f"SELECT id FROM threads WHERE id IN ({','.join('?' * len(named))})", named
+        )
+        existing: set[str] = {str(row["id"]) for row in found}
+        candidates: set[str] = await self._delete_chats(named)
+        await self._db.commit()
+        await self._release_images(candidates)
+        await self._return_free_pages()
+        return [thread_id for thread_id in named if thread_id in existing]
+
+    async def _delete_chats(self, named: tuple[str, ...]) -> set[str]:
+        """Delete the chats ``named`` with everything they hold, as :meth:`delete_threads` says, in the transaction its
+        caller has begun and commits; the screenshot files that what it deleted named, for ``_release_images`` once
+        that transaction is committed."""
         marks: str = ",".join("?" * len(named))
         doomed: str = (
             "WITH RECURSIVE doomed(id) AS ("
             f" SELECT id FROM runs WHERE thread_id IN ({marks})"
             " UNION SELECT runs.id FROM runs JOIN doomed ON runs.parent_run_id = doomed.id)"
         )
-        await self._db.execute("BEGIN IMMEDIATE")
-        await self._refuse_working_chats(named, "chats with a run under way cannot be deleted")
-        found: list[aiosqlite.Row] = await self._all(f"SELECT id FROM threads WHERE id IN ({marks})", named)
-        existing: set[str] = {str(row["id"]) for row in found}
         hosts: list[aiosqlite.Row] = await self._all(
             f"{doomed} SELECT DISTINCT thread_id FROM runs"
             f" WHERE id IN (SELECT id FROM doomed) AND thread_id NOT IN ({marks})",
@@ -1084,10 +1096,7 @@ class Store:
                 " AND NOT EXISTS (SELECT 1 FROM runs WHERE runs.thread_id = threads.id)",
                 delegated,
             )
-        await self._db.commit()
-        await self._release_images(candidates)
-        await self._return_free_pages()
-        return [thread_id for thread_id in named if thread_id in existing]
+        return candidates
 
     async def _refuse_working_chats(self, named: tuple[str, ...], refusal: str) -> None:
         """Raise ``RunConflict`` with the message ``refusal`` when a run of any process works on one of the chats
@@ -3331,6 +3340,41 @@ class Store:
         await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign_id,))
         await self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign_id,))
         await self._db.commit()
+
+    @_writing
+    async def delete_campaign_with_sessions(self, campaign_id: str) -> None:
+        """Delete a campaign that is not active, on the owner's word, in one transaction: its ledger, and the threads of
+        its sessions after the first with everything they hold, as :meth:`delete_threads` deletes chats. The campaign's
+        conversation stays a chat: its runs are no longer the campaign's, and the questions they left for the owner
+        expire, as no session reads their answers any more. ``RunConflict`` while the campaign is active or a run of any
+        process works in its conversation or in the thread of one of its sessions; the checks are made in the
+        transaction of the deletes, which holds the write lock from its start."""
+        await self._db.execute("BEGIN IMMEDIATE")
+        campaign: CampaignRecord = await self.get_campaign(campaign_id)
+        if campaign.status == "active":
+            raise RunConflict("an active campaign cannot be deleted: stop it first", {"campaign_id": campaign.id})
+        rows: list[aiosqlite.Row] = await self._all(
+            "SELECT DISTINCT thread_id FROM runs WHERE campaign_id = ? AND thread_id != ? ORDER BY thread_id",
+            (campaign.id, campaign.thread_id),
+        )
+        sessions: tuple[str, ...] = tuple(str(row["thread_id"]) for row in rows)
+        await self._refuse_working_chats(
+            (campaign.thread_id, *sessions), "a campaign cannot be deleted while a run works in one of its chats"
+        )
+        candidates: set[str] = await self._delete_chats(sessions) if sessions else set()
+        await self._db.execute(
+            "WITH RECURSIVE family(id) AS (SELECT id FROM runs WHERE campaign_id = ?"
+            " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
+            " UPDATE approvals SET status = 'expired', decided_at = ?, decided_by = 'system', note = ?"
+            " WHERE status = 'left' AND run_id IN (SELECT id FROM family)",
+            (campaign.id, time.time(), "the campaign was deleted"),
+        )
+        await self._db.execute("UPDATE runs SET campaign_id = NULL WHERE campaign_id = ?", (campaign.id,))
+        await self._db.execute("DELETE FROM campaign_entries WHERE campaign_id = ?", (campaign.id,))
+        await self._db.execute("DELETE FROM campaigns WHERE id = ?", (campaign.id,))
+        await self._db.commit()
+        await self._release_images(candidates)
+        await self._return_free_pages()
 
     @_writing
     async def add_campaign_entry(
