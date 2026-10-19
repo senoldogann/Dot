@@ -199,7 +199,7 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await expect(_pill(page, "mode")).to_contain_text("Task")
             await expect(_pill(page, "model")).to_contain_text("scripted")
             await expect(_pill(page, "reasoning")).to_be_hidden()
-            await expect(_pill(page, "options")).to_contain_text("Ask")
+            await expect(_pill(page, "options")).to_contain_text("Edits")
             await expect(_pill(page, "agent")).to_have_count(0)
             await expect(_pill(page, "model")).not_to_have_attribute("data-waiting", re.compile(".*"))
 
@@ -222,7 +222,7 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await _pill(page, "options").click()
             options: Locator = _menu(page, "Options")
             await expect(options.get_by_role("switch", name="Keep going until done")).to_have_count(0)
-            await options.get_by_role("button", name="Auto").click()
+            await options.locator(".pop-option[data-mode='auto']").click()
             await expect(_pill(page, "options")).to_contain_text("Auto")
             await page.keyboard.press("Escape")
             await expect(options).to_be_hidden()
@@ -268,7 +268,7 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await page.goto(f"{address}/#/runs")
             await expect(page.locator(".composer-pill[data-pill='model']")).to_contain_text("scripted")
             await expect(page.locator(".composer-pill[data-pill='reasoning']")).to_be_hidden()
-            await expect(page.locator(".composer-pill[data-pill='options']")).to_contain_text("Ask")
+            await expect(page.locator(".composer-pill[data-pill='options']")).to_contain_text("Edits")
             assert errors == []
         finally:
             await browser.close()

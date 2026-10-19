@@ -347,11 +347,15 @@ step_router_threshold = 0.6
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;
 # cautious: ask for everything that is not read-only.
 preset = "aggressive"
-# Who answers a question the policy raises: "ask" = you; "auto" = the review model decides and passes on what it cannot
-# decide; "yolo" = nobody is asked, the action is allowed and recorded. With ask and auto, secrets and exfiltration are
-# refused and money and credentials are handed to you, and Dot never types into a password, one-time-code or card
-# field. yolo lets all of that through and records it (a run types the codes it can read itself); a research run stays
-# read-only, your own hand-off rules still stop a run, and the desktop tools never control a password manager.
+# Who answers a question the policy raises (item 398): "supervised" = you, and you are also asked before every change
+# the preset lets through (a file, a command that does more than read, an entry or a click in a page or an app); "ask"
+# = you, while edits and routine work run (the web UI calls it Auto-accept edits); "auto" = the review model decides
+# and passes on what it cannot decide; "yolo" = nobody is asked, the action is allowed and recorded. In every mode but
+# yolo a change of Dot's own files (its code, plugins, skills, playbooks, emergency stop) asks you, never the review
+# model, and secrets and exfiltration are refused, money and credentials are handed to you, and Dot never types into a
+# password, one-time-code or card field. yolo lets all of that through and records it (a run types the codes it can
+# read itself); a research run stays read-only, your own hand-off rules still stop a run, and the desktop tools never
+# control a password manager.
 approvals = "ask"
 approval_timeout_s = 900.0
 protected_paths = [

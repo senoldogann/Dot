@@ -2891,6 +2891,19 @@ a.pill:hover {
   mask-image: url("../icons/providers/generic.svg");
 }
 
+/* The approval modes of the Options menu (item 398), strictest first; YOLO chosen in the warning ink, so a run that asks
+   nobody is never started by accident. */
+.approval-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.approval-list[data-mode="yolo"] .pop-option[aria-selected="true"] {
+  background: var(--warn-weak);
+  box-shadow: inset 0 0 0 1px var(--warn-border);
+  color: var(--warn);
+}
+
 /* A row of the Options menu: the caption on the left, its control on the right. */
 .composer-popover .composer-pick {
   display: flex;

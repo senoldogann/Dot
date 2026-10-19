@@ -1,7 +1,8 @@
 """Skills and plugins end to end, on real folders in a throwaway Dot home: a plugin brings its MCP server and its
 skills, the prompt lists the skills, the ``skill`` tool hands over the instructions and the files of a skill the run
-is offered and of no other (item 168), a run reads and runs them but never changes what Dot loads (item 135), and
-``dotx skills list`` shows what was found and what was left out. Nothing is mocked."""
+is offered and of no other (item 168), a run reads and runs them but changes what Dot loads only with the file tools
+and once the user agrees, never with a command line (items 135 and 398), and ``dotx skills list`` shows what was found
+and what was left out. Nothing is mocked."""
 
 import asyncio
 import json
@@ -25,7 +26,8 @@ from dotagent.config import load_config
 from dotagent.core.paths import playbooks_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.harness.components import NO_HARNESS
-from dotagent.policy.engine import auto_review, preset_verdict
+from dotagent.policy.engine import auto_review, decide, preset_verdict
+from dotagent.policy.paths import DOT_BY_FILE_TOOLS
 from dotagent.policy.types import ActionInfo, Decision
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.skills.catalog import load_skills
@@ -262,7 +264,9 @@ async def test_the_skill_tool_hands_over_the_instructions_and_the_files(runtime:
     assert result.text.rstrip().endswith("scripts/collect.sh")
 
 
-async def test_a_run_reads_and_runs_a_skill_but_never_changes_what_dot_loads(runtime: Runtime, home: Path) -> None:
+async def test_a_run_reads_and_runs_a_skill_and_changes_what_dot_loads_only_once_the_user_agrees(
+    runtime: Runtime, home: Path
+) -> None:
     skill: Path = home / "skills" / "release-notes"
     plugin: Path = home / "plugins" / "acme-tools"
     reads: list[tuple[str, JsonObject]] = [
@@ -270,23 +274,32 @@ async def test_a_run_reads_and_runs_a_skill_but_never_changes_what_dot_loads(run
         ("read_file", {"path": str(plugin / ".mcp.json")}),
         ("shell", {"command": f"sh {skill / 'scripts' / 'collect.sh'}"}),
     ]
-    changes: list[tuple[str, JsonObject]] = [
+    # The file tools ask the user first (item 398): a question no rule and no review model answers in the user's place.
+    asked: list[tuple[str, JsonObject]] = [
         ("write_file", {"path": str(plugin / ".mcp.json"), "content": "{}"}),
         ("write_file", {"path": str(home / "plugins" / "new" / ".mcp.json"), "content": "{}"}),
         ("edit_file", {"path": str(skill / "SKILL.md"), "old": "# Release notes", "new": "# Notes"}),
         ("write_file", {"path": str(home / "playbooks" / "learned-notes" / "SKILL.md"), "content": "x"}),
         ("write_file", {"path": str(home / "plugins-data" / "acme-tools" / "state.json"), "content": "{}"}),
+    ]
+    # A command line never changes them, and is told which way is open.
+    refused_lines: list[tuple[str, JsonObject]] = [
         ("shell", {"command": f"rm -f {home / 'STOP'}"}),
         ("shell", {"command": f"echo '{{}}' > {plugin / '.mcp.json'}"}),
     ]
     for name, arguments in reads:
         action: ActionInfo = await _action(runtime, name, arguments)
         assert auto_review(action) is None and preset_verdict("aggressive", action)[0] == "allow", action
-    for name, arguments in changes:
+    for name, arguments in asked:
+        action = await _action(runtime, name, arguments)
+        decision: Decision = decide(action, "task", False, "aggressive", [], None)
+        assert (decision.verdict, decision.source) == ("ask", "own_files"), action
+    for name, arguments in refused_lines:
         action = await _action(runtime, name, arguments)
         refused: Decision | None = auto_review(action)
         assert refused is not None and refused.verdict == "deny", action
-    assert "what Dot loads and runs" in (await _action(runtime, *changes[0])).summary
+        assert DOT_BY_FILE_TOOLS in refused.reason, refused.reason
+    assert "what Dot loads and runs" in (await _action(runtime, *asked[0])).summary
 
 
 async def test_an_unknown_skill_is_refused_with_the_names_of_the_skills_offered(runtime: Runtime) -> None:

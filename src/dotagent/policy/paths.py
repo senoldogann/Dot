@@ -8,10 +8,12 @@ from pathlib import Path
 from typing import Literal
 
 # ``dot`` is what Dot loads and runs, and its emergency stop (``Runtime.dot_paths``): a run reads it as it reads the
-# home folder, and changes it as it would a protected location.
+# home folder; the file tools change it once the user agrees (item 398), and a command line never does.
 PathClass = Literal["workspace", "temp", "home", "system", "dot", "protected"]
 # The reason the policy gives when a run would change a ``dot`` path.
-CHANGES_DOT: str = "changes what Dot loads and runs (its plugins, skills and playbooks) or its emergency stop"
+CHANGES_DOT: str = "changes what Dot loads and runs (its code, plugins, skills and playbooks) or its emergency stop"
+# What a run is told when a command line would change a ``dot`` path: the way that is open to it.
+DOT_BY_FILE_TOOLS: str = "Dot's own files are changed with edit_file or write_file, once the user agrees"
 
 _SYSTEM_PREFIXES: tuple[str, ...] = (
     "/System",

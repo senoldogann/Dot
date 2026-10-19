@@ -19,6 +19,7 @@ from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
+from dotagent.policy.paths import CHANGES_DOT
 from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Preset
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, EventRecord, RunMode, RunRecord, ThreadRecord
@@ -76,6 +77,23 @@ SCHEDULE: ActionInfo = ActionInfo(
     summary="Save a schedule",
     target="schedules",
     flags=("persistence",),
+)
+# A change of Dot's own files as the file tools describe it (item 398), a command that changes the workspace, one that
+# only reads it, and a read of a file.
+OWN_FILE: ActionInfo = ActionInfo(
+    tool="edit_file",
+    kind="write",
+    risk="high",
+    summary=f"Edit /Dot/src/dotagent/server/static/css/app.css ({CHANGES_DOT})",
+    target="/Dot/src/dotagent/server/static/css/app.css",
+    flags=("self_change",),
+)
+COMMAND: ActionInfo = ActionInfo(
+    tool="shell", kind="shell", risk="low", summary="npm install", target="npm install", flags=()
+)
+LISTING: ActionInfo = ActionInfo(tool="shell", kind="shell", risk="safe", summary="ls", target="ls", flags=())
+READ: ActionInfo = ActionInfo(
+    tool="read_file", kind="read", risk="safe", summary="Read notes.md", target="notes.md", flags=()
 )
 
 
@@ -422,3 +440,61 @@ async def test_auto_mode_tells_the_review_model_when_the_run_read_untrusted_cont
     assert await asyncio.wait_for(gate.authorize(SCHEDULE), WAIT_S) == ""
     (request,) = asked
     assert request.tainted
+
+
+# ----------------------------------------------------------------------------------------------- Dot's own files
+
+
+async def test_a_change_of_dots_own_files_asks_the_user_and_goes_ahead_when_allowed(room: Room) -> None:
+    """Item 398: in every mode but yolo, the user answers it, never the review model, and the run makes the change once
+    the user allows it; before, the change was refused outright in ask and auto."""
+    for approvals in ("supervised", "ask", "auto"):
+        question: Question = await _ask(room, _gate(room, "task", "aggressive", approvals, _nobody), OWN_FILE)
+        assert question.record.tool == "edit_file"
+        assert CHANGES_DOT in question.record.summary
+        assert "only the user lets a run change Dot's own files" in question.record.summary
+        assert question.record.severity == "high"
+        await room.broker.resolve(question.record.id, True, "user", f"go ahead in {approvals}")
+        assert await asyncio.wait_for(question.answer, WAIT_S) == f"go ahead in {approvals}"
+    declined: Question = await _ask(room, _gate(room, "task", "aggressive", "auto", _nobody), OWN_FILE)
+    await room.broker.resolve(declined.record.id, False, "user", "not that file")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(declined.answer, WAIT_S)
+
+
+async def test_an_allow_rule_of_the_user_does_not_answer_for_dots_own_files(room: Room) -> None:
+    await room.store.add_rule("allow", "edit_file", "", "Edits are fine")
+    question: Question = await _ask(room, _gate(room, "task", "aggressive", "ask", _nobody), OWN_FILE)
+    await room.broker.resolve(question.record.id, True, "user", "")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == ""
+
+
+async def test_yolo_changes_dots_own_files_without_asking_and_keeps_the_record(room: Room) -> None:
+    gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
+    assert await asyncio.wait_for(gate.authorize(OWN_FILE), WAIT_S) == ""
+    (record,) = await _decided(room)
+    assert (record.status, record.decided_by, record.tool) == ("approved", YOLO_DECIDER, "edit_file")
+
+
+# ---------------------------------------------------------------------------------------------------- supervised
+
+
+async def test_supervised_waits_for_the_user_before_a_change_the_preset_lets_through(room: Room) -> None:
+    question: Question = await _ask(room, _gate(room, "task", "aggressive", "supervised", _nobody), WRITE)
+    assert question.record.tool == "write_file"
+    assert "Supervised asks before every change" in question.record.summary
+    await room.broker.resolve(question.record.id, True, "user", "fine")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == "fine"
+    command: Question = await _ask(room, _gate(room, "task", "aggressive", "supervised", _nobody), COMMAND)
+    await room.broker.resolve(command.record.id, False, "user", "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(command.answer, WAIT_S)
+
+
+async def test_supervised_lets_reads_and_the_users_own_allow_rules_run(room: Room) -> None:
+    gate: RunGate = _gate(room, "task", "aggressive", "supervised", _nobody)
+    assert await asyncio.wait_for(gate.authorize(READ), WAIT_S) == ""
+    assert await asyncio.wait_for(gate.authorize(LISTING), WAIT_S) == ""
+    await room.store.add_rule("allow", "write_file", "", "Notes are fine")
+    assert await asyncio.wait_for(gate.authorize(WRITE), WAIT_S) == ""
+    assert await room.store.list_approvals(None, 10) == []
