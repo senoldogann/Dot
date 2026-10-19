@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from dotagent.agent.loop import AGENT_CORE_TOOLS
 from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
 from dotagent.core.errors import InvalidValueError
+from dotagent.harness.components import NO_HARNESS
 from dotagent.server.routes_agents import changed_agent_tools, new_agent_tools
 from dotagent.server.views import AgentRequest
 from dotagent.store.db import Store
@@ -39,6 +40,7 @@ def _prompt(agent: AgentBrief | None) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 

@@ -622,6 +622,45 @@ score_min_uses = 3
 # write there are yours, kept as they are and never rewritten.
 owner_chars = 1500
 
+[harness]
+# The harness (docs/harness.md): the texts of the adopted version, which every run's system prompt takes after Dot's
+# own. Habits (how to work here) come after how to work, tool guidance (what earlier runs learned of the tools on this
+# Mac) after the tools and the rules of communication; each is at most this many characters and component_lines lines,
+# with no line past 300 characters, and holds no secret, link, e-mail address, home path, account name or character that
+# does not print. A version is written by you (`dotx harness set`, POST /api/harness) or proposed by the improvement
+# loop, and only the adopted one is read; with none adopted a run's prompt is Dot's own text alone.
+habits_chars = 1200
+tool_guidance_chars = 1500
+component_lines = 16
+# The models of the roles of the improvement loop (docs/harness.md): the proposer writes a candidate from what a run
+# did, the composer makes one version of the candidates and what their probes showed, the selector picks among
+# anonymous answers, the experience writer records what each edit did. A model reference each ("provider:model");
+# "" means [models] review. A role's model sees a digest of a run, the harness and the candidates, never a key.
+proposer = ""
+composer = ""
+selector = ""
+experience = ""
+# The nightly step (docs/harness.md): once a day at step_time (a time of day in [scheduler] timezone; "off", the
+# default, never), the step reads the newest run of yours that ended since the last step, asks the proposer for a
+# candidate in each scope of step_candidates, plays the scoring set (eval task ids, safe to repeat, never shown to the
+# proposer) step_repeats times under the adopted texts and under each candidate in a separate process and throw-away
+# homes, keeps the candidate that did better on a task and worse on none, has the composer merge two that both did,
+# writes what each edit did as experience, and stops at step_minutes or step_tokens of the model under test. The final
+# set is played only by `dotx harness final`, once a version is adopted, and reported as it comes out. Every run of a
+# probe spends the main model's tokens: the eight tasks below, twice, under three texts, are about fifty runs (measured
+# 2026-10-19 with Claude Haiku 5.5: about 57,000 tokens a run with Dot's prompt, 1.8 million for two texts; step_tokens
+# leaves room for three and a composed one). adopt = "owner" leaves the probed version for you to adopt (`dotx harness
+# adopt`); "auto" adopts one the probe showed better on a task and worse on none, with step_repeats of at least 2, and
+# never one written from a run that had read content others can author.
+step_time = "off"
+scoring_tasks = ["write-todo-note", "read-config-port", "edit-debug-flag", "bump-version", "sum-column", "count-errors", "sorted-unique-names", "shell-script-hello"]
+final_tasks = ["fix-add-bug", "recover-wrong-extension", "report-failing-tests", "injection-in-notes"]
+step_repeats = 2
+step_candidates = ["invariant", "domain"]
+step_minutes = 90
+step_tokens = 8000000
+adopt = "owner"
+
 [scheduler]
 # IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the
 # TZ environment variable names when one is set, else this Mac's zone.

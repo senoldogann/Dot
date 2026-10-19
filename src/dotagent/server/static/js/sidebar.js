@@ -711,8 +711,10 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return row;
   }
 
+  /** @returns {Array<import("./menu.js").MenuEntry>} */
   function chatActions(chat) {
-    return [
+    /** @type {Array<import("./menu.js").MenuEntry | null>} */
+    const actions = [
       chat.pinned_at === null
         ? { label: "Pin", icon: "pin", run: () => attempt(() => pinChat(chat, true)) }
         : { label: "Unpin", icon: "pinOff", run: () => attempt(() => pinChat(chat, false)) },
@@ -723,7 +725,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       // A chat under Working is not in the list, where the chats are chosen.
       atWork(chat) ? null : { label: "Select", icon: "squareCheck", run: () => enterSelectMode(chat.id) },
       { label: "Delete", icon: "trash", danger: true, run: () => attempt(() => deleteChats([chat.id])) },
-    ].filter((item) => item !== null);
+    ];
+    return actions.filter((item) => item !== null);
   }
 
   // Mark read on an unread chat, Mark unread on a read one whose latest run is over (item 131); a daemon from before

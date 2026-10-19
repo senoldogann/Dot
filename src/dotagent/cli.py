@@ -55,6 +55,19 @@ _FAMILIES: dict[str, str] = {
     "memory-search": "dotagent.cli_memory",
     "memory-forget": "dotagent.cli_memory",
     "memory-reindex": "dotagent.cli_memory",
+    "harness-list": "dotagent.cli_harness",
+    "harness-show": "dotagent.cli_harness",
+    "harness-diff": "dotagent.cli_harness",
+    "harness-set": "dotagent.cli_harness",
+    "harness-adopt": "dotagent.cli_harness",
+    "harness-retire": "dotagent.cli_harness",
+    "harness-propose": "dotagent.cli_harness",
+    "harness-step": "dotagent.cli_harness",
+    "harness-probe": "dotagent.cli_harness",
+    "harness-final": "dotagent.cli_harness",
+    "harness-graph": "dotagent.cli_harness",
+    "harness-steps": "dotagent.cli_harness",
+    "harness-experiences": "dotagent.cli_harness",
     "schedule-list": "dotagent.cli_schedule",
     "schedule-add": "dotagent.cli_schedule",
     "schedule-delete": "dotagent.cli_schedule",
@@ -249,6 +262,72 @@ def build_parser() -> argparse.ArgumentParser:
     memory_forget.add_argument("memory_id", help="the id shown in brackets by 'dotx memory list'")
     memory_commands.add_parser("reindex", help="embed every note again, e.g. after changing [memory] embed_model")
 
+    harness = commands.add_parser(
+        "harness", help="the versions of what Dot's prompt takes from the harness (docs/harness.md)"
+    )
+    harness_commands = harness.add_subparsers(dest="harness_action", required=True)
+    harness_commands.add_parser("list", help="every version, the newest first, with the adopted one marked")
+    harness_show = harness_commands.add_parser("show", help="the texts of a version (the adopted one by default)")
+    harness_show.add_argument("version_id", nargs="?", default=None, help="a version id from 'dotx harness list'")
+    harness_diff = harness_commands.add_parser("diff", help="what a version changes against another")
+    harness_diff.add_argument("version_id", help="the version to read")
+    harness_diff.add_argument(
+        "--against", default=None, help="the version compared with; the adopted one, or Dot's own text, by default"
+    )
+    harness_set = harness_commands.add_parser("set", help="write a version of your own from files, and adopt it or not")
+    harness_set.add_argument("--summary", required=True, help="what the version is, in a line")
+    harness_set.add_argument("--habits", default=None, help="a file with the habits ('-' reads standard input)")
+    harness_set.add_argument(
+        "--tool-guidance",
+        dest="tool_guidance",
+        default=None,
+        help="a file with the tool guidance ('-' for standard input)",
+    )
+    harness_set.add_argument("--adopt", action="store_true", help="adopt the version at once")
+    harness_adopt = harness_commands.add_parser("adopt", help="make a version the one every run takes")
+    harness_adopt.add_argument("version_id", help="a version id from 'dotx harness list'")
+    harness_retire = harness_commands.add_parser(
+        "retire", help="put a version aside; an adopted one leaves the prompt as Dot's own"
+    )
+    harness_retire.add_argument("version_id", help="a version id from 'dotx harness list'")
+    harness_propose = harness_commands.add_parser(
+        "propose", help="ask the proposer for a candidate from what one run did (a model call; the candidate waits)"
+    )
+    harness_propose.add_argument("run_id", help="the run to learn from, as its page or dotx stats --run names it")
+    harness_propose.add_argument(
+        "--scope",
+        choices=["invariant", "domain"],
+        default="invariant",
+        help="how the agent works (invariant, the default) or what a practitioner knows (domain)",
+    )
+    harness_step = harness_commands.add_parser(
+        "step",
+        help=(
+            "one step of the improvement loop now: propose, probe the scoring set apart, keep the best, write the"
+            " experience (the daemon does it at [harness] step_time)"
+        ),
+    )
+    harness_step.add_argument("--run", dest="run_id", default=None, help="the run to learn from; the newest by default")
+    harness_step.add_argument(
+        "--scripted", action="store_true", help="play the references through the scripted model: a check, no model cost"
+    )
+    harness_probe = harness_commands.add_parser("probe", help="a probe in a process of its own (the step starts these)")
+    harness_probe.add_argument(
+        "--ask", required=True, help="a JSON file with what to play; the report is printed as JSON"
+    )
+    harness_final = harness_commands.add_parser(
+        "final", help="play the final set once under the adopted version and report it as it comes out"
+    )
+    harness_final.add_argument("version_id", nargs="?", default=None, help="a version other than the adopted one")
+    harness_graph = harness_commands.add_parser(
+        "graph", help="the provenance of the harness as a Mermaid flowchart: versions, steps, experiences, runs"
+    )
+    harness_graph.add_argument("--steps", type=int, default=50, help="how many of the newest steps to draw")
+    harness_steps = harness_commands.add_parser("steps", help="the newest steps of the improvement loop")
+    harness_steps.add_argument("--limit", type=int, default=20, help="how many steps to show")
+    harness_experiences = harness_commands.add_parser("experiences", help="the experience library, the newest first")
+    harness_experiences.add_argument("--limit", type=int, default=50, help="how many experiences to show")
+
     schedule = commands.add_parser("schedule", help="goals that Dot runs later or on a rhythm, while the daemon runs")
     schedule_commands = schedule.add_subparsers(dest="schedule_action", required=True)
     schedule_commands.add_parser("list", help="show every schedule: when it runs, what is next, how the last run went")
@@ -397,6 +476,7 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
     browser_action: object = raw.pop("browser_action", None)
     desktop_action: object = raw.pop("desktop_action", None)
     memory_action: object = raw.pop("memory_action", None)
+    harness_action: object = raw.pop("harness_action", None)
     schedule_action: object = raw.pop("schedule_action", None)
     campaign_action: object = raw.pop("campaign_action", None)
     mcp_action: object = raw.pop("mcp_action", None)
@@ -417,6 +497,8 @@ def parse_command(parser: argparse.ArgumentParser, arguments: list[str]) -> Comm
         raw["name"] = f"desktop-{desktop_action}"
     if raw["name"] == "memory":
         raw["name"] = f"memory-{memory_action}"
+    if raw["name"] == "harness":
+        raw["name"] = f"harness-{harness_action}"
     if raw["name"] == "schedule":
         raw["name"] = f"schedule-{schedule_action}"
     if raw["name"] == "campaign":

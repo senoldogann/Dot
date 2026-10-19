@@ -13,7 +13,7 @@ import json
 import os
 import tempfile
 import time
-from collections.abc import AsyncIterator, Iterator, Mapping, Sequence
+from collections.abc import AsyncGenerator, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
@@ -31,6 +31,8 @@ from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.site import serve_site, with_site
 from dotagent.evals.types import EvalTask, FileSeed, SkillSeed
 from dotagent.events import Subscription
+from dotagent.harness.components import NO_HARNESS, HarnessText
+from dotagent.harness.service import adopt, create_version
 from dotagent.llm.calls import CALL_EVENT
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatProvider
@@ -296,11 +298,15 @@ async def _supervise(
 
 
 async def _run_in(
-    runtime: Runtime, task: EvalTask, model: str, stand_in: ChatProvider | None, attempt: int
+    runtime: Runtime, task: EvalTask, model: str, stand_in: ChatProvider | None, attempt: int, harness: HarnessText
 ) -> TaskOutcome:
-    """One attempt in an open runtime: seed the workspace, run the goal, judge what is left."""
+    """One attempt in an open runtime: seed the workspace, adopt ``harness`` in the attempt's own store when it is
+    not Dot's own text alone (item 391: a probe of the harness), run the goal, judge what is left."""
     if stand_in is not None:
         await runtime.router.register(parse_model_ref(model).provider, stand_in)
+    if harness != NO_HARNESS:
+        probed = await create_version(runtime.store, runtime.config.harness, harness, "probed text", "probe", "", ())
+        await adopt(runtime.store, probed.id, time.time())
     await asyncio.to_thread(seed_workspace, runtime.workspace, task.files)
     manager: RunManager = RunManager(runtime)
     started: float = time.monotonic()
@@ -353,6 +359,7 @@ async def _attempt(
     model: str,
     scripted: bool,
     attempt: int,
+    harness: HarnessText,
 ) -> TaskOutcome:
     """One attempt in a throw-away home that is removed afterwards, holding the skills the task brings, its run given
     the MCP servers the task brings, with the task's site (if it has one) served for its length and its address put
@@ -365,7 +372,7 @@ async def _attempt(
             with_servers(site_config(config) if task.site else config, task), {**login_env, **_ATTEMPT_ENV}
         )
         try:
-            outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt)
+            outcome: TaskOutcome = await _run_in(runtime, placed, model, stand_in, attempt, harness)
         finally:
             await close_runtime(runtime)
     log.info(
@@ -389,12 +396,16 @@ async def play(
     model: str,
     tasks: Sequence[EvalTask],
     repeats: int,
-) -> AsyncIterator[TaskOutcome]:
-    """Every task ``repeats`` times against ``model``, one attempt at a time, each outcome as soon as it is known. The
-    whole catalog is played once before it is played again."""
+    harness: HarnessText,
+    scripted: bool,
+) -> AsyncGenerator[TaskOutcome]:
+    """Every task ``repeats`` times against ``model``, one attempt at a time, each outcome as soon as it is known, each
+    run taking ``harness`` (:data:`NO_HARNESS` for Dot's own text alone). The whole catalog is played once before it is
+    played again. ``scripted`` plays each task's reference through the scripted model instead of ``model``, as
+    ``dotx eval check`` does: what a probe of the harness is checked with (item 391)."""
     for attempt in range(1, repeats + 1):
         for task in tasks:
-            yield await _attempt(task, config, login_env, secrets, model, False, attempt)
+            yield await _attempt(task, config, login_env, secrets, model, scripted, attempt, harness)
 
 
 async def replay_reference(task: EvalTask, config: AppConfig, login_env: Mapping[str, str]) -> TaskOutcome:
@@ -405,7 +416,7 @@ async def replay_reference(task: EvalTask, config: AppConfig, login_env: Mapping
         if task.goal_mode
         else config
     )
-    return await _attempt(task, replay, login_env, {}, SCRIPTED_MODEL, True, 1)
+    return await _attempt(task, replay, login_env, {}, SCRIPTED_MODEL, True, 1, NO_HARNESS)
 
 
 async def do_nothing_passes(task: EvalTask, env: Mapping[str, str]) -> bool:

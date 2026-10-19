@@ -12,6 +12,7 @@ from dotagent.agent.prompt import PromptInputs, build_system_prompt, collect_pro
 from dotagent.agent.scaffold import Scaffold, surface_for
 from dotagent.config import AgentConfig, AppConfig, Tier, load_default_config
 from dotagent.core.types import JsonObject
+from dotagent.harness.components import NO_HARNESS
 from dotagent.help.listed import tools_in_order
 from dotagent.llm.types import ToolCall, ToolSpec, assistant_message, tool_message, user_message
 from dotagent.runtime import _tool_groups
@@ -160,6 +161,7 @@ def _inputs(tool_names: list[str]) -> PromptInputs:
         (),
         None,
         "full",
+        NO_HARNESS,
     )
 
 

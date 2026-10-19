@@ -5,7 +5,7 @@
 // time it took beside it (item 374), that the reader can fold away. A group is timed from the moment the work began (the
 // start of the run or the last message) to the moment it ended, so the groups of a run add up to the time the run took.
 
-import { AUTO_LINES, valueOf } from "./appearance/settings.js";
+import { AUTO_LINES, settingValue } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
 import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
@@ -752,7 +752,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   /** The model is done thinking: its block says "Thought", folded or open as the reader left it. */
   function endThought(scope) {
     const thought = scope.thought;
-    if (thought !== null && thought.live) {
+    if (thought?.live) {
       thought.live = false;
       thought.node.dataset.live = "false";
       thought.label.textContent = "Thought";
@@ -1027,7 +1027,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       }
     },
 
-    approval_decided(scope, record) {
+    approval_decided(_scope, record) {
       const entry = cards.get(record.data.approval_id);
       if (entry !== undefined) {
         cards.delete(record.data.approval_id);
@@ -1047,7 +1047,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const yolo = data.decided_by === "yolo";
       const denied = data.status === "denied";
       // Settings › General may keep such lines out of the chat (item 346); a refusal stays, as its action did not run.
-      if (!denied && valueOf(AUTO_LINES) === "hidden") {
+      if (!denied && settingValue(AUTO_LINES) === "hidden") {
         return;
       }
       const verdict = yolo ? "YOLO, not asked" : denied ? "Reviewer denied" : "Reviewer approved";
@@ -1274,7 +1274,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       made.refresh();
     },
 
-    draft_decided(scope, record) {
+    draft_decided(_scope, record) {
       drafts.get(record.data.id)?.update(record.data);
     },
 

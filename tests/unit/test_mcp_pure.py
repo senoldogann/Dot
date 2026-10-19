@@ -26,6 +26,7 @@ from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import McpServerConfig, load_config
 from dotagent.core.errors import ConfigError, McpError
 from dotagent.core.types import JsonObject
+from dotagent.harness.components import NO_HARNESS
 from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, select_tools
 from dotagent.mcp.naming import MAX_NAME_CHARS, exposed_name, require_distinct_names
 from dotagent.mcp.types import McpTool, ToolHints
@@ -311,6 +312,7 @@ def _prompt(tool_names: tuple[str, ...]) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 

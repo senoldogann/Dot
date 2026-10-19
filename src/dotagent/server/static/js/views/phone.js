@@ -59,7 +59,7 @@ function tailnetLines(tailnet) {
   ];
 }
 
-export function mount(root, ctx) {
+export function mount(root, _ctx) {
   let disposed = false;
   const holder = el("div", { class: "stack" }, loadingPanel());
   const code = el("output", { class: "pair-code mono", "aria-label": "Pairing code", hidden: true });

@@ -14752,6 +14752,145 @@ pruned as unpaired; the pre-push review found the first version wrote the new id
 schedule whose firing a crash cut before its run was under way is due again at the time it fired as the scheduler
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
+### 388. The web interface has checks of its own, and its pages load on demand
+
+**Status: done (2026-10-19), on `js-gate`.** The owner's word of 2026-10-19, after the review of the interface of
+2026-10-18 ("eksik ne var ise hepsini düzelt", fix whatever is missing): the interface's scripts had no lint, no type
+check and no unit test of their own, the gate read them only as the browser would (`tests/unit/test_static_ui.py`), and
+every page's script was parsed at every opening. **As built.** `npm run check` (package.json, a development requirement
+on Node 22 or later; nothing of Dot needs Node to run) runs Biome's recommended lint rules (`biome.json`; `useTemplate`
+and `useArrowFunction` off, as matters of style, and the import sorting off, as the scripts order theirs by hand), `tsc`
+over the scripts' JSDoc with `checkJs` (`tsconfig.json`, loose: `strict` off, so a parameter without a type is no
+error; `tsconfig.sw.json` for the service worker, whose globals are a worker's; `types/interface.d.ts` for the desktop
+shell's bridge and Safari's `standalone`), and the unit tests of the pure modules under `tests/js` with `node --test`
+(the Markdown reader, the words of a flow, the formatting helpers, the reasoning levels). Biome's 67 findings and the
+49 type errors were fixed, among them a helper named `valueOf` (now `settingValue`), a call of `notePage` with an
+argument it does not take, and `callKind` reading a tool's kind with `in`, so that a tool named `constructor` was a
+function (the first unit test found it). `test_static_ui.py` also fails on an export nothing imports (the tests count as
+importers; 30 exports were dropped and two dead functions removed) and on an `import()` of a script that is not there.
+The pages that are not the chat or the home (campaigns, agents, team, customize, settings, diagnostics, licences,
+controls) are loaded when first asked for (`import()` in main.js's route table) and fetched once the browser is idle
+after the first page, so that the first paint parses 84 modules instead of 106 (the `modulepreload` list says which)
+and a page asked for while another's script is on its way opens the one asked for last. The gate runs the checks
+(`.github/workflows/gate.yml`, setup-node pinned); CLAUDE.md, CONTRIBUTING.md and docs/development.md say so. **Left
+for later:** `noImplicitAny` once the modules carry their JSDoc, and Biome's formatter (configured, off: 84 files would
+change at 120 columns), to be switched on in one commit of its own when no branch is in flight.
+
+### 389. The harness: what Dot improves around its model, and its first layer, the versions a run's prompt takes
+
+**Status: done (2026-10-19), on `harness-1`, stacked on `js-gate`.** The owner's word of 2026-10-19 ("Prompts → Agents →
+Loops → Graphs → Harness; ön araştırma, ardından profesyonel şekilde"): Dot's model is fixed, the soft parts around it
+are what makes a given model work well here, and nothing improved them with evidence. **Research.** Harness² (Xu et al.,
+arXiv 2610.14224; google-research/harness2, Apache-2.0): eight editable components mounted as files, a
+Propose–Probe–Compose step per task (two candidates, one about how the agent works and one about what a practitioner
+knows; probes beside a reference; a composer that keeps, revises or drops each edit on an observed moment, or keeps the
+base), parallel or sequential recursion with budget k, an experience library with cue/lesson/evidence/confidence entries
+written only when execution contrasts support them, and a blind selector. Taken as the method, not the code: it is a
+Linux research harness over OpenCode/Codex with Vertex model ids, three commits and no release. A survey of Dot's own
+layers (prompt assembly, lessons/reflection/playbooks, evals, agents, API/UI patterns) is in `docs/harness.md`'s shape
+and in this item's decisions. **As built (this layer, Prompts).** `docs/harness.md` says what the harness holds and what
+never changes without the owner. A version of the harness (`harness_versions`, a record `HarnessVersion`) holds two
+texts, *habits* (after how to work) and *tool guidance* (after the tools and the rules of communication), who made it,
+what it was made from, its state (candidate, probed, adopted, retired), a summary and its notes; `[harness]` bounds each
+text (1,200 and 1,500 characters, 16 lines, no line past 300), and a text with a secret, a link, an e-mail address, a
+home path or an account name is refused, as a lesson's is, and so is one with a character that does not print. Every
+run's system prompt takes the adopted version's texts (`agent/prompt.py`, both styles, under leads that name the trust
+rules as the ones that win), and records the version it took (`runs.harness_version`). `dotx harness
+list|show|diff|set|adopt|retire` and `GET/POST /api/harness…` write, adopt (which retires the one adopted before;
+adopting an earlier one again takes a change back) and retire versions; the daemon reads the adopted one as each run
+starts, no restart. **Decisions.** Addenda, not rewrites: the loop (and the owner) add bounded sections under Dot's own
+text rather than editing the 14k-character prompt, so a weaker review model can propose safely and the trust, safety and
+secrets lines stay as tests pin them. Domain knowledge keeps going to learned skills (playbooks), which have their own
+validation; the harness holds the invariant scope. Roles of the loop are config, not agent records (an agent with no
+tool list gets every tool and learns for itself). The store keeps versions and the adopted pointer (`kv
+harness.adopted`); files on disk would duplicate state. **Next layers.** Agents (the proposer, composer, selector and
+reflector as typed roles on `[models] review`), Loops (the probe in a throwaway home on the eval tasks safe to repeat,
+the nightly step after the reflection with budgets and a health record), Graphs (provenance: version ← probe ← run,
+experience → version, the decisions of each step), Harness (the owner's page).
+
+### 390. The harness: the roles of the improvement loop
+
+**Status: done (2026-10-19), on `harness-2`, stacked on `harness-1`.** The second layer (Agents): the four roles of the
+step as typed questions to a model, answered with one tool call each, in `agent/review.py` beside Dot's other questions:
+the proposer (`propose_harness`: the whole texts of a candidate within the bounds, the moments of the run behind each
+change, or keep; a scope of how the agent works or of what a practitioner knows), the composer (`compose_harness`: one
+version of the candidates and what their probes showed, a decision with its evidence for each change, or the base kept),
+the blind selector (`select_answer`: the best of anonymous answers, judged on delivery, conformance, fidelity,
+consistency, fitness and finish, never length) and the experience writer (`write_experience`: what each edit did,
+helped/hurt/no_effect/confounded, and an experience of cue, lesson, evidence and confidence only when an edit helped or
+hurt). Each answer is checked (`proposal_check`, `composition_check`, `selection_check`, `experience_check`): a text
+past the bounds or with a secret, a link or an address, a change with no moment, keep with a text that differs from the
+one in place, a decision naming no candidate, an experience with no effect behind it or whose lines could not stand in a
+prompt (a link, a secret, an address), is asked again with what was wrong, as the review model's other answers are. What
+a run read stands inside fences the roles are told to read and never follow; the secrets Dot holds are masked as in
+every review question. `[harness] proposer|composer|selector|experience` name a model each, "" for `[models] review`;
+the call purposes `harness_propose|compose|select|experience` count in `dotx stats`. `dotx harness propose RUN_ID
+[--scope]` asks the proposer about one run by hand (the run as the reflection reads it: digest, failed calls, stalls,
+send-backs, whether it read outside content) and writes its candidate, made by `proposer`, with the scope, the moments
+and the taint in its notes. **Research taken in.** Wei et al., "The End of Harness Engineering" (2026): the human's
+artifact is the scoring set, never shown to the proposer; a final set is run once and never optimized against; the best
+edit by score survives. docs/harness.md says so, and the probe (next item) keeps a final set apart. From the Grok Bot
+build notes: charters of owns / done looks like / stops at, and "a figure without its source and read time goes back to
+the desk it came from", kept as the first example habits and as a candidate check for the page's "keep this run as a
+test".
+
+### 391. The harness: the probe and the nightly step
+
+**Status: done (2026-10-19), on `harness-3`, stacked on `harness-2`.** The third layer (Loops). A probe
+(`harness/probe.py`) plays one text on the scoring set: each task a run in a throw-away home with the exclusions of an
+eval, the text adopted in the attempt's own store before its run starts (`play(..., harness)` in the eval runner), a
+scorecard per attempt (passed, ending, cut, steps, tokens, tool errors, seconds), and a stop before the attempt that
+would pass the budget of minutes or tokens, the next attempt taken to cost what the earlier ones did; a process that
+outlives its budget is ended and counts as cut short, and ended too when the daemon stops (SIGTERM, which the probe
+answers by cancelling its play so that the commands it started end with it; SIGKILL after a grace). A probe runs in a
+process of its own (`dotx harness probe --ask FILE`, JSON in and out): an attempt switches the process's Dot home, which
+the daemon must never see. The contrast (`harness/contrast.py`) says per task whether a candidate passed more, as often
+or less than the base, and in all better (more on a task, less on none), same, worse or unclear (a probe cut short); the
+candidate better on the most tasks, then the cheapest, survives. The step (`harness/step.py`) learns from the newest run
+of the owner's that ended since the last step, proposes in each scope, probes the base and the candidates within the
+budget, keeps the survivor as `probed` (two that both did better are merged by the composer and the merge is played in
+its turn; it survives when it did better, else the best candidate does), retires the rest with their contrasts, writes
+what each edit did and an experience when one helped or hurt (`harness_experiences`), records itself (`harness_steps`,
+`harness_probes`), and adopts on its own only with `[harness] adopt = "auto"` and two repeats, never from a run that had
+read content third parties can author; a composer or experience writer that fails leaves the step failed with the error,
+the survivor probed all the same, and a scripted check does not move the next step's window. The scheduler runs it at
+`[harness] step_time` ("off" by default: every run of a probe spends the main model's tokens; the eight small tasks
+twice under three texts are about fifty runs), timed and recorded like the reflection, under learning health's new work
+`harness`; `dotx harness step` runs it by hand and `--scripted` plays the references through the scripted model, the
+whole loop at no cost, which the smoke test does. `dotx harness final` plays the final set once under the adopted
+version and keeps the report in the version's notes. **Decisions.** Score first, composer second: the best by the
+scoring set survives; the composer merges only two winners. Probes apart from the daemon, not in it: `eval_environment`
+is process-wide. The default is off until the owner chooses a budget; the page (item 393) will carry the switch. **Left
+for later.** A scoring set with headroom: the first step with a real model (Claude Haiku 5.5) passed the eight tasks 2/2
+under the base and the candidate alike, so the loop can only keep until the set holds tasks the main model fails
+sometimes; and a secondary signal (steps, tokens) when pass rates tie.
+
+### 392. The harness: provenance
+
+**Status: done (2026-10-19), on `harness-4`, stacked on `harness-3`.** The fourth layer (Graphs). `harness/graph.py`
+reads the store into a graph: versions (made from, composed of), steps (learned from a run, proposed candidates, probed
+the survivor), experiences (about a version, written in a step) and the runs learned from, and draws it as a Mermaid
+flowchart; a version's lineage is its ancestors, the attempts of its probes, the steps that touched it (as base,
+candidate or probed version) and the experiences about it. `GET /api/harness/graph|steps|experiences` and `GET
+/api/harness/{id}/lineage`; `dotx harness graph|steps|experiences`, and `show` ends with the lineage. The library is
+read: the proposer is shown the newest experiences before it writes; an experience written from a run that had read
+content third parties can author is kept marked `tainted` and never shown to it (the rule of item 384's notes).
+**Decision.** The graph is read from the tables the step already writes (`harness_versions.parent_id`, the notes'
+`composed_of`, the steps' outcome, the probes and experiences by version), not from an edge table of its own: one source
+of truth, nothing to keep in step.
+
+### 393. The harness: the page
+
+**Status: done (2026-10-19), on `harness-5`, stacked on `harness-4`.** The fifth layer (Harness). Settings › Harness
+(`views/harness.js`, a tab under How Dot works, a row of the phone's list): the version in use and its texts, a form
+for a version of the owner's (habits, tool guidance prefilled from the adopted version, a summary; saved as a
+candidate or adopted at once, refused with why when a text cannot be a component), every version with its state, who
+made it, when, its texts and notes under a fold, Adopt and Retire (retiring the version in use asks first), the newest
+steps with the run each learned from and what it decided, the experiences, and how the nightly step is set (when, the
+scoring and final sets, who adopts, the bounds; `GET /api/harness` says them now). A browser test writes, adopts,
+retires and adopts again on the page, and opens the row on a phone. **Left for later** (docs/harness.md): a run of
+the owner's kept as a test of the scoring set from its page, a step started from the page, the graph drawn on it, and
+the switch of `step_time` from the page, which needs the settings writer to learn `[harness]`.
 
 ### 396. A model's context size is the most its window allows unless one is chosen, and the context meter leads to it
 
@@ -15580,4 +15719,10 @@ address that names a model of a folded provider), `test_context_meter.py` (the l
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Fable 5.1): item 388 on `js-gate`, on the owner's word of the same day after the interface review of 2026-10-18: the web interface gets checks of its own (Biome, `tsc` over the JSDoc, `node --test`), an export nothing imports fails the gate, and the pages that are not the chat or the home load on demand. Done, awaiting the owner's push.
+- 2026-10-19 (Fable 5.1): item 388's whole gate ran: 705 passed, the 17 browser tests that failed under `-n auto` passed serially, as they do on main. Item 389 on `harness-1`, stacked on `js-gate`: the harness's first layer, versions of the texts a run's prompt takes, written, adopted and retired by the owner (docs/harness.md); the method of Harness² (arXiv 2610.14224) adopted, its code not.
+- 2026-10-19 (Fable 5.1): item 389 committed on `harness-1`; item 390 on `harness-2`: the four roles of the step and `dotx harness propose`.
+- 2026-10-19 (Fable 5.1): item 390 committed on `harness-2`; item 391 on `harness-3`: the probe apart from the daemon, the contrast, the step and its schedule, `dotx harness step|probe|final`.
+- 2026-10-19 (Fable 5.1): item 391 committed on `harness-3`; item 392 on `harness-4`: the provenance graph, the lineage, the library read by the proposer.
+- 2026-10-19 (Fable 5.1): item 392 committed on `harness-4`; item 393 on `harness-5`: Settings › Harness.
 - 2026-10-19 (Opus 5.5): item 396 on the owner's word of the same day, on `item-396-context-size` from `main`, while other agents of the owner's work on items 385 to 393: a model's context size is the most its window allows unless one is chosen, and the context meter leads to it.

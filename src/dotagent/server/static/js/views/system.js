@@ -2,7 +2,7 @@
 
 import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
-import { AUTO_COMPUTER, AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, valueOf } from "../appearance/settings.js";
+import { AUTO_COMPUTER, AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, settingValue } from "../appearance/settings.js";
 import {
   notificationsAvailable,
   notificationsBlocked,
@@ -176,7 +176,7 @@ function buildComposerCard() {
       { id: "enter", label: "Enter", hint: "Enter sends; Shift+Enter breaks a line." },
       { id: "mod-enter", label: "⌘Enter", hint: "⌘Enter or Ctrl+Enter sends; Enter breaks a line." },
     ],
-    selected: valueOf(SEND_KEY),
+    selected: settingValue(SEND_KEY),
     onSelect: (id) => setValue(SEND_KEY, id),
   });
   const busy = choiceSetting({
@@ -186,7 +186,7 @@ function buildComposerCard() {
       { id: "queue", label: "Queue", hint: "The message waits in the chat's queue." },
       { id: "steer", label: "Steer", hint: "The message goes to the run at work at once." },
     ],
-    selected: valueOf(BUSY_SEND),
+    selected: settingValue(BUSY_SEND),
     onSelect: (id) => setValue(BUSY_SEND, id),
   });
   return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
@@ -197,7 +197,7 @@ function buildChatCard() {
   const lines = switchSetting({
     label: "Show what ran without asking",
     hint: "A line under the step for each action YOLO let through without asking you, or the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows. Kept in this browser.",
-    read: () => valueOf(AUTO_LINES) === "shown",
+    read: () => settingValue(AUTO_LINES) === "shown",
     write: async (on) => setValue(AUTO_LINES, on ? "shown" : "hidden"),
     onToggled: () => lines.paint(),
   });
@@ -281,7 +281,7 @@ function buildFailsafe() {
   return {
     element: el("section", { class: "card card-pad row" }, text, engage, release),
     paint(snapshot) {
-      const engaged = snapshot.status !== null && snapshot.status.failsafe_engaged;
+      const engaged = snapshot.status?.failsafe_engaged === true;
       text.textContent = engaged
         ? "The emergency stop is engaged: every run was cancelled and desktop control is blocked."
         : "The emergency stop cancels every running task and blocks desktop control until you release it.";
@@ -1032,7 +1032,7 @@ function buildBrowser(isDisposed) {
     label: "Bring Chrome to the front while working",
     hint:
       "Off, Dot's Chrome stays where it is while a run works and the app you were in keeps the focus; the run's page shows the page under Dot's computer either way, and Take over always brings the tab to the front.",
-    read: () => view !== null && view.raise_window,
+    read: () => view?.raise_window === true,
     write: async (on) => {
       view = await api.post("/browser/raise", { raise_window: on });
     },
@@ -1048,7 +1048,7 @@ function buildBrowser(isDisposed) {
   const enabled = switchSetting({
     label: "Runs may use the browser",
     hint: "Off, no run is offered the browser tools, an agent's neither, from the next run on; computer use still sees the screen.",
-    read: () => view !== null && view.enabled,
+    read: () => view?.enabled === true,
     write: async (on) => {
       view = await api.post("/browser/enabled", { enabled: on });
     },
@@ -1085,7 +1085,7 @@ function buildBrowser(isDisposed) {
   const autoComputer = switchSetting({
     label: "Show Dot's computer when a run opens the browser",
     hint: "On a wide window the details panel opens on the page the run works in, beside the chat; a phone keeps its button. Kept in this browser.",
-    read: () => valueOf(AUTO_COMPUTER) === "shown",
+    read: () => settingValue(AUTO_COMPUTER) === "shown",
     write: async (on) => setValue(AUTO_COMPUTER, on ? "shown" : "hidden"),
     onToggled: () => autoComputer.paint(),
   });
@@ -1665,7 +1665,7 @@ function buildDotLookCard() {
   return { element, dispose: picker.dispose };
 }
 
-export function mountGeneral(root, ctx) {
+export function mountGeneral(root, _ctx) {
   const look = buildDotLookCard();
   root.append(
     paneHead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, what a chat shows of what ran without asking, and the token this browser is signed in with.", null),
@@ -1680,7 +1680,7 @@ export function mountGeneral(root, ctx) {
 }
 
 /** The providers Dot can reach and the models each of them offers; `?model=<ref>` in the address shows that model. */
-export function mountModels(root, ctx) {
+export function mountModels(root, _ctx) {
   let disposed = false;
   const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("model") ?? "";
   const models = buildModels(() => disposed, asked);
@@ -1697,7 +1697,7 @@ export function mountModels(root, ctx) {
 }
 
 /** Which Chrome the agent browses with. */
-export function mountBrowser(root, ctx) {
+export function mountBrowser(root, _ctx) {
   let disposed = false;
   const browser = buildBrowser(() => disposed);
   root.append(paneHead("Which Chrome the agent browses with, and what Chrome has to allow first.", null), browser.element);
@@ -1708,7 +1708,7 @@ export function mountBrowser(root, ctx) {
 }
 
 /** The daemon, its emergency stop and its health checks. */
-export function mountSystem(root, ctx) {
+export function mountSystem(root, _ctx) {
   let disposed = false;
   const daemon = buildDaemon();
   const failsafe = buildFailsafe();

@@ -26,12 +26,12 @@ export function sizeLabel(size) {
 }
 
 /** Whether a pasted text goes as a file rather than into the box (item 269). */
-export function isLongPaste(text) {
+function isLongPaste(text) {
   return text.length >= LONG_PASTE_CHARS || text.split("\n").length >= LONG_PASTE_LINES;
 }
 
 /** A pasted text as a file named for the time `at` (item 269): Markdown when it reads as Markdown, else plain text. */
-export function pastedFile(text, at) {
+function pastedFile(text, at) {
   const time = [at.getHours(), at.getMinutes(), at.getSeconds()].map((part) => String(part).padStart(2, "0")).join("");
   const markdown = readsAsMarkdown(text);
   return new File([text], `pasted-text-${time}.${markdown ? "md" : "txt"}`, { type: markdown ? "text/markdown" : "text/plain" });

@@ -174,6 +174,7 @@ from dotagent.core.jsonutil import dumps_compact
 from dotagent.core.logs import get_logger
 from dotagent.core.text import CHARS_PER_TOKEN, redact_known, redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel, JsonObject
+from dotagent.harness.service import adopted_text
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.http import is_retryable_provider_error
@@ -1610,6 +1611,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     notes_budget: int = memory_budget(runtime.config.memory, info.context_length)
     query: str = await _goal_query(runtime, run)
     recalled: Remembered = await _start_notes(runtime, run, query, notes_budget)
+    # The adopted version of the harness (item 389): its texts go into the prompt, and the run records which it took.
+    harness_text, harness_version = await adopted_text(runtime.store)
+    if harness_version is not None:
+        await runtime.store.set_run_harness(run.id, harness_version)
     remembered: tuple[MemoryRecord, ...] = recalled.records
     if remembered:
         handed: list[str] = [record.id for record in remembered]
@@ -1669,6 +1674,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 owner_prompt_lines(await owner_section(runtime.store)),
                 devtools_address(browser.config),
                 config.prompt,
+                harness_text,
             )
         )
     )

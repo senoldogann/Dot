@@ -7,6 +7,7 @@ import pytest
 
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import PromptStyle
+from dotagent.harness.components import NO_HARNESS
 from dotagent.policy.types import ApprovalMode
 from dotagent.tools.shell import build_shell_tool
 
@@ -61,6 +62,7 @@ def _prompt(style: PromptStyle, approvals: ApprovalMode) -> str:
             (),
             None,
             style,
+            NO_HARNESS,
         )
     )
 

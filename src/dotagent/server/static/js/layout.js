@@ -170,6 +170,7 @@ export function followSeen() {
     }
   }
 
+  /** @type {Array<[EventTarget, string]>} */
   const sources = [
     [seen, "resize"],
     [seen, "scroll"],

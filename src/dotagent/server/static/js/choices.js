@@ -199,7 +199,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
 
   // Whether a run would ask the model `info` for fast mode: it has it, and fast was chosen.
   function fastOn(info) {
-    return info !== null && info.fast_mode && kept.speed.read() === "fast";
+    return info?.fast_mode === true && kept.speed.read() === "fast";
   }
 
   // The choice for one message the next message goes with: the one armed by the menu, else the one the word in the box
@@ -218,7 +218,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     modelPill.setIcon(providerMark(ref === null ? "" : providerOf(ref)));
     setTitle(modelPill.element, info === null ? "" : info.ref);
     const choice = info !== null && offersChoice(info);
-    const shown = choice || (info !== null && info.fast_mode);
+    const shown = choice || info?.fast_mode === true;
     reasoningPill.element.hidden = !shown;
     // The frame wears the choice for one message while it is armed (item 259): its border is the gradient.
     const boost = onceFor(info);

@@ -31,6 +31,12 @@ type CallPurpose = Literal[
     "aside",
     "consult",
     "memory",
+    # The roles of the harness (item 390, docs/harness.md): the proposer, the composer, the blind selector and the
+    # experience writer.
+    "harness_propose",
+    "harness_compose",
+    "harness_select",
+    "harness_experience",
 ]
 
 CALL_EVENT: str = "model_call"

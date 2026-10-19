@@ -29,6 +29,10 @@ SCRIPT_TAG: re.Pattern[str] = re.compile(r"<script\b(?P<attributes>[^>]*)>(?P<bo
 REFERENCE: re.Pattern[str] = re.compile(r'(?:src|href)="([^"]+)"')
 MODULE_ENTRY: re.Pattern[str] = re.compile(r'<script type="module" src="(?P<src>[^"]+)"></script>')
 MODULEPRELOAD: re.Pattern[str] = re.compile(r'<link rel="modulepreload" href="(?P<place>[^"]+)">')
+IMPORT_ON_DEMAND: re.Pattern[str] = re.compile(r'import\("(?P<specifier>[^"]+)"\)')
+# The scripts the page loads itself: nothing imports what they export.
+ENTRY_SCRIPTS: frozenset[str] = frozenset({"main.js", "boot.js"})
+TESTS_DIR: Path = Path(__file__).resolve().parents[1]
 
 
 def read_scripts() -> dict[Path, str]:
@@ -148,3 +152,51 @@ def test_the_page_preloads_every_module_its_entry_reaches() -> None:
     assert listed == reachable, (
         f"the modulepreload links must name each module {entry['src']} reaches once, sorted as this test sorts them"
     )
+
+
+def test_every_import_on_demand_names_a_script_that_exists() -> None:
+    """A page loaded when it is first asked for (`import()` in main.js's route table) is as much a part of the interface
+    as one imported at the start; a wrong place would show only when that page is opened."""
+    scripts: dict[Path, str] = read_scripts()
+    missing: list[str] = [
+        f"{path.relative_to(JS_DIR)}: {statement['specifier']}"
+        for path, source in scripts.items()
+        for statement in IMPORT_ON_DEMAND.finditer(source)
+        if (path.parent / statement["specifier"]).resolve() not in scripts
+    ]
+    assert missing == []
+
+
+def test_every_export_of_the_interface_is_used_somewhere() -> None:
+    """An export nothing imports is code nobody reads any more, or a seam kept for a test: a script imported whole
+    (`import * as`, or on demand) is used whole, the tests of the interface (`tests/js`), the browser tests that import
+    a script in the page (`tests/smoke`) and the unit tests that read one (`tests/unit`) use what they name, and the
+    rest must be imported by name."""
+    scripts: dict[Path, str] = read_scripts()
+    exports: dict[Path, set[str]] = {path: exports_of(source) for path, source in scripts.items()}
+    named: dict[Path, set[str]] = {path: set() for path in scripts}
+    whole: set[Path] = set()
+    for path, source in scripts.items():
+        for statement in IMPORT.finditer(source):
+            target: Path = (path.parent / statement["specifier"]).resolve()
+            clause: str = statement["clause"].strip()
+            listed: re.Match[str] | None = NAMED.match(clause)
+            if listed is not None:
+                named.setdefault(target, set()).update(exported for exported, _ in names_in(listed["names"]))
+            else:
+                whole.add(target)
+        for statement in IMPORT_ON_DEMAND.finditer(source):
+            whole.add((path.parent / statement["specifier"]).resolve())
+    elsewhere: str = "\n".join(
+        file.read_text(encoding="utf-8")
+        for folder, pattern in (("js", "*.js"), ("smoke", "*.py"), ("unit", "*.py"))
+        for file in sorted((TESTS_DIR / folder).glob(pattern))
+    )
+    unused: list[str] = [
+        f"{path.relative_to(JS_DIR)}: {name}"
+        for path, names in exports.items()
+        if path not in whole and path.name not in ENTRY_SCRIPTS
+        for name in sorted(names - named[path])
+        if re.search(rf"\b{re.escape(name)}\b", elsewhere) is None
+    ]
+    assert unused == [], f"exported and never imported: {unused}"

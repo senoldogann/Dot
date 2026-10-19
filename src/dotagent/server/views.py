@@ -34,6 +34,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     ChatChoices,
+    HarnessVersion,
     MemoryRecord,
     MemoryScore,
     QueuedMessage,
@@ -569,10 +570,41 @@ class LearnedSkillView(FrozenModel):
 
 class LearningHealthView(FrozenModel):
     """``GET /api/memories/learning``: how Dot's learning fares (:mod:`dotagent.agent.learning_health`, review O25):
-    the record, ``None`` before the first outcome, and why learning has stopped (``None`` while it works)."""
+    the record, ``None`` before the first outcome, why learning has stopped (``None`` while it works), and whether the
+    harness's nightly step is set to run (``[harness] step_time``, item 391), so that a step that never ran reads as
+    off, not as failing."""
 
     health: LearningHealth | None
     stalled: str | None
+    harness_on: bool
+
+
+class HarnessView(FrozenModel):
+    """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
+    own text alone, every version the newest first, the bounds a component keeps to, and how the nightly step is set
+    (item 393): when it runs ("off" never), the scoring and final sets, the repeats, and who adopts a version the probe
+    showed better."""
+
+    adopted: HarnessVersion | None
+    versions: tuple[HarnessVersion, ...]
+    habits_chars: int
+    tool_guidance_chars: int
+    component_lines: int
+    step_time: str
+    scoring_tasks: tuple[str, ...]
+    final_tasks: tuple[str, ...]
+    step_repeats: int
+    adopt: Literal["owner", "auto"]
+
+
+class HarnessRequest(FrozenModel):
+    """``POST /api/harness``: a version of the owner's. A component given replaces the adopted version's text, one left
+    out (``None``) keeps it; ``summary`` says in a line what the version is; ``adopt`` adopts it at once."""
+
+    habits: str | None
+    tool_guidance: str | None
+    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    adopt: bool
 
 
 class LearnedSkillsView(FrozenModel):
