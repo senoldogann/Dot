@@ -396,6 +396,21 @@ class DesktopConfig(FrozenModel):
     osascript_timeout_s: float = Field(gt=0, allow_inf_nan=False)
 
 
+type SnapshotSound = Literal["click", "pop", "glass", "off"]
+
+
+class SnapshotsConfig(FrozenModel):
+    """SnapShots (item 405): whether a double tap of the Command key captures the window in front into the open
+    chat's composer, whether the window's text comes with it, the sound that says it was taken, whether the capture
+    animates into the box, and how close the two taps must be."""
+
+    enabled: bool
+    app_text: bool
+    sound: SnapshotSound
+    animations: bool
+    double_tap_ms: int = Field(gt=0)
+
+
 type EmbedProvider = Literal["ollama", "openai"]
 
 
@@ -647,6 +662,7 @@ class AppConfig(FrozenModel):
     web: WebConfig
     browser: BrowserConfig
     desktop: DesktopConfig
+    snapshots: SnapshotsConfig
     memory: MemoryConfig
     harness: HarnessConfig
     scheduler: SchedulerConfig

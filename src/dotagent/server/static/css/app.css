@@ -6451,6 +6451,40 @@ button.attach-chip:hover {
   flex: none;
 }
 
+/* A capture of SnapShots comes into the box with a small spring (item 405); reduced motion shows it in place. */
+.attach-chip.arrived {
+  animation: chip-arrive var(--motion-slow) var(--ease-emphasis) both;
+}
+
+@keyframes chip-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attach-chip.arrived {
+    animation: none;
+  }
+}
+
+.snapshots-keys {
+  font: inherit;
+  padding: var(--space-half) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.snapshots-problem {
+  color: var(--bad);
+}
+
 /* A queued message's file in the box that edits it (item 376): small, the picture itself or a file's icon, and the ×
    at its corner; no words (the name is its tooltip). */
 .attach-chip.small {

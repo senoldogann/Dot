@@ -46,6 +46,7 @@ from dotagent.core.paths import (
     workspace_dir,
 )
 from dotagent.desktop.session import DesktopSession
+from dotagent.desktop.snapshots import SnapshotService
 from dotagent.events import EventBus
 from dotagent.help.added import AddedServers, added_server_configs, read_added_servers
 from dotagent.help.meaning import HelpVectors
@@ -126,6 +127,8 @@ class Runtime:
     anthropic_key_present: bool
     mcp: McpHub
     memory: MemoryIndex
+    # SnapShots (item 405): the watch of the Command key and the captures waiting for a composer.
+    snapshots: SnapshotService
     # Help found by meaning with the memory's embeddings (item 169); ``None`` when they are off.
     help_vectors: HelpVectors | None
     registry: ToolRegistry
@@ -405,6 +408,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             anthropic_key_present=anthropic_key is not None,
             mcp=mcp,
             memory=memory,
+            snapshots=SnapshotService(config.snapshots, bus),
             help_vectors=(
                 None if memory.embedder is None else HelpVectors(memory.embedder, config.memory.min_similarity)
             ),

@@ -15,6 +15,7 @@ import { icon, toolIconName } from "./icons.js";
 import { markdownMirror } from "./mirror.js";
 import { arePicks, createPicks, pickColour } from "./picks.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
+import { takesSnapshots } from "./snapshots.js";
 import { filterGroups, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 
 const DRAFT_PREFIX = "dot.draft.";
@@ -376,6 +377,15 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     requestAnimationFrame(wired.autosize);
   }
   paintEmpty();
+  // SnapShots (item 405): a box with a draft of its own takes the captures the daemon made, the ones that waited
+  // and each new one, as files of the draft.
+  const stopSnapshots =
+    draftKey === null
+      ? () => undefined
+      : takesSnapshots((files, animated) => {
+          attachments.arrive(files, animated);
+          filesChanged();
+        });
 
   return {
     element,
@@ -412,6 +422,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       drafting = true;
     },
     dispose: () => {
+      stopSnapshots();
       wired.dispose();
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);

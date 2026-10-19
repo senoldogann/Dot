@@ -578,6 +578,19 @@ launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0
 
+[snapshots]
+# SnapShots (item 405): a double tap of the Command key, in any application, captures the window in front and puts it in
+# the open chat's composer as a picture (and, with app_text, the window's text as a Markdown file, when the application
+# shows it to accessibility). Dot's own window and a password manager's are never captured. The key is watched by a
+# listen-only event tap once Accessibility is granted to the app that runs Dot; it reads only whether the Command key
+# went down or up, and whether another key was pressed meanwhile (⌘C ⌘V is not a double tap), never which. Settings ›
+# SnapShots changes these. sound: "click", "pop", "glass" or "off". double_tap_ms: the most between the two taps.
+enabled = true
+app_text = true
+sound = "click"
+animations = true
+double_tap_ms = 400
+
 [memory]
 # Who embeds the notes, for finding them by meaning: "ollama" (the local server; nothing leaves this Mac) or "openai"
 # (the OpenAI API with OPENAI_API_KEY; the text of every note and search is sent to OpenAI). embed_model names a model of

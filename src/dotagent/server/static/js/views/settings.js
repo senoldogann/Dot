@@ -16,6 +16,7 @@ import * as keys from "./keys.js";
 import * as memory from "./memory.js";
 import * as phone from "./phone.js";
 import * as rules from "./rules.js";
+import * as snapshots from "./snapshots.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
 
 const DEFAULT_TAB = "general";
@@ -29,6 +30,7 @@ const TABS = [
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
   { id: "harness", label: "Harness", icon: "sparkle", mount: harness.mount },
   { id: "phone", label: "Phone", icon: "smartphone", mount: phone.mount },
+  { id: "snapshots", label: "SnapShots", icon: "image", mount: snapshots.mount },
   { id: "system", label: "System", icon: "monitor", mount: mountSystem },
 ];
 // The phone's list: the tabs in groups, each group's name over its rows.
@@ -36,7 +38,7 @@ const GROUPS = [
   { title: "Interface", tabs: ["general", "appearance"] },
   { title: "Models", tabs: ["models", "keys"] },
   { title: "How Dot works", tabs: ["rules", "memory", "harness"] },
-  { title: "This Mac", tabs: ["browser", "phone", "system"] },
+  { title: "This Mac", tabs: ["browser", "phone", "snapshots", "system"] },
 ];
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");
 
