@@ -15035,6 +15035,35 @@ cut; the hints are one short line each now, as in the picture, the Options menu 
 the composer keeps within the window above its pill (`popover.js` `--room-above`), so none leaves it at the top;
 `test_composer.py` checks the menu shows the modes and the warning whole.
 
+### 399. A path is classified by the place it names, through the Data volume too
+
+**Status: done (2026-10-19), on `item-399-kernel-paths`, for the owner to merge (it changes `src/dotagent/policy/`).**
+Found by the `/security-review` of item 398, as a finding older than that item: macOS joins its Data volume to the
+system volume with firmlinks, so `/System/Volumes/Data/Users/<owner>/.ssh/id_rsa` is `~/.ssh/id_rsa` and
+`/System/Volumes/Data/private/tmp/…` is `/tmp/…`, and `realpath` follows links, not firmlinks; spelled so, a path
+escaped its class: a protected file read as a `system` one, with neither the refusal of a secret nor a question, and a
+file of Dot's own was no `dot` path. **As built.** `policy/paths.kernel_path` names a path as the kernel does: the
+deepest folder on it that the daemon can open is opened for its events alone (`O_EVTONLY`, which reads nothing of it,
+with `O_DIRECTORY | O_NOFOLLOW`, so that a file, a pipe, a device or a link is never opened: a pipe nobody writes to
+would hold the open, and opening a device can wake it) and asked its path (`F_GETPATH`); the rest of the path follows.
+`expand_path` (every path a tool, the shell guard or OpenCode's permissions name), `expand_protected` (the protected
+locations and Dot's own paths) and the workspace in `classify_path` go through it, so both sides of a comparison name
+places the same way; letter case was already set aside (`within`, item 116). Tests: `tests/unit/test_kernel_paths.py` (a
+protected file through the Data volume is protected and its read refused, a new file in Dot's own folder is `dot`, a
+missing place keeps its name after the folder the kernel names, a pipe nobody writes to is named at once, a folder
+closed to reading through the folder it is in). Docs: `docs/safety.md`. The `/security-review` of this item found three
+spellings more, older than it, fixed here as the same class: a file named by its number (`/.vol/<device>/<inode>`, which
+no folder can name: a path, a glob or a text in that namespace, behind `/.nofollow` too, now reaches every protected
+location), a link the command line made (the shell guard resolved the path behind it with `realpath` alone; now with
+`kernel_path`), and a glob that spells the Data volume (`/S*/V*/D*/U*/…`; a glob is now matched against every spelling
+of a location: as it is, through the Data volume, behind `/.nofollow`, and both); with them, one this item brought:
+`mentions_protected` compared a `$HOME` in other letters with the kernel-named locations letter by letter (now letter
+case aside). Each has a test that fails without its fix. The pre-push review of those fixes (0 Important) named two more
+of the class, fixed too: the prefix `/.resolve/<flags>`, which names the root again as `/.nofollow` does, and the links
+at the root (`/var`, `/tmp`, `/etc` into `/private`), which a glob or a text could spell a protected location through; a
+glob is now matched through every other name of the root (`_glob_reaches`), a text through the links too, and the home
+folder's spellings are made part by part, so a letter whose case folding changes its length cannot cut them wrong.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15846,3 +15875,4 @@ the composer keeps within the window above its pill (`popover.js` `--room-above`
 - 2026-10-19 (Opus 5.5): item 396 on the owner's word of the same day, on `item-396-context-size` from `main`, while other agents of the owner's work on items 385 to 393: a model's context size is the most its window allows unless one is chosen, and the context meter leads to it.
 - 2026-10-19 (Opus 5.5): item 397 on the owner's word of the same day, on `item-397-new-chat-choices` from `main`, while other agents of the owner's work on items 385 to 393: a new chat keeps its choices with its draft until its message goes.
 - 2026-10-19 (Opus 5.5): item 398 on the owner's word of the same day and their two choices, on `item-398-approval-modes` from `main`: the approval modes in four steps, and Dot's own files asked about instead of refused; for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 399 on `item-399-kernel-paths` from `main`, found by the `/security-review` of item 398: a path spelled through the Data volume is classified by the place it names; for the owner to merge.
