@@ -5,10 +5,13 @@
 import { actorFace, DOT_ID } from "../actors.js";
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
+import { assistant, loadAssistant, onAssistant } from "../assistant.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el, modelName } from "../dom.js";
+import { dotName } from "../face.js";
+import { buildFirstChat } from "../firstchat.js";
 import { forgetLevel, KEPT_SPEED, ONE_MESSAGE, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
@@ -82,13 +85,18 @@ const HOME_KEPT = {
   goalMode: KEPT_GOAL_MODE,
 };
 
+/** The words in the home's empty box, with the name the owner calls Dot by (item 420). */
+function placeholderFor(name) {
+  return `Message ${name} (@ for skills, / for commands)`;
+}
+
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
 function buildComposer(ctx, listener) {
   const start = readHomeChoices();
   const frame = composerFrame({
     label: "New chat",
     boxLabel: "Goal",
-    placeholder: "Message Dot (@ for skills, / for commands)",
+    placeholder: placeholderFor(dotName()),
     maxPx: MAX_GOAL_PX,
     commands: [
       ...MODES.map((option) => ({
@@ -205,6 +213,8 @@ function buildComposer(ctx, listener) {
   // a second press must be refused here, or one goal would start two runs.
   let starting = false;
   const keys = messageKeys();
+  // The approval mode a send from outside the box asks for, in place of the box's choice; null otherwise.
+  let sentApprovals = null;
 
   async function submit() {
     if (starting) {
@@ -242,7 +252,7 @@ function buildComposer(ctx, listener) {
           effort: chosen.effort,
           speed: chosen.speed,
           once: chosen.once,
-          approvals: chosen.approvals,
+          approvals: sentApprovals ?? chosen.approvals,
           goal_mode: standing.value() ? null : chosen.goal_mode,
           standing: standing.value(),
           thread_id: null,
@@ -272,6 +282,20 @@ function buildComposer(ctx, listener) {
     // Keep going's line sits under the frame, not in it.
     element: el("div", { class: "composer-stack" }, frame.element, standing.note),
     focus: () => goal.focus(),
+    // Send `text` as the owner would, with the choices of the box but the approval mode `approvals` (the first
+    // conversation's look, item 420, which starts in the mode its promises were said in).
+    send: async (text, approvals) => {
+      goal.value = text;
+      sentApprovals = approvals;
+      try {
+        await submit();
+      } finally {
+        sentApprovals = null;
+      }
+    },
+    rename: (name) => {
+      goal.placeholder = placeholderFor(name);
+    },
     dispose: () => {
       stopStatus();
       choices.dispose();
@@ -388,9 +412,29 @@ function buildSetup() {
   return { element, sync };
 }
 
+/** Whether a first open is due its first conversation (item 420): Dot has not introduced itself, and there is no
+ * chat yet. */
+async function firstChatDue() {
+  const names = assistant() ?? (await loadAssistant());
+  if (names.introduced) {
+    return false;
+  }
+  const chats = await api.get("/threads?limit=1");
+  return chats.length === 0;
+}
+
 export function mount(root, ctx) {
   const presence = buildPresence();
-  const composer = buildComposer(ctx, presence.listen);
+  let first = null;
+  // A message the owner sends ends the first conversation too.
+  const listen = {
+    ...presence.listen,
+    sending: () => {
+      presence.listen.sending();
+      first?.sent();
+    },
+  };
+  const composer = buildComposer(ctx, listen);
   const approvals = buildApprovals();
   const setup = buildSetup();
   // The setup card stands over the greeting, in the block the page keeps in the middle.
@@ -411,7 +455,29 @@ export function mount(root, ctx) {
   }
   const stopCompose = onCompose(offerCaret);
   offerCaret();
+  const stopNames = onAssistant((names) => composer.rename(names.name));
+  let disposed = false;
+  // The first conversation stands in the place of the greeting, over the composer, once it is known to be due; a
+  // daemon that cannot say whether it is is shown, and the home keeps its greeting.
+  void attempt(async () => {
+    const due = await firstChatDue();
+    if (!due || disposed) {
+      return;
+    }
+    first = buildFirstChat({
+      startLook: (goal, approvals) => composer.send(goal, approvals),
+      onSkipped: () => {
+        first.element.replaceWith(presence.element);
+        first.dispose();
+        first = null;
+      },
+    });
+    presence.element.replaceWith(first.element);
+  });
   return () => {
+    disposed = true;
+    first?.dispose();
+    stopNames();
     stopCentring();
     stopApprovals();
     stopSetup();

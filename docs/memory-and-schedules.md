@@ -59,7 +59,9 @@ dotx memory reindex      # embed every note again, for example after changing [m
   language, hours, tools and sites, the ways you ask, the limits you set), rewritten each night from its previous
   version, your notes and the day's runs. The Memory page shows it first; the lines you write under it are yours, kept
   as they are, marked "(you said)" in the prompt, never rewritten, and the reflection never contradicts them
-  (`GET`/`PUT /api/memories/owner`).
+  (`GET`/`PUT /api/memories/owner`). Before them the section names you, as you gave your name in Settings › General
+  ("(you said)") or as your account on this Mac has it, and, in Dot's own runs, the name you call Dot by, once it is
+  not Dot (item 420); those lines come from Settings, not from the Memory page.
 - The score decides too: over the last `score_days` (30), a note's balance is the runs handed it that ended done less
   the ones that failed. Once `score_min_uses` (3) runs were handed it, the balance lifts or lowers the note in a search
   as much as a fresh use would, and a negative balance rests it at once, before the nightly reflection retires it.

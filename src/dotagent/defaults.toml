@@ -579,6 +579,14 @@ launch_timeout_s = 20.0
 activate_timeout_s = 3.0
 osascript_timeout_s = 30.0
 
+[assistant]
+# Who Dot is to you (item 420): the name you call it by (1 to 24 characters), your own name (at most 40; empty: the
+# first name of your account on this Mac), and whether Dot has had its first conversation with you, which the home
+# shows on a first open. The web UI changes them live and writes them here.
+name = "Dot"
+owner = ""
+introduced = false
+
 [snapshots]
 # SnapShots (item 405): both Command keys pressed together, or the Command key tapped twice, in any application,
 # captures the window in front and puts it in the open chat's composer as a picture (and, with app_text, the window's

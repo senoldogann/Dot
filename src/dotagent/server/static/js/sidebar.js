@@ -12,6 +12,7 @@ import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
 import { icon } from "./icons.js";
 import { actorFace, lookOf } from "./actors.js";
+import { onAssistant } from "./assistant.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
@@ -1153,6 +1154,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     body,
     foot,
   );
+  // The name the owner calls Dot by, as it changes (item 420).
+  onAssistant((names) => setText(element.querySelector(".side-title"), names.name));
   const workTicker = setInterval(() => {
     for (const node of element.querySelectorAll(".side-working-time")) {
       setText(node, workingFor(Number(node.dataset.since)));

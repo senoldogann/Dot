@@ -13,6 +13,9 @@ import { readFolds, readPref, writePref } from "./prefs.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, readFailed } from "./state.js";
 
 const OWNER_KEY = "dot.owner";
+// The first name of the owner's account on this Mac, as the daemon said it (assistant.js): the greeting's name until the
+// owner gives one.
+export const MAC_OWNER_KEY = "dot.owner.mac";
 export const OWNER_CHARS = 40;
 // How many rows a section of the strip shows before its "Show N more" (item 364): two, so the strip stays short under the
 // composer (item 124).
@@ -36,6 +39,12 @@ const VERB_OF_STATE = {
 export function ownerName() {
   const saved = readPref(OWNER_KEY);
   return saved === null ? "" : saved.trim();
+}
+
+/** The name the greeting says: the one you gave, else your account's first name on this Mac, else none. */
+export function shownOwner() {
+  const given = ownerName();
+  return given !== "" ? given : (readPref(MAC_OWNER_KEY) ?? "").trim();
 }
 
 /** Set your name; blank forgets it. Returns the name in use. */
@@ -139,7 +148,7 @@ export function buildPresence() {
   function paintGreeting(snapshot) {
     const state = overallState(snapshot);
     setActorState(face, state);
-    hello.textContent = greeting(new Date().getHours(), ownerName(), state);
+    hello.textContent = greeting(new Date().getHours(), shownOwner(), state);
   }
 
   function toggleFold(key) {

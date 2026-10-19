@@ -87,9 +87,11 @@ progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link t
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
 with "Faces that move" off), and shows the state of the whole of Dot (waiting when something waits for you, working
-while a run is active, else idle) under Dot's name (yours to give in Settings › General; Dot until then, and kept in
-this browser only); a greeting by the hour says your name when you gave one there ("Good morning, Ada. What should I
-work on?"; "Something waits for you." when it does) and one line says what is going on ("Working on 2 runs · 1 waits for
+while a run is active, else idle) under the name you call Dot by, and a greeting by the hour says your name ("Good
+morning, Ada. What should I work on?"; "Something waits for you." when it does). Both names are yours to give in
+Settings › General, and the daemon keeps them for every browser and phone (`[assistant] name` and `owner`, `GET` and
+`PUT /api/assistant`, item 420); your name is the first name of your account on this Mac until you give one, and the
+model is told both. One line says what is going on ("Working on 2 runs · 1 waits for
 you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under the composer, the **Today** strip
 lists it: what waits for you, what works, what is due later today (the schedules that fire and the campaigns whose next
 session starts), what was learned today (the lessons and the day's journal) and what ended, each row opening what it is
@@ -368,6 +370,17 @@ phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules a
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
 
+**Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
+and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
+no model called: Dot greets you by name and asks what to call it (a few names to pick, or one to type; "Name changed to
+Miro" notes a new one), says in a few lines what it does (and, in Ask and Supervised, what it asks you about; in Auto,
+that a review model answers for you and money and passwords stay yours), and offers to
+connect Gmail and Google Calendar: Connect takes the Google sign-in step in Dot's browser and the card follows it until
+you are signed in (a browser without a window says so instead). Then it offers to look through your inbox for something
+to take off your hands: that look is a run of its own whose goal tells it to only read and to ask you which to do
+(the goal asks it, as a goal does; the approval mode decides what is asked of you on the way). The look, Not now, Skip
+the introduction and the first message you send end it, and the daemon keeps that it was had.
+
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
 memory and how long it has run, read again every five seconds while the page is seen; the room each kind of what Dot
@@ -596,6 +609,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /connections`, `POST /connections/{id}`                                    | the applications of Customize › Plugins, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
 | `GET\|POST /mcp/servers` (`secrets` by name for a service that takes a key, item 408), `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`, `logo`) and the services to add (`kind`, `secrets`, `logo`); add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there (409 for one set up elsewhere) |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state` (400 for none) |
+| `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`), what Tailscale says of the Mac and whether the daemon keeps it awake (item 271); a new pairing code (item 267) |
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |

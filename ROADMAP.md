@@ -15474,6 +15474,23 @@ holds that end until the program has exited, takes what it printed last, then cl
 (forty programs that print and end at once: each output is read and each session ends; without the change every output
 is lost).
 
+### 420. Dot's first conversation, and the names the daemon keeps
+
+**Status: done (2026-10-20), on `first-chat-and-teach`.** The owner's word of 2026-10-20, with screenshots of another
+assistant's first open: a greeting by name, a choice of what to call it, its new name noted, two lines on what it does,
+an offer to connect Gmail and to find something to handle. **As built (2026-10-20).** The daemon keeps the name the
+owner calls Dot by, the owner's own name and whether Dot has introduced itself (`[assistant] name`, `owner`,
+`introduced`; `GET` and `PUT /api/assistant`, written to the config file and used at once); the owner's name is the
+first name of their account on this Mac until they give one. Every browser and phone shows the same names: localStorage
+is a copy, and a name a browser kept before moves to the daemon once. The prompt lists the owner's name and, for Dot's
+own runs, the name the owner calls it by, among what Dot knows about the owner. On a first open with no chat, New chat
+shows Dot's first conversation in the place of the greeting, no model called: a greeting by name, what to call Dot
+(names to pick, or one to type; "Name changed to X"), what Dot does and, outside yolo, what it asks about, a card that
+takes the Google sign-in step in Dot's browser and follows it, then a read-only look through the inbox, which is a run
+of its own. The look, Not now, Skip the introduction and the first message sent end it for good. The composer says
+"Message <name>", the sidebar follows the name, and Settings' name card writes to the daemon. Tests:
+`tests/unit/test_assistant.py`, `tests/smoke/test_first_chat.py`. Docs: `docs/daemon.md`, `defaults.toml`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16327,3 +16344,5 @@ is lost).
   the paths that need a human (the catch-all handlers under ruff's BLE rule, the README on the default mode and the data
   that leaves the Mac, AppleDouble files ignored, the sandbox pinned in every mode but yolo, the notes of the last
   pre-push review), and a terminal session that keeps what a program printed as it ended.
+- 2026-10-20 (Opus 5.5): item 420 on `first-chat-and-teach` from `main`: Dot's first conversation on a first open, and
+  the names of Dot and its owner kept by the daemon and told to the model.

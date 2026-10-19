@@ -399,6 +399,19 @@ class DesktopConfig(FrozenModel):
 type SnapshotSound = Literal["click", "pop", "glass", "off"]
 
 
+# A name a person reads and the prompt says: no control character, so that it stays one line (item 420).
+SHOWN_NAME: str = r"^[^\x00-\x1f\x7f]*$"
+
+
+class AssistantConfig(FrozenModel):
+    """Who Dot is to its owner (item 420): the name the owner calls it by, the owner's own name (empty: the first
+    name of their account on this Mac), and whether Dot has had its first conversation."""
+
+    name: str = Field(min_length=1, max_length=24, pattern=SHOWN_NAME)
+    owner: str = Field(max_length=40, pattern=SHOWN_NAME)
+    introduced: bool
+
+
 class SnapshotsConfig(FrozenModel):
     """SnapShots (item 405): whether both Command keys together, or a double tap of one, capture the window in front
     into the open chat's composer, whether the window's text comes with it, the sound that says it was taken, whether
@@ -666,6 +679,7 @@ class AppConfig(FrozenModel):
     browser: BrowserConfig
     desktop: DesktopConfig
     snapshots: SnapshotsConfig
+    assistant: AssistantConfig
     memory: MemoryConfig
     harness: HarnessConfig
     scheduler: SchedulerConfig

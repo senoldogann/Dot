@@ -13,6 +13,7 @@ from dotagent.agent.gate import SiteLocks
 from dotagent.agent.judge import SwitchedJudge, TypeSafeService, judge_for
 from dotagent.agent.peers import Peers
 from dotagent.agent.sizes import ContextSizes
+from dotagent.assistant import Assistant, mac_first_name
 from dotagent.awake import KeepAwake
 from dotagent.browser.pool import BrowserPool
 from dotagent.browser.session import RECONNECT_NOTICE, BrowserSession
@@ -118,6 +119,8 @@ class Runtime:
     desktop: DesktopSession
     # The daemon's hold on the Mac's sleep while it charges (item 271); off until the daemon starts it.
     awake: KeepAwake
+    # The name the owner calls Dot by and the owner's own (item 420), as the web UI changes them.
+    assistant: Assistant
     terminals: Terminals
     web: WebClient
     # Whether the key of Ollama's hosted search was found when the runtime was built: the first rung of web_search's
@@ -394,6 +397,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             approvals=ApprovalBroker(store, bus, config.policy.approval_timeout_s),
             site_locks=SiteLocks(),
             awake=KeepAwake(),
+            assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),
             router=ModelRouter(config, _call_recorder(store, bus), login_env),
             roles=ModelRoles(config.models),
             context_sizes=ContextSizes(config.models.context),

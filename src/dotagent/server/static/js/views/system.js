@@ -14,8 +14,9 @@ import {
 import { compact, copyText, dateTimeFull, duration, el, modelName, plural } from "../dom.js";
 import { offersChoice } from "../efforts.js";
 import { engageFailsafe, releaseFailsafe } from "../failsafe.js";
-import { dotName, NAME_CHARS, setDotName } from "../face.js";
-import { OWNER_CHARS, ownerName, setOwnerName } from "../presence.js";
+import { saveAssistant } from "../assistant.js";
+import { dotName, NAME_CHARS } from "../face.js";
+import { OWNER_CHARS, ownerName, shownOwner } from "../presence.js";
 import { icon } from "../icons.js";
 import { lookPicker } from "../lookpicker.js";
 import { choiceSetting, foldCard, foldGroup, inlineError, inlineLoading, paneHead, segmented, switchSetting } from "../panels.js";
@@ -1707,14 +1708,17 @@ function buildNameCard() {
     type: "text",
     maxlength: String(OWNER_CHARS),
     autocomplete: "off",
-    placeholder: "Your name",
+    placeholder: shownOwner() || "Your name",
     value: ownerName(),
     "aria-label": "Your name",
   });
-  owner.addEventListener("change", () => {
-    owner.value = setOwnerName(owner.value);
-    toast("ok", owner.value === "" ? "The greeting says no name." : `The greeting says “${owner.value}”.`);
-  });
+  owner.addEventListener("change", () =>
+    attempt(async () => {
+      const saved = await saveAssistant({ owner: owner.value.trim().slice(0, OWNER_CHARS) });
+      owner.value = saved.owner;
+      toast("ok", saved.owner === "" ? "Dot calls you by your Mac account's name, or by none." : `Dot calls you “${saved.owner}”.`);
+    }),
+  );
   owner.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -1730,10 +1734,14 @@ function buildNameCard() {
     value: dotName(),
     "aria-label": "Name",
   });
-  input.addEventListener("change", () => {
-    input.value = setDotName(input.value);
-    toast("ok", `Here, Dot answers to “${dotName()}”.`);
-  });
+  input.addEventListener("change", () =>
+    attempt(async () => {
+      const typed = input.value.trim().slice(0, NAME_CHARS);
+      const saved = await saveAssistant({ name: typed === "" ? "Dot" : typed });
+      input.value = saved.name;
+      toast("ok", `Dot answers to “${saved.name}”.`);
+    }),
+  );
   input.addEventListener("keydown", (event) => {
     if (event.key === "Enter") {
       event.preventDefault();
@@ -1750,13 +1758,13 @@ function buildNameCard() {
         "div",
         { class: "setting" },
         el("div", { class: "row" }, el("span", { class: "grow" }, "What Dot is called"), input),
-        el("div", { class: "hint" }, "In the greeting of a new chat and at the head of a run. Kept in this browser; the daemon and the model never see it."),
+        el("div", { class: "hint" }, "In the greeting, at the head of a run and in what the model is told: the daemon keeps it for every browser and phone."),
       ),
       el(
         "div",
         { class: "setting" },
         el("div", { class: "row" }, el("span", { class: "grow" }, "What Dot calls you"), owner),
-        el("div", { class: "hint" }, "In the greeting of the home (“Good morning, Ada.”). Kept in this browser too; blank greets without a name."),
+        el("div", { class: "hint" }, "In the greeting (“Good morning, Ada.”) and in what the model is told. Blank: the first name of your account on this Mac."),
       ),
     ),
   );

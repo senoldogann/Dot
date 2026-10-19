@@ -3,6 +3,7 @@
 import { loadLooks } from "./actors.js";
 import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pairWithCode, setToken } from "./api.js";
 import { loadOwnThemes } from "./appearance/own.js";
+import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { wireConversationCopy } from "./clipboard.js";
@@ -566,7 +567,7 @@ function handleAuthLost() {
 async function connect() {
   renderWaiting();
   try {
-    await Promise.all([refresh(), loadLooks(), loadOwnThemes()]);
+    await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       clearToken();
