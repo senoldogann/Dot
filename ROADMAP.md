@@ -15164,6 +15164,30 @@ the whole branch: 1 Important, 2 Nits, fixed: `docs/` said the **+** opened a me
 Keep going), which the work had made the file picker itself; so did comments and a test's words; `openPicker`'s
 `accept`, which nothing passed, is gone.
 
+### 402. A group's calls in line with its head, each the command itself
+
+**Status: done (2026-10-19), on `item-402-step-rows`.** The owner's word of 2026-10-19, with two pictures of another
+coding agent's conversation ("Ran 2 commands" over one line for each command, a terminal's mark, the command cut with an
+ellipsis and a chevron, a thought with a brain): "Son olarak ekteki fotograftaki gibi streaming calisirken ekteki
+tasarimda göstersek calisan komutlari vs? Meseal ran 2 commands tiklarsam acilir menü aciliyor ve icerigin gösteriyor
+hepsi ayni hizzada vs.." (finally, while it streams, could we show the commands at work in the design of the pictures?
+Clicking "Ran 2 commands" opens and shows what it holds, all in line). **As built (2026-10-19).** The group of steps
+(item 374) keeps its head and fold; its calls stand in line with the head, no longer indented on a hairline: each call's
+mark under the group's, its words under the group's (`run.css` `.steps-body`, `app.css` `.tool-head`). A call's row is
+its mark (a spinner while it runs, then the mark of its kind from `toolIconName`, a cross when it failed, the warning
+when it was cut off), what it did and the chevron (`tools.js` `toolRow`): a command is the command itself, its tool's
+name for screen readers alone and the policy's "Run: … (read-only command)" its tooltip; another call, whose mark
+several tools share (a file's: read, write, edit), keeps its tool's name and says what it did in the policy's words once
+it is done ("Read notes.txt"); a failure's first line is the tooltip of any call. A group that is over wears the mark of
+the kind its words start with, the terminal's for "Ran 2 commands" (`flowIcon`), and a folded group at work says its
+latest call in the same words (`describeCall`); a call that went well wears its mark in the quiet ink. The thought's
+brain and the bolt of a resumed turn take the same column. Tests: `tests/smoke/test_flow_fold.py` (the rows' words, the
+hidden name, the terminal's marks on the rows and the head, the marks and the words in line with the head's, which fails
+without the change; the latest line says the command alone; a write and a read of one file keep their names and differ).
+Docs: `docs/daemon.md`. **Review (2026-10-19).** The pre-push review's Important: the first version hid the name of
+every tool but an MCP server's and kept a call's arguments as its words, so a write and a read of one file, or two steps
+in one app, read the same; now only a command, whose mark says what it is, stands alone.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15986,3 +16010,4 @@ Keep going), which the work had made the file picker itself; so did comments and
   assignment, `rsync -t`, curl's `-o -`, and the roadmap); 239 remote branches of merged pull requests, their worktrees
   and local branches deleted. `tests/unit/test_rule_timeout.py` measures wall time and fails on a loaded Mac (5 s at a load
   of 70, 0.25 s alone); it passes on CI and is left for a later item.
+- 2026-10-19 (Opus 5.5): item 402 on the owner's word of the same day, on `item-402-step-rows` from `main`: a group's calls in line with its head, each the command itself.

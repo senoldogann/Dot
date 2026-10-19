@@ -20,7 +20,7 @@ import { answerMessage, userMessage } from "./messages.js";
 import { pageCard } from "./pageframe.js";
 import { sentPicks } from "./picks.js";
 import { blockNode, prose } from "./prose.js";
-import { callKind, describeArguments, flowWords, toolRow } from "./tools.js";
+import { callKind, describeArguments, flowIcon, flowWords, toolRow } from "./tools.js";
 
 const GOAL_CHARS = 160;
 const LATEST_CHARS = 140;
@@ -221,10 +221,14 @@ function limitSpent(data) {
   return parts.join(" and ");
 }
 
-/** The one line a live group shows for the call that ran last. */
+/** The one line a live group shows for the call that ran last, in its row's words (item 402): the tool's name goes
+ * before them for any call but a command, whose mark says what it is, and alone for a call that names nothing. */
 function describeCall(tool, args) {
   const detail = describeArguments(args);
-  return clip(detail === "" ? tool : `${tool} · ${detail}`, LATEST_CHARS);
+  if (detail === "") {
+    return clip(tool, LATEST_CHARS);
+  }
+  return clip(callKind(tool) === "command" ? detail : `${tool} · ${detail}`, LATEST_CHARS);
 }
 
 /** The line a compaction leaves in the conversation (item 312): "Context compacted", and the size of the context
@@ -288,7 +292,7 @@ function paintGroup(group) {
   const live = group.tail || group.pending > 0;
   if (group.live !== live) {
     group.live = live;
-    group.state.replaceChildren(live ? el("span", { class: "spinner" }) : icon("check"));
+    group.state.replaceChildren(live ? el("span", { class: "spinner" }) : icon(flowIcon(group.kinds) ?? "check"));
   }
   // A stretch of work reads as what it ran (item 374), "Ran 2 commands and read 1 file", with the time it took beside
   // it, and while it runs, how much of it is behind it.
@@ -714,8 +718,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     const head = el(
       "summary",
       { class: "tool-head" },
-      el("span", { class: "tool-state" }),
-      el("span", { class: "tool-kind" }, icon("brain")),
+      el("span", { class: "tool-state" }, icon("brain")),
       label,
       preview,
       el("span", { class: "chev" }, icon("chevron")),
@@ -1174,7 +1177,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const head = el(
         "summary",
         { class: "tool-head" },
-        el("span", { class: "tool-kind restart-mark" }, icon("bolt")),
+        el("span", { class: "tool-state restart-mark" }, icon("bolt")),
         el("span", { class: "restart-label" }, restarted ? "Dot restarted and resumed this turn" : `Resumed this turn after ${cutOff.after}`),
         el("span", { class: "chev" }, icon("chevron")),
       );

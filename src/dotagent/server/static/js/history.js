@@ -7,7 +7,7 @@ import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, userMessage } from "./messages.js";
 import { prose } from "./prose.js";
-import { countKinds, flowWords, toolRow } from "./tools.js";
+import { countKinds, flowIcon, flowWords, toolRow } from "./tools.js";
 
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read with the page; older ones read them as they come near it (item 374).
@@ -54,16 +54,18 @@ export function backgroundNote(goal) {
   return el("div", { class: "note background-note" }, icon("terminal"), el("span", null, goal.split("\n")[0]));
 }
 
-/** A stretch of work as a turn's page shows it: one folded line — "Ran 2 commands and read 1 file" — that opens to
- * every call and its result, and says beside it, as the run's own page does, how many failed or were cut off. */
+/** A stretch of work as a turn's page shows it: one folded line — "Ran 2 commands and read 1 file" — under the mark
+ * of the kind its words start with (item 402), that opens to every call and its result, and says beside it, as the
+ * run's own page does, how many failed or were cut off. */
 function stepsBlock(batch) {
+  const kinds = countKinds(batch.tools);
   const troubles = [batch.failed > 0 ? `${batch.failed} failed` : "", batch.cut > 0 ? `${batch.cut} cut off` : ""];
   const said = troubles.filter((words) => words !== "").join(" · ");
   const head = el(
     "summary",
     { class: "steps-head" },
-    el("span", { class: "steps-state" }, icon("check")),
-    el("span", { class: "steps-title" }, flowWords(countKinds(batch.tools))),
+    el("span", { class: "steps-state" }, icon(flowIcon(kinds) ?? "check")),
+    el("span", { class: "steps-title" }, flowWords(kinds)),
     el("span", { class: "steps-count" }),
     said === "" ? null : el("span", { class: "badge b-warn" }, said),
     el("span", { class: "chev" }, icon("chevron")),

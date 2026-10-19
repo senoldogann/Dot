@@ -58,6 +58,27 @@ const FLOW_WORDS = {
 // The order the parts are said in, whatever order the calls came in.
 const FLOW_ORDER = ["command", "read", "write", "search", "page", "browser", "desktop", "schedule", "memory", "other"];
 
+// The mark of each kind of call, as its rows wear it (icons.js `toolIconName`): a group of steps that is over wears the
+// mark of the kind its summary starts with (item 402).
+const KIND_ICONS = {
+  command: "terminal",
+  read: "file",
+  write: "file",
+  search: "globe",
+  page: "globe",
+  browser: "globe",
+  desktop: "monitor",
+  schedule: "calendar",
+  memory: "database",
+  other: "wrench",
+};
+
+/** The mark of a group of calls — the terminal's for "Ran 2 commands and read 1 file" — or null when it holds no call. */
+export function flowIcon(kinds) {
+  const first = FLOW_ORDER.find((kind) => (kinds[kind] ?? 0) > 0);
+  return first === undefined ? null : KIND_ICONS[first];
+}
+
 /** The summary of a group of calls — "Ran 2 commands and read 1 file" — or "" when it holds no call. */
 export function flowWords(kinds) {
   const parts = FLOW_ORDER.filter((kind) => (kinds[kind] ?? 0) > 0).map((kind) => FLOW_WORDS[kind](kinds[kind]));
@@ -170,18 +191,27 @@ function nameParts(tool) {
   return tool.split(/(?<=__)/).flatMap((part, index) => (index === 0 ? [part] : [el("wbr", null), part]));
 }
 
-/** A row for a tool call. `finish(result)` fills in the outcome once the `tool_result` event arrives. */
+/**
+ * A row for a tool call, one line in line with its group's head (item 402): its mark (a spinner while it runs, then the
+ * mark of its kind, a cross when it failed), what it did and the way into it. A command is the command itself, its
+ * tool's name for screen readers alone and the policy's words its tooltip, since its mark says what it is; another call,
+ * whose mark several tools share (a file's: read, write, edit), keeps its tool's name and says what it did in the
+ * policy's words once it is done ("Read notes.txt"). `finish(result)` fills in the outcome once the `tool_result` event
+ * arrives.
+ */
 export function toolRow({ tool, args }) {
   const state = el("span", { class: "tool-state" }, el("span", { class: "spinner" }));
-  const summary = el("span", { class: "tool-sum" }, describeArguments(args));
+  const words = describeArguments(args);
+  const command = callKind(tool) === "command";
+  const named = words === "" || !command;
+  const summary = el("span", { class: "tool-sum" }, words);
   const time = el("span", { class: "tool-time" });
   const badges = el("span", { class: "cluster" });
   const head = el(
     "summary",
-    { class: "tool-head" },
+    { class: "tool-head", title: tool },
     state,
-    el("span", { class: "tool-kind" }, icon(toolIconName(tool))),
-    el("span", { class: "tool-name" }, ...nameParts(tool)),
+    el("span", { class: named ? "tool-name" : "tool-name visually-hidden" }, ...nameParts(tool)),
     summary,
     badges,
     time,
@@ -219,14 +249,15 @@ export function toolRow({ tool, args }) {
   function finish(outcome) {
     result = outcome;
     details.classList.remove("running");
-    state.replaceChildren(icon(outcome.ok ? "check" : "x"));
+    state.replaceChildren(icon(outcome.ok ? toolIconName(tool) : "x"));
     state.className = `tool-state ${outcome.ok ? "ok" : "bad"}`;
     if (!outcome.ok) {
       summary.className = "tool-sum bad";
-      summary.textContent = firstLine(outcome.text) || "failed";
-    } else if (outcome.summary !== "") {
+    } else if (!command && outcome.summary !== "") {
       summary.textContent = clip(outcome.summary, SUMMARY_CHARS);
     }
+    // A command keeps its own words, what it came to its tooltip; a failure's first line is the tooltip of any call.
+    head.title = outcome.ok ? outcome.summary || tool : firstLine(outcome.text) || "failed";
     time.textContent = duration(outcome.seconds);
     if (outcome.risk !== "" && outcome.risk !== "safe") {
       badges.replaceChildren(el("span", { class: `badge r-${outcome.risk}` }, outcome.risk));

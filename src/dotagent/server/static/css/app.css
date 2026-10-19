@@ -3828,11 +3828,13 @@ a.pill:hover {
   min-width: 0;
 }
 
+/* A call's row stands in line with its group's head (item 402): its mark under the group's, its words under the
+   group's title. */
 .tool-head {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 4px 8px;
+  gap: 12px;
+  padding: 4px 8px 4px 4px;
   border-radius: var(--radius-control);
   cursor: pointer;
   list-style: none;
@@ -3847,6 +3849,7 @@ a.pill:hover {
   background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
+/* A call's mark is in the quiet ink, its kind's once it went well (item 402); a cross and a warning wear theirs. */
 .tool-state {
   width: 18px;
   display: grid;
@@ -3855,22 +3858,12 @@ a.pill:hover {
   color: var(--muted);
 }
 
-.tool-state.ok {
-  color: var(--ok);
-}
-
 .tool-state.bad {
   color: var(--bad);
 }
 
 .tool-state.cut {
   color: var(--warn);
-}
-
-.tool-kind {
-  color: var(--muted);
-  display: grid;
-  place-items: center;
 }
 
 /* A name too long for the row, as an MCP tool's can be, breaks where it must rather than widen the chat (item 360). */

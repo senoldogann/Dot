@@ -746,7 +746,7 @@
   display: grid;
   place-items: center;
   flex: none;
-  color: var(--ok);
+  color: var(--muted);
 }
 
 .steps-title {
@@ -775,13 +775,12 @@
   display: none;
 }
 
+/* The calls stand in line with the head, each mark under the group's (item 402). */
 .steps-body {
   display: flex;
   flex-direction: column;
   gap: var(--space-half);
-  margin: 4px 0 var(--space-half) 12px;
-  padding-left: 12px;
-  border-left: 1px solid var(--border);
+  margin: var(--space-half) 0;
 }
 
 /* ---------- inspector ---------- */
