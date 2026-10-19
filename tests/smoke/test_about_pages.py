@@ -17,7 +17,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_default_config
@@ -89,6 +89,11 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, str
         await close_runtime(runtime)
 
 
+def _fold(page: Page, title: str) -> Locator:
+    """The folding card of the System page whose title is ``title`` (item 411)."""
+    return page.locator("section.card.fold", has=page.locator(".fold-title", has_text=title))
+
+
 async def test_diagnostics_and_the_licences_show_what_is_there(
     login_env: dict[str, str], logs: Path, tmp_path: Path
 ) -> None:
@@ -135,6 +140,21 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     await expect(groups.first.locator("dt")).to_have_text(
                         ["Version", "Process id", "Uptime", "Started", "Address", "Home"]
                     )
+
+                    # Each section folds and stays as it was left, in this browser (item 411); the Permissions card says
+                    # in its summary what is missing, and no part of it says "null", as an empty note did.
+                    await expect(_fold(page, "Permissions").locator(".fold-summary .badge")).to_have_text(
+                        re.compile(r"^(all granted|missing: .+)$")
+                    )
+                    await expect(_fold(page, "Permissions").locator(".fold-body")).not_to_contain_text("null")
+                    for title in ("Daemon", "Emergency stop", "Health checks", "About this Dot"):
+                        await expect(_fold(page, title)).to_have_count(1)
+                    await _fold(page, "Daemon").locator(".fold-toggle").click()
+                    await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "false")
+                    await page.reload()
+                    await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "false")
+                    await _fold(page, "Daemon").locator(".fold-toggle").click()
+                    await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "true")
                     await page.screenshot(path=tmp_path / f"system-{width}-{scheme}.png", full_page=True)
                     await page.get_by_role("link", name=re.compile(r"^Diagnostics")).click()
                     await expect(page).to_have_url(f"{address}/#/diagnostics")

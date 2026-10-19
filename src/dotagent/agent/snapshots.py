@@ -8,18 +8,23 @@ from pathlib import Path
 
 from dotagent.agent.attachments import StoredAttachment, attachment_summary, store_attachment
 from dotagent.config import DesktopConfig
-from dotagent.desktop.snapshots import Capture, SnapshotTaken, capture_front_window
+from dotagent.desktop.snapshots import Capture, Kept, SnapshotTaken, capture_front_window
 
 
-def stored_taker(desktop: DesktopConfig, workspace: Path) -> Callable[[bool], SnapshotTaken]:
+def stored_taker(desktop: DesktopConfig, workspace: Path) -> Callable[[bool], Kept]:
     """What the service captures with: the window in front, kept in ``workspace`` as a JPEG and, with its text, a
-    Markdown file beside it. Blocking: the service calls it off the event loop."""
+    Markdown file beside it, with where the window was and the picture's file for the flight (item 414). Blocking: the
+    service calls it off the event loop."""
 
-    def take(with_text: bool) -> SnapshotTaken:
+    def take(with_text: bool) -> Kept:
         taken: Capture = capture_front_window(desktop, with_text)
-        files: list[StoredAttachment] = [store_attachment(workspace, f"{taken.stem}.jpg", "image/jpeg", taken.image)]
+        picture: StoredAttachment = store_attachment(workspace, f"{taken.stem}.jpg", "image/jpeg", taken.image)
+        files: list[StoredAttachment] = [picture]
         if taken.text:
             files.append(store_attachment(workspace, f"{taken.stem}.md", "text/markdown", taken.text.encode("utf-8")))
-        return SnapshotTaken(app=taken.app, title=taken.title, files=attachment_summary(files), taken_at=time.time())
+        snapshot: SnapshotTaken = SnapshotTaken(
+            app=taken.app, title=taken.title, files=attachment_summary(files), taken_at=time.time()
+        )
+        return Kept(snapshot=snapshot, frame=taken.frame, picture=picture.path)
 
     return take

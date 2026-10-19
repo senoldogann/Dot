@@ -103,6 +103,8 @@ class SnapshotsView(FrozenModel):
     app_text: bool
     sound: SnapshotSound
     animations: bool
+    flash: bool
+    open_dot: bool
     shortcut: str
     listening: bool
     problem: str | None
@@ -110,11 +112,11 @@ class SnapshotsView(FrozenModel):
 
 
 class SnapshotSettingRequest(FrozenModel):
-    """One setting of SnapShots to change (item 405): ``enabled``, ``app_text`` and ``animations`` take a bool,
-    ``sound`` one of its choices; a value that does not fit its key is refused before anything is written, since the
-    config file would refuse it at the daemon's next start."""
+    """One setting of SnapShots to change (item 405): ``enabled``, ``app_text``, ``animations``, ``flash`` and
+    ``open_dot`` (item 414) take a bool, ``sound`` one of its choices; a value that does not fit its key is refused
+    before anything is written, since the config file would refuse it at the daemon's next start."""
 
-    key: Literal["enabled", "app_text", "sound", "animations"]
+    key: Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
     value: bool | SnapshotSound
 
     @model_validator(mode="after")
@@ -1118,11 +1120,12 @@ class McpServerView(FrozenModel):
 
 
 class ServiceSecretView(FrozenModel):
-    """A secret a service asks the owner for on the page (item 408): its name, its label and where to get one."""
+    """A secret a service asks the owner for on the page (item 408): its name, its label and where to get one (None
+    for a value the owner knows, such as a site's address, item 413)."""
 
     name: str
     label: str
-    help: str
+    help: str | None
 
 
 class McpServiceView(FrozenModel):

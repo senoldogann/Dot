@@ -6,7 +6,7 @@
 works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
 leads to Plugins.
 
-**Plugins** lists 47 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
+**Plugins** lists 65 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
 Communication, Development, Business, Productivity and This Mac. Each tile has the service's mark, what Dot does with
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
@@ -15,10 +15,13 @@ ready, and where its data goes. **Check again** reads them all anew. The marks o
 (version 16.35.0, CC0) are files of `static/icons/plugins`, with the brands' guidelines in its LICENSE; a mark
 identifies its service and nothing more. `GET /api/plugins` returns the listings (`connections/directory.py`).
 
-A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel, Figma and Canva (their MCP
-servers let in approved clients only), Atlassian (allow-listed clients only), and Asana and Box (clients registered by
-hand). Google and Slack work in Dot's browser; their pages name their MCP servers as not tried, since they sign in only
-clients registered by hand. Any MCP server can still be added by its address (below).
+A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel and Canva (their MCP servers
+let in approved clients only; Canva refused Dot's on 2026-10-19), and Asana and Box (clients registered by hand). Figma
+reads through Framelink's server with your access token instead of Figma's own, which refused Dot's registration, and
+Atlassian either through its own server, signed in (your organization's admin may have to let it in), or through
+`mcp-atlassian` with an API token (item 413). Google and Slack work in Dot's browser; their pages name their MCP servers
+as not tried, since they sign in only clients registered by hand. Any MCP server can still be added by its address
+(below).
 
 The ways a service connects:
 
@@ -42,14 +45,18 @@ The ways a service connects:
   in, which the service's page says. A sign-in is told by its cookie alone: a session the site ended stays **Signed
   in** until its cookie expires.
 - **MCP server** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
-  Supabase and monday.com too (item 408), DeepWiki, Microsoft Learn, Context7 and Exa, open to all, and the services
-  that take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix, Firecrawl and
-  Tavily; a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to over standard
-  input and output: Memory, Sequential Thinking, Fetch, Playwright and Brave Search (a key). A service that takes a key
-  asks for it under its tile and on its page, with where to get one; Dot keeps each in its `.env` (mode 0600) under
-  `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the server's headers or environment refer to it as
-  `${...}`, so the value is in no record and leaves the daemon only to the service; **Remove** takes the key out of
-  `.env` with the service's own server, and nothing else does (`keep` in `routes_mcp.py` says so): a try that fails
+  Supabase and monday.com too (item 408), and GitLab, PostHog, Zapier, Webflow, ClickUp, Postman, Netlify, Apify, Miro,
+  Heroku and Atlassian (item 413: Dot's own client registered with each and each opened its sign-in page to it on
+  2026-10-19), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs and Jina, open to all, and the services that
+  take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix, Firecrawl and Tavily;
+  a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to over standard input
+  and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation, and with a key
+  (**MCP · On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana and Atlassian
+  (API token); a value the owner knows, such as a site's address, is asked for with the keys, without a link. A service
+  that takes a key asks for it under its tile and on its page, with where to get one; Dot keeps each in its `.env` (mode
+  0600) under `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the server's headers or environment refer to
+  it as `${...}`, so the value is in no record and leaves the daemon only to the service; **Remove** takes the key out
+  of `.env` with the service's own server, and nothing else does (`keep` in `routes_mcp.py` says so): a try that fails
   leaves the key for **Try again**, an add after a failed one writes it anew, and a daemon's restart forgets a failed
   try but not its key. The addresses, keys and commands are as the services' own docs read on 2026-10-19
   (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools, which go to

@@ -209,16 +209,18 @@ function buildChatCard() {
 function buildAbout() {
   const row = (href, title, text) =>
     el("a", { class: "list-row about-row", href }, el("div", { class: "row-main" }, el("div", { class: "row-title" }, title), el("div", { class: "row-text small muted" }, text)), icon("chevron"));
-  return section(
-    "About this Dot",
-    null,
-    el(
+  return foldCard({
+    id: "system-about",
+    title: "About this Dot",
+    actions: null,
+    body: el(
       "div",
       { class: "list" },
       row("#/diagnostics", "Diagnostics", "Dot's processes and what they take, the room what it keeps takes, and its logs."),
       row("#/licences", "Open source licences", "The notices of the packages, the assets and the tools Dot uses."),
     ),
-  );
+    openByDefault: true,
+  }).element;
 }
 
 function buildDaemon() {
@@ -256,10 +258,19 @@ function buildDaemon() {
     }
   }
 
+  // Each section of the page folds (item 411), and stays as the reader left it, in this browser.
+  const card = foldCard({
+    id: "system-daemon",
+    title: "Daemon",
+    actions: refreshButton,
+    body: el("div", null, body, el("div", { class: "card-pad daemon-resume" }, goOn.element)),
+    openByDefault: true,
+  });
   return {
-    element: section("Daemon", refreshButton, el("div", null, body, el("div", { class: "card-pad daemon-resume" }, goOn.element))),
+    element: card.element,
     paint(snapshot) {
       if (snapshot.status !== null) {
+        card.setSummary(el("span", { class: "muted" }, `up ${duration(Math.max(0, Date.now() / 1000 - snapshot.status.started_at))}`));
         body.replaceChildren(...statusFacts(snapshot.status));
         resume = snapshot.status.resume;
         goOn.element.hidden = false;
@@ -342,11 +353,22 @@ function buildPermissions() {
       icon("power"),
       armed ? "Restart now?" : "Restart Dot",
     );
+    // A part with nothing to say is left out: replaceChildren writes a null as the word "null" (item 411).
     body.replaceChildren(
-      el("dl", { class: "kv kv-rows" }, row("Accessibility", view.accessibility), row("Input events", view.input_events), row("Screen Recording", view.screen_recording), wideEntry("Program", el("span", { class: "mono" }, view.program))),
-      el("p", { class: "hint" }, steps),
-      serviceNote,
-      el("div", { class: "cluster" }, askButton, ...panes, restartButton),
+      ...[
+        el("dl", { class: "kv kv-rows" }, row("Accessibility", view.accessibility), row("Input events", view.input_events), row("Screen Recording", view.screen_recording), wideEntry("Program", el("span", { class: "mono" }, view.program))),
+        el("p", { class: "hint" }, steps),
+        serviceNote,
+        el("div", { class: "cluster" }, askButton, ...panes, restartButton),
+      ].filter((node) => node !== null),
+    );
+    const lacking = [
+      view.accessibility ? null : "Accessibility",
+      view.input_events ? null : "Input events",
+      view.screen_recording ? null : "Screen Recording",
+    ].filter((name) => name !== null);
+    card.setSummary(
+      el("span", { class: `badge ${lacking.length === 0 ? "b-ok" : "b-warn"}` }, lacking.length === 0 ? "all granted" : `missing: ${lacking.join(", ")}`),
     );
   }
 
@@ -356,7 +378,8 @@ function buildPermissions() {
     await load();
   }
 
-  return { element: section("Permissions", refreshButton, body), load: loadQuiet };
+  const card = foldCard({ id: "system-permissions", title: "Permissions", actions: refreshButton, body, openByDefault: true });
+  return { element: card.element, load: loadQuiet };
 }
 
 function buildFailsafe() {
@@ -370,11 +393,13 @@ function buildFailsafe() {
   );
   const release = el("button", { class: "btn", type: "button", onclick: () => attempt(releaseFailsafe) }, "Release");
   return {
-    element: section(
-      "Emergency stop",
-      statusBadge,
-      el("div", { class: "card-pad row" }, text, engage, release),
-    ),
+    element: foldCard({
+      id: "system-failsafe",
+      title: "Emergency stop",
+      actions: statusBadge,
+      body: el("div", { class: "card-pad row" }, text, engage, release),
+      openByDefault: true,
+    }).element,
     paint(snapshot) {
       const engaged = snapshot.status?.failsafe_engaged === true;
       statusBadge.className = engaged ? "badge b-bad" : "badge b-muted";

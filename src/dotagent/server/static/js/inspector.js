@@ -405,7 +405,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
       hideDocked();
     }
     arrange();
-    (dropped.opener !== null && dropped.opener.isConnected ? dropped.opener : toggle).focus();
+    (dropped.opener?.isConnected ? dropped.opener : toggle).focus();
   }
 
   // A tab shown by itself (item 354: Dot's computer when a run opens its browser) beside the conversation, without

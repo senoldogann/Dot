@@ -3,6 +3,7 @@ written on the page and adopted shows in use and in the list; retiring it leaves
 settings list has the row."""
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
@@ -108,6 +109,14 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_retired(
         await expect(page.get_by_text("Dot's own text alone: no version is adopted.")).to_be_visible()
         await expect(page.get_by_text("No version yet")).to_be_visible()
         await expect(page.get_by_text("No step yet")).to_be_visible()
+        # The form says what goes in it (item 412): that it is optional, what each field takes, with examples.
+        write = page.locator("section.memory-panel", has_text="Write a version")
+        await expect(write.locator(".harness-intro")).to_contain_text("Optional: you need not write anything here.")
+        await expect(write.locator(".harness-intro")).to_contain_text("Once a time of day is set for the nightly step")
+        assert "For example:" in (await page.get_by_role("textbox", name="Habits").get_attribute("placeholder") or "")
+        await write.get_by_role("button", name="Start from an example").click()
+        await expect(page.get_by_role("textbox", name="Habits")).to_have_value(re.compile(r"^- Read a file whole"))
+        await expect(page.get_by_role("textbox", name="Summary")).not_to_have_value("")
         await page.get_by_role("textbox", name="Habits").fill(HABIT)
         await page.get_by_role("textbox", name="Summary").fill("Read first")
         await page.get_by_role("button", name="Save and adopt").click()

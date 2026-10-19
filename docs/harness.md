@@ -164,13 +164,15 @@ the lesson writer: its words cannot pass into a clean run's candidate unmarked.
 
 Settings › Harness is where you read and decide. *In use* shows the adopted version's texts, or that Dot's own text
 alone is in use. *Write a version* takes habits and tool guidance (prefilled from the adopted version) and a summary,
-and saves them as a candidate or adopts them at once; what cannot be a component is refused with why. *Versions* lists
-every version, the newest first, with its state, who made it and when, its texts and notes (the scope and the moments
-of a proposal, the contrast of a probe, the decisions of a composition) under *Texts and notes*, and Adopt and Retire;
-retiring the version in use asks first. *Steps of the loop* and *Experiences* list the newest of each, a step with the
-run it learned from and what it decided. *The nightly step* says when the step runs (or that it is off, and which
-setting turns it on), the scoring and final sets, who adopts, and the bounds. On a phone the page is a row of the
-settings list under *How Dot works*.
+and says what each takes (item 412): that writing one is optional since the nightly step proposes versions, what a habit
+and a line of tool guidance are, the bounds a version keeps and what each button does, with examples in the empty fields
+and **Start from an example**, which puts them in, and saves them as a candidate or adopts them at once; what cannot be
+a component is refused with why. *Versions* lists every version, the newest first, with its state, who made it and when,
+its texts and notes (the scope and the moments of a proposal, the contrast of a probe, the decisions of a composition)
+under *Texts and notes*, and Adopt and Retire; retiring the version in use asks first. *Steps of the loop* and
+*Experiences* list the newest of each, a step with the run it learned from and what it decided. *The nightly step* says
+when the step runs (or that it is off, and which setting turns it on), the scoring and final sets, who adopts, and the
+bounds. On a phone the page is a row of the settings list under *How Dot works*.
 
 ## What is built so far
 

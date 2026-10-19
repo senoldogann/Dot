@@ -323,7 +323,7 @@ export function mount(root, ctx) {
       "div",
       { class: "connect-add plugin-secrets" },
       ...service.secrets.map((secret) =>
-        field(secret.label, fields.get(secret.name), el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, "Where to get one")),
+        field(secret.label, fields.get(secret.name), secret.help === null ? "" : el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, "Where to get one")),
       ),
       el("div", { class: "connect-add-actions" }, addButton, cancel),
     );

@@ -7,6 +7,12 @@ import { icon } from "./icons.js";
 import { readsAsMarkdown } from "./markdown.js";
 import { toast } from "./ui.js";
 
+// The flight of a picture SnapShots brought into its chip (item 414): as wide as this share of the page, at most this
+// many pixels, from this far down the page, this long (another coding agent's captures fly as long).
+const FLIGHT_SHARE = 0.5;
+const FLIGHT_MAX_PX = 480;
+const FLIGHT_TOP_SHARE = 0.18;
+const FLIGHT_MS = 520;
 // The daemon's limits (agent/attachments.py).
 const MAX_BYTES = 20 * 1024 * 1024;
 const MAX_FILES = 10;
@@ -251,8 +257,38 @@ export function createAttachments({ dropTarget, input, onChange }) {
     }
   });
 
+  /** A picture SnapShots brought flies into its chip (item 414), from the top of the page, where the eye is when
+   * Dot's tab comes to the front, unless the reader asked for less motion. */
+  function flyIn(thumb, url) {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches || !thumb.isConnected) {
+      return;
+    }
+    const end = thumb.getBoundingClientRect();
+    if (end.width === 0) {
+      return;
+    }
+    const width = Math.min(window.innerWidth * FLIGHT_SHARE, FLIGHT_MAX_PX);
+    const left = (window.innerWidth - width) / 2;
+    const top = window.innerHeight * FLIGHT_TOP_SHARE;
+    const flight = el("img", { class: "attach-flight", src: url, alt: "" });
+    flight.style.left = `${left}px`;
+    flight.style.top = `${top}px`;
+    flight.style.width = `${width}px`;
+    document.body.append(flight);
+    const animation = flight.animate(
+      [
+        { transform: "translate(0, 0) scale(1)", opacity: 1 },
+        { transform: `translate(${end.left - left}px, ${end.top - top}px) scale(${end.width / width})`, opacity: 0.85 },
+      ],
+      { duration: FLIGHT_MS, easing: "cubic-bezier(0.2, 0.8, 0.2, 1)" },
+    );
+    const land = () => flight.remove();
+    animation.addEventListener("finish", land);
+    animation.addEventListener("cancel", land);
+  }
+
   /** List `files` (`{id, name, size, kind}`, uploaded already) as files of the draft; `animated` springs them in
-   * (a capture of SnapShots, item 405). */
+   * (a capture of SnapShots, item 405) and flies a picture into its chip (item 414). */
   function restoreFiles(files, animated) {
     for (const { id, name, size, kind } of files) {
       if (entries.length >= MAX_FILES) {
@@ -272,6 +308,9 @@ export function createAttachments({ dropTarget, input, onChange }) {
             if (entries.includes(entry)) {
               entry.preview = url;
               entry.thumb.src = url;
+              if (animated) {
+                flyIn(entry.thumb, url);
+              }
             } else {
               URL.revokeObjectURL(url);
             }

@@ -197,12 +197,36 @@ function loopFacts(view) {
   ];
 }
 
+// What a version can say (item 412), shown in the empty fields and put in them by Start from an example: lines a run
+// can follow, with no secret, link, address or home path, which a version refuses.
+const EXAMPLE_HABITS = [
+  "- Read a file whole before you change it.",
+  "- When a command fails twice the same way, stop and say why instead of trying a third time.",
+  "- Keep answers short; when the details run long, put them in a file and say where.",
+].join("\n");
+const EXAMPLE_GUIDANCE = [
+  "- Search code with rg, not grep -r.",
+  "- Run a project's tests with the command its README gives, not one you guess.",
+  "- Read an Excel file with the excel skill, not as text.",
+].join("\n");
+const EXAMPLE_SUMMARY = "Read before editing, stop after two failures, short answers";
+
 function buildForm(onWritten) {
-  const habits = el("textarea", { class: "textarea", rows: "5", "aria-label": "Habits", spellcheck: "false" });
-  const guidance = el("textarea", { class: "textarea", rows: "5", "aria-label": "Tool guidance", spellcheck: "false" });
-  const summary = el("input", { class: "input", type: "text", maxlength: "200", "aria-label": "Summary", placeholder: "What this version changes, in a line" });
+  const habits = el("textarea", { class: "textarea", rows: "5", "aria-label": "Habits", spellcheck: "false", placeholder: `For example:\n${EXAMPLE_HABITS}` });
+  const guidance = el("textarea", { class: "textarea", rows: "5", "aria-label": "Tool guidance", spellcheck: "false", placeholder: `For example:\n${EXAMPLE_GUIDANCE}` });
+  const summary = el("input", { class: "input", type: "text", maxlength: "200", "aria-label": "Summary", placeholder: `For example: ${EXAMPLE_SUMMARY}` });
   const save = el("button", { class: "btn sm", type: "button" }, "Save as a candidate");
   const adopt = el("button", { class: "btn primary sm", type: "button" }, icon("check"), "Save and adopt");
+  const example = el("button", { class: "btn ghost sm", type: "button" }, icon("pencil"), "Start from an example");
+  example.addEventListener("click", () => {
+    habits.value = EXAMPLE_HABITS;
+    guidance.value = EXAMPLE_GUIDANCE;
+    summary.value = EXAMPLE_SUMMARY;
+    habits.focus();
+  });
+  // What the section is for, in plain words: writing a version is optional, the nightly step writes them (item 412).
+  const intro = el("p", { class: "hint harness-intro" });
+  const bounds = el("p", { class: "hint" });
   async function submit(adoptNow) {
     if (summary.value.trim() === "") {
       summary.focus();
@@ -230,16 +254,28 @@ function buildForm(onWritten) {
   const element = el(
     "div",
     { class: "harness-form" },
-    field("Habits", habits, "Ways of working, after how to work. A line each; no secret, link, address or home path."),
-    field("Tool guidance", guidance, "What the tools on this Mac want, after the tools and the rules of communication."),
-    field("Summary", summary, ""),
-    el("div", { class: "panel-foot" }, el("span", { class: "spacer" }), save, adopt),
+    intro,
+    field("Habits", habits, "How Dot should work, as you would brief a new colleague: one rule a line. Every run reads them after Dot's own way of working."),
+    field("Tool guidance", guidance, "What the commands, applications and sites of this Mac want: one line each. Every run reads it after the list of its tools."),
+    field("Summary", summary, "One line for the list of versions: what this version changes."),
+    bounds,
+    el("p", { class: "hint" }, "Save as a candidate keeps it under Versions without using it; Save and adopt puts it into every run that starts from now on. Retire, on a version, takes it back and Dot's own text alone is used again."),
+    el("div", { class: "panel-foot" }, example, el("span", { class: "spacer" }), save, adopt),
   );
   return {
     element,
     fill: (text) => {
       habits.value = text.habits;
       guidance.value = text.tool_guidance;
+    },
+    /** Say what the loop does and the bounds a version keeps, from the daemon's view of the harness. */
+    describe: (view) => {
+      const nightly =
+        view.step_time === "off"
+          ? "Once a time of day is set for the nightly step ([harness] step_time in the config file), the loop reads what the runs did each night and proposes versions by itself."
+          : `Each night at ${view.step_time} the loop reads what the runs did and proposes versions by itself.`;
+      intro.textContent = `Optional: you need not write anything here. ${nightly} They appear under Versions for you to adopt. Write one yourself only when you want every run to keep a way of working you choose.`;
+      bounds.textContent = `At most ${view.habits_chars} characters of habits and ${view.tool_guidance_chars} of tool guidance, ${view.component_lines} lines each, no line past 300 characters; no secret, link, e-mail address, home path or account name: a version with one is refused.`;
     },
   };
 }
@@ -309,6 +345,7 @@ export function mount(root, _ctx) {
         : el("div", { class: "rule-list" }, experiences.map(experienceRow)),
     );
     facts.replaceChildren(...loopFacts(view));
+    form.describe(view);
   }
 
   async function reload() {
@@ -378,7 +415,7 @@ export function mount(root, _ctx) {
 
   root.append(
     paneHead(
-      "What Dot improves around its model: the habits and the tool guidance its prompt takes after its own text, as versions you adopt.",
+      "A short text every run's instructions take after Dot's own: habits (how to work) and tool guidance (what the tools of this Mac want). The nightly step proposes versions of it from what the runs did; the one you adopt is in use.",
       null,
     ),
     section("In use", [], inUse),

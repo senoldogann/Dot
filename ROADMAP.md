@@ -15353,6 +15353,92 @@ Postgres's DSN). Tests: `tests/unit/test_mcp_connect.py` (the secrets, the match
 `test_plugins_directory.py` (the marks, the untried), `test_skills.py` (the icon). Docs: `docs/extending.md`,
 `docs/daemon.md`.
 
+### 411. The System page: no stray null in the Permissions card, and every section folds
+
+**Status: done (2026-10-19), on `items-411-415-evening`.** The owner's word of 2026-10-19 evening, with a picture: the
+Permissions card said "null", and the System page's sections should fold. **As built (2026-10-19).** The card handed its
+note on launchd, null when there is none, to `replaceChildren`, which writes a null as the word: the parts are filtered
+now, as `run.js` and `approvals.js` already did (the other calls of the page were checked: none hands a null). Daemon,
+Permissions, Emergency stop, Health checks and About this Dot are each a `foldCard`, remembered in the browser
+(`system-daemon`, `system-permissions`, `system-failsafe`, `system-about`); the Daemon fold says how long it is up, the
+Permissions fold "all granted" or what is missing, the Emergency stop's badge stays beside its title. Tests:
+`tests/smoke/test_about_pages.py` (the summary, no null, a fold that stays folded after a reload). Docs:
+`docs/daemon.md`.
+
+### 412. The harness's form says what goes in it
+
+**Status: done (2026-10-19), on `items-411-415-evening`.** The owner's word of 2026-10-19 evening, with a picture of
+Settings › Harness: "what goes in these inputs, I have no idea". **As built (2026-10-19).** The form begins with what it
+is for: writing a version is optional, since the nightly step (`[harness] step_time`, or how to set one) proposes
+versions from what the runs did, which appear under Versions to adopt; a habit is a rule a run keeps, one a line, after
+Dot's own way of working, and a line of tool guidance what a command, application or site of this Mac wants, after the
+list of tools; the bounds a version keeps (characters, lines, no secret, link, address, home path or account name) are
+said from the daemon's view, and what Save as a candidate, Save and adopt and Retire do. The empty fields show examples,
+and **Start from an example** puts them in, to change. The page's line says what the harness is in plain words. Tests:
+`tests/smoke/test_harness_page.py`. Docs: `docs/harness.md`.
+
+### 413. More MCP servers, checked from this Mac, and the untried ones that have a way
+
+**Status: done (2026-10-19), on `items-411-415-evening`.** The owner's word of 2026-10-19 evening: some services say
+"Not tried yet" and cannot be added; add more MCP servers or plugins. **As built (2026-10-19).** Each candidate was
+checked from this Mac with Dot's own client: its endpoint answered (401 and its resource metadata, or open), the
+authorization server took the registration of a public client (`token_endpoint_auth_method: none`) and its sign-in page
+opened to that client without an error. So sign in: GitLab, PostHog, Zapier, Webflow, ClickUp, Postman, Netlify, Apify,
+Miro, Heroku and Atlassian (its v2 server; an organization's admin may have to let it in); open: Cloudflare Docs and
+Jina; on this Mac, from the packages' registries: Chrome DevTools and AWS Documentation, and with a key Figma
+(Framelink's `figma-developer-mcp` with a personal access token: Figma's own server refused the registration, 403),
+Perplexity, ElevenLabs, Mapbox, Grafana and Atlassian with an API token (`mcp-atlassian`, three values: the site, the
+e-mail and the token, the site's `/wiki` for Confluence). A secret may have no help link, for a value the owner knows.
+The catalogue holds 45 services, the Plugins page 65 listings; Figma and Atlassian are tried now, and the untried are
+Vercel and Canva (approved clients only; Canva answered "unsupported client"), Asana and Box (clients registered by
+hand; Asana's v2 server offers no registration). Left out after the check: Semgrep (its authorization server refused the
+resource the MCP library asks for, `invalid_target`), Render and HubSpot (no registration), Kagi (its search API is not
+open to all). The marks of GitLab, PostHog, Postman, Netlify, Grafana, Chrome, Perplexity, ElevenLabs, Mapbox, Zapier,
+Webflow, Miro and ClickUp came from Simple Icons 16.35.0 (CC0, named in the LICENSE with the brands' guidelines);
+Heroku, Apify, Jina and AWS have letters or an icon of the interface. Left for later: an OAuth client of the owner's own
+(client id and secret) for Asana, Box, Slack, Google and HubSpot. Tests: `tests/unit/test_plugins_directory.py` (the
+untried, the marks), `test_mcp_connect.py` (every service a server Dot can have, its secrets). Docs:
+`docs/extending.md`.
+
+### 414. SnapShots: both Command keys together, a flash, a card that flies to Dot, and Dot's window brought to the front
+
+**Status: done (2026-10-19), on `items-411-415-evening`.** The owner's word of 2026-10-19 evening: pressing the two
+Command keys at once in another application should capture with an animation, as another coding agent does, and open
+Dot's window. The log showed the captures taken (`snapshot_taken` of the other agent's window): nothing flashed, no Dot
+came to the front (the owner uses Dot in a browser), and the spring played in a hidden tab. **As built (2026-10-19).**
+The watch reads the left and the right Command keys apart (`NX_DEVICELCMDKEYMASK`, `NX_DEVICERCMDKEYMASK` in the event's
+flags): both down together captures (`TapDetector.sides`), as the double tap still does, and lets a double tap begun go,
+so a release does not capture again. After a capture the window gets a soft white flash (`[snapshots] flash`), and a
+card with the picture lifts off it and flies to Dot's window, in 280 to 680 ms by the way it covers, with a 12 px corner
+and a shadow, or to the corner of the screen when no Dot window came to the front; a helper process draws them (`python
+-m dotagent.desktop.flight`, an accessory application fed a JSON line per command, started with SnapShots), as the
+daemon's main thread runs its event loop and has no window. Dot's window comes to the front (`[snapshots] open_dot`,
+`desktop/show_dot.py`): the desktop app when it runs, else the tab of a browser that shows Dot's pages, found and chosen
+with AppleScript (Safari, Chrome and the browsers built on it, Arc; the browser of the page that last claimed first,
+from its User-Agent), else Dot opened in the default browser; a browser Dot may not drive (macOS asks once, Automation)
+is brought to the front as it is, rather than Dot opening anew at every capture. The page takes a capture once it is
+seen (`visibilitychange`), so the picture flies into its chip (Web Animations, none with reduced motion) and the chip
+springs; a page of this Mac with no box that came to the front goes to the new chat; only the pages of this Mac claim,
+so a phone does not take a capture from the Mac's box. Settings › SnapShots switches the flash and the opening. Checked
+on this Mac: the helper drew a flash and a flight on a 4 px frame, read past a bad line, landed a card that heard no
+landing in the corner, and ended clean; the Chrome and Safari scripts compile (Arc's could not be, as it is not
+installed). Tests: `tests/unit/test_snapshots.py` (both keys, the flash, the flight and the opening in order, the
+settings), `test_flight.py` (the flight's numbers, the commands, the browsers' order), `tests/smoke/test_snapshots.py`.
+Docs: `docs/daemon.md`.
+
+### 415. A server picked for a message is open to an agent's run, and a refusal says what keeps a server out
+
+**Status: done (2026-10-19), on `items-411-415-evening`.** The owner's word of 2026-10-19 evening, with a picture:
+rea-mcp picked for a message to the agent Reviewer was refused as "not connected, or none of its tools is open to this
+run (the servers it can use: none)", though rea-mcp was ready with 30 tools. The agent's `tools` named no MCP tool, so
+its bounds held no server, and the words blamed the connection. **As built (2026-10-19).** The owner's pick widens the
+agent's bounds for the run (`owner_server_groups`): the servers picked for its message, and the MCP servers picked for
+an earlier message of the chat (`picked_servers`, from the runs' picks events: a server the model only called opens
+nothing), as the check before the run (`_check_picks`) and the loop agree. A refusal names its cause: a server not
+connected (with those that are), or one with no tool a run of its mode may use (a chat, whose servers' acting tools it
+cannot use: send it as a task). Tests: `tests/unit/test_picks.py`, `tests/smoke/test_composer_picks.py` (a bounded
+agent's run starts with the picked server's tools and still without the ones it does not name). Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16198,3 +16284,7 @@ Postgres's DSN). Tests: `tests/unit/test_mcp_connect.py` (the secrets, the match
 - 2026-10-19 (Fable 5.1): item 408 on `item-408-catalog` from `main`, on the owner's word of the same day: the MCP
   catalogue at 24 services with keys asked for on the page and servers run on this Mac, the marks of the new ones, a
   server added by hand wearing its service's logo, and a skill's icon from its frontmatter or its words.
+- 2026-10-19 (Opus 5.5): items 411 to 415 on `items-411-415-evening` from `main`, in one pull request at the owner's
+  word of the same evening: the System page's null and folds, the harness's form explained, 21 more MCP services with
+  Figma and Atlassian addable, SnapShots on both Command keys with a flash, a flight and Dot brought forward, and a
+  server picked for an agent's message open to its run.

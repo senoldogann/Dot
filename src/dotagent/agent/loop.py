@@ -69,7 +69,7 @@ from dotagent.agent.limits import (
     limits_of,
 )
 from dotagent.agent.peers import peers_note
-from dotagent.agent.picks import PICKS_EVENT, picked_groups, picks_event_data, with_picks
+from dotagent.agent.picks import PICKS_EVENT, owner_server_groups, picked_groups, picks_event_data, with_picks
 from dotagent.agent.plan import (
     EMPTY_PLAN,
     PLAN_EVENT,
@@ -1588,7 +1588,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         specs = tuple(spec for spec in specs if spec.name not in _NOT_FOR_DELEGATED_RUNS)
     if run.campaign_id is None:
         specs = tuple(spec for spec in specs if spec.name not in CAMPAIGN_TOOLS | POST_TOOLS)
-    # The agent the run belongs to (item 86) bounds its tools: the ones it names, and the core tools in any case.
+    # The agent the run belongs to (item 86) bounds its tools: the ones it names, the core tools in any case, and the
+    # MCP servers the owner opened to it (item 415): the ones picked for its message or an earlier one of its chat.
     agent_record: AgentRecord | None = None if run.agent_id is None else await runtime.store.get_agent(run.agent_id)
     # The team (item 87): the other agents, whom the run may message.
     team: tuple[AgentRecord, ...] = tuple(
@@ -1596,7 +1597,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     )
     if agent_record is not None and agent_record.tools:
         agent_tools: frozenset[str] = frozenset(agent_record.tools) | frozenset(AGENT_CORE_TOOLS)
-        specs = tuple(spec for spec in specs if spec.name in agent_tools)
+        picked_before: frozenset[str] = await runtime.store.picked_servers(run.thread_id, PICKS_EVENT)
+        owner_servers: frozenset[str] = owner_server_groups(opening.picks, picked_before)
+        specs = tuple(spec for spec in specs if spec.name in agent_tools or group_of(spec.name) in owner_servers)
     # Settings › Browser may keep every run off the browser (item 354).
     if not runtime.browser.config.enabled:
         specs = tuple(spec for spec in specs if group_of(spec.name) != BROWSER_GROUP)

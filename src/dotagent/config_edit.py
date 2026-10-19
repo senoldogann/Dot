@@ -50,7 +50,7 @@ type JudgeSetting = Literal["provider"]
 type ModelsSetting = Literal["main", "fast", "review", "vision"]
 type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
-type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations"]
+type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
 type SettingKey = (
     AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting | ServerSetting | ShellSetting | SnapshotsSetting
 )

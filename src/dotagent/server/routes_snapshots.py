@@ -4,7 +4,7 @@ claim a composer makes of the captures waiting for it."""
 
 import asyncio
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request
 
 from dotagent.config import SnapshotSound
 from dotagent.config_edit import set_setting
@@ -27,6 +27,8 @@ def snapshots_router(ctx: ServerContext) -> APIRouter:
             app_text=service.app_text,
             sound=service.sound,
             animations=service.animations,
+            flash=service.flash,
+            open_dot=service.open_dot,
             shortcut=SHORTCUT_WORDS,
             listening=service.listening,
             problem=service.problem,
@@ -58,8 +60,9 @@ def snapshots_router(ctx: ServerContext) -> APIRouter:
         return view()
 
     @router.post("/snapshots/claim")
-    async def claim() -> SnapshotsClaimed:
-        """The captures waiting, for the composer that asks: they are its from now."""
-        return SnapshotsClaimed(files=service.claim(), animations=service.animations)
+    async def claim(request: Request) -> SnapshotsClaimed:
+        """The captures waiting, for the composer that asks: they are its from now. Its browser (the User-Agent) is
+        where Dot's tab is looked for first after the next capture (item 414)."""
+        return SnapshotsClaimed(files=service.claim(request.headers.get("user-agent")), animations=service.animations)
 
     return router

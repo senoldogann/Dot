@@ -36,7 +36,7 @@ from dotagent.agent.learning_health import (
 from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
-from dotagent.agent.picks import picks_problems
+from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, offered_to_run, playbook_case
 from dotagent.agent.progress import can_ask_user
@@ -117,7 +117,7 @@ from dotagent.store.models import (
 from dotagent.terminal.session import TerminalSession, ended_notice
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
-from dotagent.tools.groups import groups_of
+from dotagent.tools.groups import group_of, groups_of
 from dotagent.tools.meta import ASK_USER_TOOL
 from dotagent.tools.registry import tools_for_mode
 from dotagent.tools.team import TEAM_SOURCE
@@ -1649,8 +1649,9 @@ class RunManager:
     ) -> None:
         """Refuse ``picks`` (item 318) that a run of ``mode`` on ``model`` for ``agent_id`` (``None`` for Dot) with
         ``approvals``, sent from ``source``, could not start with (:func:`picks_problems`): the tools it may use are its
-        mode's, within the agent's bounds, as the loop gives them. A run on one of OpenCode's models goes whole to
-        OpenCode's own agent (item 283), whose first message is the owner's words alone, so it takes no picks."""
+        mode's, within the agent's bounds, which take in the servers the owner picked (item 415), as the loop gives
+        them. A run on one of OpenCode's models goes whole to OpenCode's own agent (item 283), whose first message is
+        the owner's words alone, so it takes no picks."""
         if picks == NO_PICKS:
             return
         if model.provider == OPENCODE_PROVIDER:
@@ -1669,7 +1670,8 @@ class RunManager:
         agent: AgentRecord | None = None if agent_id is None else await runtime.store.get_agent(agent_id)
         if agent is not None and agent.tools:
             bounds: frozenset[str] = frozenset(agent.tools) | frozenset(AGENT_CORE_TOOLS)
-            names = [name for name in names if name in bounds]
+            picked: frozenset[str] = picked_groups(picks)
+            names = [name for name in names if name in bounds or group_of(name) in picked]
         catalog: SkillCatalog = await asyncio.to_thread(
             load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
         )
@@ -1678,6 +1680,7 @@ class RunManager:
             picks,
             mode,
             frozenset(groups_of(names)),
+            runtime.mcp.connected(),
             [skill.name for skill in offered],
             can_ask_user(source, None, approvals),
         )
