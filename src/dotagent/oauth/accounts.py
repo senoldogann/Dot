@@ -220,13 +220,21 @@ class Accounts:
         log.info("sign_in_started", provider=provider.id)
         return authorize_link(provider, client_id, redirect_uri, state, challenge_of(verifier))
 
-    async def come_back(self, state: str, code: str | None, error: str | None) -> CameBack | None:
-        """What the page says to the browser that came back with ``state``; None when no sign-in of these waits for
-        it (it may be an MCP server's)."""
+    async def come_back(self, state: str, code: str | None, error: str | None, now: float) -> CameBack | None:
+        """What the page says to the browser that came back with ``state`` at ``now``; None when no sign-in of these
+        waits for it (it may be an MCP server's)."""
         waiting: Waiting | None = self._waiting.pop(state, None)
         if waiting is None:
             return None
         provider: Provider = PROVIDERS[waiting.provider]
+        if now - waiting.started_at >= _WAIT_S:
+            log.info("sign_in_expired", provider=provider.id)
+            return CameBack(
+                title=f"Not signed in to {provider.name}",
+                text=f"The sign-in waited more than {_WAIT_S / 60:g} minutes for the browser to come back. Start it "
+                "again in Customize › Plugins.",
+                status=400,
+            )
         if error is not None or code is None:
             log.info("sign_in_declined", provider=provider.id, error=error)
             return CameBack(

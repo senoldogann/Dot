@@ -15577,7 +15577,8 @@ address (Google's `email`, Microsoft's `mail` or user name), an access token ref
 refresh token kept when the provider gives no new one), signing out. The clients are read as Dot's keys are
 (`DOT_GOOGLE_CLIENT_ID`, `DOT_GOOGLE_CLIENT_SECRET`, `DOT_MS_CLIENT_ID`: environment, `.env`, the Keychain's
 `dot-agent`); the tokens of each account are in the login Keychain under `dot-oauth`, written through `security`'s own
-prompt so that no token is on a command line, and the list of accounts in the store. The browser comes back to the
+prompt so that no token is on a command line, in pieces short enough for a line of that prompt and in one of two slots
+named last, so that tokens cut off half-written leave the ones before whole, and the list of accounts in the store. The browser comes back to the
 daemon's `/oauth/callback`, which hands it to the accounts first and to an MCP server's sign-in otherwise; a sign-in
 starts only from this Mac's own address. Customize › Plugins opens on an Accounts card with Sign in, the accounts and
 Sign out. Nothing logs a token, a code or an address. The tools that use the accounts (Gmail, Google Calendar) are the

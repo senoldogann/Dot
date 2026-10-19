@@ -102,9 +102,13 @@ security add-generic-password -U -s dot-agent -a DOT_MS_CLIENT_ID -w
 
 Google is asked for `gmail.modify` and `calendar` (and who you are), Microsoft for `Mail.ReadWrite`, `Mail.Send`,
 `Calendars.ReadWrite`, `User.Read` and `offline_access`. The tokens of each account are in the login Keychain under the
-service `dot-oauth` (one item an account, `google:<address>`), written through `security`'s own prompt so that no token
-is on a command line, and the list of accounts, with no secret in it, is in the store. Nothing logs a token, a code or
-an address (`GET /api/accounts`, `POST /api/accounts/<provider>/start`, `DELETE /api/accounts/<provider>/<address>`).
+service `dot-oauth`, in pieces short enough for a line of `security`'s own prompt (Microsoft's run to some kilobytes):
+the item `google:<address>` says which of two slots holds them and how many there are (`a2`), the items
+`google:<address>#a0`, `#a1`… hold the pieces, and new tokens go to the other slot before that item names it, so that
+tokens cut off half-written leave the ones before them whole. They are written through that prompt so that no token is
+on a command line, and the list of accounts, with no secret in it, is in the store. A sign-in the browser comes back to
+after more than 10 minutes is turned away. Nothing logs a token, a code or an address (`GET /api/accounts`,
+`POST /api/accounts/<provider>/start`, `DELETE /api/accounts/<provider>/<address>`).
 
 ## MCP servers
 

@@ -1,6 +1,6 @@
 """The official sign-ins of Google and Microsoft (item 422), their pure parts: PKCE's challenge, the address of a
 provider's page, the tokens and the address read from what the provider answered, and which requests come from this
-Mac's own address."""
+Mac's own address, and the pieces the tokens are kept in in the Keychain."""
 
 import base64
 import hashlib
@@ -10,9 +10,10 @@ import pytest
 
 from dotagent.core.errors import SignInError
 from dotagent.oauth.accounts import authorize_link, client_names
+from dotagent.oauth.keychain import pieces_of, tokens_of, without_pieces
 from dotagent.oauth.pkce import challenge_of, new_state, new_verifier
 from dotagent.oauth.providers import GOOGLE, MICROSOFT
-from dotagent.oauth.tokens import address_from, tokens_from
+from dotagent.oauth.tokens import Tokens, address_from, tokens_from
 from dotagent.server.routes_accounts import on_this_mac
 
 
@@ -58,3 +59,17 @@ def test_the_address_is_googles_email_or_microsofts_mail_or_its_user_name() -> N
 def test_a_sign_in_starts_only_from_this_macs_own_address() -> None:
     assert [on_this_mac(host) for host in ("127.0.0.1:8765", "localhost", "LOCALHOST:8765", "[::1]:8765")] == [True] * 4
     assert [on_this_mac(host) for host in ("mac.tail1234.ts.net", "192.168.1.5:8765", None)] == [False] * 3
+
+
+def test_tokens_longer_than_a_line_of_securitys_prompt_go_in_pieces_and_come_back_whole() -> None:
+    tokens: Tokens = Tokens(access_token="x" * 5000, refresh_token="r" * 1500, expires_at=1.0, scope="Mail.Send")
+    pieces: list[str] = pieces_of(tokens)
+    assert len(pieces) == 3 and all(0 < len(piece) <= 3000 for piece in pieces)
+    assert tokens_of(pieces) == tokens
+
+
+def test_what_security_says_keeps_no_piece_of_a_token() -> None:
+    piece: str = pieces_of(Tokens(access_token="a" * 900, refresh_token=None, expires_at=1.0, scope="s"))[0]
+    said: str = f'security: unknown command "{piece[:400]}"\nSecKeychainItemCreateFromContent: The item already exists.'
+    cut: str = without_pieces(said)
+    assert piece[:40] not in cut and "[cut]" in cut and "SecKeychainItemCreateFromContent" in cut

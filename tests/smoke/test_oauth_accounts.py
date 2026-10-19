@@ -2,10 +2,13 @@
 ``httpx.MockTransport`` that checks PKCE and the client, the Keychain is a throw-away keychain file (the owner's is
 never touched), and the client names are in the environment. A sign-in comes back with a code traded for tokens, the
 account is named by its address and kept, an access token is refreshed once it runs out, and signing out takes the
-tokens away."""
+tokens away. Tokens longer than a line of ``security``'s prompt are kept whole, in pieces that leave nothing behind."""
 
 import asyncio
+import fcntl
+import re
 import subprocess
+import tempfile
 import time
 from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
@@ -26,18 +29,51 @@ from dotagent.store.db import Store
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
 _PASSWORD: str = "dot-test"
+_SECURITY: str = "/usr/bin/security"
+# Held while a test's keychain is made or removed, so that the workers put the owner's search list back one at a time.
+_LOCK: Path = Path(tempfile.gettempdir()) / "dot-tests-keychains.lock"
+_ACCOUNT: re.Pattern[str] = re.compile(r'"acct"<blob>="([^"]*)"')
+
+
+def _search_list() -> list[str]:
+    said: str = subprocess.run(
+        [_SECURITY, "list-keychains", "-d", "user"], check=True, capture_output=True, text=True
+    ).stdout
+    return [line.strip().strip('"') for line in said.splitlines() if line.strip()]
+
+
+def _keeping_search_list(arguments: list[str]) -> None:
+    """Run ``security`` with ``arguments`` and put the owner's search list back as it was, should they change it
+    (``security``'s manual says making a keychain adds it to the list)."""
+    with _LOCK.open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            before: list[str] = _search_list()
+            subprocess.run([_SECURITY, *arguments], check=True, capture_output=True)
+            if _search_list() != before:
+                subprocess.run(
+                    [_SECURITY, "list-keychains", "-d", "user", "-s", *before], check=True, capture_output=True
+                )
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+def _items(file: str) -> list[str]:
+    """The accounts of the items ``file`` holds, sorted."""
+    said: str = subprocess.run([_SECURITY, "dump-keychain", file], check=True, capture_output=True, text=True).stdout
+    return sorted(_ACCOUNT.findall(said))
 
 
 @pytest.fixture
 def keychain_file(tmp_path: Path) -> Iterator[str]:
-    """A keychain file of the test's own, unlocked, removed at the end."""
+    """A keychain file of the test's own, unlocked, removed at the end; the owner's search list is left as it was."""
     file: str = str(tmp_path / "test.keychain-db")
-    subprocess.run(["/usr/bin/security", "create-keychain", "-p", _PASSWORD, file], check=True, capture_output=True)
-    subprocess.run(["/usr/bin/security", "unlock-keychain", "-p", _PASSWORD, file], check=True, capture_output=True)
+    _keeping_search_list(["create-keychain", "-p", _PASSWORD, file])
+    subprocess.run([_SECURITY, "unlock-keychain", "-p", _PASSWORD, file], check=True, capture_output=True)
     try:
         yield file
     finally:
-        subprocess.run(["/usr/bin/security", "delete-keychain", file], check=False, capture_output=True)
+        _keeping_search_list(["delete-keychain", file])
 
 
 @pytest.fixture
@@ -88,7 +124,7 @@ async def _signed_in(accounts: Accounts, google: _Google) -> CameBack | None:
     query: dict[str, list[str]] = parse_qs(urlsplit(link).query)
     assert query["redirect_uri"] == ["http://127.0.0.1:8765/oauth/callback"]
     google.challenge = query["code_challenge"][0]
-    return await accounts.come_back(query["state"][0], "the-code", None)
+    return await accounts.come_back(query["state"][0], "the-code", None, time.time())
 
 
 async def test_a_sign_in_keeps_the_account_its_tokens_refresh_and_signing_out_takes_them(
@@ -126,16 +162,16 @@ async def test_a_code_the_provider_refuses_a_no_and_a_state_nobody_waits_for(
     link: str = await accounts.start("google", 8765, time.time())
     query: dict[str, list[str]] = parse_qs(urlsplit(link).query)
     google.challenge = "not the sign-in's"
-    refused: CameBack | None = await accounts.come_back(query["state"][0], "the-code", None)
+    refused: CameBack | None = await accounts.come_back(query["state"][0], "the-code", None, time.time())
     assert refused is not None and refused.status == 400 and "Google refused the sign-in's code" in refused.text
     # A state is good once.
-    assert await accounts.come_back(query["state"][0], "the-code", None) is None
+    assert await accounts.come_back(query["state"][0], "the-code", None, time.time()) is None
     declined_link: str = await accounts.start("google", 8765, time.time())
     declined: CameBack | None = await accounts.come_back(
-        parse_qs(urlsplit(declined_link).query)["state"][0], None, "access_denied"
+        parse_qs(urlsplit(declined_link).query)["state"][0], None, "access_denied", time.time()
     )
     assert declined is not None and "without a yes (access_denied)" in declined.text
-    assert await accounts.come_back("nobody-waits", "code", None) is None
+    assert await accounts.come_back("nobody-waits", "code", None, time.time()) is None
     assert await asyncio.wait_for(accounts.providers(), 30) is not None
 
 
@@ -148,3 +184,35 @@ async def test_a_sign_in_without_the_owners_client_says_what_to_save(
     accounts: Accounts = Accounts(store, Keychain(keychain_file), httpx.MockTransport(_Google()))
     with pytest.raises(SignInError, match="save DOT_GOOGLE_CLIENT_SECRET"):
         await accounts.start("google", 8765, time.time())
+
+
+async def test_a_browser_that_comes_back_too_late_is_turned_away(clients: None, store: Store, tmp_path: Path) -> None:
+    google: _Google = _Google()
+    accounts: Accounts = Accounts(store, Keychain(str(tmp_path / "none.keychain-db")), httpx.MockTransport(google))
+    started: float = time.time()
+    link: str = await accounts.start("google", 8765, started)
+    query: dict[str, list[str]] = parse_qs(urlsplit(link).query)
+    google.challenge = query["code_challenge"][0]
+    late: CameBack | None = await accounts.come_back(query["state"][0], "the-code", None, started + 601)
+    assert late is not None and late.status == 400 and "more than 10 minutes" in late.text, late
+    assert google.forms == []
+
+
+async def test_tokens_longer_than_a_line_of_the_prompt_are_kept_whole_and_leave_nothing_behind(
+    keychain_file: str,
+) -> None:
+    keychain: Keychain = Keychain(keychain_file)
+    # Microsoft's tokens are some kilobytes: these would not fit on one line of security's prompt.
+    long: Tokens = Tokens(
+        access_token="eyJ0." + "x" * 4000, refresh_token="0.AXEA" + "r" * 1800, expires_at=1.0, scope="Mail.Send " * 20
+    )
+    await keychain.save("microsoft", "ada@example.com", long)
+    assert await keychain.read("microsoft", "ada@example.com") == long
+    assert _items(keychain_file) == [f"microsoft:ada@example.com{end}" for end in ("", "#a0", "#a1", "#a2")]
+    short: Tokens = Tokens(access_token="at-2", refresh_token="rt-2", expires_at=2.0, scope="s")
+    await keychain.save("microsoft", "ada@example.com", short)
+    assert await keychain.read("microsoft", "ada@example.com") == short
+    assert _items(keychain_file) == ["microsoft:ada@example.com", "microsoft:ada@example.com#b0"]
+    await keychain.forget("microsoft", "ada@example.com")
+    assert await keychain.read("microsoft", "ada@example.com") is None
+    assert _items(keychain_file) == []
