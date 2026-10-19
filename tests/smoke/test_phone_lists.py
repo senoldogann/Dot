@@ -152,6 +152,9 @@ async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_l
                 empty: Locator = page.locator("main .empty-line")
                 await expect(empty).to_contain_text("Ask Dot")
                 await expect(empty).not_to_contain_text("message_agent")
+                # The empty page stands its mark, its title and the line in the middle (item 407).
+                await expect(page.locator("main .empty-state .empty-mark svg")).to_have_count(1)
+                await expect(page.locator("main .empty-state .empty-title")).to_have_text("No messages today")
                 await context.close()
 
             page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")

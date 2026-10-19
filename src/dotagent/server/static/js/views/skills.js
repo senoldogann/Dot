@@ -401,7 +401,7 @@ export function foundSection(found, onFound) {
   }
   const head = foundHead();
   if (groups.length === 0) {
-    return [head, emptyPanel("Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or MCP servers set up.")];
+    return [head, emptyPanel("search", "Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or MCP servers set up.")];
   }
   const hint = el(
     "div",
@@ -673,8 +673,8 @@ export function mount(root) {
     if (parts.every((part) => part === null)) {
       parts.push(
         words === ""
-          ? emptyPanel("No skills of yours yet", "After a task that went well, Dot writes how it did it as a skill for the next one of its kind; Save from a chat writes one at your word.")
-          : el("p", { class: "hint plugin-none" }, "No skill matches the search."),
+          ? emptyPanel("sparkles", "No skills of yours yet", "After a task that went well, Dot writes how it did it as a skill for the next one of its kind; Save from a chat writes one at your word.")
+          : emptyPanel("search", "No skill matches the search", ""),
       );
     }
     return [...parts, ...foundPart()];
@@ -698,7 +698,11 @@ export function mount(root) {
       ),
     ];
     if (parts.every((part) => part === null)) {
-      parts.push(el("p", { class: "hint plugin-none" }, words === "" ? "Neither Dot nor a plugin brings a skill: [skills] builtin is off and no plugin has one." : "No skill matches the search."));
+      parts.push(
+        words === ""
+          ? emptyPanel("sparkles", "Neither Dot nor a plugin brings a skill", "[skills] builtin is off and no plugin has one.")
+          : emptyPanel("search", "No skill matches the search", ""),
+      );
     }
     return parts;
   }

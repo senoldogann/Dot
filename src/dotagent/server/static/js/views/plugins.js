@@ -12,7 +12,7 @@
 import { api } from "../api.js";
 import { el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { errorPanel, field, loadingPanel, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog } from "../ui.js";
 
 const SECTIONS = [
@@ -499,11 +499,9 @@ export function mount(root, ctx) {
     }
     if (showing.length === 0 && (others.length === 0 || shown === "all")) {
       parts.push(
-        el(
-          "p",
-          { class: "hint plugin-none" },
-          words !== "" ? "No plugin matches the search." : "Dot is connected to nothing yet: All lists what it works with.",
-        ),
+        words !== ""
+          ? emptyPanel("search", "No plugin matches the search", "")
+          : emptyPanel("plug", "Dot is connected to nothing yet", "All lists what it works with."),
       );
     }
     parts.push(
