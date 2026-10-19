@@ -29,7 +29,7 @@ from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_conn
 from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
-from dotagent.secrets import remove_env_values, write_env_values
+from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import origin_is_local
 from dotagent.server.views import (
@@ -263,8 +263,18 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             ),
         )
 
+    async def forget_service_secrets(config: McpServerConfig) -> None:
+        """The key of a service of the catalogue goes with the service's own server (item 408): the one named as the
+        service, not one added by hand at the same address, which may stand beside it."""
+        service: McpService | None = next((one for one in MCP_SERVICES if one.id == config.name), None)
+        if service is None or not service.secrets or _service_of(config) != service.id:
+            return
+        for kept_name in kept_secret_names(service).values():
+            await asyncio.to_thread(remove_env_value, env_file_path(), kept_name)
+
     async def keep(attempt: _Try, origin: str) -> None:
-        """Try the server once, signing in when it asks, then keep it and connect it as runs do."""
+        """Try the server once, signing in when it asks, then keep it and connect it as runs do; the key of a service
+        whose first try fails goes out of .env with it, as nothing keeps the server (item 408)."""
         config: McpServerConfig = attempt.config
 
         def show(link: str) -> None:
@@ -290,10 +300,14 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         except DotError as error:
             attempt.error = error.message
             log.warning("mcp_server_not_added", server=config.name, error=error.message, context=error.context)
+            if attempt.origin == "connected":
+                await forget_service_secrets(config)
         except Exception as error:
             # Not one of Dot's own errors: a fault in Dot or in the MCP library, as the hub reports it.
             attempt.error = f"{type(error).__name__}: {error}"
             log.error("mcp_server_try_crashed", server=config.name, exc_info=error)
+            if attempt.origin == "connected":
+                await forget_service_secrets(config)
         finally:
             attempt.news.set()
 
@@ -332,9 +346,10 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict("Dot is trying this server already", {"server": config.name})
         service: McpService | None = requested_service(body)
         if service is not None and service.secrets:
-            # The secrets go into Dot's .env, all at once, under the names the server's config refers to (item 408),
-            # once nothing stands in the add's way.
-            await asyncio.to_thread(write_env_values, env_file_path(), secret_entries(service, body.secrets))
+            # The secrets go into Dot's .env under the names the server's config refers to (item 408), once nothing
+            # stands in the add's way and every one of them is there (secret_entries refuses before any is written).
+            for kept_name, value in secret_entries(service, body.secrets).items():
+                await asyncio.to_thread(write_env_value, env_file_path(), kept_name, value)
         return await start(config, "connected", page)
 
     @router.post("/api/mcp/servers/{name}/connect")
@@ -373,11 +388,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         refresh_mcp_tools(ctx.runtime.registry, hub)
         await asyncio.to_thread(forget_connected, connected_servers_path(), name)
         await asyncio.to_thread(forget_sign_in, sign_in_path(name))
-        # The key of a service of the catalogue goes with its server (item 408).
-        service_id: str | None = _service_of(found[0])
-        service: McpService | None = next((one for one in MCP_SERVICES if one.id == service_id), None)
-        if service is not None and service.secrets:
-            await asyncio.to_thread(remove_env_values, env_file_path(), set(kept_secret_names(service).values()))
+        await forget_service_secrets(found[0])
         log.info("mcp_server_removed", server=name)
         return await listing()
 

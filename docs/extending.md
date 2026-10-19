@@ -49,16 +49,17 @@ The ways a service connects:
   asks for it under its tile and on its page, with where to get one; Dot keeps each in its `.env` (mode 0600) under
   `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the server's headers or environment refer to it as
   `${...}`, so the value is in no record and leaves the daemon only to the service; **Remove** takes the key out of
-  `.env` with the server. The addresses, keys and commands are as the services' own docs read on 2026-10-19
-  (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools, which go to
-  the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using:
-  its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own page, which
-  sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through
-  `[server] reach`); then it turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself
-  with the service as a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and
-  renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left
-  out with words that bring you back here (**Sign in again**). **Remove** takes a server added here out, with its tools
-  and its sign-in; one set up elsewhere is removed there.
+  `.env` with the service's own server, and a first try that fails takes it out too, as nothing keeps the server. The
+  addresses, keys and commands are as the services' own docs read on 2026-10-19 (`mcp/catalogue.py`). **Add** tries the
+  server first and keeps it only once it answered with its tools, which go to the runs that start next, without a
+  restart. A server that asks for a sign-in gets one in the browser you are using: its tile says **Waiting for your
+  sign-in**, and its page has **Open the sign-in page**, the service's own page, which sends you back to Dot's
+  `/oauth/callback` on the address you added it from (the Mac's, or your phone's through `[server] reach`); then it
+  turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself with the service as a client
+  without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before they run
+  out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words that bring
+  you back here (**Sign in again**). **Remove** takes a server added here out, with its tools and its sign-in; one set
+  up elsewhere is removed there.
 
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
 command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
@@ -132,12 +133,12 @@ picked and the embedding service fails, or the embeddings are still being made, 
 goes on, as it recalls its notes by words then. A skill that shares only some of the goal's words is kept, as a goal can
 ask for more than one kind of work. Dot always looks in `<home>/skills` and in the `skills/` folder of every plugin;
 `[skills] dirs` lists more directories (each holds skill folders; `~` expands). Skills written for Claude Code load
-unchanged: Dot reads only `name` and `description` of the frontmatter, so other keys (a date or a nested map under
-`metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put `dirs = ["~/.claude/skills"]`
-under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be one skill folder
-(`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills written for Claude Code's own
-tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you wrote for Claude Code are then
-the playbook a campaign can work from.
+unchanged: Dot reads only `name`, `description` and its own `icon` of the frontmatter, so other keys (a date or a nested
+map under `metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put `dirs =
+["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be
+one skill folder (`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills written for
+Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you wrote for
+Claude Code are then the playbook a campaign can work from.
 
 Dot comes with three skills of its own, for work that has to know this Mac: `excel` (reading and changing a workbook
 with openpyxl, getting the results of its formulas from LibreOffice or Excel, which openpyxl does not compute, and
