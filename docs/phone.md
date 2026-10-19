@@ -128,7 +128,13 @@ not two, and the light scheme's own ground, `#f8f7f4`, as its `theme_color` and 
 screen between the tap and the first frame, the colour the page gives the browser in the light scheme), so that no white
 flash or strip of amber shows while it opens. Beside the plain icons it carries a 512 px `maskable` one, its artwork at
 four fifths of the square on that ground, which a launcher that rounds or crops an icon draws whole; a long press on it
-offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`).
+offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`). iOS draws the added app with the page's
+`apple-touch-icon`, a 180 px file at the root of the pages (`/apple-touch-icon.png`, the name iOS also tries by itself,
+and its `-precomposed` twin that older ones try; item 410). A phone's own process fetches it outside the page, so that
+file, the manifest, the favicon and the icons folder are served with a resource policy that lets another origin read
+them, and a name of `[server] reach` written with HTTPS's own port (`:443`) names this server too. A request the daemon
+turns away is logged (`request_refused`, with its path, status, reason, Host and Origin, never the token), so that an
+icon that does not come says why in `dotx.log`.
 
 The daemon answers with gzip what a browser asks it for that way (item 381): the pages' scripts and sheets and the API's
 answers, past 1 KiB; the event streams go as they are written, and the fonts and the images, compressed already, as they

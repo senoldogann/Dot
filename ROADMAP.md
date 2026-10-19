@@ -15261,6 +15261,21 @@ search with nothing), Plugins (nothing connected; a search with nothing), a run 
 Dot's computer is quiet. Tests: `tests/smoke/test_phone_lists.py` (Team's empty page: the mark, the title and the line).
 Docs: `docs/daemon.md`.
 
+### 410. The app added to a phone's home screen carries Dot's icon
+
+**Status: done (2026-10-19), on `item-410-home-icon`.** The owner's word of 2026-10-19: the app added to the iPhone's
+home screen came without Dot's logo. **As built (2026-10-19).** iOS draws an added app with the page's
+`apple-touch-icon`: now a 180 px file at the root of the pages (`apple-touch-icon.png`, the name iOS also tries by
+itself, and its `-precomposed` twin that older ones try), named with its size in `index.html`, made by
+`desktop/icons/render.py` with the other icons (this once resized from the 512 px render). A phone's own process fetches
+it outside the page, where the headers of every file kept it to the page's origin (`Cross-Origin-Resource-Policy:
+same-origin`): that file, the manifest, the favicon and the icons folder, which hold nothing of the owner's, are served
+with `cross-origin` (`LAUNCHER_PATHS`), and a name of `[server] reach` written with HTTPS's own port (`:443`), as some
+clients write it, names this server too. A request the daemon turns away is logged (`request_refused`: path, status,
+reason, Host, Origin, never the token), so that an icon that still does not come says why in `dotx.log`; the owner adds
+the app again to see it. Tests: `tests/unit/test_manifest.py` (the link and the files), `test_server_guard.py` (the
+headers, the port). Docs: `docs/phone.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16095,3 +16110,5 @@ Docs: `docs/daemon.md`.
 - 2026-10-19 (Fable 5.1): item 405 on `item-405-snapshots` from `main`, on the owner's word of the same day: SnapShots,
   a double tap of ⌘ in any application that captures the window in front, with its text, into the open chat's box; the
   flash and a shortcut of one's own left for later.
+- 2026-10-19 (Fable 5.1): item 410 on `item-410-home-icon` from `main`, on the owner's word of the same day: the home
+  screen's icon at the root, readable by a phone's launcher, with the refused requests logged.
