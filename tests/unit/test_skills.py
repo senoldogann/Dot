@@ -13,6 +13,7 @@ from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import McpServerConfig, PluginsConfig, SkillsConfig
 from dotagent.core.errors import PluginError, SkillError
 from dotagent.doctor import CheckResult, _office_row, _onedrive_row
+from dotagent.harness.components import NO_HARNESS
 from dotagent.help.listed import SkillListing, listed_skills
 from dotagent.plugins.catalog import load_plugins, read_plugin
 from dotagent.plugins.manifest import PluginVariables, parse_manifest, parse_servers_file, to_server_config
@@ -439,6 +440,7 @@ def _prompt(tool_names: list[str], skills: list[Skill], left: int) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 

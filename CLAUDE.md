@@ -26,12 +26,14 @@ uv run mypy src
 uv run pytest tests/unit -q -n auto
 uv run dotx eval check
 uv run pytest tests/smoke -q -n auto -m "not live and not browser and not internet and not desktop and not hosted"
+npm run check
 ```
 
 - A change to a tool, the policy or the loop: `dotx eval check` must pass.
 - A change the browser tests cover: add them with `-m "not live and not internet and not hosted and not desktop"`.
 - `desktop/src-tauri`: `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`.
-- A web UI change: click through the affected screen in a browser, on a phone-sized window too.
+- A web UI change: `npm run check` (Biome, `tsc` over the JSDoc, `node --test tests/js`; `npm ci` once, Node 22 or later,
+  a development requirement only), and click through the affected screen in a browser, on a phone-sized window too.
 
 [CONTRIBUTING.md](CONTRIBUTING.md) has the conventions for code, tests and pull requests, and
 [docs/development.md](docs/development.md) what each test marker needs and how the agent is measured.

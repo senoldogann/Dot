@@ -50,6 +50,12 @@ from dotagent.store.models import (
     DraftRecord,
     DraftStatus,
     EventRecord,
+    HarnessExperience,
+    HarnessProbe,
+    HarnessState,
+    HarnessStep,
+    HarnessStepState,
+    HarnessVersion,
     MemoryRecord,
     MemoryScore,
     MemoryUseHow,
@@ -183,6 +189,28 @@ CREATE TABLE IF NOT EXISTS spends (
     host TEXT NOT NULL, amount REAL NOT NULL, currency TEXT NOT NULL, ts REAL NOT NULL, run_id TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS spends_host ON spends(host, ts);
+CREATE TABLE IF NOT EXISTS harness_versions (
+    id TEXT PRIMARY KEY, parent_id TEXT, made_by TEXT NOT NULL, state TEXT NOT NULL, summary TEXT NOT NULL,
+    habits TEXT NOT NULL, tool_guidance TEXT NOT NULL, notes TEXT NOT NULL, created_at REAL NOT NULL,
+    adopted_at REAL, retired_at REAL
+);
+CREATE INDEX IF NOT EXISTS harness_versions_state ON harness_versions(state, created_at);
+CREATE TABLE IF NOT EXISTS harness_steps (
+    id TEXT PRIMARY KEY, started_at REAL NOT NULL, ended_at REAL, from_run TEXT, base_version TEXT,
+    state TEXT NOT NULL, outcome TEXT NOT NULL, error TEXT
+);
+CREATE TABLE IF NOT EXISTS harness_probes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, step_id TEXT NOT NULL, version_id TEXT, label TEXT NOT NULL,
+    task_id TEXT NOT NULL, attempt INTEGER NOT NULL, passed INTEGER NOT NULL, status TEXT NOT NULL, cut TEXT NOT NULL,
+    steps INTEGER NOT NULL, input_tokens INTEGER NOT NULL, output_tokens INTEGER NOT NULL, tool_errors INTEGER NOT NULL,
+    seconds REAL NOT NULL, created_at REAL NOT NULL
+);
+CREATE INDEX IF NOT EXISTS harness_probes_step ON harness_probes(step_id);
+CREATE INDEX IF NOT EXISTS harness_probes_version ON harness_probes(version_id);
+CREATE TABLE IF NOT EXISTS harness_experiences (
+    id TEXT PRIMARY KEY, step_id TEXT NOT NULL, version_id TEXT, cue TEXT NOT NULL, lesson TEXT NOT NULL,
+    evidence TEXT NOT NULL, confidence TEXT NOT NULL, created_at REAL NOT NULL
+);
 """
 
 _EXTENSIONS: dict[str, str] = {
@@ -410,6 +438,69 @@ def _run(row: aiosqlite.Row) -> RunRecord:
         campaign_id=row["campaign_id"],
         agent_id=row["agent_id"],
         rewindable=row["history_version"] is not None and row["history_seq"] is not None,
+    )
+
+
+def _harness_version(row: aiosqlite.Row) -> HarnessVersion:
+    return HarnessVersion(
+        id=row["id"],
+        parent_id=row["parent_id"],
+        made_by=row["made_by"],
+        state=row["state"],
+        summary=row["summary"],
+        habits=row["habits"],
+        tool_guidance=row["tool_guidance"],
+        notes=row["notes"],
+        created_at=row["created_at"],
+        adopted_at=row["adopted_at"],
+        retired_at=row["retired_at"],
+    )
+
+
+def _harness_step(row: aiosqlite.Row) -> HarnessStep:
+    return HarnessStep(
+        id=row["id"],
+        started_at=row["started_at"],
+        ended_at=row["ended_at"],
+        from_run=row["from_run"],
+        base_version=row["base_version"],
+        state=row["state"],
+        outcome=row["outcome"],
+        error=row["error"],
+    )
+
+
+def _harness_probe(row: aiosqlite.Row) -> HarnessProbe:
+    return HarnessProbe(
+        id=row["id"],
+        step_id=row["step_id"],
+        version_id=row["version_id"],
+        label=row["label"],
+        task_id=row["task_id"],
+        attempt=row["attempt"],
+        passed=bool(row["passed"]),
+        status=row["status"],
+        cut=row["cut"],
+        steps=row["steps"],
+        input_tokens=row["input_tokens"],
+        output_tokens=row["output_tokens"],
+        tool_errors=row["tool_errors"],
+        seconds=row["seconds"],
+        created_at=row["created_at"],
+    )
+
+
+def _harness_experience(row: aiosqlite.Row) -> HarnessExperience:
+    return HarnessExperience(
+        id=row["id"],
+        step_id=row["step_id"],
+        version_id=row["version_id"],
+        cue=row["cue"],
+        lesson=row["lesson"],
+        evidence=row["evidence"],
+        confidence=row["confidence"],
+        tainted=bool(row["tainted"]),
+        created_at=row["created_at"],
     )
 
 
@@ -647,6 +738,9 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
 # value those runs had in effect: no reasoning level kept, ``ask``, no goal mode, no campaign, no owner (a run of a
 # process of before owners, which a daemon that starts takes for gone, as it took every run then), the standard speed,
 # no choice for one message (item 251).
+# The kv key that names the adopted version of the harness (item 389); absent while none is adopted.
+HARNESS_ADOPTED_KEY: str = "harness.adopted"
+
 _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("effort", "TEXT"),
     ("approvals", "TEXT NOT NULL DEFAULT 'ask'"),
@@ -662,6 +756,8 @@ _ADDED_RUN_COLUMNS: tuple[tuple[str, str], ...] = (
     ("history_version", "INTEGER"),
     ("history_seq", "INTEGER"),
     ("rewound_at", "REAL"),
+    # The version of the harness the run took as it started (item 389), NULL with none adopted and for runs from before.
+    ("harness_version", "TEXT"),
 )
 # Columns of ``memories`` added later: notes of an older database were never counted as used, and are Dot's.
 _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -702,6 +798,9 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("once", "TEXT"),
     ("picks", "TEXT"),
 )
+# Columns of ``harness_experiences`` added later: whether the run the experience was written from had read content
+# third parties can author (item 392), which keeps it from the proposer.
+_ADDED_HARNESS_EXPERIENCE_COLUMNS: tuple[tuple[str, str], ...] = (("tainted", "INTEGER NOT NULL DEFAULT 0"),)
 # Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
 # ``ChatChoices`` as JSON, item 199), and one that is no chat of a schedule (a firing's chat names its schedule, item
@@ -748,6 +847,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
+    await _add_columns(connection, "harness_experiences", _ADDED_HARNESS_EXPERIENCE_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
@@ -919,6 +1019,280 @@ class Store:
         )
         await self._db.commit()
         return value
+
+    # ----- harness -------------------------------------------------------------------------
+
+    @_writing
+    async def create_harness_version(
+        self, parent_id: str | None, made_by: str, summary: str, habits: str, tool_guidance: str, notes: str
+    ) -> HarnessVersion:
+        """Store a new version of the harness (item 389) as a candidate."""
+        record: HarnessVersion = HarnessVersion(
+            id=new_id("hrn"),
+            parent_id=parent_id,
+            made_by=made_by,
+            state="candidate",
+            summary=summary,
+            habits=habits,
+            tool_guidance=tool_guidance,
+            notes=notes,
+            created_at=time.time(),
+            adopted_at=None,
+            retired_at=None,
+        )
+        await self._db.execute(
+            "INSERT INTO harness_versions(id, parent_id, made_by, state, summary, habits, tool_guidance, notes,"
+            " created_at, adopted_at, retired_at) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.parent_id,
+                record.made_by,
+                record.state,
+                record.summary,
+                record.habits,
+                record.tool_guidance,
+                record.notes,
+                record.created_at,
+                record.adopted_at,
+                record.retired_at,
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def get_harness_version(self, version_id: str) -> HarnessVersion:
+        row: aiosqlite.Row | None = await self._one("SELECT * FROM harness_versions WHERE id = ?", (version_id,))
+        if row is None:
+            raise NotFoundError("harness version not found", {"version_id": version_id})
+        return _harness_version(row)
+
+    async def list_harness_versions(self) -> list[HarnessVersion]:
+        """Every version of the harness, the newest first."""
+        rows = await self._all("SELECT * FROM harness_versions ORDER BY created_at DESC, id DESC", ())
+        return [_harness_version(row) for row in rows]
+
+    async def adopted_harness_id(self) -> str | None:
+        """The id of the adopted version, or ``None`` while a run's prompt is Dot's own text alone."""
+        return await self.kv_get(HARNESS_ADOPTED_KEY)
+
+    async def adopt_harness(self, version_id: str, now: float) -> HarnessVersion:
+        """Make ``version_id`` the version every run takes from now on, and retire the one adopted before; one unit, so
+        that no run reads a moment with two adopted or none."""
+
+        async def statements() -> HarnessVersion:
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM harness_versions WHERE id = ?", (version_id,))
+            if row is None:
+                raise NotFoundError("harness version not found", {"version_id": version_id})
+            await self._db.execute(
+                "UPDATE harness_versions SET state = 'retired', retired_at = ? WHERE state = 'adopted' AND id != ?",
+                (now, version_id),
+            )
+            await self._db.execute(
+                "UPDATE harness_versions SET state = 'adopted', adopted_at = ?, retired_at = NULL WHERE id = ?",
+                (now, version_id),
+            )
+            await self._db.execute(
+                "INSERT INTO kv(key, value) VALUES(?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                (HARNESS_ADOPTED_KEY, version_id),
+            )
+            adopted: aiosqlite.Row | None = await self._one(
+                "SELECT * FROM harness_versions WHERE id = ?", (version_id,)
+            )
+            assert adopted is not None
+            return _harness_version(adopted)
+
+        return await self._unit(statements)
+
+    async def retire_harness(self, version_id: str, now: float) -> HarnessVersion:
+        """Put ``version_id`` aside; when it was the adopted one, a run's prompt is Dot's own text alone from now on."""
+
+        async def statements() -> HarnessVersion:
+            row: aiosqlite.Row | None = await self._one("SELECT * FROM harness_versions WHERE id = ?", (version_id,))
+            if row is None:
+                raise NotFoundError("harness version not found", {"version_id": version_id})
+            if row["state"] != "retired":
+                await self._db.execute(
+                    "UPDATE harness_versions SET state = 'retired', retired_at = ? WHERE id = ?", (now, version_id)
+                )
+            await self._db.execute("DELETE FROM kv WHERE key = ? AND value = ?", (HARNESS_ADOPTED_KEY, version_id))
+            retired: aiosqlite.Row | None = await self._one(
+                "SELECT * FROM harness_versions WHERE id = ?", (version_id,)
+            )
+            assert retired is not None
+            return _harness_version(retired)
+
+        return await self._unit(statements)
+
+    @_writing
+    async def set_run_harness(self, run_id: str, version_id: str) -> None:
+        """Record the version of the harness the run ``run_id`` took as it started."""
+        await self._db.execute("UPDATE runs SET harness_version = ? WHERE id = ?", (version_id, run_id))
+        await self._db.commit()
+
+    @_writing
+    async def set_harness_state(self, version_id: str, state: HarnessState) -> HarnessVersion:
+        """Mark a version ``probed`` or ``candidate``; adopting and retiring are :meth:`adopt_harness`'s and
+        :meth:`retire_harness`'s, which keep the adopted key with the state."""
+        if state in ("adopted", "retired"):
+            raise InvalidValueError("adopt_harness and retire_harness set these states", {"state": state})
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_versions SET state = ? WHERE id = ?", (state, version_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("harness version not found", {"version_id": version_id})
+        return await self.get_harness_version(version_id)
+
+    @_writing
+    async def set_harness_notes(self, version_id: str, notes: str) -> None:
+        """Replace a version's notes: what a probe showed of it, the decisions behind it."""
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_versions SET notes = ? WHERE id = ?", (notes, version_id)
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("harness version not found", {"version_id": version_id})
+
+    @_writing
+    async def create_harness_step(
+        self, started_at: float, from_run: str | None, base_version: str | None
+    ) -> HarnessStep:
+        """Store the start of a step of the improvement loop (item 391), as failed until :meth:`finish_harness_step`
+        says how it ended: a step the daemon's stop cut off reads so."""
+        step: HarnessStep = HarnessStep(
+            id=new_id("hst"),
+            started_at=started_at,
+            ended_at=None,
+            from_run=from_run,
+            base_version=base_version,
+            state="failed",
+            outcome="{}",
+            error="the step did not end",
+        )
+        await self._db.execute(
+            "INSERT INTO harness_steps(id, started_at, ended_at, from_run, base_version, state, outcome, error)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            (step.id, step.started_at, None, step.from_run, step.base_version, step.state, step.outcome, step.error),
+        )
+        await self._db.commit()
+        return step
+
+    @_writing
+    async def finish_harness_step(
+        self, step_id: str, ended_at: float, state: HarnessStepState, outcome: str, error: str | None
+    ) -> HarnessStep:
+        cursor: aiosqlite.Cursor = await self._db.execute(
+            "UPDATE harness_steps SET ended_at = ?, state = ?, outcome = ?, error = ? WHERE id = ?",
+            (ended_at, state, outcome, error, step_id),
+        )
+        await self._db.commit()
+        if cursor.rowcount == 0:
+            raise NotFoundError("harness step not found", {"step_id": step_id})
+        return await self.get_harness_step(step_id)
+
+    async def get_harness_step(self, step_id: str) -> HarnessStep:
+        row: aiosqlite.Row | None = await self._one("SELECT * FROM harness_steps WHERE id = ?", (step_id,))
+        if row is None:
+            raise NotFoundError("harness step not found", {"step_id": step_id})
+        return _harness_step(row)
+
+    async def list_harness_steps(self, limit: int) -> list[HarnessStep]:
+        """The newest ``limit`` steps, the newest first."""
+        rows = await self._all("SELECT * FROM harness_steps ORDER BY started_at DESC, id DESC LIMIT ?", (limit,))
+        return [_harness_step(row) for row in rows]
+
+    @_writing
+    async def add_harness_probes(
+        self, step_id: str, version_id: str | None, label: str, cards: Sequence[tuple[object, ...]], created_at: float
+    ) -> None:
+        """Keep the attempts of a probe: each of ``cards`` is ``(task_id, attempt, passed, status, cut, steps,
+        input_tokens, output_tokens, tool_errors, seconds)``."""
+        await self._db.executemany(
+            "INSERT INTO harness_probes(step_id, version_id, label, task_id, attempt, passed, status, cut, steps,"
+            " input_tokens, output_tokens, tool_errors, seconds, created_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            [(step_id, version_id, label, *card, created_at) for card in cards],
+        )
+        await self._db.commit()
+
+    async def harness_probes_of(self, step_id: str) -> list[HarnessProbe]:
+        rows = await self._all("SELECT * FROM harness_probes WHERE step_id = ? ORDER BY id", (step_id,))
+        return [_harness_probe(row) for row in rows]
+
+    async def harness_probes_of_version(self, version_id: str) -> list[HarnessProbe]:
+        rows = await self._all("SELECT * FROM harness_probes WHERE version_id = ? ORDER BY id", (version_id,))
+        return [_harness_probe(row) for row in rows]
+
+    @_writing
+    async def add_harness_experience(
+        self,
+        step_id: str,
+        version_id: str | None,
+        cue: str,
+        lesson: str,
+        evidence: str,
+        confidence: str,
+        tainted: bool,
+    ) -> HarnessExperience:
+        """Keep an experience of the loop (item 391); ``tainted`` says the run it was written from had read content
+        third parties can author (item 392), which keeps it from the proposer."""
+        record: HarnessExperience = HarnessExperience(
+            id=new_id("hxp"),
+            step_id=step_id,
+            version_id=version_id,
+            cue=cue,
+            lesson=lesson,
+            evidence=evidence,
+            confidence=confidence,
+            created_at=time.time(),
+            tainted=tainted,
+        )
+        await self._db.execute(
+            "INSERT INTO harness_experiences(id, step_id, version_id, cue, lesson, evidence, confidence, created_at,"
+            " tainted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (
+                record.id,
+                record.step_id,
+                record.version_id,
+                record.cue,
+                record.lesson,
+                record.evidence,
+                record.confidence,
+                record.created_at,
+                int(record.tainted),
+            ),
+        )
+        await self._db.commit()
+        return record
+
+    async def harness_steps_of_version(self, version_id: str) -> list[HarnessStep]:
+        """The steps that touched a version: as the base of their probes, or named in what they did (a candidate, the
+        probed version), the newest first."""
+        rows = await self._all(
+            "SELECT * FROM harness_steps WHERE base_version = ? OR json_extract(outcome, '$.probed') = ?"
+            " OR EXISTS (SELECT 1 FROM json_each(outcome, '$.candidates') WHERE value = ?)"
+            " ORDER BY started_at DESC, id DESC",
+            (version_id, version_id, version_id),
+        )
+        return [_harness_step(row) for row in rows]
+
+    async def harness_experiences_of_version(self, version_id: str) -> list[HarnessExperience]:
+        rows = await self._all(
+            "SELECT * FROM harness_experiences WHERE version_id = ? ORDER BY created_at DESC, id DESC", (version_id,)
+        )
+        return [_harness_experience(row) for row in rows]
+
+    async def list_harness_experiences(self, limit: int) -> list[HarnessExperience]:
+        """The newest ``limit`` experiences, the newest first."""
+        rows = await self._all("SELECT * FROM harness_experiences ORDER BY created_at DESC, id DESC LIMIT ?", (limit,))
+        return [_harness_experience(row) for row in rows]
+
+    async def run_harness(self, run_id: str) -> str | None:
+        """The version of the harness the run took, ``None`` with none adopted then or for a run from before."""
+        row: aiosqlite.Row | None = await self._one("SELECT harness_version FROM runs WHERE id = ?", (run_id,))
+        if row is None:
+            raise NotFoundError("run not found", {"run_id": run_id})
+        return None if row["harness_version"] is None else str(row["harness_version"])
 
     # ----- threads and messages ------------------------------------------------------------
 

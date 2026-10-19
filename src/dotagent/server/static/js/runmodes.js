@@ -151,7 +151,7 @@ export function standingPicker(onToggle) {
 export function goalModePicker(kept) {
   function shown() {
     const { status } = getSnapshot();
-    return kept.read() ?? (status !== null && status.goal_mode);
+    return kept.read() ?? status?.goal_mode === true;
   }
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
   const element = switchRow(pick("Goal mode", toggle), toggle);

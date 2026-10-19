@@ -39,6 +39,7 @@ from dotagent.evals.scoring import (
     score_report,
 )
 from dotagent.evals.types import EvalTask
+from dotagent.harness.components import NO_HARNESS
 from dotagent.llm.router import parse_model_ref
 from dotagent.tools.shell import child_env, read_login_env
 
@@ -172,7 +173,7 @@ async def cmd_eval_run(command: EvalRunCommand) -> int:
     )
     started_at: float = time.time()
     outcomes: list[TaskOutcome] = []
-    async for outcome in play(run_config, login_env, secrets, model, tasks, command.repeat):
+    async for outcome in play(run_config, login_env, secrets, model, tasks, command.repeat, NO_HARNESS, False):
         outcomes.append(outcome)
         sys.stdout.write(_progress_line(outcome) + "\n")
         await asyncio.to_thread(save_report, evals_dir(), _report_of(config, model, started_at, outcomes))

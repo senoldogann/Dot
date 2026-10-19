@@ -59,7 +59,7 @@ function blendPose(a, b, t) {
 // The morph's length when the body's shape or the rest expression changes.
 export const SHAPE_MORPH = 0.45;
 // The gaze's catch-up toward its target: shorter than SHAPE_MORPH, a following gaze looks attentive, not viscous.
-export const LOOK_MORPH = 0.24;
+const LOOK_MORPH = 0.24;
 
 export class CharacterEngine {
   // `scale` is the ball's radius at rest in viewBox units; `shape` a radii array of skins.js or null; `expression`

@@ -16,6 +16,7 @@ from dotagent.agent.prompt import build_system_prompt, clock_note, collect_promp
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
+from dotagent.harness.components import NO_HARNESS
 from dotagent.llm.types import ImageData, Message, assistant_message, user_message
 from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, QuestionMode, Route
@@ -135,6 +136,7 @@ def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 
@@ -212,6 +214,7 @@ def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 
@@ -254,6 +257,7 @@ def _in_mode(mode: RunMode) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 
@@ -295,6 +299,7 @@ def test_task_and_research_runs_keep_acting_and_take_an_ask_to_keep_going_at_its
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
     for rule in rules:

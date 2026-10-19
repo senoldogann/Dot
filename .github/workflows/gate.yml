@@ -42,6 +42,14 @@ jobs:
           enable-cache: true
       - name: Install
         run: uv sync --frozen
+      # The checks of the web interface (package.json): Biome, tsc over the JSDoc, the unit tests of its pure modules.
+      # Node is a development requirement only; nothing of Dot needs it to run.
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Interface tooling
+        run: npm ci
       # The search tool runs ripgrep; the runner image has Homebrew but not rg.
       - name: Ripgrep
         run: brew install ripgrep
@@ -53,6 +61,8 @@ jobs:
         run: uv run ruff check src tests
       - name: Types
         run: uv run mypy src
+      - name: Interface checks
+        run: npm run check
       - name: Unit tests
         run: uv run pytest tests/unit -q -n auto -p no:cacheprovider
       - name: Eval references
