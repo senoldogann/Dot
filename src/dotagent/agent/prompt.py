@@ -712,6 +712,21 @@ def recalled_note(notes: Sequence[str], left_out: int, skills: Sequence[Skill], 
     return "\n\n".join(parts)
 
 
+def recalled_again(
+    rendered: Sequence[str], left_out: int, skills: Sequence[Skill], forgotten: Sequence[str], present: str
+) -> str:
+    """After a compaction of the run: what of the message's note the context ``present`` (its user messages) no
+    longer carries, the notes ``rendered`` as they stand now, the ``left_out`` line, the ``skills`` and the
+    ``forgotten`` not yet named; "" when it carries all of it still."""
+    left: str = _left_out_line(left_out)
+    return recalled_note(
+        notes_missing(rendered, present),
+        0 if left == "" or left in present else left_out,
+        [skill for skill in skills if f"- {skill.name}: {skill.description}" not in present],
+        forgotten_unnamed(forgotten, present),
+    )
+
+
 def turn_note(
     now: datetime, notes: Sequence[str], left_out: int, skills: Sequence[Skill], forgotten: Sequence[str]
 ) -> str:

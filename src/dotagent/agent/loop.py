@@ -117,7 +117,7 @@ from dotagent.agent.prompt import (
     forgotten_unnamed,
     handed_note_ids,
     notes_missing,
-    recalled_note,
+    recalled_again,
     turn_note,
 )
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
@@ -1769,11 +1769,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         whichever messages it folded away."""
         kept: list[MemoryRecord] = await runtime.store.get_memories(recalled_ids)
         gone: list[str] = sorted(set(recalled_ids) - {record.id for record in kept})
-        return recalled_note(
-            notes_missing([render_note(record) for record in kept], present),
-            recalled.tainted_left_out,
-            extra_skills,
-            forgotten_unnamed(gone, present),
+        return recalled_again(
+            [render_note(record) for record in kept], recalled.tainted_left_out, extra_skills, gone, present
         )
 
     history.append(

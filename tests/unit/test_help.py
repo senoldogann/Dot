@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.help.apps import scriptable_apps
 from dotagent.help import meaning
+from dotagent.help.apps import scriptable_apps
 from dotagent.help.meaning import _BATCH, _COLD_TEXTS, _KEPT_TEXTS, HelpVectors, HelpVectorsCold
 from dotagent.help.rank import rank, words
 from dotagent.help.types import HelpItem

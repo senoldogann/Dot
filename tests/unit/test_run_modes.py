@@ -16,7 +16,10 @@ from dotagent.agent.prompt import (
     build_system_prompt,
     clock_note,
     collect_prompt_inputs,
+    forgotten_unnamed,
     handed_note_ids,
+    notes_missing,
+    recalled_again,
     recalled_note,
     turn_note,
 )
@@ -218,6 +221,9 @@ def test_the_note_under_a_message_carries_what_changes_from_message_to_message(t
     note: str = "[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"
     changed: str = "[mem_1] The rent is due on the 5th (the user wrote it, 2026-10-19)"
     assert notes_missing([note, changed], f"earlier\n- {note}\n") == [changed]
+    # After a compaction, only what the context lost comes back: nothing, while it carries the whole note still.
+    assert recalled_again([note], 1, [skill], ["mem_7"], f"{full}\n{gone}") == ""
+    assert recalled_again([note], 1, [skill], ["mem_7"], "") == recalled_note([note], 1, [skill], ["mem_7"])
 
 
 def _lines(approvals: ApprovalMode) -> set[str]:
