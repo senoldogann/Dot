@@ -75,9 +75,11 @@ currency, so list sites that bill in one currency. Empty by default.
 1. *Auto-review* denies actions that read secrets or send data out (`secret_access`, `exfiltration`), whatever else is
    configured.
 2. The *run mode* denies what a research run may not do.
-3. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
+3. *Dot's own files*: a change of them (`self_change`, below) is a question to you in every approval mode but `yolo`,
+   which no rule of yours and no review model answers in your place (item 398). Allowed, the run makes the change.
+4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
    yourself. A payment under the pre-approved caps of its site (below) is a question instead of a hand-off.
-4. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
+5. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
    it needs done and waits; on a browser step you can take the browser over, do it and give it back; when you say you
@@ -96,7 +98,8 @@ currency, so list sites that bill in one currency. Empty by default.
    use of any tool: Dot does it without asking."), which the protections that are always on still bound; words that
    make no rule are answered with the reason, in English.
    An approval card offers *Make a rule of this*, which opens the tab with a sentence about the action in the box.
-5. *The preset* decides everything that is left:
+6. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
+   when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
 | Preset                 | Asks before                                                                                                                 |
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------- |
@@ -110,7 +113,7 @@ name (not `cp -n`), `ln -f`, `tee` without `-a`, `dd` without `conv=notrunc`. Th
 replaces, unlike the file tools, whose changes `dotx undo` writes back.
 
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The first three steps above hold in every mode.
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The first four steps above hold in every mode.
 
 **Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
 with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,
@@ -135,7 +138,7 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
 - The memory tools refuse a note that holds a key-like string or one of the secrets Dot holds (`memory_save`,
   `memory_update`), and tell the model to record where the key lives, not the key. A note you write yourself, with
   `dotx memory add` or on the Memory page, is yours and not refused.
-- In `ask` and `auto` the browser and desktop tools never type into password, one-time-code and card fields: the field
+- Outside `yolo` the browser and desktop tools never type into password, one-time-code and card fields: the field
   that would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). A
   `yolo` run types into them what it can read itself (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). In the same way `terminal_send` types nothing outside
@@ -159,18 +162,19 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   In any mode, a tool that names files (the file tools, `web_extract`, `browser_upload`) looks at them again as it
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
   and called again it is decided for where the path leads now.
-- Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
-  own code (the folder its package is imported from, the Python environment it runs in and the Python under that, and
-  the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
+- Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but changes them only once you
+  agree: its own code (the folder its package is imported from, the Python environment it runs in and the Python under
+  that, and the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
   of the MCP servers you added from other agents and on Customize › Plugins, the home of the OpenCode server it starts,
-  the playbooks it learned and the file of its emergency stop. The file
-  tools refuse to write there, and so does the shell guard for a line that writes there by a copy or a move (its target
-  folder option too), `dd`, a redirect, a download, a clone, an unpacked archive, git run in one of those folders, a
-  file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline code that names the place (in a word of switches such
-  as `-pe` too). The guard reads the line, not what a program does; the sandbox below holds what it cannot read. A
-  plugin's MCP servers, and those you added, start with the daemon and are given keys from the key store: put a plugin
-  or a skill in place yourself.
+  the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there
+  (`self_change`, item 398), in every approval mode but `yolo`, and neither the review model nor a rule of yours answers
+  in your place; OpenCode's own agent, which writes past the journal `dotx undo` reads, is refused. The shell guard
+  refuses a line that writes there: by a copy or a move (its target folder option too), `dd`, a redirect, a download, a
+  clone, an unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`)
+  or inline code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a
+  program does; the sandbox below holds what it cannot read. A plugin's MCP servers, and those you added, start with the
+  daemon and are given keys from the key store: put a plugin or a skill in place yourself.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
   files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals,
@@ -220,7 +224,7 @@ at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.
 move them together. A missing or refused key, a spent quota or a failed request turns it off for `[models]
 helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key
 saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key. The click questions
-are asked in `ask` and `auto` only: in `yolo` a flag asks nothing, so a click there sends nothing to TypeSafe. Two more
+are asked in every mode but `yolo`, where a flag asks nothing, so a click sends nothing to TypeSafe. Two more
 checks run before a model call when the judge is on. A `browser_act` that names what it expects to see after its steps
 (`expect`: "the reply shows under the post") gets, above its result, the probability that the page's text shows it and
 that the page is a login wall, a CAPTCHA or an error page, from one request over the page's visible text, so the next
@@ -268,9 +272,9 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
-counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`; in
-`auto` and `yolo` the questions of the policy are answered for you. A question of the agent itself (`ask_user`) waits
-the same way, except in a run nobody can answer during it (see
+counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`,
+and `supervised` asks before every change as well; in `auto` and `yolo` the questions of the policy are answered for
+you. A question of the agent itself (`ask_user`) waits the same way, except in a run nobody can answer during it (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with what it
 leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows ticked
 are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by commas)

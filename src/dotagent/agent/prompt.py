@@ -105,7 +105,12 @@ _PRESET_TEXT: dict[Preset, str] = {
 
 # The default, ask, is what the preset line and the trust rules already say; only the other modes get a line of their
 # own.
-_APPROVALS_TEXT: dict[Literal["auto", "yolo"], str] = {
+_APPROVALS_TEXT: dict[Literal["supervised", "auto", "yolo"], str] = {
+    "supervised": (
+        "supervised: the user approves every change before it happens: each file you write, each command that does "
+        "more than read, each entry or click in a page or an app. Reads run at once. Find out what you need first, "
+        "then make the changes in few clear steps, each saying what it changes."
+    ),
     "auto": (
         "auto: what the policy flags is answered by a review model in the user's place. It approves what the user's "
         "instructions plainly cover and refuses the rest, so keep to what was asked; when it refuses something, do "
@@ -367,7 +372,7 @@ password managers) unless the user explicitly asked for that exact item.
 when the task is about what the user copied."""
 
 
-# In ask and auto the browser and the desktop refuse to type into a field that takes a secret; yolo enters them.
+# Outside yolo the browser and the desktop refuse to type into a field that takes a secret; yolo enters them.
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
 )

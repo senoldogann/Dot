@@ -12,7 +12,7 @@ import { icon } from "./icons.js";
 import { modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
-import { approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
+import { approvalBadge, approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
 import { getSnapshot, loadModels, refresh } from "./state.js";
 import { attempt, toast } from "./ui.js";
 
@@ -21,8 +21,6 @@ export const MODES = [
   { id: "chat", label: "Chat", hint: "Converse; use tools whenever they help", icon: "message" },
   { id: "research", label: "Research", hint: "Read-only: gather information and report, change nothing", icon: "search" },
 ];
-// The Options pill's icon by approval mode: closed for Ask, a guard for Auto (a review model answers), open for YOLO.
-const APPROVAL_ICONS = { ask: "lock", auto: "shield", yolo: "lockOpen" };
 // Never a real value of a status, so the first synchronisation always paints.
 const NOTHING_SHOWN = false;
 // What the pills add to their tooltips while a run works on a chat's page: a message waits in the queue and starts
@@ -102,10 +100,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   // it acts.
   const optionsPill = composerPill({ id: "options", caption: "Options", value: "", icon: null });
   setTitle(optionsPill.element, optionsTitle);
+  // The pill wears the mode's shorter name and its icon (item 398), its tooltip the whole name.
   const approvals = approvalsPicker((shown) => {
-    optionsPill.setValue(shown === null ? "" : approvalLabel(shown), "");
-    optionsPill.setIcon(icon(shown === null ? "lock" : APPROVAL_ICONS[shown]));
+    const badge = shown === null ? null : approvalBadge(shown);
+    optionsPill.setValue(badge === null ? "" : badge.short, "");
+    optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
     optionsPill.setTone(shown === "yolo" ? "warn" : null);
+    setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));
   frame.addMenuItems(() => [goalMode.element]);

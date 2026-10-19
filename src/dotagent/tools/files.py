@@ -105,7 +105,7 @@ def write_action(
     elif path_class == "system":
         risk, flags = "high", ("system_settings", "outside_workspace")
     elif path_class == "dot":
-        risk, flags, summary = "high", ("secret_access",), f"{summary} ({CHANGES_DOT})"
+        risk, flags, summary = "high", ("self_change",), f"{summary} ({CHANGES_DOT})"
     else:
         risk, flags = "high", ("secret_access",)
     return ActionInfo(tool=tool, kind="write", risk=risk, summary=summary, target=str(path), flags=flags)

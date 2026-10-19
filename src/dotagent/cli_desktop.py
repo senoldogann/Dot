@@ -37,8 +37,9 @@ from dotagent.tools.desktop import snapshot_budget
 _NONCE_BYTES: int = 8
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
-    "who answers what the policy would ask: ask (you), auto (a review model) or yolo (nobody; the run also reads "
-    "secrets, pays and signs in by itself, and only your hand-off rules stop it)"
+    "who answers what the policy would ask: supervised (you, and before every change too), ask (you; edits and "
+    "routine work run), auto (a review model) or yolo (nobody; the run also reads secrets, pays and signs in by "
+    "itself, and only your hand-off rules stop it). A change of Dot's own files asks you in every mode but yolo"
 )
 _GOAL_MODE_HELP: str = (
     "a checker sends the run back to work until the goal is really reached (default: [agent] goal_mode)"

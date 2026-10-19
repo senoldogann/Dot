@@ -298,7 +298,7 @@ def secret_field_flag(kind: SecretKind) -> Flag:
 
 
 async def refuse_secret_field(field: SecretField) -> None:
-    """The secret-field check of the ask and auto modes: no text goes into a field that takes a secret."""
+    """The secret-field check of every mode but yolo: no text goes into a field that takes a secret."""
     raise BrowserError(
         f"refusing to type into {secret_field_label(field.kind)}: ask the user to enter it themselves",
         {"action": "type", "ref": field.ref, "url": field.url},

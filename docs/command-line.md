@@ -31,9 +31,10 @@ can be resumed too.
 - `--mode research` makes the run read-only
 - `--model provider:model` picks the model for this run, for example `ollama:gpt-oss:20b-cloud`
 - `--effort LEVEL` picks the reasoning level for this run (see [Models and providers](models.md#models-and-providers))
-- `--approvals ask|auto|yolo` picks who answers the questions of the policy in this run: you (`ask`, the default), a
-  review model (`auto`) or nobody (`yolo`); `--auto-approve` and `--yolo` are short for the last two. `chat` takes the
-  same flags (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run))
+- `--approvals supervised|ask|auto|yolo` picks who answers the questions of the policy in this run: you, and before
+  every change too (`supervised`), you (`ask`, the default), a review model (`auto`) or nobody (`yolo`);
+  `--auto-approve` and `--yolo` are short for the last two. `chat` takes the same flags (see
+  [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run))
 - `--goal-mode` / `--no-goal-mode` turns the check of the answer against the goal on or off for this run (`run` only)
 - `--thread ID` continues an earlier conversation; the line printed at the end of a run names its thread
 - `--no-input` never prompts: every approval that would wait for you is denied and questions go unanswered. The same

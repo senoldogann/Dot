@@ -101,9 +101,11 @@ grows with it, the files attached and the picks under it, then one bar that neve
 Chat or Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent
 exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
 default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
-per model) and **Options** (a lock, closed for Ask, a shield for Auto, open for YOLO: the approval mode, which the pill
-always shows, see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run); YOLO in the warn ink, on no
-fill) and the round send, quiet while the box is empty. Each pill is an icon and its value, on no ground until the
+per model) and **Options** (the approval mode, which the pill always shows by its icon and a short name: a lock for
+Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock for YOLO, in the warn ink, on no
+fill; its menu lists the four modes with what each does, item 398, see
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)) and the round send, quiet while the box is
+empty. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
 the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
