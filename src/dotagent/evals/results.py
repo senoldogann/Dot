@@ -82,8 +82,9 @@ class TaskOutcome(FrozenModel):
 
 class EvalSettings(FrozenModel):
     """The settings of the run that change how a model fares, kept with the report so that two reports can be compared
-    knowing whether they ran the same way. ``tier`` is the tier ``[agent] tiers`` set for the evaluated model, the only
-    way to make it weak in an eval: an attempt's run history is empty. A report that does not record
+    knowing whether they ran the same way. ``context_tokens`` is ``[agent] context_tokens``: a number of tokens, or
+    ``"most"`` of each model's window (item 396). ``tier`` is the tier ``[agent] tiers`` set for the evaluated model,
+    the only way to make it weak in an eval: an attempt's run history is empty. A report that does not record
     ``stall_escalation`` counts as run without it, one that does not record ``tier`` as run with the standard tier, one
     that does not record ``tool_surface`` as run with every tool offered at every step, one that does not record
     ``verify_answer_paths`` as run without the check of the paths a final answer names, one that does not record
@@ -91,7 +92,7 @@ class EvalSettings(FrozenModel):
 
     effort: str
     goal_mode: bool
-    context_tokens: int
+    context_tokens: int | Literal["most"]
     preset: str
     stall_escalation: bool = False
     tier: Tier = "standard"

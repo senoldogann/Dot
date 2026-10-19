@@ -295,7 +295,7 @@ async def test_a_chat_keeps_what_its_composer_chose_after_a_reload_and_in_anothe
             await _pill(page, "reasoning").click()
             await _menu(page, "Reasoning").get_by_role("option", name="High").click()
             await _pill(page, "options").click()
-            await _menu(page, "Options").get_by_role("button", name="Auto").click()
+            await _menu(page, "Options").locator(".pop-option[data-mode='auto']").click()
             await page.keyboard.press("Escape")
             await _shows(page, "Research", "thinker", "High", "Auto")
             await _kept(
@@ -357,7 +357,7 @@ async def test_a_run_moved_to_a_standby_model_leaves_the_chats_model(
             for width, scheme in (_SHOTS[1], _SHOTS[2]):
                 page, errors = await _page(browser, address, width, scheme)
                 await page.goto(f"{address}/#/runs/{first.id}")
-                await _shows(page, "Task", "thinker", "Low", "Ask")
+                await _shows(page, "Task", "thinker", "Low", "Edits")
                 await page.screenshot(path=str(tmp_path / f"standby-{width}-{scheme}.png"), animations="disabled")
                 assert errors == []
                 await page.context.close()

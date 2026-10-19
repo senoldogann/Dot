@@ -1,14 +1,16 @@
 """The context meter of a run's composer (item 222): a ring of how much of the run's context budget its last step
 filled, warning near the budget and past it, and on a click the figures: the tokens the step sent the model, the budget
 past which Dot summarizes the older part of the run, and the model's window; for a model given a context size of its own
-(item 250), that size and the point past which the run summarizes, which the timeline notes too. Runs seeded with their
-scaffold and assistant events, served by a real server, wide and on a phone, light and dark."""
+(item 250), that size and the point past which the run summarizes, which the timeline notes too; and a link that opens
+Settings › Models at the model's context size (item 396). Runs seeded with their scaffold and assistant events, served
+by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 import pytest
 import pytest_asyncio
@@ -32,6 +34,8 @@ _BUDGET: int = 96_000
 _WINDOW: int = 1_000_000
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
 _METER: str = ".dock .context-meter"
+# Settings › Models, at the context size of the run's model (item 396).
+_SIZE_SETTING: str = f"#/settings/models?model={quote(SCRIPTED_MODEL, safe='')}"
 # The scaffold event of a run from before item 250, which names no chosen size and no point of summary.
 _UNSIZED: JsonObject = {
     "model": SCRIPTED_MODEL,
@@ -213,14 +217,25 @@ async def test_the_context_meter_shows_how_much_of_the_budget_the_last_step_fill
                         "summarizes its older part.",
                         "The model holds 1,000,000 tokens.",
                         "Each step sends the model the whole run again, so a run kept within its budget is answered "
-                        "sooner and costs less. Dot's default size sets the budget, and Settings › Models one model's "
-                        "own, up to three quarters of the model's window. In the config file: [agent] context_tokens.",
+                        "sooner and costs less. Dot's default size sets the budget: the most the model's window "
+                        "allows, three quarters of it, unless [agent] context_tokens sets one number. Settings › "
+                        "Models gives a model a size of its own.",
                     ]
                 )
+                # The way to the model's own size in Settings › Models (item 396).
+                link: Locator = panel.get_by_role("link", name="Change context size")
+                await expect(link).to_have_attribute("href", _SIZE_SETTING)
                 await page.screenshot(path=str(tmp_path / f"meter-{width}-{scheme}.png"), animations="disabled")
                 await page.keyboard.press("Escape")
                 await expect(panel).to_be_hidden()
                 await page.close()
+            # The link opens Settings › Models on the run's model.
+            page = await _run_page(browser, served, near.id, 1280, "light")
+            await page.locator(_METER).click()
+            await page.get_by_role("link", name="Change context size").click()
+            await expect(page).to_have_url(f"{served}/{_SIZE_SETTING}")
+            await expect(page.locator("#fold-system-models")).to_be_attached()
+            await page.close()
             # Past the budget the ring is full and says so; with room it says that.
             for run, level, label, filled in (
                 (past, "full", "Context: 105% of the run's budget, 101k of 96k tokens", 100),

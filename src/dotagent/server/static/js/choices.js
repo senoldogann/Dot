@@ -12,7 +12,7 @@ import { icon } from "./icons.js";
 import { modelPicker } from "./modelpicker.js";
 import { anchoredPopover } from "./popover.js";
 import { providerMark, providerOf } from "./providers.js";
-import { approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
+import { approvalBadge, approvalLabel, approvalsPicker, goalModePicker } from "./runmodes.js";
 import { getSnapshot, loadModels, refresh } from "./state.js";
 import { attempt, toast } from "./ui.js";
 
@@ -21,8 +21,6 @@ export const MODES = [
   { id: "chat", label: "Chat", hint: "Converse; use tools whenever they help", icon: "message" },
   { id: "research", label: "Research", hint: "Read-only: gather information and report, change nothing", icon: "search" },
 ];
-// The Options pill's icon by approval mode: closed for Ask, a guard for Auto (a review model answers), open for YOLO.
-const APPROVAL_ICONS = { ask: "lock", auto: "shield", yolo: "lockOpen" };
 // Never a real value of a status, so the first synchronisation always paints.
 const NOTHING_SHOWN = false;
 // What the pills add to their tooltips while a run works on a chat's page: a message waits in the queue and starts
@@ -64,7 +62,7 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * `level` (`read(info)`, the reasoning level chosen for a model, or null for the daemon's; `write(info, level)`, null to
  * go back to the daemon's), `speed` (`read()`, "fast" or "standard"; `write(speed)`: fast mode, which a run asks for
  * only of a model that has it, item 223), `approvals` and `goalMode` (as `approvalsPicker` and `goalModePicker` take
- * them).
+ * them), and `once` (the id of a choice for one message armed as the box opens, or null; item 397).
  * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after the approvals, `onMode(id)` runs
  * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then). Goal mode's switch is a
  * row of the frame's "+" menu (item 318), and a chat, which has neither, hides it and Plan first.
@@ -72,7 +70,8 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
  * `ready()` (resolves once the models are loaded), `value()` (what the next message starts its run with: `{ mode, model,
  * effort, speed, approvals, goal_mode, once }`, `once` the id of a choice for one message, item 251, whose level the
- * daemon asks for instead of `effort`), `kept()` (the same without `once`, as a chat keeps them), `sent()` once a
+ * daemon asks for instead of `effort`), `kept()` (the same without `once`, as a chat keeps them), `armed()` (the id of
+ * the choice for one message armed from the menu, or null, not the word in the box), `sent()` once a
  * message went, which puts the choice for one message away, `sync()` after a status change, `setWaiting(on)` (while a
  * run works, the choices wait for the next follow-up and the pills say so), `setWords(on)` (whether the word ultrathink
  * or ultracode in the box arms its choice, item 259) and `dispose()`.
@@ -101,10 +100,13 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   // it acts.
   const optionsPill = composerPill({ id: "options", caption: "Options", value: "", icon: null });
   setTitle(optionsPill.element, optionsTitle);
+  // The pill wears the mode's shorter name and its icon (item 398), its tooltip the whole name.
   const approvals = approvalsPicker((shown) => {
-    optionsPill.setValue(shown === null ? "" : approvalLabel(shown), "");
-    optionsPill.setIcon(icon(shown === null ? "lock" : APPROVAL_ICONS[shown]));
+    const badge = shown === null ? null : approvalBadge(shown);
+    optionsPill.setValue(badge === null ? "" : badge.short, "");
+    optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
     optionsPill.setTone(shown === "yolo" ? "warn" : null);
+    setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));
   frame.addMenuItems(() => [goalMode.element]);
@@ -172,7 +174,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   let shownDefault = NOTHING_SHOWN;
   // The choice for one message armed (item 251), an id of ONE_MESSAGE (efforts.js), or null: the next message goes with
   // it, and the one after with the kept level again.
-  let once = null;
+  let once = kept.once;
   // The choice the word in the box named when the frame was last painted (item 259), and whether a word may arm one:
   // not while the box edits a queued message, whose save changes its text alone, nor while its send steers the run
   // under way, which keeps its level (`setWords`).
@@ -269,6 +271,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     reasoningMenu.close();
     paintModel();
     reasoningPill.element.focus();
+    onChange();
   }
 
   function pickSpeed(speed) {
@@ -413,6 +416,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
       return { ...keptNow(), once: boost === null ? null : boost.id };
     },
     kept: keptNow,
+    armed: () => once,
     sent: () => {
       once = null;
       paintModel();

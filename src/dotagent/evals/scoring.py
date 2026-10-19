@@ -271,10 +271,15 @@ def _easy_ways(card: Scorecard) -> str:
 def render_scorecard(card: Scorecard) -> list[str]:
     """The lines that show one scorecard."""
     settings: EvalSettings = card.settings
+    context: str = (
+        "the most of the window as context"
+        if settings.context_tokens == "most"
+        else f"{settings.context_tokens} context tokens"
+    )
     lines: list[str] = [
         card.model,
         f"  run with effort {settings.effort}, goal mode {'on' if settings.goal_mode else 'off'}, "
-        f"{settings.context_tokens} context tokens, preset {settings.preset}, "
+        f"{context}, preset {settings.preset}, "
         f"stall escalation {'on' if settings.stall_escalation else 'off'}, tier {settings.tier}, "
         f"tool surface {settings.tool_surface}, prompt {settings.prompt}, "
         f"answer path check {'on' if settings.verify_answer_paths else 'off'}",

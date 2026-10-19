@@ -24,6 +24,8 @@ export function anchoredPopover({ anchor, frame, label, build }) {
     const room = frame.clientWidth - panel.offsetWidth - EDGE_PX;
     panel.style.left = `${Math.max(EDGE_PX, Math.min(anchor.offsetLeft, room))}px`;
     panel.style.bottom = `${frame.clientHeight - anchor.offsetTop + EDGE_PX}px`;
+    // The height the window has above the control, which the panel keeps within (app.css), so its top never leaves it.
+    panel.style.setProperty("--room-above", `${Math.max(0, anchor.getBoundingClientRect().top - 2 * EDGE_PX)}px`);
   }
 
   function focusChoice() {

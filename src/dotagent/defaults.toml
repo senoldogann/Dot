@@ -144,14 +144,14 @@ max_concurrent = 4
 # campaign's claim of its targets hold, or a run's answer in goal mode reach its goal? Below target_threshold the claim
 # is refused before the goal checker is asked. And when a browser_act names what it expects to see (expect), the result
 # opens with the probability that the page shows it and that it is a login wall, a CAPTCHA or an error page. The click
-# questions are asked in ask and auto only: in yolo a flag asks nothing, so a click there sends nothing.
+# questions are asked in every mode but yolo, where a flag asks nothing, so a click sends nothing.
 # "none" leaves both to the patterns and the goal checker; "typesafe" asks TypeSafe's System One API, a paid service:
 # one request per judged click or claim, bounded by timeout_s. A missing key or a failed request leaves the decisions
 # to the patterns and the goal checker for [models] helper_cooldown_s, with a judge_unavailable event.
 # The thresholds were set on TypeSafe's answers from jev-1.13.0, so the model is that version, not the jev-latest alias,
 # which moves with each release: move the model and the thresholds together. Clicks: on 26 labels in other languages,
 # over three runs, every yes scored at least 0.49 and every no at most 0.46; a missed yes lets a click through without
-# its question in ask and auto, a wrong flag only asks, so the threshold sits under every yes even where it flags the
+# its question outside yolo, a wrong flag only asks, so the threshold sits under every yes even where it flags the
 # highest no's. Claims: true ones scored 0.24 to 0.71, false ones 0.03 to 0.15, and a true claim the judge refused would
 # keep a campaign from ending, so only a clearly false one is refused; the goal checker reads the rest.
 # second_opinion asks each question a second time in an independent phrasing (a second request per judged click or
@@ -209,13 +209,16 @@ campaign_browser = "attach"
 consult_max_per_run = 5
 tool_output_chars = 12000
 # The prompt budget of a run: past 60 % of it older tool output is shortened, past all of it the older part of the run is
-# summarized. A model whose window is smaller gets three quarters of its window instead (for Ollama the window is at most
-# [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model), and tool_output_chars shrinks in the same proportion.
-# A wider budget means fewer summaries in a long run and more input tokens a step (item 55, decision 33 of the roadmap):
-# 48000 was the budget before 2026-10-11; set it back on a metered key if the tokens weigh more than the summaries.
-context_tokens = 96000
+# summarized. "most" gives each model three quarters of its window, the most it may be given (item 396; for Ollama the
+# window is at most [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model), and 96000 to a model whose provider
+# does not say its window; a number gives every model that budget, or three quarters of its window when that is less.
+# [models.context] and Settings › Models give one model a size of its own instead. A wider budget means fewer summaries
+# in a long run and more input tokens a step (item 55, decision 33 of the roadmap): 96000 was the budget from 2026-10-11
+# and 48000 before; set a number on a metered key if the tokens weigh more than the summaries. tool_output_chars is meant
+# for a budget of 96000 (or of the number set here), and shrinks in proportion when a window cuts a budget under that.
+context_tokens = "most"
 # Where in the budget the harness acts (item 87, after arXiv 2609.20804): past context_elide_share of the run's budget
-# older tool output is shortened; past context_summarise_share of context_tokens the older part of the run is
+# older tool output is shortened; past context_summarise_share of the model's context size the older part of the run is
 # summarised into a note (a model whose window cuts the budget under that point summarises when its budget is full).
 # The paper's finding is that eliding first and summarising at 85 % keeps a run's answers at the quality of a run that
 # never compacts; 1.0 would summarise only when the budget is full, as before.
@@ -245,7 +248,8 @@ revisit_window = 8
 finish_nudges = 2
 # What ask_user does in a run nobody can answer during the run (yolo, scheduled and eval runs): "leave" stores the
 # question for you (the run's page lists it, your answer goes on with the work in the run's thread) and the run goes on
-# at once; "wait" waits for an answer as a run you started in ask or auto mode always does (approval_timeout_s at most).
+# at once; "wait" waits for an answer as a run you started in any mode but yolo always does (approval_timeout_s at
+# most).
 questions = "leave"
 parallel_tools = 4
 model_call_timeout_s = 420.0
@@ -347,11 +351,15 @@ step_router_threshold = 0.6
 # aggressive: act without asking except for the hard stops; balanced: ask for external side effects;
 # cautious: ask for everything that is not read-only.
 preset = "aggressive"
-# Who answers a question the policy raises: "ask" = you; "auto" = the review model decides and passes on what it cannot
-# decide; "yolo" = nobody is asked, the action is allowed and recorded. With ask and auto, secrets and exfiltration are
-# refused and money and credentials are handed to you, and Dot never types into a password, one-time-code or card
-# field. yolo lets all of that through and records it (a run types the codes it can read itself); a research run stays
-# read-only, your own hand-off rules still stop a run, and the desktop tools never control a password manager.
+# Who answers a question the policy raises (item 398): "supervised" = you, and you are also asked before every change
+# the preset lets through (a file, a command that does more than read, an entry or a click in a page or an app); "ask"
+# = you, while edits and routine work run (the web UI calls it Auto-accept edits); "auto" = the review model decides
+# and passes on what it cannot decide; "yolo" = nobody is asked, the action is allowed and recorded. In every mode but
+# yolo a change of Dot's own files (its code, plugins, skills, playbooks, emergency stop) asks you, never the review
+# model, and secrets and exfiltration are refused, money and credentials are handed to you, and Dot never types into a
+# password, one-time-code or card field. yolo lets all of that through and records it (a run types the codes it can
+# read itself); a research run stays read-only, your own hand-off rules still stop a run, and the desktop tools never
+# control a password manager.
 approvals = "ask"
 approval_timeout_s = 900.0
 protected_paths = [

@@ -11,7 +11,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, ConsoleMessage, Page, Route, async_playwright, expect
+from playwright.async_api import Browser, ConsoleMessage, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -296,20 +296,38 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await page.keyboard.press("Escape")
                 await expect(plus).to_be_hidden()
                 options_pill = page.locator(".composer-pill[data-pill='options']")
-                await expect(options_pill).to_contain_text("Ask")
+                await expect(options_pill).to_contain_text("Edits")
                 await options_pill.click()
                 popover = page.locator(".composer .composer-popover[aria-label='Options']")
                 await expect(popover.get_by_role("group", name="Approvals")).to_be_visible()
                 await expect(popover.get_by_role("switch", name="Goal mode")).to_have_count(0)
                 await expect(popover.get_by_role("switch", name="Keep going until done")).to_have_count(0)
                 await page.screenshot(path=str(tmp_path / f"options-menu-{width}.png"), animations="disabled")
-                await popover.get_by_role("button", name="YOLO").click()
+                # The four modes, strictest first, each with its icon and what it does (item 398).
+                modes: Locator = popover.get_by_role("listbox", name="Approval mode").get_by_role("option")
+                assert await modes.evaluate_all("(rows) => rows.map((row) => row.dataset.mode)") == [
+                    "supervised",
+                    "ask",
+                    "auto",
+                    "yolo",
+                ]
+                await expect(modes.locator(".pop-option-text > span:first-child")).to_have_text(
+                    ["Supervised", "Auto-accept edits", "Auto", "YOLO"]
+                )
+                await popover.locator(".pop-option[data-mode='yolo']").click()
                 await expect(options_pill).to_contain_text("YOLO")
                 await expect(options_pill).to_have_attribute("data-tone", "warn")
+                # The four modes and YOLO's warning show whole, with no scroll, where the window has the room.
+                await expect(popover.locator(".note.warn")).to_be_visible()
+                assert await popover.evaluate("(menu) => menu.scrollHeight <= menu.clientHeight")
                 await expect(options_pill.locator("[data-icon='lockOpen']")).to_have_count(1)
-                await popover.get_by_role("button", name="Ask").click()
-                await expect(options_pill).to_contain_text("Ask")
+                await popover.locator(".pop-option[data-mode='supervised']").click()
+                await expect(options_pill).to_contain_text("Supervised")
                 await expect(options_pill.locator("[data-icon='lock']")).to_have_count(1)
+                await popover.locator(".pop-option[data-mode='ask']").click()
+                await expect(options_pill).to_contain_text("Edits")
+                await expect(options_pill).to_have_attribute("title", "Approvals: Auto-accept edits")
+                await expect(options_pill.locator("[data-icon='pencil']")).to_have_count(1)
                 # A click outside (on the empty page under the composer) closes the menu.
                 await page.mouse.click(width - 20, 880)
                 await expect(popover).to_be_hidden()
@@ -390,7 +408,7 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 await expect(page.locator(".composer-pill[data-pill='reasoning']")).to_be_visible()
                 options_pill = page.locator(".composer-pill[data-pill='options']")
                 await options_pill.click()
-                await page.locator(".composer-popover[aria-label='Options']").get_by_role("button", name="YOLO").click()
+                await page.locator(".composer-popover[aria-label='Options'] .pop-option[data-mode='yolo']").click()
                 await page.mouse.click(width - 20, 880)
                 await expect(page.locator(".composer-popover[aria-label='Options']")).to_be_hidden()
                 await page.mouse.move(0, 0)

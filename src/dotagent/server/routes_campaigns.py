@@ -87,4 +87,15 @@ def campaigns_router(ctx: ServerContext) -> APIRouter:
         await stop_session(campaign_id)
         return await detail(campaign_id)
 
+    @router.delete("/campaigns/{campaign_id}", status_code=204)
+    async def delete(campaign_id: str) -> None:
+        """Delete a campaign that is not active, with its ledger and the threads of its sessions after the first; its
+        conversation stays a chat. 409 while it is active or a run works in one of its chats; no run starts on them
+        while they are deleted."""
+        campaign: CampaignRecord = await store.get_campaign(campaign_id)
+        sessions: list[RunRecord] = await store.campaign_sessions(campaign.id)
+        chats: list[str] = list(dict.fromkeys([campaign.thread_id, *(session.thread_id for session in sessions)]))
+        with ctx.manager.deleting_threads(chats):
+            await store.delete_campaign_with_sessions(campaign.id)
+
     return router

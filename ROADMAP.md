@@ -14892,6 +14892,149 @@ retires and adopts again on the page, and opens the row on a phone. **Left for l
 the owner's kept as a test of the scoring set from its page, a step started from the page, the graph drawn on it, and
 the switch of `step_time` from the page, which needs the settings writer to learn `[harness]`.
 
+### 394. A campaign is stopped, marked achieved or deleted from its row
+
+**Status: done (2026-10-19), on `item-394-campaign-cards`.** The owner's word of 2026-10-19: "Campaigns sayfasinda bir
+campaigns stop yada mark achieved yapmak icin icine girmek gerekiyor, ona gerek kalmadan bu ikonlari svg olarak direk
+kartlara ekle. ve campaigns silme butonuda ekle dinamik olarak." (on the Campaigns page, a campaign is stopped or marked
+achieved only from inside it; put those icons on the cards as SVG instead, and add a button that deletes a campaign, as
+its state allows). **As built (2026-10-19).** A row of Campaigns has icon buttons, the shapes of `icons.js` the
+campaign's page uses (`views/campaigns.js` `rowActions`): Stop while the campaign is active, Mark achieved until it is
+achieved, and Delete once it is not active and none of its sessions works. Each asks as the campaign's page asks, from
+the same functions, and the list repaints the row where it is; the campaign's page has Delete too, on the same terms,
+beside Go on and Mark achieved, and goes back to the list after it. `DELETE /api/campaigns/{id}` (`routes_campaigns.py`,
+`Store.delete_campaign_with_sessions`) deletes in one transaction the campaign, its ledger and the threads of its
+sessions after the first with all they hold, through the deletes of a chat (`_delete_chats`, which `delete_threads`
+shares now). The conversation the campaign started in stays a chat: its runs are no longer the campaign's, so the run's
+page and the home's rows ask for no campaign that is gone, and the questions they left for the owner expire, since no
+brief reads their answers and an answer would otherwise start a run in the conversation. It is refused (409) while the
+campaign is active and while a run works in one of its chats, checked in the transaction of the deletes, and no run
+starts on those chats meanwhile (`deleting_threads`). `Store.delete_campaign`, which forgets a campaign whose opening
+session never started, is as it was. Tests: `tests/smoke/test_campaigns.py` (deleted with the thread of its later
+session, its conversation kept as a chat and its question expired, refused while active; refused while its session
+works, deleted once it has ended), `tests/smoke/test_campaign_rows.py` (the buttons of each state, each asking first
+and changing its row in place, and the rows on a phone). Docs: `docs/agents-and-campaigns.md`.
+
+### 395. The model menu's search looks through the provider shown
+
+**Status: done (2026-10-19), on `item-395-model-search`.** The owner's word of 2026-10-19: "bir provider secip search
+kutusuna model ismi yazdigimda diger provider sonuclarida geliyor bu yanlis, sadece secili provider modelleri
+icerisinden filtreleme yapmali." (when I pick a provider and type a model's name in the search box, the other providers'
+results come too; that is wrong, it should filter within the picked provider's models alone). **As built
+(2026-10-19).** The composer's model menu searched every provider once a word was typed, and its rail pressed none (item
+208, `modelpicker.js`). The search now narrows the view the rail shows, a provider's models or the favourites: the rail
+keeps that view pressed, the search's placeholder and label name what it looks through ("Search OpenAI models", "Search
+favourites"), a search that finds nothing says where ("No OpenAI models match “haiku”."), and a provider's rows do not
+name their provider in a search either. Another view on the rail keeps the words typed and looks through its own
+models, so a name typed in the wrong provider is found by pressing the right one; the default's row shows as before,
+when its words match. Tests: `tests/smoke/test_model_picker.py` (OpenAI's view finds its models alone and says it found
+nothing of another's; Anthropic's, shown next with the same words, finds it; the default made from such a search).
+Docs: `docs/daemon.md`.
+
+### 396. A model's context size is the most its window allows unless one is chosen, and the context meter leads to it
+
+**Status: done (2026-10-19), on `item-396-context-size`.** The owner's word of 2026-10-19: "Providerlarin modellerinin
+default context size en yüksek ne ise o olsun default providerin destekledigi, eger kisiler isterse modeller kismindan
+degistirir. Composerdaki halka içinede bir buton koy, change contextsize gibi ona tiklayinca o providerin o modeline
+gitsin direk." (the default context size of a provider's models should be the highest the provider supports, and
+whoever wants another changes it among the models; and put a button in the composer's ring, like change context size,
+that goes straight to that provider's model). **As built (2026-10-19).** `[agent] context_tokens` takes `"most"`, its
+new default (`defaults.toml`, `config.py`): a model without a size of its own gets three quarters of its window, the
+most item 250 lets it have, where it got 96,000 or three quarters of a smaller window; a model whose provider does not
+say its window gets 96,000, and a number there still gives every model that size, so an owner's own number keeps its
+meaning. While it is "most", 96,000 stays the budget `tool_output_chars` is meant for and under which the tool surface
+counts a budget as small, and a window too small for it cuts the budget as it cut a number (`scaffold.py`
+`configured_size`, `_reference_size`): a model whose window is 128,000 or less runs as before, with the same budget,
+point of summary and tool output. Settings › Models offers the most first, as Dot's default, then the smaller sizes,
+and its Why says where the default comes from (`ContextChoice.configured` is null while it is "most"). The panel of the
+composer's context meter has **Change context size**, a link to `#/settings/models?model=<ref>` (not for OpenCode's
+agent, whose window Dot does not set, nor for a window the provider does not say); there the model's provider fold and
+the Models card open when folded, and its row comes into sight, marked, with the focus on its size (`system.js`
+`showAsked`), on a phone too, where the table scrolls sideways to it. The eval reports keep "most" as it is
+(`EvalSettings.context_tokens`). A larger budget means fewer summaries and more input a step: a long run on a large
+window costs more on a key billed by the token, as `docs/models.md` says, and a number in `[agent] context_tokens`, or
+a size of the model's own, brings it down. Tests: `tests/unit/test_scaffold.py`, `test_context_sizes.py`,
+`test_tool_groups.py`, `tests/smoke/test_scaffold.py`, `test_context_sizes.py` (the API's default, the menu, and an
+address that names a model of a folded provider), `test_context_meter.py` (the link and where it leads). Docs:
+`docs/models.md`, `docs/runs.md`, `docs/daemon.md`.
+
+### 397. A new chat keeps its choices with its draft until its message goes
+
+**Status: done (2026-10-19), on `item-397-new-chat-choices`.** The owner's word of 2026-10-19: "bos bir sohbette bir
+seyler yazdigimda, sectigim model, effort, mod ve diger hersey gidip baska bir sohbete giirp gelsemde tekrar +new chat
+bastigimda orada görünmeli." (when I write something in an empty chat, the model, effort, mode and everything else I
+picked should be there when I press + New chat again, even after going to another chat and back). **As built
+(2026-10-19).** The home's box kept the text, the files and the picks of a new chat in the browser (`dot.draft.home`),
+and a reasoning level (per model), fast mode, the approvals and goal mode until changed again, but began on Task, the
+daemon's default model, Dot and Keep going off whenever the page was opened again: the reasoning level of the model
+picked went with it. The mode, the model, the agent, Keep going and a choice for one message armed from the menu are now
+the new chat's own (`views/runs.js`, `dot.home.choices`): kept as each is made, read when the home opens, the agent once
+the agents are listed and while it is still one of them, and put away once a message goes, as the draft is, so the next
+new chat starts afresh; what is kept and does not read as those choices is dropped. `runChoices` takes the choice for
+one message to start with and says the one armed (`choices.js` `kept.once`, `armed()`), a choice of it is told as the
+others are, and Keep going can be turned as a new chat left it (`runmodes.js` `set`); a chat's page keeps its own on the
+daemon as before and writes none of these. Tests: `tests/smoke/test_new_chat_choices.py` (a task that keeps going on a
+model at High, then research for an agent with Ultrathink and words typed, each there again after another page and New
+chat; the run that goes has them, and the next new chat starts afresh), `test_dock_choices.py` (a chat's page writes no
+choice of the home's). Docs: `docs/daemon.md`. The review of the merge with main found a choice made before the agents
+were listed, or when they could not be, forgot the new chat's agent; it keeps the one it had until they are listed
+(`listed` in `views/runs.js`, and a browser test whose agents fail to list).
+
+### 398. The approval modes in four steps, and Dot's own files asked about instead of refused
+
+**Status: done (2026-10-19), on `item-398-approval-modes`, for the owner to merge (it changes `src/dotagent/policy/`).**
+The owner's word of 2026-10-19: "Mevcut sistemimizdeki Auto ve Ask modlarinin mantigini düzeltelim meseal auto modda bir
+dosya düzenlemeye bile izin vermedi Blocked by policy: Edit …/app.css (changes what Dot loads and runs (its plugins,
+skills and playbooks) or its emergency stop) — auto-review refused this action (secret_access) … yolo`ya dokunmadn
+ekteki fotograftaki mantiktan bir yapiyida kurabiliriz en dogru ve arastirarak.. Ardindan testlerle onayladiktan sonra
+projede kullanima baslariz." (let us fix the logic of the Auto and Ask modes: in auto mode it did not even allow a file
+to be edited …; without touching yolo, we can build a structure from the logic of the attached picture, the most right
+one and with research; then, once tests confirm it, we start using it), with a picture of four modes: Supervised (ask
+before commands and file changes), Auto-accept edits (auto-approve edits, ask before other actions), Auto (supported
+providers approve routine actions; others still ask) and Full access. Asked, the owner chose to keep Dot's autonomy
+(today's Ask becomes Auto-accept edits as it is, Supervised is new, Auto and YOLO stay) and to be asked about a change
+of Dot's own files rather than have it refused. **As built (2026-10-19).** The refusal was no review model's: the
+always-on layer (`engine.auto_review`) refuses what carries `secret_access`, and a write into what Dot loads and runs
+carried it (`tools/files.py`), whose own code is the whole `src/` of a checkout (`runtime._own_code`), so a run could
+not change its CSS in `ask` or `auto`, and `yolo` alone let it. Such a write now carries `self_change`, and a layer of
+its own after the run mode's (`engine.own_files`) makes it a question that goes to the owner in every mode but yolo
+(`route_for` takes the decision now; yolo waives it, as it waived the refusal), never to the review model, and that no
+rule of the owner's answers; allowed, the run makes the change with the file tools, whose changes the undo journal
+keeps. It is a question and not a hand-off, since an allowed hand-off tells the run that the owner did the step. A
+command line that would change those files is still refused, as the run's sandbox seals them too, and so is an edit of
+OpenCode's own agent, which writes past the undo journal (`opencode/run.py` `permission_action`). The new mode
+`supervised` (`policy/types.py` `ApprovalMode`, strictest first) asks the owner before every change the preset lets
+through: a file written, a command the shell guard does not read as only reading, an entry or a click in a page or an
+app, a message, a schedule, a tool of an MCP server, and what shapes later runs (`persistence`: a lasting teammate, a
+campaign's targets, ledger and next session) (`engine.supervised`, `changes_something`, applied by the run's gate);
+reads, the run's own notes and memory notes, and what a rule of the owner's allows go on. Its runs are told so in the
+prompt, and a delegated run takes the stricter of its mode and its parent's. `ask` keeps its id and its behaviour and is
+shown as Auto-accept edits. The composer's Options menu lists the four modes as rows with their icons and what each
+does, as in the picture (lock, pencil, shield, open lock; `runmodes.js` `approvalList`), and its pill wears the mode's
+short name (`approvalBadge`: "Edits" for Auto-accept edits). Researched: Claude Code's permission modes (default,
+acceptEdits within the working directory, auto with a classifier, bypassPermissions; protected paths never
+auto-approved), Codex's sandbox and approval policies with its auto-review (a reviewer swap, not a grant), Cursor's run
+modes; the picture's own app has no public description of its menu. Tests:
+`tests/unit/test_supervised_and_own_files.py`, `tests/unit/test_run_modes.py`, `test_shell_policy.py`,
+`test_rule_answers.py`, `tests/smoke/test_approval_modes.py` (Dot's own file asked in supervised, ask and auto and
+written once allowed, refused when declined, not answered by an allow rule, written and recorded in yolo; supervised
+waits for a write and a command, and lets reads and an allow rule through), `test_skills_runtime.py` (the file tools
+ask, a command line is refused), `tests/unit/test_opencode.py` (OpenCode's edit of Dot's own files is refused),
+`test_composer.py` (the four modes in the menu, the pill's names and icons), `test_chat_choices.py`,
+`test_dock_choices.py`. Docs: `docs/autonomy.md`, `docs/safety.md`, `docs/daemon.md`, `docs/command-line.md`. The
+pre-push review's first pass (2 Important, 2 Nits) is fixed: Supervised let a lasting teammate and a campaign's plan
+through (`persistence` now asks, but for the run's own notes and memory notes); OpenCode's agent, once allowed, wrote
+Dot's own files past the undo journal (now refused); the `_dot_paths` docstring said "never change"; and the shell
+guard's hint to use the file tools, wrong for a delete and for OpenCode's agent, is gone, so a refused line says what it
+said before. The second pass (1 Important, 1 Nit) is fixed too: the docs, `defaults.toml` and the docstrings that named
+the modes but yolo as `ask` and `auto` (the secret fields, the click questions, a run that waits for its answer) say
+every mode but yolo, the foot of a delegated run in supervised says so, and the `auto` and `yolo` bullets of
+`docs/autonomy.md` are wrapped again. Clicked through on a phone (Pixel 7, iPhone SE, landscape) and wide, light and
+dark: the four rows with their first hints and YOLO's warning outgrew the composer's menus (360 px), so the warning was
+cut; the hints are one short line each now, as in the picture, the Options menu may grow to 480 px, and every menu of
+the composer keeps within the window above its pill (`popover.js` `--room-above`), so none leaves it at the top;
+`test_composer.py` checks the menu shows the modes and the warning whole.
+
 ### 399. A path is classified by the place it names, through the Data volume too
 
 **Status: done (2026-10-19), on `item-399-kernel-paths`, for the owner to merge (it changes `src/dotagent/policy/`).**
@@ -15727,4 +15870,9 @@ folder's spellings are made part by part, so a letter whose case folding changes
 - 2026-10-19 (Fable 5.1): item 390 committed on `harness-2`; item 391 on `harness-3`: the probe apart from the daemon, the contrast, the step and its schedule, `dotx harness step|probe|final`.
 - 2026-10-19 (Fable 5.1): item 391 committed on `harness-3`; item 392 on `harness-4`: the provenance graph, the lineage, the library read by the proposer.
 - 2026-10-19 (Fable 5.1): item 392 committed on `harness-4`; item 393 on `harness-5`: Settings › Harness.
+- 2026-10-19 (Opus 5.5): items 394 to 397 on the owner's words of the same day, each on a branch of its own from `main`, while other agents of the owner's work on items 385 to 393; item 394 on `item-394-campaign-cards`: a campaign is stopped, marked achieved or deleted from its row.
+- 2026-10-19 (Opus 5.5): item 395 on the owner's word of the same day, on `item-395-model-search` from `main`, while other agents of the owner's work on items 385 to 393: the model menu's search looks through the provider shown.
+- 2026-10-19 (Opus 5.5): item 396 on the owner's word of the same day, on `item-396-context-size` from `main`, while other agents of the owner's work on items 385 to 393: a model's context size is the most its window allows unless one is chosen, and the context meter leads to it.
+- 2026-10-19 (Opus 5.5): item 397 on the owner's word of the same day, on `item-397-new-chat-choices` from `main`, while other agents of the owner's work on items 385 to 393: a new chat keeps its choices with its draft until its message goes.
+- 2026-10-19 (Opus 5.5): item 398 on the owner's word of the same day and their two choices, on `item-398-approval-modes` from `main`: the approval modes in four steps, and Dot's own files asked about instead of refused; for the owner to merge.
 - 2026-10-19 (Opus 5.5): item 399 on `item-399-kernel-paths` from `main`, found by the `/security-review` of item 398: a path spelled through the Data volume is classified by the place it names; for the owner to merge.
