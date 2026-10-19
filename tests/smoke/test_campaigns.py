@@ -2,9 +2,10 @@
 the scheduler starts the next session with the brief, only a claim the goal checker accepts ends the campaign, a
 session the daemon cut off is followed by a new one, the answer to a question an ended session left goes to no other
 run and brings the next session forward, a moment planned for the next session keeps the rhythm of the sessions, and
-the owner stops, lets go on and marks a campaign achieved. A session whose `dotx` command died is followed by the
-next as soon as the daemon closes it, and a campaign whose opening session could not start, in any way, is not
-kept (item 180).
+the owner stops, lets go on, marks a campaign achieved and deletes one that is not active, with the threads of its
+sessions after the first but not its conversation, and not while a session of it works (item 394). A session whose
+`dotx` command died is followed by the next as soon as the daemon closes it, and a campaign whose opening session could
+not start, in any way, is not kept (item 180).
 
 No network and no model service is used: the scripted model plays the sessions and answers for the goal checker too,
 and the notification of the owner is recorded instead of shown.
@@ -631,6 +632,94 @@ async def test_the_owner_starts_stops_lets_go_on_and_marks_a_campaign_achieved_t
     assert achieved.json()["record"]["evidence"] == "The owner marked the campaign achieved."
     assert achieved_again.status_code == 409
     assert missing.status_code == 404
+
+
+async def test_the_owner_deletes_a_campaign_with_its_sessions_and_its_conversation_stays_a_chat(
+    login_env: dict[str, str],
+) -> None:
+    """Item 394: a campaign that is not active is deleted with its ledger and the thread of its later session; its
+    conversation stays a chat, the opening session a run of that chat, and the question it left expires, as no session
+    reads the answer. An active campaign is refused."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(
+            _PROVIDER,
+            [
+                # Session 1, the opening one, leaves a question for the owner and ends.
+                _turn(_call(ASK_USER_TOOL, {"question": "Which region do the leads come from?"}), _targets()),
+                _finish("5 leads so far."),
+                # Session 2, in a thread of its own.
+                _finish("10 leads so far."),
+            ],
+        )
+    )
+    async with (
+        _session(_config(60), login_env, model, Notices()) as (runtime, manager),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(_context(runtime, manager))),
+            base_url=BASE,
+            headers={"Authorization": f"Bearer {TOKEN}"},
+        ) as client,
+    ):
+        opening: RunRecord = await _start_campaign(manager)
+        assert opening.campaign_id is not None
+        campaign_id: str = opening.campaign_id
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await manager.wait(opening.id)
+            second: RunRecord = await manager.start_session(campaign_id)
+            await manager.wait(second.id)
+        active: httpx.Response = await client.delete(f"/api/campaigns/{campaign_id}")
+        await _post(client, f"/campaigns/{campaign_id}/stop", None)
+        deleted: httpx.Response = await client.delete(f"/api/campaigns/{campaign_id}")
+        again: httpx.Response = await client.delete(f"/api/campaigns/{campaign_id}")
+        listed: list[JsonObject] = (await client.get("/api/campaigns")).json()
+        kept: httpx.Response = await client.get(f"/api/runs/{opening.id}")
+        gone: httpx.Response = await client.get(f"/api/runs/{second.id}")
+        chats: list[str] = [chat.id for chat in await runtime.store.list_thread_summaries(50)]
+        threads: list[str] = [thread.id for thread in await runtime.store.list_threads(50)]
+        (question,) = await runtime.store.run_questions(opening.id, ASK_USER_TOOL)
+        entries: list[CampaignEntry] = await runtime.store.campaign_entries(campaign_id, 10)
+    assert active.status_code == 409, active.text
+    assert deleted.status_code == 204, deleted.text
+    assert again.status_code == 404
+    assert listed == []
+    assert kept.status_code == 200, kept.text
+    assert (kept.json()["campaign"], kept.json()["run"]["campaign_id"]) == (None, None)
+    assert gone.status_code == 404
+    assert opening.thread_id in chats
+    assert opening.thread_id in threads and second.thread_id not in threads
+    assert (question.status, question.note) == ("expired", "the campaign was deleted")
+    assert entries == []
+
+
+async def test_a_campaign_whose_session_still_works_is_not_deleted(login_env: dict[str, str]) -> None:
+    """Item 394: stopped as `dotx campaign stop` stops it, in the store alone, a campaign whose session still works is
+    not deleted, and the refusal names the session; once the session has ended, the campaign is deleted."""
+    model: RecordingProvider = RecordingProvider(
+        ScriptedProvider(_PROVIDER, [_turn(_targets(), _call("shell", {"command": "sleep 30"})), _finish("Done.")])
+    )
+    async with (
+        _session(_config(60), login_env, model, Notices()) as (runtime, manager),
+        httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=create_app(_context(runtime, manager))),
+            base_url=BASE,
+            headers={"Authorization": f"Bearer {TOKEN}"},
+        ) as client,
+    ):
+        session: RunRecord = await manager.start_campaign(
+            GOAL, "task", SCRIPTED_MODEL, None, EVAL_SOURCE, None, "standard", None, "yolo", None, (), None
+        )
+        assert session.campaign_id is not None
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await _called(runtime, session.id, "shell")
+        await stop_campaign(runtime.store, session.campaign_id)
+        working: httpx.Response = await client.delete(f"/api/campaigns/{session.campaign_id}")
+        manager.cancel(session.id)
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await manager.wait(session.id)
+        deleted: httpx.Response = await client.delete(f"/api/campaigns/{session.campaign_id}")
+    assert working.status_code == 409, working.text
+    assert working.json()["context"]["run_ids"] == [session.id]
+    assert deleted.status_code == 204, deleted.text
 
 
 async def test_a_campaign_that_asks_for_the_owners_chrome_is_refused_while_that_chrome_is_closed(
