@@ -222,14 +222,13 @@ function limitSpent(data) {
 }
 
 /** The one line a live group shows for the call that ran last, in its row's words (item 402): the tool's name goes
- * before them only where its kind does not say what it is (an MCP server's tool), and alone for a call that names
- * nothing. */
+ * before them for any call but a command, whose mark says what it is, and alone for a call that names nothing. */
 function describeCall(tool, args) {
   const detail = describeArguments(args);
   if (detail === "") {
     return clip(tool, LATEST_CHARS);
   }
-  return clip(callKind(tool) === "other" ? `${tool} · ${detail}` : detail, LATEST_CHARS);
+  return clip(callKind(tool) === "command" ? detail : `${tool} · ${detail}`, LATEST_CHARS);
 }
 
 /** The line a compaction leaves in the conversation (item 312): "Context compacted", and the size of the context

@@ -15175,15 +15175,18 @@ Clicking "Ran 2 commands" opens and shows what it holds, all in line). **As buil
 (item 374) keeps its head and fold; its calls stand in line with the head, no longer indented on a hairline: each call's
 mark under the group's, its words under the group's (`run.css` `.steps-body`, `app.css` `.tool-head`). A call's row is
 its mark (a spinner while it runs, then the mark of its kind from `toolIconName`, a cross when it failed, the warning
-when it was cut off), the call in its own words (the command itself, not the policy's "Run: … (read-only command)",
-which is now the row's tooltip, as a failure's first line is), and the chevron; the tool's name is for screen readers,
-shown only for a tool whose mark does not say what it is (an MCP server's) or a call that names nothing (`tools.js`
-`toolRow`). A group that is over wears the mark of the kind its words start with, the terminal's for "Ran 2 commands"
-(`flowIcon`), and a folded group at work says its latest call in the same words (`describeCall`); a call that went well
-wears its mark in the quiet ink. The thought's brain and the bolt of a resumed turn take the same column. Tests:
-`tests/smoke/test_flow_fold.py` (the rows' words, the hidden name, the terminal's marks on the rows and the head, the
-marks and the words in line with the head's, which fails without the change; the latest line says the command alone).
-Docs: `docs/daemon.md`.
+when it was cut off), what it did and the chevron (`tools.js` `toolRow`): a command is the command itself, its tool's
+name for screen readers alone and the policy's "Run: … (read-only command)" its tooltip; another call, whose mark
+several tools share (a file's: read, write, edit), keeps its tool's name and says what it did in the policy's words once
+it is done ("Read notes.txt"); a failure's first line is the tooltip of any call. A group that is over wears the mark of
+the kind its words start with, the terminal's for "Ran 2 commands" (`flowIcon`), and a folded group at work says its
+latest call in the same words (`describeCall`); a call that went well wears its mark in the quiet ink. The thought's
+brain and the bolt of a resumed turn take the same column. Tests: `tests/smoke/test_flow_fold.py` (the rows' words, the
+hidden name, the terminal's marks on the rows and the head, the marks and the words in line with the head's, which fails
+without the change; the latest line says the command alone; a write and a read of one file keep their names and differ).
+Docs: `docs/daemon.md`. **Review (2026-10-19).** The pre-push review's Important: the first version hid the name of
+every tool but an MCP server's and kept a call's arguments as its words, so a write and a read of one file, or two steps
+in one app, read the same; now only a command, whose mark says what it is, stands alone.
 
 ## Log
 

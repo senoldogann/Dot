@@ -3849,16 +3849,12 @@ a.pill:hover {
   background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
+/* A call's mark is in the quiet ink, its kind's once it went well (item 402); a cross and a warning wear theirs. */
 .tool-state {
   width: 18px;
   display: grid;
   place-items: center;
   flex: none;
-  color: var(--muted);
-}
-
-/* A call that went well wears its kind's mark in the quiet ink (item 402); a cross and a warning keep their colours. */
-.tool-state.ok {
   color: var(--muted);
 }
 

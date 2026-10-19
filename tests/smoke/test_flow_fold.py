@@ -44,6 +44,14 @@ _SCRIPT: tuple[ScriptedTurn, ...] = (
 )
 
 
+# A note written, then read: two calls whose mark (a file's) is the same and whose words (the path) are too.
+_NOTE: str = "notes.txt"
+_FILE_SCRIPT: tuple[ScriptedTurn, ...] = (
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="write_file", arguments={"path": _NOTE, "content": "one"}),)),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="read_file", arguments={"path": _NOTE}),)),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="finish", arguments={"answer": "Done.", "success": True}),)),
+)
+
 # Where the head and each call's row put their mark and their words: the left edge of each, the head first.
 _LINES: str = """(group) => [
   [group.querySelector(".steps-state"), group.querySelector(".steps-title")],
@@ -199,5 +207,35 @@ async def test_the_step_group_folds_and_unfolds_while_the_run_still_works(tmp_pa
                 await expect(summary).to_be_visible()
                 assert await group.evaluate("(node) => node.open") is True
                 await page.screenshot(path=str(tmp_path / "steps-after-the-run-390.png"))
+            finally:
+                await browser.close()
+
+
+async def test_calls_whose_mark_is_shared_keep_their_names_and_say_what_they_did() -> None:
+    """A call whose mark several tools share (a file's) keeps its tool's name and says what it did once it is done, so a
+    write and a read of one file are told apart; only a command is its own words alone (item 402)."""
+    model: ScriptedProvider = ScriptedProvider(_PROVIDER, list(_FILE_SCRIPT))
+    async with _served(model) as (runtime, manager, address):
+        run: RunRecord = await manager.start(
+            "Write the note, then read it.", "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None,
+            "yolo", False, (),
+        )  # fmt: skip
+        assert (await _ended(manager, run.id)).status == "done"
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                group: Locator = page.locator(".timeline details.steps").first
+                await expect(group.locator(".steps-title")).to_have_text("Read 1 file and wrote 1 file")
+                if not await group.evaluate("(node) => node.open"):
+                    await group.locator("summary.steps-head").click()
+                rows: Locator = group.locator(".steps-body .tool-head")
+                await expect(rows.locator(".tool-name")).to_have_text(["write_file", "read_file"])
+                await expect(rows.locator(".tool-name.visually-hidden")).to_have_count(0)
+                said: list[str] = await rows.locator(".tool-sum").all_text_contents()
+                assert len(said) == 2 and said[0] != said[1] and all(_NOTE in words for words in said), said
             finally:
                 await browser.close()

@@ -193,15 +193,17 @@ function nameParts(tool) {
 
 /**
  * A row for a tool call, one line in line with its group's head (item 402): its mark (a spinner while it runs, then the
- * mark of its kind, a cross when it failed), the call in its own words (the command itself for a command) and the way
- * into it. The tool's name is said to screen readers, and shown for a call whose mark does not tell what it is (an MCP
- * server's tool) or that names nothing; what the call came to is the row's tooltip. `finish(result)` fills in the outcome
- * once the `tool_result` event arrives.
+ * mark of its kind, a cross when it failed), what it did and the way into it. A command is the command itself, its
+ * tool's name for screen readers alone and the policy's words its tooltip, since its mark says what it is; another call,
+ * whose mark several tools share (a file's: read, write, edit), keeps its tool's name and says what it did in the
+ * policy's words once it is done ("Read notes.txt"). `finish(result)` fills in the outcome once the `tool_result` event
+ * arrives.
  */
 export function toolRow({ tool, args }) {
   const state = el("span", { class: "tool-state" }, el("span", { class: "spinner" }));
   const words = describeArguments(args);
-  const named = words === "" || callKind(tool) === "other";
+  const command = callKind(tool) === "command";
+  const named = words === "" || !command;
   const summary = el("span", { class: "tool-sum" }, words);
   const time = el("span", { class: "tool-time" });
   const badges = el("span", { class: "cluster" });
@@ -251,8 +253,10 @@ export function toolRow({ tool, args }) {
     state.className = `tool-state ${outcome.ok ? "ok" : "bad"}`;
     if (!outcome.ok) {
       summary.className = "tool-sum bad";
+    } else if (!command && outcome.summary !== "") {
+      summary.textContent = clip(outcome.summary, SUMMARY_CHARS);
     }
-    // The row keeps the call's own words; what it came to is its tooltip (item 402).
+    // A command keeps its own words, what it came to its tooltip; a failure's first line is the tooltip of any call.
     head.title = outcome.ok ? outcome.summary || tool : firstLine(outcome.text) || "failed";
     time.textContent = duration(outcome.seconds);
     if (outcome.risk !== "" && outcome.risk !== "safe") {
