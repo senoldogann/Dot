@@ -74,6 +74,38 @@ command that starts it on this Mac, added as the services are. Connected lists, 
 has from its config, a plugin or another agent (Customize › Skills › Found on this Mac), with **Ready** and its tools,
 **Left out** and why, or **Off**.
 
+## Accounts: Google's and Microsoft's own sign-in
+
+Customize › Plugins opens on **Accounts** (item 422): Google (Gmail, Google Calendar) and Microsoft (Outlook, Microsoft
+365) through their official sign-ins, with the client you register with each, as each asks of an app that runs on a
+computer. **Sign in** opens the provider's page in a new tab; you say yes there, the provider sends the browser back to
+the daemon's `/oauth/callback` on this Mac's own address with a code, which Dot trades for tokens with PKCE, and the
+card follows until the account is there, named by its address; **Sign out** takes it away. A sign-in starts only from a
+page on this Mac (the provider comes back to the Mac's loopback address, which a phone does not reach). An account's
+access token is refreshed with its refresh token once it is about to run out.
+
+The clients, once: at Google, enable the [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+and the [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), create a **Desktop
+app** client at [Google Auth Platform › Clients](https://console.cloud.google.com/auth/clients), and add your address as
+a test user under [Audience](https://console.cloud.google.com/auth/audience); at Microsoft, register an app at [Entra ›
+App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) for any
+organisation's and personal accounts, with `http://localhost/oauth/callback` as a redirect URI of **Mobile and desktop
+applications** (Microsoft compares the path, not the port) and public client flows allowed. Then save the three values
+where Dot reads its keys, the Keychain's `dot-agent` service, each command asking for its value twice without showing
+it:
+
+```bash
+security add-generic-password -U -s dot-agent -a DOT_GOOGLE_CLIENT_ID -w
+security add-generic-password -U -s dot-agent -a DOT_GOOGLE_CLIENT_SECRET -w
+security add-generic-password -U -s dot-agent -a DOT_MS_CLIENT_ID -w
+```
+
+Google is asked for `gmail.modify` and `calendar` (and who you are), Microsoft for `Mail.ReadWrite`, `Mail.Send`,
+`Calendars.ReadWrite`, `User.Read` and `offline_access`. The tokens of each account are in the login Keychain under the
+service `dot-oauth` (one item an account, `google:<address>`), written through `security`'s own prompt so that no token
+is on a command line, and the list of accounts, with no secret in it, is in the store. Nothing logs a token, a code or
+an address (`GET /api/accounts`, `POST /api/accounts/<provider>/start`, `DELETE /api/accounts/<provider>/<address>`).
+
 ## MCP servers
 
 Dot can use the tools of [MCP](https://modelcontextprotocol.io) servers that it starts itself over stdio, or reaches

@@ -223,7 +223,8 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   (Homebrew's,
   the caches of npm and uv) and your shell's startup files, which those programs and your own Terminal then run. And it
   keeps files: a key saved with `dotx auth set` or in Settings is in the key file, which it seals, while a key kept in
-  the keychain (service `dot-agent`) can be read by a command through `security`, in the sandbox too.
+  the keychain (service `dot-agent`) can be read by a command through `security`, in the sandbox too, and so can
+  the tokens of the accounts of Google and Microsoft signed in (service `dot-oauth`, item 422).
 
 **Typed judgments (optional, off by default).** The policy reads what a click does from the control's label, with
 patterns in English and Turkish, and a few in Finnish ("Post", "Send", "Delete", "Pay now", "Paylaş", "Lähetä"…); a

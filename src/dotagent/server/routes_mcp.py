@@ -29,6 +29,7 @@ from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_conn
 from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
+from dotagent.oauth.accounts import CameBack
 from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import origin_is_local
@@ -398,7 +399,11 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     async def come_back(
         state: str = "", code: str | None = None, error: str | None = None, iss: str | None = None
     ) -> HTMLResponse:
-        """Where the authorization server sends the browser back: the code goes to the sign-in that waits for it."""
+        """Where the authorization server sends the browser back: the code goes to the sign-in that waits for it, an
+        account's of Google or Microsoft (item 422) first, else an MCP server's."""
+        came: CameBack | None = await ctx.runtime.accounts.come_back(state, code, error)
+        if came is not None:
+            return HTMLResponse(_page(came.title, came.text), status_code=came.status)
         server: str | None = sign_ins.answer(state, code, iss, error)
         if server is None:
             return HTMLResponse(
