@@ -15275,6 +15275,23 @@ clients write it, names this server too. A request the daemon turns away is logg
 reason, Host, Origin, never the token), so that an icon that still does not come says why in `dotx.log`; the owner adds
 the app again to see it. Tests: `tests/unit/test_manifest.py` (the link and the files), `test_server_guard.py` (the
 headers, the port). Docs: `docs/phone.md`.
+### 409. The desktop's permissions granted from Settings › System, and the service started again from there
+
+**Status: done (2026-10-19), on `item-409-permissions`.** The owner's word of 2026-10-19, with the daemon's own words in
+hand ("macOS has not granted Screen Recording to the app that runs Dot… `dotx desktop setup` opens the pane; for the
+service use `dotx service permissions`"): let the permission be granted easily from the system. **As built
+(2026-10-19).** Settings › System has a **Permissions** card: Accessibility, Input events and Screen Recording as macOS
+reports them for the program that runs the daemon (`GET /api/desktop/permissions`, `check_permissions`, no dialog), the
+program's path, the steps in words, **Ask macOS** (the `POST` of item 251, which also puts the program in the panes'
+lists), **Open <pane>** for each permission missing (`POST /api/desktop/permissions/open`, `perms.open_settings`), and
+**Restart Dot** when the daemon is the service's own process (`inspect_job`'s pid is the daemon's own or its parent's,
+Dot.app's launcher: `service_runs`; launchd that does not answer is shown on the card and the restart refused, the
+review's findings): `POST /api/system/restart` has the daemon stop and `run_daemon` return `RESTART_CODE` (75), an exit
+launchd does not count as clean, so the job (`KeepAlive` `SuccessfulExit: false`) starts it again with what was granted
+meanwhile; a daemon run by hand is refused (`ServerContext.restart`, `no_restart` by default). The SnapShots page's
+problem line got the same **Open System Settings**, and the hint in the errors names the card. Tests:
+`tests/smoke/test_server.py` (the read, the pane, the refusal). Docs: `docs/daemon.md`,
+`docs/browser-and-computer-use.md`.
 
 ## Log
 
@@ -16112,3 +16129,5 @@ headers, the port). Docs: `docs/phone.md`.
   flash and a shortcut of one's own left for later.
 - 2026-10-19 (Fable 5.1): item 410 on `item-410-home-icon` from `main`, on the owner's word of the same day: the home
   screen's icon at the root, readable by a phone's launcher, with the refused requests logged.
+- 2026-10-19 (Fable 5.1): item 409 on `item-409-permissions` from `main`, on the owner's word of the same day: the
+  desktop's permissions read, asked, their panes opened and the service started again from Settings › System.

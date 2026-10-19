@@ -22,6 +22,7 @@ from dotagent.launchd import (
     launch_agent_path,
     parse_job,
     render_launch_agent,
+    service_runs,
     service_target,
 )
 
@@ -198,3 +199,13 @@ async def test_a_job_launchd_cannot_unload_keeps_its_property_list(tmp_path: Pat
     with pytest.raises(ServiceError, match="launchctl cannot unload the job that is loaded"):
         await install_job(plist, NEXT_JOB, UID)
     assert _job_and_file(plist, launchctl) == (JOB_OF_BEFORE, JOB_OF_BEFORE)
+
+
+def test_the_service_runs_the_daemon_when_launchd_s_pid_is_its_own_or_its_launcher_s() -> None:
+    """Item 409: the job runs Dot.app's launcher, the daemon's parent; a job of another pid, or none, is not it."""
+    job: JobState = JobState(state="running", pid=4242, runs=1, last_exit=None)
+    assert service_runs(job, (9000, 4242)) is True
+    assert service_runs(job, (4242, 1)) is True
+    assert service_runs(job, (9000, 9001)) is False
+    assert service_runs(JobState(state="waiting", pid=None, runs=0, last_exit="75"), (9000, 4242)) is False
+    assert service_runs(None, (4242,)) is False

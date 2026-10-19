@@ -988,13 +988,30 @@ class PaletteView(FrozenModel):
 
 class PermissionsView(FrozenModel):
     """What macOS has granted to ``program``, the program it holds responsible for the daemon (Dot.app for the
-    service), and the Settings panes that grant the rest."""
+    service), the Settings panes that grant the rest (``panes``, with every pane's ``titles``), whether the daemon is
+    the ``service``'s own process, which a restart asked of it brings back (item 409), and why that could not be told
+    (``service_problem``: launchd did not answer)."""
 
     program: str
     accessibility: bool
     input_events: bool
     screen_recording: bool
     panes: list[Pane]
+    titles: dict[Pane, str]
+    service: bool
+    service_problem: str | None
+
+
+class PaneRequest(FrozenModel):
+    """The pane of System Settings > Privacy & Security to show (item 409)."""
+
+    pane: Pane
+
+
+class RestartView(FrozenModel):
+    """The daemon stops so that its service starts it again (item 409)."""
+
+    restarting: bool
 
 
 class FailsafeView(FrozenModel):
