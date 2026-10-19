@@ -195,7 +195,9 @@ def test_the_note_under_a_message_carries_what_changes_from_message_to_message(t
     now: datetime = datetime.now().astimezone()
     alone: str = turn_note(now, [], 0, [], [])
     assert alone == clock_note(now)
-    skill: Skill = Skill(name="invoice-pdf", description="Fill in an invoice.", root=tmp_path, body="x", source="home")
+    skill: Skill = Skill(
+        name="invoice-pdf", description="Fill in an invoice.", root=tmp_path, body="x", source="home", icon="file"
+    )
     full: str = turn_note(now, ["[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"], 1, [skill], [])
     lines: list[str] = full.splitlines()
     assert lines[0] == clock_note(now)

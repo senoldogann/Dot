@@ -11,21 +11,25 @@ back to the address of the page the owner added it from (the Mac's, or the one t
 import asyncio
 import html
 import shlex
+from collections.abc import Mapping
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 from fastapi import APIRouter
 from fastapi.responses import HTMLResponse
-from pydantic import ValidationError
+from pydantic import JsonValue, ValidationError
 
 from dotagent.config import McpServerConfig
+from dotagent.connections.directory import logo_of_service
 from dotagent.core.errors import ConfigError, DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import connected_servers_path
+from dotagent.core.paths import connected_servers_path, env_file_path
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_connected, read_connected
 from dotagent.mcp.hub import McpHub
+from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
+from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import origin_is_local
 from dotagent.server.views import (
@@ -36,6 +40,7 @@ from dotagent.server.views import (
     McpServersView,
     McpServerView,
     McpServiceView,
+    ServiceSecretView,
 )
 from dotagent.tools.mcp import refresh_mcp_tools
 
@@ -85,17 +90,75 @@ def _address(config: McpServerConfig) -> str:
 
 
 def _service_of(config: McpServerConfig) -> str | None:
-    return next((service.id for service in MCP_SERVICES if service.url == config.url), None)
+    """The service of the catalogue ``config`` is a server of: the one at its URL, or the one started by its command
+    and first arguments (the package), so that a server added by hand wears the service's mark too (item 408)."""
+    for service in MCP_SERVICES:
+        if service.url is not None and service.url == config.url:
+            return service.id
+        if service.command is not None and service.command == config.command:
+            package: tuple[str, ...] = tuple(arg for arg in service.args if not arg.startswith("-"))
+            if package and package == tuple(arg for arg in config.args if not arg.startswith("-"))[: len(package)]:
+                return service.id
+    return None
+
+
+def kept_secret_names(service: McpService) -> dict[str, str]:
+    """The names Dot keeps a service's secrets under in its ``.env``, by the names the service knows them by:
+    ``MCP_<SERVICE>_<NAME>``, so that two services' keys of the same name stay apart (item 408)."""
+    stem: str = service.id.upper().replace("-", "_")
+    return {secret.name: f"MCP_{stem}_{secret.name}" for secret in service.secrets}
+
+
+def secret_entries(service: McpService, given: Mapping[str, str]) -> dict[str, str]:
+    """What goes into Dot's ``.env`` for the secrets ``given`` for ``service``, by the names Dot keeps them under: every
+    secret of the service, none other, none empty. Raises ConfigError otherwise, naming what is missing."""
+    kept: dict[str, str] = kept_secret_names(service)
+    missing: list[JsonValue] = [name for name in kept if given.get(name, "").strip() == ""]
+    unknown: list[JsonValue] = [name for name in sorted(set(given) - set(kept))]
+    if missing or unknown:
+        raise ConfigError(
+            "the service asks for its secrets by name", {"service": service.id, "missing": missing, "unknown": unknown}
+        )
+    # A value is one line, as the env file's writer takes it (every line boundary str.splitlines knows, not the
+    # newline alone): refused here, before any of them is written, so a service with two keys never keeps one alone.
+    broken: list[JsonValue] = [name for name in kept if len(given[name].strip().splitlines()) != 1]
+    if broken:
+        raise ConfigError("a secret is one line", {"service": service.id, "secrets": broken})
+    return {kept[name]: given[name].strip() for name in kept}
+
+
+def service_config(service: McpService) -> McpServerConfig:
+    """The server of ``service``, its headers or env referring to the secrets by the names Dot keeps them under."""
+    kept: dict[str, str] = kept_secret_names(service)
+
+    def renamed(value: str) -> str:
+        return SECRET_REFERENCE.sub(lambda match: "${" + kept.get(match.group(1), match.group(1)) + "}", value)
+
+    if service.url is not None:
+        headers: dict[str, str] = {key: renamed(value) for key, value in service.headers.items()}
+        return McpServerConfig(name=service.id, url=service.url, transport="http", headers=headers)
+    env: dict[str, str] = {key: renamed(value) for key, value in service.env.items()}
+    return McpServerConfig(name=service.id, command=service.command, args=list(service.args), env=env)
+
+
+def requested_service(body: McpServerAdd) -> McpService | None:
+    """The service of the catalogue ``body`` names, None when it names none; NotFoundError for one it has not."""
+    if body.service is None:
+        return None
+    service: McpService | None = next((one for one in MCP_SERVICES if one.id == body.service), None)
+    if service is None:
+        raise NotFoundError("the MCP catalogue has no such service", {"service": body.service})
+    return service
 
 
 def requested_server(body: McpServerAdd) -> McpServerConfig:
-    """The server ``body`` asks to add: a service of the catalogue, a URL (SSE when its path ends in ``/sse``), or a
-    command line. Raises NotFoundError for a service the catalogue does not have, ConfigError for the rest."""
-    if body.service is not None:
-        service: McpService | None = next((one for one in MCP_SERVICES if one.id == body.service), None)
-        if service is None:
-            raise NotFoundError("the MCP catalogue has no such service", {"service": body.service})
-        return McpServerConfig(name=service.id, url=service.url, transport="http")
+    """The server ``body`` asks to add: a service of the catalogue (with its secrets given, item 408), a URL (SSE when
+    its path ends in ``/sse``), or a command line. Raises NotFoundError for a service the catalogue does not have,
+    ConfigError for the rest."""
+    service: McpService | None = requested_service(body)
+    if service is not None:
+        secret_entries(service, body.secrets)
+        return service_config(service)
     if body.name is None or body.address is None or body.address.strip() == "":
         raise ConfigError("name a service of the list, or a server's name and its address", {})
     name: str = body.name.strip()
@@ -165,11 +228,13 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             state = "left_out"
             fallback: str = _TAKEN_NAME if origin == "connected" else "Dot did not start it"
             error = attempt.error if attempt is not None and attempt.error is not None else failure or fallback
+        service: str | None = _service_of(config)
         return McpServerView(
             name=config.name,
             origin=origin,
             address=_address(config),
-            service=_service_of(config) if origin == "connected" else None,
+            service=service if origin == "connected" else None,
+            logo=None if service is None else logo_of_service(service),
             state=state,
             tools=tuple(tool.remote_name for tool in hub.tools if tool.server == config.name)
             if state == "ready"
@@ -188,16 +253,34 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
                     id=service.id,
                     name=service.name,
                     does=service.does,
+                    kind=service.kind,
                     url=service.url,
+                    command=None if service.command is None else shlex.join([service.command, *service.args]),
+                    secrets=tuple(
+                        ServiceSecretView(name=secret.name, label=secret.label, help=secret.help)
+                        for secret in service.secrets
+                    ),
                     signs_in=service.signs_in,
+                    logo=logo_of_service(service.id),
                     added=service.id in servers,
                 )
                 for service in MCP_SERVICES
             ),
         )
 
+    async def forget_service_secrets(config: McpServerConfig) -> None:
+        """The key of a service of the catalogue goes with the service's own server (item 408): the one named as the
+        service, not one added by hand at the same address, which may stand beside it."""
+        service: McpService | None = next((one for one in MCP_SERVICES if one.id == config.name), None)
+        if service is None or not service.secrets or _service_of(config) != service.id:
+            return
+        for kept_name in kept_secret_names(service).values():
+            await asyncio.to_thread(remove_env_value, env_file_path(), kept_name)
+
     async def keep(attempt: _Try, origin: str) -> None:
-        """Try the server once, signing in when it asks, then keep it and connect it as runs do."""
+        """Try the server once, signing in when it asks, then keep it and connect it as runs do. A try that fails
+        leaves a service's key in .env, so that Try again can use it; Remove takes the key out with the server, and an
+        add after a failed one writes it anew (item 408)."""
         config: McpServerConfig = attempt.config
 
         def show(link: str) -> None:
@@ -260,6 +343,15 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(config.name)
         if found is not None and found[1] != "connected":
             raise RunConflict(_TAKEN_NAME, {"server": config.name, "set_up": found[1]})
+        current: _Try | None = tries.get(config.name)
+        if current is not None and current.running():
+            raise RunConflict("Dot is trying this server already", {"server": config.name})
+        service: McpService | None = requested_service(body)
+        if service is not None and service.secrets:
+            # The secrets go into Dot's .env under the names the server's config refers to (item 408), once nothing
+            # stands in the add's way and every one of them is there (secret_entries refuses before any is written).
+            for kept_name, value in secret_entries(service, body.secrets).items():
+                await asyncio.to_thread(write_env_value, env_file_path(), kept_name, value)
         return await start(config, "connected", page)
 
     @router.post("/api/mcp/servers/{name}/connect")
@@ -298,6 +390,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         refresh_mcp_tools(ctx.runtime.registry, hub)
         await asyncio.to_thread(forget_connected, connected_servers_path(), name)
         await asyncio.to_thread(forget_sign_in, sign_in_path(name))
+        await forget_service_secrets(found[0])
         log.info("mcp_server_removed", server=name)
         return await listing()
 

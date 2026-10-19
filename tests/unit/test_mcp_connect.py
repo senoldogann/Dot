@@ -5,16 +5,17 @@ import pytest
 
 from dotagent.config import McpServerConfig
 from dotagent.core.errors import ConfigError, McpError, NotFoundError
-from dotagent.mcp.catalogue import MCP_SERVICES
+from dotagent.mcp.catalogue import MCP_SERVICES, McpService
+from dotagent.mcp.launch import referenced_secrets
 from dotagent.mcp.signin import checked_link
-from dotagent.server.routes_mcp import requested_server
+from dotagent.server.routes_mcp import _service_of, kept_secret_names, requested_server, secret_entries, service_config
 from dotagent.server.views import McpServerAdd
 
 _ORIGIN: str = "http://127.0.0.1:8765"
 
 
-def _asked(service: str | None, name: str | None, address: str | None) -> McpServerAdd:
-    return McpServerAdd(service=service, name=name, address=address, origin=_ORIGIN)
+def _asked(service: str | None, name: str | None, address: str | None, **secrets: str) -> McpServerAdd:
+    return McpServerAdd(service=service, name=name, address=address, origin=_ORIGIN, secrets=secrets)
 
 
 def test_an_add_names_a_service_a_url_or_a_command_line() -> None:
@@ -46,8 +47,43 @@ def test_each_service_of_the_catalogue_is_a_server_dot_can_have() -> None:
     ids: list[str] = [service.id for service in MCP_SERVICES]
     assert len(set(ids)) == len(ids)
     for service in MCP_SERVICES:
-        config: McpServerConfig = McpServerConfig(name=service.id, url=service.url, transport="http")
-        assert config.url is not None and config.url.startswith("https://")
+        config: McpServerConfig = service_config(service)
+        if service.kind == "remote":
+            assert config.url is not None and config.url.startswith("https://") and config.command is None
+        else:
+            assert config.command in ("npx", "uvx") and config.url is None and not service.signs_in
+        # Its secrets are referred to by the names Dot keeps them under, nothing else is.
+        kept: set[str] = set(kept_secret_names(service).values())
+        assert set(referenced_secrets(config)) == kept, service.id
+
+
+def test_a_service_s_secrets_are_asked_for_by_name_and_kept_under_dot_s_own_names() -> None:
+    """Item 408: a service that takes a key asks for it on the page; Dot keeps it in its .env under
+    ``MCP_<SERVICE>_<NAME>`` and the server's headers or env refer to it by that name."""
+    github: McpService = next(service for service in MCP_SERVICES if service.id == "github")
+    assert kept_secret_names(github) == {"GITHUB_PAT": "MCP_GITHUB_GITHUB_PAT"}
+    assert secret_entries(github, {"GITHUB_PAT": " ghp_x "}) == {"MCP_GITHUB_GITHUB_PAT": "ghp_x"}
+    assert service_config(github).headers == {"Authorization": "Bearer ${MCP_GITHUB_GITHUB_PAT}"}
+    assert requested_server(_asked("github", None, None, GITHUB_PAT="ghp_x")).name == "github"
+    with pytest.raises(ConfigError) as refused:
+        requested_server(_asked("github", None, None))
+    assert refused.value.context == {"service": "github", "missing": ["GITHUB_PAT"], "unknown": []}
+    with pytest.raises(ConfigError) as unknown:
+        secret_entries(github, {"GITHUB_PAT": "x", "OTHER": "y"})
+    assert unknown.value.context["unknown"] == ["OTHER"]
+    brave: McpService = next(service for service in MCP_SERVICES if service.id == "brave-search")
+    local: McpServerConfig = service_config(brave)
+    assert (local.command, local.args, local.env) == (
+        "npx",
+        ["-y", "@brave/brave-search-mcp-server"],
+        {"BRAVE_API_KEY": "${MCP_BRAVE_SEARCH_BRAVE_API_KEY}"},
+    )
+    # A server added by hand with the service's address or command wears the service's name.
+    assert _service_of(McpServerConfig(name="mine", url="https://mcp.notion.com/mcp")) == "notion"
+    assert (
+        _service_of(McpServerConfig(name="mine", command="npx", args=["-y", "@playwright/mcp@latest"])) == "playwright"
+    )
+    assert _service_of(McpServerConfig(name="mine", command="npx", args=["-y", "something-else"])) is None
 
 
 def test_a_sign_in_page_is_opened_only_at_an_https_address_or_one_of_this_mac() -> None:

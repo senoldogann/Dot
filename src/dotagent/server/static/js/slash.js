@@ -35,6 +35,7 @@ export function paletteGroups(commands, palette) {
         id: `skill-${skill.name}`,
         label: skill.name,
         hint: skill.description,
+        icon: skill.icon,
         kind: "skill",
         pick: { kind: "skill", name: skill.name },
       })),

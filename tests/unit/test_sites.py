@@ -50,7 +50,9 @@ def _note(identifier: str, agent_id: str | None) -> MemoryRecord:
 
 
 def _skill(name: str, source: str) -> Skill:
-    return Skill(name=name, description=f"Do {name}.", root=Path("/tmp/skills") / name, body="", source=source)
+    return Skill(
+        name=name, description=f"Do {name}.", root=Path("/tmp/skills") / name, body="", source=source, icon="sparkle"
+    )
 
 
 def _entry(name: str, host: str, uses: int, retired: bool) -> PlaybookEntry:

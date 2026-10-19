@@ -15327,6 +15327,31 @@ meanwhile; a daemon run by hand is refused (`ServerContext.restart`, `no_restart
 problem line got the same **Open System Settings**, and the hint in the errors names the card. Tests:
 `tests/smoke/test_server.py` (the read, the pane, the refusal). Docs: `docs/daemon.md`,
 `docs/browser-and-computer-use.md`.
+### 408. The catalogue of MCP servers, plugins and skills: logos, keys asked for on the page, local servers, skill icons
+
+**Status: done (2026-10-19), on `item-408-catalog`.** The owner's word of 2026-10-19: an MCP, plugin and skill system
+with the design, variety and easy install of Claude's, OpenAI's and Cursor's; skills with an SVG icon each, plugins and
+MCP servers listed with their developers' real logos. **As built (2026-10-19).** The MCP catalogue (`mcp/catalogue.py`)
+grew from 8 services to 24: besides the six that sign in and the two open to all, Supabase and monday.com sign in
+(dynamic client registration, as their docs say), Context7 and Exa are open, GitHub, Intercom, Neon, Hugging Face, Wix,
+Firecrawl and Tavily take a key (`ServiceSecret`: its name, label and where to get one), and Memory, Sequential
+Thinking, Fetch, Playwright and Brave Search run on this Mac, started by Dot with `npx` or `uvx` (`McpService.command`).
+A service that takes a key asks for it under its tile (`plugins.js`, password fields and a link each): `POST
+/api/mcp/servers` takes `secrets` by name, writes each into Dot's `.env` under `MCP_<SERVICE>_<NAME>` (`secret_entries`,
+`write_env_value`) and keeps the server with `${...}` references in its headers or env (`service_config`), so no value
+sits in a record; a service added with a secret missing or unknown is refused by name. The Plugins page lists 47
+services (13 new listings) with the chips MCP · Key and MCP · On this Mac; Brave, Intercom, Neon, Wix and the Model
+Context Protocol marks came from Simple Icons 16.35.0 (CC0, the LICENSE says so, with the brands' guidelines); a server
+added by hand with a service's address or command wears that service's logo (`_service_of`, `logo_of_service`,
+`McpServerView.logo`). Skills: the frontmatter's `icon` names one of the interface's icons (`skills/icons.py`'s
+`ICON_NAMES`, kept the same as `icons.js` by a test), else the words of the name and description choose one (mail,
+calendar, columns, file, branch, terminal, globe, search, image, message, database, lock, cloud, brain, pencil,
+squareCheck, smartphone, monitor, users, sliders), else the spark; the palette, the Skills page's cards and the slash
+and at menus show it. Left for later: OAuth clients with a secret (Asana, Box, Slack, Google, Square), a remote
+registry, plugin manifests with an icon, and the stdio servers that take arguments of the owner's (Filesystem's folders,
+Postgres's DSN). Tests: `tests/unit/test_mcp_connect.py` (the secrets, the match by command),
+`test_plugins_directory.py` (the marks, the untried), `test_skills.py` (the icon). Docs: `docs/extending.md`,
+`docs/daemon.md`.
 
 ## Log
 
@@ -16170,3 +16195,6 @@ problem line got the same **Open System Settings**, and the hint in the errors n
   screen's icon at the root, readable by a phone's launcher, with the refused requests logged.
 - 2026-10-19 (Fable 5.1): item 409 on `item-409-permissions` from `main`, on the owner's word of the same day: the
   desktop's permissions read, asked, their panes opened and the service started again from Settings › System.
+- 2026-10-19 (Fable 5.1): item 408 on `item-408-catalog` from `main`, on the owner's word of the same day: the MCP
+  catalogue at 24 services with keys asked for on the page and servers run on this Mac, the marks of the new ones, a
+  server added by hand wearing its service's logo, and a skill's icon from its frontmatter or its words.

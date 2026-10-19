@@ -657,7 +657,7 @@ export function mount(root) {
     const copies = imported();
     const own = palette.skills.filter((skill) => OWN_SOURCES.has(skill.source) && !copies.has(skill.name) && matches(skill.name, skill.description));
     const ownCards = own.map((skill) =>
-      skillCard({ name: skill.name, description: skill.description, mark: "sparkle", facts: factsOf([], [skill.source === "home" ? "In Dot's skills folder" : "In a folder of the config"]), actions: [], have: "Installed" }),
+      skillCard({ name: skill.name, description: skill.description, mark: skill.icon, facts: factsOf([], [skill.source === "home" ? "In Dot's skills folder" : "In a folder of the config"]), actions: [], have: "Installed" }),
     );
     const importedCards = [...copies.values()]
       .filter((skill) => matches(skill.name, skill.description))
@@ -687,13 +687,13 @@ export function mount(root) {
       section(
         "builtin",
         "Comes with Dot",
-        builtin.map((skill) => skillCard({ name: skill.name, description: skill.description, mark: "sparkle", facts: factsOf([], ["Comes with Dot"]), actions: [], have: "Installed" })),
+        builtin.map((skill) => skillCard({ name: skill.name, description: skill.description, mark: skill.icon, facts: factsOf([], ["Comes with Dot"]), actions: [], have: "Installed" })),
       ),
       section(
         "plugins",
         "From plugins",
         fromPlugins.map((skill) =>
-          skillCard({ name: skill.name, description: skill.description, mark: "plug", facts: factsOf([el("span", { class: "chip" }, skill.source.slice(PLUGIN_SOURCE.length))], []), actions: [], have: "Installed" }),
+          skillCard({ name: skill.name, description: skill.description, mark: skill.icon, facts: factsOf([el("span", { class: "chip" }, skill.source.slice(PLUGIN_SOURCE.length))], []), actions: [], have: "Installed" }),
         ),
       ),
     ];

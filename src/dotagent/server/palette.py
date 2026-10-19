@@ -18,7 +18,7 @@ def palette_view(skills: Sequence[Skill], tools: Sequence[McpTool]) -> PaletteVi
         )
     return PaletteView(
         skills=tuple(
-            PaletteSkill(name=skill.name, description=skill.description, source=skill.source)
+            PaletteSkill(name=skill.name, description=skill.description, source=skill.source, icon=skill.icon)
             for skill in sorted(skills, key=lambda skill: skill.name)
         ),
         servers=tuple(PaletteServer(name=name, tools=tuple(listed)) for name, listed in servers.items()),

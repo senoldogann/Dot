@@ -9,7 +9,14 @@ from dotagent.skills.types import Skill
 
 
 def _skill(name: str, description: str) -> Skill:
-    return Skill(name=name, description=description, root=Path("/tmp/skills") / name, body="# Steps", source="home")
+    return Skill(
+        name=name,
+        description=description,
+        root=Path("/tmp/skills") / name,
+        body="# Steps",
+        source="home",
+        icon="sparkle",
+    )
 
 
 def _tool(server: str, name: str, description: str) -> McpTool:

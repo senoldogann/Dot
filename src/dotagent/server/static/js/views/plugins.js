@@ -187,7 +187,12 @@ export function mount(root, ctx) {
           if (now.service?.added) {
             continue;
           }
-          return { label: "Add", key: `mcp:${way.ref}`, take: () => add({ service: way.ref, name: null, address: null }) };
+          const service = now.service;
+          if (service !== undefined && service !== null && service.secrets.length > 0) {
+            // A service that takes a key asks for it first (item 408): the form opens under the tile.
+            return { label: "Add", key: `mcp:${way.ref}`, take: () => askSecrets(service) };
+          }
+          return { label: "Add", key: `mcp:${way.ref}`, take: () => add({ service: way.ref, name: null, address: null, secrets: {} }) };
         }
         if (now.server.state === "signing_in" && now.server.link !== null) {
           return { label: "Sign in", link: now.server.link };
@@ -236,14 +241,98 @@ export function mount(root, ctx) {
     }
     if (first.kind === "mcp") {
       const service = servers.services.find((one) => one.id === first.ref);
-      return el("span", { class: "chip" }, service?.signs_in ? "MCP · Sign in" : "MCP · Open to all");
+      return el("span", { class: "chip" }, mcpWords(service));
     }
     return el("span", { class: "chip" }, WAY_NAMES[first.kind]);
+  }
+
+  /** Where a service of the catalogue stands before it is added, in a badge's words (item 408). */
+  function serviceWords(service) {
+    if (service === undefined || service === null) {
+      return "Open to all";
+    }
+    if (service.kind === "local") {
+      return "On this Mac";
+    }
+    if (service.secrets.length > 0) {
+      return "Takes a key";
+    }
+    return service.signs_in ? "Signs in" : "Open to all";
+  }
+
+  /** How a service of the catalogue connects, in the chip's words (item 408): signed in, with a key, open to all, or
+   * started on this Mac. */
+  function mcpWords(service) {
+    if (service === undefined || service === null) {
+      return "MCP";
+    }
+    if (service.kind === "local") {
+      return service.secrets.length > 0 ? "MCP · On this Mac · Key" : "MCP · On this Mac";
+    }
+    if (service.secrets.length > 0) {
+      return "MCP · Key";
+    }
+    return service.signs_in ? "MCP · Sign in" : "MCP · Open to all";
+  }
+
+  // The service whose secrets are being asked for, and the fields typed into, kept while the page paints again.
+  let asking = null;
+  const secretFields = new Map();
+
+  function askSecrets(service) {
+    asking = service.id;
+    paint();
+    const fields = secretFields.get(service.id);
+    if (fields !== undefined) {
+      const [first] = fields.values();
+      first?.focus();
+    }
+  }
+
+  /** The form under a service's tile that takes its secrets (item 408): a password field for each, where to get one,
+   * Add and Cancel. The values go to the daemon once, which keeps them in its .env; the fields are emptied after. */
+  function secretsForm(service) {
+    let fields = secretFields.get(service.id);
+    if (fields === undefined) {
+      fields = new Map(
+        service.secrets.map((secret) => [
+          secret.name,
+          el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": `${service.name}: ${secret.label}` }),
+        ]),
+      );
+      secretFields.set(service.id, fields);
+    }
+    const addButton = el("button", { class: "btn primary sm", type: "button", disabled: busy.has(`mcp:${service.id}`) }, icon("plus"), "Add");
+    addButton.addEventListener("click", () =>
+      attempt(async () => {
+        const secrets = Object.fromEntries([...fields].map(([name, input]) => [name, input.value]));
+        await add({ service: service.id, name: null, address: null, secrets });
+        for (const input of fields.values()) {
+          input.value = "";
+        }
+        asking = null;
+        paint();
+      }),
+    );
+    const cancel = el("button", { class: "btn sm", type: "button" }, "Cancel");
+    cancel.addEventListener("click", () => {
+      asking = null;
+      paint();
+    });
+    return el(
+      "div",
+      { class: "connect-add plugin-secrets" },
+      ...service.secrets.map((secret) =>
+        field(secret.label, fields.get(secret.name), el("a", { href: secret.help, target: "_blank", rel: "noopener noreferrer" }, "Where to get one")),
+      ),
+      el("div", { class: "connect-add-actions" }, addButton, cancel),
+    );
   }
 
   function tile(plugin) {
     const isConnected = connected(plugin);
     const step = isConnected ? null : firstStep(plugin);
+    const askedService = asking === null ? null : (servers.services.find((one) => one.id === asking && plugin.ways.some((way) => way.kind === "mcp" && way.ref === one.id)) ?? null);
     let action = null;
     if (step !== null && step.link !== undefined) {
       action = el(
@@ -266,7 +355,7 @@ export function mount(root, ctx) {
       );
       action.addEventListener("click", () => attempt(step.take));
     }
-    const asking = plugin.ways.some((way) => way.kind === "mac" && busy.has(`app:${way.ref}`));
+    const waiting = plugin.ways.some((way) => way.kind === "mac" && busy.has(`app:${way.ref}`));
     return el(
       "div",
       { class: "plugin-tile", dataset: { plugin: plugin.id, connected: String(isConnected), tried: String(plugin.tried) } },
@@ -276,10 +365,25 @@ export function mount(root, ctx) {
         { class: "plugin-main" },
         el("a", { class: "plugin-name", href: `#/customize/plugins/${plugin.id}` }, plugin.name),
         el("div", { class: "plugin-does" }, plugin.does),
-        el("div", { class: "plugin-meta" }, howChip(plugin), asking ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : standing(plugin)),
+        el("div", { class: "plugin-meta" }, howChip(plugin), waiting ? el("span", { class: "badge b-warn" }, "Waiting for macOS…") : standing(plugin)),
+        askedService === null ? null : secretsForm(askedService),
       ),
       action,
     );
+  }
+
+  /** The mark of a server added by hand: the logo of the service it is one of, by its address or its command (item
+   * 408), else the plug. */
+  function serverMark(server) {
+    const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" });
+    if (server.logo !== null) {
+      const logo = el("span", { class: "plugin-logo" });
+      logo.style.setProperty("--plugin-logo", `url("/icons/plugins/${server.logo}")`);
+      mark.append(logo);
+    } else {
+      mark.append(icon("plug"));
+    }
+    return mark;
   }
 
   /** An MCP server that is no service of the catalogue: its name, address and tools, where it stands and its actions. */
@@ -287,7 +391,7 @@ export function mount(root, ctx) {
     return el(
       "div",
       { class: "plugin-tile plugin-server", dataset: { server: server.name, state: server.state } },
-      el("span", { class: "plugin-mark", "aria-hidden": "true" }, icon("plug")),
+      serverMark(server),
       el(
         "div",
         { class: "plugin-main" },
@@ -339,7 +443,7 @@ export function mount(root, ctx) {
       attempt(async () => {
         button.disabled = true;
         try {
-          await add({ service: null, name: name.value.trim(), address: address.value.trim() });
+          await add({ service: null, name: name.value.trim(), address: address.value.trim(), secrets: {} });
         } finally {
           button.disabled = false;
         }
@@ -532,10 +636,13 @@ export function mount(root, ctx) {
         badge = el("span", { class: "badge b-muted" }, "Name taken");
         guideLine = `A server of Dot's config or of a plugin is named ${way.ref} already: Connected lists it.`;
       } else if (now.server === null) {
+        const service = now.service;
+        const keyed = service !== null && service !== undefined && service.secrets.length > 0;
         const button = el("button", { class: "btn sm primary", type: "button", disabled: busy.has(`mcp:${way.ref}`) }, "Add");
-        button.addEventListener("click", () => attempt(() => add({ service: way.ref, name: null, address: null })));
-        actions = el("div", { class: "plugin-actions" }, button);
-        badge = el("span", { class: "badge b-muted" }, now.service?.signs_in ? "Signs in" : "Open to all");
+        button.addEventListener("click", () => attempt(() => (keyed ? askSecrets(service) : add({ service: way.ref, name: null, address: null, secrets: {} }))));
+        // A service that takes a key asks for it here too (item 408), under the row.
+        actions = el("div", { class: "plugin-actions" }, button, keyed && asking === way.ref ? secretsForm(service) : null);
+        badge = el("span", { class: "badge b-muted" }, serviceWords(service));
       } else {
         badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
         guideLine = serverGuide(now.server);
