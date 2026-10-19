@@ -419,6 +419,16 @@ class HarnessConfig(FrozenModel):
     habits_chars: int = Field(ge=0)
     tool_guidance_chars: int = Field(ge=0)
     component_lines: int = Field(ge=1)
+    # The models of the roles of the improvement loop (item 390): a model reference each, "" for [models] review.
+    proposer: str
+    composer: str
+    selector: str
+    experience: str
+
+    @field_validator("proposer", "composer", "selector", "experience")
+    @classmethod
+    def _model_or_review(cls, value: str) -> str:
+        return value if value == "" else _model_reference(value)
 
 
 class ShellConfig(FrozenModel):

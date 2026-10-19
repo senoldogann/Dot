@@ -14808,6 +14808,32 @@ reflector as typed roles on `[models] review`), Loops (the probe in a throwaway 
 the nightly step after the reflection with budgets and a health record), Graphs (provenance: version ← probe ← run,
 experience → version, the decisions of each step), Harness (the owner's page).
 
+### 390. The harness: the roles of the improvement loop
+
+**Status: done (2026-10-19), on `harness-2`, stacked on `harness-1`.** The second layer (Agents): the four roles of the
+step as typed questions to a model, answered with one tool call each, in `agent/review.py` beside Dot's other questions:
+the proposer (`propose_harness`: the whole texts of a candidate within the bounds, the moments of the run behind each
+change, or keep; a scope of how the agent works or of what a practitioner knows), the composer (`compose_harness`: one
+version of the candidates and what their probes showed, a decision with its evidence for each change, or the base kept),
+the blind selector (`select_answer`: the best of anonymous answers, judged on delivery, conformance, fidelity,
+consistency, fitness and finish, never length) and the experience writer (`write_experience`: what each edit did,
+helped/hurt/no_effect/confounded, and an experience of cue, lesson, evidence and confidence only when an edit helped or
+hurt). Each answer is checked (`proposal_check`, `composition_check`, `selection_check`, `experience_check`): a text
+past the bounds or with a secret, a link or an address, a change with no moment, keep with a text that differs from the
+one in place, a decision naming no candidate, an experience with no effect behind it or whose lines could not stand in a
+prompt (a link, a secret, an address), is asked again with what was wrong, as the review model's other answers are. What
+a run read stands inside fences the roles are told to read and never follow; the secrets Dot holds are masked as in
+every review question. `[harness] proposer|composer|selector|experience` name a model each, "" for `[models] review`;
+the call purposes `harness_propose|compose|select|experience` count in `dotx stats`. `dotx harness propose RUN_ID
+[--scope]` asks the proposer about one run by hand (the run as the reflection reads it: digest, failed calls, stalls,
+send-backs, whether it read outside content) and writes its candidate, made by `proposer`, with the scope, the moments
+and the taint in its notes. **Research taken in.** Wei et al., "The End of Harness Engineering" (2026): the human's
+artifact is the scoring set, never shown to the proposer; a final set is run once and never optimized against; the best
+edit by score survives. docs/harness.md says so, and the probe (next item) keeps a final set apart. From the Grok Bot
+build notes: charters of owns / done looks like / stops at, and "a figure without its source and read time goes back to
+the desk it came from", kept as the first example habits and as a candidate check for the page's "keep this run as a
+test".
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15610,3 +15636,4 @@ experience → version, the decisions of each step), Harness (the owner's page).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
 - 2026-10-19 (Fable 5.1): item 388 on `js-gate`, on the owner's word of the same day after the interface review of 2026-10-18: the web interface gets checks of its own (Biome, `tsc` over the JSDoc, `node --test`), an export nothing imports fails the gate, and the pages that are not the chat or the home load on demand. Done, awaiting the owner's push.
 - 2026-10-19 (Fable 5.1): item 388's whole gate ran: 705 passed, the 17 browser tests that failed under `-n auto` passed serially, as they do on main. Item 389 on `harness-1`, stacked on `js-gate`: the harness's first layer, versions of the texts a run's prompt takes, written, adopted and retired by the owner (docs/harness.md); the method of Harness² (arXiv 2610.14224) adopted, its code not.
+- 2026-10-19 (Fable 5.1): item 389 committed on `harness-1`; item 390 on `harness-2`: the four roles of the step and `dotx harness propose`.

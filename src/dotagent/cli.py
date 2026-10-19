@@ -61,6 +61,7 @@ _FAMILIES: dict[str, str] = {
     "harness-set": "dotagent.cli_harness",
     "harness-adopt": "dotagent.cli_harness",
     "harness-retire": "dotagent.cli_harness",
+    "harness-propose": "dotagent.cli_harness",
     "schedule-list": "dotagent.cli_schedule",
     "schedule-add": "dotagent.cli_schedule",
     "schedule-delete": "dotagent.cli_schedule",
@@ -283,6 +284,16 @@ def build_parser() -> argparse.ArgumentParser:
         "retire", help="put a version aside; an adopted one leaves the prompt as Dot's own"
     )
     harness_retire.add_argument("version_id", help="a version id from 'dotx harness list'")
+    harness_propose = harness_commands.add_parser(
+        "propose", help="ask the proposer for a candidate from what one run did (a model call; the candidate waits)"
+    )
+    harness_propose.add_argument("run_id", help="the run to learn from, as its page or dotx stats --run names it")
+    harness_propose.add_argument(
+        "--scope",
+        choices=["invariant", "domain"],
+        default="invariant",
+        help="how the agent works (invariant, the default) or what a practitioner knows (domain)",
+    )
 
     schedule = commands.add_parser("schedule", help="goals that Dot runs later or on a rhythm, while the daemon runs")
     schedule_commands = schedule.add_subparsers(dest="schedule_action", required=True)

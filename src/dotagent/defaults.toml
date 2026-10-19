@@ -629,6 +629,14 @@ owner_chars = 1500
 habits_chars = 1200
 tool_guidance_chars = 1500
 component_lines = 16
+# The models of the roles of the improvement loop (docs/harness.md): the proposer writes a candidate from what a run
+# did, the composer makes one version of the candidates and what their probes showed, the selector picks among
+# anonymous answers, the experience writer records what each edit did. A model reference each ("provider:model");
+# "" means [models] review. A role's model sees a digest of a run, the harness and the candidates, never a key.
+proposer = ""
+composer = ""
+selector = ""
+experience = ""
 
 [scheduler]
 # IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the
