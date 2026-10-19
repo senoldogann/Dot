@@ -65,7 +65,8 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * them), and `once` (the id of a choice for one message armed as the box opens, or null; item 397).
  * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after the approvals, `onMode(id)` runs
  * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then). Goal mode's switch is a
- * row of the frame's "+" menu (item 318), and a chat, which has neither, hides it and Plan first.
+ * row of the Options menu's Execution group (`addExecutionItem`, item 353), and a chat, which has neither, hides it
+ * and Plan first.
  *
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
  * `ready()` (resolves once the models are loaded), `value()` (what the next message starts its run with: `{ mode, model,

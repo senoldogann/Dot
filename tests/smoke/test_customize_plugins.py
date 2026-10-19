@@ -194,10 +194,10 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 await page.goto(ui_url("127.0.0.1", port, TOKEN))
                 if width < _PHONE_PX:
                     await page.get_by_role("button", name="Show sidebar").first.click()
-                # A page among the others, under Campaigns (item 289).
+                # A page among the others, under Campaigns and Schedules (items 289 and 401).
                 pages: Locator = page.locator("#sidebar nav.side-links a.side-link")
-                await expect(pages).to_have_text(["Agents", "Campaigns", "Customize"])
-                link: Locator = pages.nth(2)
+                await expect(pages).to_have_text(["Agents", "Campaigns", "Schedules", "Customize"])
+                link: Locator = pages.nth(3)
                 link_box: FloatRect = await _box(link)
                 assert link_box["y"] + link_box["height"] <= 860, link_box
                 await link.click()

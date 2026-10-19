@@ -15117,20 +15117,23 @@ hours for its run's report. Memory and System as cards (8e379713): Memory one co
 learning), rows with hairlines, a note's actions where the pointer is (always on a touch screen), the emergency stop a
 card with its state. `ui/composer-images-and-flow-fold` came in with it (622285d2): the composer's images and the flow's
 fold. Schedules is a page of its own in the sidebar (`#/schedules`; `#/settings/schedules` leads there), where a push
-for a schedule that did not run and the Today strip's rows lead. The composer: the **+** opens Add files and Add photos
-(and Save skill in a run's box); plugins and skills are picked from the slash and at menus; Keep going, Goal mode and
-Plan first stand in the Options menu's Execution group under the approvals; the pills are compact on a wide window and
-keep a phone's reading size on a phone. **Merged with main (2026-10-19)**, items 389 to 400, by the agent that merged
-them (b362da28), with the branch's unsaved files kept: `docs/daemon.md` and `docs/runs.md` (item 398's four modes and
-item 400's `/loop` with this branch's words), `app.css` (the context meter's link with this branch's 36 px controls),
-`views/run.js` and `views/system.js` (this branch's screen and badge with item 388's `notePage()` and narrowing). What
-main and the work met in: `picks.js`'s `pickColour` exported again (item 388 had made it private as the work began to
-import it, which would have stopped the interface's scripts from loading); `views/schedules.js`'s `mount` names `ctx`
-again (item 388 had made it `_ctx`, which the work then used); the Options menu up to 600 px, so the four modes, YOLO's
-warning and the three switches show whole where the window has the room (item 398's check); a phone's pills at the
-reading size (`test_phone_type`, which the work failed on its own base too); the outline's sidebar narrowed to an
-element with a width (item 388's `tsc`); an unused import, `toolIcon` and `pickMark`'s export gone (item 388's
-`test_static_ui`); item 397's test finds Keep going in the Options menu.
+for a schedule that did not run and the Today strip's rows lead. The composer: the **+** opens the file picker at once,
+and a run's box has Save skill under a More button; plugins and skills are picked from the slash and at menus; Keep
+going, Goal mode and Plan first stand in the Options menu's Execution group under the approvals; the pills are compact
+on a wide window and keep a phone's reading size on a phone. **Merged with main (2026-10-19)**, items 389 to 400, by the
+agent that merged them (b362da28), with the branch's unsaved files kept: `docs/daemon.md` and `docs/runs.md` (item 398's
+four modes and item 400's `/loop` with this branch's words), `app.css` (the context meter's link with this branch's 36
+px controls), `views/run.js` and `views/system.js` (this branch's screen and badge with item 388's `notePage()` and
+narrowing). What main and the work met in: `picks.js`'s `pickColour` exported again (item 388 had made it private as the
+work began to import it, which would have stopped the interface's scripts from loading); `views/schedules.js`'s `mount`
+names `ctx` again (item 388 had made it `_ctx`, which the work then used); the Options menu up to 600 px, so the four
+modes, YOLO's warning and the three switches show whole where the window has the room (item 398's check); a phone's
+pills at the reading size (`test_phone_type`, which the work failed on its own base too); the outline's sidebar narrowed
+to an element with a width (item 388's `tsc`); an unused import, `toolIcon` and `pickMark`'s export gone (item 388's
+`test_static_ui`); item 397's test finds Keep going in the Options menu. **Review (2026-10-19).** The pre-push review of
+the whole branch: 1 Important, 2 Nits, fixed: `docs/` said the **+** opened a menu (Add files, Add photos, Save skill,
+Keep going), which the work had made the file picker itself; so did comments and a test's words; `openPicker`'s
+`accept`, which nothing passed, is gone.
 
 ## Log
 

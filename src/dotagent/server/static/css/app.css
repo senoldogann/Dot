@@ -3628,15 +3628,9 @@ a.pill:hover {
 }
 
 /* Right under the bubble the foot rises into the band its buttons add above their marks (item 336); under a file or a
-   pick it does not, as it would cover them. A phone's finger-sized buttons add a wider band. */
+   pick it does not, as it would cover them. A phone's buttons are a thumb's since item 401, their band no wider. */
 .bubble.user + .message-foot {
   margin-top: -4px;
-}
-
-@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
-  .bubble.user + .message-foot {
-    margin-top: -8px;
-  }
 }
 
 /* The last button ends where the message's text does, not 8 px past it: a button reaching past the column made the

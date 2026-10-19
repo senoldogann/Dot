@@ -3,8 +3,9 @@ pick its group is off (a grouped run, the fixture MCP server); a picked skill an
 the run's first message, while the run's goal stays the owner's words; a queued message keeps its picks; picks a run
 cannot start with are refused, and nothing starts; Save skill writes the skill of a run that ended done after fewer
 acting steps than a skill needs on its own, and refuses a run with none. In the browser, wide and light, and on a phone
-and dark: the "+" menu picks plugins, skills and Plan first as chips, the slash menu too, a chip goes with its ×, the
-picks go with the message and stand under it, and on a phone the chips wrap inside the box.
+and dark: the "+" opens the file picker, the at and slash menus pick plugins and skills and the Options menu Plan first,
+as chips, a chip goes with its ×, the picks go with the message and stand under it, and on a phone the chips wrap inside
+the box.
 
 No network and no model service is used: the scripted model plays the runs and answers as the review model too; the
 homes are throw-away directories.
@@ -68,7 +69,7 @@ TOKEN: str = "composer-picks-test-token"
 WAIT_S: float = 60.0
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _MAX_EVENTS: int = 10_000
-# The browser's window height; the "+" menu must fit in it.
+# The browser's window height; the Options menu must fit in it.
 _HEIGHT: int = 900
 
 
@@ -486,7 +487,7 @@ async def _fits(page: Page, inner: Locator, outer: Locator) -> None:
 
 
 @pytest.mark.browser
-async def test_the_plus_menu_picks_plugins_skills_and_plan_first_as_chips_that_go_with_the_message(
+async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_with_the_message(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     passes: tuple[tuple[int, Literal["light", "dark"], tuple[str, ...]], ...] = (

@@ -73,7 +73,7 @@ export function sentFiles(files) {
 }
 
 /**
- * The file picker, the list of attached files and the drop/paste handling for one message box (the composer's "+" menu
+ * The file picker, the list of attached files and the drop/paste handling for one message box (the composer's "+"
  * opens the picker, item 318). `dropTarget` takes dropped files and `input` pasted ones, and a long text pasted into
  * `input` as a file (item 269), which can be put back into the box as text. A file uploaded opens beside the
  * conversation from its chip (`requestFile`). `ids()` names the uploaded files for the message, `ready()` describes
@@ -214,15 +214,9 @@ export function createAttachments({ dropTarget, input, onChange }) {
   picker.addEventListener("change", () => {
     add([...picker.files]);
     picker.value = "";
-    picker.removeAttribute("accept");
   });
 
-  function openPicker(accept = "") {
-    if (accept) {
-      picker.setAttribute("accept", accept);
-    } else {
-      picker.removeAttribute("accept");
-    }
+  function openPicker() {
     picker.click();
   }
   dropTarget.addEventListener("dragover", (event) => {
