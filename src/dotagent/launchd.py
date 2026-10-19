@@ -230,6 +230,13 @@ async def _checked(arguments: list[str], message: str) -> LaunchctlResult:
     return result
 
 
+def service_runs(job: JobState | None, pids: tuple[int, ...]) -> bool:
+    """Whether the job launchd describes (``job``, None when it is not loaded) is one of the processes ``pids``: the
+    daemon's own, or its parent, since the job runs Dot.app's launcher, which starts the daemon's Python and waits
+    for it (item 409)."""
+    return job is not None and job.pid is not None and job.pid in pids
+
+
 async def inspect_job(uid: int) -> JobState | None:
     """What launchd keeps about the job, or ``None`` when the job is not loaded. Changes nothing."""
     result: LaunchctlResult = await run_launchctl(["print", service_target(uid)])

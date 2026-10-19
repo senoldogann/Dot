@@ -17,6 +17,7 @@ from fastapi import FastAPI
 
 from dotagent.agent.loop import warm_help_vectors
 from dotagent.agent.manager import RunManager
+from dotagent.agent.snapshots import stored_taker
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
@@ -39,6 +40,9 @@ _GRACE_S: int = 3
 _PRIVATE_FILE_MODE: int = 0o600
 _PID_BYTES: int = 32
 _STOP_SIGNALS: tuple[signal.Signals, ...] = (signal.SIGINT, signal.SIGTERM)
+# The exit code of a daemon asked to start again (item 409): not a clean exit, so the service's launchd job, which
+# starts the daemon again only after one, does so (sysexits' EX_TEMPFAIL).
+RESTART_CODE: int = 75
 
 
 class DotServer(uvicorn.Server):
@@ -173,8 +177,9 @@ async def _cancelled(task: asyncio.Task[None]) -> None:
     await asyncio.wait({task})
 
 
-async def run_daemon(config: AppConfig) -> None:
-    """Serve until SIGINT or SIGTERM.
+async def run_daemon(config: AppConfig) -> int:
+    """Serve until SIGINT or SIGTERM, or until a restart is asked (``POST /api/system/restart``, item 409): then
+    ``RESTART_CODE`` is returned, so that the service's launchd job starts the daemon again; 0 otherwise.
 
     Raises when the address is taken, another daemon runs, or the scheduler loop failed. On the way out the scheduler
     stops, the runs that are going on are cancelled, the schedules that finished are written and the services close.
@@ -186,6 +191,13 @@ async def run_daemon(config: AppConfig) -> None:
     token: str = await asyncio.to_thread(read_or_create_token, token_path())
     loop: asyncio.AbstractEventLoop = asyncio.get_running_loop()
     stop: asyncio.Event = asyncio.Event()
+    restart_wanted: bool = False
+
+    def restart() -> None:
+        nonlocal restart_wanted
+        restart_wanted = True
+        stop.set()
+
     with instance_lock(pid_path()), running_mark(running_mark_path()) as unclean:
         async with AsyncExitStack() as cleanup:
             for number in _STOP_SIGNALS:
@@ -217,6 +229,9 @@ async def run_daemon(config: AppConfig) -> None:
             warming: asyncio.Task[None] = asyncio.create_task(warm_help_vectors(runtime), name="help-vectors")
             warming.add_done_callback(_log_warm_end)
             cleanup.push_async_callback(_cancelled, warming)
+            # The Command key is watched for SnapShots while they are on (item 405); the watch ends with the daemon.
+            await runtime.snapshots.start(stored_taker(config.desktop, runtime.workspace))
+            cleanup.push_async_callback(runtime.snapshots.stop)
             recovered: int = await manager.recover()
             if unclean:
                 log.warning("daemon_restarted_after_unclean_end", runs_cut_off=recovered)
@@ -246,6 +261,7 @@ async def run_daemon(config: AppConfig) -> None:
                 port=port,
                 started_at=time.time(),
                 stopping=stopping,
+                restart=restart,
             )
             server: DotServer = DotServer(serving_config(create_app(context)), stopping)
             scheduler_loop.add_done_callback(functools.partial(_end_with_scheduler, server))
@@ -263,3 +279,4 @@ async def run_daemon(config: AppConfig) -> None:
             if not stop.is_set():
                 await server.serve(sockets=[listener])
             log.info("daemon_stopping")
+    return RESTART_CODE if restart_wanted else 0

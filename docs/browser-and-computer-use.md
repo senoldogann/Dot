@@ -209,7 +209,8 @@ Both modes share what follows.
 The desktop tools see and drive any application through the accessibility tree and, where an application has none,
 through screenshots and coordinates. macOS must grant the app that runs Dot three permissions: **Accessibility**,
 **Input events** and **Screen Recording**. `dotx desktop check` shows which it has and `dotx desktop setup` asks macOS
-for the missing ones and opens their Settings panes.
+for the missing ones and opens their Settings panes; Settings › System › Permissions in the web UI does the same for the
+daemon, and restarts the service once a permission is granted (item 409).
 
 - `desktop_apps` lists the running applications and `desktop_open_app` brings one to the front, starting it when it is
 not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path to

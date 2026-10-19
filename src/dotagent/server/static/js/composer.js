@@ -14,8 +14,8 @@ import { el, setText } from "./dom.js";
 import { icon, toolIconName } from "./icons.js";
 import { markdownMirror } from "./mirror.js";
 import { arePicks, createPicks, pickColour } from "./picks.js";
-import { anchoredPopover } from "./popover.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
+import { takesSnapshots } from "./snapshots.js";
 import { filterGroups, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
 
 const DRAFT_PREFIX = "dot.draft.";
@@ -271,8 +271,7 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
  * The frame the composers share (item 115): the slash menu over it, the box (one line, `boxLabel` its name, growing
  * with its text up to `maxPx`), the attached files and the picks (item 318) in rows under the box, then one bar: the
  * "+" that opens the file picker directly (documents, photos and screenshots alike; a phone opens its own sheet),
- * the rows the composer adds (`addMenuItems`) under a "More" menu when there are any (e.g. Save skill), the `options`
- * row for the pills (app.css keeps the mode at the left and sends the rest to the right)
+ * the `options` row for the pills (app.css keeps the mode at the left and sends the rest to the right)
  * and the round send button (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on Enter and on the button.
  * `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until `clear()` after a send.
  * `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens. The frame carries
@@ -281,8 +280,7 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
  * `handler`; a word typed or a file listed (a long paste among them, item 269) brings the send back, and
  * `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
  * `picks` (picks.js: `body()` goes into the message's request, `sent()` once a message that starts a run went),
- * `addMenuItems(build)` (`build(close)` gives the composer's own rows of the "More" menu each time it opens; `close()`
- * closes it), `options`,
+ * `options`,
  * `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs `watcher()` after
  * every change of the text, a clear among them, and returns what stops it; item 259), `clear()` (the text and the
  * files; the picks wait for `picks.sent()`), `pauseDraft()` and `resumeDraft()` (while the box holds what is not the
@@ -355,22 +353,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     { class: "btn ghost sm plus-button", type: "button", title: "Add files", "aria-label": "Add files", onclick: () => attachments.openPicker() },
     icon("plus"),
   );
-  // Rows added by caller views (e.g. Save skill in the open run view), under a "More" menu that only shows while there
-  // are any; the "+" itself opens the file picker directly.
-  const menuItems = [];
-  const moreButton = el(
-    "button",
-    { class: "btn ghost sm more-button", type: "button", title: "More", "aria-label": "More", hidden: true },
-    icon("ellipsis"),
-  );
-
-  const moreMenu = anchoredPopover({
-    anchor: moreButton,
-    frame: element,
-    label: "More",
-    build: () => [...menuItems.flatMap((build) => build(moreMenu.close))],
-  });
-  element.append(wired.menu, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, moreButton, wired.field, options, sendButton));
+  element.append(wired.menu, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, wired.field, options, sendButton));
   sendButton.addEventListener("click", () => (stopping() ? stop() : send()));
 
   function onInput() {
@@ -394,17 +377,21 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     requestAnimationFrame(wired.autosize);
   }
   paintEmpty();
+  // SnapShots (item 405): a box with a draft of its own takes the captures the daemon made, the ones that waited
+  // and each new one, as files of the draft.
+  const stopSnapshots =
+    draftKey === null
+      ? () => undefined
+      : takesSnapshots((files, animated) => {
+          attachments.arrive(files, animated);
+          filesChanged();
+        });
 
   return {
     element,
     textarea,
     attachments,
     picks,
-    addMenuItems: (build) => {
-      menuItems.push(build);
-      moreButton.hidden = false;
-      moreMenu.repaint();
-    },
     options,
     sendButton,
     setSendLabel: (text) => {
@@ -435,7 +422,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       drafting = true;
     },
     dispose: () => {
-      moreMenu.dispose();
+      stopSnapshots();
       wired.dispose();
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);

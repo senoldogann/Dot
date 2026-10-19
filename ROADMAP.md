@@ -15242,6 +15242,91 @@ and the owner's `[models] fast` is the main model since; the SSL `BAD_RECORD_MAC
 rare. Tests: `tests/unit/test_run_modes.py` (the note), `test_help.py` (batches, the cold start, the keeper),
 `test_model_calls.py` (the first word's seconds). Docs: `docs/memory-and-schedules.md`, `docs/extending.md`,
 `docs/development.md`.
+### 405. SnapShots: a double tap of ⌘ captures the window in front into the open chat's box
+
+**Status: done (2026-10-19), on `item-405-snapshots`.** The owner's word of 2026-10-19, with a picture of another coding
+agent's Settings › SnapShots (SnapShots, Include app text, Capture shortcut ⌘ ⌘, Capture sound, Capture flash, Capture
+animations): "bu sistemi bizim projeye de kur" (build this system in our project too). **As built (2026-10-19).**
+`desktop/snapshots.py`: a listen-only event tap of the session on a thread of its own watches the Command key through a
+`TapDetector` (two presses within `[snapshots] double_tap_ms`, the key released between them, no other key from the
+first press on, so ⌘C ⌘V is not a tap; it reads no key's identity); a double tap captures the window in front
+(`screen.windows_on_screen` and `apps.frontmost_pid`, ScreenCaptureKit's rectangle capture with the password managers
+blacked out, kept as sharp as the display up to 2000 px) and, with `app_text`, the window's accessibility tree as the
+model reads it (`ax.snapshot`, `render.fit_lines`, 12,000 characters) as a Markdown file; both are stored as attachments
+(`store_attachment`) and kept by the `SnapshotService` until a composer claims them (`POST /api/snapshots/claim`), the
+system sound of the choice plays (`NSSound`: Tink, Pop, Glass), and a live `snapshot_taken` event tells the pages; a
+capture that fails (`snapshot_failed`: Dot's own window, a password manager, no window, no permission) tells them why.
+The box with a draft of its own (`composerFrame`, `js/snapshots.js`) takes the captures as they come and the ones that
+waited, with a spring (`attach-chip.arrived`, none with reduced motion). Settings › SnapShots (`views/snapshots.js`, the
+tab under This Mac) switches it live and in the config file (`config_edit` learned `[snapshots]`) and says whether the
+key is watched or why not. The watch needs Accessibility granted to the app that runs Dot, which the desktop already
+needs. The review's findings: the watch is tried again every few seconds while the permission is missing and the page's
+reason clears by itself; a capture's files past the ten of a message are left out at the box with a notice; a capture
+whose files cannot be stored tells the pages why, as one refused does. **Left for later:** the flash on the captured
+window (the daemon has no AppKit run loop for a window of its own; the shell could draw it), a shortcut of the owner's
+own, and the capture of one window alone (`SCContentFilter`) where the rectangle shows what lies over it. Tests:
+`tests/unit/test_snapshots.py` (the tap, the names, the service), `tests/unit/test_config_edit.py`,
+`tests/smoke/test_snapshots.py` (the routes with a capture in place of the window, the page, the box taking a capture),
+`test_phone_settings.py` and `test_phone_pages.py` (the tab). Docs: `docs/daemon.md`.
+
+### 406. The file beside the conversation stays as the chat goes on; the box's More menu and Save skill go
+
+**Status: done (2026-10-19), on `item-406-panel-composer`.** The owner's word of 2026-10-19: a file opened beside the
+conversation closed as soon as a message was sent ("kapatmasın"), and the three dots of the box with Save skill were
+needless ("gereksiz"). **As built (2026-10-19).** A message sent, or an answer that came, goes on at the next run's
+address and the page is made again: the inspector dropped its file with the rest. Now the page keeps the file's source
+by the chat's thread in the browser's tab (`sessionStorage`, `dot.panelFile.<thread_id>`, written by the inspector's
+`onFile` as a file is shown or closed) and the next run's page shows it again as it opens (`restoreFile`, without taking
+the focus from the box); a narrow page, where the file would cover the conversation, lets it go. The box lost its More
+button and the Save skill row (item 318): the skill of a chat is written from the Skills page's Save from a chat, on the
+same route (`POST /api/runs/{id}/skill`); `addMenuItems` and the composer's popover went with them, and the bar's grid
+(item 401) no longer makes room for it. Tests: `tests/smoke/test_file_panel.py` (the file after a message),
+`test_composer.py` and `test_composer_picks.py` (no More). Docs: `docs/daemon.md`, `docs/extending.md`.
+
+### 407. An empty page stands its mark, a title and one line in the middle
+
+**Status: done (2026-10-19), on `item-407-empty-states`.** The owner's word of 2026-10-19: a page with no data should
+show a better empty page, an SVG icon in the middle with a "no data" text, on every page ("tüm sayfalara uygula"). **As
+built (2026-10-19).** `emptyPanel(mark, title, text)` (panels.js) is the one empty state: a Lucide mark in a quiet ring,
+a title and one line that says what brings something there, centred in its place (`.empty-state`, after the Screen tab's
+quiet panel of item 401), in place of the one muted line of item 79. Every empty place takes it with a mark of its own:
+Schedules (calendar), Rules (shield), Campaigns (target), Memory (brain; a search with nothing, search), Harness (its
+versions, steps and experiences), Agents and an agent's chats, Team, Skills (yours, and what other agents set up; a
+search with nothing), Plugins (nothing connected; a search with nothing), a run not found, and the Screen tab while
+Dot's computer is quiet. Tests: `tests/smoke/test_phone_lists.py` (Team's empty page: the mark, the title and the line).
+Docs: `docs/daemon.md`.
+
+### 410. The app added to a phone's home screen carries Dot's icon
+
+**Status: done (2026-10-19), on `item-410-home-icon`.** The owner's word of 2026-10-19: the app added to the iPhone's
+home screen came without Dot's logo. **As built (2026-10-19).** iOS draws an added app with the page's
+`apple-touch-icon`: now a 180 px file at the root of the pages (`apple-touch-icon.png`, the name iOS also tries by
+itself, and its `-precomposed` twin that older ones try), named with its size in `index.html`, made by
+`desktop/icons/render.py` with the other icons (this once resized from the 512 px render). A phone's own process fetches
+it outside the page, where the headers of every file kept it to the page's origin (`Cross-Origin-Resource-Policy:
+same-origin`): that file, the manifest, the favicon and the icons folder, which hold nothing of the owner's, are served
+with `cross-origin` (`LAUNCHER_PATHS`), and a name of `[server] reach` written with HTTPS's own port (`:443`), as some
+clients write it, names this server too. A request the daemon turns away is logged (`request_refused`: path, status,
+reason, Host, Origin, never the token), so that an icon that still does not come says why in `dotx.log`; the owner adds
+the app again to see it. Tests: `tests/unit/test_manifest.py` (the link and the files), `test_server_guard.py` (the
+headers, the port). Docs: `docs/phone.md`.
+### 409. The desktop's permissions granted from Settings › System, and the service started again from there
+
+**Status: done (2026-10-19), on `item-409-permissions`.** The owner's word of 2026-10-19, with the daemon's own words in
+hand ("macOS has not granted Screen Recording to the app that runs Dot… `dotx desktop setup` opens the pane; for the
+service use `dotx service permissions`"): let the permission be granted easily from the system. **As built
+(2026-10-19).** Settings › System has a **Permissions** card: Accessibility, Input events and Screen Recording as macOS
+reports them for the program that runs the daemon (`GET /api/desktop/permissions`, `check_permissions`, no dialog), the
+program's path, the steps in words, **Ask macOS** (the `POST` of item 251, which also puts the program in the panes'
+lists), **Open <pane>** for each permission missing (`POST /api/desktop/permissions/open`, `perms.open_settings`), and
+**Restart Dot** when the daemon is the service's own process (`inspect_job`'s pid is the daemon's own or its parent's,
+Dot.app's launcher: `service_runs`; launchd that does not answer is shown on the card and the restart refused, the
+review's findings): `POST /api/system/restart` has the daemon stop and `run_daemon` return `RESTART_CODE` (75), an exit
+launchd does not count as clean, so the job (`KeepAlive` `SuccessfulExit: false`) starts it again with what was granted
+meanwhile; a daemon run by hand is refused (`ServerContext.restart`, `no_restart` by default). The SnapShots page's
+problem line got the same **Open System Settings**, and the hint in the errors names the card. Tests:
+`tests/smoke/test_server.py` (the read, the pane, the refusal). Docs: `docs/daemon.md`,
+`docs/browser-and-computer-use.md`.
 
 ## Log
 
@@ -16074,3 +16159,14 @@ rare. Tests: `tests/unit/test_run_modes.py` (the note), `test_help.py` (batches,
   first answer waited for 200,000 tokens of prompt processing at every message, since the instructions changed with the
   message; now what changes goes under the message and the instructions stay the same bytes, the skills' embeddings
   are kept and warmed, and `model_call` events time the first word.
+- 2026-10-19 (Fable 5.1): item 406 on `item-406-panel-composer` from `main`, on the owner's word of the same day: the
+  file beside the conversation stays as the chat goes on at its next run; the box's More menu and Save skill go.
+- 2026-10-19 (Fable 5.1): item 407 on `item-407-empty-states` from `main` (on item 406's tree until it merged), on the
+  owner's word of the same day: every empty page stands its mark, a title and one line in the middle.
+- 2026-10-19 (Fable 5.1): item 405 on `item-405-snapshots` from `main`, on the owner's word of the same day: SnapShots,
+  a double tap of ⌘ in any application that captures the window in front, with its text, into the open chat's box; the
+  flash and a shortcut of one's own left for later.
+- 2026-10-19 (Fable 5.1): item 410 on `item-410-home-icon` from `main`, on the owner's word of the same day: the home
+  screen's icon at the root, readable by a phone's launcher, with the refused requests logged.
+- 2026-10-19 (Fable 5.1): item 409 on `item-409-permissions` from `main`, on the owner's word of the same day: the
+  desktop's permissions read, asked, their panes opened and the service started again from Settings › System.

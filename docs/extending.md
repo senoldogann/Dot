@@ -102,11 +102,11 @@ change things (`destructive`) and send to the world (`external_send`), unless it
 ## Skills and plugins
 
 **Customize › Skills** (item 317) lists the skills Dot reads as cards, two a row (one on a phone), each with what it is
-for and that Dot has it, with a search and, past a section's first six cards, See N more. **Personal** holds yours (Dot's
-skills folder and the `[skills] dirs` folders), those imported from the Mac's other agents (with Remove) and the learned
-ones (below, with Share and Drop); **System** holds those that come with Dot and those of its plugins. **Save from a
-chat** writes the skill of a chat that ended done, as Save skill in a run's box does (`POST /api/runs/{id}/skill`).
-Under Personal, Found on this Mac and Import from other apps (below). The old address `#/settings/skills` leads here.
+for and that Dot has it, with a search and, past a section's first six cards, See N more. **Personal** holds yours
+(Dot's skills folder and the `[skills] dirs` folders), those imported from the Mac's other agents (with Remove) and the
+learned ones (below, with Share and Drop); **System** holds those that come with Dot and those of its plugins. **Save
+from a chat** writes the skill of a chat that ended done (`POST /api/runs/{id}/skill`). Under Personal, Found on this
+Mac and Import from other apps (below). The old address `#/settings/skills` leads here.
 
 A skill is a folder of instructions for one kind of work, in the Agent Skills layout: `<name>/SKILL.md` with a YAML
 frontmatter (`name`, `description`) and optional `scripts/`, `references/` and `assets/`. Every model is given, in its

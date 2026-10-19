@@ -146,27 +146,27 @@ after it; a pick is a chip and the at word goes. An `@` inside a word, as in an 
 for your approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
-screenshots alike; a phone opens its own sheet); in the box of a run a **More** button beside it holds **Save skill**.
-The slash and at menus pick **Plugins** (the MCP servers with tools) and **Skills**, both as `GET /api/palette` lists
-them. A plugin or a skill picked is a chip under the box in a colour of its name, which its × takes away; Plan first is
-a chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
-Execution group, under the approvals (item 353). The picks go with the message (`plugins`, `skills` and `plan_first` of
-`POST /api/runs`, and of a message the queue holds), and once it is sent they stand under it as chips (the run's `picks`
-event); a message that steers the run under way leaves them for the next one, and the page says so, and a queued message
-with picks is not steered into the run at work: it stays queued to start a run of its own. A run sent with picks starts
-with each picked server's tool group on from its first step when its tools are grouped (with every tool offered they are
-on anyway), and its first message is your words, then a line that names the servers to use, Plan first's (write the plan
-with `update_plan`, then ask with `ask_user` and act once you agree: the prompt asks it, nothing holds the run's tools
-back), and each picked skill's instructions as the `skill` tool gives them; the run's goal stays your words. Picks a run
-cannot start with are refused, with why, and nothing starts: a server that is not connected or none of whose tools the
-run may use (its mode's, within its agent's bounds), a skill it is not offered, Plan first in a chat or under YOLO (a
-YOLO run does not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is OpenCode's own
-agent. A run that goes on from another (Resume, or an answer that came after its run ended) starts without the picks:
-the first message, with their lines and skills, stays in the chat, and with grouped tools `use_tools` turns a picked
-server's group on. **Save skill** (`POST /api/runs/{id}/skill`) has the review model write the skill of the run as a
-learned skill, as one is written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is
-refused while learned skills are off, and for a run that did not end done or took no acting step, a delegated run, an
-eval's and one of OpenCode's agent.
+screenshots alike; a phone opens its own sheet). The slash and at menus pick **Plugins** (the MCP servers with tools)
+and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked is a chip under the box in a colour of
+its name, which its × takes away; Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all
+three switches stand in the **Options** menu's Execution group, under the approvals (item 353). The picks go with the
+message (`plugins`, `skills` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
+sent they stand under it as chips (the run's `picks` event); a message that steers the run under way leaves them for the
+next one, and the page says so, and a queued message with picks is not steered into the run at work: it stays queued to
+start a run of its own. A run sent with picks starts with each picked server's tool group on from its first step when
+its tools are grouped (with every tool offered they are on anyway), and its first message is your words, then a line
+that names the servers to use, Plan first's (write the plan with `update_plan`, then ask with `ask_user` and act once
+you agree: the prompt asks it, nothing holds the run's tools back), and each picked skill's instructions as the `skill`
+tool gives them; the run's goal stays your words. Picks a run cannot start with are refused, with why, and nothing
+starts: a server that is not connected or none of whose tools the run may use (its mode's, within its agent's bounds), a
+skill it is not offered, Plan first in a chat or under YOLO (a YOLO run does not ask), any pick with Keep going, and any
+pick on one of OpenCode's models, whose run is OpenCode's own agent. A run that goes on from another (Resume, or an
+answer that came after its run ended) starts without the picks: the first message, with their lines and skills, stays in
+the chat, and with grouped tools `use_tools` turns a picked server's group on. **Save from a chat**, on the Skills page
+(`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's last run as a learned skill, as one is
+written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is refused while learned
+skills are off, and for a run that did not end done or took no acting step, a delegated run, an eval's and one of
+OpenCode's agent. The box of a run held it as **Save skill**, under a **More** button, until item 406.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
@@ -340,29 +340,29 @@ since, cannot be taken back, as before the run). `POST /api/runs/{id}/undo` take
 left it, once the run has ended.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
-notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on:
-off, a chat leaves out the lines of the actions YOLO let through and of those the reviewer approved, while a refusal
-still shows (items 346 and 362, kept in this browser), and the token this browser is signed in with), **Appearance**
-(the look of this browser, below),
-**Models** (the **Default model** first, a menu of the models that can call tools: the runs that name no model, a new
-chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`, as when it is changed
-from the composer's model menu; then one fold per provider, with the reasoning levels of each model and a menu to choose
-one; a provider without a key, or whose key was refused (HTTP 401), says so and links to Providers, and one that refused
-access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in with, each with its key and the
-models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
-with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
-**Memory**, **Skills**, **Harness** (what Dot improves around its model: the version in use, a form for
-one of your own, every version with Adopt and Retire, the steps of the loop, the experiences and how the nightly step is
-set; see [The harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its
-home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, its facts in four
-groups each named over its rows of a label and a value, item 378: this Dot, how it acts, what it works with and its
-models; the emergency stop and the health checks in a fold, closed, with the number of failures on its line, and the
-ways to **Diagnostics** and **Open source licences**, pages of their own). Which folds are open is kept in the browser.
-The tabs sit beside their content when the window has the room and above it otherwise, in one row that scrolls sideways
-with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are a list in groups
-whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)). The
-earlier addresses of the memory, rules and system pages lead to their tabs, and the schedules' tab
-(`#/settings/schedules`) to the Schedules page.
+notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on: off, a
+chat leaves out the lines of the actions YOLO let through and of those the reviewer approved, while a refusal still
+shows (items 346 and 362, kept in this browser), and the token this browser is signed in with), **Appearance** (the look
+of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
+that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
+main`, as when it is changed from the composer's model menu; then one fold per provider, with the reasoning levels of
+each model and a menu to choose one; a provider without a key, or whose key was refused (HTTP 401), says so and links to
+Providers, and one that refused access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in
+with, each with its key and the models it brings; see [Models and providers](models.md#models-and-providers)),
+**Browser** (which Chrome Dot browses with and what Chrome has to allow first; see [Browser
+use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Harness** (what Dot improves around
+its model: the version in use, a form for one of your own, every version with Adopt and Retire, the steps of the loop,
+the experiences and how the nightly step is set; see [The harness](harness.md)), **Phone** (the addresses a phone
+reaches Dot at and a pairing code for its home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and
+**System** (the daemon, its facts in four groups each named over its rows of a label and a value, item 378: this Dot,
+how it acts, what it works with and its models; the emergency stop and the health checks in a fold, closed, with the
+number of failures on its line, and the ways to **Diagnostics** and **Open source licences**, pages of their own). Which
+folds are open is kept in the browser. The tabs sit beside their content when the window has the room and above it
+otherwise, in one row that scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item
+272); on a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
+phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
+the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
+the box by a double tap of the Command key: see below.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
@@ -380,96 +380,96 @@ Both pages, like the other pages under another (an agent's or a campaign's page,
 link back at their top in a wide window, with the sidebar beside them too (item 380): the sidebar names the list they
 are under, not the page itself.
 
-Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards,
-each a miniature of Dot's window drawn in the scheme it names: System (the default, split down the middle), Light and
-Dark; ⇧⌥⌘A steps through them. **Themes** is a gallery of cards with a light and a dark orb each: the card takes its
-theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light can wear one theme
-and dark another. Dot's two looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper** (warm
-paper tones with a serif heading and a terracotta accent), whose serif voice follows the scheme it is picked for; Dot's
-six palettes are **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and a raspberry accent),
-**Grove**, **Ocean**, **Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (the colour a palette
-paints its solid controls with is Dot's accent) and held to the rule of the looks below: a text tier or an ink
-that would read under its ratio is moved in lightness until it reads, and in dark a card lies a step above the page; a
-browser test measures every theme in both schemes as the page paints it. The two picks are written on the page as
-`light-dark()` pairs (nothing when one look is picked for both) and kept with the picks, so the first paint after a
-reload already wears them. Themes of your own join the gallery: **Create theme** starts from the themes in use for light
-and dark, **Duplicate** (on a card, as Edit, Export and Delete are on one of your own) copies any theme, **Export**
-saves one in the theme file format, and **Delete** asks first and gives a scheme it was picked for back to Neutral. The
-editor takes a name and, for each scheme the theme has, the **Background** and the **Accent** its palette is made from,
-as the theme generator makes one, and the **Action** colour Dot paints its buttons, switches and send button with (the
-generator turns it away from the accent, so Dot lets you set it); **Colour families** change one colour, and the ones
-made with it, at a time. The page wears the palette while you change it. **Add theme** reads a file: a theme
-file (version 1, or the short form of a name, an appearance, a canvas and an accent) or a VS Code colour theme, mapped
-onto a palette. The daemon keeps them, one theme file each, in its home's `themes` folder (made with the first
-theme saved; 32 themes, 32 KB a file and 192 KB in all at most), so every browser has them; a file put there by hand
-shows after a reload, one Dot cannot read is listed under the gallery with the reason, and a colour a theme leaves out
-is Rose's. **Interface**: **Contrast**, 50 to 200 % (100, the theme's own, by default): under 100 the
-text tiers and the lines fade toward the page, over it they move toward black in light and white in dark, the lines a
-quarter as far; **Chat width**, how wide the home and a conversation read (Comfortable, 768 px,
-the default; Wide, 1152 px; Full); **Density**, how close the rows, cards and lists sit (comfortable or compact); and
-two switches that follow the theme picked for light until you set them yourself: fold the tool steps (on in all but
-Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how long the sidebar and the details panel
-take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never slide), and "Faces that move"
-(below). **Text** (item 331): one **Text size** under a line of an answer, the size of the body on this device, every
-text size scaled with it: on a phone 12 to 20 px around 16 (item 347), as iOS's own, and elsewhere 13 to 17 px around
-14; each device keeps its own. **Type**: the interface's font (Inter, the system's, or families typed, which go before
-Inter so that no glyph goes missing); the answers' font (the theme's,
-which is a serif in Paper, the interface's, or a serif); the composer's font (the interface's, a serif, the code's, or
-families typed) and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed)
-and the size of an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on)
-and long lines of code wrapped (off). The choices are kept in the browser only, and `boot.js` puts each of them on the
-page before the first paint. The palettes, the colour arithmetic, the orbs, the contrast's mixing, the families typed,
-the theme generator, the theme file with its checks and the VS Code import are a port of an MIT-licensed project to
-plain ES modules; its notice is `static/js/appearance/LICENSE`, and Dot is not affiliated with that project. The looks
-are one visual system. Colour: every colour is a token of `themes.css` naming
-its light and its dark value in one place; surfaces step up by lightness (page, sunken sidebar, raised cards) rather
-than by shadow in dark; borders are the text colour at a small alpha so they sit on every surface; the text tiers are
-measured against every surface by a unit test (4.5:1 for text and its second tier, 3:1 for the muted and faint ones);
-the yellow is the owner's bubbles. Type: Inter for the interface and the answers, Geist Mono for code and identifiers,
-both served from Dot's own origin (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16
-badges and chips, 13/18 meta and hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28
-page titles, 24/32 the greeting), three weights (400 text, 500 labels and names, 600 titles), tabular numerals
-throughout; a unit test refuses any size, weight, line-height or family in the sheets that is not one of these tokens.
-Surfaces: cards are flat, a surface with a hairline and a 12 px radius and no shadow (shadows stay on what floats:
-menus, dialogs, the composer in focus); section labels are sentence case; the facts of a row are spans a gap apart
-rather than one dotted string; an empty list is one line that says so and what to do; your messages sit on the raised
-surface. Controls: buttons, inputs and selects 36 px tall on an 8 px corner with a hairline (32 for the small ones), the
-same 2 px focus ring on each, a select with its own drawn chevron, a range on a hairline track filled with the accent up
-to its value under the switch's knob, field labels on the interface line and hints on the small one, the composer's
-menus as round pills of 32 px (an icon of 16 px, the value, a chevron of 12; no ground at rest, a tint under the
-pointer) that open a panel above them, the providers' marks served from `static/icons/providers/` with their licences,
-table rows 40 px with their content on the middle; `#/controls` shows every control on one page for checking a look.
-Faces: every actor is a character (below); an agent wears the look you choose, Dot its own (Settings › General), and an
-actor without one (a delegated run, a campaign, a schedule) the shape and colour its id's hue gives it, one of eight, so
-it keeps its face in the sidebar, the lists, the rows of a chat and the bar of its own page. Characters: the animated
-faces (`static/js/character/`) are a port of bloub (github.com/jeremy-prt/bloub, MIT, Jérémy Perret) to plain ES
-modules, one filled shape with two eyes that are holes in it, in eight shapes, sixteen expressions, twelve colours (the
-theme's `--character-*` tokens) and fourteen animations; bloub recreates the behaviour of x.ai's bot avatar as an
-exercise and is affiliated with nobody, and neither is Dot: the licence covers the code, not the design it imitates
-(`static/js/character/LICENSE`). One loop drives every moving character on the page and stops while the tab is hidden;
-under reduced motion, or with "Faces that move" off in Settings › Appearance, each shows one still frame (while the
-system reduces motion the switch says so, and where that is turned off). A still character follows a change of its shape
-or expression at once. Two characters move: the home's face and the look editor's preview; every other face is a still
-frame. One moving face costs about a millisecond of main-thread time a frame (`tests/smoke/test_character_cost.py` reads
-it from Chrome's performance metrics and caps it). `#/controls` shows every shape, expression, colour and animation.
-Space: every gap, padding and margin sits on one rhythm of 8 px (4 for the smallest, a 2 px hairline token for what sits
-a breath apart; a unit test checks it); the sidebar is a tone darker than the page with no line between them, has no
-dividers between its groups, its labels are the lightest ink that reads, a chat's last activity sits at the right of its
-row in figures of one width ("5m", "3h", "2d") and its open row is a surface step rather than a tint; the top bar's
-pills show a border only when they count something; a card's head is lighter than its body; a folded step of the
-timeline is one line whose duration shows on hover. Motion: three durations (120, 200 and 320 ms) and two easings for
-what changes, and the rhythms of what repeats (the face's breath and pulse, a blink, a spin); a unit test holds every
-transition and animation to them. The face breathes slowly at rest and pulses while a run works; cards, rows, the slash
-menu and the toasts fade in; a state badge cross-fades. Under the system's reduced-motion setting every transform goes
-(the breath, the pulse, the spinners, the drawer's slide) and the fades stay, so a state change is still seen. Dot's
-mark is a yellow dot with the character's eyes, the o of the wordmark "dot" between a d and a t drawn in one line
-(`static/index.html`); the favicon, the app's icon, the menu bar's and the web app's icons are drawn from it
-(`desktop/icons/render.py`), and the wordmark heads the sign-in card. A window that opens the UI plays the opening once:
-the d and the t hop up, the dot drops in with its eyes shut, bounces twice, opens its eyes and blinks, and the page
-shows through, 1.3 s in all; a click or a key cuts it short, it takes no pointer, and it plays neither on a reload nor
-under reduced motion. The look, the scheme and the density you chose are put on the page by a small script in the
-document's head before the first paint, so a held dark scheme never flashes light on the way in; a screenshot tour
-(`tests/smoke/test_tour.py`) photographs every page in both schemes at 1280 and 390 for reading by eye.
+Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards, each a miniature of Dot's
+window drawn in the scheme it names: System (the default, split down the middle), Light and Dark; ⇧⌥⌘A steps through
+them. **Themes** is a gallery of cards with a light and a dark orb each: the card takes its theme for both schemes, an
+orb for its own scheme only (a sun or a moon marks the picks), so light can wear one theme and dark another. Dot's two
+looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper** (warm paper tones with a serif
+heading and a terracotta accent), whose serif voice follows the scheme it is picked for; Dot's six palettes are
+**Clean** (near-white, grey and a blue accent), **Rose** (blush whites and a raspberry accent), **Grove**, **Ocean**,
+**Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (the colour a palette paints its solid controls
+with is Dot's accent) and held to the rule of the looks below: a text tier or an ink that would read under its ratio is
+moved in lightness until it reads, and in dark a card lies a step above the page; a browser test measures every theme in
+both schemes as the page paints it. The two picks are written on the page as `light-dark()` pairs (nothing when one look
+is picked for both) and kept with the picks, so the first paint after a reload already wears them. Themes of your own
+join the gallery: **Create theme** starts from the themes in use for light and dark, **Duplicate** (on a card, as Edit,
+Export and Delete are on one of your own) copies any theme, **Export** saves one in the theme file format, and
+**Delete** asks first and gives a scheme it was picked for back to Neutral. The editor takes a name and, for each scheme
+the theme has, the **Background** and the **Accent** its palette is made from, as the theme generator makes one, and the
+**Action** colour Dot paints its buttons, switches and send button with (the generator turns it away from the accent, so
+Dot lets you set it); **Colour families** change one colour, and the ones made with it, at a time. The page wears the
+palette while you change it. **Add theme** reads a file: a theme file (version 1, or the short form of a name, an
+appearance, a canvas and an accent) or a VS Code colour theme, mapped onto a palette. The daemon keeps them, one theme
+file each, in its home's `themes` folder (made with the first theme saved; 32 themes, 32 KB a file and 192 KB in all at
+most), so every browser has them; a file put there by hand shows after a reload, one Dot cannot read is listed under the
+gallery with the reason, and a colour a theme leaves out is Rose's. **Interface**: **Contrast**, 50 to 200 % (100, the
+theme's own, by default): under 100 the text tiers and the lines fade toward the page, over it they move toward black in
+light and white in dark, the lines a quarter as far; **Chat width**, how wide the home and a conversation read
+(Comfortable, 768 px, the default; Wide, 1152 px; Full); **Density**, how close the rows, cards and lists sit
+(comfortable or compact); and two switches that follow the theme picked for light until you set them yourself: fold the
+tool steps (on in all but Paper) and the Details panel (off in all). **Motion**: **Panel animation**, how long the
+sidebar and the details panel take to slide (0 to 400 ms, 200 by default; while the system reduces motion they never
+slide), and "Faces that move" (below). **Text** (item 331): one **Text size** under a line of an answer, the size of the
+body on this device, every text size scaled with it: on a phone 12 to 20 px around 16 (item 347), as iOS's own, and
+elsewhere 13 to 17 px around 14; each device keeps its own. **Type**: the interface's font (Inter, the system's, or
+families typed, which go before Inter so that no glyph goes missing); the answers' font (the theme's, which is a serif
+in Paper, the interface's, or a serif); the composer's font (the interface's, a serif, the code's, or families typed)
+and size (12 to 20 px, 15 by default); the code's font (Geist Mono, SF Mono, Menlo, or families typed) and the size of
+an answer's code blocks (10 to 18 px, 13 by default), each with a line of preview; font smoothing (on) and long lines of
+code wrapped (off). The choices are kept in the browser only, and `boot.js` puts each of them on the page before the
+first paint. The palettes, the colour arithmetic, the orbs, the contrast's mixing, the families typed, the theme
+generator, the theme file with its checks and the VS Code import are a port of an MIT-licensed project to plain ES
+modules; its notice is `static/js/appearance/LICENSE`, and Dot is not affiliated with that project. The looks are one
+visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
+surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
+colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit test
+(4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type: Inter
+for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
+(`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta and
+hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the greeting),
+three weights (400 text, 500 labels and names, 600 titles), tabular numerals throughout; a unit test refuses any size,
+weight, line-height or family in the sheets that is not one of these tokens. Surfaces: cards are flat, a surface with a
+hairline and a 12 px radius and no shadow (shadows stay on what floats: menus, dialogs, the composer in focus); section
+labels are sentence case; the facts of a row are spans a gap apart rather than one dotted string; an empty page or list
+stands a mark in a quiet ring, a title and one line that says what brings something there, in the middle of its place
+(item 407); your messages sit on the raised surface. Controls: buttons, inputs and selects 36 px tall on an 8 px corner
+with a hairline (32 for the small ones), the same 2 px focus ring on each, a select with its own drawn chevron, a range
+on a hairline track filled with the accent up to its value under the switch's knob, field labels on the interface line
+and hints on the small one, the composer's menus as round pills of 32 px (an icon of 16 px, the value, a chevron of 12;
+no ground at rest, a tint under the pointer) that open a panel above them, the providers' marks served from
+`static/icons/providers/` with their licences, table rows 40 px with their content on the middle; `#/controls` shows
+every control on one page for checking a look. Faces: every actor is a character (below); an agent wears the look you
+choose, Dot its own (Settings › General), and an actor without one (a delegated run, a campaign, a schedule) the shape
+and colour its id's hue gives it, one of eight, so it keeps its face in the sidebar, the lists, the rows of a chat and
+the bar of its own page. Characters: the animated faces (`static/js/character/`) are a port of bloub
+(github.com/jeremy-prt/bloub, MIT, Jérémy Perret) to plain ES modules, one filled shape with two eyes that are holes in
+it, in eight shapes, sixteen expressions, twelve colours (the theme's `--character-*` tokens) and fourteen animations;
+bloub recreates the behaviour of x.ai's bot avatar as an exercise and is affiliated with nobody, and neither is Dot: the
+licence covers the code, not the design it imitates (`static/js/character/LICENSE`). One loop drives every moving
+character on the page and stops while the tab is hidden; under reduced motion, or with "Faces that move" off in Settings
+› Appearance, each shows one still frame (while the system reduces motion the switch says so, and where that is turned
+off). A still character follows a change of its shape or expression at once. Two characters move: the home's face and
+the look editor's preview; every other face is a still frame. One moving face costs about a millisecond of main-thread
+time a frame (`tests/smoke/test_character_cost.py` reads it from Chrome's performance metrics and caps it). `#/controls`
+shows every shape, expression, colour and animation. Space: every gap, padding and margin sits on one rhythm of 8 px (4
+for the smallest, a 2 px hairline token for what sits a breath apart; a unit test checks it); the sidebar is a tone
+darker than the page with no line between them, has no dividers between its groups, its labels are the lightest ink that
+reads, a chat's last activity sits at the right of its row in figures of one width ("5m", "3h", "2d") and its open row
+is a surface step rather than a tint; the top bar's pills show a border only when they count something; a card's head is
+lighter than its body; a folded step of the timeline is one line whose duration shows on hover. Motion: three durations
+(120, 200 and 320 ms) and two easings for what changes, and the rhythms of what repeats (the face's breath and pulse, a
+blink, a spin); a unit test holds every transition and animation to them. The face breathes slowly at rest and pulses
+while a run works; cards, rows, the slash menu and the toasts fade in; a state badge cross-fades. Under the system's
+reduced-motion setting every transform goes (the breath, the pulse, the spinners, the drawer's slide) and the fades
+stay, so a state change is still seen. Dot's mark is a yellow dot with the character's eyes, the o of the wordmark "dot"
+between a d and a t drawn in one line (`static/index.html`); the favicon, the app's icon, the menu bar's and the web
+app's icons are drawn from it (`desktop/icons/render.py`), and the wordmark heads the sign-in card. A window that opens
+the UI plays the opening once: the d and the t hop up, the dot drops in with its eyes shut, bounces twice, opens its
+eyes and blinks, and the page shows through, 1.3 s in all; a click or a key cuts it short, it takes no pointer, and it
+plays neither on a reload nor under reduced motion. The look, the scheme and the density you chose are put on the page
+by a small script in the document's head before the first paint, so a held dark scheme never flashes light on the way
+in; a screenshot tour (`tests/smoke/test_tour.py`) photographs every page in both schemes at 1280 and 390 for reading by
+eye.
 
 While you are elsewhere, the tab title counts the approvals that wait: `(2) New chat · Dot`. Settings › General ›
 Notifications adds
@@ -537,10 +537,17 @@ dotx service uninstall   # stop the daemon and remove the job
     Return, choose **Open** and switch it on.
 
   A running process keeps what it had when it started, so after you switched a permission on run `dotx service install`
-  (it restarts the daemon) and then `dotx service permissions` again for the next one. The command ends with
-  "The service has everything the desktop needs." and exit code 0 once the daemon has accessibility, input events and
-  screen recording. Measured through the service with all three granted: the model opened the fixture app, typed a
-  name, pressed a button twice and ticked a checkbox in 4 steps and 13 seconds.
+  (it restarts the daemon) and then `dotx service permissions` again for the next one. The command ends with "The
+  service has everything the desktop needs." and exit code 0 once the daemon has accessibility, input events and screen
+  recording. Settings › System › **Permissions** in the web UI does the same from the page (item 409): the three
+  permissions as macOS reports them for the daemon (`GET /api/desktop/permissions`, no dialog), **Ask macOS** (`POST`,
+  which also puts the program in the panes' lists), **Open** for the pane of each permission missing (`POST
+  /api/desktop/permissions/open`), and, when the daemon is the service's own process (launchd's job runs Dot.app's
+  launcher, the daemon's parent), **Restart Dot** (`POST /api/system/restart`): the daemon stops with an exit launchd
+  does not count as clean, so the job starts it again, with what was granted meanwhile; a daemon run by hand is refused
+  the restart, and so is one when launchd cannot be asked. The SnapShots page offers the Accessibility pane the same
+  way. Measured through the service with all three granted: the model opened the fixture app, typed a name, pressed a
+  button twice and ticked a checkbox in 4 steps and 13 seconds.
 - The job does not see the environment of your shell. Give it its API keys through `dotx auth set` or the Keychain.
 - When Dot's files are under Desktop, Documents or Downloads, the first start of the job waits for you: macOS asks once
   whether Dot may use that folder, and `service install` waits up to 60 seconds for the answer. Measured on an
@@ -587,7 +594,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`), what Tailscale says of the Mac and whether the daemon keeps it awake (item 271); a new pairing code (item 267) |
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
-| `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
+| `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | SnapShots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
+| `GET /desktop/permissions`, `POST /desktop/permissions`, `POST /desktop/permissions/open` (`{"pane": "screen_recording"}`), `POST /system/restart` | the desktop permissions as macOS reports them, make macOS ask for the missing ones, show a pane, start the service's daemon again (item 409) |
 
 `POST /runs`, `POST /runs/{id}/steer` and `POST /threads/{id}/queue` take a `key` of the caller's own (16 to 64 letters,
 digits and dashes), which the pages send with each new message. The same message sent again with its key is not done
@@ -597,6 +605,21 @@ sending is under way, for two minutes at most. A key is kept for a day.
 Errors come as `{"message": …, "context": {…}}`, those of the web framework itself (a path that does not exist, a method
 a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the
 log keeps its traceback. Invalid input is a 422 with the validation errors in the context.
+
+**SnapShots** (item 405, after another coding agent's). In any application, a double tap of the Command key (⌘ ⌘)
+captures the window in front and puts it in the box of the open chat (or of the new chat) as a picture, without
+switching to Dot; a short sound says it was taken, and the chip springs into the box. With **Include app text** the
+window's text and controls, as the application shows them to accessibility and as the model reads a window, come as a
+Markdown file beside the picture. The key is watched by the daemon through a listen-only event tap once macOS has
+granted Accessibility to the app that runs Dot; it reads only whether the Command key went down or up and whether
+another key was pressed meanwhile (⌘C ⌘V is two shortcuts, not a tap), never which key. Dot's own window (the desktop
+app, or a browser showing Dot) and a password manager's are never captured; what lies over the window shows in the
+picture, as on the screen. A box on screen takes the capture as it comes; with none on screen (another page open) the
+daemon keeps it until a box is made. Settings › SnapShots switches it (`[snapshots] enabled`), the text (`app_text`),
+the sound (`sound`: click, pop, glass or off), the spring (`animations`), and says whether the key is watched and, when
+it is not, why; while the permission is missing the daemon tries the watch again every few seconds, so granting it needs
+no restart. A capture past the ten files of a message is left out, and the box says so. Left for later: a flash on the
+captured window and a shortcut of your own; the shortcut is ⌘ ⌘.
 
 ## The desktop shell
 

@@ -17,6 +17,7 @@ from dotagent.server.guard import (
     read_or_create_token,
     read_token,
     require_loopback,
+    response_headers,
 )
 
 PORT: int = 8765
@@ -155,6 +156,27 @@ def test_a_name_of_reach_is_served_like_the_loopback_address_over_https(
     """``[server] reach``: the names a reverse proxy on the owner's network presents the daemon as (item 52)."""
     refusal: Refusal | None = check_request("/api/status", host, origin, None, None, GOOD_AUTH, TOKEN, PORT, REACH)
     assert (None if refusal is None else refusal.status) == refused_with
+
+
+def test_a_name_of_reach_with_https_s_own_port_written_out_is_served_too() -> None:
+    """A client that writes the port of HTTPS into the Host header names the same server (item 410)."""
+    name: str = next(iter(REACH))
+    assert check_request("/api/status", f"{name}:443", None, None, None, GOOD_AUTH, TOKEN, PORT, REACH) is None
+    refused: Refusal | None = check_request(
+        "/api/status", f"{name}:8443", None, None, None, GOOD_AUTH, TOKEN, PORT, REACH
+    )
+    assert refused is not None and refused.status == 421
+
+
+@pytest.mark.parametrize(
+    "path", ["/apple-touch-icon.png", "/icons/icon-192.png", "/manifest.webmanifest", "/favicon.svg"]
+)
+def test_the_files_a_launcher_draws_an_added_app_with_may_be_read_from_any_origin(path: str) -> None:
+    """A phone's launcher fetches the icon outside the page (item 410): a resource policy of ``same-origin`` kept it."""
+    headers: dict[str, str] = dict(response_headers(path))
+    assert headers["Cross-Origin-Resource-Policy"] == "cross-origin"
+    assert headers["Cache-Control"] == "no-cache"
+    assert dict(response_headers("/css/app.css"))["Cross-Origin-Resource-Policy"] == "same-origin"
 
 
 def test_the_token_file_is_created_private_and_reused(tmp_path: Path) -> None:

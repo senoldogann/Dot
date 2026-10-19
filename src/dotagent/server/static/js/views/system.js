@@ -269,6 +269,96 @@ function buildDaemon() {
   };
 }
 
+// How long "Restart now?" stands before the button is the quiet "Restart Dot" again (item 409).
+const RESTART_ARMED_MS = 6000;
+
+/** The desktop's permissions (item 409): what macOS granted the program that runs Dot, a button that makes macOS ask
+ * (and puts the program in the panes' lists), one that opens the pane of each permission missing, and, when the daemon
+ * is the service's, one that starts Dot again, since a running process keeps what it had when it started. */
+function buildPermissions() {
+  let view = null;
+  let armed = false;
+  let disarm = null;
+  const body = el("div", { class: "card-pad stack" }, inlineLoading());
+
+  function arm(on) {
+    armed = on;
+    if (disarm !== null) {
+      clearTimeout(disarm);
+      disarm = null;
+    }
+    if (on) {
+      disarm = setTimeout(() => arm(false), RESTART_ARMED_MS);
+    }
+    paint();
+  }
+
+  async function load() {
+    view = await api.get("/desktop/permissions");
+    paint();
+  }
+
+  async function ask() {
+    view = await api.post("/desktop/permissions", null);
+    paint();
+    toast("ok", view.panes.length === 0 ? "macOS granted everything the desktop needs." : "macOS asked; switch Dot on where it did not grant.");
+  }
+
+  async function open(pane) {
+    view = await api.post("/desktop/permissions/open", { pane });
+    paint();
+  }
+
+  async function restart() {
+    if (!armed) {
+      arm(true);
+      return;
+    }
+    arm(false);
+    await api.post("/system/restart", null);
+    toast("ok", "Dot stops and the service starts it again; this page answers again in a moment.");
+  }
+
+  function row(label, granted) {
+    return entry(label, el("span", { class: `badge ${granted ? "b-ok" : "b-warn"}` }, granted ? "granted" : "missing"));
+  }
+
+  function paint() {
+    if (view === null) {
+      return;
+    }
+    const missing = view.panes.length > 0;
+    const steps = missing
+      ? `Switch Dot on in the pane (Touch ID or password). If it is not in the list, press +, then Cmd+Shift+G, paste the program's path and choose Open. ${view.service ? "Then press Restart Dot:" : "Then start Dot again:"} a running process keeps what it had when it started.`
+      : "macOS granted everything the desktop needs.";
+    const serviceNote = view.service_problem === null ? null : el("p", { class: "hint" }, icon("alert"), ` launchd could not be asked whether its service runs this Dot: ${view.service_problem}`);
+    const askButton = el("button", { class: "btn sm", type: "button", onclick: () => attempt(ask) }, icon("hand"), "Ask macOS");
+    const panes = view.panes.map((pane) =>
+      el("button", { class: "btn sm", type: "button", onclick: () => attempt(() => open(pane)) }, icon("external"), `Open ${view.titles[pane] ?? pane}`),
+    );
+    const restartButton = el(
+      "button",
+      { class: `btn sm ${armed ? "danger solid" : ""}`, type: "button", hidden: !view.service, onclick: () => attempt(restart) },
+      icon("power"),
+      armed ? "Restart now?" : "Restart Dot",
+    );
+    body.replaceChildren(
+      el("dl", { class: "kv kv-rows" }, row("Accessibility", view.accessibility), row("Input events", view.input_events), row("Screen Recording", view.screen_recording), wideEntry("Program", el("span", { class: "mono" }, view.program))),
+      el("p", { class: "hint" }, steps),
+      serviceNote,
+      el("div", { class: "cluster" }, askButton, ...panes, restartButton),
+    );
+  }
+
+  const refreshButton = el("button", { class: "btn ghost sm", type: "button", title: "Read the permissions again", "aria-label": "Read the permissions again", onclick: () => attempt(load) }, icon("refresh"));
+  async function loadQuiet() {
+    arm(false);
+    await load();
+  }
+
+  return { element: section("Permissions", refreshButton, body), load: loadQuiet };
+}
+
 function buildFailsafe() {
   const text = el("div", { class: "grow muted" });
   const statusBadge = el("span", { class: "badge b-muted" }, "standby");
@@ -1718,6 +1808,7 @@ export function mountBrowser(root, _ctx) {
 export function mountSystem(root, _ctx) {
   let disposed = false;
   const daemon = buildDaemon();
+  const permissions = buildPermissions();
   const failsafe = buildFailsafe();
   const doctor = buildDoctor(() => disposed);
 
@@ -1726,10 +1817,11 @@ export function mountSystem(root, _ctx) {
     failsafe.paint(snapshot);
   }
 
-  root.append(paneHead("The daemon, its emergency stop and its health checks.", null), daemon.element, failsafe.element, doctor.element, buildAbout());
+  root.append(paneHead("The daemon, its permissions, its emergency stop and its health checks.", null), daemon.element, permissions.element, failsafe.element, doctor.element, buildAbout());
   const stop = onChange(paint);
   paint(getSnapshot());
   attempt(refresh);
+  attempt(permissions.load);
   attempt(doctor.run);
   return () => {
     disposed = true;

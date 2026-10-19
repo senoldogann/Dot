@@ -4,7 +4,7 @@
 // their own work, each with the kind of work, where it acted and how it fared; an agent's is offered to its runs alone
 // until Share, and Drop removes one (item 94). System holds the skills that come with Dot and those of its plugins. A
 // search over both, and a section shows its first cards with the others a click away. Save from a chat writes a
-// finished chat's work as a skill with the review model (item 318's Save skill). Under Personal, what the Mac's other
+// finished chat's work as a skill with the review model (item 318). Under Personal, what the Mac's other
 // agents set up (item 164): their skills, folded by agent, and their MCP servers by name and what they reach, never
 // their arguments or keys. Dot uses one only once the owner adds it here, after a confirmation (item 165): a skill is
 // copied into Dot's skills folder and offered to runs at once, a server is started from Dot's next start; Remove takes
@@ -401,7 +401,7 @@ export function foundSection(found, onFound) {
   }
   const head = foundHead();
   if (groups.length === 0) {
-    return [head, emptyPanel("Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or MCP servers set up.")];
+    return [head, emptyPanel("search", "Nothing found", "No other agent of this Mac (Claude Code, Claude Desktop, Cursor, VS Code, Codex) has skills or MCP servers set up.")];
   }
   const hint = el(
     "div",
@@ -673,8 +673,8 @@ export function mount(root) {
     if (parts.every((part) => part === null)) {
       parts.push(
         words === ""
-          ? emptyPanel("No skills of yours yet", "After a task that went well, Dot writes how it did it as a skill for the next one of its kind; Save from a chat writes one at your word.")
-          : el("p", { class: "hint plugin-none" }, "No skill matches the search."),
+          ? emptyPanel("sparkles", "No skills of yours yet", "After a task that went well, Dot writes how it did it as a skill for the next one of its kind; Save from a chat writes one at your word.")
+          : emptyPanel("search", "No skill matches the search", ""),
       );
     }
     return [...parts, ...foundPart()];
@@ -698,7 +698,11 @@ export function mount(root) {
       ),
     ];
     if (parts.every((part) => part === null)) {
-      parts.push(el("p", { class: "hint plugin-none" }, words === "" ? "Neither Dot nor a plugin brings a skill: [skills] builtin is off and no plugin has one." : "No skill matches the search."));
+      parts.push(
+        words === ""
+          ? emptyPanel("sparkles", "Neither Dot nor a plugin brings a skill", "[skills] builtin is off and no plugin has one.")
+          : emptyPanel("search", "No skill matches the search", ""),
+      );
     }
     return parts;
   }

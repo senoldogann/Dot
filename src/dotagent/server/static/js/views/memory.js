@@ -292,9 +292,9 @@ export function mount(root, _ctx) {
       placeChildren(restingCard, asleep);
       placeChildren(holder, [...(awake.length > 0 ? [awakeCard] : []), ...(asleep.length > 0 ? [restingHead, restingCard] : [])]);
     } else if (shownQuery === "") {
-      holder.replaceChildren(emptyPanel("Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
+      holder.replaceChildren(emptyPanel("brain", "Nothing remembered yet", "Add a note above, or ask Dot to remember something during a run."));
     } else {
-      holder.replaceChildren(emptyPanel("Nothing matches", "Try other words or a shorter query."));
+      holder.replaceChildren(emptyPanel("search", "Nothing matches", "Try other words or a shorter query."));
     }
   }
 

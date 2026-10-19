@@ -1360,10 +1360,47 @@ a.pill:hover {
   margin-bottom: 8px;
 }
 
-/* An empty place is one line that says so and what to do (item 79): no card, no icon. */
-.empty-line {
-  padding: 12px 16px;
+/* An empty place stands in the middle of its page (item 407, after the Screen tab's quiet panel of item 401): a mark
+   in a quiet ring, a title and one line that says what brings something here; no card. */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  max-width: 420px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
   color: var(--muted);
+}
+
+.empty-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--muted) 28%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  color: var(--muted);
+}
+
+.empty-mark .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.empty-title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-ui);
+}
+
+.empty-line {
+  margin: 0;
+  max-width: 46ch;
 }
 
 /* The facts of a row or an answer: separate spans a space apart, not one dotted string (item 79). */
@@ -1828,9 +1865,6 @@ a.pill:hover {
   flex: 1 1 220px;
 }
 
-.plugin-none {
-  margin: 0;
-}
 
 .plugin-own .plugin-tile {
   margin: 0 16px 8px;
@@ -2506,8 +2540,7 @@ a.pill:hover {
   margin-inline-end: auto;
 }
 
-.composer .plus-button,
-.composer .more-button {
+.composer .plus-button {
   width: 32px;
   padding: 0;
   border-radius: var(--radius-pill);
@@ -2796,7 +2829,6 @@ a.pill:hover {
   }
 
   .composer .plus-button,
-  .composer .more-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;
@@ -6419,6 +6451,40 @@ button.attach-chip:hover {
   flex: none;
 }
 
+/* A capture of SnapShots comes into the box with a small spring (item 405); reduced motion shows it in place. */
+.attach-chip.arrived {
+  animation: chip-arrive var(--motion-slow) var(--ease-emphasis) both;
+}
+
+@keyframes chip-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.85);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attach-chip.arrived {
+    animation: none;
+  }
+}
+
+.snapshots-keys {
+  font: inherit;
+  padding: var(--space-half) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+}
+
+.snapshots-problem {
+  color: var(--bad);
+}
+
 /* A queued message's file in the box that edits it (item 376): small, the picture itself or a file's icon, and the ×
    at its corner; no words (the name is its tooltip). */
 .attach-chip.small {
@@ -6517,8 +6583,7 @@ button.attach-chip:hover {
   border-radius: var(--radius-xs);
 }
 
-.plus-button,
-.more-button {
+.plus-button {
   flex: none;
 }
 
@@ -7078,7 +7143,6 @@ button.attach-chip:hover {
 
   /* The composer's round buttons are the send's size, at the dock's right, and so is the stop's square in them. */
   .composer .plus-button,
-  .composer .more-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;

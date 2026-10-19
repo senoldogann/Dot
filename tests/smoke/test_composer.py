@@ -284,7 +284,6 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await expect(mode_pill.locator("[data-icon='message']")).to_have_count(1)
                 await expect(goal).to_be_focused()
                 # A chat has neither goal mode nor Keep going:
-                await expect(page.get_by_role("button", name="More")).to_be_hidden()
                 await expect(page.get_by_role("button", name="Add files")).to_be_visible()
                 await expect(page.locator(".composer .composer-popover[aria-label='Add']")).to_have_count(0)
                 options_pill = page.locator(".composer-pill[data-pill='options']")
@@ -298,9 +297,7 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await expect(mode_pill).to_contain_text("Task")
                 # The "+" opens the file picker directly; Options carries Approvals and Execution
                 # (Keep going, Goal mode, Plan first).
-                await expect(page.get_by_role("button", name="More")).to_be_hidden()
                 await expect(page.get_by_role("button", name="Add files")).to_be_visible()
-                await expect(page.locator(".composer .composer-popover[aria-label='More']")).to_be_hidden()
                 await expect(options_pill).to_contain_text("Edits")
                 await options_pill.click()
                 popover = page.locator(".composer .composer-popover[aria-label='Options']")

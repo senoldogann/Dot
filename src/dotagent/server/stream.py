@@ -18,7 +18,7 @@ from dotagent.agent.manager import QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT
 from dotagent.agent.rewind import CHAT_REWOUND_EVENT
 from dotagent.browser.types import Frame
 from dotagent.drafts.service import DRAFT_CREATED_EVENT, DRAFT_DECIDED_EVENT
-from dotagent.events import EventBus
+from dotagent.events import SNAPSHOT_EVENT, SNAPSHOT_FAILED_EVENT, EventBus
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_data import RULES_CHANGED_EVENT
@@ -60,6 +60,8 @@ LIFECYCLE_KINDS: frozenset[str] = frozenset(
         LEARNING_STALLED_EVENT,
         RULES_CHANGED_EVENT,
         CHAT_REWOUND_EVENT,
+        SNAPSHOT_EVENT,
+        SNAPSHOT_FAILED_EVENT,
     }
 )
 

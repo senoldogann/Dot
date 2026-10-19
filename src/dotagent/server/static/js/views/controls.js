@@ -218,7 +218,7 @@ export function mount(root, _ctx) {
   );
   const costSample = createCostCard();
   costSample.paint(FAKE_COSTS);
-  const panels = el("div", { class: "stack" }, loadingPanel(), emptyPanel("Nothing here yet", "An empty panel with its hint."), errorPanel(new Error("Something went wrong"), () => {}));
+  const panels = el("div", { class: "stack" }, loadingPanel(), emptyPanel("circleDashed", "Nothing here yet", "An empty panel with its hint."), errorPanel(new Error("Something went wrong"), () => {}));
   const type = el(
     "div",
     { class: "stack tight" },

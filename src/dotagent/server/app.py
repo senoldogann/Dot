@@ -50,6 +50,7 @@ from dotagent.server.routes_pages import pages_router
 from dotagent.server.routes_phone import phone_router
 from dotagent.server.routes_queue import queue_router
 from dotagent.server.routes_runs import runs_router
+from dotagent.server.routes_snapshots import snapshots_router
 from dotagent.server.routes_system import health_router, proof_router, system_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
@@ -123,6 +124,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(files_router(ctx, looks))
     app.include_router(looks_router(looks))
     app.include_router(phone_router(ctx))
+    app.include_router(snapshots_router(ctx))
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:
