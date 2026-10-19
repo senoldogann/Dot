@@ -117,8 +117,9 @@ asyncio_mode = "auto"
 testpaths = ["tests"]
 # tests/unit and tests/smoke have modules of the same name, so each is imported by its path; a smoke test that borrows
 # from another finds it on tests/smoke. A mark that is not registered below fails, as a mistyped one would select a
-# test that needs a service.
-addopts = ["--import-mode=importlib", "--strict-markers"]
+# test that needs a service. With -n (pytest-xdist), a module's tests stay on one worker: many share a module's fixture
+# and follow one another, as the add and the remove of a server do.
+addopts = ["--import-mode=importlib", "--strict-markers", "--dist=loadfile"]
 pythonpath = ["tests/smoke"]
 markers = [
     "live: needs a running Ollama server with a signed-in cloud model",

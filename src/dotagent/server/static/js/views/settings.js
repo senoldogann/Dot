@@ -11,6 +11,7 @@ import { getSnapshot, onChange } from "../state.js";
 import { findTheme, onSchemeChange, onThemeChange, shownScheme, themePicks } from "../theme.js";
 import { attempt } from "../ui.js";
 import * as appearance from "./appearance.js";
+import * as harness from "./harness.js";
 import * as keys from "./keys.js";
 import * as memory from "./memory.js";
 import * as phone from "./phone.js";
@@ -28,6 +29,7 @@ const TABS = [
   { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
   { id: "schedules", label: "Schedules", icon: "calendar", mount: schedules.mount },
+  { id: "harness", label: "Harness", icon: "sparkle", mount: harness.mount },
   { id: "phone", label: "Phone", icon: "smartphone", mount: phone.mount },
   { id: "system", label: "System", icon: "monitor", mount: mountSystem },
 ];
@@ -35,7 +37,7 @@ const TABS = [
 const GROUPS = [
   { title: "Interface", tabs: ["general", "appearance"] },
   { title: "Models", tabs: ["models", "keys"] },
-  { title: "How Dot works", tabs: ["rules", "memory", "schedules"] },
+  { title: "How Dot works", tabs: ["rules", "memory", "schedules", "harness"] },
   { title: "This Mac", tabs: ["browser", "phone", "system"] },
 ];
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");
@@ -95,6 +97,10 @@ function mountList(root, ctx) {
   attempt(async () => {
     const found = await api.get("/schedules");
     values.get("schedules").textContent = String(found.length);
+  });
+  attempt(async () => {
+    const found = await api.get("/harness");
+    values.get("harness").textContent = found.adopted === null ? "Dot's own" : "in use";
   });
   return () => {
     SYSTEM_DARK.removeEventListener("change", paintTheme);

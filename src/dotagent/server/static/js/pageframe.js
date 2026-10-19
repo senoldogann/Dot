@@ -62,8 +62,9 @@ function sendTheme(frame, theme) {
   frame.contentWindow?.postMessage({ jsonrpc: "2.0", method: CONTEXT_CHANGED, params: theme }, "*");
 }
 
+/** @returns {HTMLIFrameElement[]} */
 function frames() {
-  return [...document.querySelectorAll("iframe.shown-page-frame")];
+  return [.../** @type {NodeListOf<HTMLIFrameElement>} */ (document.querySelectorAll("iframe.shown-page-frame"))];
 }
 
 /** Open `url`, a link the user clicked in the page of `frame`, in their browser; what kept it shut, or null. */
@@ -121,7 +122,9 @@ function watch() {
       const shown = frames();
       if (shown.length > 0) {
         const theme = context();
-        shown.forEach((frame) => sendTheme(frame, theme));
+        for (const frame of shown) {
+          sendTheme(frame, theme);
+        }
       }
     });
   };

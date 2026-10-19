@@ -5,6 +5,7 @@ delegate, and the store keeps the choice with a run, a queued message and a camp
 from pathlib import Path
 
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.harness.components import NO_HARNESS
 from dotagent.llm.types import ONE_MESSAGE_LEVELS, splits_work
 from dotagent.store.db import Store
 from dotagent.store.models import NO_PICKS, CampaignRecord, QueuedMessage, RunRecord, ThreadRecord
@@ -37,6 +38,7 @@ def _prompt(split: bool, tool_names: list[str]) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 

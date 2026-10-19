@@ -36,7 +36,7 @@ function quoted(name) {
 }
 
 /** The families typed as a CSS list, or null when nothing is typed. */
-export function familyList(typed) {
+function familyList(typed) {
   const families = typed.split(",").map(quoted).filter((name) => name !== "");
   return families.length > 0 ? families.join(", ") : null;
 }
@@ -234,7 +234,7 @@ const SETTINGS = [
 ];
 
 /** The value of `setting` kept in this browser, or its default when none is or what is kept is not one of its values. */
-export function valueOf(setting) {
+export function settingValue(setting) {
   return setting.parse(readPref(setting.key)) ?? setting.initial;
 }
 
@@ -259,6 +259,6 @@ export function setValue(setting, value) {
 /** Put every setting kept in this browser on the page, as boot.js did before the first paint. */
 export function applyStoredSettings() {
   for (const setting of SETTINGS) {
-    setting.paint(valueOf(setting));
+    setting.paint(settingValue(setting));
   }
 }

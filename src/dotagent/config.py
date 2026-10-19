@@ -412,6 +412,44 @@ class MemoryConfig(FrozenModel):
     owner_chars: int = Field(ge=100)
 
 
+class HarnessConfig(FrozenModel):
+    """The harness (item 389, docs/harness.md): how long each component of a version may be, in characters, and in
+    lines; a version past these is refused when it is written."""
+
+    habits_chars: int = Field(ge=0)
+    tool_guidance_chars: int = Field(ge=0)
+    component_lines: int = Field(ge=1)
+    # The models of the roles of the improvement loop (item 390): a model reference each, "" for [models] review.
+    proposer: str
+    composer: str
+    selector: str
+    experience: str
+    # The nightly step (item 391): when it runs (HH:MM in [scheduler] timezone, or "off"), the scoring set and the
+    # final set (eval task ids), how many times each task is played, which scopes are proposed, and its budget of
+    # minutes and tokens; who adopts a version the probe showed better: the owner, or the step itself. Each set names
+    # at least one task: an empty list would select the whole catalogue, the final set with it.
+    step_time: str
+    scoring_tasks: list[str] = Field(min_length=1)
+    final_tasks: list[str] = Field(min_length=1)
+    step_repeats: int = Field(ge=1)
+    step_candidates: list[Literal["invariant", "domain"]] = Field(min_length=1, max_length=2)
+    step_minutes: float = Field(gt=0, allow_inf_nan=False)
+    step_tokens: int = Field(gt=0)
+    adopt: Literal["owner", "auto"]
+
+    @field_validator("proposer", "composer", "selector", "experience")
+    @classmethod
+    def _model_or_review(cls, value: str) -> str:
+        return value if value == "" else _model_reference(value)
+
+    @field_validator("step_time")
+    @classmethod
+    def _step_time_of_day_or_off(cls, value: str) -> str:
+        if value != "off" and _TIME_OF_DAY.fullmatch(value) is None:
+            raise ValueError('step_time is a time of day as "04:10" (24-hour) or "off"')
+        return value
+
+
 class ShellConfig(FrozenModel):
     pass_env: list[str]
     login_env_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -600,6 +638,7 @@ class AppConfig(FrozenModel):
     browser: BrowserConfig
     desktop: DesktopConfig
     memory: MemoryConfig
+    harness: HarnessConfig
     scheduler: SchedulerConfig
     skills: SkillsConfig
     plugins: PluginsConfig

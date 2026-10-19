@@ -324,10 +324,13 @@ export function createQueue({ threadId, frame, onSteered, onStarted, onEdit, onC
     resume.disabled = busy;
     // The rows are drawn anew, on every change of the queue from any page: the control that has the focus hands it to
     // its like in the new rows (a handle moved from the keyboard to its new place), or to the box once that is gone.
-    const focused = list.contains(document.activeElement) ? document.activeElement : null;
+    const active = document.activeElement;
+    const focused = active instanceof HTMLElement && list.contains(active) ? active : null;
     list.replaceChildren(...messages.map(row));
     if (focused !== null) {
-      const like = list.querySelector(`[data-id="${focused.dataset.id}"][data-part="${focused.dataset.part}"]`);
+      const like = /** @type {HTMLButtonElement | HTMLTextAreaElement | null} */ (
+        list.querySelector(`[data-id="${focused.dataset.id}"][data-part="${focused.dataset.part}"]`)
+      );
       (like !== null && !like.disabled ? like : frame.textarea).focus();
     }
     onCount(messages.length);

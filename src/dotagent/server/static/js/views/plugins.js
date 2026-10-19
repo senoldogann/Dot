@@ -184,7 +184,7 @@ export function mount(root, ctx) {
       const now = wayNow(way);
       if (way.kind === "mcp") {
         if (now.server === null) {
-          if (now.service !== null && now.service.added) {
+          if (now.service?.added) {
             continue;
           }
           return { label: "Add", key: `mcp:${way.ref}`, take: () => add({ service: way.ref, name: null, address: null }) };
@@ -236,7 +236,7 @@ export function mount(root, ctx) {
     }
     if (first.kind === "mcp") {
       const service = servers.services.find((one) => one.id === first.ref);
-      return el("span", { class: "chip" }, service !== undefined && service.signs_in ? "MCP · Sign in" : "MCP · Open to all");
+      return el("span", { class: "chip" }, service?.signs_in ? "MCP · Sign in" : "MCP · Open to all");
     }
     return el("span", { class: "chip" }, WAY_NAMES[first.kind]);
   }
@@ -524,7 +524,7 @@ export function mount(root, ctx) {
   }
 
   /** One way of a service on its page: what it is, how it connects, where it stands, what to do and its step. */
-  function wayRow(plugin, way) {
+  function wayRow(_plugin, way) {
     const now = wayNow(way);
     let badge = null;
     let guideLine = null;
@@ -537,7 +537,7 @@ export function mount(root, ctx) {
         const button = el("button", { class: "btn sm primary", type: "button", disabled: busy.has(`mcp:${way.ref}`) }, "Add");
         button.addEventListener("click", () => attempt(() => add({ service: way.ref, name: null, address: null })));
         actions = el("div", { class: "plugin-actions" }, button);
-        badge = el("span", { class: "badge b-muted" }, now.service !== null && now.service.signs_in ? "Signs in" : "Open to all");
+        badge = el("span", { class: "badge b-muted" }, now.service?.signs_in ? "Signs in" : "Open to all");
       } else {
         badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
         guideLine = serverGuide(now.server);

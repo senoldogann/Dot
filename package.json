@@ -1,0 +1,19 @@
+{
+  "name": "dot-interface-checks",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The development checks of Dot's web interface: lint and format (Biome), types (tsc over JSDoc) and the unit tests of its pure modules. Nothing here is needed to run Dot.",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "check": "biome ci . && tsc -p tsconfig.json && tsc -p tsconfig.sw.json && node --test tests/js/*.test.js",
+    "fix": "biome check --write .",
+    "test": "node --test tests/js/*.test.js"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "typescript": "5.9.3"
+  }
+}

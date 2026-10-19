@@ -9,7 +9,7 @@
   var read = function (key) {
     try {
       return localStorage.getItem(key);
-    } catch (error) {
+    } catch {
       return null;
     }
   };
@@ -38,7 +38,7 @@
   var tokens = null;
   try {
     tokens = JSON.parse(read("dot.themeTokens") || "null");
-  } catch (error) {
+  } catch {
     tokens = null;
   }
   if (tokens !== null && typeof tokens === "object") {
@@ -87,10 +87,10 @@
   if (answers === "interface" || answers === "serif") {
     root.style.setProperty("--voice", answers === "interface" ? "var(--font)" : "var(--family-serif)");
   }
-  [
+  /** @type {Array<[string, string, number, number, number]>} */ ([
     ["dot.sizeComposer", "--composer-size", 12, 20, 15],
     ["dot.sizeCode", "--code-size", 10, 18, 13],
-  ].forEach(function (size) {
+  ]).forEach(function (size) {
     var value = whole(size[0], size[2], size[3], 1);
     if (value !== null && value !== size[4]) {
       root.style.setProperty(size[1], value + "px");
@@ -103,11 +103,11 @@
       /^[a-zA-Z][a-zA-Z0-9-]*$/.test(bare) && !/^(inherit|initial|unset|revert|revert-layer|default)$/i.test(bare);
     return bare === "" || plain ? bare : '"' + bare + '"';
   };
-  [
+  /** @type {Array<[string, string, string[], string]>} */ ([
     ["dot.fontInterface", "--font", ["system"], "var(--family-inter)"],
     ["dot.fontComposer", "--composer-font", ["serif", "mono"], "var(--font)"],
     ["dot.fontCode", "--mono", ["sf-mono", "menlo"], "var(--family-geist-mono)"],
-  ].forEach(function (font) {
+  ]).forEach(function (font) {
     var stored = read(font[0]);
     if (stored === null) {
       return;
@@ -161,18 +161,18 @@
     if (opening) {
       sessionStorage.setItem("dot.opened", "1");
     }
-  } catch (error) {
+  } catch {
     opening = false;
   }
   if (opening) {
     // Once the overlay has begun to fade, the quick fade would only start again from full and flash (item 116).
-    var skip = function () {
+    const skip = function () {
       var overlay = document.querySelector(".opening");
       if (root.dataset.opening === "on" && overlay !== null && getComputedStyle(overlay).opacity === "1") {
         root.dataset.opening = "skip";
       }
     };
-    var end = function (event) {
+    const end = function (event) {
       if (!(event.target instanceof Element) || !event.target.classList.contains("opening")) {
         return;
       }
