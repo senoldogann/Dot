@@ -84,7 +84,9 @@ currency, so list sites that bill in one currency. Empty by default.
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
    it needs done and waits; on a browser step you can take the browser over, do it and give it back; when you say you
    did it, the run goes on from there). The expression is searched, case-insensitive, in the action's one-line summary
-   (a shell command's starts with `Run: `), a line break and its target (the command, the path, the address). A rule
+   (a shell command's starts with `Run: `), a line break and its target (the command, the path, the address); one that
+   takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so that a
+   pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
    is managed there or through `/api/rules`; the page lists the rules in the order they are checked and **New rule**
    opens the two ways to write one. It can also be said in your own words ("let Dot run git status and git

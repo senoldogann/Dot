@@ -14752,6 +14752,19 @@ pruned as unpaired; the pre-push review found the first version wrote the new id
 schedule whose firing a crash cut before its run was under way is due again at the time it fired as the scheduler
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
+### 387. An owner's rule is matched with a timeout
+
+**Status: in progress, for the owner to merge** (it changes `src/dotagent/policy/` and the dependencies in
+`pyproject.toml`, paths that need a human). The finding B8 of the deep review of 2026-10-19 and the owner's choice of
+the same day: the `regex` package, with a timeout. **As built (2026-10-19).** An owner's rule is matched with the
+`regex` package instead of `re`, with a timeout of 0.25 s an action (`policy/engine.py` `match_rule`,
+`RULE_MATCH_TIMEOUT_S`): `re` holds the interpreter's lock for the whole match, so a pattern that backtracks for long,
+`(a|aa)+$` on a long line, held the daemon's event loop, and every page and stream with it, for as long as it ran, and
+running it in a thread did not help (item 385 tried and took that back). A match that times out is refused as a rule
+that cannot be read is, rather than passed over, which could let through an action the rule stops. `regex` reads the
+patterns `re` reads. Dependencies: `regex`, and `types-regex` for the type check. Tests:
+`tests/unit/test_rule_timeout.py`. Docs: `docs/safety.md`.
+
 ### 388. The web interface has checks of its own, and its pages load on demand
 
 **Status: done (2026-10-19), on `js-gate`.** The owner's word of 2026-10-19, after the review of the interface of
@@ -15919,6 +15932,7 @@ element with a width (item 388's `tsc`); an unused import, `toolIcon` and `pickM
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 387 on `item-387-rule-timeout`, the review's B8 with the owner's choice of the `regex` package, for the owner to merge.
 - 2026-10-19 (Fable 5.1): item 388 on `js-gate`, on the owner's word of the same day after the interface review of 2026-10-18: the web interface gets checks of its own (Biome, `tsc` over the JSDoc, `node --test`), an export nothing imports fails the gate, and the pages that are not the chat or the home load on demand. Done, awaiting the owner's push.
 - 2026-10-19 (Fable 5.1): item 388's whole gate ran: 705 passed, the 17 browser tests that failed under `-n auto` passed serially, as they do on main. Item 389 on `harness-1`, stacked on `js-gate`: the harness's first layer, versions of the texts a run's prompt takes, written, adopted and retired by the owner (docs/harness.md); the method of Harness² (arXiv 2610.14224) adopted, its code not.
 - 2026-10-19 (Fable 5.1): item 389 committed on `harness-1`; item 390 on `harness-2`: the four roles of the step and `dotx harness propose`.

@@ -1,11 +1,11 @@
 """Routes for what Dot keeps: rules for the policy, memories and schedules."""
 
-import re
 import time
 from datetime import datetime
 from typing import Annotated
 from zoneinfo import ZoneInfo
 
+import regex
 from fastapi import APIRouter, Query
 
 from dotagent.agent.learning_health import LearningHealth, quiet_limit, read_learning_health, stall_reason
@@ -61,8 +61,8 @@ from dotagent.store.models import MemoryRecord, MemoryScore, RuleRecord, Schedul
 
 def _checked_pattern(pattern: str) -> str:
     try:
-        re.compile(pattern)
-    except re.error as exc:
+        regex.compile(pattern)
+    except regex.error as exc:
         raise InvalidValueError(
             "the pattern is not a valid regular expression", {"pattern": pattern, "error": str(exc)}
         ) from exc
