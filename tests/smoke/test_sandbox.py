@@ -217,6 +217,20 @@ async def test_a_command_starts_in_the_sandbox_in_every_approval_mode_but_yolo(
     assert _refused(read) and TOKEN not in read, read
 
 
+async def test_a_command_of_a_run_hands_launchd_nothing_and_one_of_a_yolo_run_does(
+    runtime: Runtime,
+) -> None:
+    """Item 418: a run's command starts neither launchctl nor shortcuts, opens nothing through Launch Services and
+    leaves no job in the user's LaunchAgents, where launchd would start it outside the sandbox; a yolo run's command
+    does as the user's account may."""
+    agents: str = await asyncio.to_thread(os.path.realpath, Path.home() / "Library" / "LaunchAgents")
+    assert f'(subpath "{agents}")' in runtime.sandbox.current().commands[-1]
+    ctx: ToolContext = await _context(runtime, "ask")
+    handed: str = await _run(ctx, "shell", {"command": "launchctl version"})
+    assert _refused(handed) and "Darwin" not in handed, handed
+    assert "Darwin" in await _run(await _context(runtime, "yolo"), "shell", {"command": "launchctl version"})
+
+
 async def test_a_search_of_a_run_reads_neither_dots_own_files_nor_the_protected_locations(runtime: Runtime) -> None:
     ctx: ToolContext = await _context(runtime, "ask")
     vault: Path = Path(runtime.config.policy.protected_paths[0])

@@ -1,11 +1,13 @@
 """A tool that names files works on the files it was authorised for (item 181): it is classified again as it starts,
 and a path that leads elsewhere by then (a link moved while the call waited for its approval) fails the call, saying
-so, with nothing written or read; called again, it is authorised for where the path leads now.
+so, with nothing written or read; called again, it is authorised for where the path leads now. An application is named
+by a path too, and the bundle it leads to is what decides whether it may be opened without a question (item 418).
 
 No network and no model service is used: the calls are prepared, authorised and run as the executor runs them.
 """
 
 import asyncio
+import os
 from collections.abc import AsyncIterator
 from pathlib import Path
 
@@ -119,6 +121,27 @@ def _move(link: Path, to: Path) -> None:
     link.symlink_to(to)
 
 
+def _bundle_link(name: str) -> tuple[Path, Path]:
+    """A link that leads to an application on the sealed system volume, and the path of one that is not, a bundle a run
+    may have made."""
+    folder: Path = workspace_dir() / name
+    folder.mkdir(parents=True)
+    link: Path = folder / "Tool.app"
+    link.symlink_to("/System/Applications/Notes.app")
+    return folder / "made.app", link
+
+
+def _two_bundles(name: str) -> tuple[str, Path, Path]:
+    """A link, the resolved path of the application it leads to when a call is authorised, and the path of another a run
+    may have made, both of them outside the sealed system volume: the same question, with another answer."""
+    folder: Path = workspace_dir() / name
+    folder.mkdir(parents=True)
+    link: Path = folder / "Tool.app"
+    approved: Path = Path("/Applications/An Application.app")
+    link.symlink_to(approved)
+    return os.path.realpath(approved), folder / "made.app", link
+
+
 async def test_a_write_whose_link_moved_after_it_was_authorised_writes_nothing(runtime: Runtime) -> None:
     ctx: ToolContext = await _context(runtime)
     authorized, other, link = _files("write")
@@ -141,3 +164,37 @@ async def test_a_read_whose_link_moved_after_it_was_authorised_reads_nothing(run
         await prepared.run(ctx)
     read: ToolResult = await (await _authorized(ctx, "read_file", {"path": str(link)})).run(ctx)
     assert "other" in read.text
+
+
+async def test_an_application_named_by_its_name_is_named_so_for_the_other_runs(runtime: Runtime) -> None:
+    """Item 418 with items 301 and 305: the action names the application as every other desktop tool names it, so a run
+    at work in the same application is still seen, while the bundle the name resolved to is what is opened."""
+    ctx: ToolContext = await _context(runtime)
+    prepared: PreparedCall = await _authorized(ctx, "desktop_open_app", {"app": "Notes"})
+    assert prepared.action.target == "Notes"
+    assert prepared.action.bundle == "/System/Applications/Notes.app"
+
+
+async def test_an_application_whose_link_moved_to_a_bundle_a_run_made_is_not_opened(runtime: Runtime) -> None:
+    """Item 418: a bundle on the sealed system volume needs no question; the same link leading to a bundle a run could
+    have made does, so a link moved while the call waited for its approval is refused rather than opened."""
+    ctx: ToolContext = await _context(runtime)
+    made, link = _bundle_link("open")
+    prepared: PreparedCall = await _authorized(ctx, "desktop_open_app", {"app": str(link)})
+    _move(link, made)
+    with pytest.raises(ToolExecutionError, match=MOVED):
+        await prepared.run(ctx)
+
+
+async def test_an_application_whose_link_moved_to_another_bundle_outside_system_is_not_opened(
+    runtime: Runtime,
+) -> None:
+    """Item 418: what is authorised is the bundle the link leads to, not the question it is asked about, so a second
+    bundle outside the system volume put in place of the first while the call waited is not opened in its stead."""
+    ctx: ToolContext = await _context(runtime)
+    approved, made, link = _two_bundles("open-outside")
+    prepared: PreparedCall = await _authorized(ctx, "desktop_open_app", {"app": str(link)})
+    assert prepared.action.bundle == approved
+    _move(link, made)
+    with pytest.raises(ToolExecutionError, match=MOVED):
+        await prepared.run(ctx)

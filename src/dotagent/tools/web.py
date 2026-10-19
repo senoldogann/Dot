@@ -792,7 +792,7 @@ def _extract_tool() -> RegisteredTool:
             _source_flags(args.sources, ctx),
         )
 
-    async def run(args: ExtractArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: ExtractArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         config: AppConfig = ctx.runtime.config
         fields: tuple[FieldSpec, ...] = tuple(
             FieldSpec(name=field.name, description=field.description) for field in args.fields

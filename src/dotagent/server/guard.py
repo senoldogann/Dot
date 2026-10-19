@@ -40,6 +40,7 @@ _PERMISSION_BITS: int = 0o777
 _OTHERS_BITS: int = 0o077
 _TOKEN_BYTES: int = 32
 _LOOPBACK_NAME: str = "localhost"
+_HTTP_BAD_REQUEST: int = 400
 _HTTP_MISDIRECTED: int = 421
 _HTTP_FORBIDDEN: int = 403
 _HTTP_UNAUTHORIZED: int = 401
@@ -49,13 +50,13 @@ _CROSS_SITE: str = "cross-site"
 # What the proof of the daemon puts before the nonce, so that it is good for nothing else keyed with the token.
 _PROOF_LABEL: bytes = b"dot daemon proof\n"
 
-# The pages of the UI load only their own scripts and styles, frame only pages of the server itself (the pages runs
-# showed), and nothing can frame them.
 log = get_logger(__name__)
 
 # The files a launcher asks for outside any page of the UI, to draw the app it adds to a home screen or a dock (item
 # 410): a phone's own process fetches them, and reads them only when their headers let another origin do so.
 LAUNCHER_PATHS: tuple[str, ...] = ("/apple-touch-icon", "/icons/", "/favicon.svg", "/manifest.webmanifest")
+# The pages of the UI load only their own scripts and styles, frame only pages of the server itself (the pages runs
+# showed), and nothing can frame them.
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
@@ -232,6 +233,13 @@ def response_headers(path: str) -> tuple[tuple[str, str], ...]:
     return (*SECURITY_HEADERS, ("Cache-Control", "no-store" if is_api_path(path) else "no-cache"))
 
 
+def has_dot_segment(path: str) -> bool:
+    """Whether the decoded ``path`` has a ``.`` or ``..`` segment. No page of the server has one, and the files behind
+    a prefix the guard knows (the launcher's, a run's page, a preview) would resolve it to a file of another prefix
+    (``/icons/..%2Findex.html``)."""
+    return any(segment in (".", "..") for segment in path.split("/"))
+
+
 def check_request(
     path: str,
     host: str | None,
@@ -244,6 +252,8 @@ def check_request(
     reach: frozenset[str],
 ) -> Refusal | None:
     """Why a request must not be served, or ``None`` when it may be."""
+    if has_dot_segment(path):
+        return Refusal(status=_HTTP_BAD_REQUEST, message="a path with a . or .. segment is refused")
     if not host_is_local(host, port, reach):
         return Refusal(status=_HTTP_MISDIRECTED, message="this server answers only to its loopback address")
     if not origin_is_local(origin, port, reach):

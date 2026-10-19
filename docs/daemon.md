@@ -505,7 +505,8 @@ is active, still otherwise), and a notification carries the face in the state it
 Ctrl-C stops the daemon: the runs that are going on are cancelled, and the browser and the other services are closed.
 
 The server listens on `127.0.0.1:8765` (`[server]`) and refuses to start on any other address. Every request must carry
-a `Host` of the loopback address and, when it has one, an `Origin` of the server itself; every call under `/api` except
+a path without a `.` or `..` segment (`..%2F`, as a browser sends it, reads as one; item 419), a `Host` of the loopback
+address and, when it has one, an `Origin` of the server itself; every call under `/api` except
 `/api/health`, `/api/proof` and `/api/phone/pair` needs the bearer token in `<home>/api-token` (mode 0600). A page a run showed
 (`/pages/<id>`) needs none: its id cannot be guessed, and it is served sandboxed (see [Tools](runs.md#tools)). `dotx url` puts
 the token in the fragment of the address (`#token=…`), so it never reaches the server or a log; the page keeps it in the

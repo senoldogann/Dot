@@ -154,7 +154,9 @@ def build_apple_tool() -> RegisteredTool:
             'value of range "A1:C3" of active sheet`. '
             "find_help says which applications of this Mac can do a task, from their dictionaries, and `sdef` with "
             "an application's path prints its whole dictionary. The first use of an application can make macOS ask "
-            "the user for Automation permission; a call that times out may be waiting for that answer. Prefer "
+            "the user for Automation permission; a call that times out may be waiting for that answer. Outside "
+            "yolo, while the sandbox is on, the script's own files are sealed as a command's are, but macOS does not "
+            "hold it back from the application it names: that application acts with its own powers. Prefer "
             "desktop_act for anything that needs the interface itself, and browser_eval for a web page: a script "
             "sent to Chrome reaches whichever Chrome window macOS picks."
         ),

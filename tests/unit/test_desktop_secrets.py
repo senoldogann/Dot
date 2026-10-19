@@ -1,6 +1,7 @@
 """The desktop's secret checks that need no screen: a password manager is never controlled, nor Dot's own window outside
-a yolo run (item 135), a paste is typing, and a long typed text goes through the clipboard only into a known field that
-is not secure."""
+a yolo run (item 135), a paste is typing, a long typed text goes through the clipboard only into a known field that is
+not secure, and an application named by its bundle's path anywhere but under /System is one a run may have made
+(item 418)."""
 
 import plistlib
 from pathlib import Path
@@ -28,6 +29,7 @@ from dotagent.policy.elements import Element, StepAssessment
 from dotagent.policy.engine import auto_review
 from dotagent.policy.types import ActionInfo
 from dotagent.tools.apple import secrets_reason
+from dotagent.tools.desktop import _bundle_of, _on_the_sealed_system_volume
 
 
 @pytest.mark.parametrize(
@@ -235,3 +237,44 @@ def test_an_application_a_script_names_is_known_by_its_bundle_id(tmp_path: Path)
     assert secrets_reason(renamed, {}) is None
     assert secrets_reason(renamed, identities) == "it names 'Vault', which holds passwords or keys"
     assert secrets_reason('tell application "Notes" to get name of every note', identities) is None
+
+
+def test_a_bundle_outside_the_sealed_system_volume_is_one_a_run_may_have_made_however_it_is_named() -> None:
+    made: list[Path] = [
+        Path("/tmp/x.app"),
+        Path("x.app"),
+        Path("Notes.APP"),
+        Path("/System/../tmp/x.app"),
+        Path("~/Applications/Tool.app"),
+        Path("/System/Volumes/Data/Users/someone/x.app"),
+        # The Mac's file systems read the letters of a path without case, so these are the same volume.
+        Path("/System/volumes/data/Users/someone/x.app"),
+        Path("/system/volumes/Data/Users/someone/x.app"),
+    ]
+    installed: list[Path] = [
+        Path("/System/Applications/Notes.app"),
+        # Apple's own applications are on the sealed system volume, Safari's under its Cryptexes.
+        Path("/Applications/Safari.app"),
+    ]
+    assert [not _on_the_sealed_system_volume(path) for path in made] == [True] * len(made)
+    assert [not _on_the_sealed_system_volume(path) for path in installed] == [False] * len(installed)
+
+
+def test_a_name_or_a_bundle_id_is_the_bundle_launch_services_resolves_it_to() -> None:
+    """Item 418: the name or the bundle id a run can give is resolved through Launch Services, so it is judged by the
+    bundle it reaches; a path to anything but a bundle names none, and open refuses it as not an application."""
+    assert _bundle_of("Notes") == Path("/System/Applications/Notes.app")
+    assert _bundle_of("com.apple.Notes") == Path("/System/Applications/Notes.app")
+    # A name that ends in .app is read as a path, whatever its letter case, as open reads it.
+    assert [_bundle_of(app) for app in ("x.app", "Notes.APP")] == [Path("x.app"), Path("Notes.APP")]
+    assert [_bundle_of(app) for app in ("123", "com.example.no-such-application", "/usr/bin/node")] == [None] * 3
+
+
+@pytest.mark.parametrize("app", ["Google Chrome", "com.google.Chrome"])
+def test_a_name_or_a_bundle_id_launch_services_resolves_outside_system_may_be_one_a_run_made(app: str) -> None:
+    """Item 418: a run may register a bundle it made, so the name or the bundle id it gave it resolves through Launch
+    Services to the same path a bundle outside /System has, and asks as that path does."""
+    bundle: Path | None = _bundle_of(app)
+    if bundle is None:
+        pytest.skip(f"no {app} installed outside the sealed system volume")
+    assert not _on_the_sealed_system_volume(bundle)

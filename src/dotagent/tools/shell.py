@@ -229,7 +229,8 @@ def build_shell_tool() -> RegisteredTool:
             "eval, a long build) goes to terminal_open with background: this chat is told when it ends. Outside yolo, "
             "while the owner keeps the sandbox on, the command runs in a macOS sandbox that keeps it out of Dot's own "
             "files, and macOS starts no program that runs as root there (ps, top, sudo): there use pgrep -lf and lsof "
-            "instead of ps."
+            "instead of ps. Nor does it open an app, a file or an address (open), start launchctl or shortcuts, or "
+            "hand launchd a job: desktop_open_app opens an app."
         ),
         args_model=ShellArgs,
         modes=ACTING_MODES,

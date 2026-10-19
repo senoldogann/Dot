@@ -126,7 +126,9 @@ class ActionInfo(FrozenModel):
     the page says it; every other action has none (the default stands for that, since only the browser's payment
     steps know an amount). ``changes`` are the files a command line changes or removes as far as it shows them (item
     305), which the runs at work at the same time keep to; only the lines of a shell, a terminal and a script name
-    such files, so the default is none."""
+    such files, so the default is none. ``bundle`` is the path an application resolves to now, when the tool resolved
+    one (item 418): a call that names an application is checked again as it starts, and the application it found is the
+    one it opens, not another put in its place meanwhile."""
 
     tool: str
     kind: ActionKind
@@ -136,6 +138,7 @@ class ActionInfo(FrozenModel):
     flags: tuple[Flag, ...]
     amount: Amount | None = None
     changes: tuple[str, ...] = ()
+    bundle: str | None = None
 
 
 class Decision(FrozenModel):

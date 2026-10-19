@@ -45,7 +45,7 @@ pytestmark = [
 async def desktop(app: FixtureApp, failsafe_file: Path, settings_file: Path) -> AsyncIterator[DesktopSession]:
     config: DesktopConfig = load_config(settings_file).desktop
     session: DesktopSession = DesktopSession(config, failsafe_file, no_browser_chrome)
-    await session.open_app(_THREAD, str(app.pid), _MAX_CHARS)
+    await session.open_app(_THREAD, str(app.pid), _MAX_CHARS, None)
     yield session
     await session.close()
 

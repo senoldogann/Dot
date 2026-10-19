@@ -7,7 +7,9 @@ before it runs; a step that turns out riskier than what was approved goes back t
 """
 
 import base64
+import os
 import secrets
+from pathlib import Path
 from typing import Literal
 
 from pydantic import Field
@@ -15,6 +17,7 @@ from pydantic import Field
 from dotagent.config import AppConfig
 from dotagent.core.errors import DesktopError, ToolInputError
 from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
+from dotagent.desktop.apps import bundle_path
 from dotagent.desktop.render import (
     describe_step,
     render_act_outcome,
@@ -48,6 +51,7 @@ from dotagent.tools.base import (
     RegisteredTool,
     ToolArgs,
     ToolResult,
+    make_path_tool,
     make_reviewed_tool,
     make_tool,
     mark_untrusted,
@@ -90,9 +94,23 @@ def _clip(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
-def _action(tool: str, kind: ActionKind, risk: Risk, summary: str, target: str, flags: tuple[Flag, ...]) -> ActionInfo:
+def _action(
+    tool: str,
+    kind: ActionKind,
+    risk: Risk,
+    summary: str,
+    target: str,
+    flags: tuple[Flag, ...],
+    bundle: str | None = None,
+) -> ActionInfo:
     return ActionInfo(
-        tool=tool, kind=kind, risk=risk, summary=_clip(summary, _SUMMARY_CHARS), target=target, flags=flags
+        tool=tool,
+        kind=kind,
+        risk=risk,
+        summary=_clip(summary, _SUMMARY_CHARS),
+        target=target,
+        flags=flags,
+        bundle=bundle,
     )
 
 
@@ -153,8 +171,31 @@ class OpenAppArgs(ToolArgs):
     )
 
 
+def _on_the_sealed_system_volume(path: Path) -> bool:
+    """Whether ``path`` is on the sealed system volume: under ``/System`` and not on the data volume mounted at
+    ``/System/Volumes/Data``, where a run writes what it writes anywhere else. The letters are read without case, as the
+    Mac's file systems read them, so ``/System/volumes/data`` is that same volume."""
+    parts: tuple[str, ...] = tuple(part.casefold() for part in Path(os.path.realpath(path)).parts)
+    return parts[:2] == ("/", "system") and parts[2:4] != ("volumes", "data")
+
+
+def _bundle_of(app: str) -> Path | None:
+    """The bundle ``app`` names: by the path of its bundle (a ``/`` in it, or ``.app`` at its end, which ``open`` reads
+    from the daemon's folder), or by a name or a bundle id Launch Services resolves to one. ``None`` for a path to
+    anything but a bundle (a binary such as ``.../bin/node``), which names no bundle, and for a name or an id that no
+    application of this Mac has."""
+    if "/" in app and not app.casefold().endswith(".app"):
+        return None
+    return bundle_path(app)
+
+
 def _open_app_tool() -> RegisteredTool:
     def classify(args: OpenAppArgs, ctx: ToolContext) -> ActionInfo:
+        """What opening ``args.app`` does, named by the bundle it leads to now: the bundle is what the same check
+        compares again as the call starts (`make_path_tool`), so one put in the place of another while the call waits
+        is not opened in its stead, and it is what ``run`` opens, so nothing is resolved a second time."""
+        bundle: Path | None = _bundle_of(args.app)
+        resolved: str | None = os.path.realpath(bundle) if bundle is not None else None
         if is_secrets_app(args.app, None):
             return _action(
                 "desktop_open_app",
@@ -163,16 +204,30 @@ def _open_app_tool() -> RegisteredTool:
                 f"Open {args.app}, which holds passwords or keys",
                 args.app,
                 ("secret_access",),
+                resolved,
             )
-        return _action("desktop_open_app", "app_control", "low", f"Open {args.app}", args.app, ())
+        if bundle is not None and not _on_the_sealed_system_volume(bundle):
+            return _action(
+                "desktop_open_app",
+                "app_control",
+                "high",
+                f"Open {args.app}, which runs outside Dot's sandbox",
+                args.app,
+                ("privilege",),
+                resolved,
+            )
+        return _action("desktop_open_app", "app_control", "low", f"Open {args.app}", args.app, (), resolved)
 
-    async def run(args: OpenAppArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: OpenAppArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         opened: OpenedApp = await ctx.runtime.desktop.open_app(
-            ctx.thread_id, args.app, snapshot_budget(ctx.runtime.config, ctx.output_chars)
+            ctx.thread_id,
+            args.app,
+            snapshot_budget(ctx.runtime.config, ctx.output_chars),
+            authorized.bundle,
         )
         return _screen_result(render_opened_app(opened, _nonce()))
 
-    return make_tool(
+    return make_path_tool(
         name="desktop_open_app",
         description=(
             "Open a Mac application (or bring it to the front) and return its window as a list of elements with refs. "

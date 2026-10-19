@@ -204,12 +204,13 @@ def _app_view_job(config: DesktopConfig, app: AppInfo) -> AppView:
     return views.app_view(app, screen.windows_everywhere(), scale)
 
 
-def _open_job(config: DesktopConfig, query: str, preferred: frozenset[int]) -> tuple[AppInfo, bool]:
+def _open_job(config: DesktopConfig, query: str, preferred: frozenset[int], bundle: str | None) -> tuple[AppInfo, bool]:
     """Open an application (worker thread): the application and whether this call started it. An application that
-    runs without a window is asked to reopen one, as a click on its Dock icon would."""
+    runs without a window is asked to reopen one, as a click on its Dock icon would. ``bundle``, the path a check of
+    ``query`` came to, is what starts when none runs (item 418)."""
     running: AppInfo | None = apps.find_app(query, apps.list_apps(), preferred)
     if running is None:
-        return apps.open_app(query, config.launch_timeout_s, preferred), True
+        return apps.open_app(query, config.launch_timeout_s, preferred, bundle), True
     if not views.has_window(running.pid, screen.windows_everywhere()):
         apps.launch(running.bundle_id or running.bundle_path or running.name)
     apps.activate(running, config.activate_timeout_s)
@@ -577,12 +578,13 @@ class DesktopSession:
                 return False
             await asyncio.sleep(_WINDOW_POLL_S)
 
-    async def open_app(self, thread_id: str, query: str, max_chars: int) -> OpenedApp:
+    async def open_app(self, thread_id: str, query: str, max_chars: int, bundle: str | None) -> OpenedApp:
         """Open (or bring forward) an application, make it the thread's target and show its window, at most
-        ``max_chars`` of its text."""
+        ``max_chars`` of its text. ``bundle`` is the path a check of ``query`` came to, and is what starts
+        (item 418)."""
         async with self._lock:
             await self._prepare(self._prepare_acting)
-            opened, fresh = await self._call(lambda: _open_job(self._config, query, self._browser_chrome()))
+            opened, fresh = await self._call(lambda: _open_job(self._config, query, self._browser_chrome(), bundle))
             _refuse_secrets(opened)
             _log.info("app_opened", app=opened.name, pid=opened.pid, fresh=fresh)
             state: ThreadDesktop = memory.targeting(self._thread(thread_id), opened.pid)

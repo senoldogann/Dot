@@ -215,6 +215,14 @@ daemon, and restarts the service once a permission is granted (item 409).
 - `desktop_apps` lists the running applications and `desktop_open_app` brings one to the front, starting it when it is
 not running: by name (Terminal), bundle id (com.apple.Terminal) or bundle path (/Applications/Terminal.app). A path to
 anything else (a binary) is refused at once with those three forms, instead of being retried against Launch Services.
+A bundle that is not on the sealed system volume (`/System`, and not the data volume mounted at
+`/System/Volumes/Data`, the letters of the path read without case as the Mac's file systems read them) may be one a run
+made, which runs outside Dot's sandbox: it asks first, as a step outside the sandbox (item 418), whether it is named by
+its path or by a name or a bundle id Launch Services resolves to one. The bundle is resolved again as the call starts and
+one that leads elsewhere by then is refused, as a path a file tool names is (item 181), so a link moved while the call
+waited for its approval opens nothing. Outside yolo a run's command opens nothing (`open` is refused in the sandbox), so
+this tool is how a run's command starts an application; an AppleScript can still start one itself (see
+[Safety](safety.md#safety)).
 A name that fits several running copies of one application, "Google Chrome" while your Chrome and Dot's own both run,
 means the Chrome Dot's browser works in (item 343); a pid names any one of them. Chrome's remote debugging is the
 owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks is refused in every mode.

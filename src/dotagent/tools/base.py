@@ -210,12 +210,13 @@ def make_path_tool[A: ToolArgs](
     parallel_safe: bool,
     timeout_s: float,
     classify: Callable[[A, ToolContext], ActionInfo],
-    run: Callable[[A, ToolContext], Awaitable[ToolResult]],
+    run: Callable[[A, ToolContext, ActionInfo], Awaitable[ToolResult]],
 ) -> RegisteredTool:
     """A tool whose action is classified from its arguments and the files they name as they are on disk. It is
     classified again as it starts, with no wait between that and ``run``, and refused when that differs from the action
     that was authorised: a link moved while the call waited for its approval, or a path that became one, would have it
-    work on a file it was not allowed to."""
+    work on a file it was not allowed to. ``run`` receives the action that was authorised, so that what it acts on is
+    what was checked (its ``target``, or the ``bundle`` it named) and not a path resolved again."""
 
     async def classify_now(args: A, ctx: ToolContext) -> ActionInfo:
         return classify(args, ctx)
@@ -228,7 +229,7 @@ def make_path_tool[A: ToolArgs](
                 "is another); call the tool again",
                 {"tool": name, "authorized": _described(authorized), "now": _described(now)},
             )
-        return await run(args, ctx)
+        return await run(args, ctx, authorized)
 
     return _build(name, description, args_model, modes, parallel_safe, timeout_s, classify_now, run_authorized)
 

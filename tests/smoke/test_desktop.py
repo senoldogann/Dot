@@ -180,7 +180,7 @@ def owner_clipboard() -> Iterator[None]:
 async def session(app: FixtureApp, failsafe_file: Path, settings_file: Path) -> AsyncIterator[DesktopSession]:
     config: DesktopConfig = load_config(settings_file).desktop
     desktop: DesktopSession = DesktopSession(config, failsafe_file, no_browser_chrome)
-    await desktop.open_app(_THREAD, str(app.pid), _MAX_CHARS)
+    await desktop.open_app(_THREAD, str(app.pid), _MAX_CHARS, None)
     yield desktop
     await desktop.close()
 

@@ -194,7 +194,7 @@ def _read_file_tool() -> RegisteredTool:
     def classify(args: ReadFileArgs, ctx: ToolContext) -> ActionInfo:
         return _read_action("read_file", resolve_path(args.path, ctx), ctx, "Read")
 
-    async def run(args: ReadFileArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: ReadFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         desktop = ctx.runtime.config.desktop
         return await asyncio.to_thread(
             _read_blocking,
@@ -262,7 +262,7 @@ def _write_file_tool() -> RegisteredTool:
     def classify(args: WriteFileArgs, ctx: ToolContext) -> ActionInfo:
         return _write_action("write_file", resolve_path(args.path, ctx), ctx, "Write")
 
-    async def run(args: WriteFileArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: WriteFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         path: Path = resolve_path(args.path, ctx)
         written: int = await asyncio.to_thread(atomic_write, path, args.content, journal_for(ctx, "write_file"))
         return ok(f"Wrote {written} bytes ({args.content.count(chr(10)) + 1} lines) to {path}")
@@ -342,7 +342,7 @@ def _edit_file_tool() -> RegisteredTool:
     def classify(args: EditFileArgs, ctx: ToolContext) -> ActionInfo:
         return _write_action("edit_file", resolve_path(args.path, ctx), ctx, "Edit")
 
-    async def run(args: EditFileArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: EditFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         message: str = await asyncio.to_thread(
             _edit_blocking,
             resolve_path(args.path, ctx),
@@ -413,7 +413,7 @@ def _list_dir_tool() -> RegisteredTool:
     def classify(args: ListDirArgs, ctx: ToolContext) -> ActionInfo:
         return _read_action("list_dir", resolve_path(args.path, ctx), ctx, "List")
 
-    async def run(args: ListDirArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: ListDirArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         path: Path = resolve_path(args.path, ctx)
         lines: list[str] = await asyncio.to_thread(_walk, path, args.depth or 1)
         return ok(f"{path}\n" + ("\n".join(lines) if lines else "(empty)"))
@@ -496,7 +496,7 @@ def _search_files_tool() -> RegisteredTool:
     def classify(args: SearchFilesArgs, ctx: ToolContext) -> ActionInfo:
         return _read_action("search_files", target_of(args, ctx), ctx, "Search in")
 
-    async def run(args: SearchFilesArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: SearchFilesArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         options: list[str] = ["--line-number", "--no-heading", "--color", "never", "--max-columns", "300"]
         if args.ignore_case:
             options.append("-i")
@@ -542,7 +542,7 @@ def _find_files_tool() -> RegisteredTool:
     def classify(args: FindFilesArgs, ctx: ToolContext) -> ActionInfo:
         return _read_action("find_files", target_of(args, ctx), ctx, "Find files in")
 
-    async def run(args: FindFilesArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: FindFilesArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         code, stdout, stderr = await run_rg(
             ["--files", "--hidden", "-g", args.glob, "--", str(target_of(args, ctx))],
             run_sandbox(ctx).search,

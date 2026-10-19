@@ -716,7 +716,7 @@ def _upload_tool() -> RegisteredTool:
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         return _action("browser_upload", "browser_input", risk, f"Upload {names} to {target}", target, flags)
 
-    async def run(args: UploadArgs, ctx: ToolContext) -> ToolResult:
+    async def run(args: UploadArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         paths: list[str] = [str(expand_path(raw, ctx.workspace)) for raw in args.paths]
         return _page_result(await ctx.browser.upload(ctx.thread_id, args.ref, paths), ctx)
 

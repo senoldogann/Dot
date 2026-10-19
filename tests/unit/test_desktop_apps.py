@@ -47,3 +47,13 @@ def test_with_no_chrome_of_dots_among_them_the_name_names_several() -> None:
 def test_a_pid_or_a_name_of_one_application_is_what_it_was() -> None:
     assert find_app("202", _RUNNING, frozenset({101})) == _chrome(202)
     assert find_app("Finder", _RUNNING, frozenset({101})) == _FINDER
+
+
+def test_the_bundle_a_path_leads_to_is_the_application_it_names() -> None:
+    """Item 418: ``desktop_open_app`` opens the bundle its check resolved the name or link to, so a path names the
+    application that sits at it, and several copies of that one application are told apart as a name tells them."""
+    assert find_app(_CHROME_PATH, _RUNNING, frozenset({202})) == _chrome(202)
+    assert find_app("/System/Library/CoreServices/Finder.app", _RUNNING, frozenset()) == _FINDER
+    assert find_app("/Applications/Safari.app", _RUNNING, frozenset()) is None
+    with pytest.raises(DesktopError, match="names several applications"):
+        find_app(_CHROME_PATH, _RUNNING, frozenset())

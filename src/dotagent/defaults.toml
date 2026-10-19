@@ -437,8 +437,12 @@ terminal_idle_s = 1800.0
 # Outside yolo, the processes of a run (shell commands, terminal sessions, AppleScript, the search tools) start in a
 # macOS sandbox that keeps them out of Dot's own files: its keys, token, settings, database, browser profiles and
 # journals, and what it loads and runs (plugins, skills, playbooks, the emergency stop). macOS starts no program that
-# runs as root inside it (ps, top, sudo). false starts them without it; the shell guard still reads every line. The
-# processes of a yolo run start without it whatever this says.
+# runs as root inside it (ps, top, sudo). Nor do they have another program act for them outside it: they open nothing
+# (open), start neither launchctl, shortcuts nor lsregister, reach neither the Shortcuts service nor the Launch
+# Services database they would hand the work to, create no job of launchd, and write nothing into
+# ~/Library/LaunchAgents (best-effort, as the guard is; Apple Events are not covered, which docs/safety.md says).
+# false starts them without it; the shell guard still reads every line. The processes of a yolo run start without it
+# whatever this says.
 # Settings › Rules switches it while the daemon runs, from the next command on, and writes it here.
 sandbox = true
 
