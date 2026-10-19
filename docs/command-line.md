@@ -48,4 +48,6 @@ describes: `list`, `show [ID]`, `diff ID [--against ID]`, `set --summary TEXT [-
 [--scope invariant|domain]` asks the proposer for a candidate from one run; `step [--run ID] [--scripted]` runs one step
 of the improvement loop now, its probes in processes of their own (`probe --ask FILE`, which the step starts), and
 `final [ID]` plays the final set once under the adopted version; `--scripted` plays the references through the scripted
-model and has the roles answer from a script, a check of the loop at no model's cost.
+model and has the roles answer from a script, a check of the loop at no model's cost. `graph [--steps N]` draws the
+provenance (the newest N steps, 50 by default, and four experiences a step) as a Mermaid flowchart, `steps` and
+`experiences` list the newest of each, and `show ID` ends with the version's lineage.

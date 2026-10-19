@@ -387,9 +387,11 @@ async def _write_experience(
     )
     if not edits:
         return
-    run: RunRecord = await runtime.store.get_run(from_run)
+    # The run's taint goes with the experience (item 392): one written from a run that read content third parties can
+    # author is kept marked and never shown to the proposer, as a tainted note is never shown to the lesson writer.
+    case: LessonCase = await case_of(runtime, from_run)
     request: ExperienceRequest = ExperienceRequest(
-        goal=run.goal,
+        goal=case.goal,
         edits=edits,
         adopted=probed is not None,
         summary=f"step {step.id}: {len(candidates)} candidate(s) probed against the base",
@@ -403,6 +405,7 @@ async def _write_experience(
             draft.entry.lesson,
             draft.entry.evidence,
             draft.entry.confidence,
+            case.tainted,
         )
     log.info("harness_experience_written", step=step.id, entry=draft.entry is not None)
 

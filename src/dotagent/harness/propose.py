@@ -16,6 +16,7 @@ from dotagent.harness.service import adopted_text, create_version
 from dotagent.policy.types import OUTSIDE_CHANNELS, TAINTING_KINDS
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
+from dotagent.store.db import Store
 from dotagent.store.models import EventRecord, HarnessVersion, RunRecord
 
 log = get_logger(__name__)
@@ -24,6 +25,8 @@ log = get_logger(__name__)
 PROPOSER: str = "proposer"
 # The newest tool results of a run the proposer's digest is drawn from, as the reflection draws a lesson's.
 RESULTS_READ: int = 60
+# How many of the newest experiences the proposer is shown (item 392): the index of the library.
+EXPERIENCES_SHOWN: int = 12
 
 
 def bounds_of(config: HarnessConfig) -> HarnessBounds:
@@ -57,6 +60,18 @@ def notes_of(case: LessonCase, scope: ProposalScope, proposal: HarnessProposal, 
     )
 
 
+async def experience_lines(store: Store, limit: int) -> tuple[str, ...]:
+    """The index of the experience library as the proposer reads it: the newest ``limit`` experiences, a line each of
+    the cue, the lesson and the confidence, without the ones written from a run that had read content third parties
+    can author (``tainted``, as a tainted note is kept from the lesson writer, item 384). The secrets Dot holds are
+    masked with the rest of the question (:mod:`dotagent.agent.review`)."""
+    return tuple(
+        f"{experience.cue}: {experience.lesson} ({experience.confidence})"
+        for experience in await store.list_harness_experiences(limit)
+        if not experience.tainted
+    )
+
+
 async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) -> HarnessVersion | None:
     """Ask the proposer for a candidate from the run ``run_id`` in ``scope``, and write it as a candidate version made
     from the adopted one; ``None`` when the proposer keeps the harness as it is. A proposer that fails raises its
@@ -72,7 +87,7 @@ async def propose_from_run(runtime: Runtime, run_id: str, scope: ProposalScope) 
         reached_goal=case.reached_goal,
         habits=current.habits,
         tool_guidance=current.tool_guidance,
-        experience=(),
+        experience=await experience_lines(runtime.store, EXPERIENCES_SHOWN),
         scope=scope,
         bounds=bounds_of(runtime.config.harness),
     )

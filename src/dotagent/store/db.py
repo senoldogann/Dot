@@ -499,6 +499,7 @@ def _harness_experience(row: aiosqlite.Row) -> HarnessExperience:
         lesson=row["lesson"],
         evidence=row["evidence"],
         confidence=row["confidence"],
+        tainted=bool(row["tainted"]),
         created_at=row["created_at"],
     )
 
@@ -797,6 +798,9 @@ _ADDED_QUEUE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("once", "TEXT"),
     ("picks", "TEXT"),
 )
+# Columns of ``harness_experiences`` added later: whether the run the experience was written from had read content
+# third parties can author (item 392), which keeps it from the proposer.
+_ADDED_HARNESS_EXPERIENCE_COLUMNS: tuple[tuple[str, str], ...] = (("tainted", "INTEGER NOT NULL DEFAULT 0"),)
 # Columns of ``threads`` added later: NULL means a chat the owner has not pinned (item 130), one the owner has not seen
 # since its runs began or since they marked it unread (item 131), and one without choices of its own yet (a
 # ``ChatChoices`` as JSON, item 199), and one that is no chat of a schedule (a firing's chat names its schedule, item
@@ -843,6 +847,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "schedules", _ADDED_SCHEDULE_COLUMNS)
     await _add_columns(connection, "campaigns", _ADDED_CAMPAIGN_COLUMNS)
     await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
+    await _add_columns(connection, "harness_experiences", _ADDED_HARNESS_EXPERIENCE_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
@@ -1220,8 +1225,17 @@ class Store:
 
     @_writing
     async def add_harness_experience(
-        self, step_id: str, version_id: str | None, cue: str, lesson: str, evidence: str, confidence: str
+        self,
+        step_id: str,
+        version_id: str | None,
+        cue: str,
+        lesson: str,
+        evidence: str,
+        confidence: str,
+        tainted: bool,
     ) -> HarnessExperience:
+        """Keep an experience of the loop (item 391); ``tainted`` says the run it was written from had read content
+        third parties can author (item 392), which keeps it from the proposer."""
         record: HarnessExperience = HarnessExperience(
             id=new_id("hxp"),
             step_id=step_id,
@@ -1231,10 +1245,11 @@ class Store:
             evidence=evidence,
             confidence=confidence,
             created_at=time.time(),
+            tainted=tainted,
         )
         await self._db.execute(
-            "INSERT INTO harness_experiences(id, step_id, version_id, cue, lesson, evidence, confidence, created_at)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO harness_experiences(id, step_id, version_id, cue, lesson, evidence, confidence, created_at,"
+            " tainted) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.step_id,
@@ -1244,10 +1259,28 @@ class Store:
                 record.evidence,
                 record.confidence,
                 record.created_at,
+                int(record.tainted),
             ),
         )
         await self._db.commit()
         return record
+
+    async def harness_steps_of_version(self, version_id: str) -> list[HarnessStep]:
+        """The steps that touched a version: as the base of their probes, or named in what they did (a candidate, the
+        probed version), the newest first."""
+        rows = await self._all(
+            "SELECT * FROM harness_steps WHERE base_version = ? OR json_extract(outcome, '$.probed') = ?"
+            " OR EXISTS (SELECT 1 FROM json_each(outcome, '$.candidates') WHERE value = ?)"
+            " ORDER BY started_at DESC, id DESC",
+            (version_id, version_id, version_id),
+        )
+        return [_harness_step(row) for row in rows]
+
+    async def harness_experiences_of_version(self, version_id: str) -> list[HarnessExperience]:
+        rows = await self._all(
+            "SELECT * FROM harness_experiences WHERE version_id = ? ORDER BY created_at DESC, id DESC", (version_id,)
+        )
+        return [_harness_experience(row) for row in rows]
 
     async def list_harness_experiences(self, limit: int) -> list[HarnessExperience]:
         """The newest ``limit`` experiences, the newest first."""

@@ -513,7 +513,8 @@ class HarnessProbe(FrozenModel):
 
 class HarnessExperience(FrozenModel):
     """An experience the loop kept (item 391): the shape of situation it applies to (``cue``), the lesson, the
-    evidence it rests on, how sure the writer was, and the step and version it came from."""
+    evidence it rests on, how sure the writer was, the step and version it came from, and whether the run it was
+    written from had read content third parties can author (``tainted``, item 392), which keeps it from the proposer."""
 
     id: str
     step_id: str
@@ -523,3 +524,4 @@ class HarnessExperience(FrozenModel):
     evidence: str
     confidence: str
     created_at: float
+    tainted: bool

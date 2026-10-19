@@ -65,6 +65,9 @@ _FAMILIES: dict[str, str] = {
     "harness-step": "dotagent.cli_harness",
     "harness-probe": "dotagent.cli_harness",
     "harness-final": "dotagent.cli_harness",
+    "harness-graph": "dotagent.cli_harness",
+    "harness-steps": "dotagent.cli_harness",
+    "harness-experiences": "dotagent.cli_harness",
     "schedule-list": "dotagent.cli_schedule",
     "schedule-add": "dotagent.cli_schedule",
     "schedule-delete": "dotagent.cli_schedule",
@@ -316,6 +319,14 @@ def build_parser() -> argparse.ArgumentParser:
         "final", help="play the final set once under the adopted version and report it as it comes out"
     )
     harness_final.add_argument("version_id", nargs="?", default=None, help="a version other than the adopted one")
+    harness_graph = harness_commands.add_parser(
+        "graph", help="the provenance of the harness as a Mermaid flowchart: versions, steps, experiences, runs"
+    )
+    harness_graph.add_argument("--steps", type=int, default=50, help="how many of the newest steps to draw")
+    harness_steps = harness_commands.add_parser("steps", help="the newest steps of the improvement loop")
+    harness_steps.add_argument("--limit", type=int, default=20, help="how many steps to show")
+    harness_experiences = harness_commands.add_parser("experiences", help="the experience library, the newest first")
+    harness_experiences.add_argument("--limit", type=int, default=50, help="how many experiences to show")
 
     schedule = commands.add_parser("schedule", help="goals that Dot runs later or on a rhythm, while the daemon runs")
     schedule_commands = schedule.add_subparsers(dest="schedule_action", required=True)

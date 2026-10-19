@@ -199,6 +199,23 @@ class HarnessFinalCommand(FrozenModel):
     version_id: str | None
 
 
+class HarnessGraphCommand(FrozenModel):
+    """The provenance of the harness as a Mermaid flowchart (item 392), of the newest ``steps`` steps."""
+
+    name: Literal["harness-graph"]
+    steps: int = Field(ge=1)
+
+
+class HarnessStepsCommand(FrozenModel):
+    name: Literal["harness-steps"]
+    limit: int = Field(ge=1)
+
+
+class HarnessExperiencesCommand(FrozenModel):
+    name: Literal["harness-experiences"]
+    limit: int = Field(ge=1)
+
+
 class BrowserImportChromeCommand(FrozenModel):
     name: Literal["browser-import-chrome"]
     profile: str
@@ -385,6 +402,9 @@ type Command = Annotated[
     | HarnessStepCommand
     | HarnessProbeCommand
     | HarnessFinalCommand
+    | HarnessGraphCommand
+    | HarnessStepsCommand
+    | HarnessExperiencesCommand
     | BrowserLoginCommand
     | BrowserImportChromeCommand
     | BrowserAttachCommand
