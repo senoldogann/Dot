@@ -23,6 +23,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from dotagent.agent.pages import LIBRARY_HOSTS
 from dotagent.core.errors import ConfigError
+from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.mcp.signin import CALLBACK_PATH
 
@@ -50,6 +51,11 @@ _PROOF_LABEL: bytes = b"dot daemon proof\n"
 
 # The pages of the UI load only their own scripts and styles, frame only pages of the server itself (the pages runs
 # showed), and nothing can frame them.
+log = get_logger(__name__)
+
+# The files a launcher asks for outside any page of the UI, to draw the app it adds to a home screen or a dock (item
+# 410): a phone's own process fetches them, and reads them only when their headers let another origin do so.
+LAUNCHER_PATHS: tuple[str, ...] = ("/apple-touch-icon", "/icons/", "/favicon.svg", "/manifest.webmanifest")
 SECURITY_HEADERS: tuple[tuple[str, str], ...] = (
     (
         "Content-Security-Policy",
@@ -131,11 +137,13 @@ def local_hosts(port: int) -> frozenset[str]:
 
 def host_is_local(host_header: str | None, port: int, reach: frozenset[str]) -> bool:
     """Whether the request names this server: its loopback address, or one of the names a reverse proxy on the
-    owner's own network presents it as (``[server] reach``)."""
+    owner's own network presents it as (``[server] reach``), with or without HTTPS's own port, which some clients
+    write out."""
     if host_header is None:
         return False
     name: str = host_header.lower()
-    return name in local_hosts(port) or name in {host.lower() for host in reach}
+    names: set[str] = {host.lower() for host in reach}
+    return name in local_hosts(port) or name in names or (name.endswith(":443") and name[:-4] in names)
 
 
 def origin_is_local(origin: str | None, port: int, reach: frozenset[str]) -> bool:
@@ -191,6 +199,10 @@ def is_api_path(path: str) -> bool:
     return path == API_ROOT or path.startswith(API_PREFIX)
 
 
+def is_launcher_path(path: str) -> bool:
+    return path.startswith(LAUNCHER_PATHS)
+
+
 def needs_token(path: str) -> bool:
     return is_api_path(path) and path not in PUBLIC_PATHS
 
@@ -210,6 +222,13 @@ def response_headers(path: str) -> tuple[tuple[str, str], ...]:
         return (*PAGE_HEADERS, ("Cache-Control", "no-store"))
     if is_look_path(path):
         return (*LOOK_HEADERS, ("Cache-Control", "no-store"))
+    if is_launcher_path(path):
+        # Public files that hold nothing of the owner's: a launcher's process may read them from any origin.
+        return (
+            *(header for header in SECURITY_HEADERS if header[0] != "Cross-Origin-Resource-Policy"),
+            ("Cross-Origin-Resource-Policy", "cross-origin"),
+            ("Cache-Control", "no-cache"),
+        )
     return (*SECURITY_HEADERS, ("Cache-Control", "no-store" if is_api_path(path) else "no-cache"))
 
 
@@ -309,6 +328,16 @@ class LocalGuard:
         if refusal is None:
             await self._app(scope, receive, secured)
             return
+        # Why a request was turned away, for the owner who wonders why a phone's launcher drew no icon (item 410); the
+        # token is never in it.
+        log.info(
+            "request_refused",
+            path=path,
+            status=refusal.status,
+            reason=refusal.message,
+            host=headers.get("host"),
+            origin=headers.get("origin"),
+        )
         response: JSONResponse = JSONResponse(
             {"message": refusal.message, "context": {}},
             status_code=refusal.status,

@@ -1,5 +1,6 @@
 """Render Dot's mark (item 114) into the files that carry it: the favicon of the web UI (``static/favicon.svg``), the
-web app's icons (``static/icons/icon-192.png``, ``icon-512.png``), the app icon of the desktop shell (``app.png``, 1024
+web app's icons (``static/icons/icon-192.png``, ``icon-512.png``, the home screen's
+``apple-touch-icon.png`` at the root, item 410), the app icon of the desktop shell (``app.png``, 1024
 px, for ``npm run icons``) and its menu bar icons, one per state (``tray-{state}.png``, 44 px, the 22 pt item at 2x).
 
 The mark is a yellow dot that looks: a disc with the two capsule eyes of the character's attentive rest pose
@@ -36,6 +37,8 @@ GLANCE: tuple[str, str] = (
 TRAY_PX: int = 44
 APP_PX: int = 1024
 WEB_PX: tuple[int, ...] = (192, 512)
+# The icon iOS asks for when the app is added to the home screen (item 410): 180 px, at the root of the pages.
+TOUCH_PX: int = 180
 
 
 def dot(eyes: tuple[str, str], fill: str) -> str:
@@ -105,6 +108,8 @@ async def main() -> None:
     await render(HERE / "app.png", tile_svg(True), APP_PX)
     for size in WEB_PX:
         await render(STATIC / "icons" / f"icon-{size}.png", tile_svg(False), size)
+    await render(STATIC / "apple-touch-icon.png", tile_svg(False), TOUCH_PX)
+    await render(STATIC / "apple-touch-icon-precomposed.png", tile_svg(False), TOUCH_PX)
     states: dict[str, str] = {
         "idle": mark_svg(ATTENTIVE, False),
         "working": mark_svg(GLANCE, False),
