@@ -85,7 +85,9 @@ export function markdownMirror(textarea) {
       const lines = sourceLines(shown);
       const nodes = lines.map(lineNode);
       copy.replaceChildren(...nodes);
-      lines.forEach((line, index) => highlight(nodes[index], line));
+      lines.forEach((line, index) => {
+        highlight(nodes[index], line);
+      });
     }
     // A box that scrolls may give room to its scroll bar: the copy leaves the same room, and scrolls with the box.
     copy.style.setProperty("--mirror-bar", `${textarea.offsetWidth - textarea.clientWidth}px`);

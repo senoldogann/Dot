@@ -216,7 +216,7 @@ function outcomeNodes(saved, actions) {
   return nodes;
 }
 
-export function mount(root, ctx) {
+export function mount(root, _ctx) {
   let disposed = false;
   // Grows with every load, so a slow answer never overwrites a newer one.
   let ticket = 0;

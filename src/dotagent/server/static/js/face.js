@@ -32,7 +32,7 @@ export function overallState(snapshot) {
 }
 
 /** The face as a standalone SVG document, for the favicon and the notification icon: Dot's character in the state. */
-export function faceSvg(state) {
+function faceSvg(state) {
   const { animation, expression } = FACE_OF_STATE[state];
   return stillSvg(lookOf(DOT_ID, null), animation, expression, state);
 }

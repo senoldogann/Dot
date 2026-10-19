@@ -119,10 +119,11 @@ flash or strip of amber shows while it opens. Beside the plain icons it carries 
 four fifths of the square on that ground, which a launcher that rounds or crops an icon draws whole; a long press on it
 offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`).
 
-The daemon answers with gzip what a browser asks it for that way (item 381): the pages' scripts and sheets and the
-API's answers, past 1 KiB; the event streams go as they are written, and the fonts and the images, compressed
-already, as they are. The page names every module its script reaches (`modulepreload`), so a phone asks for them at
-once instead of one import after another.
+The daemon answers with gzip what a browser asks it for that way (item 381): the pages' scripts and sheets and the API's
+answers, past 1 KiB; the event streams go as they are written, and the fonts and the images, compressed already, as they
+are. The page names the modules its script reaches on opening (`modulepreload`), so a phone asks for them at once
+instead of one import after another; a page that is not the chat or the home loads its script when it is first asked
+for, and the browser fetches those scripts once it is idle, so that the first one asked for opens at once (item 388).
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. It keeps them by the build of the pages they are of, which the daemon names in the `X-Dot-Pages` header of

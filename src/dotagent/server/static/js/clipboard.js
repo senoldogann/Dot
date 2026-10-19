@@ -328,7 +328,7 @@ function cleanHtml(nodes) {
  * What a copy of `selection` puts on the clipboard: `{ text, html }`, the markdown and the clean HTML of what it holds;
  * null when it lies in one block of code, whose text the browser copies as it is, or holds no words.
  */
-export function selectionCopy(selection) {
+function selectionCopy(selection) {
   const texts = [];
   const htmls = [];
   for (let index = 0; index < selection.rangeCount; index += 1) {

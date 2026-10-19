@@ -4,7 +4,7 @@
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
-import { AUTO_COMPUTER, BUSY_SEND, valueOf } from "../appearance/settings.js";
+import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
@@ -324,8 +324,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // than a wide one does, and a card still folded is measured once it opens. One watch for the rows drawn last.
   const lessonCuts = new ResizeObserver((entries) => {
     for (const { target } of entries) {
-      if (!target.classList.contains("open")) {
-        target.nextElementSibling.hidden = target.scrollHeight <= target.clientHeight + 1;
+      const more = target.nextElementSibling;
+      if (!target.classList.contains("open") && more instanceof HTMLElement) {
+        more.hidden = target.scrollHeight <= target.clientHeight + 1;
       }
     }
   });
@@ -810,7 +811,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     if (elsewhere) {
       return false;
     }
-    return !queueing || (valueOf(BUSY_SEND) === "steer") !== other;
+    return !queueing || (settingValue(BUSY_SEND) === "steer") !== other;
   }
 
   // Send `text` with the files `files` (their ids) as the composer's send does: to the run under way or into the queue
@@ -1277,12 +1278,12 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     onImage: inspector.addImage,
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
     onHeld: computer.setHeld,
-    onBrowserStep: (page) => {
-      computer.notePage(page);
+    onBrowserStep: () => {
+      computer.notePage();
       screenButton.hidden = false;
       // A run at work that opens its browser shows its page beside the chat (item 354) unless Settings › Browser turned
       // that off; a phone keeps the button, which opens it over the page.
-      if (active && !elsewhere && valueOf(AUTO_COMPUTER) === "shown") {
+      if (active && !elsewhere && settingValue(AUTO_COMPUTER) === "shown") {
         inspector.peekTab("screen");
       }
     },
