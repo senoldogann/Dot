@@ -15,14 +15,14 @@ const PLAN_FIRST_HINT = "Dot writes its plan and asks you before it changes anyt
 
 const KINDS = {
   plugin: { icon: "plug", noun: "MCP server", many: "MCP servers", most: MAX_PLUGINS },
-  skill: { icon: "sparkle", noun: "skill", many: "skills", most: MAX_SKILLS },
+  skill: { icon: "sparkles", noun: "skill", many: "skills", most: MAX_SKILLS },
 };
 
 // The colours a server's or a skill's chip takes, by its name: the characters' (themes.css), without amber, Dot's own.
 const PICK_COLOURS = ["blue", "green", "violet", "orange", "teal", "pink", "red", "brown"];
 
 /** The colour of the pick `name`, the same wherever its chip shows: one of `PICK_COLOURS`. */
-function pickColour(name) {
+export function pickColour(name) {
   let hash = 0;
   for (const char of name) {
     hash = (hash * 31 + char.codePointAt(0)) >>> 0;
@@ -38,7 +38,7 @@ function tint(node, name) {
 }
 
 /** The mark of a pick of `kind` ("plugin", "skill" or "plan") named `name`: its icon in its colour. */
-export function pickMark(kind, name) {
+function pickMark(kind, name) {
   const mark = el("span", { class: "pick-mark", dataset: { kind } }, icon(kind === "plan" ? "listOrdered" : KINDS[kind].icon));
   return kind === "plan" ? mark : tint(mark, name);
 }
@@ -95,7 +95,20 @@ export function createPicks({ onChange }) {
   let planAvailable = true;
   const list = el("div", { class: "pick-list", role: "list", "aria-label": "Picked for this message", hidden: true });
   const planSwitch = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": PLAN_FIRST });
-  const planRow = switchRow(el("div", { class: "composer-pick", role: "group", "aria-label": PLAN_FIRST, title: PLAN_FIRST_HINT }, el("span", { class: "composer-pick-label" }, PLAN_FIRST), planSwitch), planSwitch);
+  const planRow = switchRow(
+    el(
+      "div",
+      { class: "composer-pick", role: "group", "aria-label": PLAN_FIRST, title: PLAN_FIRST_HINT },
+      el(
+        "span",
+        { class: "composer-pick-content" },
+        el("span", { class: "composer-pick-label" }, PLAN_FIRST),
+        el("span", { class: "composer-pick-hint" }, "Draft a plan and ask before taking action"),
+      ),
+      planSwitch,
+    ),
+    planSwitch,
+  );
 
   function paint() {
     planSwitch.setAttribute("aria-checked", String(planFirst));

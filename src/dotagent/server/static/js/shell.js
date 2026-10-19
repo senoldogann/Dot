@@ -63,7 +63,7 @@ function buildIndicators() {
 
 /**
  * A page that knows its own way back on a phone says so in this event, with `{ to }`: an address, or null for the
- * sidebar in place. A run's page does (item 385): the list of chats stands a tap away instead of a page of its own, and
+ * sidebar in place. A run's page does (item 401): the list of chats stands a tap away instead of a page of its own, and
  * a delegated run leads back to the run above it.
  */
 export const RUN_BACK_EVENT = "dot:run-back";
@@ -87,7 +87,7 @@ export function buildShell({ homeRoute }) {
   const indicators = buildIndicators();
   // Where the page's Back leads on a phone (item 338): `{ to: "history" }`, `{ to: "#/…" }`, or null on a page whose
   // way back is the list of chats. A page may know better than its route and says so once it is drawn (pageBack; item
-  // 385): undefined leaves the route's answer, null is the sidebar in place, and `{ to }` another page.
+  // 401): undefined leaves the route's answer, null is the sidebar in place, and `{ to }` another page.
   let back = null;
   let pageBack;
   const menu = el("button", {
@@ -218,7 +218,7 @@ export function buildShell({ homeRoute }) {
     toast("ok", `Colour scheme: ${SCHEMES.find((scheme) => scheme.id === id).label}`);
   }
 
-  // A page that knows where its way back leads says it once it is drawn (a run's page, item 385).
+  // A page that knows where its way back leads says it once it is drawn (a run's page, item 401).
   function onPageBack(event) {
     const to = event.detail !== null && typeof event.detail === "object" ? event.detail.to : undefined;
     pageBack = to === undefined || to === null ? null : { to };

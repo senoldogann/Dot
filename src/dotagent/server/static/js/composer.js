@@ -10,10 +10,10 @@
 import { api } from "./api.js";
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
-import { clip, el, setText } from "./dom.js";
-import { icon } from "./icons.js";
+import { el, setText } from "./dom.js";
+import { icon, toolIconName } from "./icons.js";
 import { markdownMirror } from "./mirror.js";
-import { arePicks, createPicks, pickMark } from "./picks.js";
+import { arePicks, createPicks, pickColour } from "./picks.js";
 import { anchoredPopover } from "./popover.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
 import { filterGroups, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
@@ -96,6 +96,32 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
     range = null;
   }
 
+  function itemIconName(item) {
+    if (item.kind === "command") {
+      return item.label === "/loop" ? "refresh" : "terminal";
+    }
+    if (item.kind === "plugin") {
+      return "plug";
+    }
+    if (item.kind === "skill") {
+      return "sparkles";
+    }
+    if (item.kind === "tool") {
+      return toolIconName(item.label);
+    }
+    return "sparkles";
+  }
+
+  function itemMark(item) {
+    const iconName = itemIconName(item);
+    const span = el("span", { class: "slash-mark", dataset: { kind: item.kind ?? "command" } }, icon(iconName));
+    if (item.kind === "plugin" || item.kind === "skill" || item.kind === "tool") {
+      const tintName = item.serverName ?? item.label;
+      span.style.setProperty("--pick-tint", `var(--character-${pickColour(tintName)})`);
+    }
+    return span;
+  }
+
   function paint() {
     menu.replaceChildren();
     const groups = filterGroups(range.trigger === "@" ? pickGroups(palette) : paletteGroups(commands, palette), range.word);
@@ -108,6 +134,7 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
         const option = el(
           "div",
           { class: "slash-option", role: "option", id: `${menu.id}-${item.id}`, "aria-selected": String(at === active) },
+          itemMark(item),
           el("span", { class: "slash-label" }, item.label),
           el("span", { class: "slash-hint" }, item.hint),
         );
@@ -240,26 +267,12 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
   };
 }
 
-// A skill's description in the "+" menu is cut to this many characters.
-const PICK_HINT_CHARS = 90;
-
-/** A row of the "+" menu that picks the server or the skill `name` (`kind`) for the message, or takes it away: its
- * mark, its name with `hint` under it, and a tick while it is picked. */
-function pickRow(kind, name, hint, selected, onPick) {
-  return el(
-    "button",
-    { class: "pop-option", type: "button", role: "option", "aria-selected": String(selected), onclick: onPick },
-    pickMark(kind, name),
-    el("span", { class: "pop-option-text" }, el("span", null, name), hint === "" ? null : el("span", { class: "pop-option-hint" }, hint)),
-    icon("check"),
-  );
-}
-
 /**
  * The frame the composers share (item 115): the slash menu over it, the box (one line, `boxLabel` its name, growing
  * with its text up to `maxPx`), the attached files and the picks (item 318) in rows under the box, then one bar: the
- * "+" that opens the menu of Add files, the rows the composer adds (`addMenuItems`), Plan first and the MCP servers and
- * skills to pick, the `options` row for the pills (app.css keeps the mode at the left and sends the rest to the right)
+ * "+" that opens the file picker directly (documents, photos and screenshots alike; a phone opens its own sheet),
+ * the rows the composer adds (`addMenuItems`) under a "More" menu when there are any (e.g. Save skill), the `options`
+ * row for the pills (app.css keeps the mode at the left and sends the rest to the right)
  * and the round send button (`sendLabel` its words). `commands` are the slash menu's own; `send()` runs on Enter and on the button.
  * `draftKey` (or null) keeps the text and the ready files under `dot.draft.<key>` until `clear()` after a send.
  * `listener` (`{ focus(on), typing() }`, or null) hears the box, for a face that listens. The frame carries
@@ -268,7 +281,7 @@ function pickRow(kind, name, hint, selected, onPick) {
  * `handler`; a word typed or a file listed (a long paste among them, item 269) brings the send back, and
  * `setStop(null)` ends it. Returns `element`, `textarea`, `attachments`,
  * `picks` (picks.js: `body()` goes into the message's request, `sent()` once a message that starts a run went),
- * `addMenuItems(build)` (`build(close)` gives the composer's own rows of the "+" menu each time it opens; `close()`
+ * `addMenuItems(build)` (`build(close)` gives the composer's own rows of the "More" menu each time it opens; `close()`
  * closes it), `options`,
  * `sendButton`, `setSendLabel(text)`, `setStop(handler)`, `autosize()`, `watchText(watcher)` (runs `watcher()` after
  * every change of the text, a clear among them, and returns what stops it; item 259), `clear()` (the text and the
@@ -337,88 +350,27 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   }
 
   const wired = wireComposer(textarea, { maxPx, send, commands, edited, picked: (pick) => picks.add(pick.kind, pick.name) });
-  const plusButton = el("button", { class: "btn ghost sm plus-button", type: "button", title: "Add files, plugins and skills", "aria-label": "Add" }, icon("plus"));
-  // The rows each composer adds to the "+" menu (goal mode, Save skill), and the palette its plugins and skills come
-  // from, asked for when the menu first opens.
+  const plusButton = el(
+    "button",
+    { class: "btn ghost sm plus-button", type: "button", title: "Add files", "aria-label": "Add files", onclick: () => attachments.openPicker() },
+    icon("plus"),
+  );
+  // Rows added by caller views (e.g. Save skill in the open run view), under a "More" menu that only shows while there
+  // are any; the "+" itself opens the file picker directly.
   const menuItems = [];
-  let palette = null;
-  let paletteProblem = null;
+  const moreButton = el(
+    "button",
+    { class: "btn ghost sm more-button", type: "button", title: "More", "aria-label": "More", hidden: true },
+    icon("ellipsis"),
+  );
 
-  function pickLists() {
-    if (paletteProblem !== null) {
-      return [el("div", { class: "pop-note" }, `Plugins and skills could not be loaded: ${paletteProblem}`)];
-    }
-    if (palette === null) {
-      loadPalette().then(
-        (loaded) => {
-          palette = loaded;
-          plusMenu.repaint();
-        },
-        (error) => {
-          paletteProblem = error.message;
-          plusMenu.repaint();
-        },
-      );
-      return [el("div", { class: "pop-note" }, "Loading plugins and skills…")];
-    }
-    const toggled = (kind, name) => () => {
-      picks.toggle(kind, name);
-      plusMenu.repaint();
-    };
-    return [
-      el(
-        "div",
-        { class: "pop-group" },
-        el("div", { class: "pop-heading" }, "Plugins"),
-        palette.servers.length === 0
-          ? el("div", { class: "pop-note" }, "No MCP server is connected.")
-          : el(
-              "div",
-              { role: "listbox", "aria-label": "Plugins", "aria-multiselectable": "true" },
-              palette.servers.map((server) =>
-                pickRow("plugin", server.name, `${server.tools.length} ${server.tools.length === 1 ? "tool" : "tools"}`, picks.has("plugin", server.name), toggled("plugin", server.name)),
-              ),
-            ),
-      ),
-      el(
-        "div",
-        { class: "pop-group" },
-        el("div", { class: "pop-heading" }, "Skills"),
-        palette.skills.length === 0
-          ? el("div", { class: "pop-note" }, "No skill is installed.")
-          : el(
-              "div",
-              { role: "listbox", "aria-label": "Skills", "aria-multiselectable": "true" },
-              palette.skills.map((skill) => pickRow("skill", skill.name, clip(skill.description, PICK_HINT_CHARS), picks.has("skill", skill.name), toggled("skill", skill.name))),
-            ),
-      ),
-    ];
-  }
-
-  const plusMenu = anchoredPopover({
-    anchor: plusButton,
+  const moreMenu = anchoredPopover({
+    anchor: moreButton,
     frame: element,
-    label: "Add",
-    build: () => [
-      el(
-        "button",
-        {
-          class: "pop-option",
-          type: "button",
-          onclick: () => {
-            plusMenu.close();
-            attachments.picker.click();
-          },
-        },
-        icon("paperclip"),
-        el("span", { class: "pop-option-text" }, el("span", null, "Add files"), el("span", { class: "pop-option-hint" }, "Or drop or paste them into the box")),
-      ),
-      ...menuItems.flatMap((build) => build(plusMenu.close)),
-      picks.planRow(),
-      ...pickLists(),
-    ],
+    label: "More",
+    build: () => [...menuItems.flatMap((build) => build(moreMenu.close))],
   });
-  element.append(wired.menu, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, wired.field, options, sendButton));
+  element.append(wired.menu, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, moreButton, wired.field, options, sendButton));
   sendButton.addEventListener("click", () => (stopping() ? stop() : send()));
 
   function onInput() {
@@ -450,6 +402,8 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     picks,
     addMenuItems: (build) => {
       menuItems.push(build);
+      moreButton.hidden = false;
+      moreMenu.repaint();
     },
     options,
     sendButton,
@@ -481,7 +435,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
       drafting = true;
     },
     dispose: () => {
-      plusMenu.dispose();
+      moreMenu.dispose();
       wired.dispose();
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);

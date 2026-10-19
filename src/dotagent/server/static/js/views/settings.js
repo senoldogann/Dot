@@ -16,7 +16,6 @@ import * as keys from "./keys.js";
 import * as memory from "./memory.js";
 import * as phone from "./phone.js";
 import * as rules from "./rules.js";
-import * as schedules from "./schedules.js";
 import { mountBrowser, mountGeneral, mountModels, mountSystem } from "./system.js";
 
 const DEFAULT_TAB = "general";
@@ -28,7 +27,6 @@ const TABS = [
   { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },
   { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
-  { id: "schedules", label: "Schedules", icon: "calendar", mount: schedules.mount },
   { id: "harness", label: "Harness", icon: "sparkle", mount: harness.mount },
   { id: "phone", label: "Phone", icon: "smartphone", mount: phone.mount },
   { id: "system", label: "System", icon: "monitor", mount: mountSystem },
@@ -37,7 +35,7 @@ const TABS = [
 const GROUPS = [
   { title: "Interface", tabs: ["general", "appearance"] },
   { title: "Models", tabs: ["models", "keys"] },
-  { title: "How Dot works", tabs: ["rules", "memory", "schedules", "harness"] },
+  { title: "How Dot works", tabs: ["rules", "memory", "harness"] },
   { title: "This Mac", tabs: ["browser", "phone", "system"] },
 ];
 const SYSTEM_DARK = window.matchMedia("(prefers-color-scheme: dark)");
@@ -63,8 +61,8 @@ function listRow(tab, value) {
   );
 }
 
-/** The phone's list of the settings. Appearance tells the theme on screen, Models the main model, Memory how many notes
- * Dot keeps and Schedules how many schedules there are. */
+/** The phone's list of the settings. Appearance tells the theme on screen, Models the main model and Memory how many notes
+ * Dot keeps. */
 function mountList(root, ctx) {
   ctx.setTitle("Settings");
   const values = new Map(TABS.map((tab) => [tab.id, el("span", { class: "settings-row-value" })]));
@@ -93,10 +91,6 @@ function mountList(root, ctx) {
   attempt(async () => {
     const notes = await api.get(`/memories${query({ limit: 1, offset: 0 })}`);
     values.get("memory").textContent = String(notes.total);
-  });
-  attempt(async () => {
-    const found = await api.get("/schedules");
-    values.get("schedules").textContent = String(found.length);
   });
   attempt(async () => {
     const found = await api.get("/harness");

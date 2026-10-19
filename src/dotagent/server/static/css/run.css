@@ -122,7 +122,7 @@
   margin-top: 16px;
 }
 
-/* The line over the composer is one bar (item 385): how the run works, how its helpers stand and how many messages wait
+/* The line over the composer is one bar (item 401): how the run works, how its helpers stand and how many messages wait
    at its left, the way down at its right end. It is a pane of glass, the look of the composer under it on a phone. */
 .status-bar {
   display: flex;
@@ -154,7 +154,7 @@
   background: none;
 }
 
-/* The way down sits in the bar's right end, not over the conversation (item 385). */
+/* The way down sits in the bar's right end, not over the conversation (item 401). */
 .status-bar > .jump {
   position: static;
   flex: none;
@@ -254,7 +254,7 @@
     top: var(--space-2);
   }
 
-  /* The count of what a group did stays on the head's one line (item 385): it gives way with an ellipsis instead of
+  /* The count of what a group did stays on the head's one line (item 401): it gives way with an ellipsis instead of
      pushing the state onto a row of its own. */
   .steps-count {
     flex: 1 1 0;
@@ -263,12 +263,12 @@
     text-overflow: ellipsis;
   }
 
-  /* The last tool's name is the count's detail, and on a phone the count has the room (item 385). */
+  /* The last tool's name is the count's detail, and on a phone the count has the room (item 401). */
   .steps-latest {
     display: none;
   }
 
-  /* The bar's parts are a phone's width together (item 385): the three counters and the way down fit one row. */
+  /* The bar's parts are a phone's width together (item 401): the three counters and the way down fit one row. */
   .status-bar .capsule-part {
     padding-inline: var(--space-1);
   }
@@ -300,7 +300,7 @@
   }
 
   /* The dock floats over the conversation's foot (item 374), so the thread keeps its own height under it, and a
-     helper's row, which WebKit can lay a little under its group's own height, still ends above the bar (item 385). */
+     helper's row, which WebKit can lay a little under its group's own height, still ends above the bar (item 401). */
   html.chat-shell .run-thread {
     padding-bottom: calc(var(--dock-h, 96px) + var(--space-6));
   }
@@ -312,7 +312,7 @@
     padding-bottom: calc(var(--space-1) + var(--safe-bottom));
   }
 
-  /* The bar over the composer is a phone's line (item 385): one row across the dock, the parts at its left and the way
+  /* The bar over the composer is a phone's line (item 401): one row across the dock, the parts at its left and the way
      down in the same pane at its right, never a circle of its own over the conversation. */
   .status-bar {
     width: 100%;
@@ -324,7 +324,7 @@
     height: 32px;
   }
 
-  /* The conversation's rows sit a breath apart on a phone (item 385): the message, what Dot did and its answer read as
+  /* The conversation's rows sit a breath apart on a phone (item 401): the message, what Dot did and its answer read as
      one chat, and only a turn or a group of steps keeps its distance. */
   html.chat-shell .run-thread > * + * {
     margin-top: var(--space-2);
@@ -414,10 +414,16 @@
   position: fixed;
   z-index: 10;
   top: calc(var(--stagebar-h) + (100dvh - var(--stagebar-h) - var(--dock-h)) / 2);
+  left: 12px;
   width: var(--outline-w);
   height: min(var(--outline-h), calc(100dvh - var(--stagebar-h) - var(--dock-h) - 96px));
-  margin-left: var(--space-3);
+  margin-left: 0;
   translate: 0 -50%;
+  transition: left var(--motion-panel) var(--ease);
+}
+
+.shell[data-nav="docked"][data-sidebar="open"] .outline {
+  left: calc(var(--sidebar-w) + 12px);
 }
 
 /* The whole column is one button: the mark nearest to the pointer, or the one the arrows chose, is the one it goes to. */

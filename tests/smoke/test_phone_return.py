@@ -114,7 +114,7 @@ _RECORD: str = """(words) => {
   log.steps = steps();
   // What stands at three heights of the screen, but never a helper's row: a row is made again when a step arrives (its
   // state and time are new), and the point at 30 per cent of a phone's screen can land on one now that the conversation
-  // keeps a chat's rhythm (item 385). What holds the rows, the group, is watched instead.
+  // keeps a chat's rhythm (item 401). What holds the rows, the group, is watched instead.
   log.watched = [0.3, 0.5, 0.7].map((f) => {
     let node = document.elementFromPoint(innerWidth / 2, innerHeight * f);
     while (node !== null && node.closest(".helpers-body") !== null) node = node.parentElement;

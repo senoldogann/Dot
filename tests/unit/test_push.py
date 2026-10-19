@@ -186,7 +186,7 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             PushMessage(
                 title="A schedule did not run",
                 body="Morning digest: skipped: 125 minutes overdue (the daemon was not running)",
-                route="#/settings/schedules",
+                route="#/schedules",
                 state="failed",
             ),
         ),

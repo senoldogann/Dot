@@ -78,21 +78,21 @@ At a phone's width (720 px and under) Dot is laid out like a phone app (items 29
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
 the thumb. A chat's bar has a way back to that list, the chat's title over the agent and the model, and its tools
 in one pill: Dot's computer once the run has had a page, the helpers with their count, and the details. The line over the
-composer is one bar of glass (item 385): how long the run has worked (or that it waits for you), how its helpers stand
+composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
 end, in the same pane; it is a row of 40 px, a translucent surface with the page blurred under it, a hairline and a
-rounded pill (items 352 and 360; a wider window has the same bar). The conversation keeps a chat's rhythm (item 385):
+rounded pill (items 352 and 360; a wider window has the same bar). The conversation keeps a chat's rhythm (item 401):
 the gap between its rows is 4 px, a message's bubble holds its words in 4 px above and below, and a step's head is 40 px
 tall, so a phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
 keyboard move nothing else. The composer floats over the conversation's foot as a pane of glass, with no band of the
 page's colour behind it, and the conversation scrolls under it, its last line kept clear of the bar however tall the
-composer grows (items 374 and 385); the "+" and a compact square stop or the send stand beside the box at 36 px, and the
+composer grows (items 374 and 401); the "+" and a compact square stop or the send stand beside the box at 36 px, and the
 choices on the line under it. The conversation scrolls up and down only
 (item 360): a table or a block of code wider than the screen scrolls sideways in its own box, and a long command or tool
 name breaks over lines. A delegated run's row, under the helpers it belongs to, is one line tall at this width:
 its face, its goal, its state and time, and the way to its page, with the goal or the last line cut by an ellipsis
-rather than wrapped onto a second row (item 385); the helpers' own head is one line too. The details rise from the foot
+rather than wrapped onto a second row (item 401); the helpers' own head is one line too. The details rise from the foot
 as a sheet with a grabber, and a drag of its head down closes it; its Agents tab says of each helper its state, its
 model and what it does now (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
 other tabs that Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the
@@ -101,7 +101,7 @@ over), and goes back to the side panel when it closes.
 
 The button at the top left is the one way back (item 338): a chevron on the page's own ground, no circle around it
 (item 373), in a 36 px box. On a chat's page, wherever it was opened from, it opens the list of chats in place, as the
-sidebar comes over the page: the address stays the run's, and no page of chats stands between them (item 385). On a
+sidebar comes over the page: the address stays the run's, and no page of chats stands between them (item 401). On a
 delegated run's page it says Back and leads to the run that started it. On any other page opened by a link of another
 page (a service from Plugins, a tab from the settings' list) it says Back and returns to that page; on a page opened
 directly that has one above it (a settings tab, a service's page, an agent's or a campaign's page, Team) it leads there;

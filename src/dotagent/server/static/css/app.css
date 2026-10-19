@@ -96,7 +96,7 @@
   --radius-pill: 999px;
   /* The composer's lift (item 121): a hairline of shadow and a soft one that falls below it. */
   --shadow-composer: 0 1px 2px var(--shadow-ink), 0 12px 28px -18px var(--shadow-ink-deep);
-  /* The glass of what stands over the conversation at the foot (item 385): the composer and the bar over it, a
+  /* The glass of what stands over the conversation at the foot (item 401): the composer and the bar over it, a
      translucent surface a hairline frames with the page blurred under it. */
   --glass-surface: color-mix(in srgb, var(--surface) 78%, transparent);
   --glass-border: color-mix(in srgb, var(--border-strong) 60%, transparent);
@@ -1362,13 +1362,8 @@ a.pill:hover {
 
 /* An empty place is one line that says so and what to do (item 79): no card, no icon. */
 .empty-line {
-  padding: 12px 0;
-  color: var(--muted);
-}
-
-.card > .empty-line,
-.card .empty-line {
   padding: 12px 16px;
+  color: var(--muted);
 }
 
 /* The facts of a row or an answer: separate spans a space apart, not one dotted string (item 79). */
@@ -2511,7 +2506,8 @@ a.pill:hover {
   margin-inline-end: auto;
 }
 
-.composer .plus-button {
+.composer .plus-button,
+.composer .more-button {
   width: 32px;
   padding: 0;
   border-radius: var(--radius-pill);
@@ -2524,25 +2520,45 @@ a.pill:hover {
   display: inline-flex;
   flex: none;
   align-items: center;
-  gap: var(--space-1);
+  gap: var(--space-half);
   min-width: 0;
   height: 32px;
   padding: 0 var(--space-2);
-  border: 0;
+  border: 1px solid transparent;
   border-radius: var(--radius-pill);
   background: transparent;
   color: var(--text-2);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   cursor: pointer;
   transition:
     background-color var(--motion-quick) var(--ease),
+    border-color var(--motion-quick) var(--ease),
     color var(--motion-quick) var(--ease);
 }
 
 .composer-pill:hover,
 .composer-pill[aria-expanded="true"] {
   background: var(--surface-2);
+  border-color: var(--border);
   color: var(--text);
+}
+
+.composer-pill > .icon:last-child {
+  width: 12px;
+  height: 12px;
+  opacity: 0.5;
+  transition:
+    opacity var(--motion-quick) var(--ease),
+    transform var(--motion-quick) var(--ease);
+}
+
+.composer-pill:hover > .icon:last-child,
+.composer-pill[aria-expanded="true"] > .icon:last-child {
+  opacity: 0.85;
+}
+
+.composer-pill[aria-expanded="true"] > .icon:last-child {
+  transform: rotate(180deg);
 }
 
 /* The context meter of a run's composer (item 222, contextmeter.js): a ring of how much of the run's budget its last
@@ -2780,14 +2796,17 @@ a.pill:hover {
   }
 
   .composer .plus-button,
+  .composer .more-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;
     min-height: 36px;
   }
 
+  /* A pill's value reads at a phone's reading size (item 329), not at the small size of a desktop's compact bar. */
   .composer-pill {
     height: 36px;
+    font-size: var(--text-sm);
   }
 }
 
@@ -2817,10 +2836,10 @@ a.pill:hover {
   animation: fade-in var(--motion-quick) var(--ease);
 }
 
-/* The Options menu: the four approval modes with what each does, and YOLO's warning once it is chosen (item 398), whole
-   where the window has the room. */
+/* The Options menu: the four approval modes with what each does and YOLO's warning once it is chosen (item 398), then
+   Execution's switches (Keep going, Goal mode, Plan first), whole where the window has the room. */
 .composer-popover:has(.approval-list) {
-  max-height: min(480px, var(--room-above, 480px));
+  max-height: min(600px, var(--room-above, 600px));
 }
 
 .pop-option {
@@ -2937,11 +2956,33 @@ a.pill:hover {
   justify-content: space-between;
   gap: 8px;
   padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  transition: background-color var(--motion-quick) var(--ease);
+}
+
+.composer-popover .composer-pick.switch-row {
+  cursor: pointer;
+}
+
+.composer-popover .composer-pick.switch-row:hover {
+  background: var(--surface-2);
+}
+
+.composer-pick-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .composer-pick-label {
-  color: var(--muted);
+  color: var(--text);
   font-size: var(--text-sm);
+}
+
+.composer-pick-hint {
+  color: var(--muted);
+  font-size: var(--text-xs);
+  line-height: var(--leading-xs);
 }
 
 /* A group of a composer menu under a heading of its own, such as the speeds under the reasoning levels (item 223);
@@ -3240,11 +3281,35 @@ a.pill:hover {
 
 .slash-option {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
-  padding: 8px 8px;
+  padding: 4px 8px;
   border-radius: var(--radius-sm);
   cursor: pointer;
+  transition: background var(--motion-quick) var(--ease);
+}
+
+.slash-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-xs);
+  flex: none;
+  color: color-mix(in oklab, var(--pick-tint, var(--accent)) 85%, var(--text));
+  background: color-mix(in oklab, var(--pick-tint, var(--muted)) 14%, transparent);
+}
+
+.slash-mark .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.slash-mark[data-kind="command"] {
+  color: var(--text-2);
+  background: var(--surface);
+  border: 1px solid var(--border);
 }
 
 .slash-option[aria-selected="true"],
@@ -3515,7 +3580,7 @@ a.pill:hover {
 .timeline {
   display: flex;
   flex-direction: column;
-  /* Rows of the run's flow sit a breath apart (item 385): a chat's rhythm, not a page's paragraphs. */
+  /* Rows of the run's flow sit a breath apart (item 401): a chat's rhythm, not a page's paragraphs. */
   gap: var(--space-1);
 }
 
@@ -3525,7 +3590,7 @@ a.pill:hover {
 }
 
 /* Your message sits on the raised surface (item 79); the yellow is Dot's face alone. Its padding is a chat bubble's
-   (item 385): the words, and no room above and below them to scroll past. */
+   (item 401): the words, and no room above and below them to scroll past. */
 .bubble.user {
   align-self: flex-end;
   width: fit-content;
@@ -4635,7 +4700,7 @@ a.memory-line:hover .memory-change {
   border-radius: var(--radius-sm);
 }
 
-/* A phone keeps the head of a delegated run, and of the helpers it belongs to, one line tall (item 385): the state
+/* A phone keeps the head of a delegated run, and of the helpers it belongs to, one line tall (item 401): the state
    words never wrap, the title or the last line gives way with an ellipsis, and nothing pushes a second row. The rows a
    finger taps stay 40 px tall through `min-height` (app.css). */
 @media (max-width: 720px) {
@@ -4948,7 +5013,7 @@ a.memory-line:hover .memory-change {
   display: flex;
   flex-direction: column;
   /* The message, the flow of what the run did and its answer sit as close as the lines of the run's own page do
-     (`.timeline`; items 377 and 385). */
+     (`.timeline`; items 377 and 401). */
   gap: var(--space-1);
 }
 
@@ -6458,7 +6523,8 @@ button.attach-chip:hover {
   border-radius: var(--radius-xs);
 }
 
-.plus-button {
+.plus-button,
+.more-button {
   flex: none;
 }
 
@@ -6978,7 +7044,7 @@ button.attach-chip:hover {
   }
 }
 
-/* On a phone what is tapped is a thumb's, not an iOS row's (item 385): the buttons are 36 px tall and the small ones
+/* On a phone what is tapped is a thumb's, not an iOS row's (item 401): the buttons are 36 px tall and the small ones
    32, the heads of the steps keep a tappable 40, and the dock's send and "+" are a compact 36. A link inside a line of
    text is no target of its own (WCAG 2.5.8). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
@@ -7018,6 +7084,7 @@ button.attach-chip:hover {
 
   /* The composer's round buttons are the send's size, at the dock's right, and so is the stop's square in them. */
   .composer .plus-button,
+  .composer .more-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;
@@ -7035,7 +7102,7 @@ button.attach-chip:hover {
     height: 14px;
   }
 
-  /* What stops the run is a square one can put a thumb on, not a wide block (item 385). */
+  /* What stops the run is a square one can put a thumb on, not a wide block (item 401). */
   .composer[data-stop] .btn.send {
     border-radius: var(--radius-sm);
   }

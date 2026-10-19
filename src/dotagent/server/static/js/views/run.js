@@ -197,7 +197,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The pill is in the dock, so it stays at the window's foot as the conversation scrolls (item 244).
   const parentId = run.parent_run_id;
   // A phone's way back from a chat's page is the sidebar in place, never a page of chats to walk through; from a
-  // delegated run it is the run that started it (item 385). The shell draws the button, the page says where it leads.
+  // delegated run it is the run that started it (item 401). The shell draws the button, the page says where it leads.
   window.dispatchEvent(new CustomEvent(RUN_BACK_EVENT, { detail: { to: parentId === null ? null : `#/runs/${parentId}` } }));
   const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Parent run");
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
@@ -339,7 +339,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el(
       "summary",
       { class: "lessons-head" },
-      el("span", { class: "lessons-mark" }, icon("sparkle")),
+      el("span", { class: "lessons-mark" }, icon("brain")),
       el("span", { class: "lessons-title" }, "Lessons from this run"),
       lessonsCount,
       el("span", { class: "lessons-chevron" }, icon("chevron")),
@@ -635,7 +635,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const background = backgroundWork({ threadId: run.thread_id });
   // The chat's loops (item 281), beside its commands at work.
   const loops = chatLoops({ threadId: run.thread_id });
-  // The bar over the composer (items 297, 352, 360 and 385): the run's time, its helpers and the messages queued at its
+  // The bar over the composer (items 297, 352, 360 and 401): the run's time, its helpers and the messages queued at its
   // left, and the way down at its right end, all in one pane of glass.
   const capsule = createCapsule({
     onWork: () => inspector.openTab("run"),
@@ -926,7 +926,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer (item 111).
     const working = steers(false) ? "Steer this run, or /btw to ask on the side" : "Queue a message, or /btw to ask on the side";
-    input.placeholder = active ? working : "Follow up, or /btw to ask on the side";
+    input.placeholder = active ? working : "Follow up (@ for skills, / for commands, or /btw to ask on the side)";
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
@@ -961,7 +961,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     paintBar();
   }
 
-  // The bar stands while one of its parts has something to say or the way down is offered in it (item 385).
+  // The bar stands while one of its parts has something to say or the way down is offered in it (item 401).
   let jumpVisible = false;
 
   function paintBar() {
@@ -970,7 +970,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
 
   // ------------------------------------------------------------------------------------------------ scroll
   // The way down (item 96): an arrow at the right end of the bar over the composer while the end, or the answer, is
-  // below the window (item 385).
+  // below the window (item 401).
   const jump = el(
     "button",
     {
@@ -1221,7 +1221,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   });
   // The agents of the chat: the runs its runs handed work to (item 227).
   const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
-  // The Screen tab with nothing yet (item 385): Dot's computer is quiet, and what it shows and the screenshots it takes
+  // The Screen tab with nothing yet (item 401): Dot's computer is quiet, and what it shows and the screenshots it takes
   // stand there once it works. The empty panel is the page's own, in Dot's voice; the card of the page takes its place
   // as soon as there is a page.
   const screenQuiet = el(

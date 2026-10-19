@@ -62,7 +62,8 @@ ready now (open, waiting for nothing open or failed) and which are held by a fai
 are independent, so the run can hand each to `delegate` in one turn, naming the step; the delegated run's report then
 closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
 does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
-line says the step was not in the plan, and nothing is marked. A run that calls `finish` with steps still open is asked
+line says the step was not in the plan, and nothing is marked. A `delegate` call waits up to four hours for its
+run's report. A run that calls `finish` with steps still open is asked
 once to close them. A plan can also hold the run's targets (`targets` of `update_plan`, at most 600 characters): for a
 goal that names an outcome, what the run will reach and how its own tools measure it. They stay until new targets
 replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are the first line of the plan in
@@ -200,7 +201,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   every 1, 2, 3, 4, 6, 8 or 12 hours, in the chat, as its follow-ups start (its model, reasoning level, speed, approvals
   and goal mode). Each run of it is told how the loop ends: it deletes its schedule (`schedule_delete`) once the work is
   done for good. Right above the composer, in the bar that also says how long the run has worked and how its helpers
-  stand (one pane of glass on a phone, item 385), a line shows each loop of the chat, how often it asks again, when
+  stand (one pane of glass on a phone, item 401), a line shows each loop of the chat, how often it asks again, when
   next, and a Stop that deletes it. A rhythm a cron expression cannot keep exactly, or one shorter than
   `[scheduler] min_interval_s`, is refused (422); a new chat then starts nothing, nor when `[scheduler] max_schedules`
   are switched on already. A loop does not go with Keep going, whose campaign goes on by itself.

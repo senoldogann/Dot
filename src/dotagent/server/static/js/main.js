@@ -29,7 +29,7 @@ const OLD_START = "#/activity";
 // The pages of the earlier sidebar live on as tabs of the settings or of Customize; their old addresses lead there.
 const MOVED = new Map([
   ["/memory", "/settings/memory"],
-  ["/schedules", "/settings/schedules"],
+  ["/settings/schedules", "/schedules"],
   ["/rules", "/settings/rules"],
   ["/system", "/settings/system"],
   // Connect apps and the settings' Skills became Customize's two tabs (items 316 and 317).
@@ -66,6 +66,14 @@ const ROUTES = [
     parent: ([id]) => (id === undefined ? null : "/agents"),
   },
   { tab: "agents", layout: "page", title: "Team", pattern: /^\/team$/, load: () => import("./views/team.js"), parent: () => "/agents" },
+  {
+    tab: "schedules",
+    layout: "page",
+    title: "Schedules",
+    pattern: /^\/schedules$/,
+    load: () => import("./views/schedules.js"),
+    parent: () => null,
+  },
   {
     tab: "customize",
     layout: "page",

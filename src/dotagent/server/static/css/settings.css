@@ -1613,10 +1613,9 @@
   display: block;
 }
 
-/* The memory list (Settings › Memory): a note is a row that reads as one card — the sentence first, then a quiet line of
-   what it carries (who saved it, when, how it scored), and the actions at the end of that line where the eye can find
-   them instead of a column of buttons down the page. */
-/* Standard list rows inside settings/pages: clean hairline separation without nested cards or double borders. */
+/* The list rows of a page: hairlines between them, no card inside a card. A note of Settings › Memory reads as one
+   row: the sentence first, then a quiet line of what it carries (who saved it, when, how it scored), its actions at the
+   end of that line. */
 .page[data-layout="page"] .list-row {
   gap: var(--space-2) var(--space-3);
   align-items: center;
@@ -1687,17 +1686,21 @@
 
 .page[data-layout="page"] .row-actions {
   gap: var(--space-1);
+}
+
+/* A note's actions show when the pointer is on its row or a key is in it, and always on a touch screen. */
+.notes-panel .row-actions {
   opacity: 0;
   transition: opacity var(--motion-quick) var(--ease);
 }
 
-.page[data-layout="page"] .list-row:hover .row-actions,
-.page[data-layout="page"] .list-row:focus-within .row-actions {
+.notes-panel .list-row:hover .row-actions,
+.notes-panel .list-row:focus-within .row-actions {
   opacity: 1;
 }
 
 @media (hover: none) {
-  .page[data-layout="page"] .row-actions {
+  .notes-panel .row-actions {
     opacity: 1;
   }
 }

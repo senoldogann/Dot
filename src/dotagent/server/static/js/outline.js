@@ -202,7 +202,9 @@ export function messageOutline({ layout, main, thread, dock }) {
    * that room and something to walk, as wide as the room lets it be. */
   function arrange() {
     layout.dataset.outline = FINE_POINTER.matches ? "on" : "off";
-    const room = main.getBoundingClientRect().left - layout.getBoundingClientRect().left;
+    const sidebar = document.querySelector(".shell[data-nav='docked'][data-sidebar='open'] .sidebar");
+    const leftEdge = sidebar instanceof HTMLElement && sidebar.offsetWidth > 0 ? sidebar.getBoundingClientRect().right : 0;
+    const room = main.getBoundingClientRect().left - leftEdge;
     const shown = FINE_POINTER.matches && messages.length >= MIN_MESSAGES && room >= ROOM_PX;
     element.hidden = !shown;
     if (shown) {
@@ -244,6 +246,10 @@ export function messageOutline({ layout, main, thread, dock }) {
   const sizes = new ResizeObserver(repaint);
   sizes.observe(layout);
   sizes.observe(main);
+  const shell = document.querySelector(".shell");
+  if (shell !== null) {
+    sizes.observe(shell);
+  }
   window.addEventListener("scroll", repaint, { passive: true });
   FINE_POINTER.addEventListener("change", repaint);
   count();

@@ -89,8 +89,18 @@ export function heldChoice(initial) {
   };
 }
 
-function pick(caption, control) {
-  return el("div", { class: "composer-pick", role: "group", "aria-label": caption }, el("span", { class: "composer-pick-label" }, caption), control);
+function pick(caption, control, hint = "") {
+  return el(
+    "div",
+    { class: "composer-pick", role: "group", "aria-label": caption },
+    el(
+      "span",
+      { class: "composer-pick-content" },
+      el("span", { class: "composer-pick-label" }, caption),
+      hint === "" ? null : el("span", { class: "composer-pick-hint" }, hint),
+    ),
+    control,
+  );
 }
 
 /** The approval modes as a list (item 398), each with its icon, its name and what it does, the one chosen ticked:
@@ -184,7 +194,7 @@ export function approvalsPicker(onPaint, kept) {
 export function standingPicker(onToggle) {
   let on = false;
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Keep going until done" });
-  const element = switchRow(pick("Keep going", toggle), toggle);
+  const element = switchRow(pick("Keep going", toggle, "Work in sessions until outcome is verified"), toggle);
   element.title = STANDING_HINT;
   const note = el("div", { class: "composer-note", hidden: true }, icon("target"), el("span", null, STANDING_NOTE));
 
@@ -221,7 +231,7 @@ export function goalModePicker(kept) {
     return kept.read() ?? status?.goal_mode === true;
   }
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
-  const element = switchRow(pick("Goal mode", toggle), toggle);
+  const element = switchRow(pick("Goal mode", toggle, "Keep working until goal is verified"), toggle);
   element.title = GOAL_MODE_HINT;
 
   function paint() {

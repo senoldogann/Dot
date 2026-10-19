@@ -144,28 +144,27 @@ the MCP servers by name with the number of their tools, then the skills and each
 after it; a pick is a chip and the at word goes. An `@` inside a word, as in an address, opens nothing. A run that waits
 for your approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
-The **+** at the left of the bar (item 318, after Codex's composer) opens **Add files**, in the box of a run **Save
-skill**, the **Goal mode** switch, on the home for a task of Dot's **Keep going** (item 353), and **Plan first**, then
-**Plugins**, the MCP servers with tools (a connected app's
-among them), and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked, there or in the slash or
-at menu, is a chip under the box in a colour of its name, which its × takes away; Plan first is a chip too, and a chat
-has neither it nor goal mode. The picks go with the message (`plugins`, `skills` and `plan_first` of `POST /api/runs`,
-and of a message the queue holds), and once it is sent they stand under it as chips (the run's `picks` event); a message
-that steers the run under way leaves them for the next one, and the page says so, and a queued message with picks is not
-steered into the run at work: it stays queued to start a run of its own. A run sent with picks starts with each
-picked server's tool group on from its first step when its tools are grouped (with every tool offered they are on
-anyway), and its first message is your words, then a line that names the servers to use, Plan first's (write the plan
-with `update_plan`, then ask with `ask_user` and act once you agree: the prompt asks it, nothing holds the run's tools
-back), and each picked skill's instructions as the `skill` tool gives them; the run's goal stays your words. Picks a run
-cannot start with are refused, with why, and nothing starts: a server that is not connected or none of whose tools the
-run may use (its mode's, within its agent's bounds), a skill it is not offered, Plan first in a chat or under YOLO (a
-YOLO run does not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is OpenCode's own
-agent. A run that goes on from another (Resume, or an answer that came after its run ended) starts without the picks:
-the first message, with their lines and skills, stays in the chat, and with grouped tools `use_tools` turns a picked
-server's group on. **Save skill** (`POST /api/runs/{id}/skill`) has the review model
-write the skill of the run as a learned skill, as one is written when a run ends, also after fewer acting steps than
-`[agent] skill_min_steps`; it is refused while learned skills are off, and for a run that did not end done or took no
-acting step, a delegated run, an eval's and one of OpenCode's agent.
+The **+** at the left of the bar (item 318, after Codex's composer) opens **Add files** and **Add photos**, in the box
+of a run **Save skill**. The slash and at menus pick **Plugins** (the MCP servers with tools) and **Skills**, both as
+`GET /api/palette` lists them. A plugin or a skill picked is a chip under the box in a colour of its name, which its ×
+takes away; Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all three execution
+switches stand inside the **Options** menu alongside the approvals (item 353). The picks go with the message (`plugins`,
+`skills` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is sent they stand under
+it as chips (the run's `picks` event); a message that steers the run under way leaves them for the next one, and the
+page says so, and a queued message with picks is not steered into the run at work: it stays queued to start a run of its
+own. A run sent with picks starts with each picked server's tool group on from its first step when its tools are grouped
+(with every tool offered they are on anyway), and its first message is your words, then a line that names the servers to
+use, Plan first's (write the plan with `update_plan`, then ask with `ask_user` and act once you agree: the prompt asks
+it, nothing holds the run's tools back), and each picked skill's instructions as the `skill` tool gives them; the run's
+goal stays your words. Picks a run cannot start with are refused, with why, and nothing starts: a server that is not
+connected or none of whose tools the run may use (its mode's, within its agent's bounds), a skill it is not offered,
+Plan first in a chat or under YOLO (a YOLO run does not ask), any pick with Keep going, and any pick on one of
+OpenCode's models, whose run is OpenCode's own agent. A run that goes on from another (Resume, or an answer that came
+after its run ended) starts without the picks: the first message, with their lines and skills, stays in the chat, and
+with grouped tools `use_tools` turns a picked server's group on. **Save skill** (`POST /api/runs/{id}/skill`) has the
+review model write the skill of the run as a learned skill, as one is written when a run ends, also after fewer acting
+steps than `[agent] skill_min_steps`; it is refused while learned skills are off, and for a run that did not end done or
+took no acting step, a delegated run, an eval's and one of OpenCode's agent.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
@@ -315,7 +314,7 @@ unless Settings › Browser turned that off (item 354); until a frame comes it k
 with a mark and a title (no page yet, waiting for the page, the view closed, the run ended, or a run in a `dotx`
 command, item 220). A Screen tab that has had no page at all says instead, in the empty panel the other tabs use, that
 Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
-Settings › Browser that opens it when a run starts its browser (item 385). **Watch** and **Close the view** open and
+Settings › Browser that opens it when a run starts its browser (item 401). **Watch** and **Close the view** open and
 close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the agent's name). Since that
 view shows the page, Dot's own Chrome stays in the background while a run works (`[browser] raise_window`, off by
 default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in gets the focus back right after

@@ -3,7 +3,7 @@ served daemon with one finished chat of the scripted model:
 
 - a tab opened from the settings' list says Back, and Back returns to the list, where the button opens the chats;
 - a service's page opened by its address says Back and leads to Plugins; one opened from a tile returns there;
-- a chat's page, wherever it was opened from, has the button that opens the list of chats in place (item 385);
+- a chat's page, wherever it was opened from, has the button that opens the list of chats in place (item 401);
 - a delegated run's page goes Back to the run that started it;
 - no page draws a link back of its own on a phone; in a Mac's window no Back shows, and the link back of a page under
   another (a service's page, Diagnostics) shows with the sidebar beside it and without it (item 380);
@@ -109,7 +109,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(button).to_have_attribute("aria-label", "Back")
     await button.click()
     await expect(page).to_have_url(f"{address}/#/customize/plugins")
-    # A chat's page opens the list of chats in place (item 385), wherever the page was opened from: no page of chats
+    # A chat's page opens the list of chats in place (item 401), wherever the page was opened from: no page of chats
     # between them, and the address stays the run's.
     await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
@@ -165,7 +165,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
 
 
 async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
-    """A follow-up goes on in the same chat (item 345), whose page opens the list of chats in place (item 385)."""
+    """A follow-up goes on in the same chat (item 345), whose page opens the list of chats in place (item 401)."""
     button: Locator = page.locator(".stagebar-left button")
     await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
@@ -234,7 +234,7 @@ async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_pa
                     phone: Page = await phone_context.new_page()
                     await phone.goto(ui_url("127.0.0.1", port, TOKEN))
                     await _phone_walk(phone, address, ended)
-                    # A delegated run's page goes Back to the run that started it (item 385).
+                    # A delegated run's page goes Back to the run that started it (item 401).
                     child: RunRecord = await manager.start(
                         "Check the fares",
                         "chat",

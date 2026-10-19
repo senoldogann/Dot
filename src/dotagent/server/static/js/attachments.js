@@ -214,7 +214,17 @@ export function createAttachments({ dropTarget, input, onChange }) {
   picker.addEventListener("change", () => {
     add([...picker.files]);
     picker.value = "";
+    picker.removeAttribute("accept");
   });
+
+  function openPicker(accept = "") {
+    if (accept) {
+      picker.setAttribute("accept", accept);
+    } else {
+      picker.removeAttribute("accept");
+    }
+    picker.click();
+  }
   dropTarget.addEventListener("dragover", (event) => {
     if (event.dataTransfer !== null && [...event.dataTransfer.types].includes("Files")) {
       event.preventDefault();
@@ -249,6 +259,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
 
   return {
     picker,
+    openPicker,
     list,
     ids: () => entries.filter((entry) => entry.state === "ready").map((entry) => entry.id),
     ready: () => entries
@@ -276,6 +287,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
               // The picture could not be read: the chip says so where it stands, and the file still opens.
               entry.open.replaceChildren(icon("alert"));
               entry.open.title = `${name}: ${error.message}`;
+              entry.open.setAttribute("aria-label", `${name}: ${error.message}`);
             },
           );
         }
@@ -317,6 +329,7 @@ export function createAttachments({ dropTarget, input, onChange }) {
               // The picture could not be read: the chip says so where it stands, and the file still opens.
               entry.open.replaceChildren(icon("alert"));
               entry.open.title = `${name}: ${error.message}`;
+              entry.open.setAttribute("aria-label", `${name}: ${error.message}`);
             },
           );
         }
