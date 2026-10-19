@@ -95,6 +95,7 @@ class TerminalSession:
         background: bool,
         process: asyncio.subprocess.Process,
         master: int,
+        follower: int,
     ) -> None:
         self.id: str = session_id
         self.command: str = command
@@ -108,6 +109,10 @@ class TerminalSession:
         self.started_at: float = time.time()
         self._process: asyncio.subprocess.Process = process
         self._master: int = master
+        # Dot's own copy of the terminal's other end, held until the program has exited (:meth:`release_follower`).
+        # When the program's exit closed that end last, macOS kept what it printed last from the read side, and a
+        # program that leads its session waited in its exit for that output to drain, for good.
+        self._follower: int | None = follower
         # What was typed and the program has not read yet, and whether the loop is asked to say when it takes more.
         self._pending: bytearray = bytearray()
         self._writing: bool = False
@@ -140,11 +145,16 @@ class TerminalSession:
         return asks_for_secret(self._recent)
 
     def _on_readable(self) -> None:
+        self._take()
+
+    def _take(self) -> bool:
+        """Take what the terminal holds now, and say whether it held something; its end (EIO, or a read of nothing)
+        ends the session."""
         try:
             data: bytes = os.read(self._master, _READ_BYTES)
         except BlockingIOError:
             # The loop spoke too soon: nothing to read after all, and nothing ended.
-            return
+            return False
         except OSError as error:
             # EIO is how the terminal says that nothing holds its other end any more: the program is gone.
             if error.errno != errno.EIO:
@@ -163,6 +173,25 @@ class TerminalSession:
             self.ended = True
             self.finished.set()
         self._arrived.set()
+        return bool(data)
+
+    def release_follower(self) -> None:
+        """Once the program has exited: take what it printed last, then close Dot's copy of the terminal's other end,
+        so that the read side comes to the end once nothing else holds it. A session closed by hand takes nothing
+        more: its terminal is gone or going."""
+        if self._follower is None:
+            return
+        if not self.closing:
+            # What is kept is the newest _KEPT_CHARS, so a program's descendants that still print cannot hold the loop.
+            for _ in range(_KEPT_CHARS // _READ_BYTES + 1):
+                if self.ended or not self._take():
+                    break
+        self._close_follower()
+
+    def _close_follower(self) -> None:
+        if self._follower is not None:
+            os.close(self._follower)
+            self._follower = None
 
     def _ended_error(self) -> ToolExecutionError:
         return ToolExecutionError(
@@ -277,6 +306,7 @@ class TerminalSession:
                 asyncio.get_running_loop().remove_reader(self._master)
                 self.ended = True
             self.finished.set()
+            self._close_follower()
             os.close(self._master)
 
 
@@ -335,31 +365,34 @@ class Terminals:
                 "one with terminal_close first.",
                 {"open": list(mine), "limit": self._limit},
             )
-        master, slave = pty.openpty()
+        master, follower = pty.openpty()
+        started: bool = False
         try:
             process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
                 *confinement,
                 "/bin/zsh",
                 "-c",
                 command,
-                stdin=slave,
-                stdout=slave,
-                stderr=slave,
+                stdin=follower,
+                stdout=follower,
+                stderr=follower,
                 cwd=str(cwd),
                 env=self._env,
                 start_new_session=True,
                 preexec_fn=_controlling_terminal,
             )
+            started = True
         except OSError as error:
-            os.close(master)
             raise ToolExecutionError(
                 "the terminal session could not start", {"command": command, "cwd": str(cwd), "error": str(error)}
             ) from error
         finally:
-            os.close(slave)
+            if not started:
+                os.close(master)
+                os.close(follower)
         self._opened += 1
         session: TerminalSession = TerminalSession(
-            f"t{self._opened}", command, cwd, bool(confinement), background, process, master
+            f"t{self._opened}", command, cwd, bool(confinement), background, process, master, follower
         )
         mine[session.id] = session
         self._follows[session.id] = asyncio.create_task(self._follow(thread_id, session))
@@ -395,10 +428,13 @@ class Terminals:
             await self._watcher.sessions_changed(thread_id)
 
     async def _follow(self, thread_id: str, session: TerminalSession) -> None:
-        """Wait for the program of ``session`` to end. One that ended by itself is kept ``idle_s`` more for what it
-        printed last to be read, and the watcher hears of it: of a command in the background, its chat is told. A
-        session closed by hand tells nothing more. A watcher that fails is logged: nothing awaits this."""
+        """Wait for the program of ``session`` to end, and for the session to take what it printed last
+        (:meth:`TerminalSession.release_follower`). One that ended by itself is kept ``idle_s`` more for that to be
+        read, and the watcher hears of it: of a command in the background, its chat is told. A session closed by hand
+        tells nothing more. A watcher that fails is logged: nothing awaits this."""
         try:
+            await session.exit_code()
+            session.release_follower()
             await session.finished.wait()
             if session.closing:
                 return

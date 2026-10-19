@@ -238,7 +238,7 @@ async def _inspect(config: McpServerConfig, login_env: Mapping[str, str]) -> Ser
         return ServerReport(server=config.name, enabled=False, listed=0, tools=(), error=None, detail={}, log=log_file)
     try:
         connected: _Connected = await _connect_kept(config, login_env)
-    except Exception as exc:
+    except Exception as exc:  # noqa: BLE001 - _failure logs it, and the report shows it on the server's card
         # Any failure, as :func:`open_hub` leaves the server out with it.
         failure: McpFailure = _failure(config, exc)
         return ServerReport(

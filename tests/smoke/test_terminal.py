@@ -252,6 +252,37 @@ async def test_a_close_cancelled_while_it_waits_still_releases_the_terminal(runt
         await terminals.aclose()
 
 
+async def _read_to_end(session: TerminalSession) -> str:
+    """What the session's program printed, read until its end and once more after it, for what came with the end."""
+    text: str = ""
+    while not session.ended:
+        text += await session.read(1.0)
+    return text + await session.read(0.0)
+
+
+async def test_a_program_that_ends_at_once_leaves_what_it_printed_and_its_session_ends(runtime: Runtime) -> None:
+    """Many programs that print and end at once, side by side: what each printed is read and each session ends. While
+    the program's exit closed the terminal's other end last, macOS kept what it printed from the read side, and a
+    program waited in its exit for that output to drain, for good."""
+    terminals: Terminals = Terminals(1, 60.0, runtime.shell_env)
+    try:
+        sessions: list[TerminalSession] = list(
+            await asyncio.gather(
+                *(
+                    terminals.open(f"chat{index}", "echo said-$((40 + 2)) >&2; exit 3", (), workspace_dir(), False)
+                    for index in range(40)
+                )
+            )
+        )
+        texts: list[str] = list(
+            await asyncio.gather(*(asyncio.wait_for(_read_to_end(session), 10.0) for session in sessions))
+        )
+        assert [text.strip() for text in texts] == ["said-42"] * len(sessions), texts
+        assert [await session.exit_code() for session in sessions] == [3] * len(sessions)
+    finally:
+        await terminals.aclose()
+
+
 async def test_a_command_in_the_background_needs_a_chat_to_tell(runtime: Runtime) -> None:
     """Item 229: a delegated run opens no command in the background, since no chat of its own would hear of its end;
     nor does a process whose chats hear of no command's end, as a dotx command's, which ends with its run."""
