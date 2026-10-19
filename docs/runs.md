@@ -20,15 +20,16 @@ is the answer (a small model that is offered both writes the call out as text).
 
 - Old tool results and screenshots are trimmed, and the oldest part of the conversation is summarised by the fast
   model (`[models] fast`, the side work the run's slower model need not do), so a run stays inside its context budget:
-  `context_tokens` (96 000 by default) or the model's own context size (Settings › Models, item 250), or three
-  quarters of the model's window when that is less. A wider budget means
-  fewer summaries in a long run and more input tokens a step (up to twice as many at the end of a long run); 48 000 was
-  the default before 2026-10-11, and an owner on a metered key who weighs tokens over summaries sets it back. The
+  the model's own context size (Settings › Models, item 250), else `context_tokens`: by default `"most"`, three
+  quarters of the model's window (item 396), or a number for every model, cut to three quarters of the window when
+  that is less. A wider budget means fewer summaries in a long run and more input tokens a step (up to twice as many at
+  the end of a long run); 96 000 was the default from 2026-10-11 and 48 000 before, and an owner on a metered key who
+  weighs tokens over summaries sets a number, or a smaller size for a model. The
   summary may use a tenth of the budget and never more than 1 500 words, so a long run's summary does not grow with
   each compaction until every step compacts, and does not cost the fast model minutes of writing. A compaction keeps as
   many of the newest messages as fit next to the system prompt, the tool definitions and its note in 85 % of the size at
-  which it starts (`context_summarise_share` of `context_tokens` or of the model's own size, or the whole budget when
-  the window leaves less), and
+  which it starts (`context_summarise_share` of the model's context size, or the whole budget when the window leaves
+  less), and
   never less than the model's last reply with its results, so the steps after it have room. It is tried three times:
   a summary far over the limit is asked again with the limit and the overrun in front, and one that lacks a section (a
   section is there as a heading, not as a word of a sentence) is asked again once with the missing sections named and
@@ -72,9 +73,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   (`kimi-k3:cloud`, `gpt-oss:120b-cloud`) and which runs on Ollama's servers; where the model's own window is larger,
   the table shows it beside the one Dot asks for ("of 262k (own 1.0M)", items 221 and 250). OpenAI's and OpenCode
   Go's windows come from Dot's tables of their models, kept to their published pages; Anthropic's from its list of
-  models. When three quarters of the window is less than `context_tokens`, the run's budget
-  is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same proportion (never below 2000
-  characters). The text of a page or an application window in a browser or desktop result takes what is left next to the
+  models. When three quarters of the window is less than the number `context_tokens` sets, or than 96 000 while it is
+  `"most"`, the run's budget is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same
+  proportion (never below 2000 characters). The text of a page or an application window in a browser or desktop result takes what is left next to the
   rest of the result, and never less than half the result, so a small window shortens a page instead of leaving it out.
   A model whose window cannot hold the system prompt and the tool definitions is refused at the start, with
   a hint. A model of the `weak` tier is reminded in task and research runs, every `reminder_every` steps, of the goal,

@@ -313,9 +313,9 @@ function buildFlock() {
  * ends a run under the reader's eyes, to be written in (item 366), rather than one read again; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
- * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
- * event (its context budget, its model's window, the size chosen for the model and the prompt past which the run
- * summarizes), `onSetup({ kind, short, iconName, text, tone })` for each line of how the run was set up (item 365; the
+ * review, a description of images), `onScaffold({ model, contextTokens, window, chosen, summariseAt })` for the run's
+ * scaffold event (its model, its context budget, its model's window, the size chosen for the model and the prompt past
+ * which the run summarizes), `onSetup({ kind, short, iconName, text, tone })` for each line of how the run was set up (item 365; the
  * conversation keeps none), `onCalls({ calls, failed })` after every tool call of the run, `onCompacted({ count, flagged })` after
  * every compaction of the run (item 260; the conversation shows a quiet line where it happened, item 312; `flagged`
  * counts the checks that found a section missing or a name the conversation never had),
@@ -1178,7 +1178,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const data = record.data;
       const chosen = typeof data.chosen === "number" ? data.chosen : null;
       if (scope.runId === rootRunId) {
-        onScaffold({ contextTokens: data.context_tokens, window: data.window, chosen, summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null });
+        onScaffold({
+          model: typeof data.model === "string" ? data.model : null,
+          contextTokens: data.context_tokens,
+          window: data.window,
+          chosen,
+          summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null,
+        });
       }
       const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
       const budget = `budget ${compact(data.context_tokens)}`;

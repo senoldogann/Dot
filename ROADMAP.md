@@ -14931,6 +14931,33 @@ when its words match. Tests: `tests/smoke/test_model_picker.py` (OpenAI's view f
 nothing of another's; Anthropic's, shown next with the same words, finds it; the default made from such a search).
 Docs: `docs/daemon.md`.
 
+### 396. A model's context size is the most its window allows unless one is chosen, and the context meter leads to it
+
+**Status: done (2026-10-19), on `item-396-context-size`.** The owner's word of 2026-10-19: "Providerlarin modellerinin
+default context size en yüksek ne ise o olsun default providerin destekledigi, eger kisiler isterse modeller kismindan
+degistirir. Composerdaki halka içinede bir buton koy, change contextsize gibi ona tiklayinca o providerin o modeline
+gitsin direk." (the default context size of a provider's models should be the highest the provider supports, and
+whoever wants another changes it among the models; and put a button in the composer's ring, like change context size,
+that goes straight to that provider's model). **As built (2026-10-19).** `[agent] context_tokens` takes `"most"`, its
+new default (`defaults.toml`, `config.py`): a model without a size of its own gets three quarters of its window, the
+most item 250 lets it have, where it got 96,000 or three quarters of a smaller window; a model whose provider does not
+say its window gets 96,000, and a number there still gives every model that size, so an owner's own number keeps its
+meaning. While it is "most", 96,000 stays the budget `tool_output_chars` is meant for and under which the tool surface
+counts a budget as small, and a window too small for it cuts the budget as it cut a number (`scaffold.py`
+`configured_size`, `_reference_size`): a model whose window is 128,000 or less runs as before, with the same budget,
+point of summary and tool output. Settings › Models offers the most first, as Dot's default, then the smaller sizes,
+and its Why says where the default comes from (`ContextChoice.configured` is null while it is "most"). The panel of the
+composer's context meter has **Change context size**, a link to `#/settings/models?model=<ref>` (not for OpenCode's
+agent, whose window Dot does not set, nor for a window the provider does not say); there the model's provider fold and
+the Models card open when folded, and its row comes into sight, marked, with the focus on its size (`system.js`
+`showAsked`), on a phone too, where the table scrolls sideways to it. The eval reports keep "most" as it is
+(`EvalSettings.context_tokens`). A larger budget means fewer summaries and more input a step: a long run on a large
+window costs more on a key billed by the token, as `docs/models.md` says, and a number in `[agent] context_tokens`, or
+a size of the model's own, brings it down. Tests: `tests/unit/test_scaffold.py`, `test_context_sizes.py`,
+`test_tool_groups.py`, `tests/smoke/test_scaffold.py`, `test_context_sizes.py` (the API's default, the menu, and an
+address that names a model of a folded provider), `test_context_meter.py` (the link and where it leads). Docs:
+`docs/models.md`, `docs/runs.md`, `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15739,3 +15766,4 @@ Docs: `docs/daemon.md`.
 - 2026-10-19 (Fable 5.1): item 392 committed on `harness-4`; item 393 on `harness-5`: Settings › Harness.
 - 2026-10-19 (Opus 5.5): items 394 to 397 on the owner's words of the same day, each on a branch of its own from `main`, while other agents of the owner's work on items 385 to 393; item 394 on `item-394-campaign-cards`: a campaign is stopped, marked achieved or deleted from its row.
 - 2026-10-19 (Opus 5.5): item 395 on the owner's word of the same day, on `item-395-model-search` from `main`, while other agents of the owner's work on items 385 to 393: the model menu's search looks through the provider shown.
+- 2026-10-19 (Opus 5.5): item 396 on the owner's word of the same day, on `item-396-context-size` from `main`, while other agents of the owner's work on items 385 to 393: a model's context size is the most its window allows unless one is chosen, and the context meter leads to it.
