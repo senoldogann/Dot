@@ -15234,12 +15234,14 @@ and the vectors no search asked for in thirty days, or another model's, go at th
 a note handed earlier in the chat comes again when its text changed since, and one forgotten since is named under the
 message, as the old text stays in the chat; its fifth to seventh: after a compaction, told by the ledger's count, every
 note the context lost comes back and only that (`recalled_again`), a forgotten note is named once (`forgotten_unnamed`),
-a warming takes the texts asked for while it runs, and a search holds its own vectors against a cut meanwhile. Every
-`model_call` event says how long its first streamed word took (`first_token_seconds`), so the delay is measured from now
-on. Left as it was: the fast model's summary failures in the log were an earlier fast model's quota, and the owner's
-`[models] fast` is the main model since; the SSL `BAD_RECORD_MAC` retries on reused connections are rare. Tests:
-`tests/unit/test_run_modes.py` (the note), `test_help.py` (batches, the cold start, the keeper), `test_model_calls.py`
-(the first word's seconds). Docs: `docs/memory-and-schedules.md`, `docs/extending.md`, `docs/development.md`.
+a warming takes the texts asked for while it runs, and a search holds its own vectors against a cut meanwhile; its
+eighth: the note handed again bears the system note's head, as every stored note does, so the goal's review reads it as
+data. Every `model_call` event says how long its first streamed word took (`first_token_seconds`), so the delay is
+measured from now on. Left as it was: the fast model's summary failures in the log were an earlier fast model's quota,
+and the owner's `[models] fast` is the main model since; the SSL `BAD_RECORD_MAC` retries on reused connections are
+rare. Tests: `tests/unit/test_run_modes.py` (the note), `test_help.py` (batches, the cold start, the keeper),
+`test_model_calls.py` (the first word's seconds). Docs: `docs/memory-and-schedules.md`, `docs/extending.md`,
+`docs/development.md`.
 
 ## Log
 

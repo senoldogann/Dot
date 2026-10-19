@@ -223,7 +223,11 @@ def test_the_note_under_a_message_carries_what_changes_from_message_to_message(t
     assert notes_missing([note, changed], f"earlier\n- {note}\n") == [changed]
     # After a compaction, only what the context lost comes back: nothing, while it carries the whole note still.
     assert recalled_again([note], 1, [skill], ["mem_7"], f"{full}\n{gone}") == ""
-    assert recalled_again([note], 1, [skill], ["mem_7"], "") == recalled_note([note], 1, [skill], ["mem_7"])
+    # Stored as a user message, it bears the head every system note does, so the goal's review reads it as data.
+    assert (
+        recalled_again([note], 1, [skill], ["mem_7"], "")
+        == f"[system note] {recalled_note([note], 1, [skill], ['mem_7'])}"
+    )
 
 
 def _lines(approvals: ApprovalMode) -> set[str]:

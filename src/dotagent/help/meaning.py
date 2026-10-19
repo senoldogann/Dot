@@ -146,17 +146,26 @@ class HelpVectors:
         async def run() -> None:
             try:
                 made: int = await self.prepare(texts)
+                pruned: int = await self.prune()
+                # The texts asked for meanwhile, to the last: nothing is left for the next warming.
                 while self._queued:
                     queued: list[str] = sorted(self._queued)
                     self._queued.clear()
                     made += await self.prepare(queued)
-                pruned: int = await self.prune()
                 log.info("help_vectors_warmed", texts=len(texts), embedded=made, pruned=pruned)
             except (ProviderError, StoreError) as error:
                 self._queued.clear()
                 log.warning("help_vectors_warming_failed", error_type=type(error).__name__, error=str(error))
 
+        def ended(task: asyncio.Task[None]) -> None:
+            # A fault that is not the service's or the store's would be retrieved by nobody: it is logged here, and the
+            # texts queued for the task are let go, for the next search to start a warming again.
+            if not task.cancelled() and task.exception() is not None:
+                self._queued.clear()
+                log.error("help_vectors_warming_crashed", exc_info=task.exception())
+
         self._warming = asyncio.create_task(run(), name="help-vectors")
+        self._warming.add_done_callback(ended)
         return self._warming
 
     async def aclose(self) -> None:
