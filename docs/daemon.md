@@ -111,7 +111,8 @@ least 16 px on a touch screen other than an iPhone's or an iPad's, which would z
 311). While Keep going is on, one line under the frame says so. Each pill opens its menu above it, and a pick or Escape
 or a click outside closes it. The model's menu (item 208) has a rail on its left, a star for the
 favourites and the mark of each provider, that shows the favourites or one provider's models; a search over the models
-of every provider, which has the keys as the menu opens and reads names, providers and "free"; and on each model a star
+of the view shown (item 395), as its placeholder says, which keeps its words when the rail shows another view, has the
+keys as the menu opens and reads names, providers and "free"; and on each model a star
 that keeps it among the favourites in that browser, where the menu opens once there are any. The arrows and Enter pick a
 model, ⌘1 to ⌘9 the rows that show those keys, and ⌘D stars the row the keys are on. The default's row, the first of
 every view, has **Change** (item 209): the list then chooses the model new chats start on, a bar under the search says

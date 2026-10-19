@@ -14753,6 +14753,22 @@ schedule whose firing a crash cut before its run was under way is due again at t
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
 
+### 395. The model menu's search looks through the provider shown
+
+**Status: done (2026-10-19), on `item-395-model-search`.** The owner's word of 2026-10-19: "bir provider secip search
+kutusuna model ismi yazdigimda diger provider sonuclarida geliyor bu yanlis, sadece secili provider modelleri
+icerisinden filtreleme yapmali." (when I pick a provider and type a model's name in the search box, the other providers'
+results come too; that is wrong, it should filter within the picked provider's models alone). **As built
+(2026-10-19).** The composer's model menu searched every provider once a word was typed, and its rail pressed none (item
+208, `modelpicker.js`). The search now narrows the view the rail shows, a provider's models or the favourites: the rail
+keeps that view pressed, the search's placeholder names what it looks through ("Search OpenAI models", "Search
+favourites"), a search that finds nothing says where ("No OpenAI models match “haiku”."), and a provider's rows do not
+name their provider in a search either. Another view on the rail keeps the words typed and looks through its own
+models, so a name typed in the wrong provider is found by pressing the right one; the default's row shows as before,
+when its words match. Tests: `tests/smoke/test_model_picker.py` (OpenAI's view finds its models alone and says it found
+nothing of another's; Anthropic's, shown next with the same words, finds it; the default made from such a search).
+Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15553,3 +15569,4 @@ starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 395 on the owner's word of the same day, on `item-395-model-search` from `main`, while other agents of the owner's work on items 385 to 393: the model menu's search looks through the provider shown.

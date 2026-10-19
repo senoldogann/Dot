@@ -1,8 +1,9 @@
 """The composer's model menu (item 208): a rail of the favourites and of each provider's mark shows one view at a time,
-a search finds models across every provider, a star keeps a model among the favourites (in this browser) without picking
-it, and the keys move, pick, star and leave; on a touch screen the search leaves the focus where it is. Change, on the
-default's row, makes the daemon's default from the menu (item 209). A real server, whose providers list the test's
-models and answer nothing; nothing is sent. Wide and on a phone, light and dark."""
+a search finds the models of the view shown and keeps its words when another is shown (item 395), a star keeps a model
+among the favourites (in this browser) without picking it, and the keys move, pick, star and leave; on a touch screen
+the search leaves the focus where it is. Change, on the default's row, makes the daemon's default from the menu (item
+209). A real server, whose providers list the test's models and answer nothing; nothing is sent. Wide and on a phone,
+light and dark."""
 
 import asyncio
 import json
@@ -221,12 +222,23 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
                 assert await _rows(menu) == ["Default (scripted)", "gpt-5.5", "gpt-5.5-mini"]
                 await expect(search).to_be_focused()
 
-                # A search looks across every provider, the rail pressing none; a search that finds nothing says so.
+                # A search looks through the models of the provider the rail shows, which stays pressed (item 395); one
+                # that finds nothing there says so.
+                await expect(search).to_have_attribute("placeholder", "Search OpenAI models")
+                await search.fill("mini")
+                assert await _rows(menu) == ["gpt-5.5-mini"]
+                assert (await _rail(menu))[2] == ("OpenAI", "true")
                 await search.fill("haiku")
+                assert await _rows(menu) == []
+                await expect(menu.locator(".model-note")).to_have_text("No OpenAI models match “haiku”.")
+                # Another view on the rail keeps the search, which looks through its models then.
+                await menu.get_by_role("button", name="Anthropic").click()
                 assert await _rows(menu) == ["claude-haiku-5-5"]
-                assert all(pressed == "false" for _, pressed in await _rail(menu))
-                await expect(menu.locator("[role=option] .pop-option-hint")).to_have_text(["Anthropic"])
+                assert (await _rail(menu))[3] == ("Anthropic", "true")
+                await expect(search).to_have_value("haiku")
+                await expect(menu.locator("[role=option] .pop-option-hint")).to_have_count(0)
                 await page.screenshot(path=str(tmp_path / f"search-{width}-{scheme}.png"), animations="disabled")
+                await menu.get_by_role("button", name="Ollama").click()
                 await search.fill("free coder")
                 assert await _rows(menu) == ["qwen3-coder"]
                 await search.fill("default")
@@ -234,7 +246,8 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
                 await expect(menu.locator(".model-note")).to_be_hidden()
                 await search.fill("zzz")
                 assert await _rows(menu) == []
-                await expect(menu.locator(".model-note")).to_have_text("No model matches “zzz”.")
+                await expect(menu.locator(".model-note")).to_have_text("No Ollama models match “zzz”.")
+                await menu.get_by_role("button", name="OpenAI").click()
                 await search.fill("")
                 assert await _rows(menu) == ["Default (scripted)", "gpt-5.5", "gpt-5.5-mini"]
                 await expect(menu.locator(".model-note")).to_be_hidden()
@@ -427,7 +440,11 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             await expect(pill).to_contain_text("qwen3-coder")
             await pill.click()
             await change.click()
+            # The search looks through the view shown, here Ollama's; Anthropic's, shown next, has the model.
             await search.fill("haiku")
+            assert await _rows(menu) == []
+            await menu.get_by_role("button", name="Anthropic").click()
+            await expect(search).to_be_focused()
             await page.keyboard.press("Enter")
             await expect(page.locator(".toast.ok").last).to_contain_text("New chats start on claude-haiku-5-5.")
             await expect(choosing).to_be_hidden()
