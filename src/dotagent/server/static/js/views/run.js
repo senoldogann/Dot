@@ -504,41 +504,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     listener: null,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
-  // Save skill (item 318): what this run did, written as a skill by the review model, as item 92 writes one when a run
-  // ends; once the run has ended, since only a run that ended done after an acting step gives one.
-  let savingSkill = false;
-  async function saveSkill() {
-    savingSkill = true;
-    try {
-      await attempt(async () => {
-        const saved = await api.post(`/runs/${runId}/skill`, null);
-        toast("ok", `${saved.updated ? "Updated" : "Saved"} the skill ${saved.name}.`);
-      });
-    } finally {
-      savingSkill = false;
-    }
-  }
-  frame.addMenuItems((close) => [
-    el(
-      "button",
-      {
-        class: "pop-option",
-        type: "button",
-        disabled: active || savingSkill,
-        onclick: () => {
-          close();
-          saveSkill();
-        },
-      },
-      icon("download"),
-      el(
-        "span",
-        { class: "pop-option-text" },
-        el("span", null, savingSkill ? "Saving the skill…" : "Save skill"),
-        el("span", { class: "pop-option-hint" }, active ? "Once the run has ended" : "What this run did, as a skill to use again"),
-      ),
-    ),
-  ]);
   // How much of its context budget the run's last step filled (item 222), beside the send.
   const meter = createContextMeter({ frame: frame.element });
   send.before(meter.element);
@@ -1240,6 +1205,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // 96, and the files of the conversation), the plan, the agents of the chat and the screen (Dot's computer and the
   // screenshots). The run's state is the top bar's face and the Details section's first
   // fact; no card at the head of the conversation (item 113).
+  // The file beside the conversation stays as the chat goes on at its next run (a message sent, an answer that came;
+  // item 406): the browser's tab keeps it by the thread, and the next run's page shows it again as it opens.
+  const fileKey = `dot.panelFile.${run.thread_id}`;
   const inspector = createInspector({
     layout,
     tabs: [
@@ -1250,6 +1218,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       { id: "screen", label: "Screen", icon: "monitor", sections: [screenQuiet, computer.element] },
     ],
     screensIn: "screen",
+    onFile: (source) => {
+      if (source === null) {
+        sessionStorage.removeItem(fileKey);
+      } else {
+        sessionStorage.setItem(fileKey, JSON.stringify(source));
+      }
+    },
   });
   paintScreen();
 
@@ -1394,6 +1369,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   root.replaceChildren(layout);
   stage.paint();
   inspector.arrange();
+  const keptFile = storedFile(fileKey);
+  if (keptFile !== null) {
+    inspector.restoreFile(keptFile);
+  }
   paintStats();
   paintCost();
   paintFiles(thread);
@@ -1499,6 +1478,33 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       costTicker = null;
     }
   };
+}
+
+
+/** The file a page of the chat kept under `key` as the chat went on (item 406): `{ path }` or `{ attachment, name }`, as
+ * `fileSource` makes it; null when there is none, or what is kept is not one. */
+function storedFile(key) {
+  const kept = sessionStorage.getItem(key);
+  if (kept === null) {
+    return null;
+  }
+  /** @type {unknown} */
+  let parsed;
+  try {
+    parsed = JSON.parse(kept);
+  } catch {
+    return null;
+  }
+  if (typeof parsed !== "object" || parsed === null) {
+    return null;
+  }
+  if ("path" in parsed && typeof parsed.path === "string") {
+    return { path: parsed.path };
+  }
+  if ("attachment" in parsed && typeof parsed.attachment === "string" && "name" in parsed && typeof parsed.name === "string") {
+    return { attachment: parsed.attachment, name: parsed.name };
+  }
+  return null;
 }
 
 export function mount(root, ctx) {

@@ -15208,6 +15208,20 @@ of them. Tests: `tests/unit/test_previews.py` (a PDF's text), `tests/smoke/test_
 files), `test_thread_turns.py` (no cross), `test_markdown_copy.py` (the table's copy), `test_file_panel.py` (the
 panel's copy). Docs: `docs/daemon.md`, `docs/runs.md`.
 
+### 406. The file beside the conversation stays as the chat goes on; the box's More menu and Save skill go
+
+**Status: done (2026-10-19), on `item-406-panel-composer`.** The owner's word of 2026-10-19: a file opened beside the
+conversation closed as soon as a message was sent ("kapatmasın"), and the three dots of the box with Save skill were
+needless ("gereksiz"). **As built (2026-10-19).** A message sent, or an answer that came, goes on at the next run's
+address and the page is made again: the inspector dropped its file with the rest. Now the page keeps the file's source
+by the chat's thread in the browser's tab (`sessionStorage`, `dot.panelFile.<thread_id>`, written by the inspector's
+`onFile` as a file is shown or closed) and the next run's page shows it again as it opens (`restoreFile`, without taking
+the focus from the box); a narrow page, where the file would cover the conversation, lets it go. The box lost its More
+button and the Save skill row (item 318): the skill of a chat is written from the Skills page's Save from a chat, on the
+same route (`POST /api/runs/{id}/skill`); `addMenuItems` and the composer's popover went with them, and the bar's grid
+(item 401) no longer makes room for it. Tests: `tests/smoke/test_file_panel.py` (the file after a message),
+`test_composer.py` and `test_composer_picks.py` (no More). Docs: `docs/daemon.md`, `docs/extending.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16035,3 +16049,5 @@ panel's copy). Docs: `docs/daemon.md`, `docs/runs.md`.
   turn keeps its message's files and picks and its steers (a fault since item 374), a live run's page opens at its end,
   no cross or check on calls, a copy for tables and for the panel's documents. Items 404 (the first answer's delay) and
   405 (SnapShots) follow on branches of their own.
+- 2026-10-19 (Fable 5.1): item 406 on `item-406-panel-composer` from `main`, on the owner's word of the same day: the
+  file beside the conversation stays as the chat goes on at its next run; the box's More menu and Save skill go.

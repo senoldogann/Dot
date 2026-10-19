@@ -4,7 +4,7 @@
 // their own work, each with the kind of work, where it acted and how it fared; an agent's is offered to its runs alone
 // until Share, and Drop removes one (item 94). System holds the skills that come with Dot and those of its plugins. A
 // search over both, and a section shows its first cards with the others a click away. Save from a chat writes a
-// finished chat's work as a skill with the review model (item 318's Save skill). Under Personal, what the Mac's other
+// finished chat's work as a skill with the review model (item 318). Under Personal, what the Mac's other
 // agents set up (item 164): their skills, folded by agent, and their MCP servers by name and what they reach, never
 // their arguments or keys. Dot uses one only once the owner adds it here, after a confirmation (item 165): a skill is
 // copied into Dot's skills folder and offered to runs at once, a server is started from Dot's next start; Remove takes

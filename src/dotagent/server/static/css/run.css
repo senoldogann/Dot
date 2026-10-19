@@ -377,17 +377,6 @@
     grid-area: meter;
   }
 
-  /* A run's More (Save skill) takes the start of the choices' line, under the "+", so the bar stays two lines; the
-     choices make room for it only while it shows (item 401). */
-  .composer-bar > .more-button {
-    grid-row: 2;
-    grid-column: 1;
-  }
-
-  .composer-bar:has(> .more-button:not([hidden])) > .composer-options {
-    grid-column: 2;
-  }
-
   /* No bar covers the conversation's top: what the column goes to stands right there. */
   html.chat-shell .run-thread .answer,
   html.chat-shell .run-thread .bubble.user {
