@@ -14739,8 +14739,8 @@ secrets in a thread; and shortened the memory tools' descriptions, which the mod
 
 ### 385. The deep review of 2026-10-19: what was found in the paths a human merges, fixed
 
-**Status: done (2026-10-19), merged on the owner's word of the same day** (it changes `src/dotagent/policy/`, a path
-that needs a human). The owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve problemleri düzelt"
+**Status: done (`55f9effa`), merged on the owner's word of 2026-10-19** (it changes `src/dotagent/policy/`, a path that
+needs a human). The owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve problemleri düzelt"
 (review the deep review report of 2026-10-19 and fix its problems); this item holds its findings inside the paths a
 human merges, item 386 those outside them. **As built (2026-10-19).** B1: a payment step under the pre-approved caps of
 `[policy.spend]` no longer skips the owner's rules: a rule that hands the step off still does, in every mode, a `yolo`
@@ -14783,10 +14783,10 @@ as the scheduler starts, unless a run of it was made (`scheduler/runner.py`). Te
 
 ### 387. An owner's rule is matched with a timeout
 
-**Status: in progress, for the owner to merge** (it changes `src/dotagent/policy/` and the dependencies in
-`pyproject.toml`, paths that need a human). The finding B8 of the deep review of 2026-10-19 and the owner's choice of
-the same day: the `regex` package, with a timeout. **As built (2026-10-19).** An owner's rule is matched with the
-`regex` package instead of `re`, with a timeout of 0.25 s an action (`policy/engine.py` `match_rule`,
+**Status: done (`4a9606af`), merged on the owner's word of 2026-10-19** (it changes `src/dotagent/policy/` and the
+dependencies in `pyproject.toml`, paths that need a human). The finding B8 of the deep review of 2026-10-19 and the
+owner's choice of the same day: the `regex` package, with a timeout. **As built (2026-10-19).** An owner's rule is
+matched with the `regex` package instead of `re`, with a timeout of 0.25 s an action (`policy/engine.py` `match_rule`,
 `RULE_MATCH_TIMEOUT_S`): `re` holds the interpreter's lock for the whole match, so a pattern that backtracks for long,
 `(a|aa)+$` on a long line, held the daemon's event loop, and every page and stream with it, for as long as it ran, and
 running it in a thread did not help (item 385 tried and took that back). A match that times out is refused as a rule
@@ -16004,4 +16004,10 @@ in one app, read the same; now only a command, whose mark says what it is, stand
 - 2026-10-19 (Opus 5.5): item 399 on `item-399-kernel-paths` from `main`, found by the `/security-review` of item 398: a path spelled through the Data volume is classified by the place it names; for the owner to merge.
 - 2026-10-19 (Opus 5.5): item 400 on the owner's word of the same day, on `item-400-loop-new-chat` from `main`: `/loop` in a new chat's box; items 394 to 399 merged on the same word ("Hepsini birleştir").
 - 2026-10-19 (Opus 5.5): item 401, `ui/run-mobile-polish` with its unsaved files, merged with main (items 389 to 400) and readied for main on the owner's word of the same day, by the agent of thread b362da28 with the agent of thread e22fd817.
+- 2026-10-19 (Fable 5.1): on the owner's word, every open tree brought into main: #353 closed (its line had been in main
+  since #384); item 387 merged as `4a9606af` (PR #380) after a second review round (a rule's pattern checked at save with
+  `regex`); item 385 merged as `55f9effa` (PR #379) after its fourth and fifth rounds (a download behind a wrapper or an
+  assignment, `rsync -t`, curl's `-o -`, and the roadmap); 239 remote branches of merged pull requests, their worktrees
+  and local branches deleted. `tests/unit/test_rule_timeout.py` measures wall time and fails on a loaded Mac (5 s at a load
+  of 70, 0.25 s alone); it passes on CI and is left for a later item.
 - 2026-10-19 (Opus 5.5): item 402 on the owner's word of the same day, on `item-402-step-rows` from `main`: a group's calls in line with its head, each the command itself.
