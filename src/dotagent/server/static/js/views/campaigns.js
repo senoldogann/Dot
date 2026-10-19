@@ -313,7 +313,8 @@ function mountPage(root, ctx, campaignId) {
   const page = el("div", { class: "stack" }, top, waiting, rest);
   const questionCards = new Map();
   // The detail last painted, as JSON: one that did not change is not painted again. The head keeps its buttons until
-  // the title or the status changes, so a press on Stop while a session works is not lost to a repaint.
+  // the title or the status changes, or whether a campaign that is not active can be deleted (no session of it works),
+  // so a press on Stop while a session works is not lost to a repaint.
   let painted = "";
   let head = null;
 
@@ -323,7 +324,8 @@ function mountPage(root, ctx, campaignId) {
     await reload();
   }
 
-  function controls(record) {
+  /** `deletable` is whether the campaign is not active and none of its sessions works, as its row in the list asks. */
+  function controls(record, deletable) {
     return el(
       "div",
       { class: "cluster" },
@@ -366,9 +368,8 @@ function mountPage(root, ctx, campaignId) {
             icon("check"),
             el("span", { class: "label" }, "Mark achieved"),
           ),
-      record.status === "active"
-        ? null
-        : el(
+      deletable
+        ? el(
             "button",
             {
               class: "btn danger",
@@ -379,7 +380,8 @@ function mountPage(root, ctx, campaignId) {
             },
             icon("trash"),
             el("span", { class: "label" }, "Delete"),
-          ),
+          )
+        : null,
     );
   }
 
@@ -410,9 +412,10 @@ function mountPage(root, ctx, campaignId) {
   function paintTop(detail) {
     const { record } = detail;
     const meta = el("div", { class: "row-meta" }, campaignBadge(record.status), el("span", null, plural(detail.sessions.length, "session", "sessions")), nextStep(record, detail.working, detail.next_local));
-    const key = `${record.status}\n${record.title}`;
+    const deletable = record.status !== "active" && detail.working === null;
+    const key = `${record.status}\n${record.title}\n${deletable}`;
     if (head === null || head.key !== key) {
-      head = { key, node: pageHead(record.title, "", controls(record)) };
+      head = { key, node: pageHead(record.title, "", controls(record, deletable)) };
       top.replaceChildren(head.node, meta, outline(detail));
       return;
     }

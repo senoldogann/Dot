@@ -14762,8 +14762,8 @@ achieved only from inside it; put those icons on the cards as SVG instead, and a
 its state allows). **As built (2026-10-19).** A row of Campaigns has icon buttons, the shapes of `icons.js` the
 campaign's page uses (`views/campaigns.js` `rowActions`): Stop while the campaign is active, Mark achieved until it is
 achieved, and Delete once it is not active and none of its sessions works. Each asks as the campaign's page asks, from
-the same functions, and the list repaints the row where it is; the campaign's page has Delete too, beside Go on and
-Mark achieved, and goes back to the list after it. `DELETE /api/campaigns/{id}` (`routes_campaigns.py`,
+the same functions, and the list repaints the row where it is; the campaign's page has Delete too, on the same terms,
+beside Go on and Mark achieved, and goes back to the list after it. `DELETE /api/campaigns/{id}` (`routes_campaigns.py`,
 `Store.delete_campaign_with_sessions`) deletes in one transaction the campaign, its ledger and the threads of its
 sessions after the first with all they hold, through the deletes of a chat (`_delete_chats`, which `delete_threads`
 shares now). The conversation the campaign started in stays a chat: its runs are no longer the campaign's, so the run's
