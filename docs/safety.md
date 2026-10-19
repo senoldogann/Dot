@@ -168,13 +168,13 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   `[skills] dirs` and `[plugins] dirs` folders, and the copies of the skills you added from other agents), Dot's records
   of the MCP servers you added from other agents and on Customize › Plugins, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there
-  (`self_change`, item 398), in every approval mode, and neither the review model nor a rule of yours answers in your
-  place. The shell guard refuses a line that writes there, and tells the run to use the file tools: by a copy or a move
-  (its target folder option too), `dd`, a redirect, a download, a clone, an unpacked archive, git run in one of those
-  folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`) or inline code that names the place (in a word of
-  switches such as `-pe` too). The guard reads the line, not what a program does; the sandbox below holds what it
-  cannot read. A plugin's MCP servers, and those you added, start with the daemon and are given keys from the key
-  store: put a plugin or a skill in place yourself.
+  (`self_change`, item 398), in every approval mode but `yolo`, and neither the review model nor a rule of yours answers
+  in your place; OpenCode's own agent, which writes past the journal `dotx undo` reads, is refused. The shell guard
+  refuses a line that writes there: by a copy or a move (its target folder option too), `dd`, a redirect, a download, a
+  clone, an unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`)
+  or inline code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a
+  program does; the sandbox below holds what it cannot read. A plugin's MCP servers, and those you added, start with the
+  daemon and are given keys from the key store: put a plugin or a skill in place yourself.
 - Outside a `yolo` run the processes of a run start in a macOS sandbox (`sandbox-exec`; `[shell] sandbox`, on by
   default): a shell command, a terminal session, an AppleScript and what it runs can neither read nor change Dot's own
   files above (its key file, token, push key, MCP sign-ins, browser profiles, configuration, database and journals,

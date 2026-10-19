@@ -14895,8 +14895,8 @@ the switch of `step_time` from the page, which needs the settings writer to lear
 ### 398. The approval modes in four steps, and Dot's own files asked about instead of refused
 
 **Status: done (2026-10-19), on `item-398-approval-modes`, for the owner to merge (it changes `src/dotagent/policy/`).**
-The owner's word of 2026-10-19: "Mevcut sistemimizdeki Auto ve Ask modlarinin mantigini düzeltelim meseal auto modda
-bir dosya düzenlemeye bile izin vermedi Blocked by policy: Edit …/app.css (changes what Dot loads and runs (its plugins,
+The owner's word of 2026-10-19: "Mevcut sistemimizdeki Auto ve Ask modlarinin mantigini düzeltelim meseal auto modda bir
+dosya düzenlemeye bile izin vermedi Blocked by policy: Edit …/app.css (changes what Dot loads and runs (its plugins,
 skills and playbooks) or its emergency stop) — auto-review refused this action (secret_access) … yolo`ya dokunmadn
 ekteki fotograftaki mantiktan bir yapiyida kurabiliriz en dogru ve arastirarak.. Ardindan testlerle onayladiktan sonra
 projede kullanima baslariz." (let us fix the logic of the Auto and Ask modes: in auto mode it did not even allow a file
@@ -14904,8 +14904,8 @@ to be edited …; without touching yolo, we can build a structure from the logic
 one and with research; then, once tests confirm it, we start using it), with a picture of four modes: Supervised (ask
 before commands and file changes), Auto-accept edits (auto-approve edits, ask before other actions), Auto (supported
 providers approve routine actions; others still ask) and Full access. Asked, the owner chose to keep Dot's autonomy
-(today's Ask becomes Auto-accept edits as it is, Supervised is new, Auto and YOLO stay) and to be asked about a change of
-Dot's own files rather than have it refused. **As built (2026-10-19).** The refusal was no review model's: the
+(today's Ask becomes Auto-accept edits as it is, Supervised is new, Auto and YOLO stay) and to be asked about a change
+of Dot's own files rather than have it refused. **As built (2026-10-19).** The refusal was no review model's: the
 always-on layer (`engine.auto_review`) refuses what carries `secret_access`, and a write into what Dot loads and runs
 carried it (`tools/files.py`), whose own code is the whole `src/` of a checkout (`runtime._own_code`), so a run could
 not change its CSS in `ask` or `auto`, and `yolo` alone let it. Such a write now carries `self_change`, and a layer of
@@ -14913,25 +14913,32 @@ its own after the run mode's (`engine.own_files`) makes it a question that goes 
 (`route_for` takes the decision now; yolo waives it, as it waived the refusal), never to the review model, and that no
 rule of the owner's answers; allowed, the run makes the change with the file tools, whose changes the undo journal
 keeps. It is a question and not a hand-off, since an allowed hand-off tells the run that the owner did the step. A
-command line that would change those files is still refused, as the run's sandbox seals them too, and its reason now
-says the file tools do it once the owner agrees (`policy/shell.py`, `DOT_BY_FILE_TOOLS`). The new mode `supervised`
-(`policy/types.py` `ApprovalMode`, strictest first) asks the owner before every change the preset lets through: a file
-written, a command the shell guard does not read as only reading, an entry or a click in a page or an app, a message, a
-schedule, a tool of an MCP server (`engine.supervised`, `changes_something`, applied by the run's gate); reads, the
-run's own notes and memory notes, and what a rule of the owner's allows go on. Its runs are told so in the prompt, and a
-delegated run takes the stricter of its mode and its parent's. `ask` keeps its id and its behaviour and is shown as
-Auto-accept edits. The composer's Options menu lists the four modes as rows with their icons and what each does, as in
-the picture (lock, pencil, shield, open lock; `runmodes.js` `approvalList`), and its pill wears the mode's short name
-(`approvalBadge`: "Edits" for Auto-accept edits). Researched: Claude Code's permission modes (default, acceptEdits
-within the working directory, auto with a classifier, bypassPermissions; protected paths never auto-approved), Codex's
-sandbox and approval policies with its auto-review (a reviewer swap, not a grant), Cursor's run modes; the picture's own
-app has no public description of its menu. Tests: `tests/unit/test_supervised_and_own_files.py`,
-`tests/unit/test_run_modes.py`, `test_shell_policy.py`, `test_rule_answers.py`, `tests/smoke/test_approval_modes.py`
-(Dot's own file asked in supervised, ask and auto and written once allowed, refused when declined, not answered by an
-allow rule, written and recorded in yolo; supervised waits for a write and a command, and lets reads and an allow rule
-through), `test_skills_runtime.py` (the file tools ask, a command line is refused and told the open way),
+command line that would change those files is still refused, as the run's sandbox seals them too, and so is an edit of
+OpenCode's own agent, which writes past the undo journal (`opencode/run.py` `permission_action`). The new mode
+`supervised` (`policy/types.py` `ApprovalMode`, strictest first) asks the owner before every change the preset lets
+through: a file written, a command the shell guard does not read as only reading, an entry or a click in a page or an
+app, a message, a schedule, a tool of an MCP server, and what shapes later runs (`persistence`: a lasting teammate, a
+campaign's targets, ledger and next session) (`engine.supervised`, `changes_something`, applied by the run's gate);
+reads, the run's own notes and memory notes, and what a rule of the owner's allows go on. Its runs are told so in the
+prompt, and a delegated run takes the stricter of its mode and its parent's. `ask` keeps its id and its behaviour and is
+shown as Auto-accept edits. The composer's Options menu lists the four modes as rows with their icons and what each
+does, as in the picture (lock, pencil, shield, open lock; `runmodes.js` `approvalList`), and its pill wears the mode's
+short name (`approvalBadge`: "Edits" for Auto-accept edits). Researched: Claude Code's permission modes (default,
+acceptEdits within the working directory, auto with a classifier, bypassPermissions; protected paths never
+auto-approved), Codex's sandbox and approval policies with its auto-review (a reviewer swap, not a grant), Cursor's run
+modes; the picture's own app has no public description of its menu. Tests:
+`tests/unit/test_supervised_and_own_files.py`, `tests/unit/test_run_modes.py`, `test_shell_policy.py`,
+`test_rule_answers.py`, `tests/smoke/test_approval_modes.py` (Dot's own file asked in supervised, ask and auto and
+written once allowed, refused when declined, not answered by an allow rule, written and recorded in yolo; supervised
+waits for a write and a command, and lets reads and an allow rule through), `test_skills_runtime.py` (the file tools
+ask, a command line is refused), `tests/unit/test_opencode.py` (OpenCode's edit of Dot's own files is refused),
 `test_composer.py` (the four modes in the menu, the pill's names and icons), `test_chat_choices.py`,
-`test_dock_choices.py`. Docs: `docs/autonomy.md`, `docs/safety.md`, `docs/daemon.md`, `docs/command-line.md`.
+`test_dock_choices.py`. Docs: `docs/autonomy.md`, `docs/safety.md`, `docs/daemon.md`, `docs/command-line.md`. The
+pre-push review's first pass (2 Important, 2 Nits) is fixed: Supervised let a lasting teammate and a campaign's plan
+through (`persistence` now asks, but for the run's own notes and memory notes); OpenCode's agent, once allowed, wrote
+Dot's own files past the undo journal (now refused); the `_dot_paths` docstring said "never change"; and the shell
+guard's hint to use the file tools, wrong for a delete and for OpenCode's agent, is gone, so a refused line says what it
+said before.
 
 ## Log
 

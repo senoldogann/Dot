@@ -18,8 +18,9 @@ strictest first (item 398). The composer's Options menu lists them with their ic
 
 - `supervised` (Supervised, a lock): you do, and you are also asked before every change the preset lets through: each
   file the run writes, each command that does more than read (a command the shell guard reads as only reading runs),
-  each entry or click in a page or an app, each message, schedule and tool of an MCP server. Reads, the run's own notes
-  and memory notes, and what a rule of yours allows go on without a question.
+  each entry or click in a page or an app, each message, schedule and tool of an MCP server, and what shapes later runs
+  (a lasting teammate, a campaign's targets, ledger and next session). Reads, the run's own notes and memory notes, and
+  what a rule of yours allows go on without a question.
 - `ask` (Auto-accept edits, a pencil; the default): you do. Edits and the routine work the preset allows run without a
   question; the run waits for your answer to what the policy raises, on a card that shows what the action acts on whole
   (a long command scrolls within it).
@@ -44,7 +45,8 @@ like any other secret.
 
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
 [Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
-Allowed, the run makes the change with the file tools; a command line never makes it (item 398).
+Allowed, the run makes the change with the file tools; a command line never makes it, and neither does OpenCode's own
+agent, which writes past the journal `dotx undo` reads (item 398).
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
 and the note holds the reason), an `approval_auto` event and one line in the timeline of the run ("YOLO, not asked:

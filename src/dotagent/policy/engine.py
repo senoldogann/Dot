@@ -32,6 +32,8 @@ _OWN_FILES_REASON: str = "only the user lets a run change Dot's own files"
 # What Supervised lets through without a question: what only observes, and the run's own notes and memory notes, as a
 # research run may keep them; a command only when the shell guard reads it as reading (``safe``).
 _UNSUPERVISED_KINDS: frozenset[ActionKind] = RESEARCH_KINDS
+# The run's own notes and memory notes, which shape later runs as well but are its own to keep, as in a research run.
+_OWN_NOTE_KINDS: frozenset[ActionKind] = frozenset({"notes_write", "memory_write"})
 _HARD_HANDOFF_FLAGS: frozenset[Flag] = frozenset({"financial", "credential"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset({"privilege", "system_settings", "public_post", "external_send"})
 _BALANCED_ASK_FLAGS: frozenset[Flag] = frozenset(
@@ -204,9 +206,13 @@ def decide(
 
 def changes_something(info: ActionInfo) -> bool:
     """Whether Supervised asks before the action (item 398): it changes a file, runs a command that does more than
-    read, types or clicks in a page or an app, sends a message, makes a schedule or calls a tool of an MCP server."""
+    read, types or clicks in a page or an app, sends a message, calls a tool of an MCP server, or shapes later runs
+    (``persistence``: a schedule, a lasting teammate, a campaign's targets, ledger or next session), but for the run's
+    own notes and memory notes."""
     if info.kind == "shell":
         return info.risk != "safe"
+    if "persistence" in info.flags and info.kind not in _OWN_NOTE_KINDS:
+        return True
     return info.kind not in _UNSUPERVISED_KINDS
 
 

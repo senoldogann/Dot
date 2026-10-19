@@ -27,7 +27,6 @@ from dotagent.core.paths import playbooks_dir, workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.harness.components import NO_HARNESS
 from dotagent.policy.engine import auto_review, decide, preset_verdict
-from dotagent.policy.paths import DOT_BY_FILE_TOOLS
 from dotagent.policy.types import ActionInfo, Decision
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.skills.catalog import load_skills
@@ -282,7 +281,7 @@ async def test_a_run_reads_and_runs_a_skill_and_changes_what_dot_loads_only_once
         ("write_file", {"path": str(home / "playbooks" / "learned-notes" / "SKILL.md"), "content": "x"}),
         ("write_file", {"path": str(home / "plugins-data" / "acme-tools" / "state.json"), "content": "{}"}),
     ]
-    # A command line never changes them, and is told which way is open.
+    # A command line never changes them.
     refused_lines: list[tuple[str, JsonObject]] = [
         ("shell", {"command": f"rm -f {home / 'STOP'}"}),
         ("shell", {"command": f"echo '{{}}' > {plugin / '.mcp.json'}"}),
@@ -298,7 +297,6 @@ async def test_a_run_reads_and_runs_a_skill_and_changes_what_dot_loads_only_once
         action = await _action(runtime, name, arguments)
         refused: Decision | None = auto_review(action)
         assert refused is not None and refused.verdict == "deny", action
-        assert DOT_BY_FILE_TOOLS in refused.reason, refused.reason
     assert "what Dot loads and runs" in (await _action(runtime, *asked[0])).summary
 
 

@@ -21,7 +21,6 @@ from pathlib import Path
 from dotagent.core.types import FrozenModel
 from dotagent.policy.paths import (
     CHANGES_DOT,
-    DOT_BY_FILE_TOOLS,
     PathClass,
     classify_path,
     expand_path,
@@ -1491,7 +1490,7 @@ def _assess_delete(args: list[str], scope: ShellScope) -> Finding:
     if worst == "protected":
         return _finding("high", ("destructive", "secret_access"), "removes a protected location")
     if worst == "dot":
-        return _finding("high", ("destructive", "secret_access"), f"{CHANGES_DOT}; {DOT_BY_FILE_TOOLS}")
+        return _finding("high", ("destructive", "secret_access"), CHANGES_DOT)
     return _finding("high", ("destructive", "outside_workspace"), "removes files outside the workspace")
 
 
@@ -1545,7 +1544,7 @@ def _assess_writes(command: str, args: list[str], scope: ShellScope) -> Finding:
     if worst == "protected":
         return _finding("high", ("secret_access",), f"{command} touches a protected location")
     if worst == "dot":
-        return _finding("high", ("secret_access",), f"{command} {CHANGES_DOT}; {DOT_BY_FILE_TOOLS}")
+        return _finding("high", ("secret_access",), f"{command} {CHANGES_DOT}")
     settings: tuple[Flag, ...] = ("system_settings",) if worst == "system" else ()
     if command == "truncate":
         return _finding(
@@ -1616,9 +1615,7 @@ def _assess_redirects(targets: list[str], scope: ShellScope) -> list[Finding]:
         if path_class == "protected":
             findings.append(_finding("high", ("secret_access",), "redirects output into a protected location"))
         elif path_class == "dot":
-            findings.append(
-                _finding("high", ("secret_access",), f"redirects output: {CHANGES_DOT}; {DOT_BY_FILE_TOOLS}")
-            )
+            findings.append(_finding("high", ("secret_access",), f"redirects output: {CHANGES_DOT}"))
         elif path_class == "system":
             findings.append(_finding("high", ("system_settings", "outside_workspace"), "redirects output into system"))
         elif path_class == "home":
@@ -2007,9 +2004,7 @@ def _assess_interpreter(command: str, args: list[str], scope: ShellScope, given:
     if _NETWORK_CODE.search(code) or _NETWORK_COMMAND_CODE.search(code):
         findings.append(_fetching("medium", ("upload",), f"{command} runs code that reaches the network"))
     if mentions_protected(code, scope.dot_paths):
-        findings.append(
-            _finding("high", ("secret_access",), f"{command} runs code that {CHANGES_DOT}; {DOT_BY_FILE_TOOLS}")
-        )
+        findings.append(_finding("high", ("secret_access",), f"{command} runs code that {CHANGES_DOT}"))
     if line.in_place:
         # Without inline code, the first operand is the script; the files after it are the ones edited.
         findings.extend(_writes_to(command, list(line.operands if line.code else line.operands[1:]), scope))

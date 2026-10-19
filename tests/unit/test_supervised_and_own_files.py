@@ -8,7 +8,7 @@ import pytest
 
 from dotagent.policy.engine import YOLO_WAIVED_SOURCES, decide, route_for, supervised
 from dotagent.policy.paths import CHANGES_DOT
-from dotagent.policy.types import ActionInfo, ActionKind, ApprovalMode, Decision, Risk
+from dotagent.policy.types import ActionInfo, ActionKind, ApprovalMode, Decision, Flag, Risk
 from dotagent.store.models import Behavior, RuleRecord
 from dotagent.tools.files import read_action, write_action
 
@@ -26,8 +26,8 @@ def _rule(tool_glob: str, behavior: Behavior) -> RuleRecord:
     )
 
 
-def _action(kind: ActionKind, risk: Risk) -> ActionInfo:
-    return ActionInfo(tool="tool", kind=kind, risk=risk, summary=f"a {kind} action", target="", flags=())
+def _action(kind: ActionKind, risk: Risk, flags: tuple[Flag, ...]) -> ActionInfo:
+    return ActionInfo(tool="tool", kind=kind, risk=risk, summary=f"a {kind} action", target="", flags=flags)
 
 
 def test_a_change_of_dots_own_files_asks_the_user_in_every_mode_but_yolo(tmp_path: Path) -> None:
@@ -75,7 +75,7 @@ def test_a_change_of_dots_own_files_asks_the_user_in_every_mode_but_yolo(tmp_pat
     ],
 )
 def test_supervised_asks_before_every_change_and_lets_reads_through(kind: ActionKind, risk: Risk, verdict: str) -> None:
-    action: ActionInfo = _action(kind, risk)
+    action: ActionInfo = _action(kind, risk, ())
     allowed: Decision = decide(action, "task", False, "aggressive", [], None)
     assert allowed.verdict == "allow"
     decision: Decision = supervised(allowed, action)
@@ -86,8 +86,21 @@ def test_supervised_asks_before_every_change_and_lets_reads_through(kind: Action
         assert decision is allowed
 
 
+@pytest.mark.parametrize(
+    ("kind", "verdict"),
+    [("meta", "ask"), ("delegate", "ask"), ("memory_write", "allow"), ("notes_write", "allow")],
+)
+def test_supervised_asks_before_what_shapes_later_runs_but_a_runs_own_notes(kind: ActionKind, verdict: str) -> None:
+    # A lasting teammate or a campaign's targets, ledger and next session shape every later run (``persistence``), as
+    # a run's notes and memory notes do, which are its own to keep, as in a research run.
+    action: ActionInfo = _action(kind, "low", ("persistence",))
+    allowed: Decision = decide(action, "task", False, "aggressive", [], None)
+    assert allowed.verdict == "allow"
+    assert supervised(allowed, action).verdict == verdict
+
+
 def test_supervised_keeps_the_users_own_rules_and_every_stricter_answer() -> None:
-    write: ActionInfo = _action("write", "low")
+    write: ActionInfo = _action("write", "low", ())
     ruled: Decision = decide(write, "task", False, "aggressive", [_rule("tool", "allow")], None)
     assert supervised(ruled, write) is ruled and ruled.verdict == "allow"
     asked: Decision = decide(write, "task", False, "cautious", [], None)
