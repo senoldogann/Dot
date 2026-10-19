@@ -83,6 +83,8 @@ def test_a_skill_s_icon_is_its_frontmatter_s_when_the_interface_has_it_else_read
     assert parse_skill(tmp_path / "weekly-mail" / "SKILL.md", text, "home").icon == "calendar"
     unknown: str = "---\nname: weekly-mail\ndescription: Send the weekly mail.\nicon: envelope-open\n---\nSend it.\n"
     assert parse_skill(tmp_path / "weekly-mail" / "SKILL.md", unknown, "home").icon == "mail"
+    mapped: str = "---\nname: weekly-mail\ndescription: Send the weekly mail.\nicon: {src: icon.png}\n---\nSend it.\n"
+    assert parse_skill(tmp_path / "weekly-mail" / "SKILL.md", mapped, "home").icon == "mail"
     assert skill_icon(None, ("invoice-pdf", "Fill in an invoice.")) == "file"
     assert skill_icon(None, ("brainstorming", "Turn ideas into a design.")) == "image"
     assert skill_icon(None, ("zzz", "Nothing in particular.")) == "sparkle"

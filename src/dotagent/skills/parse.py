@@ -66,5 +66,5 @@ def parse_skill(path: Path, text: str, source: str) -> Skill:
         root=path.parent,
         body=instructions,
         source=source,
-        icon=skill_icon(front.icon, (front.name, description)),
+        icon=skill_icon(front.icon if isinstance(front.icon, str) else None, (front.name, description)),
     )
