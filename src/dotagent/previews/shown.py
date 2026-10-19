@@ -16,7 +16,7 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.types import FrozenModel
 from dotagent.office import DocumentContent, PresentationContent, Sheet, SheetCell, WorkbookContent, office_content
 from dotagent.previews.paths import HEAD_BYTES, TABLE_DELIMITERS, ShownKind, opens_on_mac, shown_kind
-from dotagent.previews.pdfpages import PAGE_WIDTHS, PageSize, page_sizes
+from dotagent.previews.pdfpages import PAGE_WIDTHS, PageSize, page_sizes, pdf_text
 
 # An Office file larger than this is not read for the panel: the reading would take long.
 MAX_OFFICE_BYTES: int = 50 * 1024 * 1024
@@ -30,11 +30,15 @@ _SNIFF_CHARS: int = 16_384
 
 
 class PdfPreview(FrozenModel):
-    """A PDF: the size of each page, and the widths in pixels a page is drawn at (``/api/files/page``)."""
+    """A PDF: the size of each page, the widths in pixels a page is drawn at (``/api/files/page``), and its text of at
+    most ``TEXT_BYTES`` characters for the panel's copy (item 403), ``cut`` when the PDF holds more; "" when it has
+    none that reads."""
 
     kind: Literal["pdf"]
     pages: tuple[PageSize, ...]
     widths: tuple[int, ...]
+    text: str
+    cut: bool
 
 
 class ImagePreview(FrozenModel):
@@ -158,7 +162,8 @@ def _preview(path: Path, head: bytes, size: int) -> FilePreview:
     kind: ShownKind = shown_kind(path, head)
     match kind:
         case "pdf":
-            return PdfPreview(kind="pdf", pages=page_sizes(path), widths=PAGE_WIDTHS)
+            text, cut = pdf_text(path, TEXT_BYTES)
+            return PdfPreview(kind="pdf", pages=page_sizes(path), widths=PAGE_WIDTHS, text=text, cut=cut)
         case "image":
             return ImagePreview(kind="image")
         case "text":

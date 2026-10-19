@@ -163,8 +163,8 @@ function cellText(cell) {
   return inline(cell.childNodes).replace(/\s*\n\s*/g, " ").replaceAll("|", "\\|").trim();
 }
 
-// A table as markdown: its rows in order, a row of dashes under the first, and empty cells where a row is short.
-function table(element) {
+/** A table as markdown: its rows in order, a row of dashes under the first, and empty cells where a row is short. */
+export function table(element) {
   const rows = (element.tagName === "TR" ? [element] : [...element.querySelectorAll("tr")]).map((row) =>
     [...row.children].filter((cell) => cell.tagName === "TD" || cell.tagName === "TH").map(cellText),
   );

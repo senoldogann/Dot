@@ -1,55 +1,23 @@
 // The messages of a conversation that more than one view draws: what the user wrote, and how a run ended with Dot's answer.
 
-import { copyText, dateTimeFull, duration, el, messageTime } from "./dom.js";
+import { dateTimeFull, duration, el, messageTime } from "./dom.js";
 import { actorFace } from "./actors.js";
 import { sentFiles } from "./attachments.js";
+import { copyButton } from "./copybutton.js";
 import { faceStateAtEnd } from "./face.js";
 import { icon } from "./icons.js";
 import { sentPicks } from "./picks.js";
 import { prose } from "./prose.js";
-import { toast } from "./ui.js";
 
 const OUTCOMES = {
   done: { label: "Finished", empty: "The run finished without a written answer." },
   failed: { label: "Failed", empty: "The run failed without saying why." },
   cancelled: { label: "Cancelled", empty: "The run was cancelled before it wrote an answer." },
 };
-// How long a copy button shows its check once the text is on the clipboard.
-const COPIED_MS = 1500;
 
 /** When a message was sent or an answer came, in sight; `title` says more where the pointer rests. */
 function stamp(ts, title) {
   return el("time", { class: "message-time", datetime: new Date(ts * 1000).toISOString(), title }, messageTime(ts));
-}
-
-// A copy of `text` as it was written (item 205): the icon turns to a check for a moment once the text
-// is on the clipboard; a copy that fails says why.
-function copyButton(text, label) {
-  let restore = null;
-  const button = el(
-    "button",
-    {
-      class: "btn ghost sm icon-only",
-      type: "button",
-      title: label,
-      "aria-label": label,
-      onclick: () =>
-        copyText(text).then(
-          () => {
-            clearTimeout(restore);
-            button.replaceChildren(icon("check"));
-            button.setAttribute("aria-label", "Copied");
-            restore = setTimeout(() => {
-              button.replaceChildren(icon("copy"));
-              button.setAttribute("aria-label", label);
-            }, COPIED_MS);
-          },
-          (error) => toast("error", `Could not copy: ${error.message}`),
-        ),
-    },
-    icon("copy"),
-  );
-  return button;
 }
 
 // `editFromHere()` asks whether to rewind the chat to before the message and does what the owner chose (item 282); it

@@ -8,6 +8,7 @@
 
 import { api, blobUrl, query } from "./api.js";
 import { sizeLabel } from "./attachments.js";
+import { copyButton } from "./copybutton.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { segmented } from "./panels.js";
@@ -457,6 +458,46 @@ function imageView(file, keep) {
 }
 
 // ------------------------------------------------------------------------------------------------ the view
+/** The rows of an Office table as lines of cells set apart by tabs. */
+function tabbed(rows) {
+  return rows.map((row) => row.join("\t")).join("\n");
+}
+
+/** The text a copy of the file takes, "" when the panel reads none of it. */
+function textIn(preview) {
+  switch (preview.kind) {
+    case "text":
+    case "pdf":
+      return preview.text;
+    case "document":
+      return preview.blocks
+        .map((block) => (block.kind === "table" ? tabbed(block.rows) : block.listed ? `- ${block.text}` : block.text))
+        .join("\n\n");
+    case "presentation":
+      return preview.slides.length === 0
+        ? ""
+        : preview.slides
+            .map((slide, index) =>
+              [
+                `Slide ${index + 1}${slide.title === "" ? "" : `: ${slide.title}`}`,
+                ...slide.parts.map((part) => (part.kind === "text" ? part.lines.map((line) => line.text).join("\n") : part.kind === "table" ? tabbed(part.rows) : "")),
+                slide.notes === "" ? "" : `Notes: ${slide.notes}`,
+              ]
+                .filter((text) => text !== "")
+                .join("\n"),
+            )
+            .join("\n\n");
+    default:
+      return "";
+  }
+}
+
+/** What a copy of the file takes: the text the panel reads of it, or null when it reads none. */
+function textOf(preview) {
+  const text = textIn(preview);
+  return text.trim() === "" ? null : text;
+}
+
 /**
  * The view of the file `source` names: `{ attachment, name }` for a file a message carries, `{ path }` for one named by
  * its path. `onClose()` runs on its Close button. Returns `element` and `dispose()`, which lets go of its pictures.
@@ -494,13 +535,18 @@ export function fileView(source, onClose) {
     el("span", null, "Open on the Mac"),
   );
   const closeButton = el("button", { class: "btn ghost sm icon-only", type: "button", title: "Close", "aria-label": "Close the file", onclick: onClose }, icon("x"));
+  // The text of the file, a press away (item 403): what the panel reads of a text, a Markdown file, a PDF, a Word
+  // document or a presentation; a workbook, a picture or a file not read here have none.
+  let textOfFile = null;
+  const copy = copyButton(() => textOfFile ?? "", "Copy the text");
+  copy.hidden = true;
   const views = el("div", { class: "file-views", hidden: true });
   const toolbar = el("div", { class: "file-toolbar" });
   const body = el("div", { class: "file-body" }, hint("Loading…"));
   const element = el(
     "section",
     { class: "file-view", tabindex: "-1", "aria-label": label },
-    el("div", { class: "file-head" }, icon("file"), el("div", { class: "file-heading" }, title, facts), openButton, closeButton),
+    el("div", { class: "file-head" }, icon("file"), el("div", { class: "file-heading" }, title, facts), copy, openButton, closeButton),
     views,
     toolbar,
     body,
@@ -516,6 +562,9 @@ export function fileView(source, onClose) {
     element.dataset.kind = kind;
     facts.textContent = `${KINDS[kind]}, ${sizeLabel(file.size)}`;
     openButton.hidden = !file.opens;
+    textOfFile = textOf(file.preview);
+    copy.hidden = textOfFile === null;
+    copy.title = file.preview.cut ? "Copy the text shown (the file holds more)" : "Copy the text";
     switch (kind) {
       case "pdf":
         body.replaceChildren(pdfView(file, file.preview, body, keep, cleanups));

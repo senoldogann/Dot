@@ -335,6 +335,7 @@ async def _one_size(
     await rows.click()
     await expect(view).to_have_attribute("data-kind", "table")
     await expect(view.locator(".file-grid td")).to_have_text(["Item", "Amount", "Rent", "1200,50", "Food", "300"])
+    await expect(view.get_by_role("button", name="Copy the text")).to_be_hidden()
     await view.get_by_role("button", name="Open on the Mac").click()
     await expect(page.locator(".toast.ok")).to_have_text("Opened rows.csv on the Mac")
     assert opened[-1] == (user_home / "Documents" / "rows.csv").resolve()
@@ -350,6 +351,8 @@ async def _one_size(
     await expect(view.locator("b")).to_have_count(0)
     await view.get_by_role("button", name="Source").click()
     await expect(view.locator("pre.file-text")).to_have_text(TODO)
+    # The text of the file is a press away (item 403); a picture has none.
+    await expect(view.get_by_role("button", name="Copy the text")).to_be_visible()
     await _close(page, view, todo)
 
     # An image, as it is.
@@ -359,6 +362,7 @@ async def _one_size(
     picture: Locator = view.locator("img.file-image")
     await expect(picture).to_have_attribute("src", re.compile(r"^blob:"))
     assert await picture.evaluate("(image) => image.decode().then(() => image.naturalWidth)") == 320
+    await expect(view.get_by_role("button", name="Copy the text")).to_be_hidden()
     await _close(page, view, chart)
 
     # A path the panel does not show says why; Escape closes it and the panel is back as it was.

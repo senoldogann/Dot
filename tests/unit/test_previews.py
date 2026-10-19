@@ -13,7 +13,7 @@ from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.office import SheetCell, WorkbookContent
 from dotagent.previews import shown
 from dotagent.previews.paths import located_file, opens_on_mac, shown_kind
-from dotagent.previews.pdfpages import PageSize, page_png, page_sizes
+from dotagent.previews.pdfpages import PageSize, page_png, page_sizes, pdf_text
 from dotagent.previews.quicklook import DrawnPage, drawn_pages
 from dotagent.previews.shown import TablePreview, TextPreview, shown_file
 
@@ -202,3 +202,40 @@ def test_a_workbooks_drawing_is_its_sheets_and_any_other_drawing_its_page() -> N
         DrawnPage(name="Notes", file="Attachment3.html"),
     )
     assert drawn_pages("<html><body><p>A letter</p></body></html>") == (DrawnPage(name="", file="Preview.html"),)
+
+
+def _pdf_with_text(path: Path, text: str) -> Path:
+    """A one-page PDF that says ``text`` in Helvetica, written by hand with its cross-reference table."""
+    content: bytes = b"BT /F1 24 Tf 20 40 Td (" + text.encode("ascii") + b") Tj ET"
+    objects: list[bytes] = [
+        b"<< /Type /Catalog /Pages 2 0 R >>",
+        b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+        b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 100] /Contents 4 0 R"
+        b" /Resources << /Font << /F1 5 0 R >> >> >>",
+        b"<< /Length %d >>\nstream\n" % len(content) + content + b"\nendstream",
+        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    ]
+    out: bytes = b"%PDF-1.4\n"
+    offsets: list[int] = []
+    for number, obj in enumerate(objects, 1):
+        offsets.append(len(out))
+        out += b"%d 0 obj\n" % number + obj + b"\nendobj\n"
+    xref: int = len(out)
+    out += b"xref\n0 %d\n0000000000 65535 f \n" % (len(objects) + 1)
+    out += b"".join(b"%010d 00000 n \n" % offset for offset in offsets)
+    out += b"trailer\n<< /Root 1 0 R /Size %d >>\nstartxref\n%d\n%%%%EOF\n" % (len(objects) + 1, xref)
+    path.write_bytes(out)
+    return path
+
+
+def test_a_pdf_gives_its_text_for_the_copy_up_to_the_room_it_has(tmp_path: Path) -> None:
+    """The panel's copy of a PDF takes its text (item 403), cut where the room given ends, and "" for a PDF of
+    pictures alone."""
+    said: Path = _pdf_with_text(tmp_path / "said.pdf", "Hello garden")
+    assert pdf_text(said, 1000) == ("Hello garden", False)
+    assert pdf_text(said, 5) == ("Hello", True)
+    # The bound holds at its edge: a text as long as the room is cut, one shorter is whole.
+    assert pdf_text(said, 12) == ("Hello garden", True)
+    assert pdf_text(said, 13) == ("Hello garden", False)
+    preview = shown.shown_file(said).preview
+    assert preview.kind == "pdf" and preview.text == "Hello garden" and preview.cut is False

@@ -224,29 +224,29 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A file opens beside the conversation (item 195). A sent file's chip, a file in the box once uploaded (item 269), a
   file's path an answer names in code (under `~/` or `/Users/<you>/`; Dot names the files it made by their full paths),
   and a file in the side panel's **Files** (on its Run tab: the conversation's files, those its messages carried and
-  those its answers name) open it in the side panel, which takes half of the
-  page while it has its own width, and the whole screen on a phone. A PDF shows its pages as pictures the daemon draws
-  with Core Graphics as they come into view; a page more than 20,000 px tall at the width asked is refused rather than
-  drawn (item 386). A Word document, an Excel workbook and a presentation show first as macOS's
-  Quick Look draws them (item 268), as Finder would: their fonts, fills, pictures and shapes, a workbook's sheets one
-  tab each (Quick Look leaves hidden sheets out and shows the values the file saved). The daemon asks `qlmanage` for the
-  drawing once per version of the file, keeps it in `looks/` in its home (emptied at its start) under an id nobody can
-  guess, and serves it at `/looks/<id>/` in a frame that runs Quick Look's scripts sandboxed, with an origin of its own
-  that reaches no server; **Contents**, a click away, shows what Dot reads of the file, and is what shows when Quick
-  Look cannot draw it, with why. In Contents a workbook, and a CSV or TSV table (split at its commas, or at its
-  semicolons where a comma marks decimals), a grid with a tab for each sheet, a click on a cell saying what it holds
-  (its formula and the value last worked out); a Word document its headings, paragraphs, lists and tables; a
-  presentation its slides with their text, tables, charts' series and notes; an image itself; a Markdown file (`.md`,
-  `.markdown`) formatted as an answer is, with its headings, lists, tables and code, and as it is written a click away
-  (item 269), its HTML never drawn; any other text as text, never as a page. On a page without the panel (the new
-  chat's, an agent's) the file opens in a dialog. **Open on the Mac** opens a document in its application (`open`),
-  never a script or a program. Close or Escape gives the panel back as it was. The panel shows files of the workspace
-  and of the home folder outside hidden folders and outside `~/Library`, but for the folders cloud drives sync
-  (OneDrive's and the others' in `~/Library/CloudStorage`, iCloud Drive's in `~/Library/Mobile Documents`), judged once
-  links are followed; for another file it says why not. The routes are `GET /api/files/preview?path=`, `GET
-  /api/attachments/{id}/preview`, `GET /api/files/look?path=` and `GET /api/attachments/{id}/look` (where the drawing is
-  served; 422 when Quick Look cannot draw the file), `GET /api/files/page` (a PDF's page as a PNG), `GET
-  /api/files/image` and `POST /api/files/open`.
+  those its answers name) open it in the side panel, which takes half of the page while it has its own width, and the
+  whole screen on a phone. A PDF shows its pages as pictures the daemon draws with Core Graphics as they come into view;
+  a page more than 20,000 px tall at the width asked is refused rather than drawn (item 386). A Word document, an Excel
+  workbook and a presentation show first as macOS's Quick Look draws them (item 268), as Finder would: their fonts,
+  fills, pictures and shapes, a workbook's sheets one tab each (Quick Look leaves hidden sheets out and shows the values
+  the file saved). The daemon asks `qlmanage` for the drawing once per version of the file, keeps it in `looks/` in its
+  home (emptied at its start) under an id nobody can guess, and serves it at `/looks/<id>/` in a frame that runs Quick
+  Look's scripts sandboxed, with an origin of its own that reaches no server; **Contents**, a click away, shows what Dot
+  reads of the file, and is what shows when Quick Look cannot draw it, with why. In Contents a workbook, and a CSV or
+  TSV table (split at its commas, or at its semicolons where a comma marks decimals), a grid with a tab for each sheet,
+  a click on a cell saying what it holds (its formula and the value last worked out); a Word document its headings,
+  paragraphs, lists and tables; a presentation its slides with their text, tables, charts' series and notes; an image
+  itself; a Markdown file (`.md`, `.markdown`) formatted as an answer is, with its headings, lists, tables and code, and
+  as it is written a click away (item 269), its HTML never drawn; any other text as text, never as a page. On a page
+  without the panel (the new chat's, an agent's) the file opens in a dialog. **Copy the text** in the panel's head takes
+  what the panel reads of a text or Markdown file, a PDF (its text, page by page, up to 512 KB), a Word document or a
+  presentation (item 403). **Open on the Mac** opens a document in its application (`open`), never a script or a
+  program. Close or Escape gives the panel back as it was. The panel shows files of the workspace and of the home folder
+  outside hidden folders and outside `~/Library`, but for the folders cloud drives sync (OneDrive's and the others' in
+  `~/Library/CloudStorage`, iCloud Drive's in `~/Library/Mobile Documents`), judged once links are followed; for another
+  file it says why not. The routes are `GET /api/files/preview?path=`, `GET /api/attachments/{id}/preview`, `GET
+  /api/files/look?path=` and `GET /api/attachments/{id}/look` (where the drawing is served; 422 when Quick Look cannot
+  draw the file), `GET /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
 
 ## Tools
 

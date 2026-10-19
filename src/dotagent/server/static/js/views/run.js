@@ -1398,6 +1398,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   paintCost();
   paintFiles(thread);
   syncControls();
+  // A live run opens at its end, where its next words come (item 403); before, the page stood at its top until its
+  // first event moved it, which read as a jump up after every message sent.
+  if (following) {
+    toEnd("auto");
+  }
   paintLessons(detail.lessons);
   attempt(changes.refresh);
   paintQuestions(detail.questions);
