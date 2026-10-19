@@ -52,7 +52,7 @@ _RUN_WAIT_S: float = 30.0
 # The size of the sidebar's buttons, which the side panel's switch and close share (item 273): the button and its icon.
 _SWITCH_PX: tuple[int, int, int] = (36, 36, 19)
 # The settings' tabs; Skills is a tab of Customize since item 317, Schedules a page of its own since item 401.
-TABS: int = 10
+TABS: int = 11
 # Where the window scrolls the page to in the checks of a row that stays.
 _SCROLLED_PX: int = 700
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (

@@ -16,6 +16,7 @@ import uvicorn
 from fastapi import FastAPI
 
 from dotagent.agent.manager import RunManager
+from dotagent.agent.snapshots import stored_taker
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
@@ -203,6 +204,9 @@ async def run_daemon(config: AppConfig) -> None:
             )
             pusher.add_done_callback(_log_push_end)
             cleanup.push_async_callback(_cancelled, pusher)
+            # The Command key is watched for SnapShots while they are on (item 405); the watch ends with the daemon.
+            await runtime.snapshots.start(stored_taker(config.desktop, runtime.workspace))
+            cleanup.push_async_callback(runtime.snapshots.stop)
             recovered: int = await manager.recover()
             if unclean:
                 log.warning("daemon_restarted_after_unclean_end", runs_cut_off=recovered)

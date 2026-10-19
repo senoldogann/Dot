@@ -11,12 +11,21 @@ from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
 from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileView
-from dotagent.config import BrowserProfileName, DebugPort, JudgeProvider, ModelReference, ModelsConfig, ResumeMode
+from dotagent.config import (
+    BrowserProfileName,
+    DebugPort,
+    JudgeProvider,
+    ModelReference,
+    ModelsConfig,
+    ResumeMode,
+    SnapshotSound,
+)
 from dotagent.connections.catalogue import ConnectionKind
 from dotagent.connections.directory import PluginView
 from dotagent.connections.states import ConnectionState, ConnectionStep
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
+from dotagent.desktop.snapshots import SnapshotTaken
 from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.roles import ModelRole
 from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
@@ -83,6 +92,45 @@ class PhoneView(FrozenModel):
     addresses: list[str]
     tailnet: TailnetState
     keep_awake: bool
+
+
+class SnapshotsView(FrozenModel):
+    """``GET /api/snapshots`` (item 405): the settings as they stand, how the shortcut reads, whether the Command key
+    is watched right now and, when it is not though SnapShots are on, why; the captures no composer claimed yet."""
+
+    enabled: bool
+    app_text: bool
+    sound: SnapshotSound
+    animations: bool
+    shortcut: str
+    listening: bool
+    problem: str | None
+    pending: list[SnapshotTaken]
+
+
+class SnapshotSettingRequest(FrozenModel):
+    """One setting of SnapShots to change (item 405): ``enabled``, ``app_text`` and ``animations`` take a bool,
+    ``sound`` one of its choices; a value that does not fit its key is refused before anything is written, since the
+    config file would refuse it at the daemon's next start."""
+
+    key: Literal["enabled", "app_text", "sound", "animations"]
+    value: bool | SnapshotSound
+
+    @model_validator(mode="after")
+    def _value_fits_key(self) -> "SnapshotSettingRequest":
+        if self.key == "sound" and not isinstance(self.value, str):
+            raise ValueError("sound takes one of click, pop, glass or off")
+        if self.key != "sound" and not isinstance(self.value, bool):
+            raise ValueError(f"{self.key} takes true or false")
+        return self
+
+
+class SnapshotsClaimed(FrozenModel):
+    """``POST /api/snapshots/claim``: the captures the composer that asked takes into its draft, and whether they
+    animate into it."""
+
+    files: list[SnapshotTaken]
+    animations: bool
 
 
 class AwakeRequest(FrozenModel):

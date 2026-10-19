@@ -251,6 +251,44 @@ export function createAttachments({ dropTarget, input, onChange }) {
     }
   });
 
+  /** List `files` (`{id, name, size, kind}`, uploaded already) as files of the draft; `animated` springs them in
+   * (a capture of SnapShots, item 405). */
+  function restoreFiles(files, animated) {
+    for (const { id, name, size, kind } of files) {
+      const status = el("span", { class: "muted" }, sizeLabel(size));
+      const entry = { file: null, id, name, size, kind: kind ?? "file", state: "ready", preview: null, pasted: null, status, open: null, node: null, picture: false, thumb: null };
+      entry.node = chip(name, null, status, entry);
+      mark(entry, "ready");
+      // A draft's photo is read from the daemon again, to show itself where a file shows its name.
+      if (entry.picture) {
+        blobUrl(`/attachments/${encodeURIComponent(id)}/image`).then(
+          (url) => {
+            // A chip taken away before its picture came lets the picture go at once.
+            if (entries.includes(entry)) {
+              entry.preview = url;
+              entry.thumb.src = url;
+            } else {
+              URL.revokeObjectURL(url);
+            }
+          },
+          (error) => {
+            // The picture could not be read: the chip says so where it stands, and the file still opens.
+            entry.open.replaceChildren(icon("alert"));
+            entry.open.title = `${name}: ${error.message}`;
+            entry.open.setAttribute("aria-label", `${name}: ${error.message}`);
+          },
+        );
+      }
+      opens(entry);
+      entries.push(entry);
+      list.append(entry.node);
+      if (animated) {
+        entry.node.classList.add("arrived");
+      }
+    }
+    paint();
+  }
+
   return {
     picker,
     openPicker,
@@ -259,38 +297,8 @@ export function createAttachments({ dropTarget, input, onChange }) {
     ready: () => entries
       .filter((entry) => entry.state === "ready")
       .map((entry) => ({ id: entry.id, name: entry.name, size: entry.size, kind: entry.kind })),
-    restore: (files) => {
-      for (const { id, name, size, kind } of files) {
-        const status = el("span", { class: "muted" }, sizeLabel(size));
-        const entry = { file: null, id, name, size, kind: kind ?? "file", state: "ready", preview: null, pasted: null, status, open: null, node: null, picture: false, thumb: null };
-        entry.node = chip(name, null, status, entry);
-        mark(entry, "ready");
-        // A draft's photo is read from the daemon again, to show itself where a file shows its name.
-        if (entry.picture) {
-          blobUrl(`/attachments/${encodeURIComponent(id)}/image`).then(
-            (url) => {
-              // A chip taken away before its picture came lets the picture go at once.
-              if (entries.includes(entry)) {
-                entry.preview = url;
-                entry.thumb.src = url;
-              } else {
-                URL.revokeObjectURL(url);
-              }
-            },
-            (error) => {
-              // The picture could not be read: the chip says so where it stands, and the file still opens.
-              entry.open.replaceChildren(icon("alert"));
-              entry.open.title = `${name}: ${error.message}`;
-              entry.open.setAttribute("aria-label", `${name}: ${error.message}`);
-            },
-          );
-        }
-        opens(entry);
-        entries.push(entry);
-        list.append(entry.node);
-      }
-      paint();
-    },
+    restore: (files) => restoreFiles(files, false),
+    arrive: (files, animated) => restoreFiles(files, animated),
     restoreSmall: (files) => {
       for (const { id, name, size, kind } of files) {
         // A queued message's file in the box that edits it (item 376): small, the picture itself (or a file's icon)

@@ -345,29 +345,29 @@ since, cannot be taken back, as before the run). `POST /api/runs/{id}/undo` take
 left it, once the run has ended.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
-notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on:
-off, a chat leaves out the lines of the actions YOLO let through and of those the reviewer approved, while a refusal
-still shows (items 346 and 362, kept in this browser), and the token this browser is signed in with), **Appearance**
-(the look of this browser, below),
-**Models** (the **Default model** first, a menu of the models that can call tools: the runs that name no model, a new
-chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models] main`, as when it is changed
-from the composer's model menu; then one fold per provider, with the reasoning levels of each model and a menu to choose
-one; a provider without a key, or whose key was refused (HTTP 401), says so and links to Providers, and one that refused
-access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in with, each with its key and the
-models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
-with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
-**Memory**, **Skills**, **Harness** (what Dot improves around its model: the version in use, a form for
-one of your own, every version with Adopt and Retire, the steps of the loop, the experiences and how the nightly step is
-set; see [The harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its
-home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, its facts in four
-groups each named over its rows of a label and a value, item 378: this Dot, how it acts, what it works with and its
-models; the emergency stop and the health checks in a fold, closed, with the number of failures on its line, and the
-ways to **Diagnostics** and **Open source licences**, pages of their own). Which folds are open is kept in the browser.
-The tabs sit beside their content when the window has the room and above it otherwise, in one row that scrolls sideways
-with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are a list in groups
-whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)). The
-earlier addresses of the memory, rules and system pages lead to their tabs, and the schedules' tab
-(`#/settings/schedules`) to the Schedules page.
+notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on: off, a
+chat leaves out the lines of the actions YOLO let through and of those the reviewer approved, while a refusal still
+shows (items 346 and 362, kept in this browser), and the token this browser is signed in with), **Appearance** (the look
+of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
+that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
+main`, as when it is changed from the composer's model menu; then one fold per provider, with the reasoning levels of
+each model and a menu to choose one; a provider without a key, or whose key was refused (HTTP 401), says so and links to
+Providers, and one that refused access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in
+with, each with its key and the models it brings; see [Models and providers](models.md#models-and-providers)),
+**Browser** (which Chrome Dot browses with and what Chrome has to allow first; see [Browser
+use](browser-and-computer-use.md#browser-use)), **Rules**, **Memory**, **Skills**, **Harness** (what Dot improves around
+its model: the version in use, a form for one of your own, every version with Adopt and Retire, the steps of the loop,
+the experiences and how the nightly step is set; see [The harness](harness.md)), **Phone** (the addresses a phone
+reaches Dot at and a pairing code for its home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and
+**System** (the daemon, its facts in four groups each named over its rows of a label and a value, item 378: this Dot,
+how it acts, what it works with and its models; the emergency stop and the health checks in a fold, closed, with the
+number of failures on its line, and the ways to **Diagnostics** and **Open source licences**, pages of their own). Which
+folds are open is kept in the browser. The tabs sit beside their content when the window has the room and above it
+otherwise, in one row that scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item
+272); on a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
+phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
+the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
+the box by a double tap of the Command key: see below.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
@@ -592,6 +592,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`), what Tailscale says of the Mac and whether the daemon keeps it awake (item 271); a new pairing code (item 267) |
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
+| `GET /snapshots`, `POST /snapshots/settings` (`{"key": "sound", "value": "pop"}`), `POST /snapshots/take`, `POST /snapshots/claim` | SnapShots (item 405): the settings as they stand, whether the Command key is watched and the captures waiting; a setting changed, live and in the config file; a capture taken by hand; the captures a composer takes into its draft |
 | `POST /desktop/permissions`                                                     | make macOS ask for the desktop permissions the daemon lacks  |
 
 `POST /runs`, `POST /runs/{id}/steer` and `POST /threads/{id}/queue` take a `key` of the caller's own (16 to 64 letters,
@@ -602,6 +603,19 @@ sending is under way, for two minutes at most. A key is kept for a day.
 Errors come as `{"message": …, "context": {…}}`, those of the web framework itself (a path that does not exist, a method
 a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the
 log keeps its traceback. Invalid input is a 422 with the validation errors in the context.
+
+**SnapShots** (item 405, after another coding agent's). In any application, a double tap of the Command key (⌘ ⌘) captures the
+window in front and puts it in the box of the open chat (or of the new chat) as a picture, without switching to Dot; a
+short sound says it was taken, and the chip springs into the box. With **Include app text** the window's text and
+controls, as the application shows them to accessibility and as the model reads a window, come as a Markdown file
+beside the picture. The key is watched by the daemon through a listen-only event tap once macOS has granted
+Accessibility to the app that runs Dot; it reads only whether the Command key went down or up and whether another key
+was pressed meanwhile (⌘C ⌘V is two shortcuts, not a tap), never which key. Dot's own window (the desktop app, or a
+browser showing Dot) and a password manager's are never captured; what lies over the window shows in the picture, as
+on the screen. A box on screen takes the capture as it comes; with none on screen (another page open) the daemon keeps
+it until a box is made. Settings › SnapShots switches it (`[snapshots] enabled`), the text (`app_text`), the sound
+(`sound`: click, pop, glass or off), the spring (`animations`), and says whether the key is watched and, when it is not,
+why. Left for later: a flash on the captured window and a shortcut of your own; the shortcut is ⌘ ⌘.
 
 ## The desktop shell
 

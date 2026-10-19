@@ -14,6 +14,9 @@ from dotagent.store.models import EventRecord
 
 # The run id of the events of Dot itself rather than of a run; they are live only.
 SYSTEM_RUN_ID: str = "_system"
+# A capture of SnapShots was taken (item 405), or could not be: live events for the pages, never stored.
+SNAPSHOT_EVENT: str = "snapshot_taken"
+SNAPSHOT_FAILED_EVENT: str = "snapshot_failed"
 # The event of Dot itself at a start after the daemon before it did not end cleanly (it was killed, crashed, or ended
 # with an error).
 DAEMON_RESTARTED_EVENT: str = "daemon_restarted"
