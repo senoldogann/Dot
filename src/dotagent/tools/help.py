@@ -35,7 +35,7 @@ from dotagent.help.added import AddedServers, dot_has, read_added_servers
 from dotagent.help.apps import APP_ROOTS, scriptable_apps
 from dotagent.help.elsewhere import SKILL_COPY_LIMIT, FoundElsewhere, FoundServer, FoundSkill, found_elsewhere
 from dotagent.help.listed import skill_text
-from dotagent.help.meaning import HelpVectors
+from dotagent.help.meaning import HelpVectors, HelpVectorsCold
 from dotagent.help.rank import rank, ranked_text
 from dotagent.help.types import HelpItem, HelpKind
 from dotagent.mcp.naming import PREFIX
@@ -206,6 +206,14 @@ def build_find_help_tool() -> RegisteredTool:
         if vectors is not None:
             try:
                 close = await vectors.closest(args.need, [item.text for item in items])
+            except HelpVectorsCold as cold:
+                # The texts are being embedded in the background (the first search with many new texts; item 404): by
+                # words this once, with no word of failure.
+                log.info("help_embeddings_warming", run_id=ctx.run_id, missing=cold.missing)
+                searched += (
+                    f" Help was found by its words this once: {_counted(cold.missing, 'text')} of it are being "
+                    "embedded in the background."
+                )
             except (ProviderError, StoreError) as error:
                 # The embedding service failed, or answered in another dimension than the texts kept: another model.
                 log.warning("help_meaning_failed", run_id=ctx.run_id, error=error.message, context=error.context)

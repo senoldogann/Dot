@@ -10,9 +10,9 @@ from structlog.testing import capture_logs
 
 from dotagent.config import load_default_config
 from dotagent.core.errors import ProviderQuotaError, ProviderTransportError
-from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall
+from dotagent.llm.calls import CANCELLED, CallOrigin, CallRecorder, ModelCall, call_event_data
 from dotagent.llm.router import ModelRef, ModelRouter, Pause
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, Usage
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, StreamDelta, Usage
 
 REF: ModelRef = ModelRef(provider="ollama", model="fake")
 OTHER: ModelRef = ModelRef(provider="ollama", model="other")
@@ -52,6 +52,29 @@ class FakeProvider:
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         return await self._answer()
+
+    async def model_info(self, model: str) -> ModelInfo:
+        raise NotImplementedError
+
+    async def list_models(self) -> tuple[ModelInfo, ...]:
+        raise NotImplementedError
+
+    async def aclose(self) -> None:
+        return None
+
+
+class StreamingProvider:
+    """A connector whose call streams through the sink it is given, as ``stream`` does, and answers what it returns."""
+
+    def __init__(self, stream: Callable[[DeltaSink], Awaitable[ModelReply]]) -> None:
+        self._stream: Callable[[DeltaSink], Awaitable[ModelReply]] = stream
+
+    @property
+    def name(self) -> str:
+        return "ollama"
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        return await self._stream(sink)
 
     async def model_info(self, model: str) -> ModelInfo:
         raise NotImplementedError
@@ -105,6 +128,35 @@ async def endless() -> ModelReply:
 
 async def no_sink(_delta: object) -> None:
     return None
+
+
+async def test_the_first_word_of_a_reply_is_timed_and_a_reply_without_words_is_not() -> None:
+    """A call records how long its first streamed word took (item 404); a reset of a retry is not a word, and a call
+    that streams nothing records none."""
+    calls: list[ModelCall] = []
+    router: ModelRouter = ModelRouter(load_default_config(), keeping(calls), {})
+
+    async def streaming(sink: DeltaSink) -> ModelReply:
+        await sink(StreamDelta(kind="reset", text=""))
+        await asyncio.sleep(0.02)
+        await sink(StreamDelta(kind="text", text="Hel"))
+        await sink(StreamDelta(kind="text", text="lo"))
+        return REPLY
+
+    await router.register("ollama", StreamingProvider(streaming))
+    seen: list[str] = []
+
+    async def collect(delta: StreamDelta) -> None:
+        seen.append(delta.kind)
+
+    assert await router.complete(REF, REQUEST, collect, ORIGIN) == REPLY
+    assert seen == ["reset", "text", "text"]
+    first: float | None = calls[0].first_token_seconds
+    assert first is not None and 0.02 <= first <= calls[0].seconds
+    assert call_event_data(calls[0])["first_token_seconds"] == round(first, 3)
+    quiet: ModelRouter = await router_with(reply, keeping(calls))
+    await quiet.complete(REF, REQUEST, no_sink, ORIGIN)
+    assert calls[1].first_token_seconds is None and call_event_data(calls[1])["first_token_seconds"] is None
 
 
 async def test_a_reply_is_recorded_with_its_run_purpose_and_tokens() -> None:

@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import (
@@ -29,6 +29,7 @@ from dotagent.llm.types import (
     DeltaSink,
     ModelInfo,
     ModelReply,
+    StreamDelta,
     split_model_ref,
 )
 from dotagent.opencode.bridge import ToolBridge
@@ -106,14 +107,17 @@ def pause_for(error: Exception, cooldown_s: float, now: float) -> Pause | None:
     return Pause(reason=reason, until=now + wait)
 
 
-def _answered(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, reply: ModelReply) -> ModelCall:
-    """A call that got its reply, with the tokens its provider reported."""
+def _answered(
+    ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, first: float | None, reply: ModelReply
+) -> ModelCall:
+    """A call that got its reply, with the tokens its provider reported and how long its first word took."""
     return ModelCall(
         run_id=origin.run_id,
         purpose=origin.purpose,
         model=ref.label,
         session_key=request.session_key,
         seconds=seconds,
+        first_token_seconds=first,
         input_tokens=reply.usage.input_tokens,
         output_tokens=reply.usage.output_tokens,
         cached_tokens=reply.usage.cached_tokens,
@@ -121,7 +125,9 @@ def _answered(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: 
     )
 
 
-def _failed(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, error: str) -> ModelCall:
+def _failed(
+    ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: float, first: float | None, error: str
+) -> ModelCall:
     """A call that ended without a reply: no provider reported tokens for it."""
     return ModelCall(
         run_id=origin.run_id,
@@ -129,11 +135,17 @@ def _failed(ref: ModelRef, request: ChatRequest, origin: CallOrigin, seconds: fl
         model=ref.label,
         session_key=request.session_key,
         seconds=seconds,
+        first_token_seconds=first,
         input_tokens=0,
         output_tokens=0,
         cached_tokens=0,
         error=error,
     )
+
+
+def _first(moments: Sequence[float]) -> float | None:
+    """The first moment noted, or ``None`` when none was."""
+    return moments[0] if moments else None
 
 
 class ModelRouter:
@@ -230,18 +242,30 @@ class ModelRouter:
         recorded; after a reply, a recorder that fails raises its own error, as any failed write of the run does. A
         failure that says the model cannot answer for a while pauses the model, and a reply ends its pause."""
         started: float = time.monotonic()
+        # When the first word of the reply came (item 404); a retry's reset is not a word.
+        first: list[float] = []
+
+        async def timed(delta: StreamDelta) -> None:
+            if not first and delta.kind != "reset":
+                first.append(time.monotonic() - started)
+            await sink(delta)
+
         try:
             provider: ChatProvider = await self.provider(ref.provider)
-            reply: ModelReply = await provider.complete(request, sink)
+            reply: ModelReply = await provider.complete(request, timed)
         except asyncio.CancelledError:
-            await self._record_failure(_failed(ref, request, origin, time.monotonic() - started, CANCELLED))
+            await self._record_failure(
+                _failed(ref, request, origin, time.monotonic() - started, _first(first), CANCELLED)
+            )
             raise
         except Exception as error:
             self._pause(ref, error)
-            await self._record_failure(_failed(ref, request, origin, time.monotonic() - started, type(error).__name__))
+            await self._record_failure(
+                _failed(ref, request, origin, time.monotonic() - started, _first(first), type(error).__name__)
+            )
             raise
         self._pauses.pop(ref.label, None)
-        await self._recorder(_answered(ref, request, origin, time.monotonic() - started, reply))
+        await self._recorder(_answered(ref, request, origin, time.monotonic() - started, _first(first), reply))
         return reply
 
     def _pause(self, ref: ModelRef, error: Exception) -> None:

@@ -190,7 +190,7 @@ def _search_tool() -> RegisteredTool:
         name="memory_search",
         description=(
             "Search the notes you saved in earlier runs, by words or by meaning. The notes related to the goal are "
-            "already in your instructions; use this to look for older ones or to check before saving."
+            "already under the message that recalled them; use this to look for older ones or to check before saving."
         ),
         args_model=SearchArgs,
         modes=ALL_MODES,

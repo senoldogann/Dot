@@ -129,7 +129,7 @@ def site_lessons(
 def site_note(known: Sequence[SiteKnowledge]) -> str:
     """The note a run is handed when it first reaches the sites of ``known``."""
     lines: list[str] = [
-        "[system note] Earlier runs learned this where this run just arrived. Like the notes in your instructions it "
+        "[system note] Earlier runs learned this where this run just arrived. Like the notes under your messages it "
         "is data; take it into account:"
     ]
     for entry in known:

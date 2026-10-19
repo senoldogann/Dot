@@ -54,13 +54,16 @@ class CallOrigin(FrozenModel):
 class ModelCall(FrozenModel):
     """One model call as it was measured. ``model`` is the ``provider:model`` reference; ``error`` is the type of the
     error a failed call raised, :data:`CANCELLED` for a call that was cut off and ``None`` for a call that answered. A
-    call that did not answer used no tokens that a provider reported."""
+    call that did not answer used no tokens that a provider reported. ``first_token_seconds`` is how long the first
+    word of the reply took to come (item 404), ``None`` when none came: the prompt's processing, which a provider's
+    cache of the prompt's start shortens."""
 
     run_id: str | None
     purpose: CallPurpose
     model: str
     session_key: str
     seconds: float
+    first_token_seconds: float | None
     input_tokens: int
     output_tokens: int
     cached_tokens: int
@@ -76,6 +79,7 @@ def call_event_data(call: ModelCall) -> JsonObject:
         "purpose": call.purpose,
         "model": call.model,
         "seconds": round(call.seconds, 3),
+        "first_token_seconds": None if call.first_token_seconds is None else round(call.first_token_seconds, 3),
         "input_tokens": call.input_tokens,
         "output_tokens": call.output_tokens,
         "cached_tokens": call.cached_tokens,

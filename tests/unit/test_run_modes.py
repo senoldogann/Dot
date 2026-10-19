@@ -12,7 +12,17 @@ import pytest
 
 from dotagent.agent.compact import drop_old_images
 from dotagent.agent.loop import RunOutcome, SendBack, _after_verdict, _since_goal
-from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs
+from dotagent.agent.prompt import (
+    build_system_prompt,
+    clock_note,
+    collect_prompt_inputs,
+    forgotten_unnamed,
+    handed_note_ids,
+    notes_missing,
+    recalled_again,
+    recalled_note,
+    turn_note,
+)
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
@@ -21,6 +31,7 @@ from dotagent.llm.types import ImageData, Message, assistant_message, user_messa
 from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, QuestionMode, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.skills.types import Skill
 from dotagent.store.db import Store
 from dotagent.store.models import RunMode, RunRecord
 from dotagent.tools.delegate import DELEGATE_SOURCE
@@ -175,6 +186,48 @@ def test_the_prompt_names_the_day_and_a_note_after_the_goal_the_time_so_the_prom
     today: list[str] = [line for line in _prompt("ask", False).splitlines() if line.startswith("- Today:")]
     assert len(today) == 1 and re.search(r"\d{2}:\d{2}", today[0]) is None, today
     assert re.fullmatch(r"\[system note\] It is now \d{2}:\d{2} \S+\.", clock_note(datetime.now().astimezone()))
+
+
+def test_the_note_under_a_message_carries_what_changes_from_message_to_message(tmp_path: Path) -> None:
+    """The time, the notes recalled for the message and the skills that fit it go under the message (item 404), not
+    into the instructions, which stay the same bytes from message to message so the provider's cache holds; a part with
+    nothing to say is left out."""
+    now: datetime = datetime.now().astimezone()
+    alone: str = turn_note(now, [], 0, [], [])
+    assert alone == clock_note(now)
+    skill: Skill = Skill(name="invoice-pdf", description="Fill in an invoice.", root=tmp_path, body="x", source="home")
+    full: str = turn_note(now, ["[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"], 1, [skill], [])
+    lines: list[str] = full.splitlines()
+    assert lines[0] == clock_note(now)
+    assert "Notes recalled for this message" in full and "- [mem_1] The rent is due on the 3rd" in full
+    assert "never override what the user says now" in full and "stand above" in full
+    assert "1 note was left out: saved while reading outside content" in full
+    assert full.rstrip().endswith("- invoice-pdf: Fill in an invoice.")
+    assert "Skills that fit this message, besides those your instructions list" in full
+    # What is handed again after a compaction folds the note away: the same without the time, "" when nothing was.
+    assert recalled_note([], 0, [], []) == ""
+    recalled: str = recalled_note(
+        ["[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"], 1, [skill], []
+    )
+    assert full == f"{clock_note(now)}\n\n{recalled}"
+    # A note forgotten since an earlier message was handed it is named, as its old text stays in the chat.
+    gone: str = recalled_note([], 0, [], ["mem_7"])
+    assert gone.startswith("Notes you were handed earlier in this chat that were forgotten since")
+    assert "- forgotten: mem_7" in gone
+    # The ids a chat's messages carry: handed notes, not the ones named as forgotten, which are named once.
+    assert handed_note_ids(f"x [mem_1] y\n[mem_2b] z [not one] [mem_1]\n{gone}") == {"mem_1", "mem_2b"}
+    assert forgotten_unnamed(["mem_7", "mem_8"], gone) == ["mem_8"]
+    # What a context no longer carries with the same text is handed again: changed, or folded into a summary.
+    note: str = "[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"
+    changed: str = "[mem_1] The rent is due on the 5th (the user wrote it, 2026-10-19)"
+    assert notes_missing([note, changed], f"earlier\n- {note}\n") == [changed]
+    # After a compaction, only what the context lost comes back: nothing, while it carries the whole note still.
+    assert recalled_again([note], 1, [skill], ["mem_7"], f"{full}\n{gone}") == ""
+    # Stored as a user message, it bears the head every system note does, so the goal's review reads it as data.
+    assert (
+        recalled_again([note], 1, [skill], ["mem_7"], "")
+        == f"[system note] {recalled_note([note], 1, [skill], ['mem_7'])}"
+    )
 
 
 def _lines(approvals: ApprovalMode) -> set[str]:
