@@ -17,6 +17,7 @@ from typing import Literal
 
 import httpx
 import pytest
+import Quartz
 from playwright.async_api import Browser, BrowserContext, FloatRect, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
@@ -75,9 +76,11 @@ esac
 
 
 @asynccontextmanager
-async def _daemon() -> AsyncIterator[tuple[Runtime, str]]:
-    """A daemon in a throw-away home: its runtime, and the address it serves on."""
-    config: AppConfig = eval_config(load_default_config())
+async def _daemon(reach: list[str]) -> AsyncIterator[tuple[Runtime, str]]:
+    """A daemon in a throw-away home that answers to the names ``reach`` too: its runtime, and the address it serves
+    on."""
+    plain: AppConfig = eval_config(load_default_config())
+    config: AppConfig = plain.model_copy(update={"server": plain.server.model_copy(update={"reach": reach})})
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, login_env)
@@ -112,12 +115,34 @@ async def _daemon() -> AsyncIterator[tuple[Runtime, str]]:
             await close_runtime(runtime)
 
 
+@pytest.fixture
+def opener(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """An ``open`` that only writes down what it was asked to open, which ``DOT_OPEN`` names; returns the file it
+    writes."""
+    asked: Path = tmp_path / "opened"
+    _executable(tmp_path / "open", f'#!/bin/sh\necho "$*" >> "{asked}"\n')
+    monkeypatch.setenv("DOT_OPEN", str(tmp_path / "open"))
+    return asked
+
+
+def _lines(path: Path) -> list[str]:
+    return path.read_text(encoding="utf-8").splitlines()
+
+
+def _read_qr(png: bytes) -> list[str]:
+    """What the QR codes in ``png`` open, as macOS's detector reads them."""
+    detector = Quartz.CIDetector.detectorOfType_context_options_(
+        Quartz.CIDetectorTypeQRCode, None, {Quartz.CIDetectorAccuracy: Quartz.CIDetectorAccuracyHigh}
+    )
+    return [str(feature.messageString()) for feature in detector.featuresInImage_(Quartz.CIImage.imageWithData_(png))]
+
+
 def _client(address: str) -> httpx.AsyncClient:
     return httpx.AsyncClient(base_url=f"{address}/api", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30)
 
 
 async def test_set_up_serves_dot_and_writes_its_name_and_the_mac_is_kept_awake_on_demand(stand_ins: Path) -> None:
-    async with _daemon() as (runtime, address), _client(address) as client:
+    async with _daemon([]) as (runtime, address), _client(address) as client:
         port: int = int(address.rpartition(":")[2])
         before: dict[str, object] = (await client.get("/phone")).json()
         assert before["tailnet"] == {
@@ -150,7 +175,7 @@ async def test_set_up_serves_dot_and_writes_its_name_and_the_mac_is_kept_awake_o
 
 
 async def test_a_config_file_that_cannot_be_changed_leaves_the_mac_as_it_was(stand_ins: Path) -> None:
-    async with _daemon() as (runtime, address), _client(address) as client:
+    async with _daemon([]) as (runtime, address), _client(address) as client:
         config_path().write_text("[server\n", encoding="utf-8")
         refused = await client.post("/phone/awake", json={"on": True})
         assert refused.status_code == 422, refused.text
@@ -159,7 +184,7 @@ async def test_a_config_file_that_cannot_be_changed_leaves_the_mac_as_it_was(sta
 
 async def test_a_mac_without_tailscale_is_told_how_to_get_it() -> None:
     # The Tailscale of every smoke test is one that does not exist (tests/smoke/conftest.py).
-    async with _daemon() as (_runtime, address), _client(address) as client:
+    async with _daemon([]) as (_runtime, address), _client(address) as client:
         assert (await client.get("/phone")).json()["tailnet"]["installed"] is False
         refused = await client.post("/phone/tailnet")
         assert refused.status_code == 422 and "install it from tailscale.com" in refused.text
@@ -173,7 +198,7 @@ async def test_a_tailscale_whose_app_is_closed_is_not_running_and_the_phone_scre
     closed: Path = tmp_path / "tailscale"
     _executable(closed, f"#!/bin/sh\necho '{said}' >&2\nexit 1\n")
     monkeypatch.setenv("DOT_TAILSCALE", str(closed))
-    async with _daemon() as (_runtime, address), _client(address) as client:
+    async with _daemon([]) as (_runtime, address), _client(address) as client:
         shown = await client.get("/phone")
         assert shown.status_code == 200, shown.text
         tailnet = shown.json()["tailnet"]
@@ -188,7 +213,7 @@ async def test_a_tailscale_whose_app_is_closed_is_not_running_and_the_phone_scre
 
 async def test_what_tailscale_serves_unread_is_said_and_the_switch_still_answers(stand_ins: Path) -> None:
     (stand_ins / "serve.json").write_text("not json", encoding="utf-8")
-    async with _daemon() as (runtime, address), _client(address) as client:
+    async with _daemon([]) as (runtime, address), _client(address) as client:
         shown = await client.get("/phone")
         assert shown.status_code == 200, shown.text
         tailnet = shown.json()["tailnet"]
@@ -219,13 +244,15 @@ async def test_a_serve_that_waits_is_ended_in_time_and_says_what_it_waits_for(
         "esac\n",
     )
     monkeypatch.setattr("dotagent.tailnet._SERVE_TIMEOUT_S", 1.0)
-    async with _daemon() as (_runtime, address), _client(address) as client:
+    async with _daemon([]) as (_runtime, address), _client(address) as client:
         refused = await client.post("/phone/tailnet")
         assert refused.status_code == 422, refused.text
         assert (
             "Tailscale did not answer in 1 s: Serve is not enabled on your tailnet. To enable, visit: "
             "https://login.example/f/serve"
         ) in refused.text
+        # The page that turns HTTPS on is offered as a link (item 421).
+        assert refused.json()["context"]["link"] == "https://login.example/f/serve"
         # The serve that waited is ended.
         with pytest.raises(ProcessLookupError):
             os.kill(int((stand_ins / "waiting").read_text(encoding="utf-8")), 0)
@@ -241,7 +268,7 @@ async def _card_gap(page: Page) -> float:
 
 @pytest.mark.browser
 async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins: Path, tmp_path: Path) -> None:
-    async with _daemon() as (_runtime, address), async_playwright() as playwright:
+    async with _daemon([]) as (_runtime, address), async_playwright() as playwright:
         chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         webkit: Browser = await playwright.webkit.launch(headless=True)
         try:
@@ -261,13 +288,17 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
                     page: Page = await context.new_page()
                     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                     await page.goto(f"{address}/#/settings/phone")
-                    lines: Locator = page.get_by_role("list", name="Tailscale")
-                    await expect(lines).to_contain_text(f"this Mac is {_NAME} on your tailnet")
+                    steps: Locator = page.get_by_role("list", name="Steps on this Mac")
+                    await expect(steps).to_contain_text(f"This Mac is {_NAME} on your tailnet.")
                     set_up: Locator = page.get_by_role("button", name="Set up")
                     if await set_up.is_visible():
                         await set_up.click()
-                    await expect(lines).to_contain_text("Tailscale serves Dot to your tailnet over HTTPS.")
-                    await expect(lines).to_contain_text("Dot answers to it from the daemon's next start")
+                    await expect(steps).to_contain_text("Tailscale serves Dot to your tailnet over HTTPS")
+                    await expect(steps).to_contain_text("Dot takes the name up when it starts again.")
+                    await expect(steps.get_by_role("button", name="Restart Dot")).to_be_visible()
+                    download: Locator = page.get_by_role("img", name="A QR code of Tailscale's download page")
+                    await expect(download).to_be_visible()
+                    assert await download.evaluate("picture => picture.naturalWidth") > 0
                     assert await _card_gap(page) >= 8
                     awake: Locator = page.get_by_role("switch", name="Keep this Mac awake while it charges")
                     await awake.click()
@@ -279,3 +310,30 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
         finally:
             await chromium.close()
             await webkit.close()
+
+
+async def test_tailscale_is_opened_in_the_app_store_while_it_is_missing(opener: Path) -> None:
+    async with _daemon([]) as (_runtime, address), _client(address) as client:
+        opened = await client.post("/phone/tailscale")
+        assert opened.status_code == 200, opened.text
+    assert await asyncio.to_thread(_lines, opener) == ["macappstore://apps.apple.com/app/id1475387142"]
+
+
+async def test_an_installed_tailscale_is_opened_as_its_app_to_sign_in(stand_ins: Path, opener: Path) -> None:
+    async with _daemon([]) as (_runtime, address), _client(address) as client:
+        opened = await client.post("/phone/tailscale")
+        assert opened.status_code == 200, opened.text
+    assert await asyncio.to_thread(_lines, opener) == ["-a Tailscale"]
+
+
+async def test_the_qr_codes_open_tailscales_download_page_and_dots_address_once_it_has_one() -> None:
+    async with _daemon([]) as (_runtime, address), _client(address) as client:
+        download = await client.get("/phone/qr/tailscale")
+        assert download.status_code == 200 and download.headers["content-type"] == "image/png"
+        assert _read_qr(download.content) == ["https://tailscale.com/download"]
+        assert (await client.get("/phone/qr/dot")).status_code == 422
+        assert (await client.get("/phone/qr/elsewhere")).status_code == 422
+    async with _daemon([_NAME]) as (_runtime, address), _client(address) as client:
+        dot = await client.get("/phone/qr/dot")
+        assert dot.status_code == 200, dot.text
+        assert _read_qr(dot.content) == [f"https://{_NAME}/"]

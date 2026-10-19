@@ -1,21 +1,24 @@
 """Routes for a phone (item 267): the addresses it reaches Dot at, and pairing an app added to its home screen, which
 trades a short code for the access token (:mod:`dotagent.server.pairing`). The code and the token are never logged.
-Setting up Tailscale for it, and keeping the Mac awake while it charges (item 271)."""
+Setting up Tailscale for it, and keeping the Mac awake while it charges (item 271); Tailscale opened for its install or
+its sign-in, and the QR codes a phone's camera opens (item 421)."""
 
 import asyncio
 import time
+from typing import Literal
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Response
 
 from dotagent.config import load_user_config
 from dotagent.config_edit import set_setting
 from dotagent.core.errors import ConfigError, PairingRefused, PhoneSetupError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import config_path
+from dotagent.qr import qr_png
 from dotagent.server.context import ServerContext
 from dotagent.server.pairing import PairingCode, Redeemed, new_code, redeem, shown_code
 from dotagent.server.views import AwakeRequest, PairedView, PairingView, PairRequest, PhoneView
-from dotagent.tailnet import TailnetState, serve_daemon, tailnet_state
+from dotagent.tailnet import DOWNLOAD_PAGE, TailnetState, open_tailscale, serve_daemon, tailnet_state
 
 log = get_logger(__name__)
 
@@ -65,6 +68,26 @@ def phone_router(ctx: ServerContext) -> APIRouter:
                 await asyncio.to_thread(set_setting, config_path(), "server", "reach", reach)
                 log.info("phone_tailnet_reach_written")
             return await view()
+
+    @router.post("/phone/tailscale")
+    async def open_tailscale_app() -> PhoneView:
+        """Tailscale's page in the Mac App Store while it is not on this Mac, to install it, else its app, to sign in
+        (item 421)."""
+        state: TailnetState = (await view()).tailnet
+        await open_tailscale(state.installed)
+        log.info("phone_tailscale_opened", installed=state.installed)
+        return await view()
+
+    @router.get("/phone/qr/{code}")
+    async def phone_qr(code: Literal["tailscale", "dot"]) -> Response:
+        """A QR code a phone's camera opens (item 421): Tailscale's download page, or Dot's address on the tailnet once
+        the daemon answers to it (422 before)."""
+        running: tuple[str, ...] = tuple(ctx.runtime.config.server.reach)
+        if code == "dot" and not running:
+            raise PhoneSetupError("Dot answers to no name on a tailnet yet: set it up in Settings › Phone first", {})
+        text: str = DOWNLOAD_PAGE if code == "tailscale" else f"https://{running[0]}/"
+        png: bytes = await asyncio.to_thread(qr_png, text)
+        return Response(content=png, media_type="image/png", headers={"Cache-Control": "no-store"})
 
     @router.post("/phone/awake")
     async def keep_awake(request: AwakeRequest) -> PhoneView:

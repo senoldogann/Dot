@@ -5,6 +5,7 @@ runs on the Mac signed in, ``tailscale serve`` presents this daemon's port to th
 
 import asyncio
 import os
+import re
 import shutil
 from pathlib import Path
 
@@ -22,6 +23,13 @@ _AS_COMMAND_LINE: dict[str, str] = {"TAILSCALE_BE_CLI": "true"}
 _STATUS_TIMEOUT_S: float = 10.0
 _SERVE_TIMEOUT_S: float = 30.0
 _RUNNING: str = "Running"
+_OPEN_TIMEOUT_S: float = 10.0
+# Tailscale for the Mac in the Mac App Store, where a click installs it (item 421), and its download page for any
+# device, which a phone opens from the QR code of Settings › Phone.
+MAC_STORE_PAGE: str = "macappstore://apps.apple.com/app/id1475387142"
+DOWNLOAD_PAGE: str = "https://tailscale.com/download"
+_APP_NAME: str = "Tailscale"
+_LINK: re.Pattern[str] = re.compile(r"https://[^\s\"'<>]+")
 _HTTPS_PORT: int = 443
 _ERROR_CHARS: int = 400
 
@@ -77,6 +85,51 @@ def tailscale_program() -> str | None:
     if _APP_CLI.is_file():
         return str(_APP_CLI)
     return shutil.which("tailscale")
+
+
+def first_link(said: str) -> str | None:
+    """The first web address in what Tailscale said, such as the page that turns HTTPS on for the tailnet, which
+    ``tailscale serve`` names when it is off; None when it named none."""
+    match: re.Match[str] | None = _LINK.search(said)
+    return match.group(0).rstrip(".,;:)") if match is not None else None
+
+
+def open_program() -> str:
+    """The program that opens an application or a page: macOS's ``open``, unless ``DOT_OPEN`` names another, so that
+    tests point at their own and never open the App Store or Tailscale on the owner's Mac."""
+    override: str | None = os.environ.get("DOT_OPEN")
+    return override if override is not None and override != "" else "/usr/bin/open"
+
+
+async def open_tailscale(installed: bool) -> None:
+    """Tailscale's page in the Mac App Store, to install it, when it is not on this Mac; else its app, which shows its
+    sign-in."""
+    arguments: tuple[str, ...] = ("-a", _APP_NAME) if installed else (MAC_STORE_PAGE,)
+    try:
+        process: asyncio.subprocess.Process = await asyncio.create_subprocess_exec(
+            open_program(),
+            *arguments,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except OSError as error:
+        raise PhoneSetupError(
+            f"macOS could not open Tailscale: {error.strerror or error}", {"arguments": list(arguments)}
+        ) from error
+    try:
+        _, err = await asyncio.wait_for(process.communicate(), _OPEN_TIMEOUT_S)
+    except TimeoutError as error:
+        process.kill()
+        await process.wait()
+        raise PhoneSetupError(
+            f"macOS did not open Tailscale in {_OPEN_TIMEOUT_S:g} s", {"arguments": list(arguments)}
+        ) from error
+    if process.returncode != 0:
+        raise PhoneSetupError(
+            with_said("macOS could not open Tailscale", err),
+            {"arguments": list(arguments), "returncode": process.returncode},
+        )
 
 
 def running_name(status: str) -> tuple[bool, str | None]:
@@ -206,4 +259,11 @@ async def serve_daemon(port: int) -> None:
     program: str | None = tailscale_program()
     if program is None:
         raise PhoneSetupError("Tailscale is not on this Mac: install it from tailscale.com and sign in", {})
-    await _tailscale(program, ("serve", "--bg", str(port)), _SERVE_TIMEOUT_S)
+    try:
+        await _tailscale(program, ("serve", "--bg", str(port)), _SERVE_TIMEOUT_S)
+    except PhoneSetupError as error:
+        # Tailscale names the page that turns on what it lacks (HTTPS for the tailnet): the page offers it as a link.
+        link: str | None = first_link(error.message)
+        if link is None:
+            raise
+        raise PhoneSetupError(error.message, {**error.context, "link": link}) from error
