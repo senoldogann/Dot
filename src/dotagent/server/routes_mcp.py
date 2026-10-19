@@ -74,6 +74,8 @@ class _Try:
     task: asyncio.Task[None] | None
     link: str | None
     error: str | None
+    # The server was not in the record when the try began (item 408): a failed first try takes a service's key with it.
+    first: bool
 
     def running(self) -> bool:
         return self.task is not None and not self.task.done()
@@ -274,7 +276,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     async def keep(attempt: _Try, origin: str) -> None:
         """Try the server once, signing in when it asks, then keep it and connect it as runs do; the key of a service
-        whose first try fails goes out of .env with it, as nothing keeps the server (item 408)."""
+        whose first try fails goes out of .env with it, as nothing keeps the server (item 408); a kept server's stays
+        through a Try again that fails."""
         config: McpServerConfig = attempt.config
 
         def show(link: str) -> None:
@@ -300,24 +303,26 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         except DotError as error:
             attempt.error = error.message
             log.warning("mcp_server_not_added", server=config.name, error=error.message, context=error.context)
-            if attempt.origin == "connected":
+            if attempt.origin == "connected" and attempt.first:
                 await forget_service_secrets(config)
         except Exception as error:
             # Not one of Dot's own errors: a fault in Dot or in the MCP library, as the hub reports it.
             attempt.error = f"{type(error).__name__}: {error}"
             log.error("mcp_server_try_crashed", server=config.name, exc_info=error)
-            if attempt.origin == "connected":
+            if attempt.origin == "connected" and attempt.first:
                 await forget_service_secrets(config)
         finally:
             attempt.news.set()
 
-    async def start(config: McpServerConfig, origin: McpOrigin, page: str) -> McpServerView:
+    async def start(config: McpServerConfig, origin: McpOrigin, page: str, first: bool) -> McpServerView:
         """Try ``config`` in a task of its own, and answer once the sign-in page is known, the try ended, or after
         ``_ANSWER_WITHIN_S``."""
         current: _Try | None = tries.get(config.name)
         if current is not None and current.running():
             raise RunConflict("Dot is trying this server already", {"server": config.name})
-        attempt: _Try = _Try(config=config, origin=origin, news=asyncio.Event(), task=None, link=None, error=None)
+        attempt: _Try = _Try(
+            config=config, origin=origin, news=asyncio.Event(), task=None, link=None, error=None, first=first
+        )
         tries[config.name] = attempt
         attempt.task = asyncio.create_task(keep(attempt, page), name=f"mcp-try-{config.name}")
         try:
@@ -350,7 +355,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             # stands in the add's way and every one of them is there (secret_entries refuses before any is written).
             for kept_name, value in secret_entries(service, body.secrets).items():
                 await asyncio.to_thread(write_env_value, env_file_path(), kept_name, value)
-        return await start(config, "connected", page)
+        return await start(config, "connected", page, found is None)
 
     @router.post("/api/mcp/servers/{name}/connect")
     async def connect_again(name: str, body: McpReconnect) -> McpServerView:
@@ -366,7 +371,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict(
                 "this MCP server is set up elsewhere; connect it again there", {"server": name, "set_up": origin}
             )
-        return await start(config, origin, page)
+        return await start(config, origin, page, False)
 
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:

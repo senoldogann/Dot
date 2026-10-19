@@ -26,7 +26,7 @@ class SkillFrontmatter(FrozenModel):
     name: str = Field(min_length=1, max_length=64, pattern=SKILL_NAME_PATTERN)
     description: str = Field(min_length=1, max_length=1024)
     # Dot's own key (item 408): the name of one of the interface's icons; another agent's skill has none.
-    icon: str | None = Field(default=None, max_length=40)
+    icon: str | None = None
 
 
 class Skill(FrozenModel):
