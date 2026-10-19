@@ -76,22 +76,23 @@ class _Finisher:
         return None
 
 
-def _home_with(tmp: Path, assistant: str) -> Path:
-    """A home whose config file runs the stand-in model, with a browser without a window and ``assistant`` as its
-    ``[assistant]`` lines."""
+def _home_with(tmp: Path, browser: str, assistant: str) -> Path:
+    """A home whose config file runs the stand-in model, with a browser without a window and ``browser`` as the rest
+    of its ``[browser]`` lines, and ``assistant`` as its ``[assistant]`` lines."""
     home: Path = tmp / "home"
     home.mkdir()
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{_MODEL}"\n\n[assistant]\n{assistant}', encoding="utf-8"
+        f'[browser]\nheadless = true\n{browser}\n[models]\nmain = "{_MODEL}"\n\n[assistant]\n{assistant}',
+        encoding="utf-8",
     )
     return home
 
 
 @asynccontextmanager
-async def _daemon(tmp: Path, assistant: str) -> AsyncIterator[tuple[Runtime, RunManager, _Finisher, str]]:
-    """A daemon in a throw-away home with ``assistant`` as its config file's ``[assistant]`` lines: its runtime, its run
-    manager, the stand-in model and the address it serves on."""
-    home: Path = await asyncio.to_thread(_home_with, tmp, assistant)
+async def _daemon(tmp: Path, browser: str, assistant: str) -> AsyncIterator[tuple[Runtime, RunManager, _Finisher, str]]:
+    """A daemon in a throw-away home with ``browser`` and ``assistant`` as lines of its config file
+    (:func:`_home_with`): its runtime, its run manager, the stand-in model and the address it serves on."""
+    home: Path = await asyncio.to_thread(_home_with, tmp, browser, assistant)
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_LOG_DIR", str(tmp / "logs"))
@@ -143,7 +144,12 @@ def _written() -> str:
 
 async def test_the_names_are_kept_in_the_config_file_and_said_to_the_model(tmp_path: Path) -> None:
     async with (
-        _daemon(tmp_path, 'name = "Dot"\nowner = ""\nintroduced = false\n') as (runtime, manager, finisher, address),
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = ""\nintroduced = false\n') as (
+            runtime,
+            manager,
+            finisher,
+            address,
+        ),
         _client(address) as client,
     ):
         first: dict[str, object] = (await client.get("/assistant")).json()
@@ -190,7 +196,7 @@ async def _home(browser: Browser, address: str, phone: bool, playwright_devices:
 @pytest.mark.browser
 async def test_a_first_open_has_dot_greet_the_owner_name_itself_and_say_what_it_does(tmp_path: Path) -> None:
     async with (
-        _daemon(tmp_path, 'name = "Dot"\nowner = "Ada"\nintroduced = false\n') as (_runtime, _manager, _f, address),
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = "Ada"\nintroduced = false\n') as (_runtime, _manager, _f, address),
         async_playwright() as playwright,
     ):
         chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
@@ -229,7 +235,7 @@ async def test_a_first_open_has_dot_greet_the_owner_name_itself_and_say_what_it_
 @pytest.mark.browser
 async def test_the_first_conversation_fits_a_phone_and_a_message_sent_ends_it(tmp_path: Path) -> None:
     async with (
-        _daemon(tmp_path, 'name = "Dot"\nowner = "Ada"\nintroduced = false\n') as (_runtime, _manager, _f, address),
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = "Ada"\nintroduced = false\n') as (_runtime, _manager, _f, address),
         async_playwright() as playwright,
     ):
         webkit: Browser = await playwright.webkit.launch(headless=True)
@@ -253,7 +259,7 @@ async def test_the_first_conversation_fits_a_phone_and_a_message_sent_ends_it(tm
 @pytest.mark.browser
 async def test_a_home_with_a_chat_never_shows_the_first_conversation(tmp_path: Path) -> None:
     async with (
-        _daemon(tmp_path, 'name = "Dot"\nowner = ""\nintroduced = false\n') as (_runtime, manager, _f, address),
+        _daemon(tmp_path, "", 'name = "Dot"\nowner = ""\nintroduced = false\n') as (_runtime, manager, _f, address),
         async_playwright() as playwright,
     ):
         # A chat is one a person started a run in: Dot has had no first conversation, but the owner has used it.
@@ -275,7 +281,7 @@ async def test_a_home_with_a_chat_never_shows_the_first_conversation(tmp_path: P
 @pytest.mark.browser
 async def test_in_auto_dot_says_a_review_model_answers_for_the_owner_and_promises_no_question(tmp_path: Path) -> None:
     auto: str = 'name = "Dot"\nowner = "Ada"\nintroduced = false\n\n[policy]\napprovals = "auto"\n'
-    async with _daemon(tmp_path, auto) as (_runtime, _manager, _f, address), async_playwright() as playwright:
+    async with _daemon(tmp_path, "", auto) as (_runtime, _manager, _f, address), async_playwright() as playwright:
         chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
         try:
             page: Page = await _home(chromium, address, False, playwright.devices)
@@ -284,5 +290,39 @@ async def test_in_auto_dot_says_a_review_model_answers_for_the_owner_and_promise
             await expect(first).to_contain_text("a review model answers my other questions for you")
             await expect(first).not_to_contain_text("I ask you before what is yours to decide")
             await expect(first).not_to_contain_text("Nothing is sent without your approval")
+        finally:
+            await chromium.close()
+
+
+@pytest.mark.browser
+async def test_the_look_starts_in_the_mode_its_promises_were_said_in_whatever_the_box_chose(tmp_path: Path) -> None:
+    """The owner's Chrome lends its sign-ins (attach), so Google is ready and the look is offered; this browser's box
+    chose yolo, the daemon's mode is ask, and the look starts in ask, as the first conversation said."""
+    async with (
+        _daemon(tmp_path, 'mode = "attach"\n', 'name = "Dot"\nowner = "Ada"\nintroduced = false\n') as (
+            runtime,
+            _manager,
+            _f,
+            address,
+        ),
+        async_playwright() as playwright,
+    ):
+        chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            context: BrowserContext = await chromium.new_context(
+                viewport={"width": 1280, "height": 900}, reduced_motion="reduce"
+            )
+            await context.add_init_script("localStorage.setItem('dot.approvals', 'yolo')")
+            page: Page = await context.new_page()
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            first = page.locator("section.first-chat")
+            await first.get_by_role("button", name="Dot").click()
+            await expect(first).to_contain_text("I work in your own Chrome")
+            await expect(first).to_contain_text("I'll only read, and ask you before I do anything.")
+            await first.get_by_role("button", name="Yes, have a look").click()
+            await page.wait_for_url("**/#/runs/run_*")
+            run: RunRecord = await runtime.store.get_run(page.url.rsplit("/", 1)[-1])
+            assert run.approvals == "ask", run.approvals
+            assert run.goal.startswith("Look through my Gmail inbox"), run.goal
         finally:
             await chromium.close()

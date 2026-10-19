@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from dotagent.assistant import called_lines, first_name, owner_name_lines
+from dotagent.config import AssistantConfig
 from dotagent.server.views import AssistantRequest
 
 
@@ -37,3 +38,11 @@ def test_a_change_strips_its_names_and_a_blank_owner_forgets_the_given_name() ->
     assert AssistantRequest.model_validate({"name": "  Miro "}).name == "Miro"
     assert AssistantRequest.model_validate({"owner": "  "}).owner == ""
     assert AssistantRequest.model_validate({}).model_dump() == {"name": None, "owner": None, "introduced": None}
+
+
+def test_a_name_the_config_file_holds_with_a_control_character_is_refused_as_the_api_refuses_it() -> None:
+    with pytest.raises(ValidationError):
+        AssistantConfig.model_validate({"name": "Mi\nro", "owner": "", "introduced": False})
+    with pytest.raises(ValidationError):
+        AssistantConfig.model_validate({"name": "Miro", "owner": "A\tda", "introduced": False})
+    assert AssistantConfig.model_validate({"name": 'Mi "ro"', "owner": "Ada", "introduced": True}).name == 'Mi "ro"'

@@ -38,8 +38,9 @@ async function googleView() {
 }
 
 /**
- * The first conversation, for the home to show in the place of its greeting. `startLook(goal)` sends the inbox's
- * goal from the composer; `onSkipped()` gives the home its greeting back. Returns `element`, `sent()` (the owner sent a
+ * The first conversation, for the home to show in the place of its greeting. `startLook(goal, approvals)` sends the
+ * inbox's goal from the composer, in the approval mode its promises were said in; `onSkipped()` gives the home its
+ * greeting back. Returns `element`, `sent()` (the owner sent a
  * message: the introduction is over) and `dispose()`.
  */
 export function buildFirstChat({ startLook, onSkipped }) {
@@ -79,9 +80,9 @@ export function buildFirstChat({ startLook, onSkipped }) {
     flow.append(el("p", { class: "first-note", role: "status" }, text));
   }
 
-  function approvals() {
-    return getSnapshot().status?.approvals ?? "ask";
-  }
+  // The approval mode every promise here is said in, taken once: the look starts in it too, whatever the composer's
+  // own choice is, so that what was said holds.
+  const mode = getSnapshot().status?.approvals ?? "ask";
 
   function greet() {
     const owner = shownOwner();
@@ -171,7 +172,6 @@ export function buildFirstChat({ startLook, onSkipped }) {
       "I keep working on this Mac while you're away: on a goal until it is done, on schedules and on campaigns.",
       "I connect to your apps, such as mail and calendar, and use them as you would.",
     ];
-    const mode = approvals();
     if (ASKED_MODES.includes(mode)) {
       lines.push("I ask you before what is yours to decide: money, passwords and messages sent in your name.");
     } else if (mode === "auto") {
@@ -199,7 +199,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
       offerLook();
       return;
     }
-    const promise = ASKED_MODES.includes(approvals()) ? " Nothing is sent without your approval." : "";
+    const promise = ASKED_MODES.includes(mode) ? " Nothing is sent without your approval." : "";
     say(el("p", null, `Connect your Gmail and I'll find something I can take care of right away.${promise} Or tell me what you need help with.`));
     flow.append(googleCard(google, name));
   }
@@ -264,7 +264,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
   function offerLook() {
     const yes = el("button", { class: "btn primary", type: "button" }, "Yes, have a look");
     const later = el("button", { class: "btn", type: "button" }, "Not now");
-    const asks = ASKED_MODES.includes(approvals())
+    const asks = ASKED_MODES.includes(mode)
       ? "I'll only read, and ask you before I do anything."
       : "I'll only read, and tell you what I could do.";
     say(el("p", null, `Shall I look through your inbox for something I can take off your hands? ${asks}`), el("div", { class: "row first-actions" }, yes, later));
@@ -273,7 +273,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
         yes.disabled = true;
         later.disabled = true;
         await close();
-        await startLook(INBOX_GOAL);
+        await startLook(INBOX_GOAL, mode);
       }),
     );
     later.addEventListener("click", () =>

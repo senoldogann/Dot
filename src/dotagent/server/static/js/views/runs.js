@@ -213,6 +213,8 @@ function buildComposer(ctx, listener) {
   // a second press must be refused here, or one goal would start two runs.
   let starting = false;
   const keys = messageKeys();
+  // The approval mode a send from outside the box asks for, in place of the box's choice; null otherwise.
+  let sentApprovals = null;
 
   async function submit() {
     if (starting) {
@@ -250,7 +252,7 @@ function buildComposer(ctx, listener) {
           effort: chosen.effort,
           speed: chosen.speed,
           once: chosen.once,
-          approvals: chosen.approvals,
+          approvals: sentApprovals ?? chosen.approvals,
           goal_mode: standing.value() ? null : chosen.goal_mode,
           standing: standing.value(),
           thread_id: null,
@@ -280,10 +282,16 @@ function buildComposer(ctx, listener) {
     // Keep going's line sits under the frame, not in it.
     element: el("div", { class: "composer-stack" }, frame.element, standing.note),
     focus: () => goal.focus(),
-    // Send `text` as the owner would, with the choices of the box (the first conversation's look, item 420).
-    send: (text) => {
+    // Send `text` as the owner would, with the choices of the box but the approval mode `approvals` (the first
+    // conversation's look, item 420, which starts in the mode its promises were said in).
+    send: async (text, approvals) => {
       goal.value = text;
-      return submit();
+      sentApprovals = approvals;
+      try {
+        await submit();
+      } finally {
+        sentApprovals = null;
+      }
     },
     rename: (name) => {
       goal.placeholder = placeholderFor(name);
@@ -457,16 +465,14 @@ export function mount(root, ctx) {
       return;
     }
     first = buildFirstChat({
-      startLook: (goal) => composer.send(goal),
+      startLook: (goal, approvals) => composer.send(goal, approvals),
       onSkipped: () => {
         first.element.replaceWith(presence.element);
         first.dispose();
         first = null;
-        home.classList.remove("home-first");
       },
     });
     presence.element.replaceWith(first.element);
-    home.classList.add("home-first");
   });
   return () => {
     disposed = true;

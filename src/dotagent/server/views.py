@@ -12,6 +12,7 @@ from dotagent.agent.resume import CutOff
 from dotagent.browser.look import PageLook
 from dotagent.browser.profiles import ProfileView
 from dotagent.config import (
+    SHOWN_NAME,
     BrowserProfileName,
     DebugPort,
     JudgeProvider,
@@ -136,19 +137,14 @@ class SnapshotsClaimed(FrozenModel):
     animations: bool
 
 
-# A name a person reads and the prompt says: no control character, so that it stays one line.
-_SHOWN_NAME: str = r"^[^\x00-\x1f\x7f]*$"
-
-
 class AssistantRequest(FrozenModel):
     """A change of who Dot is to its owner (item 420); what is left out stays as it is. A name is stripped and a blank
     one refused; a blank owner forgets the name given, and the owner's account on this Mac names them again."""
 
     name: (
-        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=24, pattern=_SHOWN_NAME)]
-        | None
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=24, pattern=SHOWN_NAME)] | None
     ) = None
-    owner: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40, pattern=_SHOWN_NAME)] | None = None
+    owner: Annotated[str, StringConstraints(strip_whitespace=True, max_length=40, pattern=SHOWN_NAME)] | None = None
     introduced: bool | None = None
 
 
