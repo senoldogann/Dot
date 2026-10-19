@@ -15474,6 +15474,66 @@ holds that end until the program has exited, takes what it printed last, then cl
 (forty programs that print and end at once: each output is read and each session ends; without the change every output
 is lost).
 
+### 418. What would act for a run outside its sandbox is refused: open, launchd, Apple Events
+
+**Status: done (2026-10-19), on `sandbox-escapes`; it changes `src/dotagent/policy/sandbox.py`, so the owner merges
+it.** The owner's word of 2026-10-19: sandbox-exec did not cover the programs opened with `open`, launchd or Apple
+Events; add those paths to the policy's filter. **As built (2026-10-19).** Outside yolo, the profile every process of a
+run starts in (a shell command, a terminal session, an AppleScript, a search) also refuses what would have another
+program act for it outside the sandbox: opening anything through Launch Services (`(deny lsopen)`: `open`, a program's
+own call; measured: `open -a` fails with -54 and the application does not start), starting `launchctl`, `shortcuts` and
+`lsregister` where macOS installs them (`HANDING_PROGRAMS`), creating a job of launchd (`(deny job-creation)`), and
+writing into `~/Library/LaunchAgents`; like the guard's, these rules are best-effort. Apple Events were part of it and
+are not: `(deny appleevent-send (appleevent-destination …))` over the terminal apps, Script Editor, Automator,
+Shortcuts, System Events, the Finder and Xcode compiles and holds nothing (measured 2026-10-20, the note below says
+what happened), so it was dropped rather than claimed. `desktop_open_app` given a bundle path that does not resolve onto
+the sealed system volume (under `/System`, not the data volume at `/System/Volumes/Data`) asks first, as a step outside
+the sandbox (`_bundle_of` with `_on_the_sealed_system_volume`): such a bundle may be one a run made, and `open` reads a
+bare `x.app` from the daemon's folder. The shell and AppleScript tools say what the sandbox refuses and that
+`desktop_open_app` opens an application. The owner's runs of this Mac measured the cost: of 542 shell lines none used
+`open`, three used `osascript` (Calendar) and one `launchctl print`; 65 of 72 runs were yolo, where the sandbox does not
+apply. Tests: `tests/unit/test_sandbox_profile.py` (the rules, and macOS holding a command to them: a job left in a
+LaunchAgents folder, `launchctl`, `shortcuts`, `open -a`), `tests/smoke/test_sandbox.py` (the daemon's sandbox names the
+user's LaunchAgents and refuses `launchctl` outside yolo only), `tests/unit/test_desktop_secrets.py`. Docs:
+`docs/safety.md`, `docs/browser-and-computer-use.md`, `defaults.toml`.
+
+**After the pre-push review (2026-10-20).** The review refused a copy of a handing program (`cp /usr/bin/shortcuts
+/tmp/s`), which the path rules would not cover, and a bundle a run made that is opened by the name or bundle id it
+registered. Measured on this Mac: a copy of an Apple program is killed by macOS itself before it runs (`cp /bin/echo
+/tmp/e && /tmp/e` exits 137 with no output, in the sandbox and outside it, on Apple silicon under macOS 26), so that
+route is closed; the service behind the program is refused instead, whatever program asks it (`HANDING_SERVICES`:
+`com.apple.siri.VoiceShortcuts.xpc`, which runs a shortcut, and `com.apple.lsd.modifydb`, the Launch Services database).
+Measured: with that rule `shortcuts list` fails ("Couldn't communicate with a helper application"), `lsregister -f`
+prints "failed to scan … -10822" and registers nothing (0 dump entries against 3 when allowed), and a job of launchd
+copy or not is refused. The tool's own review then found the check reading the path's letters as they came
+(`/System/volumes/data` is the data volume too, on a file system that ignores case) and deciding on a resolution that
+`open` made again later: the comparison is casefolded now, and the tool is a `make_path_tool`, classified again as it
+starts and refused when the bundle it reaches is not the one authorised, as the file tools are (item 181). A later pass
+kept the bundle apart from the words the call was given: the action carries the resolved bundle (`ActionInfo.bundle`)
+and `run` opens that, while its target stays the application's name, which the runs at work at the same time (items 301
+and 305) and the owner's rules read. The Apple
+Events rule of the first commit was measured and found to hold nothing: on macOS 26
+`(deny appleevent-send (appleevent-destination …))`, with or without a destination, still let a script drive the Finder
+("26.4"), a terminal app, and start an application that was not running (Image Events), so the rule and its list are
+gone and `docs/safety.md` says the gap is open; the Automation permission (TCC) and the policy's reading of the script
+are what stand in its way. `desktop_open_app` now resolves a name or a bundle id through Launch Services
+(`desktop.apps.bundle_path`) and judges the path it resolves to, so a run that registers a bundle it made in
+`~/Applications` does not get it opened without a question (measured: ad-hoc signed and registered, the bundle id
+resolves and `open -b` starts it); `names_a_bundle` is the one definition of a bundle path, `.app` in any letter case,
+which is how the Mac's file systems and `open` read it; the sealed system volume is `/System` without the data volume
+at `/System/Volumes/Data`, which puts Apple's own applications under `/System/Volumes/Preboot/Cryptexes` (Safari) on
+the installed side. Tests: the service rule and both programs held to it (`tests/unit/test_sandbox_profile.py`), the
+name and the bundle id (`tests/unit/test_desktop_secrets.py`).
+
+### 419. A request path with a dot segment is refused
+
+**Status: done (2026-10-19), on `sandbox-escapes`; it changes `src/dotagent/server/guard.py`, so the owner merges it.**
+The security review of item 410's change to the guard, made after its merge: the guard matched a decoded path by its
+prefix, and uvicorn decodes `%2F`, so `/icons/..%2Findex.html` was served another file of the UI with the headers of the
+launcher's files, and `/pages/..%2Findex.html` passed as a run's page to a navigation from another site. Nothing of the
+owner's was exposed. **As built (2026-10-19).** `check_request` refuses, before anything else, a path with a `.` or `..`
+segment (400, `has_dot_segment`); no page of the server has one. The comment that describes `SECURITY_HEADERS` sits
+above it again. Tests: `tests/unit/test_server_guard.py`. Docs: `docs/daemon.md`.
 ### 420. Dot's first conversation, and the names the daemon keeps
 
 **Status: done (2026-10-20), on `first-chat-and-teach`.** The owner's word of 2026-10-20, with screenshots of another
@@ -16344,5 +16404,14 @@ of its own. The look, Not now, Skip the introduction and the first message sent 
   the paths that need a human (the catch-all handlers under ruff's BLE rule, the README on the default mode and the data
   that leaves the Mac, AppleDouble files ignored, the sandbox pinned in every mode but yolo, the notes of the last
   pre-push review), and a terminal session that keeps what a program printed as it ended.
+- 2026-10-19 (Opus 5.5): items 418 and 419 on `sandbox-escapes` from `main`, in paths that need a human: a run's
+  processes outside yolo open nothing, start neither launchctl, shortcuts nor lsregister, reach neither the Shortcuts
+  service nor the Launch Services database, and leave no launch agent; `desktop_open_app` asks before a bundle outside
+  /System; the guard refuses a path with a dot segment. The Apple Events rule this commit carried held nothing and was
+  dropped in the next line's work.
+- 2026-10-20 (Opus 5.5): the pre-push review's findings on that branch answered: the sandbox refuses the Shortcuts
+  service and the Launch Services database rather than the programs alone, `desktop_open_app` resolves a name or a
+  bundle id through Launch Services and asks for the bundle it reaches, and one definition says what a bundle path is;
+  the Apple Events rule, measured to hold nothing on macOS 26, is gone and the docs say why.
 - 2026-10-20 (Opus 5.5): item 420 on `first-chat-and-teach` from `main`: Dot's first conversation on a first open, and
   the names of Dot and its owner kept by the daemon and told to the model.

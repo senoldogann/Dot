@@ -4,6 +4,7 @@ NSWorkspace.runningApplications goes stale outside a main run loop, so the list 
 front application from the accessibility system-wide element; both are live sources.
 """
 
+import os
 import re
 import subprocess
 import time
@@ -130,6 +131,21 @@ def find_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int]) -> 
     wanted: str = query.strip()
     if wanted.isdigit():
         return next((app for app in apps if app.pid == int(wanted)), None)
+    if "/" in wanted:
+        # A path names the bundle that sits at it, which is what `desktop_open_app` opens (item 418); several copies of
+        # one application may sit at the same bundle, and then Dot's own stands as it does for a name.
+        at_path: str = os.path.realpath(wanted)
+        there: list[AppInfo] = [app for app in apps if app.bundle_path and os.path.realpath(app.bundle_path) == at_path]
+        chosen_there: list[AppInfo] = [app for app in there if app.pid in preferred]
+        if len(there) == 1:
+            return there[0]
+        if len(chosen_there) == 1:
+            return chosen_there[0]
+        if there:
+            raise DesktopError(
+                f"{query!r} names several applications; use the pid or the bundle id",
+                {"candidates": ", ".join(f"{app.name} (pid {app.pid})" for app in there)},
+            )
     folded: str = fold_search(wanted)
     tiers: tuple[Callable[[str], bool], ...] = (
         lambda name: name == folded,
@@ -165,16 +181,37 @@ def require_app(query: str, apps: Sequence[AppInfo], preferred: frozenset[int]) 
     return app
 
 
+def names_a_bundle(query: str) -> bool:
+    """Whether ``query`` names an application by the path of its bundle: a ``/`` in it, or ``.app`` at its end, whatever
+    its letter case, as the Mac's file systems read it and ``open`` reads a bare ``x.app`` from the daemon's folder."""
+    return "/" in query or query.casefold().endswith(".app")
+
+
+def bundle_path(query: str) -> Path | None:
+    """Where the bundle ``query`` names is: the path itself, or where Launch Services resolves the name or bundle id it
+    gives instead; ``None`` when no application of this Mac is that name or id. A run may register a bundle it made, so
+    a name or an id is no more proof that the owner installed it than a path is."""
+    if names_a_bundle(query):
+        return Path(query)
+    workspace: AppKit.NSWorkspace = AppKit.NSWorkspace.sharedWorkspace()
+    if _BUNDLE_ID_SHAPE.match(query):
+        url = workspace.URLForApplicationWithBundleIdentifier_(query)
+        path: str = url.path() if url is not None else ""
+        return Path(path) if path else None
+    found: str | None = workspace.fullPathForApplication_(query)
+    return Path(found) if found else None
+
+
 def open_arguments(query: str) -> list[str]:
     """The arguments ``open`` takes for ``query``: a bundle path, a bundle id or an application name. A path to anything
     but a bundle (a binary such as ``.../bin/node``) is refused here: Launch Services would fail it six times over."""
-    if "/" in query and not query.endswith(".app"):
-        raise DesktopError(
-            f"{query!r} is a file path, not an application; name the application (Terminal), its bundle id "
-            "(com.apple.Terminal) or its bundle (/Applications/Terminal.app)",
-            {"query": query},
-        )
-    if query.endswith(".app"):
+    if names_a_bundle(query):
+        if not query.casefold().endswith(".app"):
+            raise DesktopError(
+                f"{query!r} is a file path, not an application; name the application (Terminal), its bundle id "
+                "(com.apple.Terminal) or its bundle (/Applications/Terminal.app)",
+                {"query": query},
+            )
         return [query]
     if _BUNDLE_ID_SHAPE.match(query):
         return ["-b", query]
@@ -182,8 +219,13 @@ def open_arguments(query: str) -> list[str]:
 
 
 def launch(query: str) -> None:
-    """Ask Launch Services to open an application by bundle id, path or name; it comes to the front."""
+    """Ask Launch Services to open an application by bundle id, path or name; it comes to the front. A bundle that
+    resolves is opened by the path it resolved to, so what starts is the application the check reached and not another
+    put in a link's place meanwhile (item 418)."""
+    bundle: Path | None = bundle_path(query)
     arguments: list[str] = open_arguments(query)
+    if bundle is not None and bundle.name.casefold().endswith(".app"):
+        arguments = [os.path.realpath(bundle)]
     for attempt in range(1, _LAUNCH_ATTEMPTS + 1):
         outcome: subprocess.CompletedProcess[str] = subprocess.run(
             [_OPEN, *arguments], capture_output=True, text=True, timeout=_COMMAND_TIMEOUT_S, check=False
@@ -214,12 +256,13 @@ def open_document(path: Path) -> None:
         )
 
 
-def open_app(query: str, timeout_s: float, preferred: frozenset[int]) -> AppInfo:
-    """The running application ``query`` names, started first when it is not running yet."""
+def open_app(query: str, timeout_s: float, preferred: frozenset[int], bundle: str | None) -> AppInfo:
+    """The running application ``query`` names, started first when it is not running yet: ``bundle``, the path a check
+    of ``query`` came to, is what starts, so an application put in its place meanwhile is not (item 418)."""
     running: AppInfo | None = find_app(query, list_apps(), preferred)
     if running is not None:
         return running
-    launch(query)
+    launch(bundle or query)
     deadline: float = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         started: AppInfo | None = find_app(query, list_apps(), preferred)

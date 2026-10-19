@@ -197,17 +197,30 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   what it found elsewhere and names the places it did not read, as a search of any run does with a folder whose reading
   macOS broke off (it does now and then under `~/Library/Containers` when the home folder is searched). macOS starts no
   program that runs as root inside the sandbox (`ps`, `top`, `sudo`, `crontab`): `pgrep -lf` and `lsof` work, a `yolo`
-  run runs them, `[shell] sandbox = false` turns the sandbox off. Settings › Rules switches it while the daemon runs
-  ("Sandbox for a run's commands", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
+  run runs them, `[shell] sandbox = false` turns the sandbox off. Nor does a process of a run have another program act
+  for it, outside the sandbox (item 418): it opens nothing through Launch Services (`open`, a program's own call),
+  starts neither the `launchctl`, `shortcuts` nor `lsregister` that macOS installs and reaches neither the Shortcuts
+  service nor the Launch Services database they would hand the work to, whatever program asks, creates no job of
+  launchd, and writes nothing into `~/Library/LaunchAgents`, where launchd finds the jobs it starts at a login. These
+  rules are best-effort, as the guard's are. An application that is open is still driven (Mail, Calendar), with its own
+  powers; `desktop_open_app` opens one from Dot's own process, and asks first for one whose bundle is not on the sealed
+  system volume, however it names it: by the bundle's path, or by a name or a bundle id Launch Services resolves to
+  one, which a run that registered a bundle it made can give it too. Settings › Rules switches it while the daemon
+  runs ("Sandbox for a run's commands", `PUT /api/shell/sandbox`): from the next command on, with no restart, and the config
   file keeps it; a terminal session already open keeps how it started. Switching it on where `sandbox-exec` does not
   start is refused, and nothing changes.
 - What Dot runs at its start is kept from a run's commands too: the login shell whose environment it reads runs its
   startup files, which a command may change, in the same sandbox, and the daemon's launchd job starts Python with `-P`,
   so a file a command left in Dot's home, the job's working directory, is never imported (run `dotx service install`
   again after an update to rewrite the job).
-- What the sandbox does not cover: a program a command has act for it (Terminal through `open`, a launchd job, an
-  application driven by Apple Events) acts outside it, and so do the programs Dot starts itself (its browser, the MCP
-  servers), from where they are installed: a command can change the programs installed under your account (Homebrew's,
+- What the sandbox does not cover: Apple Events, which macOS does not hold a `sandbox-exec` profile to (measured on
+  macOS 26: with a rule over the Finder, the terminal apps, System Events and the rest, a script still drove the Finder
+  and started an application that was not running), so an AppleScript can have another application act for it, with that
+  application's powers: Mail sends a message the policy asked about, a terminal app runs a line outside the sandbox. The
+  Automation permission you grant is what stands in its way. Nor a program that speaks to launchd or another service
+  through its own interface rather than the programs above, and the programs Dot starts itself (its browser, the MCP
+  servers) run from where they are installed: a command can change the programs installed under your account
+  (Homebrew's,
   the caches of npm and uv) and your shell's startup files, which those programs and your own Terminal then run. And it
   keeps files: a key saved with `dotx auth set` or in Settings is in the key file, which it seals, while a key kept in
   the keychain (service `dot-agent`) can be read by a command through `security`, in the sandbox too.
@@ -308,18 +321,19 @@ or your own words. The run reads which option you chose, and whether it was the 
 - before each step of a desktop batch Dot checks that the pointer is where the previous step left it; if someone else is
   moving the mouse, the rest of the batch is not run
 
-> **The shell guardrail is best-effort; the sandbox holds only Dot's own files.** Dot reads a shell command before it
-> runs it and judges what it would touch: it reads the line as the shell does (quotes, comments, here-documents, the
-> commands substituted into it, a `case` inside one, a `cd` however it is spelt, a variable, a link it makes, a wrapper
-> such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings and variables that make git or another
-> program run a command line), compares paths without case, and treats what it cannot read (a command named by a
-> substitution or a pattern, `eval` of one, a setting of git it does not know, a line it cannot parse) as a destructive
-> step outside the workspace, which every preset asks about. A script the line downloads and then runs (`curl -o`, `wget
-> -O` or `git clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp`, an `mv`
-> or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged as piping the download into a shell; a
-> file named after an at sign (`curl --data-binary @file`) as that file; a script handed to a terminal app (`open -a
-> Terminal`, a `.command` file) as a step outside Dot's sandbox, which every preset asks about (item 385). It does not
-> follow what a recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps
-> those out of Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a
-> user of your account with the rights of your account: keep backups, keep the workspace for scratch work, and use
-> `balanced` or `cautious` on a machine where a mistake would be expensive.
+> **The shell guardrail is best-effort; the sandbox holds only Dot's own files and what would act outside it.** Dot
+> reads a shell command before it runs it and judges what it would touch: it reads the line as the shell does (quotes,
+> comments, here-documents, the commands substituted into it, a `case` inside one, a `cd` however it is spelt, a
+> variable, a link it makes, a wrapper such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings
+> and variables that make git or another program run a command line), compares paths without case, and treats what it
+> cannot read (a command named by a substitution or a pattern, `eval` of one, a setting of git it does not know, a line
+> it cannot parse) as a destructive step outside the workspace, which every preset asks about. A script the line
+> downloads and then runs (`curl -o`, `wget -O` or `git clone`, then a shell, `source`, its path or an interpreter such
+> as `python3`, also after a `cp`, an `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged
+> as piping the download into a shell; a file named after an at sign (`curl --data-binary @file`) as that file; a script
+> handed to a terminal app (`open -a Terminal`, a `.command` file) as a step outside Dot's sandbox, which every preset
+> asks about (item 385), and outside yolo the sandbox refuses the opening itself (item 418). It does not follow what a
+> recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps those out of
+> Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a user of your
+> account with the rights of your account: keep backups, keep the workspace for scratch work, and use `balanced` or
+> `cautious` on a machine where a mistake would be expensive.

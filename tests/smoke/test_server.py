@@ -606,15 +606,10 @@ async def test_screenshots_are_served_by_their_file_name_only(client: httpx.Asyn
     assert served.status_code == 200
     assert served.headers["content-type"] == "image/png"
     assert served.content == PNG_1X1
-    for name in (
-        "0" * 24 + ".png",
-        "../config.toml",
-        "..%2Fconfig.toml",
-        "abc.png",
-        names[0].upper(),
-        "x" * 24 + ".png",
-    ):
+    for name in ("0" * 24 + ".png", "../config.toml", "abc.png", names[0].upper(), "x" * 24 + ".png"):
         assert (await client.get(f"/api/images/{name}")).status_code == 404, name
+    # A name with a dot segment, as a browser sends it, never reaches the route: the guard refuses the path (item 419).
+    assert (await client.get("/api/images/..%2Fconfig.toml")).status_code == 400
 
 
 async def test_the_status_the_models_and_the_checks_describe_this_installation(client: httpx.AsyncClient) -> None:

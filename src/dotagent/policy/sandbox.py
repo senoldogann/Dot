@@ -12,14 +12,31 @@ tools may not read the user's protected locations either: a search has no reason
 whatever path, link or letter case names the file. ``[shell] sandbox = false`` starts them without it, and Settings ›
 Rules switches it while the daemon runs (:class:`SwitchedSandbox`).
 
+A process that has another program act for it would act outside the sandbox, so the profile refuses that too:
+opening an application, a document or an address through Launch Services (``open``, a program's own call), starting the
+programs that hand one something to run (:data:`HANDING_PROGRAMS`: ``launchctl``, ``shortcuts``, ``lsregister``, where
+macOS installs them), the services that run what such a program hands them (:data:`HANDING_SERVICES`: the Shortcuts
+service and Launch Services' database, whatever program asks), creating a job of launchd, and writing a job for launchd
+into the user's ``~/Library/LaunchAgents``. An application that is already open is still driven (Mail, Calendar,
+Safari), with its own powers; ``desktop_open_app`` opens one from Dot's own process, and asks first for one that is not
+on the sealed system volume, however it is named.
+
+Apple Events are the exception, and the profile cannot refuse them: ``(deny appleevent-send …)`` compiles and holds
+nothing (measured on macOS 26: with the rule over the terminal apps, Script Editor, Automator, Shortcuts, System
+Events, the Finder and Xcode, a script still drove the Finder and the terminal apps, and started an application that
+was not running). A run's AppleScript can therefore still have another application act for it, with the powers of that
+application; the Automation permission the owner grants (TCC) and the policy's reading of the script
+(:mod:`dotagent.tools.apple`) are what stand in its way.
+
 What the sandbox costs: macOS starts no program that runs as root from inside it (``ps``, ``top``, ``sudo``,
-``crontab``). What it does not cover: a process that has another program act for it (Terminal through ``open``, a job
-of launchd, an application driven by Apple Events) acts through that program, outside it; those lines are what the guard
-reads. The programs Dot starts itself (its browser, the MCP servers) run from where they are installed, which a process
-of a run may change when the user's account may; Dot's own code is among what it loads and runs.
+``crontab``), and a run's command opens nothing (``open``). What it does not cover: Apple Events, as above; a program
+that speaks to a service through its own interface, not through the programs above; and the programs Dot starts itself
+(its browser, the MCP servers), which run from where they are installed, which a process of a run may change when the
+user's account may; Dot's own code is among what it loads and runs.
 """
 
 import asyncio
+from collections.abc import Sequence
 from pathlib import Path
 
 from dotagent.core.errors import ConfigError
@@ -30,6 +47,24 @@ SANDBOX_EXEC: str = "/usr/bin/sandbox-exec"
 _CHECKED_PROGRAM: str = "/usr/bin/true"
 
 log = get_logger(__name__)
+
+# The programs that hand another one something to run outside the sandbox: launchd a job, the Shortcuts service a
+# shortcut, Launch Services an application to know by its name.
+HANDING_PROGRAMS: tuple[Path, ...] = (
+    Path("/bin/launchctl"),
+    Path("/usr/bin/shortcuts"),
+    Path(
+        "/System/Library/Frameworks/CoreServices.framework/Versions/A/Frameworks/LaunchServices.framework/Versions/A/"
+        "Support/lsregister"
+    ),
+)
+# The services that run what such a program hands them, outside the sandbox whatever program asks: the Shortcuts
+# service runs a shortcut (its "Run Shell Script" among them), and Launch Services' database is what ``open`` finds a
+# bundle by, so a program a run wrote could register a bundle it made and have it opened by its bundle id.
+HANDING_SERVICES: tuple[str, ...] = (
+    "com.apple.siri.VoiceShortcuts.xpc",
+    "com.apple.lsd.modifydb",
+)
 
 
 class Sandbox(FrozenModel):
@@ -43,39 +78,56 @@ class Sandbox(FrozenModel):
 UNSANDBOXED: Sandbox = Sandbox(commands=(), search=())
 
 
-def _quoted(path: Path) -> str:
-    """``path`` as a string of the profile's language."""
-    escaped: str = str(path).replace("\\", "\\\\").replace('"', '\\"')
+def _quoted(text: str) -> str:
+    """``text`` as a string of the profile's language."""
+    escaped: str = text.replace("\\", "\\\\").replace('"', '\\"')
     return f'"{escaped}"'
 
 
-def _filters(kind: str, paths: list[Path]) -> str:
-    return " ".join(f"({kind} {_quoted(path)})" for path in paths)
+def _filters(kind: str, names: Sequence[str | Path]) -> str:
+    return " ".join(f"({kind} {_quoted(str(name))})" for name in names)
 
 
-def sandbox_profile(sealed: tuple[Path, ...], unwritable: tuple[Path, ...]) -> str:
+def sandbox_profile(sealed: tuple[Path, ...], unwritable: tuple[Path, ...], launch_agents: Path) -> str:
     """A profile that allows everything but reading or changing ``sealed``, changing ``unwritable``, and renaming or
-    removing a folder above any of them (a file can still be made inside such a folder). The paths must be resolved:
-    the sandbox matches the path a file has, not the link a process names it by."""
+    removing a folder above any of them (a file can still be made inside such a folder); and having another program act
+    outside it: opening anything through Launch Services, starting :data:`HANDING_PROGRAMS` where macOS installs them or
+    the services of :data:`HANDING_SERVICES` they would hand something to, creating a job of launchd, and writing into
+    ``launch_agents``, where launchd finds the jobs it starts at a login. The paths must be resolved: the sandbox
+    matches the path a file has, not the link a process names it by. Apple Events are not among them: macOS does not
+    hold this profile to ``appleevent-send``."""
     ancestors: list[Path] = sorted(
-        {folder for path in (*sealed, *unwritable) for folder in path.parents if folder != Path(folder.anchor)}
+        {
+            folder
+            for path in (*sealed, *unwritable, launch_agents)
+            for folder in path.parents
+            if folder != Path(folder.anchor)
+        }
     )
     rules: list[str] = ["(version 1)", "(allow default)"]
     if sealed:
         rules.append(f"(deny file-read* file-write* {_filters('subpath', sorted(set(sealed)))})")
     if unwritable:
         rules.append(f"(deny file-write* {_filters('subpath', sorted(set(unwritable)))})")
+    rules.append(f"(deny file-write* {_filters('subpath', [launch_agents])})")
     if ancestors:
         rules.append(f"(deny file-write* {_filters('literal', ancestors)})")
+    rules.append("(deny lsopen)")
+    rules.append(f"(deny process-exec {_filters('literal', list(HANDING_PROGRAMS))})")
+    rules.append(f"(deny mach-lookup {_filters('global-name', HANDING_SERVICES)})")
+    rules.append("(deny job-creation)")
     return "\n".join(rules)
 
 
-def build_sandbox(sealed: tuple[Path, ...], protected: tuple[Path, ...], unwritable: tuple[Path, ...]) -> Sandbox:
+def build_sandbox(
+    sealed: tuple[Path, ...], protected: tuple[Path, ...], unwritable: tuple[Path, ...], launch_agents: Path
+) -> Sandbox:
     """The sandbox of a run's processes: a command may neither read nor change ``sealed`` (Dot's own files) nor change
-    ``unwritable`` (what Dot loads and runs); a search may not read any ``protected`` location either."""
+    ``unwritable`` (what Dot loads and runs); a search may not read any ``protected`` location either. Neither has
+    another program act for it (:func:`sandbox_profile`)."""
     return Sandbox(
-        commands=(SANDBOX_EXEC, "-p", sandbox_profile(sealed, unwritable)),
-        search=(SANDBOX_EXEC, "-p", sandbox_profile(protected, unwritable)),
+        commands=(SANDBOX_EXEC, "-p", sandbox_profile(sealed, unwritable, launch_agents)),
+        search=(SANDBOX_EXEC, "-p", sandbox_profile(protected, unwritable, launch_agents)),
     )
 
 

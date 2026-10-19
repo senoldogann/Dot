@@ -1,6 +1,7 @@
 """The shared runtime: the configuration plus every long-lived service a run needs."""
 
 import asyncio
+import os
 import sys
 from contextlib import AsyncExitStack
 from dataclasses import dataclass
@@ -255,7 +256,8 @@ async def _run_sandbox(config: AppConfig, protected: tuple[Path, ...], dot_paths
     changing ``dot_paths``, a search out of every ``protected`` location too. It is built whatever [shell] sandbox says,
     so that Settings can switch it on later, and checked to start when it is on."""
     sealed: tuple[Path, ...] = await asyncio.to_thread(expand_protected, [], _guarded_files())
-    built: Sandbox = build_sandbox(sealed, protected, dot_paths)
+    launch_agents: Path = Path(await asyncio.to_thread(os.path.realpath, Path.home() / "Library" / "LaunchAgents"))
+    built: Sandbox = build_sandbox(sealed, protected, dot_paths, launch_agents)
     if config.shell.sandbox:
         await check_sandbox(built)
     return SwitchedSandbox(built, config.shell.sandbox)

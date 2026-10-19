@@ -131,6 +131,21 @@ def test_what_other_sites_send_a_browser_to_by_design_is_served_to_a_foreign_nav
     assert check_request(path, LOCAL_HOST, None, "cross-site", "navigate", None, TOKEN, PORT, frozenset()) is None
 
 
+@pytest.mark.parametrize(
+    "path",
+    ["/icons/../index.html", "/favicon.svg/../js/api.js", "/pages/../index.html", "/looks/a/../../index.html", "/./"],
+)
+def test_a_path_with_a_dot_segment_is_refused_before_anything_else(path: str) -> None:
+    """The review of item 410: a launcher's prefix, a run's page or a preview followed by ``..`` (``..%2F`` as a browser
+    sends it, decoded) reached another file of the UI with the headers of the prefix."""
+    refusal: Refusal | None = check_request(path, LOCAL_HOST, None, None, None, GOOD_AUTH, TOKEN, PORT, frozenset())
+    assert refusal is not None and refusal.status == 400, (path, refusal)
+
+
+def test_two_dots_inside_a_name_are_no_dot_segment() -> None:
+    assert check_request("/icons/a..b.png", LOCAL_HOST, None, None, None, None, TOKEN, PORT, frozenset()) is None
+
+
 def test_the_proof_of_the_daemon_is_an_hmac_of_the_nonce_keyed_with_the_token() -> None:
     assert daemon_proof(TOKEN, NONCE) == PROOF
     assert daemon_proof("another token", NONCE) != PROOF

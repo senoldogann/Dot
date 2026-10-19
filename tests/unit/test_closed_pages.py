@@ -30,6 +30,9 @@ def test_the_notes_name_the_page_and_say_where_the_model_stands() -> None:
 
 def test_open_takes_a_bundle_a_bundle_id_or_a_name_and_a_file_path_is_refused() -> None:
     assert open_arguments("/Applications/Terminal.app") == ["/Applications/Terminal.app"]
+    # A bundle's extension is read whatever its letter case, as the Mac's file systems read it (item 418), which is
+    # what a name with it is judged by too.
+    assert open_arguments("Terminal.APP") == ["Terminal.APP"]
     assert open_arguments("com.apple.Terminal") == ["-b", "com.apple.Terminal"]
     assert open_arguments("Terminal") == ["-a", "Terminal"]
     with pytest.raises(DesktopError, match="is a file path, not an application"):
