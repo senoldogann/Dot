@@ -1,6 +1,7 @@
-"""Dot's own files a run leaves alone (the outside audit of 2026-10-17, S2): what signing in to an MCP server gave
-Dot is guarded as its key file is, and the record of the MCP servers the daemon starts and the home of the OpenCode
-server it starts are read, never changed, as its plugins are."""
+"""Dot's own files a run does not change by itself (the outside audit of 2026-10-17, S2): what signing in to an MCP
+server gave Dot is guarded as its key file is, and the record of the MCP servers the daemon starts and the home of the
+OpenCode server it starts are Dot's own as its plugins are: read freely, changed only by the file tools once the owner
+agrees (item 398)."""
 
 from pathlib import Path
 

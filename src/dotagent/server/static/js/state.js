@@ -33,7 +33,7 @@ const snapshot = {
 };
 // The build of the pages this page was loaded from, which the daemon wrote in it as it served it (kept_pages.py): the
 // one the daemon's status names (`pages` of `GET /status`) unless the page is out of date (item 328).
-const OWN_PAGES = document.querySelector('meta[name="dot-pages"]').content;
+const OWN_PAGES = /** @type {HTMLMetaElement} */ (document.querySelector('meta[name="dot-pages"]')).content;
 
 const changeListeners = new Set();
 const lifecycleListeners = new Set();

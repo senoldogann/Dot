@@ -1634,3 +1634,42 @@
   flex: 1 1 100%;
   display: block;
 }
+
+/* Settings › Harness (item 393): the texts of a version read as they stand in the prompt, line by line. */
+.harness-text {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font: inherit;
+  font-size: var(--text-sm);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.harness-text.empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
+.harness-form .textarea {
+  min-height: 6lh;
+  font-family: var(--mono);
+  font-size: var(--text-sm);
+}
+
+.harness-facts {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.harness-facts dt {
+  color: var(--muted);
+}
+
+.harness-facts dd {
+  margin: 0;
+}

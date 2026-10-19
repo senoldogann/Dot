@@ -376,7 +376,8 @@ def test_the_forms_the_review_found_are_asked_about_at_least_in_ask_and_auto(com
     )
     decision: Decision = decide(info, "task", False, load_default_config().policy.preset, [], None)
     assert decision.verdict in ("ask", "deny"), decision
-    assert [route_for("ask", mode) for mode in ("ask", "auto")] == ["user", "reviewer"]
+    question: Decision = Decision(verdict="ask", source="preset", reason="", rule_id=None)
+    assert [route_for(question, mode) for mode in ("ask", "auto")] == ["user", "reviewer"]
 
 
 def test_a_jxa_script_that_drives_a_terminal_is_judged_by_the_line_it_types(tmp_path: Path) -> None:

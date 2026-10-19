@@ -86,7 +86,7 @@ export function findTheme(id) {
 
 function offers(id, scheme) {
   const theme = findTheme(id);
-  return theme !== undefined && theme.schemes.includes(scheme);
+  return theme?.schemes.includes(scheme) === true;
 }
 
 function storedPick(key, scheme) {

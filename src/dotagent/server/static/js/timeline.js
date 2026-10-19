@@ -5,7 +5,7 @@
 // time it took beside it (item 374), that the reader can fold away. A group is timed from the moment the work began (the
 // start of the run or the last message) to the moment it ended, so the groups of a run add up to the time the run took.
 
-import { AUTO_LINES, valueOf } from "./appearance/settings.js";
+import { AUTO_LINES, settingValue } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
 import { sentFiles } from "./attachments.js";
 import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
@@ -313,9 +313,9 @@ function buildFlock() {
  * ends a run under the reader's eyes, to be written in (item 366), rather than one read again; the
  * callbacks tell the page about what the timeline cannot show by itself: `onGrow()` after every event, `onPlan(steps, targets)`,
  * `onStats({ step, input, output })` after every model turn and every side call of the run (`step` 0: a compaction, a
- * review, a description of images), `onScaffold({ contextTokens, window, chosen, summariseAt })` for the run's scaffold
- * event (its context budget, its model's window, the size chosen for the model and the prompt past which the run
- * summarizes), `onSetup({ kind, short, iconName, text, tone })` for each line of how the run was set up (item 365; the
+ * review, a description of images), `onScaffold({ model, contextTokens, window, chosen, summariseAt })` for the run's
+ * scaffold event (its model, its context budget, its model's window, the size chosen for the model and the prompt past
+ * which the run summarizes), `onSetup({ kind, short, iconName, text, tone })` for each line of how the run was set up (item 365; the
  * conversation keeps none), `onCalls({ calls, failed })` after every tool call of the run, `onCompacted({ count, flagged })` after
  * every compaction of the run (item 260; the conversation shows a quiet line where it happened, item 312; `flagged`
  * counts the checks that found a section missing or a name the conversation never had),
@@ -752,7 +752,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   /** The model is done thinking: its block says "Thought", folded or open as the reader left it. */
   function endThought(scope) {
     const thought = scope.thought;
-    if (thought !== null && thought.live) {
+    if (thought?.live) {
       thought.live = false;
       thought.node.dataset.live = "false";
       thought.label.textContent = "Thought";
@@ -1027,7 +1027,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       }
     },
 
-    approval_decided(scope, record) {
+    approval_decided(_scope, record) {
       const entry = cards.get(record.data.approval_id);
       if (entry !== undefined) {
         cards.delete(record.data.approval_id);
@@ -1047,7 +1047,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const yolo = data.decided_by === "yolo";
       const denied = data.status === "denied";
       // Settings › General may keep such lines out of the chat (item 346); a refusal stays, as its action did not run.
-      if (!denied && valueOf(AUTO_LINES) === "hidden") {
+      if (!denied && settingValue(AUTO_LINES) === "hidden") {
         return;
       }
       const verdict = yolo ? "YOLO, not asked" : denied ? "Reviewer denied" : "Reviewer approved";
@@ -1178,7 +1178,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const data = record.data;
       const chosen = typeof data.chosen === "number" ? data.chosen : null;
       if (scope.runId === rootRunId) {
-        onScaffold({ contextTokens: data.context_tokens, window: data.window, chosen, summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null });
+        onScaffold({
+          model: typeof data.model === "string" ? data.model : null,
+          contextTokens: data.context_tokens,
+          window: data.window,
+          chosen,
+          summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null,
+        });
       }
       const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
       const budget = `budget ${compact(data.context_tokens)}`;
@@ -1268,7 +1274,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       made.refresh();
     },
 
-    draft_decided(scope, record) {
+    draft_decided(_scope, record) {
       drafts.get(record.data.id)?.update(record.data);
     },
 

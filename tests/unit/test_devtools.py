@@ -9,6 +9,7 @@ from pydantic import ValidationError
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.browser.devtools import devtools_address, devtools_switches
 from dotagent.config import BrowserConfig, load_default_config
+from dotagent.harness.components import NO_HARNESS
 from dotagent.store.models import BrowserMode
 
 ADDRESS: str = "http://127.0.0.1:9222"
@@ -41,6 +42,7 @@ def _prompt(devtools: str | None, tools: list[str]) -> str:
             (),
             devtools,
             "full",
+            NO_HARNESS,
         )
     )
 

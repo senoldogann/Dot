@@ -314,7 +314,7 @@ export function wordmark() {
   if (drawing === null) {
     throw new Error("the page has no wordmark to copy: index.html's opening is missing");
   }
-  const copy = drawing.cloneNode(true);
+  const copy = /** @type {SVGElement} */ (drawing.cloneNode(true));
   copy.setAttribute("role", "img");
   copy.setAttribute("aria-label", "Dot");
   return copy;

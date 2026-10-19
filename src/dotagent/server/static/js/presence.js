@@ -56,7 +56,7 @@ function count(n, one, many) {
 }
 
 /** One line of now from the activity: what works, what waits, what ended, what was learned, what is due; a quiet day says so. */
-export function nowLine(activity) {
+function nowLine(activity) {
   const parts = [];
   // The working section also lists a schedule due within the hour; only the runs are "working on".
   const runs = activity.working.filter((row) => row.run_id !== null).length;
@@ -91,7 +91,7 @@ function stripRows(activity, key) {
 /** The sections of the Today strip that have rows: `{ key, title, count, rows, rest }`. `rows` are the section's first
  * two and `rest` the others its "Show N more" opens, each a run without the runs it delegated; `count` is how many `rows`
  * and `rest` hold together, so the title counts what the section shows. */
-export function todaySections(activity) {
+function todaySections(activity) {
   return SECTIONS.map(({ key, title }) => ({ key, title, all: stripRows(activity, key) }))
     .filter(({ all }) => all.length > 0)
     .map(({ key, title, all }) => {

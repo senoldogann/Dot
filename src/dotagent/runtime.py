@@ -213,7 +213,8 @@ def _own_code() -> tuple[Path, ...]:
 
 
 def _dot_paths(config: AppConfig) -> tuple[Path, ...]:
-    """What Dot loads and runs, which the agent may read (a skill's files are read and run by path) but never change:
+    """What Dot loads and runs, which the agent may read (a skill's files are read and run by path) and change only with
+    its own file tools once the user agrees (item 398):
     its own code, which the daemon runs at its next start, its plugins and their own files, whose MCP servers start
     with the daemon and are given keys from the key store, and so does each server of its record of those added from
     other agents (item 165) and of its record of those added on Customize › Plugins, the home of the OpenCode server it

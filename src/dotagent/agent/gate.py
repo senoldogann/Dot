@@ -12,7 +12,14 @@ from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied, RunC
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
-from dotagent.policy.engine import YOLO_WAIVED_SOURCES, approval_severity, decide, owner_handoff, route_for
+from dotagent.policy.engine import (
+    YOLO_WAIVED_SOURCES,
+    approval_severity,
+    decide,
+    owner_handoff,
+    route_for,
+    supervised,
+)
 from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action, spacing_wait
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
@@ -92,12 +99,14 @@ class SiteLocks:
 class RunGate:
     """Authorises the actions of one run and remembers whether untrusted content has been seen.
 
-    ``approval_mode`` says who answers a question the policy raises: the user (``ask``), the review model (``auto``) or
-    nobody (``yolo``: the action runs and only a record is kept). Yolo also lets through what the other modes refuse
-    (secrets, exfiltration) or hand to the user (money, credentials); a research run stays read-only and a hand-off
-    rule of the user still stops it. ``instructions`` are the user's own words so far, which is all the reviewer takes
-    as authority. ``pace`` bounds the public and social actions of the browser on each site, in every mode. ``locks``
-    are the runtime's :class:`SiteLocks`, shared with the gates of the other runs.
+    ``approval_mode`` says who answers a question the policy raises: the user (``supervised``, which also asks before
+    every change the policy lets through, and ``ask``), the review model (``auto``) or nobody (``yolo``: the action
+    runs and only a record is kept). A change of Dot's own files is the user's in every mode but yolo (item 398). Yolo
+    also lets through what the other modes refuse (secrets, exfiltration) or hand to the user (money, credentials); a
+    research run stays read-only and a hand-off rule of the user still stops it. ``instructions`` are the user's own
+    words so far, which is all the reviewer takes as authority. ``pace`` bounds the public and social actions of the
+    browser on each site, in every mode. ``locks`` are the runtime's :class:`SiteLocks`, shared with the gates of the
+    other runs.
     """
 
     def __init__(
@@ -233,7 +242,8 @@ class RunGate:
         rules: list[RuleRecord] = await self._store.list_rules()
         state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
-        decision: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
+        decided: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
+        decision: Decision = supervised(decided, info) if self._approval_mode == "supervised" else decided
         if decision.verdict == "allow":
             return ""
         if allowance is not None and decision is allowance and state is not None:
@@ -269,7 +279,7 @@ class RunGate:
         if decision.verdict == "deny":
             await self._emit_policy(info, decision)
             raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})
-        route: Route = route_for(decision.verdict, self._approval_mode)
+        route: Route = route_for(decision, self._approval_mode)
         if route == "waived":
             return await self._waive(info, decision)
         if route == "reviewer":

@@ -328,8 +328,9 @@ def _act_kind(steps: list[Step]) -> ActionKind:
 
 
 def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretFieldCheck:
-    """What a batch does at a field that takes a secret: ask and auto refuse it. Yolo types into it after asking the
-    gate, which waives the hand-off and records it, unless the batch was authorized for that kind of secret already."""
+    """What a batch does at a field that takes a secret: every mode but yolo refuses it. Yolo types into it after asking
+    the gate, which waives the hand-off and records it, unless the batch was authorized for that kind of secret
+    already."""
     if ctx.approvals != "yolo":
         return refuse_secret_field
 

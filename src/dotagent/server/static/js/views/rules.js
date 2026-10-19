@@ -328,7 +328,7 @@ function buildSandbox(isDisposed) {
     label: "Sandbox for a run's commands",
     hint:
       "On, the shell commands, terminal sessions, AppleScript and searches of a run that is not yolo start in a macOS sandbox: they can neither read nor change Dot's own files (its keys, token, settings, database and browser profiles) nor change what Dot loads and runs, and macOS starts no program that runs as root there (ps, top, sudo). Off, they run with your account's rights, and the shell guard still reads every line. A yolo run is never sandboxed. Takes effect from the next command, without a restart; kept in the config file as [shell] sandbox.",
-    read: () => view !== null && view.sandbox,
+    read: () => view?.sandbox === true,
     write: async (on) => {
       view = await api.put("/shell/sandbox", { sandbox: on });
       toast("ok", on ? "From the next command on, a run that is not yolo works in the sandbox." : "From the next command on, every run works without the sandbox.");
@@ -360,7 +360,7 @@ function buildSandbox(isDisposed) {
   return { element: el("section", { class: "card card-pad", "aria-label": "Sandbox" }, setting.element), load };
 }
 
-export function mount(root, ctx) {
+export function mount(root, _ctx) {
   let disposed = false;
   let rules = null;
   const holder = el("div", null, loadingPanel());

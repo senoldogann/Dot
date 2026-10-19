@@ -21,6 +21,7 @@ const DRAFT_TITLE = { mail: "Dot drafted an email", message: "Dot drafted a mess
 
 const FINISHED_FACE = { done: "done", failed: "failed" };
 // The line breaks of Python's str.splitlines, so that the first line of a result is the one the push shows.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: the control characters are the line breaks str.splitlines knows
 const LINE_BREAK = /\r\n|[\n\v\f\r\x1c-\x1e\x85\u2028\u2029]/;
 
 let pageTitle = "Dot";
@@ -31,7 +32,7 @@ function paintTitle() {
   const waiting = snapshot.approvals.length;
   document.title = waiting === 0 ? pageTitle : `(${waiting}) ${pageTitle}`;
   const link = document.querySelector('link[rel="icon"]');
-  if (link !== null) {
+  if (link instanceof HTMLLinkElement) {
     link.href = faceDataUrl(overallState(snapshot));
   }
 }
@@ -124,7 +125,7 @@ export function setTellEvenWhenLooking(on) {
 
 /** Whether you are looking at the run `runId`: its own page is open (`hash`), the tab is visible and the window is the
  * active one. Pure, so the rule can be read alone; `lookingAt` reads the page. */
-export function isLooking(runId, { hash, visibility, focused }) {
+function isLooking(runId, { hash, visibility, focused }) {
   return visibility === "visible" && focused && hash === `#/runs/${runId}`;
 }
 

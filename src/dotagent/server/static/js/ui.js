@@ -38,6 +38,8 @@ export async function attempt(action) {
 /**
  * Ask for a yes or no; resolves to true when confirmed. `focusCancel` puts the focus on Cancel instead of the confirm
  * button, for the questions a stray Enter must not answer with yes.
+ * @param {{ title: string, message: string, confirmLabel: string, danger?: boolean, focusCancel?: boolean }} question
+ * @returns {Promise<boolean>}
  */
 export function confirmDialog({ title, message, confirmLabel, danger, focusCancel }) {
   return new Promise((resolve) => {

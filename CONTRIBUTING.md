@@ -17,7 +17,11 @@ Dot runs on macOS only, as it depends on PyObjC. With Python 3.13 and [uv](https
 git clone https://github.com/senoldogann/Dot.git
 cd Dot
 uv sync
+npm ci
 ```
+
+`npm ci` installs the checks of the web interface (Biome and TypeScript, into `node_modules/`) and needs Node 22 or
+later; nothing of Dot needs Node to run.
 
 ## The checks every change passes
 
@@ -32,7 +36,13 @@ uv run mypy src
 uv run pytest tests/unit -q -n auto
 uv run dotx eval check
 uv run pytest tests/smoke -q -n auto -m "not live and not browser and not internet and not desktop and not hosted"
+npm run check
 ```
+
+`npm run check` lints the scripts of the web interface with Biome (`biome.json`), checks their types with `tsc` over
+their JSDoc (`tsconfig.json`; the service worker apart, in `tsconfig.sw.json`) and runs the unit tests of their pure
+modules (`tests/js`, `node --test`). `npm run fix` applies the fixes Biome can make. [Development](docs/development.md)
+says how strict the type check is and what comes next.
 
 The gate leaves out the tests that need a browser or a service. Run those of them that touch your change on your Mac:
 `-m "not live and not internet and not hosted and not desktop"` adds the browser tests, which drive Google Chrome

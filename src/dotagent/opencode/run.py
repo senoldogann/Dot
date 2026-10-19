@@ -260,7 +260,12 @@ def permission_action(
                 flags=assessment.flags,
             )
         case "edit":
-            return write_action(tool, _target_path(asked, workspace), workspace, protected, dot_paths, "Write")
+            edit: ActionInfo = write_action(
+                tool, _target_path(asked, workspace), workspace, protected, dot_paths, "Write"
+            )
+            # OpenCode's agent writes outside Dot's file tools and their undo journal: a change of Dot's own files,
+            # which those tools make once the user agrees (item 398), stays refused to it.
+            return edit.model_copy(update={"flags": ("secret_access",)}) if "self_change" in edit.flags else edit
         case "read" | "list" | "glob" | "grep" | "external_directory":
             return read_action(tool, _target_path(asked, workspace), workspace, protected, dot_paths, "Read")
         case "webfetch":
