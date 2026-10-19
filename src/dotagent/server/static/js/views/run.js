@@ -1189,12 +1189,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The Screen tab with nothing yet (item 401): Dot's computer is quiet, and what it shows and the screenshots it takes
   // stand there once it works. The empty panel is the page's own, in Dot's voice; the card of the page takes its place
   // as soon as there is a page.
-  const screenQuiet = el(
-    "div",
-    { class: "empty" },
-    icon("monitor"),
-    el("div", null, "Dot's computer is quiet: the screenshots it takes while it works will appear here."),
-    el("div", { class: "hint" }, "Settings › Browser opens Dot's computer when a run starts its browser."),
+  const screenQuiet = emptyPanel(
+    "monitor",
+    "Dot's computer is quiet",
+    "The screenshots it takes while it works will appear here. Settings › Browser opens Dot's computer when a run starts its browser.",
   );
   let screenContent = detail.held;
   function paintScreen() {
@@ -1436,7 +1434,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     }
     console.error("the run stream ended", error);
     if (error.status === 404) {
-      root.replaceChildren(backLink(), emptyPanel("Run not found", `No run has the id ${runId}.`));
+      root.replaceChildren(backLink(), emptyPanel("circleDashed", "Run not found", `No run has the id ${runId}.`));
       return;
     }
     toast("error", `Live updates stopped: ${error.message}`);
@@ -1523,7 +1521,7 @@ export function mount(root, ctx) {
       if (controller.signal.aborted) {
         return;
       }
-      const problem = error.status === 404 ? emptyPanel("Run not found", `No run has the id ${runId}.`) : errorPanel(error, () => attempt(open));
+      const problem = error.status === 404 ? emptyPanel("circleDashed", "Run not found", `No run has the id ${runId}.`) : errorPanel(error, () => attempt(open));
       root.replaceChildren(backLink(), problem);
       shown();
       return;

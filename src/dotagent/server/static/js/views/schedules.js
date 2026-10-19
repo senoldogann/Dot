@@ -478,7 +478,7 @@ export function mount(root, ctx) {
       return;
     }
     if (views.length === 0) {
-      holder.replaceChildren(emptyPanel("No schedules yet", "Add one with New schedule and Dot will run it by itself."));
+      holder.replaceChildren(emptyPanel("calendar", "No schedules yet", "Add one with New schedule and Dot will run it by itself."));
       return;
     }
     const handlers = {

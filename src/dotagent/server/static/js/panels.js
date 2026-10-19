@@ -46,8 +46,16 @@ export function loadingPanel() {
   return el("div", { class: "card" }, inlineLoading());
 }
 
-export function emptyPanel(title, text) {
-  return el("div", { class: "empty-line" }, text === "" ? title : `${title}. ${text}`);
+/** The empty state of a page or a list (item 407): `mark` (an icon's name) in a quiet ring, `title` and the line `text`
+ * that says what brings something here; "" for no line. */
+export function emptyPanel(mark, title, text) {
+  return el(
+    "div",
+    { class: "empty-state", role: "status" },
+    el("span", { class: "empty-mark", "aria-hidden": "true" }, icon(mark)),
+    el("p", { class: "empty-title" }, title),
+    text === "" ? null : el("p", { class: "empty-line" }, text),
+  );
 }
 
 export function errorPanel(error, retry) {

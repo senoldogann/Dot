@@ -189,7 +189,7 @@ function mountList(root) {
       working = summaries.some((summary) => summary.working !== null);
       holder.replaceChildren(
         summaries.length === 0
-          ? emptyPanel("No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the outcome is verified.")
+          ? emptyPanel("target", "No campaigns yet", "Switch on Keep going when you start a task, and Dot works on it until the outcome is verified.")
           : el("div", { class: "card" }, summaries.map((summary) => campaignRow(summary, reload))),
       );
     } catch (error) {

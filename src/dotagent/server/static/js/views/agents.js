@@ -548,6 +548,7 @@ function learnedSection(record, learned, actions) {
   if (learned.lessons.length === 0 && learned.skills.length === 0) {
     parts.push(
       emptyPanel(
+        "users",
         "Nothing yet",
         `${record.name}'s lessons and the skills it learns from its own work will be listed here, for its runs alone.`,
       ),
@@ -681,7 +682,7 @@ function mountPage(root, ctx, agentId) {
     runs.replaceChildren(
       el("div", { class: "section-label" }, "Chats"),
       detail.runs.length === 0
-        ? emptyPanel("No chats yet", `Send ${detail.record.name} a message above.`)
+        ? emptyPanel("message", "No chats yet", `Send ${detail.record.name} a message above.`)
         : el("div", { class: "card" }, detail.runs.map(runRow)),
     );
     messages.replaceChildren(

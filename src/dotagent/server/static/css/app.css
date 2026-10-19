@@ -1360,10 +1360,47 @@ a.pill:hover {
   margin-bottom: 8px;
 }
 
-/* An empty place is one line that says so and what to do (item 79): no card, no icon. */
-.empty-line {
-  padding: 12px 16px;
+/* An empty place stands in the middle of its page (item 407, after the Screen tab's quiet panel of item 401): a mark
+   in a quiet ring, a title and one line that says what brings something here; no card. */
+.empty-state {
+  display: grid;
+  justify-items: center;
+  gap: var(--space-1);
+  max-width: 420px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
   color: var(--muted);
+}
+
+.empty-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: var(--space-2);
+  border: 1px solid color-mix(in srgb, var(--muted) 28%, transparent);
+  border-radius: var(--radius-pill);
+  background: color-mix(in srgb, var(--muted) 8%, transparent);
+  color: var(--muted);
+}
+
+.empty-mark .icon {
+  width: 20px;
+  height: 20px;
+}
+
+.empty-title {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--text-md);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-ui);
+}
+
+.empty-line {
+  margin: 0;
+  max-width: 46ch;
 }
 
 /* The facts of a row or an answer: separate spans a space apart, not one dotted string (item 79). */
@@ -1828,9 +1865,6 @@ a.pill:hover {
   flex: 1 1 220px;
 }
 
-.plugin-none {
-  margin: 0;
-}
 
 .plugin-own .plugin-tile {
   margin: 0 16px 8px;
