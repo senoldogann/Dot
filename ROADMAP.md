@@ -14739,14 +14739,14 @@ secrets in a thread; and shortened the memory tools' descriptions, which the mod
 
 ### 385. The deep review of 2026-10-19: what was found in the paths a human merges, fixed
 
-**Status: in progress, for the owner to merge** (it changes `src/dotagent/policy/`, a path that needs a human). The
-owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve problemleri düzelt" (review the deep review
-report of 2026-10-19 and fix its problems); this item holds its findings inside the paths a human merges, item 386 those
-outside them. **As built (2026-10-19).** B1: a payment step under the pre-approved caps of `[policy.spend]` no longer
-skips the owner's rules: a rule that hands the step off still does, in every mode, a `yolo` run's too
-(`policy/engine.py` `decide`). B2: a payment step's amount is the largest of the amounts in the labels of its controls
-and of the page's total (`tools/browser.py`), so a coupon or a basket line in the same step cannot stand for the
-payment. B11: `docs/safety.md` says which steps of the order hold in every mode. B3: a file named after an at sign
+**Status: done (2026-10-19), merged on the owner's word of the same day** (it changes `src/dotagent/policy/`, a path
+that needs a human). The owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve problemleri düzelt"
+(review the deep review report of 2026-10-19 and fix its problems); this item holds its findings inside the paths a
+human merges, item 386 those outside them. **As built (2026-10-19).** B1: a payment step under the pre-approved caps of
+`[policy.spend]` no longer skips the owner's rules: a rule that hands the step off still does, in every mode, a `yolo`
+run's too (`policy/engine.py` `decide`). B2: a payment step's amount is the largest of the amounts in the labels of its
+controls and of the page's total (`tools/browser.py`), so a coupon or a basket line in the same step cannot stand for
+the payment. B11: `docs/safety.md` says which steps of the order hold in every mode. B3: a file named after an at sign
 (`curl --data-binary @~/…`) is judged as that file, so a protected one is refused however it is spelled
 (`policy/shell.py` `_protected_words`). B4: a script the line downloads and then runs (`curl -o`, `wget -O`, `git
 clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp` or an `mv`) is judged as
@@ -14755,15 +14755,14 @@ standard input (`sh < y.sh`, `cat y.sh | bash`). B5: `mv` takes its sources from
 folder outside the workspace is destructive there, as `rm` is. B12: a script handed to a terminal app (`open -a
 Terminal`, `-b`, a variable app name, `open -f`) or a script type that runs as it opens (`.command`) is a step outside
 Dot's sandbox, which every preset asks about; `open -a Terminal` alone, and `open` of a document, stay as they were. B8,
-an owner's rule whose regular expression backtracks for long, is not fixed: matching in a thread does not spare the
-event loop, as `re` holds the interpreter's lock, so a fix needs the `regex` package with its timeout or a process of
-its own, which is the owner's to choose. A security review by a separate agent found the thread did not help, a file
-named as the terminal app slipped by, and interpreters other than the shells were missed; the pre-push review found
-`open -na`, a download fed on standard input, a path given by a variable, the other copy commands, `git -C` and curl's
-`--output-dir`; each is fixed or taken back. Its merge with main of the same day (Fable 5.1) took two more: `rsync -t`
-read as a target folder (it keeps times), and a download behind a wrapper or an assignment (`timeout 60 curl -o`, `cat
-y.sh | env bash`, `X=1 sh < y.sh`) not followed; both fixed. Tests: `tests/unit/test_spend.py`,
-`tests/unit/test_shell_policy.py`. Docs: `docs/safety.md`.
+an owner's rule whose regular expression backtracks for long, is item 387's: matching in a thread did not spare the
+event loop, as `re` holds the interpreter's lock, and the owner chose the `regex` package with its timeout. A security
+review by a separate agent found the thread did not help, a file named as the terminal app slipped by, and interpreters
+other than the shells were missed; the pre-push review found `open -na`, a download fed on standard input, a path given
+by a variable, the other copy commands, `git -C` and curl's `--output-dir`; each is fixed or taken back. Its merge with
+main of the same day (Fable 5.1) took two more: `rsync -t` read as a target folder (it keeps times), and a download
+behind a wrapper or an assignment (`timeout 60 curl -o`, `cat y.sh | env bash`, `X=1 sh < y.sh`) not followed; both
+fixed. Tests: `tests/unit/test_spend.py`, `tests/unit/test_shell_policy.py`. Docs: `docs/safety.md`.
 
 ### 386. The deep review of 2026-10-19: what was found outside the paths a human merges, fixed
 
@@ -14781,6 +14780,19 @@ alone. B10: a one-time schedule whose firing a crash cut before its run was unde
 as the scheduler starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`,
 `test_previews.py`, `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`,
 `docs/memory-and-schedules.md`.
+
+### 387. An owner's rule is matched with a timeout
+
+**Status: in progress, for the owner to merge** (it changes `src/dotagent/policy/` and the dependencies in
+`pyproject.toml`, paths that need a human). The finding B8 of the deep review of 2026-10-19 and the owner's choice of
+the same day: the `regex` package, with a timeout. **As built (2026-10-19).** An owner's rule is matched with the
+`regex` package instead of `re`, with a timeout of 0.25 s an action (`policy/engine.py` `match_rule`,
+`RULE_MATCH_TIMEOUT_S`): `re` holds the interpreter's lock for the whole match, so a pattern that backtracks for long,
+`(a|aa)+$` on a long line, held the daemon's event loop, and every page and stream with it, for as long as it ran, and
+running it in a thread did not help (item 385 tried and took that back). A match that times out is refused as a rule
+that cannot be read is, rather than passed over, which could let through an action the rule stops. `regex` reads the
+patterns `re` reads. Dependencies: `regex`, and `types-regex` for the type check. Tests:
+`tests/unit/test_rule_timeout.py`. Docs: `docs/safety.md`.
 
 ### 388. The web interface has checks of its own, and its pages load on demand
 
