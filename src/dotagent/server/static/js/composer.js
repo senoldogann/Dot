@@ -104,7 +104,8 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
       return "plug";
     }
     if (item.kind === "skill") {
-      return "sparkles";
+      // The skill's own icon (item 408); the palette of an older daemon names none.
+      return item.icon ?? "sparkles";
     }
     if (item.kind === "tool") {
       return toolIconName(item.label);

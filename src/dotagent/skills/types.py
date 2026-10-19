@@ -25,17 +25,21 @@ class SkillFrontmatter(FrozenModel):
 
     name: str = Field(min_length=1, max_length=64, pattern=SKILL_NAME_PATTERN)
     description: str = Field(min_length=1, max_length=1024)
+    # Dot's own key (item 408): the name of one of the interface's icons; another agent's skill has none.
+    icon: str | None = Field(default=None, max_length=40)
 
 
 class Skill(FrozenModel):
     """One usable skill: its name and description for the prompt, its folder, the instructions the model reads when it
-    activates the skill, and where the skill was found (``home``, ``config`` or ``plugin <name>``)."""
+    activates the skill, where the skill was found (``home``, ``config`` or ``plugin <name>``), and the ``icon`` it
+    shows (item 408): its frontmatter's when it names one of the interface's, else one read from its words."""
 
     name: str
     description: str
     root: Path
     body: str
     source: str
+    icon: str
 
 
 class SkillProblem(FrozenModel):

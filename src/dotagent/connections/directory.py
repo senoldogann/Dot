@@ -96,9 +96,6 @@ _APPROVED_ONLY: str = (
     "{name}'s MCP server lets in approved clients alone, so Dot cannot connect to it; Dot can still work in {site} in "
     "its own browser once you sign in there."
 )
-_SECRET_CLIENT: str = (
-    "{name}'s MCP server registers a client only with a secret, which Dot's sign-in has not been tried with."
-)
 
 
 def _own_client(name: str) -> PluginWay:
@@ -107,10 +104,6 @@ def _own_client(name: str) -> PluginWay:
 
 def _approved_only(name: str, site: str) -> PluginWay:
     return _untried(_APPROVED_ONLY.format(name=name, site=site))
-
-
-def _secret_client(name: str) -> PluginWay:
-    return _untried(_SECRET_CLIENT.format(name=name))
 
 
 PLUGINS: tuple[PluginListing, ...] = (
@@ -145,13 +138,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         colour="181717",
         glyph=None,
         monogram=None,
-        ways=(
-            _web("github"),
-            _untried(
-                "GitHub's MCP server takes a personal access token rather than a sign-in: it can be set up in Dot's "
-                "config ([[mcp]] with an Authorization header), which has not been tried."
-            ),
-        ),
+        ways=(_mcp("github"), _web("github")),
     ),
     PluginListing(
         id="slack",
@@ -305,7 +292,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         colour="3FCF8E",
         glyph=None,
         monogram=None,
-        ways=(_secret_client("Supabase"),),
+        ways=(_mcp("supabase"),),
     ),
     PluginListing(
         id="hugging-face",
@@ -316,7 +303,7 @@ PLUGINS: tuple[PluginListing, ...] = (
         colour="FFD21E",
         glyph=None,
         monogram=None,
-        ways=(_secret_client("Hugging Face"),),
+        ways=(_mcp("huggingface"),),
     ),
     PluginListing(
         id="figma",
@@ -328,6 +315,105 @@ PLUGINS: tuple[PluginListing, ...] = (
         glyph=None,
         monogram=None,
         ways=(_approved_only("Figma", "figma.com"),),
+    ),
+    PluginListing(
+        id="neon",
+        name="Neon",
+        section="development",
+        does=None,
+        logo="neon.svg",
+        colour="34D59A",
+        glyph=None,
+        monogram=None,
+        ways=(_mcp("neon"),),
+    ),
+    PluginListing(
+        id="context7",
+        name="Context7",
+        section="development",
+        does=None,
+        logo=None,
+        colour=None,
+        glyph=None,
+        monogram="C7",
+        ways=(_mcp("context7"),),
+    ),
+    PluginListing(
+        id="exa",
+        name="Exa",
+        section="development",
+        does=None,
+        logo=None,
+        colour=None,
+        glyph="search",
+        monogram=None,
+        ways=(_mcp("exa"),),
+    ),
+    PluginListing(
+        id="firecrawl",
+        name="Firecrawl",
+        section="development",
+        does=None,
+        logo=None,
+        colour="FF5A1F",
+        glyph="globe",
+        monogram=None,
+        ways=(_mcp("firecrawl"),),
+    ),
+    PluginListing(
+        id="tavily",
+        name="Tavily",
+        section="development",
+        does=None,
+        logo=None,
+        colour=None,
+        glyph=None,
+        monogram="Tv",
+        ways=(_mcp("tavily"),),
+    ),
+    PluginListing(
+        id="brave-search",
+        name="Brave Search",
+        section="development",
+        does=None,
+        logo="brave.svg",
+        colour="FB542B",
+        glyph=None,
+        monogram=None,
+        ways=(_mcp("brave-search"),),
+    ),
+    PluginListing(
+        id="playwright",
+        name="Playwright",
+        section="development",
+        does=None,
+        logo=None,
+        colour="2EAD33",
+        glyph="monitor",
+        monogram=None,
+        ways=(_mcp("playwright"),),
+    ),
+    PluginListing(
+        id="fetch",
+        name="Fetch",
+        section="development",
+        does=None,
+        logo="modelcontextprotocol.svg",
+        colour=None,
+        glyph=None,
+        monogram=None,
+        ways=(_mcp("fetch"),),
+    ),
+    PluginListing(
+        id="sequential-thinking",
+        name="Sequential Thinking",
+        section="development",
+        does=None,
+        logo="modelcontextprotocol.svg",
+        colour=None,
+        glyph=None,
+        monogram=None,
+        ways=(_mcp("sequential-thinking"),),
     ),
     PluginListing(
         id="stripe",
@@ -368,6 +454,39 @@ PLUGINS: tuple[PluginListing, ...] = (
         ways=(_approved_only("Canva", "canva.com"),),
     ),
     PluginListing(
+        id="monday",
+        name="monday.com",
+        section="business",
+        does=None,
+        logo=None,
+        colour="6161FF",
+        glyph=None,
+        monogram="m.",
+        ways=(_mcp("monday"),),
+    ),
+    PluginListing(
+        id="intercom",
+        name="Intercom",
+        section="business",
+        does=None,
+        logo="intercom.svg",
+        colour="6AFDEF",
+        glyph=None,
+        monogram=None,
+        ways=(_mcp("intercom"),),
+    ),
+    PluginListing(
+        id="wix",
+        name="Wix",
+        section="business",
+        does=None,
+        logo="wix.svg",
+        colour="0C6EFC",
+        glyph=None,
+        monogram=None,
+        ways=(_mcp("wix"),),
+    ),
+    PluginListing(
         id="todoist",
         name="Todoist",
         section="productivity",
@@ -399,6 +518,17 @@ PLUGINS: tuple[PluginListing, ...] = (
         glyph=None,
         monogram=None,
         ways=(_own_client("Box"),),
+    ),
+    PluginListing(
+        id="memory",
+        name="Memory",
+        section="productivity",
+        does=None,
+        logo="modelcontextprotocol.svg",
+        colour=None,
+        glyph=None,
+        monogram=None,
+        ways=(_mcp("memory"),),
     ),
     PluginListing(
         id="notes",
@@ -527,8 +657,12 @@ def _way_view(way: PluginWay) -> PluginWayView:
         service = next((one for one in MCP_SERVICES if one.id == way.ref), None)
         if service is None:
             raise LookupError(f"the MCP catalogue has no service {way.ref}")
-        host: str = urlsplit(service.url).hostname or service.url
-        data: str = f"Between Dot and {host}, the service's own server; {_TO_MODEL}"
+        if service.url is not None:
+            host: str = urlsplit(service.url).hostname or service.url
+            data: str = f"Between Dot and {host}, the service's own server; {_TO_MODEL}"
+        else:
+            # A local service (item 408): a server Dot starts on this Mac, which reaches what its own docs say.
+            data = f"On this Mac, a server Dot starts with {service.command}; {_TO_MODEL}"
         if service.signs_in:
             data += " Dot keeps your sign-in in its home."
         how: str = _MCP_SIGNS_IN if service.signs_in else _MCP_OPEN
@@ -575,3 +709,12 @@ def plugin_view(listing: PluginListing) -> PluginView:
 def plugin_views() -> tuple[PluginView, ...]:
     """Every listing of the Plugins page, in its order."""
     return tuple(plugin_view(listing) for listing in PLUGINS)
+
+
+def logo_of_service(service_id: str) -> str | None:
+    """The file of the mark of the listing whose MCP way is the service ``service_id``, for the servers list (item
+    408); None for a service with no logo, or none of the directory."""
+    for listing in PLUGINS:
+        if any(way.kind == "mcp" and way.ref == service_id for way in listing.ways):
+            return listing.logo
+    return None

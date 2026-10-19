@@ -29,6 +29,7 @@ from dotagent.desktop.snapshots import SnapshotTaken
 from dotagent.help.elsewhere import FoundElsewhere
 from dotagent.llm.roles import ModelRole
 from dotagent.llm.types import Effort, OneMessage, Speed, WindowSource
+from dotagent.mcp.catalogue import ServiceKind
 from dotagent.mcp.types import McpFailure
 from dotagent.notify.keys import keys_problem
 from dotagent.policy.types import ApprovalMode
@@ -966,6 +967,7 @@ class PaletteSkill(FrozenModel):
     name: str
     description: str
     source: str
+    icon: str
 
 
 class PaletteTool(FrozenModel):
@@ -1112,16 +1114,31 @@ class McpServerView(FrozenModel):
     error: str | None
     link: str | None
     signs_in: bool
+    logo: str | None
+
+
+class ServiceSecretView(FrozenModel):
+    """A secret a service asks the owner for on the page (item 408): its name, its label and where to get one."""
+
+    name: str
+    label: str
+    help: str
 
 
 class McpServiceView(FrozenModel):
-    """A service of the MCP catalogue (``mcp/catalogue.py``), with whether Dot has its server already."""
+    """A service of the MCP catalogue (``mcp/catalogue.py``), with whether Dot has its server already. ``kind``:
+    reached at ``url`` (``remote``) or started by ``command`` on this Mac (``local``); ``secrets`` are asked for
+    before it is added; ``logo`` is its mark among the plugins' (item 408)."""
 
     id: str
     name: str
     does: str
-    url: str
+    kind: ServiceKind
+    url: str | None
+    command: str | None
+    secrets: tuple[ServiceSecretView, ...]
     signs_in: bool
+    logo: str | None
     added: bool
 
 
@@ -1141,6 +1158,8 @@ class McpServerAdd(FrozenModel):
     name: str | None
     address: str | None
     origin: str
+    # The values of the service's secrets, by name (item 408): kept in Dot's ``.env``, never in the record.
+    secrets: dict[str, str] = Field(default_factory=dict)
 
 
 class McpReconnect(FrozenModel):

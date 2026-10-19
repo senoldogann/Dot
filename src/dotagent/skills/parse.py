@@ -6,6 +6,7 @@ import yaml
 from pydantic import ValidationError
 
 from dotagent.core.errors import SkillError
+from dotagent.skills.icons import skill_icon
 from dotagent.skills.types import Skill, SkillFrontmatter
 
 _DELIMITER: str = "---"
@@ -58,10 +59,12 @@ def parse_skill(path: Path, text: str, source: str) -> Skill:
     instructions: str = body.strip()
     if instructions == "":
         raise SkillError("SKILL.md has no instructions after the frontmatter", {"path": str(path)})
+    description: str = " ".join(front.description.split())
     return Skill(
         name=front.name,
-        description=" ".join(front.description.split()),
+        description=description,
         root=path.parent,
         body=instructions,
         source=source,
+        icon=skill_icon(front.icon, (front.name, description)),
     )

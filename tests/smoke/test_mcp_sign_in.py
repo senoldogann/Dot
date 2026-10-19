@@ -46,14 +46,16 @@ from starlette.types import ASGIApp
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.connections import mac
-from dotagent.core.paths import connected_servers_path
+from dotagent.core.paths import connected_servers_path, env_file_path
 from dotagent.evals.runner import SCRIPTED_MODEL
+from dotagent.mcp.catalogue import MCP_SERVICES, McpService, ServiceSecret
 from dotagent.mcp.connected import read_connected
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.mcp.signin import SIGN_IN_AGAIN, read_sign_in, sign_in_path
 from dotagent.mcp.types import McpTool
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.server import routes_connections
+from dotagent.secrets import parse_env_file
+from dotagent.server import routes_connections, routes_mcp
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
@@ -420,6 +422,39 @@ async def test_a_bad_name_an_unknown_page_and_a_stray_callback_are_refused(world
         stray: httpx.Response = await browser.get("/oauth/callback", params={"state": "made-up", "code": "x"})
     assert stray.status_code == 400
     assert "Dot does not wait for this sign-in" in stray.text
+
+
+async def test_a_service_s_secrets_go_into_dot_s_env_file_and_its_server_refers_to_them(
+    world: _World, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 408: a service of the catalogue that takes a key is added with the key, which Dot keeps in its .env under
+    ``MCP_<SERVICE>_<NAME>``; the server's env refers to it by that name, so no record holds the value and the answer
+    carries none; a key missing is refused by name. The command here answers nothing, so the server is left out."""
+    keyed: McpService = McpService(
+        id="keyed",
+        name="Keyed",
+        does="A service that takes a key.",
+        command="/usr/bin/false",
+        env={"KEYED_TOKEN": "${KEYED_TOKEN}"},
+        secrets=(ServiceSecret(name="KEYED_TOKEN", label="Token", help="https://example.com/keys"),),
+    )
+    monkeypatch.setattr(routes_mcp, "MCP_SERVICES", (*MCP_SERVICES, keyed))
+    body: dict[str, object] = {"service": "keyed", "name": None, "address": None, "origin": world.dot}
+    async with _client(world) as client:
+        listed: httpx.Response = await client.get("/api/mcp/servers")
+        service: dict[str, object] = next(one for one in listed.json()["services"] if one["id"] == "keyed")
+        assert (service["kind"], service["command"]) == ("local", "/usr/bin/false")
+        assert [secret["name"] for secret in service["secrets"]] == ["KEYED_TOKEN"]  # type: ignore[index]
+        refused: httpx.Response = await client.post("/api/mcp/servers", json={**body, "secrets": {}})
+        assert refused.status_code == 422 and "KEYED_TOKEN" in refused.text, refused.text
+        added: httpx.Response = await client.post(
+            "/api/mcp/servers", json={**body, "secrets": {"KEYED_TOKEN": "s3cret-value"}}
+        )
+        assert added.status_code == 200, added.text
+        assert "s3cret-value" not in added.text
+        assert (added.json()["address"], added.json()["origin"]) == ("/usr/bin/false", "connected")
+    assert parse_env_file(env_file_path().read_text(encoding="utf-8"))["MCP_KEYED_KEYED_TOKEN"] == "s3cret-value"
+    assert all(server.name != "keyed" for server in read_connected(connected_servers_path()).servers)
 
 
 def _server_row(page: Page, name: str) -> Locator:
