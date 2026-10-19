@@ -2,7 +2,7 @@
 
 from pathlib import Path
 
-from pydantic import ConfigDict, Field, JsonValue
+from pydantic import ConfigDict, Field
 
 from dotagent.core.types import FrozenModel
 
@@ -27,7 +27,7 @@ class SkillFrontmatter(FrozenModel):
     description: str = Field(min_length=1, max_length=1024)
     # Dot's own key (item 408): the name of one of the interface's icons; another agent's skill has none, or holds
     # anything under it, which leaves the skill in and the icon to its words.
-    icon: JsonValue | None = None
+    icon: object | None = None
 
 
 class Skill(FrozenModel):
