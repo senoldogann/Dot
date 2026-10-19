@@ -62,8 +62,10 @@ export function mount(root, _ctx) {
   let following = null;
   // The page Tailscale named to turn on HTTPS for the tailnet, after a Set up it refused for want of it.
   let httpsLink = null;
-  // The QR codes made so far, by what they open, as addresses of their pictures.
+  // The QR codes asked for so far, by what they open, as the promises of their pictures' addresses; and the addresses
+  // made, let go at the end.
   const codes = new Map();
+  const made = [];
   const holder = el("div", { class: "stack" }, loadingPanel());
   const code = el("output", { class: "pair-code mono", "aria-label": "Pairing code", hidden: true });
   const codeHint = el("p", { class: "hint", hidden: true });
@@ -114,16 +116,20 @@ export function mount(root, _ctx) {
   }
 
   async function setUp() {
+    let phone;
     try {
-      await changed(api.post("/phone/tailnet", {}), "Set up for your tailnet.");
-      httpsLink = null;
+      phone = await api.post("/phone/tailnet", {});
     } catch (error) {
+      // The page Tailscale named, when it named one; a refusal for another reason leaves none of an earlier one.
       const link = error?.context?.link;
-      if (typeof link === "string" && link.startsWith("https://")) {
-        httpsLink = link;
-        await load();
-      }
+      httpsLink = typeof link === "string" && link.startsWith("https://") ? link : null;
+      await load();
       throw error;
+    }
+    httpsLink = null;
+    if (!disposed) {
+      paint(phone);
+      toast("ok", "Set up for your tailnet.");
     }
   }
 
@@ -224,19 +230,21 @@ export function mount(root, _ctx) {
   function qrPicture(which, address, label) {
     const key = which === "dot" ? `dot ${address}` : which;
     const picture = el("img", { class: "phone-qr", alt: label, width: "148", height: "148" });
-    const made = codes.get(key);
-    if (made !== undefined) {
-      picture.src = made;
-      return picture;
+    let asked = codes.get(key);
+    if (asked === undefined) {
+      asked = blobUrl(`/phone/qr/${which}`).then((url) => {
+        made.push(url);
+        return url;
+      });
+      codes.set(key, asked);
+      // A code that could not be made is asked for again at the next drawing.
+      asked.catch(() => codes.delete(key));
     }
-    blobUrl(`/phone/qr/${which}`)
+    asked
       .then((url) => {
-        if (disposed) {
-          URL.revokeObjectURL(url);
-          return;
+        if (!disposed) {
+          picture.src = url;
         }
-        codes.set(key, url);
-        picture.src = url;
       })
       .catch((error) => {
         picture.replaceWith(el("p", { class: "hint" }, `The QR code could not be made: ${error.message}`));
@@ -327,9 +335,15 @@ export function mount(root, _ctx) {
         follow(phone);
         return;
       }
-      if (!disposed && !busy) {
-        paint(next);
+      if (disposed) {
+        return;
       }
+      if (busy) {
+        // An action of the guide answers and paints; the guide goes on following meanwhile.
+        follow(next);
+        return;
+      }
+      paint(next);
     }, FOLLOW_MS);
   }
 
@@ -372,7 +386,7 @@ export function mount(root, _ctx) {
   return () => {
     disposed = true;
     clearTimeout(following);
-    for (const url of codes.values()) {
+    for (const url of made) {
       URL.revokeObjectURL(url);
     }
   };
