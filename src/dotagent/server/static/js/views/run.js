@@ -621,6 +621,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       speed: heldChoice(start.speed),
       approvals: heldChoice(start.approvals),
       goalMode: heldChoice(start.goal_mode),
+      once: null,
     },
     optionsTitle: "Approvals",
     more: () => [],

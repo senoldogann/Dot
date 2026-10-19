@@ -9,10 +9,11 @@ import { askForWords, readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el, modelName } from "../dom.js";
-import { forgetLevel, KEPT_SPEED, savedLevel, saveLevel } from "../efforts.js";
+import { forgetLevel, KEPT_SPEED, ONE_MESSAGE, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
 import { anchoredPopover } from "../popover.js";
+import { readPref, removePref, writePref } from "../prefs.js";
 import { buildPresence } from "../presence.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
@@ -23,11 +24,48 @@ import { attempt, toast } from "../ui.js";
 
 const MAX_GOAL_PX = 320;
 
-// The home's choices are this browser's: the mode starts at Task, the model at the daemon's default, and a reasoning
-// level, an approval mode and goal mode are kept per browser until changed again.
+// The home's choices are this browser's: a reasoning level (per model), fast mode, an approval mode and goal mode are
+// kept until changed again. The mode, the model, the agent, Keep going and a choice for one message are the new chat's
+// own (item 397): kept as they are made, with its draft (composer.js), and put away with it once a message goes, so
+// that a new chat left for another page shows them again; a new chat starts on Task, the daemon's default model, Dot,
+// Keep going off and no choice for one message.
+const HOME_CHOICES_KEY = "dot.home.choices";
+const FRESH_CHOICES = { mode: "task", model: "", agent: "", standing: false, once: null };
+
+/** The new chat's own choices as last kept, or `FRESH_CHOICES` when none are kept or what is kept is not theirs. */
+function readHomeChoices() {
+  const stored = readPref(HOME_CHOICES_KEY);
+  if (stored === null) {
+    return FRESH_CHOICES;
+  }
+  try {
+    const { mode, model, agent, standing, once } = JSON.parse(stored);
+    if (
+      MODES.some((option) => option.id === mode) &&
+      typeof model === "string" &&
+      typeof agent === "string" &&
+      typeof standing === "boolean" &&
+      (once === null || ONE_MESSAGE.some((choice) => choice.id === once))
+    ) {
+      return { mode, model, agent, standing, once };
+    }
+  } catch (error) {
+    console.warn("the new chat's choices could not be read and are dropped", error);
+  }
+  removePref(HOME_CHOICES_KEY);
+  return FRESH_CHOICES;
+}
+
+/** Keep the new chat's own choices, or put them away when they are a new chat's first ones. */
+function keepHomeChoices(chosen) {
+  if (Object.entries(FRESH_CHOICES).every(([name, value]) => chosen[name] === value)) {
+    removePref(HOME_CHOICES_KEY);
+  } else {
+    writePref(HOME_CHOICES_KEY, JSON.stringify(chosen));
+  }
+}
+
 const HOME_KEPT = {
-  mode: "task",
-  model: "",
   level: {
     read: savedLevel,
     write: (info, level) => {
@@ -45,6 +83,7 @@ const HOME_KEPT = {
 
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
 function buildComposer(ctx, listener) {
+  const start = readHomeChoices();
   const frame = composerFrame({
     label: "New chat",
     boxLabel: "Goal",
@@ -65,16 +104,19 @@ function buildComposer(ctx, listener) {
   // The mode, the model with its reasoning and the Options (choices.js).
   const choices = runChoices({
     frame,
-    kept: HOME_KEPT,
+    kept: { ...HOME_KEPT, mode: start.mode, model: start.model, once: start.once },
     optionsTitle: "Approvals",
     more: () => [],
     onMode: modePicked,
-    // HOME_KEPT keeps what it keeps as it is chosen.
-    onChange: () => {},
+    // HOME_KEPT keeps what it keeps as it is chosen; the new chat's own choices are kept here.
+    onChange: keepChoices,
   });
   // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task. It is a
   // row of the "+" menu after Goal mode's (item 353).
-  const standing = standingPicker((on) => choices.goalMode.setAvailable(!on));
+  const standing = standingPicker((on) => {
+    choices.goalMode.setAvailable(!on);
+    keepChoices();
+  });
   frame.addMenuItems(() => [standing.element]);
   // Only a task of Dot's keeps going, and goal mode waits while it does.
   function modePicked(id) {
@@ -105,8 +147,18 @@ function buildComposer(ctx, listener) {
     agentId = id;
     agentMenu.close();
     paintAgent();
+    keepChoices();
     goal.focus();
   }
+  function keepChoices() {
+    const chosen = choices.value();
+    keepHomeChoices({ mode: chosen.mode, model: chosen.model ?? "", agent: agentId, standing: standing.value(), once: choices.armed() });
+  }
+  // Keep going as the new chat left it, where a task of Dot's may keep going; its agent once the agents are listed.
+  if (start.standing && start.mode === "task" && start.agent === "") {
+    standing.set(true);
+  }
+  standing.setAvailable(start.mode === "task" && start.agent === "");
   const agentMenu = anchoredPopover({
     anchor: agentPill.element,
     frame: frame.element,
@@ -127,6 +179,12 @@ function buildComposer(ctx, listener) {
     .then((summaries) => {
       agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
       agentPill.element.hidden = agents.length === 0;
+      // The agent the new chat had, while it is still one of them; its choices then keep the one shown.
+      if (start.agent !== "") {
+        agentId = agents.some((record) => record.id === start.agent) ? start.agent : "";
+        paintAgent();
+        keepChoices();
+      }
       agentMenu.repaint();
     })
     .catch((error) => {
@@ -179,6 +237,7 @@ function buildComposer(ctx, listener) {
         choices.sent();
         frame.picks.sent();
         frame.clear();
+        removePref(HOME_CHOICES_KEY);
         ctx.navigate(`/runs/${created.id}`);
       });
     } finally {

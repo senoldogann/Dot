@@ -14753,6 +14753,26 @@ schedule whose firing a crash cut before its run was under way is due again at t
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
 
+### 397. A new chat keeps its choices with its draft until its message goes
+
+**Status: done (2026-10-19), on `item-397-new-chat-choices`.** The owner's word of 2026-10-19: "bos bir sohbette bir
+seyler yazdigimda, sectigim model, effort, mod ve diger hersey gidip baska bir sohbete giirp gelsemde tekrar +new chat
+bastigimda orada görünmeli." (when I write something in an empty chat, the model, effort, mode and everything else I
+picked should be there when I press + New chat again, even after going to another chat and back). **As built
+(2026-10-19).** The home's box kept the text, the files and the picks of a new chat in the browser (`dot.draft.home`),
+and a reasoning level (per model), fast mode, the approvals and goal mode until changed again, but began on Task, the
+daemon's default model, Dot and Keep going off whenever the page was opened again: the reasoning level of the model
+picked went with it. The mode, the model, the agent, Keep going and a choice for one message armed from the menu are now
+the new chat's own (`views/runs.js`, `dot.home.choices`): kept as each is made, read when the home opens, the agent once
+the agents are listed and while it is still one of them, and put away once a message goes, as the draft is, so the next
+new chat starts afresh; what is kept and does not read as those choices is dropped. `runChoices` takes the choice for
+one message to start with and says the one armed (`choices.js` `kept.once`, `armed()`), a choice of it is told as the
+others are, and Keep going can be turned as a new chat left it (`runmodes.js` `set`); a chat's page keeps its own on the
+daemon as before and writes none of these. Tests: `tests/smoke/test_new_chat_choices.py` (a task that keeps going on a
+model at High, then research for an agent with Ultrathink and words typed, each there again after another page and New
+chat; the run that goes has them, and the next new chat starts afresh), `test_dock_choices.py` (a chat's page writes no
+choice of the home's). Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15553,3 +15573,4 @@ starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 397 on the owner's word of the same day, on `item-397-new-chat-choices` from `main`, while other agents of the owner's work on items 385 to 393: a new chat keeps its choices with its draft until its message goes.

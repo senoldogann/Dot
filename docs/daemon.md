@@ -118,7 +118,9 @@ every view, has **Change** (item 209): the list then chooses the model new chats
 so and the default has the tick, and the model picked (by a click, Enter or ⌘1 to ⌘9) becomes the default, as in
 Settings › Models; the menu goes back to the chat's model and stays open. A chat that has a model of its own keeps it,
 and one that follows the default moves with it. Escape or Cancel goes back without a change. What you typed and attached
-and did not send is kept in this browser and is there again when you come back (so is the box of each run). Dot's face
+and did not send is kept in this browser and is there again when you come back (so is the box of each run), and so are
+the mode, the model, the agent, Keep going and a choice for one message picked for it (item 397), until a message goes:
+a new chat after that starts on Task, the default model, Dot and Keep going off. Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
 ⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
 browser (item 230). The markdown in the box shows as it reads (item 207):
