@@ -42,8 +42,8 @@ const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
 const CRUMB_CHARS = 56;
 const FOOT_WORDS = { done: "Completed in", failed: "Failed after", cancelled: "Stopped after" };
-// The words of a delegated run's pill for a run that does not ask the user (the default needs none).
-const APPROVAL_WORDS = { auto: "Auto-approve", yolo: "YOLO" };
+// The words of a delegated run's pill for its approvals, but for the default's, which needs none.
+const APPROVAL_WORDS = { supervised: "Supervised", auto: "Auto-approve", yolo: "YOLO" };
 const NEAR_BOTTOM_PX = 140;
 // "/btw" followed by the side question; the question may span lines.
 const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;

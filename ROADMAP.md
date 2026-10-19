@@ -14938,7 +14938,10 @@ pre-push review's first pass (2 Important, 2 Nits) is fixed: Supervised let a la
 through (`persistence` now asks, but for the run's own notes and memory notes); OpenCode's agent, once allowed, wrote
 Dot's own files past the undo journal (now refused); the `_dot_paths` docstring said "never change"; and the shell
 guard's hint to use the file tools, wrong for a delete and for OpenCode's agent, is gone, so a refused line says what it
-said before.
+said before. The second pass (1 Important, 1 Nit) is fixed too: the docs, `defaults.toml` and the docstrings that named
+the modes but yolo as `ask` and `auto` (the secret fields, the click questions, a run that waits for its answer) say
+every mode but yolo, the foot of a delegated run in supervised says so, and the `auto` and `yolo` bullets of
+`docs/autonomy.md` are wrapped again.
 
 ## Log
 

@@ -26,22 +26,20 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   (a long command scrolls within it).
 - `auto` (Auto, a shield): the review model (`[models] review`) does. It is given your instructions (the goal and every
   message you sent to the run: the only authority it recognises), the action (up to 12,000 characters of what it acts
-  on, and of a longer
-  target its start and its end), why the policy stopped at it and whether the run has read untrusted content. It answers
-  `approve` when the action is plainly what you asked for; `deny` when it is not, goes further than you asked or looks
-  like something other than your instructions caused it; and `escalate` when it cannot tell, and then the question comes
-  to you as in `ask`, with the reason of the review model in it. What the agent wrote into the action (its summary and
-  target) is data to the review model, never an instruction.
+  on, and of a longer target its start and its end), why the policy stopped at it and whether the run has read untrusted
+  content. It answers `approve` when the action is plainly what you asked for; `deny` when it is not, goes further than
+  you asked or looks like something other than your instructions caused it; and `escalate` when it cannot tell, and then
+  the question comes to you as in `ask`, with the reason of the review model in it. What the agent wrote into the action
+  (its summary and target) is data to the review model, never an instruction.
 - `yolo` (YOLO, an open lock): nobody does. The action is allowed and recorded. The question that untrusted content
-raises (see [Safety](safety.md#safety)) is waived as well, and so are the refusals and hand-offs below and the question
-about Dot's own files: a yolo run reads secrets, uploads or
-sends files from anywhere, and does money and credential steps itself. It types passwords, one-time codes and card
-numbers into the fields that take them when it can read them itself (a code in a mailbox it can open, one that
-`code_fetch` reads, a value you gave it), and a password into a terminal program that asks for one; every such field is
-a `credential` record in its timeline (`financial` for a card field). That is the price of the mode: a run that has read
-a hostile page can send your files out, pay or sign in without asking you. Only the desktop tools stay away from
-password managers and Keychain Access in every mode; through the shell and the file tools a yolo run reads the keychain
-like any other secret.
+  raises (see [Safety](safety.md#safety)) is waived as well, and so are the refusals and hand-offs below and the
+  question about Dot's own files: a yolo run reads secrets, uploads or sends files from anywhere, and does money and
+  credential steps itself. It types passwords, one-time codes and card numbers into the fields that take them when it
+  can read them itself (a code in a mailbox it can open, one that `code_fetch` reads, a value you gave it), and a
+  password into a terminal program that asks for one; every such field is a `credential` record in its timeline
+  (`financial` for a card field). That is the price of the mode: a run that has read a hostile page can send your files
+  out, pay or sign in without asking you. Only the desktop tools stay away from password managers and Keychain Access in
+  every mode; through the shell and the file tools a yolo run reads the keychain like any other secret.
 
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
 [Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
@@ -54,7 +52,7 @@ click 'Reply' — untrusted content is in context and this action reaches outsid
 what went through and why. A chat leaves those lines out unless Settings › General › Chat › "Show what ran without
 asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows.
 
-**What only yolo waives.** Secrets and exfiltration stay denied in `ask` and `auto`. Money and credentials stay yours
+**What only yolo waives.** Secrets and exfiltration stay denied in every other mode. Money and credentials stay yours
 there: Dot stops and asks you to do that step yourself, and the review model is never asked about them. A `yolo` run
 does all of it and keeps a record. **What no mode waives:** a `research` run changes nothing but its notes file and
 memory, and a rule of yours with the hand-off behaviour still stops a yolo run, at secrets, money and credentials too.
@@ -118,7 +116,7 @@ approval mode and goal mode of the run that asked; the page then opens that run 
 open there. A run reads an answer that comes during its last step before it ends; one that reaches a run that is then
 stopped or fails stays in the conversation as your message, for the next run there. An empty answer is refused. Skip
 only closes the question, and a left question never expires. With `wait` such a question waits as in a run you watch,
-for `approval_timeout_s` at most. A run you started in `ask` or `auto` always waits for your answer.
+for `approval_timeout_s` at most. A run you started in any mode but `yolo` always waits for your answer.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries and the wait for a model out of reach (see [Models and providers](models.md#models-and-providers));

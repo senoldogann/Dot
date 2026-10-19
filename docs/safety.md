@@ -138,7 +138,7 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
 - The memory tools refuse a note that holds a key-like string or one of the secrets Dot holds (`memory_save`,
   `memory_update`), and tell the model to record where the key lives, not the key. A note you write yourself, with
   `dotx memory add` or on the Memory page, is yours and not refused.
-- In `ask` and `auto` the browser and desktop tools never type into password, one-time-code and card fields: the field
+- Outside `yolo` the browser and desktop tools never type into password, one-time-code and card fields: the field
   that would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). A
   `yolo` run types into them what it can read itself (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). In the same way `terminal_send` types nothing outside
@@ -224,7 +224,7 @@ at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.
 move them together. A missing or refused key, a spent quota or a failed request turns it off for `[models]
 helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key
 saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key. The click questions
-are asked in `ask` and `auto` only: in `yolo` a flag asks nothing, so a click there sends nothing to TypeSafe. Two more
+are asked in every mode but `yolo`, where a flag asks nothing, so a click sends nothing to TypeSafe. Two more
 checks run before a model call when the judge is on. A `browser_act` that names what it expects to see after its steps
 (`expect`: "the reply shows under the post") gets, above its result, the probability that the page's text shows it and
 that the page is a login wall, a CAPTCHA or an error page, from one request over the page's visible text, so the next
