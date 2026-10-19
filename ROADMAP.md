@@ -14958,6 +14958,28 @@ a size of the model's own, brings it down. Tests: `tests/unit/test_scaffold.py`,
 address that names a model of a folded provider), `test_context_meter.py` (the link and where it leads). Docs:
 `docs/models.md`, `docs/runs.md`, `docs/daemon.md`.
 
+### 397. A new chat keeps its choices with its draft until its message goes
+
+**Status: done (2026-10-19), on `item-397-new-chat-choices`.** The owner's word of 2026-10-19: "bos bir sohbette bir
+seyler yazdigimda, sectigim model, effort, mod ve diger hersey gidip baska bir sohbete giirp gelsemde tekrar +new chat
+bastigimda orada görünmeli." (when I write something in an empty chat, the model, effort, mode and everything else I
+picked should be there when I press + New chat again, even after going to another chat and back). **As built
+(2026-10-19).** The home's box kept the text, the files and the picks of a new chat in the browser (`dot.draft.home`),
+and a reasoning level (per model), fast mode, the approvals and goal mode until changed again, but began on Task, the
+daemon's default model, Dot and Keep going off whenever the page was opened again: the reasoning level of the model
+picked went with it. The mode, the model, the agent, Keep going and a choice for one message armed from the menu are now
+the new chat's own (`views/runs.js`, `dot.home.choices`): kept as each is made, read when the home opens, the agent once
+the agents are listed and while it is still one of them, and put away once a message goes, as the draft is, so the next
+new chat starts afresh; what is kept and does not read as those choices is dropped. `runChoices` takes the choice for
+one message to start with and says the one armed (`choices.js` `kept.once`, `armed()`), a choice of it is told as the
+others are, and Keep going can be turned as a new chat left it (`runmodes.js` `set`); a chat's page keeps its own on the
+daemon as before and writes none of these. Tests: `tests/smoke/test_new_chat_choices.py` (a task that keeps going on a
+model at High, then research for an agent with Ultrathink and words typed, each there again after another page and New
+chat; the run that goes has them, and the next new chat starts afresh), `test_dock_choices.py` (a chat's page writes no
+choice of the home's). Docs: `docs/daemon.md`. The review of the merge with main found a choice made before the agents
+were listed, or when they could not be, forgot the new chat's agent; it keeps the one it had until they are listed
+(`listed` in `views/runs.js`, and a browser test whose agents fail to list).
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15767,3 +15789,4 @@ address that names a model of a folded provider), `test_context_meter.py` (the l
 - 2026-10-19 (Opus 5.5): items 394 to 397 on the owner's words of the same day, each on a branch of its own from `main`, while other agents of the owner's work on items 385 to 393; item 394 on `item-394-campaign-cards`: a campaign is stopped, marked achieved or deleted from its row.
 - 2026-10-19 (Opus 5.5): item 395 on the owner's word of the same day, on `item-395-model-search` from `main`, while other agents of the owner's work on items 385 to 393: the model menu's search looks through the provider shown.
 - 2026-10-19 (Opus 5.5): item 396 on the owner's word of the same day, on `item-396-context-size` from `main`, while other agents of the owner's work on items 385 to 393: a model's context size is the most its window allows unless one is chosen, and the context meter leads to it.
+- 2026-10-19 (Opus 5.5): item 397 on the owner's word of the same day, on `item-397-new-chat-choices` from `main`, while other agents of the owner's work on items 385 to 393: a new chat keeps its choices with its draft until its message goes.
