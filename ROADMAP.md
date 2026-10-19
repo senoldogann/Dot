@@ -14737,21 +14737,50 @@ secrets in a thread; and shortened the memory tools' descriptions, which the mod
 `tests/unit/test_memory_taint.py`, `tests/smoke/test_memory_taint.py`, `tests/unit/test_doctor.py`. Docs:
 `docs/memory-and-schedules.md`, `docs/safety.md`, `docs/models.md`.
 
+### 385. The deep review of 2026-10-19: what was found in the paths a human merges, fixed
+
+**Status: done (2026-10-19), merged on the owner's word of the same day** (it changes `src/dotagent/policy/`, a path
+that needs a human). The owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve problemleri düzelt"
+(review the deep review report of 2026-10-19 and fix its problems); this item holds its findings inside the paths a
+human merges, item 386 those outside them. **As built (2026-10-19).** B1: a payment step under the pre-approved caps of
+`[policy.spend]` no longer skips the owner's rules: a rule that hands the step off still does, in every mode, a `yolo`
+run's too (`policy/engine.py` `decide`). B2: a payment step's amount is the largest of the amounts in the labels of its
+controls and of the page's total (`tools/browser.py`), so a coupon or a basket line in the same step cannot stand for
+the payment. B11: `docs/safety.md` says which steps of the order hold in every mode. B3: a file named after an at sign
+(`curl --data-binary @~/…`) is judged as that file, so a protected one is refused however it is spelled
+(`policy/shell.py` `_protected_words`). B4: a script the line downloads and then runs (`curl -o`, `wget -O`, `git
+clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp` or an `mv`) is judged as
+piping the download into a shell (`ShellScope.downloaded`), and so is one fed to a shell or an interpreter on its
+standard input (`sh < y.sh`, `cat y.sh | bash`). B5: `mv` takes its sources from where they were, so a move out of a
+folder outside the workspace is destructive there, as `rm` is. B12: a script handed to a terminal app (`open -a
+Terminal`, `-b`, a variable app name, `open -f`) or a script type that runs as it opens (`.command`) is a step outside
+Dot's sandbox, which every preset asks about; `open -a Terminal` alone, and `open` of a document, stay as they were. B8,
+an owner's rule whose regular expression backtracks for long, is item 387's: matching in a thread did not spare the
+event loop, as `re` holds the interpreter's lock, and the owner chose the `regex` package with its timeout. A security
+review by a separate agent found the thread did not help, a file named as the terminal app slipped by, and interpreters
+other than the shells were missed; the pre-push review found `open -na`, a download fed on standard input, a path given
+by a variable, the other copy commands, `git -C` and curl's `--output-dir`; each is fixed or taken back. Its merge with
+main of the same day (Fable 5.1) took two more: `rsync -t` read as a target folder (it keeps times), and a download
+behind a wrapper or an assignment (`timeout 60 curl -o`, `cat y.sh | env bash`, `X=1 sh < y.sh`) not followed; both
+fixed. Tests: `tests/unit/test_spend.py`, `tests/unit/test_shell_policy.py`. Docs: `docs/safety.md`.
+
 ### 386. The deep review of 2026-10-19: what was found outside the paths a human merges, fixed
 
-**Status: in progress.** The owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve problemleri
-düzelt" (review the deep review report of 2026-10-19 and fix its problems). This item holds its findings outside the
-paths a human merges; item 385 holds those inside them. **As built (2026-10-19).** B6: removing a skill added from
-another agent deletes only a folder right in Dot's skills folder; a name that is an absolute path, holds a slash or is
-`..` is refused (`help/added.py` `remove_skill`), where before `folder / "/Users/x"` was `/Users/x`. B7: a PDF page more
-than 20,000 px tall at the width asked is refused before its bitmap is made (`previews/pdfpages.py`), where a page of 1
-by 1,000 would have taken over a gigabyte. B9: the Responses codec gives a function call whose id is empty or repeated
-one of its own, as the chat codec does, in the call's own item too (`llm/codec_responses.py`): the next request sends
-those items back as they are, as `store` is off, and each result by its call's id, so the two keep one id and neither is
-pruned as unpaired; the pre-push review found the first version wrote the new ids into the calls alone. B10: a one-time
-schedule whose firing a crash cut before its run was under way is due again at the time it fired as the scheduler
-starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
-`test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
+**Status: done (`cdb9e65`).** The owner's word of 2026-10-19: "Dot derin inceleme 2026-10-19 raporu incele ve
+problemleri düzelt" (review the deep review report of 2026-10-19 and fix its problems). This item holds its findings
+outside the paths a human merges; item 385 holds those inside them. **As built (2026-10-19).** B6: removing a skill
+added from another agent deletes only a folder right in Dot's skills folder; a name that is an absolute path, holds a
+slash or is `..` is refused (`help/added.py` `remove_skill`), where before `folder / "/Users/x"` was `/Users/x`. B7: a
+PDF page more than 20,000 px tall at the width asked is refused before its bitmap is made (`previews/pdfpages.py`),
+where a page of 1 by 1,000 would have taken over a gigabyte. B9: the Responses codec gives a function call whose id is
+empty or repeated one of its own, as the chat codec does, in the call's own item too (`llm/codec_responses.py`): the
+next request sends those items back as they are, as `store` is off, and each result by its call's id, so the two keep
+one id and neither is pruned as unpaired; the pre-push review found the first version wrote the new ids into the calls
+alone. B10: a one-time schedule whose firing a crash cut before its run was under way is due again at the time it fired
+as the scheduler starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`,
+`test_previews.py`, `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`,
+`docs/memory-and-schedules.md`.
+
 ### 387. An owner's rule is matched with a timeout
 
 **Status: in progress, for the owner to merge** (it changes `src/dotagent/policy/` and the dependencies in
@@ -15902,6 +15931,7 @@ message, and the chat has started without its loop.
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 386 merged as `cdb9e65` (PR #378); the pre-push review blocked its first push on an Important finding (a Responses call's new id did not reach the item sent back) and passed the next with a Nit, answered. Item 385 on `item-385-money`, for the owner to merge.
 - 2026-10-19 (Opus 5.5): item 387 on `item-387-rule-timeout`, the review's B8 with the owner's choice of the `regex` package, for the owner to merge.
 - 2026-10-19 (Fable 5.1): item 388 on `js-gate`, on the owner's word of the same day after the interface review of 2026-10-18: the web interface gets checks of its own (Biome, `tsc` over the JSDoc, `node --test`), an export nothing imports fails the gate, and the pages that are not the chat or the home load on demand. Done, awaiting the owner's push.
 - 2026-10-19 (Fable 5.1): item 388's whole gate ran: 705 passed, the 17 browser tests that failed under `-n auto` passed serially, as they do on main. Item 389 on `harness-1`, stacked on `js-gate`: the harness's first layer, versions of the texts a run's prompt takes, written, adopted and retired by the owner (docs/harness.md); the method of Harness² (arXiv 2610.14224) adopted, its code not.

@@ -1,8 +1,8 @@
 """Pre-approved spending: a payment step on a listed site under its caps is a question instead of a hand-off.
 
 ``[policy.spend]`` lists sites with a cap per purchase and per day. The amount of a payment step is read from the
-control's label ("Pay €19.90") or, failing that, from the totals on the page ("Order total: $12.00"); where several
-amounts stand, the largest is taken, so a misread errs towards the hand-off. A step whose amount cannot be read keeps
+labels of its controls ("Pay €19.90") and from the totals on the page ("Order total: $12.00"); where several amounts
+stand, the largest is taken, so a misread errs towards the hand-off. A step whose amount cannot be read keeps
 the hand-off. Under both caps the policy asks instead of handing the step to the user, so
 a ``yolo`` run goes on, an ``auto`` run lets the review model answer, and an ``ask`` run asks once; the spend is then
 recorded and counts against the site's day. The caps are plain numbers compared with the number on the page, whatever
