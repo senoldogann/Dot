@@ -3823,6 +3823,13 @@ a.pill:hover {
   font-weight: var(--weight-title);
 }
 
+/* A table's copy stands on a line over its right edge (item 403): the table scrolls sideways under it untouched. */
+.prose .prose-table-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -4px;
+}
+
 /* A tool step is one quiet line with its icon, not a box (item 121); open, its body hangs under it on a hairline. */
 .tool {
   min-width: 0;

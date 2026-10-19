@@ -5,7 +5,7 @@ import { api, query } from "./api.js";
 import { el, plural } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
-import { answerMessage, userMessage } from "./messages.js";
+import { answerMessage, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
 import { prose } from "./prose.js";
 import { countKinds, flowIcon, flowWords, toolRow } from "./tools.js";
 
@@ -64,7 +64,7 @@ function stepsBlock(batch) {
   const head = el(
     "summary",
     { class: "steps-head" },
-    el("span", { class: "steps-state" }, icon(flowIcon(kinds) ?? "check")),
+    el("span", { class: "steps-state" }, icon(flowIcon(kinds) ?? "wrench")),
     el("span", { class: "steps-title" }, flowWords(kinds)),
     el("span", { class: "steps-count" }),
     said === "" ? null : el("span", { class: "badge b-warn" }, said),
@@ -93,11 +93,11 @@ async function allEvents(runId, signal) {
 
 /** What a run said and ran, read and drawn into the turn's `flow`; nothing is drawn once `signal` aborted. A failure
  * to read or to draw it says why, with the way to the run: the turn keeps its question and its answer. */
-async function fillFlow(past, flow, signal) {
+async function fillFlow(past, flow, asked, signal) {
   try {
     const events = await allEvents(past.id, signal);
     if (events !== null && !signal.aborted) {
-      drawFlow(past, flow, events);
+      drawFlow(past, flow, asked, events);
     }
   } catch (error) {
     console.error("what an earlier run did could not be shown", { run: past.id, error });
@@ -116,8 +116,10 @@ async function fillFlow(past, flow, signal) {
 
 /** What a run said and ran, in the order it happened (item 374): its words, the calls of the stretch that followed,
  * its words again — the answer itself is the turn's message, so a line that only repeats it is left out. `events`
- * are all its events, so a call without a result was cut off. */
-function drawFlow(past, flow, events) {
+ * are all its events, so a call without a result was cut off. The files and picks its message came with go under
+ * `asked`, the turn's message, and a message that steered the run stands where it came (item 403), as on the run's
+ * own page. */
+function drawFlow(past, flow, asked, events) {
   const answer = (past.result ?? "").trim();
   const blocks = [];
   let batch = null;
@@ -135,6 +137,11 @@ function drawFlow(past, flow, events) {
     batch.rows.push(row.node);
     return { row, batch };
   };
+  const message = asked.classList.contains("user-message") ? asked : null;
+  // The files and picks of the message go in with the flow, inside keepPlace's change: a browser without scroll
+  // anchoring would otherwise see the reader's text pushed down by their height.
+  let files = null;
+  let picks = null;
   for (const event of events) {
     if (event.kind === "assistant") {
       const said = (event.data.text ?? "").trim();
@@ -142,6 +149,13 @@ function drawFlow(past, flow, events) {
         batch = null;
         blocks.push({ say: said });
       }
+    } else if (event.kind === "attachments" && message !== null) {
+      files = event.data.files;
+    } else if (event.kind === "picks" && message !== null) {
+      picks = event.data;
+    } else if (event.kind === "steer") {
+      batch = null;
+      blocks.push({ steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } });
     } else if (event.kind === "tool_call" && event.data.tool === FINISH_TOOL) {
       finishing.set(event.data.call_id, event.data.args);
     } else if (event.kind === "tool_call") {
@@ -171,9 +185,19 @@ function drawFlow(past, flow, events) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.say === undefined ? stepsBlock(block) : el("div", { class: "turn-say" }, prose(block.say)),
+    block.steer !== undefined
+      ? userMessage({ text: block.steer.text, sentAt: block.steer.sentAt, files: block.steer.files, editFromHere: null })
+      : block.say === undefined
+        ? stepsBlock(block)
+        : el("div", { class: "turn-say" }, prose(block.say)),
   );
   keepPlace(flow, () => {
+    if (files !== null) {
+      showMessageFiles(message, files);
+    }
+    if (picks !== null) {
+      showMessagePicks(message, picks);
+    }
     flow.replaceChildren(...nodes);
     flow.hidden = nodes.length === 0;
   });
@@ -213,7 +237,7 @@ function keepPlace(flow, change) {
 
 /** Fills a turn's operations once it comes near what is seen, once: near the window, or on a phone near the box the
  * conversation scrolls in, which the turn is in once the page stands. The watch ends with the page (`signal`). */
-function whenNear(element, ops, run, signal) {
+function whenNear(element, ops, asked, run, signal) {
   requestAnimationFrame(() => {
     if (signal.aborted) {
       return;
@@ -222,7 +246,7 @@ function whenNear(element, ops, run, signal) {
       (entries) => {
         if (entries.some((entry) => entry.isIntersecting)) {
           watch.disconnect();
-          void fillFlow(run, ops, signal);
+          void fillFlow(run, ops, asked, signal);
         }
       },
       { root: scrollBox(element), rootMargin: OPS_MARGIN },
@@ -249,9 +273,9 @@ function turn(past, editFromHereOf, eager, signal) {
   const element = el("section", { class: ended ? "turn" : "turn turn-working" }, asked, ops, answer);
   if (ended) {
     if (eager) {
-      void fillFlow(past, ops, signal);
+      void fillFlow(past, ops, asked, signal);
     } else {
-      whenNear(element, ops, past, signal);
+      whenNear(element, ops, asked, past, signal);
     }
   }
   return element;

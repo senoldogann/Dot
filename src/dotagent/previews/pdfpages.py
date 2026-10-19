@@ -25,6 +25,7 @@ from Quartz import (
     CGPDFPageGetDrawingTransform,
     CGPDFPageGetRotationAngle,
     CGRectMake,
+    PDFDocument,
     kCGImageAlphaPremultipliedLast,
     kCGPDFCropBox,
 )
@@ -66,6 +67,35 @@ def page_sizes(path: Path) -> tuple[PageSize, ...]:
         _size(CGPDFDocumentGetPage(document, number))
         for number in range(1, CGPDFDocumentGetNumberOfPages(document) + 1)
     )
+
+
+# The most pages of a PDF read for the panel's copy: a scanned book of hundreds of pages would cost a read of each.
+TEXT_PAGES: int = 80
+
+
+def pdf_text(path: Path, most_chars: int) -> tuple[str, bool]:
+    """The text of the first ``TEXT_PAGES`` pages of the PDF at ``path``, in order, at most ``most_chars`` characters
+    in all, and whether it was cut at either bound (item 403): what the panel's copy takes. A PDF of pictures alone,
+    or one PDFKit cannot read, gives ""."""
+    # PDFKit's proxies carry no types: the document and its pages are read through PyObjC as they come.
+    document = PDFDocument.alloc().initWithURL_(NSURL.fileURLWithPath_(str(path)))
+    if document is None:
+        return "", False
+    pages: int = int(document.pageCount())
+    parts: list[str] = []
+    length: int = 0
+    for number in range(min(pages, TEXT_PAGES)):
+        page = document.pageAtIndex_(number)
+        text: str = "" if page is None else str(page.string() or "")
+        if text.strip() == "":
+            continue
+        room: int = most_chars - length
+        if len(text) >= room:
+            parts.append(text[:room])
+            return "\n\n".join(parts), True
+        parts.append(text)
+        length += len(text) + 2
+    return "\n\n".join(parts), pages > TEXT_PAGES
 
 
 # The tallest page drawn, in pixels: at the widest of PAGE_WIDTHS a bitmap of about 150 MB at most.

@@ -292,7 +292,7 @@ function paintGroup(group) {
   const live = group.tail || group.pending > 0;
   if (group.live !== live) {
     group.live = live;
-    group.state.replaceChildren(live ? el("span", { class: "spinner" }) : icon(flowIcon(group.kinds) ?? "check"));
+    group.state.replaceChildren(live ? el("span", { class: "spinner" }) : icon(flowIcon(group.kinds) ?? "wrench"));
   }
   // A stretch of work reads as what it ran (item 374), "Ran 2 commands and read 1 file", with the time it took beside
   // it, and while it runs, how much of it is behind it.
