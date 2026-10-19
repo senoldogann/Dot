@@ -18,6 +18,9 @@ export function closeMenu() {
   }
 }
 
+/** One entry of a menu: a choice, or the line between two groups of them. */
+/** @typedef {"separator" | { label: string, icon: string, danger?: boolean, run: () => void }} MenuEntry */
+
 /** Whether the menu open now is the one `button` opened. */
 export function menuOpenedBy(button) {
   return current !== null && current.button === button;
@@ -29,6 +32,7 @@ export function menuOpenedBy(button) {
  * ends; `back` is the element the focus goes back to when a key closes the menu; `button`, when a button opened it, is
  * left to close it again, and says the menu is open. A chosen item closes the menu and gives the focus back, then
  * runs, and may move the focus on.
+ * @param {{ label: string, items: MenuEntry[], at: { x: number, y: number }, back: HTMLElement | null, button?: HTMLElement | null }} menu
  */
 export function openMenu({ label, items, at, back, button }) {
   closeMenu();

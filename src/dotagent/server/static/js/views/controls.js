@@ -71,7 +71,7 @@ function fakeQuestion(id, question, options, multiple) {
 }
 
 // The characters (item 101): every shape, expression and colour as a still frame, and every animation moving.
-function characterRow(ids, size, make) {
+function characterRow(ids, _size, make) {
   const handles = [];
   const cells = ids.map((id) => {
     const cell = el("div", { class: "stack tight center" });
@@ -100,10 +100,17 @@ function characters() {
     states.element,
   );
   const handles = [...shapes.handles, ...expressions.handles, ...colours.handles, ...states.handles];
-  return { element, dispose: () => handles.forEach((handle) => handle.destroy()) };
+  return {
+    element,
+    dispose: () => {
+      for (const handle of handles) {
+        handle.destroy();
+      }
+    },
+  };
 }
 
-export function mount(root, ctx) {
+export function mount(root, _ctx) {
   const cast = characters();
   const swatches = el(
     "div",

@@ -65,13 +65,14 @@ composer's round buttons keep their look in a clear ring that makes them so, and
 such a box (item 337); a tap anywhere on a setting's row turns its switch, and a step's duration shows without a hover. An iPad and a Mac keep their
 sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
 
-On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot
-works and This Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and
-schedules there are). A row opens its page on its own, the bar naming it, and a card's name stands over the card. In a
-Mac's window the settings keep their tabs down the left side. On a phone Appearance draws the colour schemes as phones
-and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). A service's page of Customize ›
-Plugins and an agent's editor name their cards the same way, a row of the home's Today strip keeps its facts to one line
-that fades where it runs out of room, and Team's empty page says what brings messages there (item 332).
+On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot works and This
+Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and schedules there
+are, whether a version of the harness is in use). A row opens its page on its own, the bar naming it, and a card's name
+stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone Appearance draws the
+colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). A
+service's page of Customize › Plugins and an agent's editor name their cards the same way, a row of the home's Today
+strip keeps its facts to one line that fades where it runs out of room, and Team's empty page says what brings messages
+there (item 332).
 
 At a phone's width (720 px and under) Dot is laid out like a phone app (items 294 to 298). The sidebar is the
 list of chats over the whole screen, Dot's name at its head, and Settings, the search and a new chat at its foot, under
@@ -119,10 +120,11 @@ flash or strip of amber shows while it opens. Beside the plain icons it carries 
 four fifths of the square on that ground, which a launcher that rounds or crops an icon draws whole; a long press on it
 offers **New chat** (`/#/runs`) and **Settings** (`/#/settings`).
 
-The daemon answers with gzip what a browser asks it for that way (item 381): the pages' scripts and sheets and the
-API's answers, past 1 KiB; the event streams go as they are written, and the fonts and the images, compressed
-already, as they are. The page names every module its script reaches (`modulepreload`), so a phone asks for them at
-once instead of one import after another.
+The daemon answers with gzip what a browser asks it for that way (item 381): the pages' scripts and sheets and the API's
+answers, past 1 KiB; the event streams go as they are written, and the fonts and the images, compressed already, as they
+are. The page names the modules its script reaches on opening (`modulepreload`), so a phone asks for them at once
+instead of one import after another; a page that is not the chat or the home loads its script when it is first asked
+for, and the browser fetches those scripts once it is idle, so that the first one asked for opens at once (item 388).
 
 The service worker (`sw.js`) keeps the shell files as a fallback for when the Mac is out of reach and caches nothing
 under `/api`. It keeps them by the build of the pages they are of, which the daemon names in the `X-Dot-Pages` header of

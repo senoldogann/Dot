@@ -8,7 +8,7 @@
 // markdown in the box shows as it reads, its marks quiet (mirror.js, item 207).
 
 import { api } from "./api.js";
-import { SEND_KEY, valueOf } from "./appearance/settings.js";
+import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { clip, el, setText } from "./dom.js";
 import { icon } from "./icons.js";
@@ -69,7 +69,7 @@ function loadPalette() {
  * a tool was picked for the message (`{ kind, name }`, item 318). Returns the menu element and the box's field (the box
  * with its markdown under it) to place in the composer's frame, `autosize()`, to call after any change of the text, and
  * `dispose()`. */
-export function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
+function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
   const menu = el("div", { class: "slash-menu", role: "listbox", id: `slash-${Math.random().toString(36).slice(2, 8)}`, hidden: true });
   textarea.setAttribute("aria-controls", menu.id);
   textarea.setAttribute("aria-expanded", "false");
@@ -214,7 +214,7 @@ export function wireComposer(textarea, { maxPx, send, commands, edited, picked }
       }
     }
     // Enter sends, with ⌘ or Ctrl or without; where ⌘Enter is the key that sends, Enter alone breaks the line.
-    if (event.key === "Enter" && !event.shiftKey && (valueOf(SEND_KEY) === "enter" || event.metaKey || event.ctrlKey)) {
+    if (event.key === "Enter" && !event.shiftKey && (settingValue(SEND_KEY) === "enter" || event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       send();
     }

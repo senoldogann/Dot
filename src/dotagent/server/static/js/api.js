@@ -219,7 +219,7 @@ const CODE_CHARS = 8;
 const CODE_READ_AS = { O: "0", I: "1", L: "1" };
 
 /** Whether `text` can be a pairing code (item 267). An access token never can. */
-export function canBePairingCode(text) {
+function canBePairingCode(text) {
   const chars = [...text.toUpperCase()].filter((char) => char !== " " && char !== "-").map((char) => CODE_READ_AS[char] ?? char);
   return chars.length === CODE_CHARS && chars.every((char) => CODE_ALPHABET.includes(char));
 }

@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
+from dotagent.harness.components import NO_HARNESS
 from dotagent.policy.engine import decide
 from dotagent.policy.types import ActionInfo, ActionKind, Decision, Flag, Preset, Risk, Verdict
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -67,6 +68,7 @@ def _prompt(source: str) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 

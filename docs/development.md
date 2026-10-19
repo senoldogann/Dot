@@ -6,7 +6,22 @@
 uv sync
 .venv/bin/ruff format src tests && .venv/bin/ruff check src tests && .venv/bin/mypy
 .venv/bin/pytest
+npm ci && npm run check
 ```
+
+The web interface has checks of its own, on Node 22 or later (a development requirement only; nothing of Dot needs
+Node to run). `npm run check` runs Biome's recommended lint rules over `src/dotagent/server/static/**/*.js`,
+`desktop/ui` and `tests/js` (`biome.json`; two rules of style alone are off), `tsc` over the scripts' JSDoc with
+`checkJs` (`tsconfig.json`, and `tsconfig.sw.json` for the service worker, whose globals are a worker's; the types the
+DOM library lacks are in `types/interface.d.ts`), and the unit tests of the pure modules (the Markdown reader, the words
+of a flow, the formatting helpers, the reasoning levels) under `tests/js` with `node --test`. The type check starts
+loose: `strict` is off, so a parameter without a type is no error, and what it catches is a property an element does
+not have, a call with the wrong arguments, a union read without a check. `noImplicitAny` is the next step, taken once
+the modules carry their JSDoc. Biome's formatter is configured but off, as the scripts were not written to its line
+width; it is switched on in one commit of its own. `tests/unit/test_static_ui.py` reads the scripts the way the browser
+would: every import names an export of a script that is there, no export is left that nothing imports (the tests count
+as importers), the page has no inline code, its `modulepreload` links name every module `main.js` reaches at the start,
+and the pages loaded on demand (`import()` in main.js's route table: everything but the chat and the home) exist.
 
 The tests prefer real calls to mocks: the smoke tests start the real server, a headless Chrome against a local fixture
 server, a real MCP server process and real Ollama models, and the unit tests cover pure functions. Tests that need a
@@ -35,7 +50,8 @@ once, and waits for nothing (item 359).
 
 The gate runs on every pull request and every push to `main` that changes more than prose (`.github/workflows/gate.yml`,
 on macOS because the package depends on PyObjC; a change to the Markdown at the root, `docs/` or the issue and pull
-request templates alone skips it): the format check, the lint, mypy, the unit tests, `dotx eval check` and every smoke
+request templates alone skips it): the format check, the lint, mypy, the checks of the interface (`npm run check`), the
+unit tests, `dotx eval check` and every smoke
 test that needs no service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not
 hosted"`). The tests run spread over the cores with `-n auto` (pytest-xdist). When something under `desktop/` changes,
 `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop shell. Each action the
@@ -58,6 +74,7 @@ src/dotagent/
   desktop/    accessibility tree, input, screen capture, permissions
   web/        search and fetch
   memory/     notes, ranking, embeddings
+  harness/    the versions of what a run's prompt takes from the harness (docs/harness.md)
   evals/      eval tasks, the runner that plays them, the scripted model, scoring
   scheduler/  schedules, timing, the runner
   mcp/        MCP client hub

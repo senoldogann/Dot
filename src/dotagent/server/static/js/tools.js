@@ -30,7 +30,7 @@ const KIND_OF_TOOL = {
 
 /** What one tool call counted as in a flow's summary. */
 export function callKind(tool) {
-  if (tool in KIND_OF_TOOL) {
+  if (Object.hasOwn(KIND_OF_TOOL, tool)) {
     return KIND_OF_TOOL[tool];
   }
   if (tool.startsWith("browser_")) {

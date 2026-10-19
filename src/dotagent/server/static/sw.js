@@ -11,6 +11,9 @@
 // A page opened while nothing is kept for it, and the network fails, is answered with the page this worker keeps when it
 // installs (OFFLINE_PAGE): it says that the Mac cannot be reached and what to do about it.
 
+// The worker's own global scope, named with its type for the checks (tsconfig.sw.json).
+const worker = /** @type {ServiceWorkerGlobalScope} */ (/** @type {unknown} */ (self));
+
 const PAGES_CACHE = "dot-pages-";
 // A cache named for a build the network named after a copy of another build had answered (item 359). It holds nothing:
 // its name outlives this service worker, which iOS stops between openings, and tells the next opening to wait for the
@@ -39,13 +42,13 @@ async function keepOffline() {
   await cache.addAll(OFFLINE_FILES);
 }
 
-self.addEventListener("install", (event) => {
-  event.waitUntil(keepOffline().then(() => self.skipWaiting()));
+worker.addEventListener("install", (event) => {
+  event.waitUntil(keepOffline().then(() => worker.skipWaiting()));
 });
 
 // The caches of an earlier service worker go (`dot-shell-v1` kept files of every build in one); the page kept for a
 // Mac out of reach stays (OFFLINE_CACHE), as it is of no build.
-self.addEventListener("activate", (event) => {
+worker.addEventListener("activate", (event) => {
   event.waitUntil(
     caches
       .keys()
@@ -59,7 +62,7 @@ self.addEventListener("activate", (event) => {
             .map((name) => caches.delete(name)),
         ),
       )
-      .then(() => self.clients.claim()),
+      .then(() => worker.clients.claim()),
   );
 });
 
@@ -124,9 +127,10 @@ function after(ms, value) {
  * otherwise a phone whose network is always slower than NETWORK_WAIT_MS would open the build it first kept for ever.
  */
 async function openPage(event) {
+  /** @type {Promise<{ response: Response, error: undefined } | { response: undefined, error: unknown }>} */
   const answer = fetch(event.request).then(
-    (response) => ({ response }),
-    (error) => ({ error }),
+    (response) => ({ response, error: undefined }),
+    (error) => ({ response: undefined, error }),
   );
   const wait = (await newerNamed()) ? NEWER_WAIT_MS : NETWORK_WAIT_MS;
   const early = await Promise.race([answer, after(wait, null)]);
@@ -175,11 +179,11 @@ async function shellFile(event) {
   }
 }
 
-self.addEventListener("fetch", (event) => {
+worker.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
   if (
     event.request.method !== "GET" ||
-    url.origin !== self.location.origin ||
+    url.origin !== worker.location.origin ||
     url.pathname.startsWith(API_PREFIX) ||
     url.pathname.startsWith(PAGES_PREFIX)
   ) {
@@ -202,13 +206,13 @@ function pushed(event) {
   }
 }
 
-self.addEventListener("push", (event) => {
+worker.addEventListener("push", (event) => {
   const message = pushed(event);
   if (message === null) {
     return;
   }
   event.waitUntil(
-    self.registration.showNotification(message.title || "Dot has news", {
+    worker.registration.showNotification(message.title || "Dot has news", {
       body: message.body,
       icon: "icons/icon-192.png",
       badge: "icons/icon-192.png",
@@ -218,20 +222,20 @@ self.addEventListener("push", (event) => {
   );
 });
 
-self.addEventListener("notificationclick", (event) => {
+worker.addEventListener("notificationclick", (event) => {
   event.notification.close();
   // A tap opens one of the page's own routes (`#/…`, as the daemon sends them); anything else opens the home.
   const given = event.notification.data?.route;
   const route = typeof given === "string" && given.startsWith("#/") ? given : "#/runs";
-  const target = new URL(`/${route}`, self.location.origin).href;
+  const target = new URL(`/${route}`, worker.location.origin).href;
   event.waitUntil(
-    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+    worker.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
       const open = windows.find((client) => "focus" in client);
       if (open !== undefined) {
         open.navigate(target);
         return open.focus();
       }
-      return self.clients.openWindow(target);
+      return worker.clients.openWindow(target);
     }),
   );
 });

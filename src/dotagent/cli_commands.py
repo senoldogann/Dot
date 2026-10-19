@@ -131,6 +131,91 @@ class MemoryReindexCommand(FrozenModel):
     name: Literal["memory-reindex"]
 
 
+class HarnessListCommand(FrozenModel):
+    name: Literal["harness-list"]
+
+
+class HarnessShowCommand(FrozenModel):
+    name: Literal["harness-show"]
+    version_id: str | None
+
+
+class HarnessDiffCommand(FrozenModel):
+    name: Literal["harness-diff"]
+    version_id: str
+    against: str | None
+
+
+class HarnessSetCommand(FrozenModel):
+    """A version of the owner's: ``habits`` and ``tool_guidance`` name files to read a component from (``-`` for
+    standard input), ``None`` keeps the adopted version's text."""
+
+    name: Literal["harness-set"]
+    summary: str
+    habits: str | None
+    tool_guidance: str | None
+    adopt: bool
+
+
+class HarnessAdoptCommand(FrozenModel):
+    name: Literal["harness-adopt"]
+    version_id: str
+
+
+class HarnessRetireCommand(FrozenModel):
+    name: Literal["harness-retire"]
+    version_id: str
+
+
+class HarnessProposeCommand(FrozenModel):
+    """A candidate from what one run did (item 390): ``scope`` is the proposer's, how the agent works or what a
+    practitioner knows."""
+
+    name: Literal["harness-propose"]
+    run_id: str
+    scope: Literal["invariant", "domain"]
+
+
+class HarnessStepCommand(FrozenModel):
+    """One step of the improvement loop now (item 391): from ``run_id``, or the newest run that ended; ``scripted``
+    plays the references through the scripted model, a check of the step without a model's cost."""
+
+    name: Literal["harness-step"]
+    run_id: str | None
+    scripted: bool
+
+
+class HarnessProbeCommand(FrozenModel):
+    """A probe in a process of its own (item 391): the ask read from the file ``ask``, the report printed as JSON."""
+
+    name: Literal["harness-probe"]
+    ask: str
+
+
+class HarnessFinalCommand(FrozenModel):
+    """The final set played once under the adopted version, or ``version_id`` (item 391)."""
+
+    name: Literal["harness-final"]
+    version_id: str | None
+
+
+class HarnessGraphCommand(FrozenModel):
+    """The provenance of the harness as a Mermaid flowchart (item 392), of the newest ``steps`` steps."""
+
+    name: Literal["harness-graph"]
+    steps: int = Field(ge=1)
+
+
+class HarnessStepsCommand(FrozenModel):
+    name: Literal["harness-steps"]
+    limit: int = Field(ge=1)
+
+
+class HarnessExperiencesCommand(FrozenModel):
+    name: Literal["harness-experiences"]
+    limit: int = Field(ge=1)
+
+
 class BrowserImportChromeCommand(FrozenModel):
     name: Literal["browser-import-chrome"]
     profile: str
@@ -307,6 +392,19 @@ type Command = Annotated[
     | DoctorCommand
     | SetupCommand
     | ReflectCommand
+    | HarnessListCommand
+    | HarnessShowCommand
+    | HarnessDiffCommand
+    | HarnessSetCommand
+    | HarnessAdoptCommand
+    | HarnessRetireCommand
+    | HarnessProposeCommand
+    | HarnessStepCommand
+    | HarnessProbeCommand
+    | HarnessFinalCommand
+    | HarnessGraphCommand
+    | HarnessStepsCommand
+    | HarnessExperiencesCommand
     | BrowserLoginCommand
     | BrowserImportChromeCommand
     | BrowserAttachCommand

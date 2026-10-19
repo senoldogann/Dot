@@ -10,7 +10,7 @@ import { statusBadge } from "./panels.js";
 
 export const LIFECYCLE_KINDS = new Set(["run_queued", "run_started", "run_finished", "approval_requested", "approval_decided", "takeover", "handback"]);
 
-export const KIND_ICON = {
+const KIND_ICON = {
   run: "bolt",
   delegated: "branch",
   campaign: "target",
@@ -23,7 +23,7 @@ export const KIND_ICON = {
   journal: "file",
 };
 
-export const KIND_WORD = {
+const KIND_WORD = {
   run: "run",
   delegated: "delegated run",
   campaign: "campaign session",
@@ -37,7 +37,7 @@ export const KIND_WORD = {
 };
 
 /** The facts of a row, in order: what it is, its channel, its detail, then its steps while it works or its cost once it ended. */
-export function rowFacts(item) {
+function rowFacts(item) {
   const facts = [KIND_WORD[item.kind] ?? item.kind, item.channel, item.detail].filter((part) => part !== "");
   if (item.steps !== null && item.steps > 0 && item.minutes === null) {
     facts.push(item.steps === 1 ? "1 step" : `${item.steps} steps`);

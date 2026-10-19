@@ -443,3 +443,85 @@ class CampaignEntry(FrozenModel):
     kind: CampaignEntryKind
     text: str
     numbers: dict[str, float]
+
+
+type HarnessState = Literal["candidate", "probed", "adopted", "retired"]
+
+
+class HarnessVersion(FrozenModel):
+    """One version of the harness (item 389, docs/harness.md): the texts a run's system prompt takes (``habits`` after
+    how to work, ``tool_guidance`` after the tools; an empty one adds nothing), who made it (``made_by``: ``owner``, or
+    the name of the improvement loop), the version it was made from (``parent_id``, ``None`` for one made from Dot's own
+    text alone), its ``state`` (a ``candidate`` nobody tried, one ``probed`` by the loop, the one ``adopted``, which
+    every run takes, or one ``retired``), what it is in a line (``summary``), and the evidence and decisions behind it
+    (``notes``, empty for one of the owner's). ``adopted_at`` and ``retired_at`` are when it last was; a version adopted
+    again after it was retired has no ``retired_at``."""
+
+    id: str
+    parent_id: str | None
+    made_by: str
+    state: HarnessState
+    summary: str
+    habits: str
+    tool_guidance: str
+    notes: str
+    created_at: float
+    adopted_at: float | None
+    retired_at: float | None
+
+
+type HarnessStepState = Literal["done", "keep", "skipped", "failed"]
+
+
+class HarnessStep(FrozenModel):
+    """One step of the improvement loop (item 391, docs/harness.md): the run it learned from (``from_run``, ``None``
+    when none was there to learn from), the version the probes compared against (``base_version``, ``None`` for Dot's
+    own text alone), how it ended (``state``: ``done`` with a probed version written, ``keep`` with the base kept,
+    ``skipped`` with nothing to learn from, ``failed``), what it did as JSON (``outcome``: the candidates, the probes'
+    contrasts, the decision, the probed version) and ``error`` when it failed."""
+
+    id: str
+    started_at: float
+    ended_at: float | None
+    from_run: str | None
+    base_version: str | None
+    state: HarnessStepState
+    outcome: str
+    error: str | None
+
+
+class HarnessProbe(FrozenModel):
+    """One attempt of a probe (item 391): the step it was part of, the version played (``None`` for Dot's own text
+    alone) and its ``label``, the task and the attempt, and what the attempt came to."""
+
+    id: int
+    step_id: str
+    version_id: str | None
+    label: str
+    task_id: str
+    attempt: int
+    passed: bool
+    status: RunStatus
+    cut: str
+    steps: int
+    input_tokens: int
+    output_tokens: int
+    tool_errors: int
+    seconds: float
+    created_at: float
+
+
+class HarnessExperience(FrozenModel):
+    """An experience the loop kept (item 391): the shape of situation it applies to (``cue``), the lesson, the
+    evidence it rests on, how sure the writer was, the step and version it came from, and whether the run it was
+    written from had read content third parties can author (``tainted``, item 392), which keeps it from the proposer."""
+
+    id: str
+    step_id: str
+    version_id: str | None
+    cue: str
+    lesson: str
+    evidence: str
+    confidence: str
+    created_at: float
+    tainted: bool
