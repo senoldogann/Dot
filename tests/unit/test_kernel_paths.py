@@ -4,6 +4,7 @@ volume with firmlinks, so ``/System/Volumes/Data/private/…`` is ``/private/…
 
 import errno
 import os
+import socket
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
@@ -82,6 +83,16 @@ def test_a_pipe_is_named_at_once_and_a_closed_folder_through_the_folder_it_is_in
     finally:
         closed.chmod(0o700)
     assert inside == kernel_path(real) / "closed" / "key"
+
+
+def test_a_socket_is_named_through_the_folder_it_is_in(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    real: Path = Path(os.path.realpath(tmp_path))
+    # A socket's address is short (104 bytes on macOS), so it is bound from inside its folder.
+    monkeypatch.chdir(real)
+    with socket.socket(socket.AF_UNIX) as listening:
+        listening.bind("dot.sock")
+        assert kernel_path(real / "dot.sock") == kernel_path(real) / "dot.sock"
+        assert kernel_path(real / "dot.sock" / "past") == kernel_path(real) / "dot.sock" / "past"
 
 
 def test_an_open_that_fails_for_another_reason_is_raised(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
