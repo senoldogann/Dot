@@ -14761,7 +14761,7 @@ icerisinden filtreleme yapmali." (when I pick a provider and type a model's name
 results come too; that is wrong, it should filter within the picked provider's models alone). **As built
 (2026-10-19).** The composer's model menu searched every provider once a word was typed, and its rail pressed none (item
 208, `modelpicker.js`). The search now narrows the view the rail shows, a provider's models or the favourites: the rail
-keeps that view pressed, the search's placeholder names what it looks through ("Search OpenAI models", "Search
+keeps that view pressed, the search's placeholder and label name what it looks through ("Search OpenAI models", "Search
 favourites"), a search that finds nothing says where ("No OpenAI models match “haiku”."), and a provider's rows do not
 name their provider in a search either. Another view on the rail keeps the words typed and looks through its own
 models, so a name typed in the wrong provider is found by pressing the right one; the default's row shows as before,

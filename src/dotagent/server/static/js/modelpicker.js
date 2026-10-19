@@ -183,7 +183,6 @@ export function modelPicker({ onPick, onMakeDefault }) {
       class: "model-search-input",
       type: "text",
       value: query,
-      "aria-label": "Search models",
       role: "combobox",
       "aria-autocomplete": "list",
       "aria-expanded": "true",
@@ -211,10 +210,12 @@ export function modelPicker({ onPick, onMakeDefault }) {
       railItems.slice(1),
     );
 
-    // The rail presses the view shown, whose models the search looks through, as its placeholder says; the item
-    // pressed, or the first, is the rail's one stop for Tab.
+    // The rail presses the view shown, whose models the search looks through, as its placeholder and its label say;
+    // the item pressed, or the first, is the rail's one stop for Tab.
     function paintRail() {
-      search.placeholder = `Search ${viewModels(view)}`;
+      const scope = `Search ${viewModels(view)}`;
+      search.placeholder = scope;
+      search.setAttribute("aria-label", scope);
       for (const item of railItems) {
         item.setAttribute("aria-pressed", String(item.dataset.view === view));
       }

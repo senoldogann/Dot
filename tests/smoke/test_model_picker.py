@@ -191,7 +191,7 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
                 page, errors = await _page(browser, served, width, scheme)
                 pill: Locator = page.locator(".composer .composer-pill[data-pill='model']")
                 menu: Locator = page.locator(_MENU)
-                search: Locator = menu.locator("input[aria-label='Search models']")
+                search: Locator = menu.locator("input.model-search-input")
                 await expect(pill).to_contain_text("scripted")
 
                 # Opened with no favourites: on the provider of the model a run would use, the search taking the keys.
@@ -225,6 +225,7 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
                 # A search looks through the models of the provider the rail shows, which stays pressed (item 395); one
                 # that finds nothing there says so.
                 await expect(search).to_have_attribute("placeholder", "Search OpenAI models")
+                await expect(search).to_have_attribute("aria-label", "Search OpenAI models")
                 await search.fill("mini")
                 assert await _rows(menu) == ["gpt-5.5-mini"]
                 assert (await _rail(menu))[2] == ("OpenAI", "true")
@@ -321,11 +322,11 @@ async def test_the_model_menu_shows_providers_finds_models_and_keeps_favourites(
             await phone.locator(".composer .composer-pill[data-pill='model']").tap()
             menu = phone.locator(_MENU)
             await expect(menu.locator(".model-picker")).to_have_count(1)
-            await expect(menu.locator("input[aria-label='Search models']")).not_to_be_focused()
+            await expect(menu.locator("input.model-search-input")).not_to_be_focused()
             await expect(menu.locator("[role=option] kbd")).to_have_count(0)
             await menu.get_by_role("button", name="OpenAI").tap()
             assert await _rows(menu) == ["Default (scripted)", "gpt-5.5", "gpt-5.5-mini"]
-            await expect(menu.locator("input[aria-label='Search models']")).not_to_be_focused()
+            await expect(menu.locator("input.model-search-input")).not_to_be_focused()
             await touch.close()
 
             # Opened before the model list has come, the menu moves to its opening view once the list comes. (The
@@ -387,7 +388,7 @@ async def test_the_model_menu_makes_the_default_that_new_chats_start_on(
             await page.goto(ui_url(host, port, TOKEN))
             pill: Locator = page.locator(".composer .composer-pill[data-pill='model']")
             menu: Locator = page.locator(_MENU)
-            search: Locator = menu.locator("input[aria-label='Search models']")
+            search: Locator = menu.locator("input.model-search-input")
             choosing: Locator = menu.locator(".model-choosing")
             change: Locator = menu.get_by_role("button", name="Change")
             await expect(pill).to_contain_text("scripted")
