@@ -15164,6 +15164,27 @@ the whole branch: 1 Important, 2 Nits, fixed: `docs/` said the **+** opened a me
 Keep going), which the work had made the file picker itself; so did comments and a test's words; `openPicker`'s
 `accept`, which nothing passed, is gone.
 
+### 402. A group's calls in line with its head, each the command itself
+
+**Status: done (2026-10-19), on `item-402-step-rows`.** The owner's word of 2026-10-19, with two pictures of another
+coding agent's conversation ("Ran 2 commands" over one line for each command, a terminal's mark, the command cut with an
+ellipsis and a chevron, a thought with a brain): "Son olarak ekteki fotograftaki gibi streaming calisirken ekteki
+tasarimda göstersek calisan komutlari vs? Meseal ran 2 commands tiklarsam acilir menü aciliyor ve icerigin gösteriyor
+hepsi ayni hizzada vs.." (finally, while it streams, could we show the commands at work in the design of the pictures?
+Clicking "Ran 2 commands" opens and shows what it holds, all in line). **As built (2026-10-19).** The group of steps
+(item 374) keeps its head and fold; its calls stand in line with the head, no longer indented on a hairline: each call's
+mark under the group's, its words under the group's (`run.css` `.steps-body`, `app.css` `.tool-head`). A call's row is
+its mark (a spinner while it runs, then the mark of its kind from `toolIconName`, a cross when it failed, the warning
+when it was cut off), the call in its own words (the command itself, not the policy's "Run: … (read-only command)",
+which is now the row's tooltip, as a failure's first line is), and the chevron; the tool's name is for screen readers,
+shown only for a tool whose mark does not say what it is (an MCP server's) or a call that names nothing (`tools.js`
+`toolRow`). A group that is over wears the mark of the kind its words start with, the terminal's for "Ran 2 commands"
+(`flowIcon`), and a folded group at work says its latest call in the same words (`describeCall`); a call that went well
+wears its mark in the quiet ink. The thought's brain and the bolt of a resumed turn take the same column. Tests:
+`tests/smoke/test_flow_fold.py` (the rows' words, the hidden name, the terminal's marks on the rows and the head, the
+marks and the words in line with the head's, which fails without the change; the latest line says the command alone).
+Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15980,3 +16001,4 @@ Keep going), which the work had made the file picker itself; so did comments and
 - 2026-10-19 (Opus 5.5): item 399 on `item-399-kernel-paths` from `main`, found by the `/security-review` of item 398: a path spelled through the Data volume is classified by the place it names; for the owner to merge.
 - 2026-10-19 (Opus 5.5): item 400 on the owner's word of the same day, on `item-400-loop-new-chat` from `main`: `/loop` in a new chat's box; items 394 to 399 merged on the same word ("Hepsini birleştir").
 - 2026-10-19 (Opus 5.5): item 401, `ui/run-mobile-polish` with its unsaved files, merged with main (items 389 to 400) and readied for main on the owner's word of the same day, by the agent of thread b362da28 with the agent of thread e22fd817.
+- 2026-10-19 (Opus 5.5): item 402 on the owner's word of the same day, on `item-402-step-rows` from `main`: a group's calls in line with its head, each the command itself.

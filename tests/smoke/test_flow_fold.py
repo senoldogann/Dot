@@ -44,6 +44,15 @@ _SCRIPT: tuple[ScriptedTurn, ...] = (
 )
 
 
+# Where the head and each call's row put their mark and their words: the left edge of each, the head first.
+_LINES: str = """(group) => [
+  [group.querySelector(".steps-state"), group.querySelector(".steps-title")],
+  ...[...group.querySelectorAll(".steps-body .tool-head")].map(
+    (row) => [row.querySelector(".tool-state"), row.querySelector(".tool-sum")],
+  ),
+].map(([mark, words]) => [mark.getBoundingClientRect().left, words.getBoundingClientRect().left])"""
+
+
 class _SecondReplyHeld(ScriptedProvider):
     """The script replays at once, but its second reply waits for the test: the run works, its first call reported,
     while the page is read and the group is clicked."""
@@ -143,6 +152,8 @@ async def test_the_step_group_folds_and_unfolds_while_the_run_still_works(tmp_pa
                 # The first call has streamed and the group is at work, folded as the theme folds it; its latest line
                 # says what runs now.
                 await expect(group.locator(".steps-latest")).to_contain_text("echo one")
+                # The call in its row's words: the command, no tool's name before it (item 402).
+                await expect(group.locator(".steps-latest")).to_have_text(_FIRST)
                 assert await group.evaluate("(node) => node.open") is False
                 await expect(group.locator(".steps-latest")).to_be_visible()
                 await group.screenshot(path=str(tmp_path / "steps-folded-at-work.png"))
@@ -172,6 +183,15 @@ async def test_the_step_group_folds_and_unfolds_while_the_run_still_works(tmp_pa
                 await expect(page.locator(".timeline .answer")).to_contain_text(_ANSWER)
                 assert await group.evaluate("(node) => node.open") is True
                 await expect(group.locator(".steps-latest")).to_be_hidden()
+                # Each call is one line in line with the head (item 402): the mark of its kind under the group's, the
+                # command itself under the group's words, the tool's name for screen readers alone.
+                rows: Locator = group.locator(".steps-body .tool-head")
+                await expect(rows.locator(".tool-sum")).to_have_text([_FIRST, _SECOND])
+                await expect(rows.locator(".tool-name").first).to_have_class(re.compile(r"\bvisually-hidden\b"))
+                await expect(rows.locator(".tool-state [data-icon='terminal']")).to_have_count(2)
+                await expect(summary.locator(".steps-state [data-icon='terminal']")).to_have_count(1)
+                lines: list[list[float]] = await group.evaluate(_LINES)
+                assert all(abs(row[0] - lines[0][0]) <= 1 and abs(row[1] - lines[0][1]) <= 1 for row in lines), lines
                 await page.screenshot(path=str(tmp_path / "steps-after-the-run-1280.png"))
                 # On a phone the summary is still there, the group still open and its calls in sight.
                 await page.set_viewport_size({"width": 390, "height": 844})

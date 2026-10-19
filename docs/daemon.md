@@ -202,7 +202,11 @@ how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent s
 "Open parent" and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that
 says what they did, "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it
 while it runs, "Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and
-screenshot, each call one quiet line with its icon, its result on a hairline under it once opened, while approvals,
+screenshot, each call one line in line with the group's head (item 402): its mark (a spinner while it runs, then the
+mark of its kind, a cross when it failed), the call in its own words (the command itself; the tool's name only for a
+tool whose mark does not say what it is, an MCP server's) and a chevron, what the call came to its tooltip and its
+result on a hairline under it once opened; a group that is over wears the mark of the kind its words start with (the
+terminal's for "Ran 2 commands"), and the model's thinking is a line of the same column with the brain. Approvals,
 questions and policy notes stay in the open. A click on that line opens or folds it while the run still works and
 after it ends, and the reader's choice stands for the life of the page; folded, it keeps the call under way in sight (on a phone, only the count).
 The lines of how a run was set up (the
