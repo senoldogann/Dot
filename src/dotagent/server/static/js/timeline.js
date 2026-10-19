@@ -1178,7 +1178,13 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const data = record.data;
       const chosen = typeof data.chosen === "number" ? data.chosen : null;
       if (scope.runId === rootRunId) {
-        onScaffold({ contextTokens: data.context_tokens, window: data.window, chosen, summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null });
+        onScaffold({
+          model: typeof data.model === "string" ? data.model : null,
+          contextTokens: data.context_tokens,
+          window: data.window,
+          chosen,
+          summariseAt: typeof data.summarise_at === "number" ? data.summarise_at : null,
+        });
       }
       const output = `tool output up to ${compact(data.tool_output_chars)} characters`;
       const budget = `budget ${compact(data.context_tokens)}`;

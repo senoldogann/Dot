@@ -298,8 +298,8 @@ def _scaffold(
 async def test_a_size_chosen_for_the_model_sets_the_budget_the_tool_output_and_the_point_of_summary(
     login_env: dict[str, str],
 ) -> None:
-    # Above [agent] context_tokens the budget and the point of summary rise and the tool output stays at its most;
-    # below it all three fall in proportion; past three quarters of the window the window cuts the size (item 250).
+    # Above 96,000 the budget and the point of summary rise and the tool output stays at its most; below it all three
+    # fall in proportion; past three quarters of the window the window cuts the size (item 250).
     turns: list[ScriptedTurn] = _reading(2)
     large: Played = await _play(_sized({SCRIPTED_MODEL: 192_000}), login_env, 1_000_000, turns)
     small: Played = await _play(_sized({SCRIPTED_MODEL: 64_000}), login_env, 1_000_000, turns)
@@ -308,8 +308,8 @@ async def test_a_size_chosen_for_the_model_sets_the_budget_the_tool_output_and_t
     assert large.scaffolds == (_scaffold(1_000_000, 192_000, 192_000, 163_200, 12_000, False),)
     assert small.scaffolds == (_scaffold(1_000_000, 64_000, 64_000, 54_400, 8_000, False),)
     assert cut.scaffolds == (_scaffold(204_800, 192_000, 153_600, 153_600, 12_000, True),)
-    # A size chosen for another model leaves this one's as [agent] context_tokens has it.
-    assert other.scaffolds == (_scaffold(1_000_000, None, 96_000, 81_600, 12_000, False),)
+    # A size chosen for another model leaves this one's at Dot's default, the most of its window (item 396).
+    assert other.scaffolds == (_scaffold(1_000_000, None, 750_000, 637_500, 12_000, False),)
     assert {large.record.status, small.record.status, cut.record.status, other.record.status} == {"done"}
 
 

@@ -281,12 +281,11 @@ def test_auto_groups_the_tools_of_a_weak_model_and_of_a_window_that_cut_the_budg
         '[agent] tool_surface is "auto" and the model\'s window cut the context budget to 18,000 tokens',
     )
     assert surface_for(AUTO, _scaffold("standard", 96_000, None))[0] == "full"
-    # A context size chosen for the model under [agent] context_tokens groups them too (item 250), a larger one not; a
-    # window that cut the chosen size is the window's doing.
+    # A context size chosen for the model under the 96,000 tool_output_chars is meant for groups them too (items 250
+    # and 396), a larger one not; a window that cut the chosen size is the window's doing.
     assert surface_for(AUTO, _scaffold("standard", 64_000, 64_000)) == (
         "grouped",
-        '[agent] tool_surface is "auto" and the context size chosen for the model, 64,000 tokens, is below '
-        "[agent] context_tokens",
+        '[agent] tool_surface is "auto" and the context size chosen for the model, 64,000 tokens, is below 96,000',
     )
     assert surface_for(AUTO, _scaffold("standard", 18_000, 64_000)) == (
         "grouped",

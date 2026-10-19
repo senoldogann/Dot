@@ -256,12 +256,13 @@ of the daemon or a run moved to a standby model leaves them as they are (a chat 
 next run starts). They are not kept in the browser as the home's are, and Keep going stays a new chat's choice. The run
 under way keeps its own: while it works, the pills step back and say that they wait for the next follow-up. Beside the
 send, a ring shows how much of the run's context budget its last step filled (item 222): the tokens that
-step sent the model against the run's budget (`context_tokens` or the model's own context size, or three quarters of
-the window when that is less); it turns to the warning colour past 80 % and to the danger colour past the budget, and a
+step sent the model against the run's budget (the model's own context size or Dot's default, the most of the window,
+item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a
 click shows the figures, the point past which Dot summarizes the older part of the run, the model's window, and why
 the budget is smaller than the window (each step sends the model the whole run again, so a run kept within it is
 answered sooner and costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen
-for the model in Settings › Models, which the timeline notes too. It
+for the model in Settings › Models, which the timeline notes too; **Change context size** under them opens that
+setting at the run's model (item 396). It
 reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut off offers
 **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the model and
 its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool calls (with
@@ -540,7 +541,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
-| `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
+| `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
 | `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |

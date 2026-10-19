@@ -28,9 +28,11 @@ its second opinion and its approvals), and the config file keeps it with the res
 cannot do the work is refused, and nothing changes (`POST /api/models/roles`).
 
 **Context size.** Beside each model's window, Settings › Models sets the context size of the model's runs (item 250):
-how much of a run each step sends the model before Dot summarizes its older part. The menu offers Dot's default
-(`[agent] context_tokens`, 96 000, or three quarters of the window when that is less) and the sizes from 48 000 up to
-three quarters of the window; a choice holds from the model's next run, with no restart, and the config file keeps it
+how much of a run each step sends the model before Dot summarizes its older part. The menu offers Dot's default and the
+smaller sizes from 48 000 up. The default is the most the model's window allows, three quarters of it, the first entry
+of the menu (`[agent] context_tokens = "most"`, item 396; 96 000 for a model whose provider does not say its window); a
+number there gives every model that size instead, or three quarters of its window when that is less. A choice holds
+from the model's next run, with no restart, and the config file keeps it
 in `[models.context]` (`"anthropic:claude-opus-5-5" = 192000`) with the rest of the file as it was. A larger size means
 fewer summaries, each of which drops detail of the older part and takes a call of the fast model, and more input a step:
 steps that are answered more slowly and cost more on a key billed by the token. **Why** opens, under the model's row,
@@ -40,7 +42,9 @@ most and the least; and what the model's runs of the last 30 days measured (`GET
 the runs, the input of a step at the median, for 95 % of the steps and at most, the share the provider served from its
 cache, the input of a run's first step, the summaries, and the seconds of a step by its input. A size below 48 000 (a
 run's first step alone sends its instructions, its tools and the request) or past three quarters of the window is
-refused, and nothing changes (`PUT /api/models/context`).
+refused, and nothing changes (`PUT /api/models/context`). The context meter of a run's composer links to its model's
+row (**Change context size**, `#/settings/models?model=<provider:model>`): its provider's fold opens and the row comes
+into sight, marked, with the focus on its size.
 
 **Helpers and standby.** `helpers` lists models, best first, that a run may turn to. The `consult` tool asks one of them
 a question and returns its answer, fenced as advice; `delegate` can run a part of the work on one of them. A helper has

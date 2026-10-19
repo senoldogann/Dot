@@ -14753,6 +14753,33 @@ schedule whose firing a crash cut before its run was under way is due again at t
 starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/test_help_added.py`, `test_previews.py`,
 `test_responses_prune.py`, `tests/smoke/test_scheduler.py`. Docs: `docs/runs.md`, `docs/memory-and-schedules.md`.
 
+### 396. A model's context size is the most its window allows unless one is chosen, and the context meter leads to it
+
+**Status: done (2026-10-19), on `item-396-context-size`.** The owner's word of 2026-10-19: "Providerlarin modellerinin
+default context size en yüksek ne ise o olsun default providerin destekledigi, eger kisiler isterse modeller kismindan
+degistirir. Composerdaki halka içinede bir buton koy, change contextsize gibi ona tiklayinca o providerin o modeline
+gitsin direk." (the default context size of a provider's models should be the highest the provider supports, and
+whoever wants another changes it among the models; and put a button in the composer's ring, like change context size,
+that goes straight to that provider's model). **As built (2026-10-19).** `[agent] context_tokens` takes `"most"`, its
+new default (`defaults.toml`, `config.py`): a model without a size of its own gets three quarters of its window, the
+most item 250 lets it have, where it got 96,000 or three quarters of a smaller window; a model whose provider does not
+say its window gets 96,000, and a number there still gives every model that size, so an owner's own number keeps its
+meaning. While it is "most", 96,000 stays the budget `tool_output_chars` is meant for and under which the tool surface
+counts a budget as small, and a window too small for it cuts the budget as it cut a number (`scaffold.py`
+`configured_size`, `_reference_size`): a model whose window is 128,000 or less runs as before, with the same budget,
+point of summary and tool output. Settings › Models offers the most first, as Dot's default, then the smaller sizes,
+and its Why says where the default comes from (`ContextChoice.configured` is null while it is "most"). The panel of the
+composer's context meter has **Change context size**, a link to `#/settings/models?model=<ref>` (not for OpenCode's
+agent, whose window Dot does not set, nor for a window the provider does not say); there the model's provider fold and
+the Models card open when folded, and its row comes into sight, marked, with the focus on its size (`system.js`
+`showAsked`), on a phone too, where the table scrolls sideways to it. The eval reports keep "most" as it is
+(`EvalSettings.context_tokens`). A larger budget means fewer summaries and more input a step: a long run on a large
+window costs more on a key billed by the token, as `docs/models.md` says, and a number in `[agent] context_tokens`, or
+a size of the model's own, brings it down. Tests: `tests/unit/test_scaffold.py`, `test_context_sizes.py`,
+`test_tool_groups.py`, `tests/smoke/test_scaffold.py`, `test_context_sizes.py` (the API's default, the menu, and an
+address that names a model of a folded provider), `test_context_meter.py` (the link and where it leads). Docs:
+`docs/models.md`, `docs/runs.md`, `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15553,3 +15580,4 @@ starts, unless a run of it was made (`scheduler/runner.py`). Tests: `tests/unit/
 - 2026-10-18 (Opus 5.5): item 381 merged as `4193389` (PR #375); the pre-push review passed it with a Nit, answered. Item 382 on `item-382-edit-tools`: a file's text is changed with the file tools, and the shell runs things, on the owner's word.
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 396 on the owner's word of the same day, on `item-396-context-size` from `main`, while other agents of the owner's work on items 385 to 393: a model's context size is the most its window allows unless one is chosen, and the context meter leads to it.
