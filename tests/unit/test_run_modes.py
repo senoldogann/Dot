@@ -209,10 +209,15 @@ def test_the_note_under_a_message_carries_what_changes_from_message_to_message(t
     assert full == f"{clock_note(now)}\n\n{recalled}"
     # A note forgotten since an earlier message was handed it is named, as its old text stays in the chat.
     gone: str = recalled_note([], 0, [], ["mem_7"])
-    assert (
-        gone.startswith("Notes you were handed earlier in this chat that were forgotten since") and "- [mem_7]" in gone
-    )
-    assert handed_note_ids("x [mem_1] y\n[mem_2b] z [not one] [mem_1]") == {"mem_1", "mem_2b"}
+    assert gone.startswith("Notes you were handed earlier in this chat that were forgotten since")
+    assert "- forgotten: mem_7" in gone
+    # The ids a chat's messages carry: handed notes, not the ones named as forgotten, which are named once.
+    assert handed_note_ids(f"x [mem_1] y\n[mem_2b] z [not one] [mem_1]\n{gone}") == {"mem_1", "mem_2b"}
+    assert forgotten_unnamed(["mem_7", "mem_8"], gone) == ["mem_8"]
+    # What a context no longer carries with the same text is handed again: changed, or folded into a summary.
+    note: str = "[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"
+    changed: str = "[mem_1] The rent is due on the 5th (the user wrote it, 2026-10-19)"
+    assert notes_missing([note, changed], f"earlier\n- {note}\n") == [changed]
 
 
 def _lines(approvals: ApprovalMode) -> set[str]:
