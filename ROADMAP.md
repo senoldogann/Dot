@@ -14915,6 +14915,22 @@ session, its conversation kept as a chat and its question expired, refused while
 works, deleted once it has ended), `tests/smoke/test_campaign_rows.py` (the buttons of each state, each asking first
 and changing its row in place, and the rows on a phone). Docs: `docs/agents-and-campaigns.md`.
 
+### 395. The model menu's search looks through the provider shown
+
+**Status: done (2026-10-19), on `item-395-model-search`.** The owner's word of 2026-10-19: "bir provider secip search
+kutusuna model ismi yazdigimda diger provider sonuclarida geliyor bu yanlis, sadece secili provider modelleri
+icerisinden filtreleme yapmali." (when I pick a provider and type a model's name in the search box, the other providers'
+results come too; that is wrong, it should filter within the picked provider's models alone). **As built
+(2026-10-19).** The composer's model menu searched every provider once a word was typed, and its rail pressed none (item
+208, `modelpicker.js`). The search now narrows the view the rail shows, a provider's models or the favourites: the rail
+keeps that view pressed, the search's placeholder and label name what it looks through ("Search OpenAI models", "Search
+favourites"), a search that finds nothing says where ("No OpenAI models match “haiku”."), and a provider's rows do not
+name their provider in a search either. Another view on the rail keeps the words typed and looks through its own
+models, so a name typed in the wrong provider is found by pressing the right one; the default's row shows as before,
+when its words match. Tests: `tests/smoke/test_model_picker.py` (OpenAI's view finds its models alone and says it found
+nothing of another's; Anthropic's, shown next with the same words, finds it; the default made from such a search).
+Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15722,3 +15738,4 @@ and changing its row in place, and the rows on a phone). Docs: `docs/agents-and-
 - 2026-10-19 (Fable 5.1): item 391 committed on `harness-3`; item 392 on `harness-4`: the provenance graph, the lineage, the library read by the proposer.
 - 2026-10-19 (Fable 5.1): item 392 committed on `harness-4`; item 393 on `harness-5`: Settings › Harness.
 - 2026-10-19 (Opus 5.5): items 394 to 397 on the owner's words of the same day, each on a branch of its own from `main`, while other agents of the owner's work on items 385 to 393; item 394 on `item-394-campaign-cards`: a campaign is stopped, marked achieved or deleted from its row.
+- 2026-10-19 (Opus 5.5): item 395 on the owner's word of the same day, on `item-395-model-search` from `main`, while other agents of the owner's work on items 385 to 393: the model menu's search looks through the provider shown.
