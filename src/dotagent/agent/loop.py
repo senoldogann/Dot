@@ -110,7 +110,14 @@ from dotagent.agent.progress import (
     single_action_streak,
     stop_result,
 )
-from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs, recalled_note, turn_note
+from dotagent.agent.prompt import (
+    AgentBrief,
+    build_system_prompt,
+    collect_prompt_inputs,
+    handed_note_ids,
+    recalled_note,
+    turn_note,
+)
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
@@ -1739,17 +1746,35 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(opening.picks), True)
     history.append(goal)
     await runtime.store.append_messages(run.thread_id, [goal])
-    # Under the message (item 404): the notes recalled for it that no earlier message of the chat carries (a note
-    # folded into a summary since is handed again), and the fitting skills the instructions leave out.
+    # Under the message (item 404): the notes recalled for it that no earlier message of the chat carries with the
+    # same text (a note changed since, on the Memory page or by a run, comes again, and one folded into a summary is
+    # handed again), the notes forgotten since a message was handed them (their old text stays in the chat), and the
+    # fitting skills the instructions leave out.
     carried: str = "\n".join(message.content for message in history if message.role == "user")
-    fresh_notes: list[str] = [render_note(record) for record in remembered if f"[{record.id}]" not in carried]
+    fresh: list[MemoryRecord] = [record for record in remembered if render_note(record) not in carried]
+    handed_before: set[str] = handed_note_ids(carried) - {record.id for record in remembered}
+    still: set[str] = {record.id for record in await runtime.store.get_memories(sorted(handed_before))}
+    forgotten: list[str] = sorted(handed_before - still)
     listed_names: set[str] = {skill.name for skill in listing.skills}
     extra_skills: list[Skill] = [skill for skill in fitting.skills if skill.name not in listed_names][
         :_TURN_SKILLS_MOST
     ]
-    recalled_text: str = recalled_note(fresh_notes, recalled.tainted_left_out, extra_skills)
+
+    async def recalled_now() -> str:
+        """What the message was handed, as the notes stand now: for the note handed again after a compaction."""
+        kept: list[MemoryRecord] = await runtime.store.get_memories([record.id for record in fresh])
+        gone: list[str] = sorted(set(forgotten) | ({record.id for record in fresh} - {record.id for record in kept}))
+        return recalled_note([render_note(record) for record in kept], recalled.tainted_left_out, extra_skills, gone)
+
     turn: Message = await _stored_note(
-        agent, turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills)
+        agent,
+        turn_note(
+            datetime.now().astimezone(),
+            [render_note(record) for record in fresh],
+            recalled.tainted_left_out,
+            extra_skills,
+            forgotten,
+        ),
     )
     history.append(turn)
     facts: RunFacts = new_facts()
@@ -1885,10 +1910,13 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
         history, estimated, ledger = await _fit_context(agent, history, step_system, offered, ratio, ledger, scaffold)
         # A compaction that folded the note under the message away took the notes recalled for it with it: they are
-        # handed again after the summary (item 404), stored, so that the next message's prefix holds them too.
-        if recalled_text != "" and turn not in history:
-            turn = await _stored_note(agent, recalled_text)
-            history.append(turn)
+        # handed again after the summary (item 404), as they stand now, stored, so that the next message's prefix holds
+        # them too.
+        if turn not in history:
+            recalled_text: str = await recalled_now()
+            if recalled_text != "":
+                turn = await _stored_note(agent, recalled_text)
+                history.append(turn)
         routed: _Candidate | None = (
             None
             if route_skip or not candidates
