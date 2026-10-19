@@ -1,6 +1,7 @@
 """Where a filesystem path sits relative to the workspace, the user's home, Dot's own folders and protected
 locations."""
 
+import errno
 import fcntl
 import fnmatch
 import os
@@ -58,15 +59,24 @@ _KERNEL_PATH_BYTES: int = 1024
 # folder and not a link. A file, a pipe or a device is never opened: a pipe nobody writes to would hold the open, and
 # opening a device can wake it.
 _FOLDER_FLAGS: int = os.O_EVTONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+# What such an open says of a place that is no folder this process can open: not there, a file, a pipe, a socket, a
+# device or a link (ENOTDIR), a loop of links, closed to it (by its mode or by macOS's privacy), a name too long, or a
+# prefix that names no place by itself (``/.resolve/<flags>``, EINVAL). Any other failure (no descriptor left, an I/O
+# error) is raised, not taken for one of these.
+_NOT_A_FOLDER: frozenset[int] = frozenset(
+    {errno.ENOENT, errno.ENOTDIR, errno.ELOOP, errno.EACCES, errno.EPERM, errno.ENAMETOOLONG, errno.EINVAL}
+)
 
 
 def _folder_path(folder: Path) -> Path | None:
     """The path the kernel names for ``folder`` (``F_GETPATH``), or None when ``folder`` is no folder this process can
-    open: not there, a file, a pipe, a device, a link, or closed to it."""
+    open: not there, a file, a pipe, a device, a link, or closed to it (:data:`_NOT_A_FOLDER`)."""
     try:
         descriptor: int = os.open(folder, _FOLDER_FLAGS)
-    except OSError:
-        return None
+    except OSError as error:
+        if error.errno in _NOT_A_FOLDER:
+            return None
+        raise
     try:
         named: bytes = fcntl.fcntl(descriptor, fcntl.F_GETPATH, bytes(_KERNEL_PATH_BYTES))
     finally:

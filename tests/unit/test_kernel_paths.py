@@ -2,6 +2,7 @@
 volume with firmlinks, so ``/System/Volumes/Data/private/…`` is ``/private/…`` and ``/System/Volumes/Data/Users/…`` is
 ``/Users/…``, which ``realpath`` does not see; spelled so, a protected file read as a system one, with no question."""
 
+import errno
 import os
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
@@ -81,6 +82,16 @@ def test_a_pipe_is_named_at_once_and_a_closed_folder_through_the_folder_it_is_in
     finally:
         closed.chmod(0o700)
     assert inside == kernel_path(real) / "closed" / "key"
+
+
+def test_an_open_that_fails_for_another_reason_is_raised(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    def exhausted(path: object, flags: int) -> int:
+        raise OSError(errno.EMFILE, "Too many open files", str(path))
+
+    monkeypatch.setattr(os, "open", exhausted)
+    with pytest.raises(OSError) as raised:
+        kernel_path(tmp_path)
+    assert raised.value.errno == errno.EMFILE
 
 
 def test_a_file_named_by_its_number_is_protected(tmp_path: Path) -> None:
