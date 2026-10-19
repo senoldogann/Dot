@@ -412,6 +412,15 @@ class MemoryConfig(FrozenModel):
     owner_chars: int = Field(ge=100)
 
 
+class HarnessConfig(FrozenModel):
+    """The harness (item 389, docs/harness.md): how long each component of a version may be, in characters, and in
+    lines; a version past these is refused when it is written."""
+
+    habits_chars: int = Field(ge=0)
+    tool_guidance_chars: int = Field(ge=0)
+    component_lines: int = Field(ge=1)
+
+
 class ShellConfig(FrozenModel):
     pass_env: list[str]
     login_env_timeout_s: float = Field(gt=0, allow_inf_nan=False)
@@ -600,6 +609,7 @@ class AppConfig(FrozenModel):
     browser: BrowserConfig
     desktop: DesktopConfig
     memory: MemoryConfig
+    harness: HarnessConfig
     scheduler: SchedulerConfig
     skills: SkillsConfig
     plugins: PluginsConfig

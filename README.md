@@ -102,6 +102,7 @@ a rebuild, a bug hunt and a launch (MIT, by Jake Schincariol).
 - [Models and providers](docs/models.md)
 - [Runs and tools](docs/runs.md): how a run works, its tools, delegation
 - [Autonomy](docs/autonomy.md): approvals, goal mode and the end of a run
+- [The harness](docs/harness.md): what Dot improves around its model, and how a change is adopted
 - [Safety and privacy](docs/safety.md): what leaves this Mac, the policy, the sandbox
 - [The daemon, the web UI and the desktop shell](docs/daemon.md)
 - [Dot on the phone](docs/phone.md)

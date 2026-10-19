@@ -619,6 +619,17 @@ score_min_uses = 3
 # write there are yours, kept as they are and never rewritten.
 owner_chars = 1500
 
+[harness]
+# The harness (docs/harness.md): the texts of the adopted version, which every run's system prompt takes after Dot's
+# own. Habits (how to work here) come after how to work, tool guidance (what earlier runs learned of the tools on this
+# Mac) after the tools and the rules of communication; each is at most this many characters and component_lines lines,
+# with no line past 300 characters, and holds no secret, link, e-mail address, home path, account name or character that
+# does not print. A version is written by you (`dotx harness set`, POST /api/harness) or proposed by the improvement
+# loop, and only the adopted one is read; with none adopted a run's prompt is Dot's own text alone.
+habits_chars = 1200
+tool_guidance_chars = 1500
+component_lines = 16
+
 [scheduler]
 # IANA name ("Europe/Helsinki") of the zone that cron expressions and one-time moments are read in; "" = the zone the
 # TZ environment variable names when one is set, else this Mac's zone.

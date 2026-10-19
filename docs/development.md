@@ -74,6 +74,7 @@ src/dotagent/
   desktop/    accessibility tree, input, screen capture, permissions
   web/        search and fetch
   memory/     notes, ranking, embeddings
+  harness/    the versions of what a run's prompt takes from the harness (docs/harness.md)
   evals/      eval tasks, the runner that plays them, the scripted model, scoring
   scheduler/  schedules, timing, the runner
   mcp/        MCP client hub

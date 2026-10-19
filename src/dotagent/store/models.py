@@ -443,3 +443,28 @@ class CampaignEntry(FrozenModel):
     kind: CampaignEntryKind
     text: str
     numbers: dict[str, float]
+
+
+type HarnessState = Literal["candidate", "probed", "adopted", "retired"]
+
+
+class HarnessVersion(FrozenModel):
+    """One version of the harness (item 389, docs/harness.md): the texts a run's system prompt takes (``habits`` after
+    how to work, ``tool_guidance`` after the tools; an empty one adds nothing), who made it (``made_by``: ``owner``, or
+    the name of the improvement loop), the version it was made from (``parent_id``, ``None`` for one made from Dot's own
+    text alone), its ``state`` (a ``candidate`` nobody tried, one ``probed`` by the loop, the one ``adopted``, which
+    every run takes, or one ``retired``), what it is in a line (``summary``), and the evidence and decisions behind it
+    (``notes``, empty for one of the owner's). ``adopted_at`` and ``retired_at`` are when it last was; a version adopted
+    again after it was retired has no ``retired_at``."""
+
+    id: str
+    parent_id: str | None
+    made_by: str
+    state: HarnessState
+    summary: str
+    habits: str
+    tool_guidance: str
+    notes: str
+    created_at: float
+    adopted_at: float | None
+    retired_at: float | None

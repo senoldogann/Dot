@@ -14776,6 +14776,38 @@ and a page asked for while another's script is on its way opens the one asked fo
 for later:** `noImplicitAny` once the modules carry their JSDoc, and Biome's formatter (configured, off: 84 files would
 change at 120 columns), to be switched on in one commit of its own when no branch is in flight.
 
+### 389. The harness: what Dot improves around its model, and its first layer, the versions a run's prompt takes
+
+**Status: done (2026-10-19), on `harness-1`, stacked on `js-gate`.** The owner's word of 2026-10-19 ("Prompts → Agents →
+Loops → Graphs → Harness; ön araştırma, ardından profesyonel şekilde"): Dot's model is fixed, the soft parts around it
+are what makes a given model work well here, and nothing improved them with evidence. **Research.** Harness² (Xu et al.,
+arXiv 2610.14224; google-research/harness2, Apache-2.0): eight editable components mounted as files, a
+Propose–Probe–Compose step per task (two candidates, one about how the agent works and one about what a practitioner
+knows; probes beside a reference; a composer that keeps, revises or drops each edit on an observed moment, or keeps the
+base), parallel or sequential recursion with budget k, an experience library with cue/lesson/evidence/confidence entries
+written only when execution contrasts support them, and a blind selector. Taken as the method, not the code: it is a
+Linux research harness over OpenCode/Codex with Vertex model ids, three commits and no release. A survey of Dot's own
+layers (prompt assembly, lessons/reflection/playbooks, evals, agents, API/UI patterns) is in `docs/harness.md`'s shape
+and in this item's decisions. **As built (this layer, Prompts).** `docs/harness.md` says what the harness holds and what
+never changes without the owner. A version of the harness (`harness_versions`, a record `HarnessVersion`) holds two
+texts, *habits* (after how to work) and *tool guidance* (after the tools and the rules of communication), who made it,
+what it was made from, its state (candidate, probed, adopted, retired), a summary and its notes; `[harness]` bounds each
+text (1,200 and 1,500 characters, 16 lines, no line past 300), and a text with a secret, a link, an e-mail address, a
+home path or an account name is refused, as a lesson's is, and so is one with a character that does not print. Every
+run's system prompt takes the adopted version's texts (`agent/prompt.py`, both styles, under leads that name the trust
+rules as the ones that win), and records the version it took (`runs.harness_version`). `dotx harness
+list|show|diff|set|adopt|retire` and `GET/POST /api/harness…` write, adopt (which retires the one adopted before;
+adopting an earlier one again takes a change back) and retire versions; the daemon reads the adopted one as each run
+starts, no restart. **Decisions.** Addenda, not rewrites: the loop (and the owner) add bounded sections under Dot's own
+text rather than editing the 14k-character prompt, so a weaker review model can propose safely and the trust, safety and
+secrets lines stay as tests pin them. Domain knowledge keeps going to learned skills (playbooks), which have their own
+validation; the harness holds the invariant scope. Roles of the loop are config, not agent records (an agent with no
+tool list gets every tool and learns for itself). The store keeps versions and the adopted pointer (`kv
+harness.adopted`); files on disk would duplicate state. **Next layers.** Agents (the proposer, composer, selector and
+reflector as typed roles on `[models] review`), Loops (the probe in a throwaway home on the eval tasks safe to repeat,
+the nightly step after the reflection with budgets and a health record), Graphs (provenance: version ← probe ← run,
+experience → version, the decisions of each step), Harness (the owner's page).
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15577,3 +15609,4 @@ change at 120 columns), to be switched on in one commit of its own when no branc
 - 2026-10-19 (Opus 5.5): item 382 merged as `e6f0115` (PR #376); the pre-push review passed it with a Nit, fixed. Item 384 on `item-384-memory-trust`: a note keeps where it came from, as an agent of the owner's built it from the owner's plan, reviewed, with the owner's choice of (A).
 - 2026-10-19 (Opus 5.5): item 384 merged as `0616fe2` (PR #377). Items 385 and 386 on the owner's word: the findings of the deep review of 2026-10-19, item 386 on `item-386-review-rest` outside the paths a human merges, item 385 on `item-385-money` inside them, for the owner to merge.
 - 2026-10-19 (Fable 5.1): item 388 on `js-gate`, on the owner's word of the same day after the interface review of 2026-10-18: the web interface gets checks of its own (Biome, `tsc` over the JSDoc, `node --test`), an export nothing imports fails the gate, and the pages that are not the chat or the home load on demand. Done, awaiting the owner's push.
+- 2026-10-19 (Fable 5.1): item 388's whole gate ran: 705 passed, the 17 browser tests that failed under `-n auto` passed serially, as they do on main. Item 389 on `harness-1`, stacked on `js-gate`: the harness's first layer, versions of the texts a run's prompt takes, written, adopted and retired by the owner (docs/harness.md); the method of Harness² (arXiv 2610.14224) adopted, its code not.
