@@ -15190,25 +15190,27 @@ in one app, read the same; now only a command, whose mark says what it is, stand
 
 ### 405. SnapShots: a double tap of ⌘ captures the window in front into the open chat's box
 
-**Status: done (2026-10-19), on `item-405-snapshots`.** The owner's word of 2026-10-19, with a picture of another coding agent's
-Settings › SnapShots (SnapShots, Include app text, Capture shortcut ⌘ ⌘, Capture sound, Capture flash, Capture
-animations): "bu sistemi bizim projeye de kur" (build this system in our project too). **As
-built (2026-10-19).** `desktop/snapshots.py`: a listen-only event tap of the session on a thread of its own watches the
-Command key through a `TapDetector` (two presses within `[snapshots] double_tap_ms`, the key released between them, no
-other key from the first press on, so ⌘C ⌘V is not a tap; it reads no key's identity); a double tap captures the
-window in front (`screen.windows_on_screen` and `apps.frontmost_pid`, ScreenCaptureKit's rectangle capture with the
-password managers blacked out, kept as sharp as the display up to 2000 px) and, with `app_text`, the window's
-accessibility tree as the model reads it (`ax.snapshot`, `render.fit_lines`, 12,000 characters) as a Markdown file;
-both are stored as attachments (`store_attachment`) and kept by the `SnapshotService` until a composer claims them
-(`POST /api/snapshots/claim`), the system sound of the choice plays (`NSSound`: Tink, Pop, Glass), and a live
-`snapshot_taken` event tells the pages; a capture that fails (`snapshot_failed`: Dot's own window, a password manager,
-no window, no permission) tells them why. The box with a draft of its own (`composerFrame`, `js/snapshots.js`) takes
-the captures as they come and the ones that waited, with a spring (`attach-chip.arrived`, none with reduced motion).
-Settings › SnapShots (`views/snapshots.js`, the tab under This Mac) switches it live and in the config file
-(`config_edit` learned `[snapshots]`) and says whether the key is watched or why not. The watch needs Accessibility
-granted to the app that runs Dot, which the desktop already needs. **Left for later:** the flash on the captured window
-(the daemon has no AppKit run loop for a window of its own; the shell could draw it), a shortcut of the owner's own, and
-the capture of one window alone (`SCContentFilter`) where the rectangle shows what lies over it. Tests:
+**Status: done (2026-10-19), on `item-405-snapshots`.** The owner's word of 2026-10-19, with a picture of another coding
+agent's Settings › SnapShots (SnapShots, Include app text, Capture shortcut ⌘ ⌘, Capture sound, Capture flash, Capture
+animations): "bu sistemi bizim projeye de kur" (build this system in our project too). **As built (2026-10-19).**
+`desktop/snapshots.py`: a listen-only event tap of the session on a thread of its own watches the Command key through a
+`TapDetector` (two presses within `[snapshots] double_tap_ms`, the key released between them, no other key from the
+first press on, so ⌘C ⌘V is not a tap; it reads no key's identity); a double tap captures the window in front
+(`screen.windows_on_screen` and `apps.frontmost_pid`, ScreenCaptureKit's rectangle capture with the password managers
+blacked out, kept as sharp as the display up to 2000 px) and, with `app_text`, the window's accessibility tree as the
+model reads it (`ax.snapshot`, `render.fit_lines`, 12,000 characters) as a Markdown file; both are stored as attachments
+(`store_attachment`) and kept by the `SnapshotService` until a composer claims them (`POST /api/snapshots/claim`), the
+system sound of the choice plays (`NSSound`: Tink, Pop, Glass), and a live `snapshot_taken` event tells the pages; a
+capture that fails (`snapshot_failed`: Dot's own window, a password manager, no window, no permission) tells them why.
+The box with a draft of its own (`composerFrame`, `js/snapshots.js`) takes the captures as they come and the ones that
+waited, with a spring (`attach-chip.arrived`, none with reduced motion). Settings › SnapShots (`views/snapshots.js`, the
+tab under This Mac) switches it live and in the config file (`config_edit` learned `[snapshots]`) and says whether the
+key is watched or why not. The watch needs Accessibility granted to the app that runs Dot, which the desktop already
+needs. The review's findings: the watch is tried again every few seconds while the permission is missing and the page's
+reason clears by itself; a capture's files past the ten of a message are left out at the box with a notice; a capture
+whose files cannot be stored tells the pages why, as one refused does. **Left for later:** the flash on the captured
+window (the daemon has no AppKit run loop for a window of its own; the shell could draw it), a shortcut of the owner's
+own, and the capture of one window alone (`SCContentFilter`) where the rectangle shows what lies over it. Tests:
 `tests/unit/test_snapshots.py` (the tap, the names, the service), `tests/unit/test_config_edit.py`,
 `tests/smoke/test_snapshots.py` (the routes with a capture in place of the window, the page, the box taking a capture),
 `test_phone_settings.py` and `test_phone_pages.py` (the tab). Docs: `docs/daemon.md`.

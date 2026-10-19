@@ -15,7 +15,7 @@ import Quartz
 from pydantic import JsonValue
 
 from dotagent.config import DesktopConfig, SnapshotsConfig, SnapshotSound
-from dotagent.core.errors import DesktopError, InvalidValueError
+from dotagent.core.errors import DesktopError, DotError, InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop import apps, ax, capture, perms, render, safety, screen
@@ -36,6 +36,9 @@ _JPEG_QUALITY: int = 85
 # How long the thread that watches the key gets to stand up.
 _READY_S: float = 3.0
 _STOP_S: float = 3.0
+# A tap refused (the permission missing) is tried again this often, so the grant needs no restart of Dot.
+_RETRY_S: float = 5.0
+_SLOW: str = "the watch of the Command key did not start in time"
 
 
 class SnapshotTaken(FrozenModel):
@@ -179,6 +182,7 @@ class SnapshotWatcher(threading.Thread):
         self._tap: object | None = None
         self.ready: threading.Event = threading.Event()
         self.problem: str | None = None
+        self._stopping: threading.Event = threading.Event()
 
     def _event(self, _proxy: object, kind: int, event: object, _refcon: object) -> object:
         if kind in (Quartz.kCGEventTapDisabledByTimeout, Quartz.kCGEventTapDisabledByUserInput):
@@ -204,32 +208,45 @@ class SnapshotWatcher(threading.Thread):
             | Quartz.CGEventMaskBit(Quartz.kCGEventOtherMouseDown)
             | Quartz.CGEventMaskBit(Quartz.kCGEventScrollWheel)
         )
-        tap = Quartz.CGEventTapCreate(
-            Quartz.kCGSessionEventTap,
-            Quartz.kCGHeadInsertEventTap,
-            Quartz.kCGEventTapOptionListenOnly,
-            mask,
-            self._event,
-            None,
-        )
-        if tap is None:
-            self.problem = (
-                "macOS lets Dot watch the Command key only once Accessibility (or Input Monitoring) is granted to the "
-                "app that runs it: " + perms.grant_hint("accessibility")
+        # Refused until the permission is granted: tried again every few seconds, so the grant takes without a
+        # restart of Dot; ``ready`` is set at the first outcome either way, and ``problem`` clears once a tap is made.
+        tap: object | None = None
+        while tap is None and not self._stopping.is_set():
+            tap = Quartz.CGEventTapCreate(
+                Quartz.kCGSessionEventTap,
+                Quartz.kCGHeadInsertEventTap,
+                Quartz.kCGEventTapOptionListenOnly,
+                mask,
+                self._event,
+                None,
             )
-            self.ready.set()
+            if tap is None:
+                self.problem = (
+                    "macOS lets Dot watch the Command key only once Accessibility (or Input Monitoring) is granted to "
+                    "the app that runs it: " + perms.grant_hint("accessibility")
+                )
+                if not self.ready.is_set():
+                    log.warning("snapshots_not_listening", problem=self.problem)
+                self.ready.set()
+                self._stopping.wait(_RETRY_S)
+        if tap is None:
             return
+        self.problem = None
         self._tap = tap
         source = Quartz.CFMachPortCreateRunLoopSource(None, tap, 0)
         self._run_loop = Quartz.CFRunLoopGetCurrent()
         Quartz.CFRunLoopAddSource(self._run_loop, source, Quartz.kCFRunLoopCommonModes)
         Quartz.CGEventTapEnable(tap, True)
         self.ready.set()
-        Quartz.CFRunLoopRun()
+        log.info("snapshots_listening")
+        if not self._stopping.is_set():
+            Quartz.CFRunLoopRun()
         Quartz.CGEventTapEnable(tap, False)
 
     def stop(self) -> None:
-        """End the watch and wait for the thread, briefly; a thread still standing up is stopped once its loop runs."""
+        """End the watch and wait for the thread, briefly; a thread still standing up is stopped once its loop runs,
+        one still trying for the tap at once."""
+        self._stopping.set()
         self.ready.wait(_STOP_S)
         if self._run_loop is not None:
             Quartz.CFRunLoopStop(self._run_loop)
@@ -258,12 +275,24 @@ class SnapshotService:
         self._pending: list[SnapshotTaken] = []
         self._tasks: set[asyncio.Task[None]] = set()
         self._taking: asyncio.Lock = asyncio.Lock()
-        self.problem: str | None = None
+        self._slow: bool = False
 
     @property
     def listening(self) -> bool:
         """Whether the Command key is being watched right now."""
         return self._watcher is not None and self._watcher.is_alive() and self.problem is None
+
+    @property
+    def problem(self) -> str | None:
+        """Why the key is not watched, as it stands now: the watcher's reason, which clears by itself once the
+        permission is granted (it tries again every few seconds), or that it did not start in time; None while it
+        listens or SnapShots are off."""
+        watcher: SnapshotWatcher | None = self._watcher
+        if watcher is None:
+            return None
+        if watcher.ready.is_set():
+            return watcher.problem
+        return _SLOW if self._slow else None
 
     async def start(self, taker: Taker) -> None:
         """Take ``taker`` as what captures the window in front and keeps it, and start watching the key when SnapShots
@@ -277,15 +306,11 @@ class SnapshotService:
         watcher: SnapshotWatcher = SnapshotWatcher(self._within_s, self._tapped)
         # The service's to stop from now, also when it is slow to stand up.
         self._watcher = watcher
+        self._slow = False
         watcher.start()
         if not watcher.ready.wait(_READY_S):
-            self.problem = "the watch of the Command key did not start in time"
-            return
-        self.problem = watcher.problem
-        if self.problem is None:
-            log.info("snapshots_listening")
-        else:
-            log.warning("snapshots_not_listening", problem=self.problem)
+            self._slow = True
+            log.warning("snapshots_not_listening", problem=_SLOW)
 
     def _tapped(self) -> None:
         """A double tap, on the watcher's thread: the capture is taken on the event loop."""
@@ -298,10 +323,15 @@ class SnapshotService:
         task.add_done_callback(self._tasks.discard)
 
     async def _take_quietly(self) -> None:
+        """The capture a double tap asked for: no caller waits for it, so what fails is told to the pages here."""
         try:
             await self.take()
-        except DesktopError:
+        except (DesktopError, InvalidValueError, OSError):
             return
+        except Exception as error:  # the owner tapped and nothing came: they see why, and the log has the trace
+            reason: str = f"{type(error).__name__}: {error}"
+            log.exception("snapshot_failed", error=reason)
+            await self._bus.emit(SYSTEM_RUN_ID, SNAPSHOT_FAILED_EVENT, {"reason": reason}, False)
 
     async def stop(self) -> None:
         """End the watch of the key, if any."""
@@ -315,11 +345,10 @@ class SnapshotService:
         value that does not fit its key is refused."""
         if key == "enabled" and isinstance(value, bool):
             self.enabled = value
-            if value and self._watcher is None:
+            if value and (self._watcher is None or not self._watcher.is_alive()):
                 await asyncio.to_thread(self._listen)
             elif not value:
                 await self.stop()
-                self.problem = None
         elif key == "app_text" and isinstance(value, bool):
             self.app_text = value
         elif key == "animations" and isinstance(value, bool):
@@ -338,9 +367,12 @@ class SnapshotService:
         async with self._taking:
             try:
                 taken: SnapshotTaken = await asyncio.to_thread(taker, self.app_text)
-            except DesktopError as error:
-                log.warning("snapshot_failed", error=error.message)
-                await self._bus.emit(SYSTEM_RUN_ID, SNAPSHOT_FAILED_EVENT, {"reason": error.message}, False)
+            except (DesktopError, InvalidValueError, OSError) as error:
+                # Refused (Dot's own window, a password manager, no window, no permission) or the files could not be
+                # stored: the pages hear why, and the caller.
+                reason: str = error.message if isinstance(error, DotError) else f"{type(error).__name__}: {error}"
+                log.warning("snapshot_failed", error=reason)
+                await self._bus.emit(SYSTEM_RUN_ID, SNAPSHOT_FAILED_EVENT, {"reason": reason}, False)
                 raise
             if self.sound != "off":
                 await asyncio.to_thread(play_sound, self.sound)

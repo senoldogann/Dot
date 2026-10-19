@@ -3,12 +3,14 @@ and the service that keeps captures for the composer, plays the sound and tells 
 in place of the window in front."""
 
 import asyncio
+import time
 from pathlib import Path
 
 import pytest
 
 from dotagent.config import load_default_config
 from dotagent.core.errors import DesktopError
+from dotagent.desktop import snapshots
 from dotagent.desktop.snapshots import SnapshotService, SnapshotTaken, TapDetector, _stem
 from dotagent.events import SNAPSHOT_EVENT, SNAPSHOT_FAILED_EVENT, SYSTEM_RUN_ID
 
@@ -101,6 +103,40 @@ async def test_a_capture_that_fails_tells_the_pages_why_and_raises() -> None:
     assert [kind for _, kind, _, _ in bus.emitted] == [SNAPSHOT_FAILED_EVENT]
     assert bus.emitted[0][2] == {"reason": "the window in front is Dot's own; switch to the window to capture"}
     assert service.pending() == []
+    # The files that could not be stored tell them too.
+    failing_bus: _Bus = _Bus()
+
+    def failing(_with_text: bool) -> SnapshotTaken:
+        raise OSError("disk full")
+
+    failing_service: SnapshotService = SnapshotService(config, failing_bus)  # type: ignore[arg-type]
+    await failing_service.start(failing)
+    with pytest.raises(OSError):
+        await failing_service.take()
+    assert [data for _, _, data, _ in failing_bus.emitted] == [{"reason": "OSError: disk full"}]
+
+
+async def test_a_refused_tap_is_told_and_tried_again_until_the_watch_ends(monkeypatch: pytest.MonkeyPatch) -> None:
+    tries: list[float] = []
+
+    def refusing(*_args: object) -> None:
+        tries.append(time.monotonic())
+
+    monkeypatch.setattr(snapshots.Quartz, "CGEventTapCreate", refusing)
+    monkeypatch.setattr(snapshots, "_RETRY_S", 0.05)
+    config = load_default_config().snapshots.model_copy(update={"enabled": True})
+    service: SnapshotService = SnapshotService(config, _Bus())  # type: ignore[arg-type]
+    await service.start(lambda _with_text: _taken("x"))
+    assert service.listening is False
+    assert service.problem is not None and "Accessibility" in service.problem
+    # Tried again meanwhile, so a permission granted takes without a restart; switching it on again starts nothing new.
+    await asyncio.sleep(0.2)
+    assert len(tries) >= 2
+    await service.apply("enabled", True)
+    await service.stop()
+    tried: int = len(tries)
+    await asyncio.sleep(0.15)
+    assert len(tries) == tried and service.problem is None and service.listening is False
 
 
 async def test_the_service_starts_without_the_key_watched_while_snapshots_are_off() -> None:

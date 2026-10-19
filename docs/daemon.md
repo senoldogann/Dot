@@ -604,18 +604,20 @@ Errors come as `{"message": …, "context": {…}}`, those of the web framework 
 a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the
 log keeps its traceback. Invalid input is a 422 with the validation errors in the context.
 
-**SnapShots** (item 405, after another coding agent's). In any application, a double tap of the Command key (⌘ ⌘) captures the
-window in front and puts it in the box of the open chat (or of the new chat) as a picture, without switching to Dot; a
-short sound says it was taken, and the chip springs into the box. With **Include app text** the window's text and
-controls, as the application shows them to accessibility and as the model reads a window, come as a Markdown file
-beside the picture. The key is watched by the daemon through a listen-only event tap once macOS has granted
-Accessibility to the app that runs Dot; it reads only whether the Command key went down or up and whether another key
-was pressed meanwhile (⌘C ⌘V is two shortcuts, not a tap), never which key. Dot's own window (the desktop app, or a
-browser showing Dot) and a password manager's are never captured; what lies over the window shows in the picture, as
-on the screen. A box on screen takes the capture as it comes; with none on screen (another page open) the daemon keeps
-it until a box is made. Settings › SnapShots switches it (`[snapshots] enabled`), the text (`app_text`), the sound
-(`sound`: click, pop, glass or off), the spring (`animations`), and says whether the key is watched and, when it is not,
-why. Left for later: a flash on the captured window and a shortcut of your own; the shortcut is ⌘ ⌘.
+**SnapShots** (item 405, after another coding agent's). In any application, a double tap of the Command key (⌘ ⌘)
+captures the window in front and puts it in the box of the open chat (or of the new chat) as a picture, without
+switching to Dot; a short sound says it was taken, and the chip springs into the box. With **Include app text** the
+window's text and controls, as the application shows them to accessibility and as the model reads a window, come as a
+Markdown file beside the picture. The key is watched by the daemon through a listen-only event tap once macOS has
+granted Accessibility to the app that runs Dot; it reads only whether the Command key went down or up and whether
+another key was pressed meanwhile (⌘C ⌘V is two shortcuts, not a tap), never which key. Dot's own window (the desktop
+app, or a browser showing Dot) and a password manager's are never captured; what lies over the window shows in the
+picture, as on the screen. A box on screen takes the capture as it comes; with none on screen (another page open) the
+daemon keeps it until a box is made. Settings › SnapShots switches it (`[snapshots] enabled`), the text (`app_text`),
+the sound (`sound`: click, pop, glass or off), the spring (`animations`), and says whether the key is watched and, when
+it is not, why; while the permission is missing the daemon tries the watch again every few seconds, so granting it needs
+no restart. A capture past the ten files of a message is left out, and the box says so. Left for later: a flash on the
+captured window and a shortcut of your own; the shortcut is ⌘ ⌘.
 
 ## The desktop shell
 

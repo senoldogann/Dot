@@ -255,6 +255,11 @@ export function createAttachments({ dropTarget, input, onChange }) {
    * (a capture of SnapShots, item 405). */
   function restoreFiles(files, animated) {
     for (const { id, name, size, kind } of files) {
+      if (entries.length >= MAX_FILES) {
+        // A capture past the limit is left out here, where the owner sees it, not refused when the message is sent.
+        toast("error", `At most ${MAX_FILES} files go with one message`);
+        break;
+      }
       const status = el("span", { class: "muted" }, sizeLabel(size));
       const entry = { file: null, id, name, size, kind: kind ?? "file", state: "ready", preview: null, pasted: null, status, open: null, node: null, picture: false, thumb: null };
       entry.node = chip(name, null, status, entry);
