@@ -155,6 +155,9 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
     id UNINDEXED, content, tags, tokenize = 'unicode61 remove_diacritics 2'
 );
 CREATE TABLE IF NOT EXISTS memory_vectors (id TEXT PRIMARY KEY, dim INTEGER NOT NULL, vec BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS help_vectors (
+    model TEXT NOT NULL, text TEXT NOT NULL, dim INTEGER NOT NULL, vec BLOB NOT NULL, PRIMARY KEY(model, text)
+);
 CREATE TABLE IF NOT EXISTS memory_uses (
     run_id TEXT NOT NULL, memory_id TEXT NOT NULL, handed_at REAL NOT NULL, how TEXT NOT NULL, status TEXT
 );
@@ -3078,6 +3081,22 @@ class Store:
     async def all_memory_vectors(self) -> list[tuple[str, tuple[float, ...]]]:
         rows = await self._all("SELECT id, vec FROM memory_vectors", ())
         return [(str(row["id"]), unpack_vector(bytes(row["vec"]))) for row in rows]
+
+    async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]:
+        """The embeddings kept of the texts help is ranked by (item 404), by text, those ``model`` made."""
+        rows = await self._all("SELECT text, vec FROM help_vectors WHERE model = ?", (model,))
+        return {str(row["text"]): unpack_vector(bytes(row["vec"])) for row in rows}
+
+    @_writing
+    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]]) -> None:
+        """Keep the embeddings ``model`` made of help texts, each by its text; a text embedded again takes the new
+        one."""
+        await self._db.executemany(
+            "INSERT INTO help_vectors(model, text, dim, vec) VALUES(?, ?, ?, ?)"
+            " ON CONFLICT(model, text) DO UPDATE SET dim = excluded.dim, vec = excluded.vec",
+            [(model, text, len(vector), pack_vector(vector)) for text, vector in vectors],
+        )
+        await self._db.commit()
 
     async def find_memory_by_content(self, content: str, agent_id: str | None) -> MemoryRecord | None:
         """The note with this text that a run of ``agent_id`` (``None`` for Dot) is handed: the agent's own first, else

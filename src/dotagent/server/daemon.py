@@ -15,6 +15,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI
 
+from dotagent.agent.loop import warm_help_vectors
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
@@ -139,6 +140,15 @@ def _log_watch_end(watcher: asyncio.Task[None]) -> None:
     log.error("command_watch_ended", error=repr(watcher.exception()))
 
 
+def _log_warm_end(task: "asyncio.Task[None]") -> None:
+    """The warming of the help vectors ended: quietly, or with the error it raised, which is not the daemon's end."""
+    if task.cancelled():
+        return
+    error: BaseException | None = task.exception()
+    if error is not None:
+        log.warning("help_vectors_warming_failed", error_type=type(error).__name__, error=str(error))
+
+
 def _log_relay_end(relay: asyncio.Task[None]) -> None:
     """A relay of the runs of dotx commands that stops before the daemon does is logged: the pages see those runs only
     as they are stored, and their chats' queues wait, until the daemon starts again."""
@@ -203,6 +213,10 @@ async def run_daemon(config: AppConfig) -> None:
             )
             pusher.add_done_callback(_log_push_end)
             cleanup.push_async_callback(_cancelled, pusher)
+            # The skills' embeddings are made now, in the background, so that the first run finds them (item 404).
+            warming: asyncio.Task[None] = asyncio.create_task(warm_help_vectors(runtime), name="help-vectors")
+            warming.add_done_callback(_log_warm_end)
+            cleanup.push_async_callback(_cancelled, warming)
             recovered: int = await manager.recover()
             if unclean:
                 log.warning("daemon_restarted_after_unclean_end", runs_cut_off=recovered)

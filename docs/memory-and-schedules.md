@@ -16,7 +16,12 @@ Settings › Memory with that note first, to read, correct or forget (`#/setting
 nothing and leaves no line. The line names no agent: a note a run saves is Dot's, for every run (item 94). The notes a
 run is handed at its start leave a line too, "Recalled 3 memories", not in the conversation but under Set up in the side
 panel's Run tab (item 365), and only when its chat had not been handed one of them before: a follow-up handed the same
-notes says nothing, and one handed a new note says how many are new, "(1 new)" (item 335).
+notes says nothing, and one handed a new note says how many are new, "(1 new)" (item 335). The notes themselves go under
+the message that recalled them, in the note that gives the time ("[system note] It is now…", item 404), not into the
+instructions: the instructions stay the same bytes from one message of a chat to the next, so the provider serves them
+and the history from its prompt cache (the first word of an answer came after 30 to 50 seconds of a 200,000-token chat
+before, after a few seconds since); a note an earlier message of the chat was handed is not repeated, and a note folded
+into a summary since is handed again.
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -69,11 +74,15 @@ dotx memory reindex      # embed every note again, for example after changing [m
 - Search combines SQLite full-text search (BM25) with cosine similarity of embeddings and fuses both rankings.
   `embed_enabled = false` searches by words only. An answer of Ollama that says its model runner broke off is asked
   again, as a broken connection is; when the embedding service still fails at the start of a run, the run recalls its
-  notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Run tab, under
-  Set up, say so in a warning line (`embedding_failed`, items 256 and 365). The word search does not mind case, accents
-  or the Turkish dotted and dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the
-  words that start with its first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`).
-- Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
+  notes and lists its skills by their words alone and goes on, and the terminal and the side panel's Run tab, under Set
+  up, say so in a warning line (`embedding_failed`, items 256 and 365). The word search does not mind case, accents or
+  the Turkish dotted and dotless i (`toplanti` finds `Toplantı`), and a word of five letters or more also finds the
+  words that start with its first five letters, so Turkish endings meet the root (`toplantıda`, `toplantılar`). The
+  embeddings of the skills' texts are made as the daemon starts, in the background and 32 texts a call, and kept in the
+  store across restarts (`help_vectors`, item 404); a run that finds more than 64 of them not made yet lists its skills
+  by their words that once, without a warning, while they are made behind it. Before, the first run after each start
+  waited for all of them in one call, half a minute and more, and one call with hundreds of texts broke Ollama's model
+  runner.- Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
   outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"
   (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:

@@ -12,7 +12,7 @@ import pytest
 
 from dotagent.agent.compact import drop_old_images
 from dotagent.agent.loop import RunOutcome, SendBack, _after_verdict, _since_goal
-from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs
+from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs, turn_note
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
@@ -21,6 +21,7 @@ from dotagent.llm.types import ImageData, Message, assistant_message, user_messa
 from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, QuestionMode, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.skills.types import Skill
 from dotagent.store.db import Store
 from dotagent.store.models import RunMode, RunRecord
 from dotagent.tools.delegate import DELEGATE_SOURCE
@@ -175,6 +176,24 @@ def test_the_prompt_names_the_day_and_a_note_after_the_goal_the_time_so_the_prom
     today: list[str] = [line for line in _prompt("ask", False).splitlines() if line.startswith("- Today:")]
     assert len(today) == 1 and re.search(r"\d{2}:\d{2}", today[0]) is None, today
     assert re.fullmatch(r"\[system note\] It is now \d{2}:\d{2} \S+\.", clock_note(datetime.now().astimezone()))
+
+
+def test_the_note_under_a_message_carries_what_changes_from_message_to_message(tmp_path: Path) -> None:
+    """The time, the notes recalled for the message and the skills that fit it go under the message (item 404), not
+    into the instructions, which stay the same bytes from message to message so the provider's cache holds; a part with
+    nothing to say is left out."""
+    now: datetime = datetime.now().astimezone()
+    alone: str = turn_note(now, [], 0, [])
+    assert alone == clock_note(now)
+    skill: Skill = Skill(name="invoice-pdf", description="Fill in an invoice.", root=tmp_path, body="x", source="home")
+    full: str = turn_note(now, ["[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"], 1, [skill])
+    lines: list[str] = full.splitlines()
+    assert lines[0] == clock_note(now)
+    assert "Notes recalled for this message" in full and "- [mem_1] The rent is due on the 3rd" in full
+    assert "never override what the user says now" in full and "stand above" in full
+    assert "1 note was left out: saved while reading outside content" in full
+    assert full.rstrip().endswith("- invoice-pdf: Fill in an invoice.")
+    assert "Skills that fit this message, besides those your instructions list" in full
 
 
 def _lines(approvals: ApprovalMode) -> set[str]:

@@ -406,7 +406,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             mcp=mcp,
             memory=memory,
             help_vectors=(
-                None if memory.embedder is None else HelpVectors(memory.embedder, config.memory.min_similarity)
+                None if memory.embedder is None else HelpVectors(memory.embedder, config.memory.min_similarity, store)
             ),
             registry=registry,
             plugins=plugins,

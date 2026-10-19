@@ -7,8 +7,10 @@ import shlex
 from collections.abc import Sequence
 from pathlib import Path
 
+import pytest
+
 from dotagent.help.apps import scriptable_apps
-from dotagent.help.meaning import _KEPT_TEXTS, HelpVectors
+from dotagent.help.meaning import _BATCH, _COLD_TEXTS, _KEPT_TEXTS, HelpVectors, HelpVectorsCold
 from dotagent.help.rank import rank, words
 from dotagent.help.types import HelpItem
 from dotagent.memory.ranking import Vector
@@ -94,26 +96,70 @@ def test_an_item_close_to_the_need_in_meaning_is_found_though_it_shares_no_word_
     assert [item.name for item in rank(items, "add an event to a calendar", [2, 1], 3)] == ["Calendar", "Mail"]
 
 
-async def test_each_text_is_embedded_once_in_the_request_of_the_need_and_the_close_ones_are_found() -> None:
+async def test_each_text_is_embedded_once_before_the_need_and_the_close_ones_are_found() -> None:
     embedder: _RecordingEmbedder = _RecordingEmbedder()
-    vectors: HelpVectors = HelpVectors(embedder, 0.5)
+    vectors: HelpVectors = HelpVectors(embedder, 0.5, None)
     report: str = "weekly-report Write the weekly report."
     invoice: str = "invoice-pdf Fill in an invoice."
     monthly: str = "monthly-report Write the monthly report."
     assert await vectors.closest("haftalık rapor", [report, invoice, report]) == [0, 2]
     assert await vectors.closest("bir rapor yaz", [report, invoice, monthly]) == [0, 2]
-    # One request per search: the need, and the texts not embedded before, each once.
-    assert embedder.requests == [["haftalık rapor", report, invoice], ["bir rapor yaz", monthly]]
+    # The texts not embedded before, each once, then the need (item 404: a need alone is cheap to send again).
+    assert embedder.requests == [[report, invoice], ["haftalık rapor"], [monthly], ["bir rapor yaz"]]
+
+
+async def test_texts_are_embedded_in_batches_and_a_cold_search_warms_them_in_the_background() -> None:
+    """More than _COLD_TEXTS unembedded texts: the search does not wait (HelpVectorsCold) and the texts are embedded
+    behind it, _BATCH at a time (item 404); the next search finds them ready."""
+    embedder: _RecordingEmbedder = _RecordingEmbedder()
+    vectors: HelpVectors = HelpVectors(embedder, 0.5, None)
+    tools: list[str] = [f"tool {number}" for number in range(_COLD_TEXTS + 10)]
+    with pytest.raises(HelpVectorsCold) as cold:
+        await vectors.closest("need", tools)
+    assert cold.value.missing == _COLD_TEXTS + 10
+    assert vectors._warming is not None
+    await vectors._warming
+    assert [len(request) for request in embedder.requests] == [_BATCH, _BATCH, (_COLD_TEXTS + 10) % _BATCH]
+    # Warm, the next search embeds the need alone and ranks every text (all point the same way here).
+    assert len(await vectors.closest("need", tools)) == len(tools)
+    assert embedder.requests[-1] == ["need"]
 
 
 async def test_past_its_bound_only_the_texts_of_the_latest_search_stay_embedded() -> None:
     embedder: _RecordingEmbedder = _RecordingEmbedder()
-    vectors: HelpVectors = HelpVectors(embedder, 0.5)
+    vectors: HelpVectors = HelpVectors(embedder, 0.5, None)
     tools: list[str] = [f"tool {number}" for number in range(_KEPT_TEXTS)]
-    await vectors.closest("need", tools)
+    assert await vectors.prepare(tools) == _KEPT_TEXTS
     await vectors.closest("need", ["one more"])
     await vectors.closest("need", [tools[0], "one more"])
-    assert embedder.requests[1:] == [["need", "one more"], ["need", tools[0]]]
+    assert embedder.requests[-4:] == [["one more"], ["need"], [tools[0]], ["need"]]
+
+
+class _Keeper:
+    """A keeper of help vectors in memory, as the store is on disk."""
+
+    def __init__(self) -> None:
+        self.kept: dict[tuple[str, str], tuple[float, ...]] = {}
+
+    async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]:
+        return {text: vector for (kept_model, text), vector in self.kept.items() if kept_model == model}
+
+    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]]) -> None:
+        for text, vector in vectors:
+            self.kept[(model, text)] = tuple(vector)
+
+
+async def test_the_vectors_kept_outlive_the_process_through_the_keeper() -> None:
+    keeper: _Keeper = _Keeper()
+    first: _RecordingEmbedder = _RecordingEmbedder()
+    report: str = "weekly-report Write the weekly report."
+    invoice: str = "invoice-pdf Fill in an invoice."
+    await HelpVectors(first, 0.5, keeper).prepare([report, invoice])
+    assert set(keeper.kept) == {("recording", report), ("recording", invoice)}
+    # A new process: the texts kept are not embedded again, only the need.
+    second: _RecordingEmbedder = _RecordingEmbedder()
+    assert await HelpVectors(second, 0.5, keeper).closest("haftalık rapor", [report, invoice]) == [0]
+    assert second.requests == [["haftalık rapor"]]
 
 
 def test_a_scriptable_application_is_told_by_its_own_dictionary(tmp_path: Path) -> None:
