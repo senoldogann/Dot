@@ -727,17 +727,17 @@ async def _close_skills(runtime: Runtime, run: RunRecord, needs: Sequence[str], 
 
 async def warm_help_vectors(runtime: Runtime) -> None:
     """Embed the texts of every skill a run may be offered, as the daemon starts (item 404), so that the first run
-    finds them ready: before, the first run after each start waited for them, half a minute and more. The daemon runs
-    this as a task of its own and cancels it as it stops; a service that fails raises, which the daemon logs, and the
-    first search starts the warming again."""
+    finds them ready: before, the first run after each start waited for them, half a minute and more. One warming at
+    a time: a search that finds its texts cold meanwhile joins this one instead of starting its own. The daemon runs
+    this as a task of its own and cancels it as it stops; a service that fails is logged by the warming, and the first
+    search that finds its texts cold starts it again."""
     if runtime.help_vectors is None:
         return
     catalog: SkillCatalog = await asyncio.to_thread(
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )
     offered: tuple[Skill, ...] = await offered_to_run(runtime.config, catalog, None)
-    made: int = await runtime.help_vectors.prepare([skill_text(skill) for skill in offered])
-    log.info("help_vectors_warmed", texts=len(offered), embedded=made)
+    await runtime.help_vectors.warm([skill_text(skill) for skill in offered])
 
 
 async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_see: bool) -> list[Message]:

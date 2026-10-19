@@ -4,6 +4,7 @@ Info.plist and scripting dictionary say about it, read from bundles made here.""
 
 import plistlib
 import shlex
+import time
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -140,13 +141,26 @@ class _Keeper:
 
     def __init__(self) -> None:
         self.kept: dict[tuple[str, str], tuple[float, ...]] = {}
+        self.used: dict[tuple[str, str], float] = {}
 
     async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]:
         return {text: vector for (kept_model, text), vector in self.kept.items() if kept_model == model}
 
-    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]]) -> None:
+    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]], now: float) -> None:
         for text, vector in vectors:
             self.kept[(model, text)] = tuple(vector)
+            self.used[(model, text)] = now
+
+    async def touch_help_vectors(self, model: str, texts: Sequence[str], now: float) -> None:
+        for text in texts:
+            self.used[(model, text)] = now
+
+    async def prune_help_vectors(self, model: str, before: float) -> int:
+        gone: list[tuple[str, str]] = [key for key, used in self.used.items() if key[0] != model or used < before]
+        for key in gone:
+            del self.kept[key]
+            del self.used[key]
+        return len(gone)
 
 
 async def test_the_vectors_kept_outlive_the_process_through_the_keeper() -> None:
@@ -158,8 +172,20 @@ async def test_the_vectors_kept_outlive_the_process_through_the_keeper() -> None
     assert set(keeper.kept) == {("recording", report), ("recording", invoice)}
     # A new process: the texts kept are not embedded again, only the need.
     second: _RecordingEmbedder = _RecordingEmbedder()
-    assert await HelpVectors(second, 0.5, keeper).closest("haftalık rapor", [report, invoice]) == [0]
+    vectors: HelpVectors = HelpVectors(second, 0.5, keeper)
+    assert await vectors.closest("haftalık rapor", [report, invoice]) == [0]
     assert second.requests == [["haftalık rapor"]]
+    # A search tells the keeper its texts are in use, once a process; what no search asked for in a month goes at the
+    # next warming, and another model's vectors with it.
+    keeper.used[("recording", invoice)] = 1.0
+    keeper.used[("recording", report)] = 1.0
+    keeper.kept[("older-model", report)] = (1.0, 0.0)
+    keeper.used[("older-model", report)] = time.time()
+    third: HelpVectors = HelpVectors(_RecordingEmbedder(), 0.5, keeper)
+    assert await third.closest("rapor", [report]) == [0]
+    assert keeper.used[("recording", report)] > 1.0 and keeper.used[("recording", invoice)] == 1.0
+    assert await third.prune() == 2
+    assert set(keeper.kept) == {("recording", report)}
 
 
 def test_a_scriptable_application_is_told_by_its_own_dictionary(tmp_path: Path) -> None:

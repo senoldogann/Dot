@@ -31,7 +31,10 @@ _SKIPPED: frozenset[str] = frozenset({"node_modules", "__pycache__"})
 
 class SkillArgs(ToolArgs):
     name: str = Field(
-        description="The name of the skill, exactly as listed under Skills in your instructions or by find_help."
+        description=(
+            "The name of the skill, exactly as listed under Skills in your instructions, under a message, or by "
+            "find_help."
+        )
     )
     start: int | None = Field(
         default=None,
@@ -143,8 +146,8 @@ def build_skill_tool() -> RegisteredTool:
         name=SKILL_TOOL,
         description=(
             "Read an installed skill before working on a task that matches one listed under Skills in your "
-            "instructions. It returns the skill's instructions and the files that come with it (scripts to run with "
-            "the shell, references to read, assets to use). Then follow the instructions."
+            "instructions or under a message. It returns the skill's instructions and the files that come with it "
+            "(scripts to run with the shell, references to read, assets to use). Then follow the instructions."
         ),
         args_model=SkillArgs,
         modes=ALL_MODES,

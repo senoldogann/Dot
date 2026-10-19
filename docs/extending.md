@@ -121,16 +121,16 @@ the words it shares with the goal and, with the memory's embeddings on, by how c
 least `min_similarity` under `[memory]`), the two rankings fused as the notes' are; bge-m3 reads Turkish as well as
 English, so a goal in one language is given the skills described in the other, while by words alone it shares none with
 them. The embedding of each skill is made once, kept in the store across restarts and made as the daemon starts (item
-404); when the skills must be picked and the embedding service fails, or the embeddings are still being made, the run
-lists them by their words and goes on, as it recalls its notes by words then. A skill that shares only some of the
-goal's words is kept, as a goal can ask for more than one kind of work. Dot always looks in `<home>/skills` and in the
-`skills/` folder of every plugin; `[skills] dirs` lists more directories (each holds skill folders; `~` expands). Skills
-written for Claude Code load unchanged: Dot reads only `name` and `description` of the frontmatter, so other keys (a
-date or a nested map under `metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put `dirs =
-["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be
-one skill folder (`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills written for
-Claude Code's own tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you wrote for
-Claude Code are then the playbook a campaign can work from.
+404; one no search asked for in thirty days goes); when the skills must be picked and the embedding service fails, or
+the embeddings are still being made, the run lists them by their words and goes on, as it recalls its notes by words
+then. A skill that shares only some of the goal's words is kept, as a goal can ask for more than one kind of work. Dot
+always looks in `<home>/skills` and in the `skills/` folder of every plugin; `[skills] dirs` lists more directories
+(each holds skill folders; `~` expands). Skills written for Claude Code load unchanged: Dot reads only `name` and
+`description` of the frontmatter, so other keys (a date or a nested map under `metadata`, a list of `allowed-tools`) do
+not leave a skill out. To use your own, put `dirs = ["~/.claude/skills"]` under `[skills]` in your `config.toml`; Dot
+reads nothing there until you do. An entry may also be one skill folder (`~/.claude/skills/<name>`), to take some skills
+only: `~/.claude/skills` can hold skills written for Claude Code's own tools, such as the superpowers bundle or the
+skills synced from claude.ai. The skills you wrote for Claude Code are then the playbook a campaign can work from.
 
 Dot comes with three skills of its own, for work that has to know this Mac: `excel` (reading and changing a workbook
 with openpyxl, getting the results of its formulas from LibreOffice or Excel, which openpyxl does not compute, and

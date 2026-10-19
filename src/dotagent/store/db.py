@@ -156,7 +156,8 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
 );
 CREATE TABLE IF NOT EXISTS memory_vectors (id TEXT PRIMARY KEY, dim INTEGER NOT NULL, vec BLOB NOT NULL);
 CREATE TABLE IF NOT EXISTS help_vectors (
-    model TEXT NOT NULL, text TEXT NOT NULL, dim INTEGER NOT NULL, vec BLOB NOT NULL, PRIMARY KEY(model, text)
+    model TEXT NOT NULL, text TEXT NOT NULL, dim INTEGER NOT NULL, vec BLOB NOT NULL, used_at REAL NOT NULL,
+    PRIMARY KEY(model, text)
 );
 CREATE TABLE IF NOT EXISTS memory_uses (
     run_id TEXT NOT NULL, memory_id TEXT NOT NULL, handed_at REAL NOT NULL, how TEXT NOT NULL, status TEXT
@@ -3088,15 +3089,31 @@ class Store:
         return {str(row["text"]): unpack_vector(bytes(row["vec"])) for row in rows}
 
     @_writing
-    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]]) -> None:
-        """Keep the embeddings ``model`` made of help texts, each by its text; a text embedded again takes the new
-        one."""
+    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]], now: float) -> None:
+        """Keep the embeddings ``model`` made of help texts, each by its text and in use as of ``now``; a text
+        embedded again takes the new one."""
         await self._db.executemany(
-            "INSERT INTO help_vectors(model, text, dim, vec) VALUES(?, ?, ?, ?)"
-            " ON CONFLICT(model, text) DO UPDATE SET dim = excluded.dim, vec = excluded.vec",
-            [(model, text, len(vector), pack_vector(vector)) for text, vector in vectors],
+            "INSERT INTO help_vectors(model, text, dim, vec, used_at) VALUES(?, ?, ?, ?, ?) ON CONFLICT(model, text)"
+            " DO UPDATE SET dim = excluded.dim, vec = excluded.vec, used_at = excluded.used_at",
+            [(model, text, len(vector), pack_vector(vector), now) for text, vector in vectors],
         )
         await self._db.commit()
+
+    @_writing
+    async def touch_help_vectors(self, model: str, texts: Sequence[str], now: float) -> None:
+        """The help texts of ``texts`` are in use as of ``now``: a search asked for them."""
+        await self._db.executemany(
+            "UPDATE help_vectors SET used_at = ? WHERE model = ? AND text = ?", [(now, model, text) for text in texts]
+        )
+        await self._db.commit()
+
+    @_writing
+    async def prune_help_vectors(self, model: str, before: float) -> int:
+        """Drop the help vectors no search asked for since ``before``, and those of any model but ``model``; returns
+        how many went."""
+        cursor = await self._db.execute("DELETE FROM help_vectors WHERE model != ? OR used_at < ?", (model, before))
+        await self._db.commit()
+        return int(cursor.rowcount)
 
     async def find_memory_by_content(self, content: str, agent_id: str | None) -> MemoryRecord | None:
         """The note with this text that a run of ``agent_id`` (``None`` for Dot) is handed: the agent's own first, else

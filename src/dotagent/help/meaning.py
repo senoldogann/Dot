@@ -9,6 +9,7 @@ change seldom, and embedding them all at every search, or at every start, took s
 
 import asyncio
 import contextlib
+import time
 from collections.abc import Sequence
 from typing import Protocol
 
@@ -28,6 +29,9 @@ _BATCH: int = 32
 _NEED_CHARS: int = 1500
 # Unembedded texts past which a search does not wait for them.
 _COLD_TEXTS: int = 64
+# A text no search asked for in this long is dropped from the keeper at the next warming: a skill, tool or application
+# described otherwise since, or gone.
+_KEEP_S: float = 30 * 86400
 
 
 class HelpVectorsCold(Exception):
@@ -43,7 +47,13 @@ class VectorKeeper(Protocol):
 
     async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]: ...
 
-    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]]) -> None: ...
+    async def add_help_vectors(
+        self, model: str, vectors: Sequence[tuple[str, Sequence[float]]], now: float
+    ) -> None: ...
+
+    async def touch_help_vectors(self, model: str, texts: Sequence[str], now: float) -> None: ...
+
+    async def prune_help_vectors(self, model: str, before: float) -> int: ...
 
 
 class HelpVectors:
@@ -57,15 +67,19 @@ class HelpVectors:
         self._keeper: VectorKeeper | None = keeper
         self._kept: dict[str, Vector] = {}
         self._loaded: bool = False
+        self._loading: asyncio.Lock = asyncio.Lock()
+        # The texts the keeper was told are in use since this process started, so each is told once.
+        self._touched: set[str] = set()
         self._warming: asyncio.Task[None] | None = None
 
     async def _load(self) -> None:
-        """The vectors the keeper holds for this embedding model, once."""
-        if self._loaded:
-            return
-        self._loaded = True
-        if self._keeper is not None:
-            self._kept.update(await self._keeper.help_vectors(self._embedder.model))
+        """The vectors the keeper holds for this embedding model, once; a second caller waits for the first."""
+        async with self._loading:
+            if self._loaded:
+                return
+            if self._keeper is not None:
+                self._kept.update(await self._keeper.help_vectors(self._embedder.model))
+            self._loaded = True
 
     async def _embed(self, texts: Sequence[str]) -> None:
         """Embed ``texts``, ``_BATCH`` at a time, and keep the vectors here and with the keeper."""
@@ -74,7 +88,18 @@ class HelpVectors:
             vectors: list[Vector] = await self._embedder.embed(chunk)
             self._kept.update(zip(chunk, vectors, strict=True))
             if self._keeper is not None:
-                await self._keeper.add_help_vectors(self._embedder.model, list(zip(chunk, vectors, strict=True)))
+                await self._keeper.add_help_vectors(
+                    self._embedder.model, list(zip(chunk, vectors, strict=True)), time.time()
+                )
+            self._touched.update(chunk)
+
+    async def _touch(self, texts: Sequence[str]) -> None:
+        """Tell the keeper the kept texts of ``texts`` are in use, once each while this process runs, so that
+        :meth:`prune` keeps them."""
+        fresh: list[str] = list(dict.fromkeys(t for t in texts if t in self._kept and t not in self._touched))
+        if fresh and self._keeper is not None:
+            await self._keeper.touch_help_vectors(self._embedder.model, fresh, time.time())
+        self._touched.update(fresh)
 
     def _missing(self, texts: Sequence[str]) -> list[str]:
         return list(dict.fromkeys(text for text in texts if text not in self._kept))
@@ -84,22 +109,32 @@ class HelpVectors:
         await self._load()
         missing: list[str] = self._missing(texts)
         await self._embed(missing)
+        await self._touch(texts)
         return len(missing)
 
-    def warm(self, texts: Sequence[str]) -> None:
-        """Start :meth:`prepare` in the background, unless it is running; a failure is logged, and the next search
-        starts it again."""
+    async def prune(self) -> int:
+        """Drop from the keeper the texts no search asked for in ``_KEEP_S``, and another embedding model's. Returns
+        how many went."""
+        if self._keeper is None:
+            return 0
+        return await self._keeper.prune_help_vectors(self._embedder.model, time.time() - _KEEP_S)
+
+    def warm(self, texts: Sequence[str]) -> asyncio.Task[None]:
+        """Start :meth:`prepare` and :meth:`prune` in the background, unless a warming is running: that one is
+        returned, so the work is done once. A failure is logged, and the next search starts it again."""
         if self._warming is not None and not self._warming.done():
-            return
+            return self._warming
 
         async def run() -> None:
             try:
                 made: int = await self.prepare(texts)
-                log.info("help_vectors_warmed", texts=len(texts), embedded=made)
+                pruned: int = await self.prune()
+                log.info("help_vectors_warmed", texts=len(texts), embedded=made, pruned=pruned)
             except (ProviderError, StoreError) as error:
                 log.warning("help_vectors_warming_failed", error_type=type(error).__name__, error=str(error))
 
         self._warming = asyncio.create_task(run(), name="help-vectors")
+        return self._warming
 
     async def aclose(self) -> None:
         """End a warming still under way, as the runtime closes: nothing is written to a closed store."""
@@ -121,6 +156,7 @@ class HelpVectors:
             self.warm(texts)
             raise HelpVectorsCold(len(missing))
         await self._embed(missing)
+        await self._touch(texts)
         [vector] = await self._embedder.embed([need[:_NEED_CHARS]])
         if len(self._kept) > _KEPT_TEXTS:
             self._kept = {text: self._kept[text] for text in texts}
