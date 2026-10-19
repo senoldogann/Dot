@@ -9,7 +9,7 @@ import pytest
 
 from dotagent import tailnet
 from dotagent.core.errors import PhoneSetupError
-from dotagent.tailnet import running_name, serves, tailnet_state, tailscale_program, with_said
+from dotagent.tailnet import first_link, running_name, serves, tailnet_state, tailscale_program, with_said
 
 _STATUS: str = '{"BackendState": "Running", "Self": {"DNSName": "mac.tail1234.ts.net.", "HostName": "mac"}}'
 _SERVED: str = (
@@ -102,3 +102,12 @@ async def test_the_apps_program_is_asked_as_the_command_line(tmp_path: Path, mon
     monkeypatch.setenv("DOT_TAILSCALE", str(_like_the_app(tmp_path / "Tailscale")))
     state = await tailnet_state(8765, (), ())
     assert (state.running, state.name, state.problem) == (True, "mac.tail1234.ts.net", None)
+
+
+def test_the_page_tailscale_names_to_turn_a_feature_on_is_read_from_what_it_said() -> None:
+    said: str = (
+        "Tailscale refused: Serve is not enabled on your tailnet. To enable, visit: "
+        "https://login.tailscale.com/f/serve?node=n123abc."
+    )
+    assert first_link(said) == "https://login.tailscale.com/f/serve?node=n123abc"
+    assert first_link("Tailscale refused: something else") is None

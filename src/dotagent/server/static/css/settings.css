@@ -1402,28 +1402,67 @@
   }
 }
 
-/* Settings › Phone (item 271): what a phone needs to reach Dot through Tailscale, a line each. */
-.tailnet-lines {
+/* Settings › Phone (items 271 and 421): the steps on this Mac, each with its mark (its number, or a tick once done),
+   its title, where it stands and what does it. */
+.phone-guide {
   display: grid;
-  gap: var(--space-1);
+  gap: var(--space-4);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
-.tailnet-lines li {
+.phone-guide-step {
   display: flex;
   align-items: flex-start;
-  gap: var(--space-2);
+  gap: var(--space-3);
 }
 
-.tailnet-lines li > svg {
+.phone-guide-mark {
+  display: inline-grid;
   flex: none;
-  margin-top: var(--space-half);
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--muted);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-title);
 }
 
-.tailnet-missing > svg {
-  color: var(--warn);
+.phone-guide-step.done .phone-guide-mark {
+  background: var(--ok-weak);
+  color: var(--ok);
+}
+
+.phone-guide-body {
+  display: grid;
+  gap: var(--space-2);
+  justify-items: start;
+  min-width: 0;
+}
+
+.phone-guide-body > .hint {
+  margin: 0;
+}
+
+.phone-guide-title {
+  font-weight: var(--weight-title);
+}
+
+/* A QR code a phone's camera opens, with what it opens beside it; on a phone's own width they stack. */
+.phone-qr-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.phone-qr {
+  flex: none;
+  border-radius: var(--radius-sm);
+  image-rendering: pixelated;
 }
 
 /* ---------- Memory (item 373): the lines Dot knows and the notes in two columns, as Providers keeps its list and its

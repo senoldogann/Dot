@@ -15551,6 +15551,22 @@ of its own. The look, Not now, Skip the introduction and the first message sent 
 "Message <name>", the sidebar follows the name, and Settings' name card writes to the daemon. Tests:
 `tests/unit/test_assistant.py`, `tests/smoke/test_first_chat.py`. Docs: `docs/daemon.md`, `defaults.toml`.
 
+### 421. Settings › Phone guides the phone's setup a step at a time
+
+**Status: done (2026-10-20), on `phone-guide`.** The owner's word of 2026-10-19: setting up the phone should not need
+Tailscale installed by hand, and should guide a step at a time (docs/phone.md). **As built (2026-10-20).** Settings ›
+Phone's Reach Dot from anywhere is a guide of three steps on this Mac, each saying where it stands and offering what
+does it: Tailscale from the Mac App Store while it is missing (Get Tailscale) or its app opened to sign in (Open
+Tailscale, `POST /api/phone/tailscale`, `open` named by `DOT_OPEN` in tests); Set up as before, and when Tailscale
+refuses for want of HTTPS on the tailnet, the page it names offered as Turn on HTTPS for your tailnet (the link is read
+from what Tailscale said and kept in the error's context); Restart Dot once the config names the Mac. The guide reads
+Tailscale again every few seconds while a step is left. Dot on your phone shows QR codes, made by macOS's own Core Image
+generator, of Tailscale's download page and, once the daemon answers to its name, of Dot's address (`GET
+/api/phone/qr/tailscale` and `/dot`). The guide's buttons keep their words on a phone's width. Tests:
+`tests/unit/test_tailnet.py`, `tests/unit/test_qr.py` (a code read back by macOS's detector),
+`tests/smoke/test_phone_reach.py` (the App Store and the app opened, the QR codes, the HTTPS page in the error, the
+guide on a desktop and a phone, light and dark). Docs: `docs/phone.md`, `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16415,3 +16431,5 @@ of its own. The look, Not now, Skip the introduction and the first message sent 
   the Apple Events rule, measured to hold nothing on macOS 26, is gone and the docs say why.
 - 2026-10-20 (Opus 5.5): item 420 on `first-chat-and-teach` from `main`: Dot's first conversation on a first open, and
   the names of Dot and its owner kept by the daemon and told to the model.
+- 2026-10-20 (Opus 5.5): item 421 on `phone-guide` from `main`: Settings › Phone guides the setup a step at a time, with
+  Tailscale from the App Store, the HTTPS page Tailscale names, Restart Dot and QR codes for the phone.
