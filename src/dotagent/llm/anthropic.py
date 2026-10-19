@@ -29,8 +29,10 @@ ANTHROPIC_VERSION: str = "2023-06-01"
 # Lets a request have a replayed thinking block whose earlier context changed dropped instead of refused: a run edits
 # its history when it drops an old screenshot, and the next run of a chat starts with a new system prompt.
 _THINKING_BINDING_BETA: str = "thinking-binding-controls-2026-08-01"
-# Fast mode (item 223): a research preview of up to 2.5 times the output speed, at twice the price, which an
-# organization has to be let into; a request asks for it with ``speed`` and this beta. The models its page names.
+# Fast mode (item 223): up to 2.5 times the output speed, at twice the price; a request asks for it with ``speed``.
+# Open on Opus 5.5 to the Start, Build and Scale tiers without this beta, which is still accepted; a research preview
+# on Opus 5 and Opus 4.8, which an organization has to be let into and which need the beta, so every request sends
+# it. The models its page names.
 _FAST_MODE_BETA: str = "fast-mode-2026-02-01"
 FAST_MODE_MODELS: frozenset[str] = frozenset({"claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"})
 # The largest page of the model listing.
