@@ -26,8 +26,9 @@ them, and the fold is kept. Working lists too what is no chat's: a schedule abou
 (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
 days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
 chat in sight, and the search finds the chats at work
-too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
-and **Customize** ([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
+too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**,
+**Schedules** (a page of its own since item 401) and **Customize**
+([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the approvals waiting, and the connection to the daemon while it is being made or lost; what
@@ -350,7 +351,7 @@ one; a provider without a key, or whose key was refused (HTTP 401), says so and 
 access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in with, each with its key and the
 models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
 with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
-**Memory**, **Skills**, **Schedules**, **Harness** (what Dot improves around its model: the version in use, a form for
+**Memory**, **Skills**, **Harness** (what Dot improves around its model: the version in use, a form for
 one of your own, every version with Adopt and Retire, the steps of the loop, the experiences and how the nightly step is
 set; see [The harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its
 home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, its facts in four
@@ -360,7 +361,8 @@ ways to **Diagnostics** and **Open source licences**, pages of their own). Which
 The tabs sit beside their content when the window has the room and above it otherwise, in one row that scrolls sideways
 with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are a list in groups
 whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)). The
-earlier addresses of the memory, schedules, rules and system pages lead to their tabs.
+earlier addresses of the memory, rules and system pages lead to their tabs, and the schedules' tab
+(`#/settings/schedules`) to the Schedules page.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its

@@ -1,6 +1,6 @@
-// Customize (item 316): what Dot works with and what it knows how to do, a page of the sidebar under Campaigns. Two
-// tabs: Plugins, the services Dot connects to (views/plugins.js), and Skills, the skills it reads (views/skills.js,
-// item 317). `#/customize` opens Plugins, `#/customize/plugins/<id>` a service's own page.
+// Customize (item 316): what Dot works with and what it knows how to do, a page of the sidebar under Campaigns and
+// Schedules. Two tabs: Plugins, the services Dot connects to (views/plugins.js), and Skills, the skills it reads
+// (views/skills.js, item 317). `#/customize` opens Plugins, `#/customize/plugins/<id>` a service's own page.
 
 import { el } from "../dom.js";
 import { icon } from "../icons.js";

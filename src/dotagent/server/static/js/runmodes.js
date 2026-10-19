@@ -89,7 +89,7 @@ export function heldChoice(initial) {
   };
 }
 
-function pick(caption, control, hint = "") {
+function pick(caption, control, hint) {
   return el(
     "div",
     { class: "composer-pick", role: "group", "aria-label": caption },

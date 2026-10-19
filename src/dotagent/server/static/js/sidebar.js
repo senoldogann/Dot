@@ -367,7 +367,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
-  // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns.
+  // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns
+  // and Schedules.
   const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
   const customizeLink = el("a", { class: "side-link", href: "#/customize/plugins", onclick: onNavigate }, icon("plug"), el("span", null, "Customize"));
 

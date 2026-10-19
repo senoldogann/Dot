@@ -66,7 +66,7 @@ switch, and a step's duration shows without a hover. An iPad and a Mac keep thei
 sizes. Where a page names a setting of the config file, it says what it is in words, the key after it in faint type.
 
 On a phone the settings open on a list of their pages in groups (item 330): Interface, Models, How Dot works and This
-Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes and schedules there
+Mac, each row a page's name and what it holds (the theme on screen, the main model, how many notes there
 are, whether a version of the harness is in use). A row opens its page on its own, the bar naming it, and a card's name
 stands over the card. In a Mac's window the settings keep their tabs down the left side. On a phone Appearance draws the
 colour schemes as phones and puts the themes two a row, and its Text size starts at a phone's 16 px (item 331). A
