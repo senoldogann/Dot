@@ -14908,7 +14908,14 @@ locations and Dot's own paths) and the workspace in `classify_path` go through i
 places the same way; letter case was already set aside (`within`, item 116). Tests: `tests/unit/test_kernel_paths.py` (a
 protected file through the Data volume is protected and its read refused, a new file in Dot's own folder is `dot`, a
 missing place keeps its name after the folder the kernel names, a pipe nobody writes to is named at once, a folder
-closed to reading through the folder it is in). Docs: `docs/safety.md`.
+closed to reading through the folder it is in). Docs: `docs/safety.md`. The `/security-review` of this item found three
+spellings more, older than it, fixed here as the same class: a file named by its number (`/.vol/<device>/<inode>`, which
+no folder can name: a path, a glob or a text in that namespace, behind `/.nofollow` too, now reaches every protected
+location), a link the command line made (the shell guard resolved the path behind it with `realpath` alone; now with
+`kernel_path`), and a glob that spells the Data volume (`/S*/V*/D*/U*/…`; a glob is now matched against every spelling
+of a location: as it is, through the Data volume, behind `/.nofollow`, and both); with them, one this item brought:
+`mentions_protected` compared a `$HOME` in other letters with the kernel-named locations letter by letter (now letter
+case aside). Each has a test that fails without its fix.
 
 ## Log
 

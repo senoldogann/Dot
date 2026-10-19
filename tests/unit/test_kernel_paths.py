@@ -6,8 +6,11 @@ import os
 from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 
+import pytest
+
 from dotagent.policy.engine import decide
-from dotagent.policy.paths import classify_path, expand_path, expand_protected, kernel_path
+from dotagent.policy.paths import classify_path, expand_path, expand_protected, kernel_path, mentions_protected
+from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo, Decision
 from dotagent.tools.files import read_action, write_action
 
@@ -75,3 +78,64 @@ def test_a_pipe_is_named_at_once_and_a_closed_folder_through_the_folder_it_is_in
     finally:
         closed.chmod(0o700)
     assert inside == kernel_path(real) / "closed" / "key"
+
+
+def test_a_file_named_by_its_number_is_protected(tmp_path: Path) -> None:
+    # ``/.vol/<device>/<inode>`` names any file by its number: a folder so named is the place it is, a file cannot be
+    # named, and neither can a step back from a folder so named, which realpath takes away by its letters alone.
+    real: Path = Path(os.path.realpath(tmp_path))
+    folder: Path = real / "folder"
+    folder.mkdir()
+    note: Path = folder / "note.txt"
+    note.write_text("by number", encoding="utf-8")
+    device: int = note.stat().st_dev
+    workspace: Path = real / "work"
+    by_folder: Path = expand_path(f"/.vol/{device}/{folder.stat().st_ino}/note.txt", workspace)
+    assert by_folder == kernel_path(folder) / "note.txt"
+    for spelled in (
+        f"/.vol/{device}/{note.stat().st_ino}",
+        f"/.vol/{device}/{folder.stat().st_ino}/../folder/note.txt",
+    ):
+        path: Path = expand_path(spelled, workspace)
+        assert classify_path(path, workspace, (), ()) == "protected", path
+        assert read_action("read_file", path, workspace, (), (), "Read").flags == ("secret_access",)
+
+
+def test_the_shell_guard_sees_a_protected_location_through_a_link_a_glob_or_a_number(tmp_path: Path) -> None:
+    real: Path = Path(os.path.realpath(tmp_path))
+    secret: Path = real / "secret"
+    secret.mkdir()
+    key: Path = secret / "key"
+    key.write_text("not for a model", encoding="utf-8")
+    workspace: Path = real / "work"
+    workspace.mkdir()
+    protected: tuple[Path, ...] = expand_protected([str(secret)], ())
+    # Quotes split the location's letters, so that no text of it is in the line; a glob keeps the first of each part.
+    split: str = f"{secret.parent}/se'c'ret"
+    globbed: str = "".join(f"/{part[0]}*" for part in secret.parts[1:])
+    device: int = key.stat().st_dev
+    number: int = key.stat().st_ino
+    for line in (
+        f"ln -s / x; cat x/System/Volumes/Data{split}/key",
+        f"cat /S*/V*/D*{globbed}/key",
+        f"cat /.nofollow{globbed}/key",
+        f"cat /.vol/{device}/{number}",
+        f"python3 -c \"print(open('/.vol/{device}/{number}').read())\"",
+        f"cat /.v*/{device}/{number}",
+    ):
+        assessment: ShellAssessment = assess_shell(line, workspace, workspace, protected, ())
+        assert "secret_access" in assessment.flags, line
+    # A hidden folder whose name begins as the namespace's does is no number.
+    assert "secret_access" not in assess_shell(f"ls {real}/.volta/bin", workspace, workspace, protected, ()).flags
+
+
+def test_a_home_written_in_another_case_still_gives_its_tilde_spellings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # The protected locations are named as the kernel names them, so a $HOME in other letters is compared letter
+    # case aside when the ``~`` spellings of a location are made.
+    real: Path = Path(os.path.realpath(tmp_path))
+    (real / "secret").mkdir()
+    monkeypatch.setenv("HOME", str(real).swapcase())
+    protected: tuple[Path, ...] = expand_protected(["~/secret"], ())
+    assert mentions_protected("cat ~/secret/key", protected)
