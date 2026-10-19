@@ -36,9 +36,11 @@ const DRAG_CLOSE_PX = 96;
  * shows or hides the panel), `arrange()` (call it once the frame is on the page), `addImage(name)`, `setCount(tabId,
  * text)` (a short count beside a tab's name; "" for none), `openTab(id)` (show the tab `id`, the drawer opened for it),
  * `peekTab(id)` (show it beside the conversation for now, the reader's choices kept, item 354),
- * `showFile(source, opener)` (see `fileView`; `opener` gets the focus back when the file closes) and `dispose()`.
+ * `showFile(source, opener)` (see `fileView`; `opener` gets the focus back when the file closes), `restoreFile(source)` (the
+ * file the page kept, shown again without taking the focus, beside the conversation only) and `dispose()`. `onFile(source)`
+ * hears a file shown (its source) or closed (null), for the page to keep it while the chat goes on at its next run (item 406).
  */
-export function createInspector({ layout, tabs, screensIn }) {
+export function createInspector({ layout, tabs, screensIn, onFile }) {
   const names = [];
   const thumbs = [];
   let selected = -1;
@@ -359,7 +361,8 @@ export function createInspector({ layout, tabs, screensIn }) {
     return dropped;
   }
 
-  function showFile(source, opener) {
+  /** Put the file of `source` in the panel; `opener` (a button, or null) gets the focus back when the file closes. */
+  function placeFile(source, opener) {
     const drawerBefore = file === null ? drawerOpen : file.drawerBefore;
     dropFile();
     const view = fileView(source, closeFile);
@@ -371,7 +374,22 @@ export function createInspector({ layout, tabs, screensIn }) {
       drawerOpen = true;
     }
     arrange();
-    view.element.focus({ preventScroll: true });
+    onFile(source);
+    return view;
+  }
+
+  function showFile(source, opener) {
+    placeFile(source, opener).element.focus({ preventScroll: true });
+  }
+
+  /** The file the page kept while the chat went on (item 406): shown again where it was, the focus left to the box; a
+   * narrow page, where the file would cover the conversation, lets it go. */
+  function restoreFile(source) {
+    if (measuredWidth < MIN_WIDTH_PX) {
+      onFile(null);
+      return;
+    }
+    placeFile(source, null);
   }
 
   function closeFile() {
@@ -379,6 +397,7 @@ export function createInspector({ layout, tabs, screensIn }) {
     if (dropped === null) {
       return;
     }
+    onFile(null);
     drawerOpen = dropped.drawerBefore;
     // A panel that was hidden before the file goes with it at once: its slide would show the tabs, not the file.
     if (measuredWidth >= MIN_WIDTH_PX && !showInspector()) {
@@ -386,7 +405,7 @@ export function createInspector({ layout, tabs, screensIn }) {
       hideDocked();
     }
     arrange();
-    (dropped.opener.isConnected ? dropped.opener : toggle).focus();
+    (dropped.opener !== null && dropped.opener.isConnected ? dropped.opener : toggle).focus();
   }
 
   // A tab shown by itself (item 354: Dot's computer when a run opens its browser) beside the conversation, without
@@ -529,6 +548,7 @@ export function createInspector({ layout, tabs, screensIn }) {
     openTab,
     peekTab,
     showFile,
+    restoreFile,
     dispose: () => {
       stopLeaving();
       dropFile();

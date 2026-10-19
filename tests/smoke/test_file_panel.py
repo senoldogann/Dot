@@ -80,12 +80,13 @@ _FINISH: ScriptedTurn = ScriptedTurn(
 
 
 def _turns(workspace: Path) -> list[ScriptedTurn]:
-    """Each run writes the summary in the workspace, then answers."""
+    """Each run writes the summary in the workspace, then answers; the run a message sent from the box starts (item
+    406) does the same."""
     write: ScriptedTurn = ScriptedTurn(
         text="",
         calls=(ScriptedCall(tool="write_file", arguments={"path": str(_summary(workspace)), "content": SUMMARY}),),
     )
-    return [write, _FINISH] * len(_SHOTS)
+    return [write, _FINISH] * (2 * len(_SHOTS))
 
 
 def _summary(workspace: Path) -> Path:
@@ -422,6 +423,24 @@ async def _one_size(
     await expect(view).to_have_count(0)
     await expect(listed_budget).to_be_focused()
     await page.screenshot(path=str(shots / f"files-{width}-{scheme}.png"))
+
+    # The file stays beside the conversation as the chat goes on at its next run (item 406): a message sent from the
+    # box opens the next run's page with the file still there, until it is closed. Before, the page made again dropped
+    # it.
+    if width >= 960:
+        await listed_budget.click()
+        await expect(view).to_have_attribute("data-kind", "workbook")
+        before: str = page.url
+        await box.fill("Go on")
+        await box.press("Enter")
+        await expect(page).not_to_have_url(before)
+        await expect(page.locator(".answer").last).to_contain_text("stay where they are")
+        await expect(view).to_have_attribute("data-kind", "workbook")
+        await view.get_by_role("button", name="Close the file").click()
+        await expect(view).to_have_count(0)
+        await page.reload()
+        await expect(page.locator(".answer").last).to_contain_text("stay where they are")
+        await expect(view).to_have_count(0)
 
     await page.close()
 
