@@ -840,17 +840,18 @@ class ScheduleView(FrozenModel):
 
 class ContextChoice(FrozenModel):
     """The context size of a model's runs as Settings › Models shows and chooses it (item 250). ``tokens`` is the budget
-    of its next run; ``chosen`` the size chosen for it, ``None`` when its runs have ``[agent] context_tokens``
-    (``configured``); ``default`` the budget it has without a choice, ``configured`` cut to three quarters of its window
-    when that is less; ``floor`` and ``ceiling`` the least and the most it may be given (``ceiling`` is three quarters
-    of its window, ``None`` when its provider does not say); ``sizes`` the sizes besides the default that it may be
-    given, smallest first, none when its window allows none; ``summarise_at`` the estimated prompt past which its next
-    run summarises its older part."""
+    of its next run; ``chosen`` the size chosen for it, ``None`` when its runs have the default; ``default`` the budget
+    it has without a choice: three quarters of its window while ``[agent] context_tokens`` is ``"most"`` (item 396),
+    96,000 when its provider does not say its window, else ``configured``, cut to three quarters of its window when that
+    is less; ``configured`` the number ``[agent] context_tokens`` sets, ``None`` while it is ``"most"``; ``floor`` and
+    ``ceiling`` the least and the most it may be given (``ceiling`` is three quarters of its window, ``None`` when its
+    provider does not say); ``sizes`` the sizes besides the default that it may be given, smallest first, none when its
+    window allows none; ``summarise_at`` the estimated prompt past which its next run summarises its older part."""
 
     tokens: int
     chosen: int | None
     default: int
-    configured: int
+    configured: int | None
     floor: int
     ceiling: int | None
     sizes: list[int]
@@ -858,7 +859,7 @@ class ContextChoice(FrozenModel):
 
 
 class ContextSizeRequest(FrozenModel):
-    """The context size to give the runs of ``model`` (item 250); ``None`` gives them ``[agent] context_tokens``."""
+    """The context size to give the runs of ``model`` (item 250); ``None`` gives them the default one."""
 
     model: ModelReference
     tokens: int | None

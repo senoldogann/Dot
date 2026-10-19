@@ -13,8 +13,10 @@ from dotagent.core.errors import ConfigError
 from dotagent.llm.types import ModelInfo
 from dotagent.store.stats import ContextCall, InputBucket, ModelProfile, context_evidence
 
-# The packaged defaults: context_tokens 96 000, context_summarise_share 0.85, tool_output_chars 12 000.
+# The packaged defaults: context_tokens "most", context_summarise_share 0.85, tool_output_chars 12 000.
 DEFAULTS: AgentConfig = load_default_config().agent
+# One number for every model instead (item 396).
+NUMBERED: AgentConfig = DEFAULTS.model_copy(update={"context_tokens": 96_000})
 MODEL: str = "anthropic:claude-opus-5-5"
 
 
@@ -48,7 +50,21 @@ def _profile() -> ModelProfile:
 
 
 def test_settings_offers_the_sizes_from_the_floor_to_three_quarters_of_the_window_besides_the_default() -> None:
+    # The default is the most, three quarters of the window (item 396): the others are the steps under it.
     assert context_choices(DEFAULTS, 1_000_000, None) == (
+        48_000,
+        64_000,
+        96_000,
+        128_000,
+        192_000,
+        256_000,
+        384_000,
+        512_000,
+    )
+    # MiniMax M2.7's window.
+    assert context_choices(DEFAULTS, 204_800, None) == (48_000, 64_000, 96_000, 128_000)
+    # A number in [agent] context_tokens is the default instead, and three quarters of the window is the most.
+    assert context_choices(NUMBERED, 1_000_000, None) == (
         48_000,
         64_000,
         128_000,
@@ -58,10 +74,9 @@ def test_settings_offers_the_sizes_from_the_floor_to_three_quarters_of_the_windo
         512_000,
         750_000,
     )
-    # MiniMax M2.7's window: three quarters of it is the most.
-    assert context_choices(DEFAULTS, 204_800, None) == (48_000, 64_000, 128_000, 153_600)
-    # Three quarters of the window are the default already: the floor is the one other size.
-    assert context_choices(DEFAULTS, 65_536, None) == (48_000,)
+    assert context_choices(NUMBERED, 204_800, None) == (48_000, 64_000, 128_000, 153_600)
+    # Three quarters of the window are the default either way: the floor is the one other size.
+    assert context_choices(DEFAULTS, 65_536, None) == context_choices(NUMBERED, 65_536, None) == (48_000,)
     # A window whose three quarters are below the floor, or one the provider does not say, offers none.
     assert context_choices(DEFAULTS, 32_768, None) == ()
     assert context_choices(DEFAULTS, None, None) == ()
@@ -72,10 +87,10 @@ def test_settings_offers_the_sizes_from_the_floor_to_three_quarters_of_the_windo
 def test_a_chosen_size_sets_the_budget_the_tool_output_and_the_point_of_summary_up_to_the_window() -> None:
     large: Scaffold = scaffold_for(DEFAULTS, _info(1_000_000), _profile(), 192_000)
     assert (large.chosen, large.context_tokens, large.tool_output_chars) == (192_000, 192_000, 12_000)
-    assert summarise_point(DEFAULTS, large.chosen, large.context_tokens) == pytest.approx(163_200)
+    assert summarise_point(DEFAULTS, large.window, large.chosen, large.context_tokens) == pytest.approx(163_200)
     small: Scaffold = scaffold_for(DEFAULTS, _info(1_000_000), _profile(), 64_000)
     assert (small.context_tokens, small.tool_output_chars) == (64_000, 8_000)
-    assert summarise_point(DEFAULTS, small.chosen, small.context_tokens) == pytest.approx(54_400)
+    assert summarise_point(DEFAULTS, small.window, small.chosen, small.context_tokens) == pytest.approx(54_400)
     # The window still cuts a chosen size, and the event says the window did.
     cut: Scaffold = scaffold_for(DEFAULTS, _info(204_800), _profile(), 192_000)
     assert cut.context_tokens == 153_600

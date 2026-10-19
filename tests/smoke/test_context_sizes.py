@@ -11,6 +11,7 @@ import time
 from collections.abc import AsyncIterator
 from pathlib import Path
 from typing import Literal
+from urllib.parse import quote
 
 import httpx
 import pytest
@@ -53,8 +54,9 @@ _MODELS_TABLE: str = (
     f'[models]\nmain = "{SCRIPTED_MODEL}"\n# mine: keep this\nfast = "{SCRIPTED_MODEL}"\n'
     f'review = "{SCRIPTED_MODEL}"\nvision = "{_OPUS}"\n'
 )
-_SIZES: list[str] = ["", "48000", "64000", "128000", "192000", "256000", "384000", "512000", "750000"]
-_SIZE_TEXTS: list[str] = ["96k (default)", "48k", "64k", "128k", "192k", "256k", "384k", "512k", "750k (most)"]
+# Dot's default is the most of the window (item 396), then the smaller sizes.
+_SIZES: list[str] = ["", "48000", "64000", "96000", "128000", "192000", "256000", "384000", "512000"]
+_SIZE_TEXTS: list[str] = ["750k (default)", "48k", "64k", "96k", "128k", "192k", "256k", "384k", "512k"]
 
 
 def _model(name: str, window: int, own: int | None, source: WindowSource, vision: bool) -> ModelInfo:
@@ -243,14 +245,14 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
         listed: JsonObject = await _listed(http, SCRIPTED_MODEL)
         assert (listed["context_length"], listed["window_source"]) == (1_000_000, "provider")
         assert listed["context"] == {
-            "tokens": 96_000,
+            "tokens": 750_000,
             "chosen": None,
-            "default": 96_000,
-            "configured": 96_000,
+            "default": 750_000,
+            "configured": None,
             "floor": 48_000,
             "ceiling": 750_000,
             "sizes": [int(size) for size in _SIZES[1:]],
-            "summarise_at": 81_600,
+            "summarise_at": 637_500,
         }
         # Below the floor, past three quarters of the window, and any size of a window that holds none: refused.
         for model, tokens in ((SCRIPTED_MODEL, 47_999), (SCRIPTED_MODEL, 750_001), (_TINY, 48_000)):
@@ -304,8 +306,9 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
             ],
         }
 
-        # A run started after a choice has that size, and one started after it was taken out has Dot's default: a
-        # model with no steps in the history, so that the numbers above stay the scripted model's.
+        # A run started after a choice has that size, and one started after it was taken out has Dot's default, the
+        # most of its window: a model with no steps in the history, so that the numbers above stay the scripted
+        # model's.
         opus: httpx.Response = await http.put("/api/models/context", json={"model": _OPUS, "tokens": 128_000})
         assert opus.status_code == 200, opus.text
         sized: JsonObject = await _run_scaffold(http, runtime, _OPUS)
@@ -313,7 +316,7 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
         unsized: httpx.Response = await http.put("/api/models/context", json={"model": _OPUS, "tokens": None})
         assert unsized.status_code == 200, unsized.text
         default: JsonObject = await _run_scaffold(http, runtime, _OPUS)
-        assert (default["chosen"], default["context_tokens"], default["summarise_at"]) == (None, 96_000, 81_600)
+        assert (default["chosen"], default["context_tokens"], default["summarise_at"]) == (None, 750_000, 637_500)
 
 
 async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_numbers(
@@ -377,9 +380,8 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                         "1,000,000 tokens. Ollama gives it for the model.",
                         "750,000 tokens, three quarters of the window: the rest is room for the reply and for the "
                         "error of Dot's count of the tokens.",
-                        "96,000 tokens, for every model without a size of its own. Dot comes with 96,000: in a run "
-                        "of 41 steps it measured, 48,000 summarized twice and 96,000 not once, while each step sent a "
-                        "quarter more. In the config file: [agent] context_tokens.",
+                        "The most this model's window allows, 750,000 tokens, as for every model without a size of "
+                        'its own. In the config file: [agent] context_tokens, "most" or one number for every model.',
                         "48,000 tokens: a run's first step alone sends its instructions, its tools and the request.",
                     ]
                 )
@@ -417,7 +419,7 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                 await why.click()
                 await expect(row).to_have_count(0)
                 await page.close()
-            # Back to Dot's default: the key leaves the file and the next run has [agent] context_tokens.
+            # Back to Dot's default: the key leaves the file and the next run has the most of the window.
             page = await browser.new_page(viewport={"width": 1280, "height": 800})
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"{served}/#/settings/models")
@@ -429,5 +431,32 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
             assert runtime.context_sizes.of(SCRIPTED_MODEL) is None
             assert load_config(path).models.context == {}
             await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_an_address_that_names_a_model_shows_its_context_size(
+    runtime: Runtime, served: str, tmp_path: Path
+) -> None:
+    """The context meter's link (item 396) names the run's model in the address of Settings › Models: its provider's
+    fold opens, though it is folded by default, and its row comes into sight, marked, with the focus on its size."""
+    host, port = "127.0.0.1", int(served.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, scheme in ((1280, "light"), (390, "dark")):
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": 800}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"{served}/#/settings/models?model={quote(_OPUS, safe='')}")
+                size: Locator = page.get_by_role("combobox", name=f"Context size of {_OPUS}")
+                await expect(size).to_be_focused()
+                await expect(size).to_be_in_viewport()
+                await expect(page.locator("tr[data-asked]")).to_have_attribute("data-model", _OPUS)
+                anthropic: Locator = page.locator(".fold-group", has=size).locator(".fold-toggle")
+                await expect(anthropic).to_have_attribute("aria-expanded", "true")
+                await page.screenshot(path=str(tmp_path / f"asked-{width}-{scheme}.png"), animations="disabled")
+                await page.close()
         finally:
             await browser.close()

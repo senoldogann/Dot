@@ -126,11 +126,11 @@ def _context_choice(config: AgentConfig, window: int | None, chosen: int | None)
         tokens=tokens,
         chosen=chosen,
         default=context_budget(config, window, None),
-        configured=config.context_tokens,
+        configured=config.context_tokens if isinstance(config.context_tokens, int) else None,
         floor=CONTEXT_FLOOR,
         ceiling=context_ceiling(window),
         sizes=list(context_choices(config, window, chosen)),
-        summarise_at=round(summarise_point(config, chosen, tokens)),
+        summarise_at=round(summarise_point(config, window, chosen, tokens)),
     )
 
 
@@ -371,10 +371,10 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
 
     @router.put("/models/context")
     async def choose_context_size(request: ContextSizeRequest) -> ModelOption:
-        """Give the runs of ``model`` a context size of ``tokens`` from its next run on (item 250), or
-        ``[agent] context_tokens`` for ``None``: the config file keeps it in ``[models.context]``. A model its provider
-        does not offer is refused, as is a size below :data:`CONTEXT_FLOOR` or above three quarters of the model's
-        window, any size for a model whose provider does not say its window, and a config file that cannot be
+        """Give the runs of ``model`` a context size of ``tokens`` from its next run on (item 250), or the default one
+        ``[agent] context_tokens`` gives for ``None``: the config file keeps it in ``[models.context]``. A model its
+        provider does not offer is refused, as is a size below :data:`CONTEXT_FLOOR` or above three quarters of the
+        model's window, any size for a model whose provider does not say its window, and a config file that cannot be
         changed; nothing changes then. The runs under way keep theirs."""
         ref: ModelRef = parse_model_ref(request.model)
         info: ModelInfo = await ctx.runtime.router.model_info(ref)

@@ -80,12 +80,21 @@ def _profile_name(value: str) -> str:
 # of 48 runs, measured 2026-10-15), so a smaller budget would summarise a run after its first few steps.
 CONTEXT_FLOOR: int = 48_000
 
+
+def _context_tokens(value: int | Literal["most"]) -> int | Literal["most"]:
+    if isinstance(value, int) and value <= 0:
+        raise ValueError('context_tokens is "most" or a number of tokens above 0')
+    return value
+
+
 type ServiceAddress = Annotated[str, AfterValidator(_service_address)]
 type ModelReference = Annotated[str, AfterValidator(_model_reference)]
 type SpendSite = Annotated[str, AfterValidator(_spend_site)]
 type DebugPort = Annotated[int, Field(ge=0, le=65535), AfterValidator(_debug_port)]
 type BrowserProfileName = Annotated[str, AfterValidator(_profile_name)]
 type ContextSize = Annotated[int, Field(ge=CONTEXT_FLOOR)]
+# [agent] context_tokens: "most" of each model's window (item 396), or one number of tokens for every model.
+type ContextTokens = Annotated[int | Literal["most"], AfterValidator(_context_tokens)]
 # The colour scheme the pages of Dot's browser are told to prefer: the Mac's, or one of the two whatever the Mac shows.
 type PageAppearance = Literal["system", "light", "dark"]
 
@@ -237,7 +246,8 @@ class AgentConfig(FrozenModel):
     consult_max_per_run: int = Field(ge=0)
     # At least the floor a run's tool output keeps however small the model's window (dotagent.agent.scaffold).
     tool_output_chars: int = Field(ge=2000)
-    context_tokens: int = Field(gt=0)
+    # The context size of every model without one of its own in [models.context] (dotagent.agent.scaffold).
+    context_tokens: ContextTokens
     # The harness lessons of arXiv 2609.20804 (item 87): past context_elide_share of the budget older tool output is
     # shortened, past context_summarise_share the older part of the run is summarised; plan_each_turn puts the open
     # plan at the end of the system prompt of every step.

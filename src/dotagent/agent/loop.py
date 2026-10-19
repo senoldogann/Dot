@@ -647,7 +647,7 @@ async def _fit_context(
     if estimated > context_tokens * config.context_elide_share:
         current = shrink_old_tool_results(current, config.keep_recent_tool_results)
         estimated = round(estimate_tokens([system, *current], specs) * ratio)
-    summarise_at: float = summarise_point(config, scaffold.chosen, context_tokens)
+    summarise_at: float = summarise_point(config, scaffold.window, scaffold.chosen, context_tokens)
     if estimated > summarise_at:
         # The budget in the units of estimate_tokens, before its calibration against the provider's counts.
         plain: float = context_tokens / ratio

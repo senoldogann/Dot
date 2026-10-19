@@ -1,6 +1,6 @@
 // The menu of the composer's Model pill (item 208): a rail on its left with a star for the
-// favourites and the mark of each provider, a search over the models of every provider, and the models of the view the
-// rail shows, each with a star that keeps it among the favourites. The favourites are kept in this browser, as the
+// favourites and the mark of each provider, and the models of the view the rail shows, which a search narrows (item
+// 395), each with a star that keeps it among the favourites. The favourites are kept in this browser, as the
 // home's choices are; the menu opens on them when there are any, else on the provider of the model a run would use.
 // The focus stays in the search: the arrows move the active row, Enter picks it, ⌘1 to ⌘9 pick the rows that show
 // those keys, ⌘D stars the active row, and the left arrow (on an empty search) goes to the rail, the right arrow back.
@@ -90,9 +90,10 @@ function searchFields({ info, provider }) {
   return [foldSearch(modelName(info.ref)), foldSearch(providerLabel(provider)), provider, info.free ? "free" : ""];
 }
 
-/** The models that match the search `words`, closest first; on a tie the favourites first, then the providers' order. */
-function foundEntries(groups, words, favourites) {
-  return entriesOf(groups)
+/** The models of `entries` that match the search `words`, closest first; on a tie the favourites first, then the
+ * providers' order. */
+function foundEntries(entries, words, favourites) {
+  return entries
     .map((entry, order) => ({
       entry,
       order,
@@ -120,6 +121,11 @@ function openingView(groups, favourites, current) {
 /** The words of the daemon's default model, for the row that follows it. */
 function defaultRowText(ref) {
   return ref === null ? "Default model" : `Default (${modelName(ref)})`;
+}
+
+/** The models a search looks through in `view`, in words: "OpenAI models", or "favourites". */
+function viewModels(view) {
+  return view === FAVOURITES ? "favourites" : `${providerLabel(view)} models`;
 }
 
 // A press on a row or a star leaves the focus in the search.
@@ -177,8 +183,6 @@ export function modelPicker({ onPick, onMakeDefault }) {
       class: "model-search-input",
       type: "text",
       value: query,
-      placeholder: "Search models",
-      "aria-label": "Search models",
       role: "combobox",
       "aria-autocomplete": "list",
       "aria-expanded": "true",
@@ -206,12 +210,14 @@ export function modelPicker({ onPick, onMakeDefault }) {
       railItems.slice(1),
     );
 
-    // The rail presses the view shown, none while a search is under way; the item pressed, or the first, is the rail's
-    // one stop for Tab.
+    // The rail presses the view shown, whose models the search looks through, as its placeholder and its label say;
+    // the item pressed, or the first, is the rail's one stop for Tab.
     function paintRail() {
-      const searching = query.trim() !== "";
+      const scope = `Search ${viewModels(view)}`;
+      search.placeholder = scope;
+      search.setAttribute("aria-label", scope);
       for (const item of railItems) {
-        item.setAttribute("aria-pressed", String(!searching && item.dataset.view === view));
+        item.setAttribute("aria-pressed", String(item.dataset.view === view));
       }
       const stop = railItems.find((item) => item.getAttribute("aria-pressed") === "true") ?? railItems[0];
       for (const item of railItems) {
@@ -378,7 +384,7 @@ export function modelPicker({ onPick, onMakeDefault }) {
     }
 
     // A model's row: in a view of one provider its name, and "Free" when it costs nothing (and that its provider may
-    // train on what it is sent, when it may); among the favourites and in a search its provider's name too.
+    // train on what it is sent, when it may); among the favourites its provider's name too.
     function modelRow({ info, provider }, key, mixed, starred) {
       const name = modelName(info.ref);
       const free = info.free ? (info.learns ? "Free, may train on your data" : "Free") : "";
@@ -394,16 +400,17 @@ export function modelPicker({ onPick, onMakeDefault }) {
       return el("div", { class: "model-row", role: "none" }, row.option, row.star);
     }
 
-    // The rows of the search, or of the view when there is none: the default's row first (in a search only when its
-    // words match; never while the list chooses the default), then the models, the first nine with their keys. A row
-    // starred or not stays where it is until the list is shown again.
+    // The rows of the view, or of those of its models the search finds: the default's row first (in a search only when
+    // its words match; never while the list chooses the default), then the models, the first nine with their keys. A
+    // row starred or not stays where it is until the list is shown again.
     function paintList() {
       const words = foldSearch(query)
         .split(/\s+/)
         .filter((word) => word !== "");
       const searching = words.length > 0;
       const favourites = readFavourites();
-      const entries = searching ? foundEntries(groups, words, favourites) : viewEntries(groups, view, favourites);
+      const shown = viewEntries(groups, view, favourites);
+      const entries = searching ? foundEntries(shown, words, favourites) : shown;
       paintChoosing();
       setActive(-1);
       rows = [];
@@ -413,12 +420,12 @@ export function modelPicker({ onPick, onMakeDefault }) {
       }
       entries.forEach((entry, index) => {
         const key = index < KEYED_ROWS ? index + 1 : null;
-        children.push(modelRow(entry, keyboard ? key : null, searching || view === FAVOURITES, favourites.includes(entry.info.ref)));
+        children.push(modelRow(entry, keyboard ? key : null, view === FAVOURITES, favourites.includes(entry.info.ref)));
       });
       keyed = entries.slice(0, KEYED_ROWS).map(({ info }) => info.ref);
       let lack = "";
       if (searching && rows.length === 0) {
-        lack = `No model matches “${query.trim()}”.`;
+        lack = `No ${viewModels(view)} match “${query.trim()}”.`;
       } else if (!searching && view === FAVOURITES && entries.length === 0) {
         lack = "No favourites yet: star a model to keep it here.";
       }
@@ -438,10 +445,9 @@ export function modelPicker({ onPick, onMakeDefault }) {
       }
     }
 
+    // Another view keeps the search, which looks through its models then.
     function showView(id) {
       view = id;
-      query = "";
-      search.value = "";
       paintRail();
       paintList();
       if (keyboard) {
@@ -451,7 +457,6 @@ export function modelPicker({ onPick, onMakeDefault }) {
 
     search.addEventListener("input", () => {
       query = search.value;
-      paintRail();
       paintList();
     });
     search.addEventListener("keydown", (event) => {
