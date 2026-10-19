@@ -62,7 +62,7 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * `level` (`read(info)`, the reasoning level chosen for a model, or null for the daemon's; `write(info, level)`, null to
  * go back to the daemon's), `speed` (`read()`, "fast" or "standard"; `write(speed)`: fast mode, which a run asks for
  * only of a model that has it, item 223), `approvals` and `goalMode` (as `approvalsPicker` and `goalModePicker` take
- * them).
+ * them), and `once` (the id of a choice for one message armed as the box opens, or null; item 397).
  * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after the approvals, `onMode(id)` runs
  * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then). Goal mode's switch is a
  * row of the frame's "+" menu (item 318), and a chat, which has neither, hides it and Plan first.
@@ -70,7 +70,8 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
  * `ready()` (resolves once the models are loaded), `value()` (what the next message starts its run with: `{ mode, model,
  * effort, speed, approvals, goal_mode, once }`, `once` the id of a choice for one message, item 251, whose level the
- * daemon asks for instead of `effort`), `kept()` (the same without `once`, as a chat keeps them), `sent()` once a
+ * daemon asks for instead of `effort`), `kept()` (the same without `once`, as a chat keeps them), `armed()` (the id of
+ * the choice for one message armed from the menu, or null, not the word in the box), `sent()` once a
  * message went, which puts the choice for one message away, `sync()` after a status change, `setWaiting(on)` (while a
  * run works, the choices wait for the next follow-up and the pills say so), `setWords(on)` (whether the word ultrathink
  * or ultracode in the box arms its choice, item 259) and `dispose()`.
@@ -173,7 +174,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   let shownDefault = NOTHING_SHOWN;
   // The choice for one message armed (item 251), an id of ONE_MESSAGE (efforts.js), or null: the next message goes with
   // it, and the one after with the kept level again.
-  let once = null;
+  let once = kept.once;
   // The choice the word in the box named when the frame was last painted (item 259), and whether a word may arm one:
   // not while the box edits a queued message, whose save changes its text alone, nor while its send steers the run
   // under way, which keeps its level (`setWords`).
@@ -270,6 +271,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     reasoningMenu.close();
     paintModel();
     reasoningPill.element.focus();
+    onChange();
   }
 
   function pickSpeed(speed) {
@@ -414,6 +416,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
       return { ...keptNow(), once: boost === null ? null : boost.id };
     },
     kept: keptNow,
+    armed: () => once,
     sent: () => {
       once = null;
       paintModel();

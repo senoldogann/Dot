@@ -39,8 +39,8 @@ HELD: str = f"{_PROVIDER}:held"
 _RUNS: int = 5
 _RUN_WAIT_S: float = 30.0
 _CONTEXT_LENGTH: int = 32768
-# Where the home keeps its choices in the browser (runmodes.js, efforts.js).
-_HOME_KEYS: tuple[str, ...] = ("dot.approvals", "dot.goalMode")
+# Where the home keeps its choices in the browser (runmodes.js, efforts.js, and a new chat's own in views/runs.js).
+_HOME_KEYS: tuple[str, ...] = ("dot.approvals", "dot.goalMode", "dot.home.choices")
 _LEVEL_KEY_PREFIX: str = "dot.effort."
 
 

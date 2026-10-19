@@ -911,6 +911,11 @@ a.pill:hover {
   width: 8.5rem;
 }
 
+/* The model an address asked for (?model=, the context meter's link, item 396) stands out among the others. */
+.table.wide tr[data-asked] > td {
+  background: var(--accent-weak);
+}
+
 /* The row that says what a model's context size does. Its text wraps; on a narrow window the table scrolls sideways
    and the text stays in sight, no wider than the part of the table in sight (the scroll box's width, less the cell's
    padding on each side), so that it can keep its place however far the table is scrolled. */
@@ -2617,6 +2622,16 @@ a.pill:hover {
   padding: 0 4px 4px;
   color: var(--muted);
   font-size: var(--text-sm);
+}
+
+/* Under the meter's words, the way to the model's context size in Settings › Models (item 396). */
+.context-meter-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 4px 4px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-label);
 }
 
 /* The model's pill is the one that gives way when the bar is short. */
@@ -6870,7 +6885,8 @@ button.attach-chip:hover {
   .menu-item,
   .tool-head,
   .steps-head,
-  .helpers-head {
+  .helpers-head,
+  .context-meter-link {
     min-height: 44px;
   }
 

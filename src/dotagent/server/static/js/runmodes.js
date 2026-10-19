@@ -177,9 +177,9 @@ export function approvalsPicker(onPaint, kept) {
 
 /**
  * The switch that makes a new task a campaign: Dot keeps going on its goal in sessions until the outcome is verified. It
- * starts off on every page. `value()` is whether it is on; `setAvailable(false)` hides it and turns it off, for the kinds of
- * run that cannot be a campaign (a chat, research); `onToggle(on)` runs after every change; `note` is the one line to show
- * under the composer while it is on.
+ * starts off on every page, and `set(on)` turns it as a new chat left it (item 397). `value()` is whether it is on;
+ * `setAvailable(false)` hides it and turns it off, for the kinds of run that cannot be a campaign (a chat, research);
+ * `onToggle(on)` runs after every change; `note` is the one line to show under the composer while it is on.
  */
 export function standingPicker(onToggle) {
   let on = false;
@@ -199,6 +199,7 @@ export function standingPicker(onToggle) {
   return {
     element,
     note,
+    set,
     value: () => on,
     setAvailable: (available) => {
       element.hidden = !available;
