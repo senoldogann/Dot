@@ -196,17 +196,20 @@ picks another with `dotx run --effort high`, with the Reasoning menu of the comp
 offer is refused (a 422 over HTTP); the configured default, which is not tied to one model, is rounded to the nearest
 level the model has (`off` to its lowest, `max` to its highest).
 
-**Fast mode.** Claude Opus 5.5, Opus 5 and Opus 4.8 have fast mode: up to 2.5 times the output speed, at twice the
-price, a research preview that Anthropic lets an organization into from a waitlist. The Models API does not say which
-models have it, so Dot names them from Anthropic's page (`FAST_MODE_MODELS` in `llm/anthropic.py`); Settings › Models
-marks them `fast mode` (`fast_mode` in `GET /api/models`). The Reasoning menu of the composer has Speed, Standard
-or Fast, for such a model, off at first; the pill then reads `High · Fast`. A chat keeps it with its choices, a new
-chat's box in this browser, and the run it starts keeps it as its model and level (`speed` in `POST /api/runs` and in
-the queue; the Details panel says so). Each step of such a run on a model with fast mode asks for it (`speed: "fast"`
-with the beta `fast-mode-2026-02-01`); a step on another model (a routed step, a standby model) runs at the standard
-speed, as do helpers on a model without it. Dot never falls back by itself: a refusal (an organization not let in,
-fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Fast mode for a model without it
-is refused (a 422 over HTTP). Switching the speed of a chat starts the prompt cache again.
+**Fast mode.** Claude Opus 5.5, Opus 5 and Opus 4.8 have fast mode: up to 2.5 times the output speed, at twice the price
+(Opus 5.5: $8 and $40 a million tokens; Opus 5 and 4.8: $10 and $50). On Opus 5.5 it is open to every organization in
+the Start, Build and Scale usage tiers, with a rate limit of its own and no access request; on Opus 5 and Opus 4.8 it is
+a research preview that Anthropic lets an organization into from a waitlist. It is not for the Batch API or a Priority
+Tier commitment. The Models API does not say which models have it, so Dot names them from Anthropic's page
+(`FAST_MODE_MODELS` in `llm/anthropic.py`); Settings › Models marks them `fast mode` (`fast_mode` in `GET /api/models`).
+The Reasoning menu of the composer has Speed, Standard or Fast, for such a model, off at first; the pill then reads
+`High · Fast`. A chat keeps it with its choices, a new chat's box in this browser, and the run it starts keeps it as its
+model and level (`speed` in `POST /api/runs` and in the queue; the Details panel says so). Each step of such a run on a
+model with fast mode asks for it (`speed: "fast"` with the beta `fast-mode-2026-02-01`, which the preview models need
+and Opus 5.5 takes without effect); a step on another model (a routed step, a standby model) runs at the standard speed,
+as do helpers on a model without it. Dot never falls back by itself: a refusal (an organization not let into a preview
+model's fast mode, fast mode's own rate limit, once retried) is the run's error, as Anthropic says it. Fast mode for a
+model without it is refused (a 422 over HTTP). Switching the speed of a chat starts the prompt cache again.
 
 **Ultrathink and Ultracode.** The Reasoning menu has two choices for one message, under This message only (item 251).
 Ultrathink, for a model that offers `max`, asks it for Max for this message. Ultracode, for a model that offers `xhigh`,
