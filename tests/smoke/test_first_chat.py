@@ -270,3 +270,19 @@ async def test_a_home_with_a_chat_never_shows_the_first_conversation(tmp_path: P
             await expect(page.locator("section.first-chat")).to_have_count(0)
         finally:
             await chromium.close()
+
+
+@pytest.mark.browser
+async def test_in_auto_dot_says_a_review_model_answers_for_the_owner_and_promises_no_question(tmp_path: Path) -> None:
+    auto: str = 'name = "Dot"\nowner = "Ada"\nintroduced = false\n\n[policy]\napprovals = "auto"\n'
+    async with _daemon(tmp_path, auto) as (_runtime, _manager, _f, address), async_playwright() as playwright:
+        chromium: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            page: Page = await _home(chromium, address, False, playwright.devices)
+            first = page.locator("section.first-chat")
+            await first.get_by_role("button", name="Nova").click()
+            await expect(first).to_contain_text("a review model answers my other questions for you")
+            await expect(first).not_to_contain_text("I ask you before what is yours to decide")
+            await expect(first).not_to_contain_text("Nothing is sent without your approval")
+        finally:
+            await chromium.close()

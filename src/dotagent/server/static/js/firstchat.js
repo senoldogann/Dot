@@ -16,6 +16,8 @@ const DEFAULT_NAME = "Dot";
 // Names offered besides the one Dot has; any other can be typed.
 const SUGGESTED_NAMES = ["Miro", "Nova", "Juno"];
 const GOOGLE = "google";
+// The approval modes in which the policy's questions come to the owner (Auto has a review model answer them).
+const ASKED_MODES = ["ask", "supervised"];
 // How often the Google card asks whether the sign-in in Dot's browser is done.
 const SIGN_IN_POLL_MS = 3000;
 // The look through the inbox: reading only, with the choice left to the owner.
@@ -169,8 +171,11 @@ export function buildFirstChat({ startLook, onSkipped }) {
       "I keep working on this Mac while you're away: on a goal until it is done, on schedules and on campaigns.",
       "I connect to your apps, such as mail and calendar, and use them as you would.",
     ];
-    if (approvals() !== "yolo") {
+    const mode = approvals();
+    if (ASKED_MODES.includes(mode)) {
       lines.push("I ask you before what is yours to decide: money, passwords and messages sent in your name.");
+    } else if (mode === "auto") {
+      lines.push("Money and passwords stay yours; a review model answers my other questions for you and asks you what it cannot decide.");
     }
     say(el("p", null, "A little about me:"), el("ul", { class: "first-list" }, lines.map((line) => el("li", null, line))));
   }
@@ -194,7 +199,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
       offerLook();
       return;
     }
-    const promise = ["ask", "supervised"].includes(approvals()) ? " Nothing is sent without your approval." : "";
+    const promise = ASKED_MODES.includes(approvals()) ? " Nothing is sent without your approval." : "";
     say(el("p", null, `Connect your Gmail and I'll find something I can take care of right away.${promise} Or tell me what you need help with.`));
     flow.append(googleCard(google, name));
   }
@@ -259,7 +264,9 @@ export function buildFirstChat({ startLook, onSkipped }) {
   function offerLook() {
     const yes = el("button", { class: "btn primary", type: "button" }, "Yes, have a look");
     const later = el("button", { class: "btn", type: "button" }, "Not now");
-    const asks = approvals() === "yolo" ? "I'll only read, and tell you what I could do." : "I'll only read, and ask you before I do anything.";
+    const asks = ASKED_MODES.includes(approvals())
+      ? "I'll only read, and ask you before I do anything."
+      : "I'll only read, and tell you what I could do.";
     say(el("p", null, `Shall I look through your inbox for something I can take off your hands? ${asks}`), el("div", { class: "row first-actions" }, yes, later));
     yes.addEventListener("click", () =>
       attempt(async () => {

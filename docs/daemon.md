@@ -373,10 +373,12 @@ the box by both Command keys pressed together: see below.
 **Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
 and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
 no model called: Dot greets you by name and asks what to call it (a few names to pick, or one to type; "Name changed to
-Miro" notes a new one), says in a few lines what it does (and, outside yolo, what it asks you about), and offers to
+Miro" notes a new one), says in a few lines what it does (and, in Ask and Supervised, what it asks you about; in Auto,
+that a review model answers for you and money and passwords stay yours), and offers to
 connect Gmail and Google Calendar: Connect takes the Google sign-in step in Dot's browser and the card follows it until
 you are signed in (a browser without a window says so instead). Then it offers to look through your inbox for something
-to take off your hands: that look is a run of its own that only reads and asks you which to do. The look, Not now, Skip
+to take off your hands: that look is a run of its own whose goal tells it to only read and to ask you which to do
+(the goal asks it, as a goal does; the approval mode decides what is asked of you on the way). The look, Not now, Skip
 the introduction and the first message you send end it, and the daemon keeps that it was had.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
@@ -607,6 +609,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /connections`, `POST /connections/{id}`                                    | the applications of Customize › Plugins, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
 | `GET\|POST /mcp/servers` (`secrets` by name for a service that takes a key, item 408), `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`, `logo`) and the services to add (`kind`, `secrets`, `logo`); add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there (409 for one set up elsewhere) |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state` (400 for none) |
+| `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`), what Tailscale says of the Mac and whether the daemon keeps it awake (item 271); a new pairing code (item 267) |
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |
 | `POST /phone/pair` (public; `{"code": "7KQ2-M9XD"}`)                            | the access token for a good pairing code, once (403 when it is wrong, used or out of date) |
