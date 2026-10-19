@@ -233,6 +233,17 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             await expect(chosen.first).to_contain_text("High")
             await expect(chosen.last).to_contain_text("Ultrathink")
             await page.keyboard.press("Escape")
+
+            # When the agents cannot be listed, a choice made then keeps the agent the new chat had.
+            await page.goto(f"{served}/#/agents")
+            await expect(page.locator(GOAL)).to_have_count(0)
+            await page.route("**/api/agents", lambda route: route.fulfill(status=503, body="not now"))
+            await page.locator(".side-btn", has_text="New chat").click()
+            await expect(page.locator(GOAL)).to_have_value(WORDS)
+            await _pick(page, "mode", "Mode", "Research")
+            await page.unroute("**/api/agents")
+            await _away_and_back(page, served)
+            await expect(_pill(page, "agent")).to_contain_text("Scout")
             await page.screenshot(path=str(tmp_path / "kept.png"), animations="disabled")
 
             # The message goes with them, and the next new chat starts afresh.

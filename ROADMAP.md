@@ -14910,7 +14910,9 @@ others are, and Keep going can be turned as a new chat left it (`runmodes.js` `s
 daemon as before and writes none of these. Tests: `tests/smoke/test_new_chat_choices.py` (a task that keeps going on a
 model at High, then research for an agent with Ultrathink and words typed, each there again after another page and New
 chat; the run that goes has them, and the next new chat starts afresh), `test_dock_choices.py` (a chat's page writes no
-choice of the home's). Docs: `docs/daemon.md`.
+choice of the home's). Docs: `docs/daemon.md`. The review of the merge with main found a choice made before the agents
+were listed, or when they could not be, forgot the new chat's agent; it keeps the one it had until they are listed
+(`listed` in `views/runs.js`, and a browser test whose agents fail to list).
 
 ## Log
 

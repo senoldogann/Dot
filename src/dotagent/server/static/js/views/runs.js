@@ -132,6 +132,9 @@ function buildComposer(ctx, listener) {
   agentPill.element.hidden = true;
   let agents = [];
   let agentId = "";
+  // Until the agents are listed (and when they cannot be), the new chat keeps the agent it had: a choice made meanwhile
+  // must not forget it.
+  let listed = false;
   function chosenAgent() {
     return agents.find((candidate) => candidate.id === agentId) ?? null;
   }
@@ -152,7 +155,8 @@ function buildComposer(ctx, listener) {
   }
   function keepChoices() {
     const chosen = choices.value();
-    keepHomeChoices({ mode: chosen.mode, model: chosen.model ?? "", agent: agentId, standing: standing.value(), once: choices.armed() });
+    const agent = listed ? agentId : start.agent;
+    keepHomeChoices({ mode: chosen.mode, model: chosen.model ?? "", agent, standing: standing.value(), once: choices.armed() });
   }
   // Keep going as the new chat left it, where a task of Dot's may keep going; its agent once the agents are listed.
   if (start.standing && start.mode === "task" && start.agent === "") {
@@ -178,6 +182,7 @@ function buildComposer(ctx, listener) {
     .get("/agents")
     .then((summaries) => {
       agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
+      listed = true;
       agentPill.element.hidden = agents.length === 0;
       // The agent the new chat had, while it is still one of them; its choices then keep the one shown.
       if (start.agent !== "") {
