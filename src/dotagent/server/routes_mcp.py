@@ -74,8 +74,6 @@ class _Try:
     task: asyncio.Task[None] | None
     link: str | None
     error: str | None
-    # The server was not in the record when the try began (item 408): a failed first try takes a service's key with it.
-    first: bool
 
     def running(self) -> bool:
         return self.task is not None and not self.task.done()
@@ -121,6 +119,10 @@ def secret_entries(service: McpService, given: Mapping[str, str]) -> dict[str, s
         raise ConfigError(
             "the service asks for its secrets by name", {"service": service.id, "missing": missing, "unknown": unknown}
         )
+    # A value is one line, as the env file takes it: refused here, before any of them is written.
+    broken: list[JsonValue] = [name for name in kept if "\n" in given[name] or "\r" in given[name]]
+    if broken:
+        raise ConfigError("a secret is one line", {"service": service.id, "secrets": broken})
     return {kept[name]: given[name].strip() for name in kept}
 
 
@@ -275,9 +277,9 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             await asyncio.to_thread(remove_env_value, env_file_path(), kept_name)
 
     async def keep(attempt: _Try, origin: str) -> None:
-        """Try the server once, signing in when it asks, then keep it and connect it as runs do; the key of a service
-        whose first try fails goes out of .env with it, as nothing keeps the server (item 408); a kept server's stays
-        through a Try again that fails."""
+        """Try the server once, signing in when it asks, then keep it and connect it as runs do. A try that fails
+        leaves a service's key in .env, so that Try again can use it; Remove takes the key out with the server, and an
+        add after a failed one writes it anew (item 408)."""
         config: McpServerConfig = attempt.config
 
         def show(link: str) -> None:
@@ -303,26 +305,20 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         except DotError as error:
             attempt.error = error.message
             log.warning("mcp_server_not_added", server=config.name, error=error.message, context=error.context)
-            if attempt.origin == "connected" and attempt.first:
-                await forget_service_secrets(config)
         except Exception as error:
             # Not one of Dot's own errors: a fault in Dot or in the MCP library, as the hub reports it.
             attempt.error = f"{type(error).__name__}: {error}"
             log.error("mcp_server_try_crashed", server=config.name, exc_info=error)
-            if attempt.origin == "connected" and attempt.first:
-                await forget_service_secrets(config)
         finally:
             attempt.news.set()
 
-    async def start(config: McpServerConfig, origin: McpOrigin, page: str, first: bool) -> McpServerView:
+    async def start(config: McpServerConfig, origin: McpOrigin, page: str) -> McpServerView:
         """Try ``config`` in a task of its own, and answer once the sign-in page is known, the try ended, or after
         ``_ANSWER_WITHIN_S``."""
         current: _Try | None = tries.get(config.name)
         if current is not None and current.running():
             raise RunConflict("Dot is trying this server already", {"server": config.name})
-        attempt: _Try = _Try(
-            config=config, origin=origin, news=asyncio.Event(), task=None, link=None, error=None, first=first
-        )
+        attempt: _Try = _Try(config=config, origin=origin, news=asyncio.Event(), task=None, link=None, error=None)
         tries[config.name] = attempt
         attempt.task = asyncio.create_task(keep(attempt, page), name=f"mcp-try-{config.name}")
         try:
@@ -355,7 +351,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             # stands in the add's way and every one of them is there (secret_entries refuses before any is written).
             for kept_name, value in secret_entries(service, body.secrets).items():
                 await asyncio.to_thread(write_env_value, env_file_path(), kept_name, value)
-        return await start(config, "connected", page, found is None)
+        return await start(config, "connected", page)
 
     @router.post("/api/mcp/servers/{name}/connect")
     async def connect_again(name: str, body: McpReconnect) -> McpServerView:
@@ -371,7 +367,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             raise RunConflict(
                 "this MCP server is set up elsewhere; connect it again there", {"server": name, "set_up": origin}
             )
-        return await start(config, origin, page, False)
+        return await start(config, origin, page)
 
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:
