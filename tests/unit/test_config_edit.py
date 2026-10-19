@@ -258,3 +258,16 @@ def test_a_setting_of_snapshots_is_written_under_its_own_table(tmp_path: Path) -
     written: JsonObject = tomllib.loads(path.read_text(encoding="utf-8"))
     assert written["snapshots"] == {"sound": "pop", "app_text": False}
     assert written["models"] == {"main": "ollama:x"}
+
+
+def test_a_name_typed_with_a_quote_or_a_backslash_reads_back_as_it_was_written(tmp_path: Path) -> None:
+    """Item 420: a name the owner types goes to the file as a TOML basic string, escaped."""
+    path: Path = tmp_path / "config.toml"
+    typed: str = 'Ada "Al" Mi\\ro'
+    set_setting(path, "assistant", "name", typed)
+    assert tomllib.loads(path.read_text(encoding="utf-8"))["assistant"]["name"] == typed
+    # A value with escapes in it is found whole when it is changed again, and a comment after it is kept.
+    path.write_text('[assistant]\nname = "Ada \\"Al\\" Mi\\\\ro"  # the name\n', encoding="utf-8")
+    set_setting(path, "assistant", "name", "Miro")
+    written: str = path.read_text(encoding="utf-8")
+    assert tomllib.loads(written)["assistant"]["name"] == "Miro" and "# the name" in written, written

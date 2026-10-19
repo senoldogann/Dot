@@ -7,6 +7,7 @@ import { api } from "./api.js";
 import { dotName, setDotName } from "./face.js";
 import { MAC_OWNER_KEY, ownerName, setOwnerName } from "./presence.js";
 import { readPref, writePref } from "./prefs.js";
+import { toast } from "./ui.js";
 
 const DEFAULT_NAME = "Dot";
 // Set once this browser's names went to the daemon, so that a later change elsewhere is never undone from here.
@@ -50,9 +51,20 @@ export async function loadAssistant() {
   if (view.owner === "" && ownerName() !== "") {
     changes.owner = ownerName();
   }
-  const moved = Object.keys(changes).length > 0 ? await api.put("/assistant", changes) : view;
-  writePref(MOVED_KEY, "1");
-  return keep(moved);
+  if (Object.keys(changes).length === 0) {
+    writePref(MOVED_KEY, "1");
+    return keep(view);
+  }
+  try {
+    const moved = await api.put("/assistant", changes);
+    writePref(MOVED_KEY, "1");
+    return keep(moved);
+  } catch (error) {
+    // The daemon's names stand; the owner hears why this browser's did not move, and can give them in Settings.
+    writePref(MOVED_KEY, "1");
+    toast("error", `The names this browser kept could not move to Dot: ${error.message}`);
+    return keep(view);
+  }
 }
 
 /** Change what `changes` gives (`name`, `owner`, `introduced`); returns the names as they are now. */

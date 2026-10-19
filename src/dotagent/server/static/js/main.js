@@ -567,12 +567,7 @@ function handleAuthLost() {
 async function connect() {
   renderWaiting();
   try {
-    await Promise.all([
-      refresh(),
-      loadLooks(),
-      loadOwnThemes(),
-      loadAssistant().catch((error) => console.warn("the names of Dot and its owner could not be read", error)),
-    ]);
+    await Promise.all([refresh(), loadLooks(), loadOwnThemes(), loadAssistant()]);
   } catch (error) {
     if (error instanceof ApiError && error.status === 401) {
       clearToken();

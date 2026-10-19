@@ -259,10 +259,8 @@ export function buildFirstChat({ startLook, onSkipped }) {
   function offerLook() {
     const yes = el("button", { class: "btn primary", type: "button" }, "Yes, have a look");
     const later = el("button", { class: "btn", type: "button" }, "Not now");
-    say(
-      el("p", null, "Shall I look through your inbox for something I can take off your hands? I'll only read, and ask you before I do anything."),
-      el("div", { class: "row first-actions" }, yes, later),
-    );
+    const asks = approvals() === "yolo" ? "I'll only read, and tell you what I could do." : "I'll only read, and ask you before I do anything.";
+    say(el("p", null, `Shall I look through your inbox for something I can take off your hands? ${asks}`), el("div", { class: "row first-actions" }, yes, later));
     yes.addEventListener("click", () =>
       attempt(async () => {
         yes.disabled = true;
@@ -294,7 +292,7 @@ export function buildFirstChat({ startLook, onSkipped }) {
   return {
     element,
     sent: () => {
-      void close().catch((error) => console.warn("the end of the introduction could not be kept", error));
+      void attempt(close);
     },
     dispose: stopPolling,
   };

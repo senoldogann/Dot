@@ -66,12 +66,26 @@ type SettingKey = (
 type SettingValue = str | bool | int | list[str]
 
 
+def _basic_string(text: str) -> str:
+    """``text`` as a TOML basic string: a backslash, a double quote and a control character escaped, so that a name
+    the owner typed (``Ada "Al"``, ``Mi\\ro``) reads back as it was written."""
+    escaped: list[str] = []
+    for char in text:
+        if char in ('"', "\\"):
+            escaped.append(f"\\{char}")
+        elif ord(char) < 0x20 or ord(char) == 0x7F:
+            escaped.append(f"\\u{ord(char):04X}")
+        else:
+            escaped.append(char)
+    return '"' + "".join(escaped) + '"'
+
+
 def _literal(value: SettingValue) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, list):
         return "[" + ", ".join(_literal(item) for item in value) + "]"
-    return str(value) if isinstance(value, int) else f'"{value}"'
+    return str(value) if isinstance(value, int) else _basic_string(value)
 
 
 def _written_key(key: str) -> str:
@@ -97,7 +111,7 @@ def _key_line(key: str) -> re.Pattern[str]:
 
 def _key_value(key: str) -> re.Pattern[str]:
     return re.compile(
-        rf"""^(\s*{_key_pattern(key)}\s*=\s*)("[^"]*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*|\[[^\]]*\])(.*)$"""
+        rf"""^(\s*{_key_pattern(key)}\s*=\s*)("(?:[^"\\]|\\.)*"|'[^']*'|true|false|[+-]?[0-9][0-9_]*|\[[^\]]*\])(.*)$"""
     )
 
 

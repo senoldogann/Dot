@@ -157,6 +157,9 @@ async def test_the_names_are_kept_in_the_config_file_and_said_to_the_model(tmp_p
         assert named.json()["name"] == "Miro" and named.json()["owner"] == "Ada"
         for wrong in ({"name": "   "}, {"name": "Mi\nro"}, {"owner": "x" * 41}):
             assert (await client.put("/assistant", json=wrong)).status_code == 422, wrong
+        quoted: httpx.Response = await client.put("/assistant", json={"owner": 'Ada "Al" \\o/'})
+        assert quoted.status_code == 200 and quoted.json()["owner"] == 'Ada "Al" \\o/', quoted.text
+        assert (await client.put("/assistant", json={"owner": "Ada"})).json()["owner"] == "Ada"
         assert (await client.put("/assistant", json={"introduced": True})).json()["introduced"] is True
         written: str = _written()
         assert 'name = "Miro"' in written and 'owner = "Ada"' in written and "introduced = true" in written, written

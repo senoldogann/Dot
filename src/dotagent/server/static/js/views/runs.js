@@ -85,12 +85,12 @@ const HOME_KEPT = {
   goalMode: KEPT_GOAL_MODE,
 };
 
-/** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
 /** The words in the home's empty box, with the name the owner calls Dot by (item 420). */
 function placeholderFor(name) {
   return `Message ${name} (@ for skills, / for commands)`;
 }
 
+/** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
 function buildComposer(ctx, listener) {
   const start = readHomeChoices();
   const frame = composerFrame({
@@ -449,27 +449,25 @@ export function mount(root, ctx) {
   offerCaret();
   const stopNames = onAssistant((names) => composer.rename(names.name));
   let disposed = false;
-  // The first conversation stands in the place of the greeting, over the composer, once it is known to be due.
-  firstChatDue()
-    .then((due) => {
-      if (!due || disposed) {
-        return;
-      }
-      first = buildFirstChat({
-        startLook: (goal) => composer.send(goal),
-        onSkipped: () => {
-          first.element.replaceWith(presence.element);
-          first.dispose();
-          first = null;
-          home.classList.remove("home-first");
-        },
-      });
-      presence.element.replaceWith(first.element);
-      home.classList.add("home-first");
-    })
-    .catch((error) => {
-      console.warn("whether Dot introduced itself could not be read", error);
+  // The first conversation stands in the place of the greeting, over the composer, once it is known to be due; a
+  // daemon that cannot say whether it is is shown, and the home keeps its greeting.
+  void attempt(async () => {
+    const due = await firstChatDue();
+    if (!due || disposed) {
+      return;
+    }
+    first = buildFirstChat({
+      startLook: (goal) => composer.send(goal),
+      onSkipped: () => {
+        first.element.replaceWith(presence.element);
+        first.dispose();
+        first = null;
+        home.classList.remove("home-first");
+      },
     });
+    presence.element.replaceWith(first.element);
+    home.classList.add("home-first");
+  });
   return () => {
     disposed = true;
     first?.dispose();
