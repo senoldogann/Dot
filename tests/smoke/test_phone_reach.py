@@ -295,7 +295,13 @@ async def test_settings_phone_shows_what_a_phone_needs_and_sets_it_up(stand_ins:
                         await set_up.click()
                     await expect(steps).to_contain_text("Tailscale serves Dot to your tailnet over HTTPS")
                     await expect(steps).to_contain_text("Dot takes the name up when it starts again.")
-                    await expect(steps.get_by_role("button", name="Restart Dot")).to_be_visible()
+                    # Restart Dot asks first: the runs going on would stop with it.
+                    await steps.get_by_role("button", name="Restart Dot").click()
+                    asked: Locator = page.locator("dialog.modal")
+                    await expect(asked).to_contain_text("Restart Dot?")
+                    await asked.get_by_role("button", name="Cancel").click()
+                    await expect(asked).to_have_count(0)
+                    await expect(steps).to_contain_text("Dot takes the name up when it starts again.")
                     download: Locator = page.get_by_role("img", name="A QR code of Tailscale's download page")
                     await expect(download).to_be_visible()
                     assert await download.evaluate("picture => picture.naturalWidth") > 0

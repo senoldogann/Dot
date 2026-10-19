@@ -16,7 +16,8 @@ app closed or a call that failed, the step says what it said. **Dot on your tail
 --bg <port>` present Dot over HTTPS and writes the Mac's name into `[server] reach` (`POST /api/phone/tailnet`, 422 with
 why when Tailscale is missing or not signed in); when the tailnet has HTTPS off, Tailscale names the page that turns it
 on, and the step offers it as **Turn on HTTPS for your tailnet**, then Set up again. **Dot answers to the name**: the
-daemon answers to it from its next start, and **Restart Dot** starts it again (`GET /api/phone` reads the state). Under
+daemon answers to it from its next start, and **Restart Dot** starts it again once you say yes, and says when runs
+going on would stop with it (`GET /api/phone` reads the state). Under
 them, **Dot on your phone** has a QR code of Tailscale's download page for the phone, then, once Dot answers to its
 name, a QR code of its address, both made by macOS's own generator (`GET /api/phone/qr/tailscale` and `/dot`), Add to
 Home Screen, and the pairing code. Its switch **Keep this Mac awake while it charges** (`[server] keep_awake`, `POST

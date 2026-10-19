@@ -3,11 +3,12 @@
 // served to the tailnet, the daemon started again to take its name. Then the phone's own steps, with QR codes its
 // camera opens, and a pairing code for the app added to its home screen, which iOS keeps apart from Safari.
 
-import { api, blobUrl } from "../api.js";
+import { api, blobUrl, unreachable } from "../api.js";
 import { copyText, el } from "../dom.js";
 import { icon } from "../icons.js";
 import { errorPanel, loadingPanel, paneHead, switchSetting } from "../panels.js";
-import { attempt, toast } from "../ui.js";
+import { getSnapshot } from "../state.js";
+import { attempt, confirmDialog, toast } from "../ui.js";
 
 // How often the guide reads Tailscale again while a step is left, so that it follows an install or a sign-in.
 const FOLLOW_MS = 4000;
@@ -127,6 +128,20 @@ export function mount(root, _ctx) {
   }
 
   async function restart() {
+    const running = getSnapshot().status?.active_runs.length ?? 0;
+    const confirmed = await confirmDialog({
+      title: "Restart Dot?",
+      message:
+        running === 0
+          ? "Dot stops and the service starts it again, with the name of your tailnet."
+          : `Dot stops and the service starts it again, with the name of your tailnet. The ${running === 1 ? "run" : `${running} runs`} going on now stop too.`,
+      confirmLabel: "Restart",
+      danger: running > 0,
+      focusCancel: running > 0,
+    });
+    if (!confirmed) {
+      return;
+    }
     await api.post("/system/restart", null);
     toast("ok", "Dot starts again and takes the name up; this page answers again in a moment.");
   }
@@ -296,12 +311,21 @@ export function mount(root, _ctx) {
         follow(phone);
         return;
       }
-      let next = phone;
+      let next;
       try {
         next = await api.get("/phone");
       } catch (error) {
-        // The daemon may be starting again (Restart Dot): the guide reads it again at the next turn.
-        console.warn("the phone's steps could not be read again", error);
+        if (!unreachable(error)) {
+          // A daemon that answers with an error is shown, and the guide stops following it.
+          if (!disposed) {
+            shown = "";
+            holder.replaceChildren(errorPanel(error, () => attempt(retry)));
+          }
+          return;
+        }
+        // No answer at all: the daemon may be starting again (Restart Dot), and is read again at the next turn.
+        follow(phone);
+        return;
       }
       if (!disposed && !busy) {
         paint(next);
@@ -309,8 +333,15 @@ export function mount(root, _ctx) {
     }, FOLLOW_MS);
   }
 
+  // What the cards show now, so that a reading that changed nothing leaves them (and the focus in them) as they are.
+  let shown = "";
+
   function paint(phone) {
-    holder.replaceChildren(guideCard(phone), phoneCard(phone));
+    const drawn = JSON.stringify([phone, httpsLink]);
+    if (drawn !== shown) {
+      shown = drawn;
+      holder.replaceChildren(guideCard(phone), phoneCard(phone));
+    }
     follow(phone);
   }
 
@@ -320,6 +351,7 @@ export function mount(root, _ctx) {
       phone = await api.get("/phone");
     } catch (error) {
       if (!disposed) {
+        shown = "";
         holder.replaceChildren(errorPanel(error, () => attempt(retry)));
       }
       return;
@@ -330,6 +362,7 @@ export function mount(root, _ctx) {
   }
 
   async function retry() {
+    shown = "";
     holder.replaceChildren(loadingPanel());
     await load();
   }
