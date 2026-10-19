@@ -2506,8 +2506,7 @@ a.pill:hover {
   margin-inline-end: auto;
 }
 
-.composer .plus-button,
-.composer .more-button {
+.composer .plus-button {
   width: 32px;
   padding: 0;
   border-radius: var(--radius-pill);
@@ -2796,7 +2795,6 @@ a.pill:hover {
   }
 
   .composer .plus-button,
-  .composer .more-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;
@@ -6551,8 +6549,7 @@ button.attach-chip:hover {
   border-radius: var(--radius-xs);
 }
 
-.plus-button,
-.more-button {
+.plus-button {
   flex: none;
 }
 
@@ -7112,7 +7109,6 @@ button.attach-chip:hover {
 
   /* The composer's round buttons are the send's size, at the dock's right, and so is the stop's square in them. */
   .composer .plus-button,
-  .composer .more-button,
   .composer .btn.send {
     width: 36px;
     height: 36px;

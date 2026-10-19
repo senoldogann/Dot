@@ -241,12 +241,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   without the panel (the new chat's, an agent's) the file opens in a dialog. **Copy the text** in the panel's head takes
   what the panel reads of a text or Markdown file, a PDF (its text, page by page, up to 512 KB), a Word document or a
   presentation (item 403). **Open on the Mac** opens a document in its application (`open`), never a script or a
-  program. Close or Escape gives the panel back as it was. The panel shows files of the workspace and of the home folder
-  outside hidden folders and outside `~/Library`, but for the folders cloud drives sync (OneDrive's and the others' in
-  `~/Library/CloudStorage`, iCloud Drive's in `~/Library/Mobile Documents`), judged once links are followed; for another
-  file it says why not. The routes are `GET /api/files/preview?path=`, `GET /api/attachments/{id}/preview`, `GET
-  /api/files/look?path=` and `GET /api/attachments/{id}/look` (where the drawing is served; 422 when Quick Look cannot
-  draw the file), `GET /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
+  program. Close or Escape gives the panel back as it was. The file stays as the chat goes on at its next run (a message
+  sent, an answer that came; item 406), until it is closed; a narrow page, where it would cover the conversation, lets
+  it go. The panel shows files of the workspace and of the home folder outside hidden folders and outside `~/Library`,
+  but for the folders cloud drives sync (OneDrive's and the others' in `~/Library/CloudStorage`, iCloud Drive's in
+  `~/Library/Mobile Documents`), judged once links are followed; for another file it says why not. The routes are `GET
+  /api/files/preview?path=`, `GET /api/attachments/{id}/preview`, `GET /api/files/look?path=` and `GET
+  /api/attachments/{id}/look` (where the drawing is served; 422 when Quick Look cannot draw the file), `GET
+  /api/files/page` (a PDF's page as a PNG), `GET /api/files/image` and `POST /api/files/open`.
 
 ## Tools
 

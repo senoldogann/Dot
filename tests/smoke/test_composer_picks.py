@@ -515,7 +515,6 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
                     await expect(chips).to_have_count(0)
                     # The "+" opens the file picker directly.
                     await expect(composer.get_by_role("button", name="Add files")).to_be_visible()
-                    await expect(composer.get_by_role("button", name="More")).to_be_hidden()
                     # The "@" menu picks servers and skills.
                     await goal.click()
                     await goal.type(f"@{SERVER}")
