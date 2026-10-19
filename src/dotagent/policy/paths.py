@@ -218,7 +218,7 @@ def _glob_reaches(parts: tuple[str, ...], location: tuple[str, ...]) -> bool:
     if _part_matches(rest[0], _BY_NUMBER):
         return True
     beyond: list[tuple[str, ...]] = [
-        *((*target, *rest[1:]) for name, target in _ROOT_LINKS if _part_matches(rest[0], name))
+        (*target, *rest[1:]) for name, target in _ROOT_LINKS if _part_matches(rest[0], name)
     ]
     if _part_matches(rest[0], _NO_FOLLOW):
         beyond.append(rest[1:])

@@ -34,6 +34,9 @@ def test_a_path_through_the_data_volume_or_in_another_case_is_the_place_it_names
     through_data: Path = expand_path(f"{_DATA_VOLUME}{real / 'secret' / 'key'}", workspace)
     shouted: Path = expand_path(str(real / "secret" / "key").upper(), workspace)
     assert through_data == plain
+    # Behind the prefixes that ask the kernel to follow no link, or to resolve as its flags say, it is the same place.
+    for prefix in ("/.nofollow", "/.resolve/1"):
+        assert expand_path(f"{prefix}{real / 'secret' / 'key'}", workspace) == plain, prefix
     # The folders as the kernel names them; a file keeps the letters it was written in, which a comparison of places
     # reads letter case aside (``within``).
     assert shouted.parent == plain.parent and shouted.name.casefold() == plain.name.casefold()
