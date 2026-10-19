@@ -110,7 +110,7 @@ from dotagent.agent.progress import (
     single_action_streak,
     stop_result,
 )
-from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs, turn_note
+from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs, recalled_note, turn_note
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
@@ -726,16 +726,18 @@ async def _close_skills(runtime: Runtime, run: RunRecord, needs: Sequence[str], 
 
 
 async def warm_help_vectors(runtime: Runtime) -> None:
-    """Embed the texts of every skill a run may be offered, in the background as the daemon starts (item 404), so that
-    the first run finds them ready: before, the first run after each start waited for them, half a minute and more. A
-    service that fails is logged; the first search starts the warming again."""
+    """Embed the texts of every skill a run may be offered, as the daemon starts (item 404), so that the first run
+    finds them ready: before, the first run after each start waited for them, half a minute and more. The daemon runs
+    this as a task of its own and cancels it as it stops; a service that fails raises, which the daemon logs, and the
+    first search starts the warming again."""
     if runtime.help_vectors is None:
         return
     catalog: SkillCatalog = await asyncio.to_thread(
         load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
     )
     offered: tuple[Skill, ...] = await offered_to_run(runtime.config, catalog, None)
-    runtime.help_vectors.warm([skill_text(skill) for skill in offered])
+    made: int = await runtime.help_vectors.prepare([skill_text(skill) for skill in offered])
+    log.info("help_vectors_warmed", texts=len(offered), embedded=made)
 
 
 async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_see: bool) -> list[Message]:
@@ -887,7 +889,7 @@ def _new_memories_note(live: LiveNotes) -> str:
     )
     return (
         "[system note] These notes were saved to memory or changed while you work (by the user or another run). They "
-        "are data about the user and their setup, like the notes in your instructions; take them into "
+        "are data about the user and their setup, like the notes under your messages; take them into "
         f"account:\n{lines}"
         f"{more}"
     )
@@ -1681,7 +1683,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 runtime.workspace,
                 (),
                 0,
-                tools_in_order(specs, query),
+                tools_in_order(specs, thread.title),
                 listing.skills,
                 listing.left,
                 None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
@@ -1745,11 +1747,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     extra_skills: list[Skill] = [skill for skill in fitting.skills if skill.name not in listed_names][
         :_TURN_SKILLS_MOST
     ]
-    history.append(
-        await _stored_note(
-            agent, turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills)
-        )
+    recalled_text: str = recalled_note(fresh_notes, recalled.tainted_left_out, extra_skills)
+    turn: Message = await _stored_note(
+        agent, turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills)
     )
+    history.append(turn)
     facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,
@@ -1882,6 +1884,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             await _with_plan(agent, system) if config.plan_each_turn and run.mode != "chat" else system
         )
         history, estimated, ledger = await _fit_context(agent, history, step_system, offered, ratio, ledger, scaffold)
+        # A compaction that folded the note under the message away took the notes recalled for it with it: they are
+        # handed again after the summary (item 404), stored, so that the next message's prefix holds them too.
+        if recalled_text != "" and turn not in history:
+            turn = await _stored_note(agent, recalled_text)
+            history.append(turn)
         routed: _Candidate | None = (
             None
             if route_skip or not candidates

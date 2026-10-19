@@ -15210,29 +15210,30 @@ panel's copy). Docs: `docs/daemon.md`, `docs/runs.md`.
 ### 404. The first answer's delay: a prompt the provider's cache keeps, and the skills' embeddings ready
 
 **Status: done (2026-10-19), on `item-404-first-token`.** The owner's word of 2026-10-19: "providerların ilk response
-başlama olayı neden 30+ saniye sürüyor? Bu gecikmenin arkasında yatan problem nedir? Bunu araştırmanı ve tüm
-providerlar için düzeltmeni talep ediyorum" (why does the first response of the providers take 30+ seconds, what is
-behind it, find it and fix it for every provider). **Measured** on the owner's chat runs of the day
-(`opencode_go:deepseek-v4.1-flash`): every message is a new run, and its first model call carried 185,000 to 221,000
-input tokens of which 3,200 came from the provider's cache, against the whole prompt for the later steps of the same
-run; so the first step took 20 to 48 seconds and the later ones 2 to 15. The cause: the instructions changed from
-message to message, with the skills listed by the message's words and the notes recalled for it, in front of the whole
-history, so the cached prefix ended after 3,200 tokens. Three runs waited another 31 to 88 seconds between their
-`memories` and `scaffold` events: the first run after each start of the daemon embedded the texts of 433 skills
-through Ollama's `bge-m3` in one call of about 148,000 characters, which took half a minute when it worked and broke
-Ollama's model runner (`/tokenize: EOF`, 25 times in the log) when it did not. **As built (2026-10-19).** The
-instructions list the skills that fit the chat's first words (its title), the same at every message, and hold no
-recalled notes; what changes with the message goes under it, in the stored note that gave the time (`turn_note`): the
-notes recalled for it that no earlier message of the chat carries, how many were left out as tainted, and up to six
-more skills that fit it. Stored, the note is the same bytes at the next message, so the provider's cache holds up to
-the message after it. The skills' embeddings are made 32 texts a call, kept in the store across restarts
-(`help_vectors`), and made as the daemon starts in the background; a run that finds more than 64 of them missing
-ranks its skills by words that once, without a warning (`HelpVectorsCold`). Every `model_call` event says how long
-its first streamed word took (`first_token_seconds`), so the delay is measured from now on. Left as it was: the fast
-model's summary failures in the log were an earlier fast model's quota, and the owner's `[models] fast` is the main
-model since; the SSL `BAD_RECORD_MAC` retries on reused connections are rare. Tests: `tests/unit/test_run_modes.py`
-(the note), `test_help.py` (batches, the cold start, the keeper), `test_model_calls.py` (the first word's seconds).
-Docs: `docs/memory-and-schedules.md`, `docs/extending.md`, `docs/development.md`.
+başlama olayı neden 30+ saniye sürüyor? Bu gecikmenin arkasında yatan problem nedir? Bunu araştırmanı ve tüm providerlar
+için düzeltmeni talep ediyorum" (why does the first response of the providers take 30+ seconds, what is behind it, find
+it and fix it for every provider). **Measured** on the owner's chat runs of the day (`opencode_go:deepseek-v4.1-flash`):
+every message is a new run, and its first model call carried 185,000 to 221,000 input tokens of which 3,200 came from
+the provider's cache, against the whole prompt for the later steps of the same run; so the first step took 20 to 48
+seconds and the later ones 2 to 15. The cause: the instructions changed from message to message, with the skills listed
+by the message's words and the notes recalled for it, in front of the whole history, so the cached prefix ended after
+3,200 tokens. Three runs waited another 31 to 88 seconds between their `memories` and `scaffold` events: the first run
+after each start of the daemon embedded the texts of 433 skills through Ollama's `bge-m3` in one call of about 148,000
+characters, which took half a minute when it worked and broke Ollama's model runner (`/tokenize: EOF`, 25 times in the
+log) when it did not. **As built (2026-10-19).** The instructions list the skills that fit the chat's first words (its
+title), the same at every message, and hold no recalled notes; what changes with the message goes under it, in the
+stored note that gave the time (`turn_note`): the notes recalled for it that no earlier message of the chat carries, how
+many were left out as tainted, and up to six more skills that fit it. Stored, the note is the same bytes at the next
+message, so the provider's cache holds up to the message after it. The skills' embeddings are made 32 texts a call, kept
+in the store across restarts (`help_vectors`), and made as the daemon starts in the background; a run that finds more
+than 64 of them missing ranks its skills by words that once, without a warning (`HelpVectorsCold`). The tools' order in
+the instructions follows the chat's title too, and a compaction of the run that folds the note away has it handed again
+after the summary (the review's findings). Every `model_call` event says how long its first streamed word took
+(`first_token_seconds`), so the delay is measured from now on. Left as it was: the fast model's summary failures in the
+log were an earlier fast model's quota, and the owner's `[models] fast` is the main model since; the SSL
+`BAD_RECORD_MAC` retries on reused connections are rare. Tests: `tests/unit/test_run_modes.py` (the note),
+`test_help.py` (batches, the cold start, the keeper), `test_model_calls.py` (the first word's seconds). Docs:
+`docs/memory-and-schedules.md`, `docs/extending.md`, `docs/development.md`.
 
 ## Log
 

@@ -668,12 +668,11 @@ _TURN_NOTES: str = (
 _TURN_SKILLS: str = "Skills that fit this message, besides those your instructions list; read one with the skill tool."
 
 
-def turn_note(now: datetime, notes: Sequence[str], left_out: int, skills: Sequence[Skill]) -> str:
-    """The note stored after a message of a chat (item 404): the time of day (:func:`clock_note`), the ``notes``
-    recalled for the message that no earlier message of the chat was handed, how many were ``left_out`` as tainted,
-    and the ``skills`` that fit the message that the instructions do not list. Stored with the conversation, it is
-    the same bytes at the next message, so the provider's cache holds up to the message after it."""
-    parts: list[str] = [clock_note(now)]
+def recalled_note(notes: Sequence[str], left_out: int, skills: Sequence[Skill]) -> str:
+    """What a message of a chat is handed under it (item 404): the ``notes`` recalled for it that no earlier message
+    of the chat was handed, how many were ``left_out`` as tainted, and the ``skills`` that fit it that the
+    instructions do not list; "" when there is nothing. Handed again after a compaction of the run folds it away."""
+    parts: list[str] = []
     if notes:
         parts.append("\n".join([_TURN_NOTES, *(f"- {note}" for note in notes)]))
     left: str = _left_out_line(left_out)
@@ -682,6 +681,14 @@ def turn_note(now: datetime, notes: Sequence[str], left_out: int, skills: Sequen
     if skills:
         parts.append("\n".join([_TURN_SKILLS, *(f"- {skill.name}: {skill.description}" for skill in skills)]))
     return "\n\n".join(parts)
+
+
+def turn_note(now: datetime, notes: Sequence[str], left_out: int, skills: Sequence[Skill]) -> str:
+    """The note stored after a message of a chat (item 404): the time of day (:func:`clock_note`) and
+    :func:`recalled_note`. Stored with the conversation, it is the same bytes at the next message, so the provider's
+    cache holds up to the message after it."""
+    recalled: str = recalled_note(notes, left_out, skills)
+    return clock_note(now) if recalled == "" else f"{clock_note(now)}\n\n{recalled}"
 
 
 def build_system_prompt(inputs: PromptInputs) -> str:

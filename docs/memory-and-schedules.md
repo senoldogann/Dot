@@ -21,7 +21,7 @@ the message that recalled them, in the note that gives the time ("[system note] 
 instructions: the instructions stay the same bytes from one message of a chat to the next, so the provider serves them
 and the history from its prompt cache (the first word of an answer came after 30 to 50 seconds of a 200,000-token chat
 before, after a few seconds since); a note an earlier message of the chat was handed is not repeated, and a note folded
-into a summary since is handed again.
+into a summary, in the run or since, is handed again after the summary.
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -82,7 +82,8 @@ dotx memory reindex      # embed every note again, for example after changing [m
   store across restarts (`help_vectors`, item 404); a run that finds more than 64 of them not made yet lists its skills
   by their words that once, without a warning, while they are made behind it. Before, the first run after each start
   waited for all of them in one call, half a minute and more, and one call with hundreds of texts broke Ollama's model
-  runner.- Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
+  runner.
+- Saving a note close to an existing one (`similar_threshold`) tells the model, which decides whether the old note is
   outdated.
 - A note a run saves while it has read content third parties can author is marked "saved while reading outside content"
   (the Memory page, `dotx memory list`), and a `memory_search` that returns one counts as reading such content again:

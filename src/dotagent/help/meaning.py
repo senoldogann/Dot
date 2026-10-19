@@ -8,11 +8,13 @@ change seldom, and embedding them all at every search, or at every start, took s
 :class:`HelpVectorsCold`, so the help is ranked by words this once."""
 
 import asyncio
+import contextlib
 from collections.abc import Sequence
 from typing import Protocol
 
 import structlog
 
+from dotagent.core.errors import ProviderError, StoreError
 from dotagent.memory.embedder import Embedder
 from dotagent.memory.ranking import Similar, Vector, most_similar
 
@@ -94,10 +96,19 @@ class HelpVectors:
             try:
                 made: int = await self.prepare(texts)
                 log.info("help_vectors_warmed", texts=len(texts), embedded=made)
-            except Exception as error:
+            except (ProviderError, StoreError) as error:
                 log.warning("help_vectors_warming_failed", error_type=type(error).__name__, error=str(error))
 
         self._warming = asyncio.create_task(run(), name="help-vectors")
+
+    async def aclose(self) -> None:
+        """End a warming still under way, as the runtime closes: nothing is written to a closed store."""
+        warming: asyncio.Task[None] | None = self._warming
+        self._warming = None
+        if warming is not None and not warming.done():
+            warming.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await warming
 
     async def closest(self, need: str, texts: Sequence[str]) -> list[int]:
         """The places in ``texts`` of those at least ``minimum`` close to ``need`` in meaning, the closest first. The

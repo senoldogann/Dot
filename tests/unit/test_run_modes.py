@@ -12,7 +12,7 @@ import pytest
 
 from dotagent.agent.compact import drop_old_images
 from dotagent.agent.loop import RunOutcome, SendBack, _after_verdict, _since_goal
-from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs, turn_note
+from dotagent.agent.prompt import build_system_prompt, clock_note, collect_prompt_inputs, recalled_note, turn_note
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
@@ -194,6 +194,10 @@ def test_the_note_under_a_message_carries_what_changes_from_message_to_message(t
     assert "1 note was left out: saved while reading outside content" in full
     assert full.rstrip().endswith("- invoice-pdf: Fill in an invoice.")
     assert "Skills that fit this message, besides those your instructions list" in full
+    # What is handed again after a compaction folds the note away: the same without the time, "" when nothing was.
+    assert recalled_note([], 0, []) == ""
+    recalled: str = recalled_note(["[mem_1] The rent is due on the 3rd (the user wrote it, 2026-10-01)"], 1, [skill])
+    assert full == f"{clock_note(now)}\n\n{recalled}"
 
 
 def _lines(approvals: ApprovalMode) -> set[str]:

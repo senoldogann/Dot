@@ -435,6 +435,8 @@ async def close_runtime(runtime: Runtime) -> None:
         # Callbacks run last pushed first.
         closing.push_async_callback(runtime.store.close)
         closing.push_async_callback(close_memory_index, runtime.memory)
+        if runtime.help_vectors is not None:
+            closing.push_async_callback(runtime.help_vectors.aclose)
         if runtime.typesafe is not None:
             closing.push_async_callback(runtime.typesafe.aclose)
         closing.push_async_callback(runtime.judge.aclose)
