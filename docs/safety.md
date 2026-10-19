@@ -61,8 +61,9 @@ the Mac: the aggressive preset allows it, balanced and cautious ask, a research 
 into the field is still what the approval mode allows (only `yolo` types one-time codes).
 
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
-per_day = 50 }`. Dot reads the amount of a payment step from the control's label ("Pay €19.90") or from the total on the
-page, the largest where several stand, so that a misread errs towards the hand-off; under both caps the step is a
+per_day = 50 }`. Dot reads the amount of a payment step from the labels of its controls ("Pay €19.90") and from the
+total on the page, and takes the largest (item 385: a coupon or a basket line in the same step cannot stand for the
+payment), so that a misread errs towards the hand-off; under both caps the step is a
 question instead of a hand-off (a `yolo` run goes on, `auto` lets the review model answer, `ask` asks you once), it
 is recorded with its amount, shown in the timeline, and counts against the site's day.
 The payments of a site are decided one at a time, each from what the ones before it spent, so two runs paying at once
@@ -78,7 +79,8 @@ currency, so list sites that bill in one currency. Empty by default.
 3. *Dot's own files*: a change of them (`self_change`, below) is a question to you in every approval mode but `yolo`,
    which no rule of yours and no review model answers in your place (item 398). Allowed, the run makes the change.
 4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
-   yourself. A payment under the pre-approved caps of its site (below) is a question instead of a hand-off.
+   yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
+   one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
 5. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
@@ -109,13 +111,16 @@ currency, so list sites that bill in one currency. Empty by default.
 | `balanced`             | all of that, plus anything destructive or installing, anything of high risk, and writing or shell commands outside the workspace |
 | `cautious`             | everything that is not read-only                                                                                            |
 
-A shell line is destructive outside the workspace when it removes or cuts a file there, and when it replaces one that is
-there: a redirect that empties it (`>`, `>|`, `&>`), a copy or a move onto it or into a folder that holds a file of its
-name (not `cp -n`), `ln -f`, `tee` without `-a`, `dd` without `conv=notrunc`. The shell keeps no copy of what it
-replaces, unlike the file tools, whose changes `dotx undo` writes back.
+A shell line is destructive outside the workspace when it removes, cuts or moves away a file there (item 385: `mv` takes
+its sources from where they were), and when it replaces one that is there: a redirect that empties it (`>`, `>|`, `&>`),
+a copy or a move onto it or into a folder that holds a file of its name (not `cp -n`), `ln -f`, `tee` without `-a`, `dd`
+without `conv=notrunc`. The shell keeps no copy of what it replaces, unlike the file tools, whose changes `dotx undo`
+writes back.
 
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The first four steps above hold in every mode.
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The second step and your hand-off rules
+hold in every mode; the refusals of the first step, the questions of the third and the hand-offs of the fourth are
+what a `yolo` run waives, and it records each.
 
 **Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
 with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,
@@ -309,8 +314,12 @@ or your own words. The run reads which option you chose, and whether it was the 
 > such as `bash -c`, `env`, `xargs`, `xcrun` or `uv run`, a `trap`, the settings and variables that make git or another
 > program run a command line), compares paths without case, and treats what it cannot read (a command named by a
 > substitution or a pattern, `eval` of one, a setting of git it does not know, a line it cannot parse) as a destructive
-> step outside the workspace, which every preset asks about. It does not follow what a recursive command does inside the
-> folders it walks, nor the code of a script it runs; the sandbox keeps those out of Dot's own files, not out of yours,
-> and a shell can do more than any analysis can foresee. Treat Dot as a user of your account with the rights of your
-> account: keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a machine where a
-> mistake would be expensive.
+> step outside the workspace, which every preset asks about. A script the line downloads and then runs (`curl -o`, `wget
+> -O` or `git clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp`, an `mv`
+> or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged as piping the download into a shell; a
+> file named after an at sign (`curl --data-binary @file`) as that file; a script handed to a terminal app (`open -a
+> Terminal`, a `.command` file) as a step outside Dot's sandbox, which every preset asks about (item 385). It does not
+> follow what a recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps
+> those out of Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a
+> user of your account with the rights of your account: keep backups, keep the workspace for scratch work, and use
+> `balanced` or `cautious` on a machine where a mistake would be expensive.

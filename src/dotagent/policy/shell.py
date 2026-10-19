@@ -536,6 +536,21 @@ _OPEN_RUNS: tuple[str, ...] = (
     ".jar",
 )
 _OPEN_INSTALLS: tuple[str, ...] = (".pkg", ".mpkg")
+# The terminal apps ``open -a`` or ``open -b`` can hand a file to, which run it as a script (item 385); a name is
+# matched inside the app's name or bundle id (``com.apple.Terminal``).
+_TERMINAL_APPS: tuple[str, ...] = (
+    "terminal",
+    "iterm",
+    "warp",
+    "alacritty",
+    "kitty",
+    "wezterm",
+    "ghostty",
+    "hyper",
+    "xterm",
+    "tabby",
+    "termius",
+)
 
 _PIPE_TO_SHELL: re.Pattern[str] = re.compile(
     r"(curl|wget)\b[^|;&]*\|\s*(sudo\s+)?(bash|sh|zsh|python3?|ruby|perl|node)\b|"
@@ -614,7 +629,8 @@ class ShellScope:
     ``cwds`` are the directories the line may be in: the one it starts in and each one a ``cd`` may have moved it to (a
     ``cd`` can fail or run in a subshell, so the earlier ones stay). ``links`` are the symbolic links the line made,
     ``(link, target)``, so that a path through one is judged where it lands; ``variables`` hold every value the line
-    gave each variable; ``depth`` counts the command strings the command is nested in (``bash -c``, ``$(...)``)."""
+    gave each variable; ``depth`` counts the command strings the command is nested in (``bash -c``, ``$(...)``);
+    ``downloaded`` are the files a fetcher saved and the folders ``git clone`` made earlier in the line (item 385)."""
 
     cwds: tuple[Path, ...]
     workspace: Path
@@ -623,6 +639,7 @@ class ShellScope:
     links: tuple[tuple[Path, Path], ...]
     variables: Mapping[str, tuple[str, ...]]
     depth: int
+    downloaded: tuple[Path, ...]
 
 
 @dataclass(frozen=True)
@@ -1433,6 +1450,35 @@ def _line_scope(line: str, scope: ShellScope) -> ShellScope:
     return state
 
 
+def _run_by_wrappers(words: list[str], scope: ShellScope) -> tuple[list[str], ShellScope]:
+    """The command one simple command's ``words`` come to through the assignments, precommand modifiers and wrappers
+    in front of it (``X=1 timeout 5 curl -o y.sh U``, ``env -C /tmp nice sh``), with its arguments, and the scope it
+    runs in (``env -C`` moves it); a wrapper given a whole line (``watch``, ``env -S``) stands as the command, as only
+    the line's own reading judges it. What a line fetches and what it feeds a shell are read through them (item 385)."""
+    rest: list[str] = words
+    here: ShellScope = scope
+    while rest:
+        while rest and _ENV_ASSIGNMENT.fullmatch(rest[0]):
+            rest = rest[1:]
+        rest = _past_modifiers(rest)
+        if not rest:
+            break
+        command: str = Path(rest[0]).name
+        if command not in _WRAPPERS:
+            break
+        options, after = _options(rest[1:], _WRAPPER_VALUES.get(command, frozenset()))
+        if command == "watch" or (command == "env" and any(name in ("-S", "--split-string") for name, _ in options)):
+            break
+        if command == "env":
+            places: list[str] = [value for name, value in options if name in ("-C", "--chdir")]
+            if places:
+                here = _with_places(here, _places(places[-1], here))
+            if after[:1] == ["-"]:
+                after = after[1:]
+        rest = after[_WRAPPER_SKIPS.get(command, 0) :]
+    return rest, here
+
+
 def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     """The scope after one simple command: the directories a ``cd`` or ``pushd`` may have moved the line to, the
     values an assignment, ``export`` or ``for`` gave a variable, the links an ``ln -s`` made."""
@@ -1459,6 +1505,13 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
         return _with_places(assigned, [*assigned.cwds, *(_places(operands[0], assigned) if wanted else [Path.home()])])
     if command == "ln":
         return _linked(assigned, rest[1:])
+    run, where = _run_by_wrappers(rest, assigned)
+    ran: str = Path(run[0]).name if run else ""
+    places: list[Path] = _fetched_places(ran, run[1:], where) or _located_all(
+        _carried_download(ran, run[1:], where), where
+    )
+    if places:
+        return replace(assigned, downloaded=(*assigned.downloaded, *places))
     return assigned
 
 
@@ -1547,6 +1600,12 @@ def _assess_writes(command: str, args: list[str], scope: ShellScope) -> Finding:
     if worst == "dot":
         return _finding("high", ("secret_access",), f"{command} {CHANGES_DOT}")
     settings: tuple[Flag, ...] = ("system_settings",) if worst == "system" else ()
+    if command == "mv" and len(classes) > 1 and _worst_class(classes[:-1]) in ("home", "system"):
+        # A move takes its sources away from where they were, as a removal does (item 385); the folder it moves into
+        # comes last, whether an option or the last operand names it.
+        return _finding(
+            "high", ("destructive", *settings, "outside_workspace"), "mv takes files from outside the workspace"
+        )
     if command == "truncate":
         return _finding(
             "high", ("destructive", *settings, "outside_workspace"), "truncate cuts files outside the workspace"
@@ -1627,8 +1686,10 @@ def _assess_redirects(targets: list[str], scope: ShellScope) -> list[Finding]:
 def _protected_words(words: list[str], scope: ShellScope) -> list[Finding]:
     """A finding when a word names a protected location: as a path (a glob that can reach one, a path through a link
     the line made or a variable it set), or as the value of an assignment or an option (``K=~/.ssh``,
-    ``--key=~/.ssh/id``)."""
-    candidates: list[str] = [part for word in words for part in (word, word.partition("=")[2]) if part]
+    ``--key=~/.ssh/id``), or as the file a command reads after an at sign (curl's ``--data-binary @~/.ssh/id``, item
+    385; ``@-`` is the standard input)."""
+    parts: list[str] = [part for word in words for part in (word, word.partition("=")[2]) if part]
+    candidates: list[str] = [*parts, *(part[1:] for part in parts if part.startswith("@") and part != "@-")]
     if any(_reaches_protected(candidate, scope) for candidate in candidates):
         return [_finding("high", ("secret_access",), "names a protected location")]
     return []
@@ -1798,11 +1859,8 @@ def _assess_git(args: list[str], scope: ShellScope) -> Finding:
     return _finding("low", (), f"git {sub or 'command'}")
 
 
-def _cloned_into(args: list[str], scope: ShellScope) -> list[Finding]:
-    """What ``git clone`` writes: the folder it is given, else a folder in the directory the line is in."""
-    sub, rest = _git_subcommand(args)
-    if sub != "clone":
-        return []
+def _clone_operands(rest: list[str]) -> list[str]:
+    """The operands of ``git clone`` (its address, then the folder it may be given), its options left out."""
     operands: list[str] = []
     index: int = 0
     while index < len(rest):
@@ -1812,7 +1870,82 @@ def _cloned_into(args: list[str], scope: ShellScope) -> list[Finding]:
         if not rest[index].startswith("-"):
             operands.append(rest[index])
         index += 1
+    return operands
+
+
+def _cloned_into(args: list[str], scope: ShellScope) -> list[Finding]:
+    """What ``git clone`` writes: the folder it is given, else a folder in the directory the line is in."""
+    sub, rest = _git_subcommand(args)
+    if sub != "clone":
+        return []
+    operands: list[str] = _clone_operands(rest)
     return _writes_to("git clone", operands[1:2] or ["."], _git_scope(args, rest, scope))
+
+
+def _fetched_places(command: str, args: list[str], scope: ShellScope) -> list[Path]:
+    """Where a command puts what it brings from the network (item 385): the files of a fetcher
+    (:func:`_fetched_files`), and the folder ``git clone`` makes (the one it is given, else the one its address
+    names), from the directories git's ``-C`` moves it to."""
+    if command in _NETWORK_FETCHERS:
+        return _located_all(_fetched_files(command, args), scope)
+    if command != "git":
+        return []
+    sub, rest = _git_subcommand(args)
+    operands: list[str] = _clone_operands(rest) if sub == "clone" else []
+    if not operands:
+        return []
+    folder: list[str] = operands[1:2] or [Path(operands[0].rstrip("/")).name.removesuffix(".git")]
+    return _located_all(folder, _git_scope(args, rest, scope))
+
+
+def _located_all(raws: list[str], scope: ShellScope) -> list[Path]:
+    """Where each of ``raws`` lands from each directory the line may be in; a word only the running line knows is
+    taken as written."""
+    return [
+        _located(value, cwd, scope) for raw in raws for value in _expansions(raw, scope) or [raw] for cwd in scope.cwds
+    ]
+
+
+def _carried_download(command: str, args: list[str], scope: ShellScope) -> list[str]:
+    """Where a copy or a move (``cp``, ``mv``, ``ditto``, ``install``, ``rsync``) puts a file the line downloaded, which
+    then still counts as downloaded (item 385)."""
+    if command not in ("cp", "mv", "ditto", "install", "rsync") or not scope.downloaded:
+        return []
+    # ``-t dir`` names the folder for GNU cp, mv and install alone; rsync's ``-t`` keeps times, ditto has none.
+    words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
+    operands: list[str] = _positional(words)
+    sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
+    if any(_runs_download(source, scope) for source in sources):
+        return destinations
+    return []
+
+
+def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]:
+    """A finding when the last of ``stages`` (one pipeline's commands so far) is a shell or an interpreter and a file
+    the line downloaded reaches its standard input: by ``<`` (``sh < y.sh``) or as an operand of a command before it in
+    the pipe (``cat y.sh | bash``). That runs the download as naming it does (item 385)."""
+    words, _, _, _ = _split_redirects(stages[-1], ())
+    run, _ = _run_by_wrappers(_plain(words), scope)
+    if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):
+        return []
+    redirected: list[str] = [stages[-1][index + 1] for index, token in enumerate(stages[-1][:-1]) if token == "<"]
+    piped: list[str] = [word for stage in stages[:-1] for word in _positional(_plain(stage)[1:])]
+    if any(_runs_download(word, scope) for word in (*redirected, *piped)):
+        return [_fetching("high", ("install",), "runs a script the line downloaded, from its standard input")]
+    return []
+
+
+def _runs_download(raw: str, scope: ShellScope) -> list[Finding]:
+    """A finding when ``raw``, a script the line runs, is a file the line fetched or lies in a folder it cloned:
+    downloading a script and running it is piping it into a shell in two steps (item 385)."""
+    if not scope.downloaded:
+        return []
+    paths: list[Path] = [
+        _located(value, cwd, scope) for value in _expansions(raw, scope) or [raw] for cwd in scope.cwds
+    ]
+    if any(path == place or place in path.parents for path in paths for place in scope.downloaded):
+        return [_fetching("high", ("install",), "runs a script the line downloaded")]
+    return []
 
 
 def _assess_network_fetcher(command: str, args: list[str]) -> Finding:
@@ -1878,8 +2011,21 @@ def _httpie_sends(args: list[str]) -> bool:
 def _fetched_files(command: str, args: list[str]) -> list[str]:
     """Where a fetcher saves what it fetched: the ``-o`` files of curl and the others, the folder of curl's ``-O`` (its
     ``--output-dir``, else the directory the line is in), and wget's ``-O`` file or else its ``-P`` folder or the
-    directory the line is in (wget's ``-o`` is its log); ``-`` is the standard output."""
-    files: list[str] = _option_values(args, "-o", "--output")
+    directory the line is in (wget's ``-o`` is its log); ``-`` is the standard output. A ``-o`` file of curl lies in its
+    ``--output-dir``, and one of aria2c in its ``-d`` folder."""
+    named: list[str] = _option_values(args, "-o", "--output")
+    # curl's --output-dir and aria2c's -d hold the -o files too, when these do not name a folder of their own.
+    folder: list[str] = (
+        _option_values(args, "", "--output-dir")
+        if command == "curl"
+        else _option_values(args, "-d", "--dir")
+        if command == "aria2c"
+        else []
+    )
+    files: list[str] = [
+        str(Path(folder[-1]) / name) if folder and name != "-" and not name.startswith(("/", "~", "$")) else name
+        for name in named
+    ]
     if command == "curl" and any(
         arg in ("--remote-name", "--remote-name-all") or re.fullmatch(r"-[A-Za-z#]*O[A-Za-z#]*", arg) for arg in args
     ):
@@ -2000,7 +2146,8 @@ def _assess_interpreter(command: str, args: list[str], scope: ShellScope, given:
         inline.append(given.text)
     code: str = "\n".join(inline)
     findings: list[Finding] = [
-        _finding("medium" if inline else "low", (), f"{command} runs {'inline code' if inline else 'a script'}")
+        _finding("medium" if inline else "low", (), f"{command} runs {'inline code' if inline else 'a script'}"),
+        *(_runs_download(line.operands[0], scope) if not inline and line.operands else []),
     ]
     if _NETWORK_CODE.search(code) or _NETWORK_COMMAND_CODE.search(code):
         findings.append(_fetching("medium", ("upload",), f"{command} runs code that reaches the network"))
@@ -2067,7 +2214,7 @@ def _assess_shell_call(command: str, args: list[str], scope: ShellScope, given: 
         return _assess_all(operands[0], scope) if operands else []
     if (reads_input or not operands or operands[0] in _STDIN_FILES) and given.text is not None:
         return _assess_all(given.text, scope)
-    return [_finding("low", (), f"runs {command}")]
+    return [_finding("low", (), f"runs {command}"), *(_runs_download(operands[0], scope) if operands else [])]
 
 
 def _assess_source(args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
@@ -2085,7 +2232,7 @@ def _assess_source(args: list[str], scope: ShellScope, given: _Input) -> list[Fi
         return _assess_all(given.text, scope)
     if _SUBSTITUTED in files:
         return [_unknown("sources the output of a command, which only the running line knows")]
-    return [_finding("low", (), "source runs a script file")]
+    return [_finding("low", (), "source runs a script file"), *_runs_download(operands[0], scope)]
 
 
 def _assess_xargs(args: list[str], scope: ShellScope, given: _Input) -> list[Finding]:
@@ -2288,10 +2435,38 @@ def _assess_reader(command: str, args: list[str], scope: ShellScope) -> list[Fin
             return [_finding("medium", ("install",), "opens an installer package")]
         if any(target.endswith(".mobileconfig") for target in opened):
             return [_finding("high", ("system_settings",), "opens a configuration profile to install")]
-        if any(target.endswith(_OPEN_RUNS) for target in opened):
-            return [_finding("medium", (), "opens a script that runs as it opens")]
+        apps, files = _open_operands(args)
+        # An app named only when the line runs may be a terminal; ``-f`` hands it what the standard input brings.
+        terminal: bool = any(name in app or "$" in app for app in apps for name in _TERMINAL_APPS)
+        in_terminal: bool = terminal and (bool(files) or _has_switch(args, "f", "--stdin"))
+        if in_terminal or any(target.endswith(_OPEN_RUNS) for target in files):
+            # The program that runs it is not the line's own process, so Dot's sandbox does not hold it (item 385).
+            return [_finding("medium", ("privilege",), "opens a script that runs as it opens, outside Dot's sandbox")]
         return [_finding("safe", (), "open")]
     return None
+
+
+def _open_operands(args: list[str]) -> tuple[list[str], list[str]]:
+    """The apps ``open`` is told to use (``-a`` and ``-b``, apart or glued, as many as given) and the files it opens,
+    each told apart by where it stands (item 385: a file named as an app is still a file), all without letter case."""
+    apps: list[str] = []
+    files: list[str] = []
+    index: int = 0
+    while index < len(args):
+        word: str = args[index]
+        index += 1
+        if re.fullmatch(r"-[A-Za-z]*[ab]", word) and index < len(args):
+            # ``-a`` or ``-b`` alone, or last in a word of switches (``-na``), takes the next word as the app.
+            apps.append(args[index].casefold())
+            index += 1
+        elif re.fullmatch(r"-[A-Za-z]*[ab].+", word) and not word.startswith("--"):
+            letter: int = min(at for at in (word.find("a", 1), word.find("b", 1)) if at > 0)
+            apps.append(word[letter + 1 :].casefold())
+        elif word == "--args":
+            break
+        elif not word.startswith("-"):
+            files.append(word.casefold().rstrip("/"))
+    return apps, files
 
 
 def _shell_statements(script: str) -> list[str]:
@@ -2589,6 +2764,11 @@ def _assess_simple(words: list[str], scope: ShellScope, given: _Input) -> list[F
     if head not in _TEST_COMMANDS and any(char in head for char in _GLOB_CHARS):
         return [_unknown("runs a command whose name is a pattern the shell matches against file names")]
     command: str = head if head == "." else Path(head).name
+    if "/" in head and head != command:
+        # A program named by its path runs as itself: one the line downloaded counts as that download run (item 385).
+        ran: list[Finding] = _runs_download(head, scope)
+        if ran:
+            return [*ran, *_assess_command(command, plain[1:], scope, given)]
     if command in _DECLARERS:
         declared: list[Finding] = [found for word in plain[1:] for found in _assignment_findings(word, scope)]
         return [*declared, *_assess_command(command, plain[1:], scope, given)]
@@ -2651,6 +2831,7 @@ def _assess_all(command: str, scope: ShellScope) -> list[Finding]:
         stages = [*stages, segment] if operator in ("|", "|&") else [segment]
         found, state = _assess_segment(segment, state, _piped(stages[:-1], reading.documents), reading.documents)
         findings.extend(found)
+        findings.extend(_fed_a_download(stages, state))
     for inner in reading.substituted:
         findings.extend(_assess_all(inner, state))
     return findings
@@ -2677,7 +2858,14 @@ def _merge(findings: list[Finding]) -> ShellAssessment:
 
 def _scope(cwd: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> ShellScope:
     return ShellScope(
-        cwds=(cwd,), workspace=workspace, protected=protected, dot_paths=dot_paths, links=(), variables={}, depth=0
+        cwds=(cwd,),
+        workspace=workspace,
+        protected=protected,
+        dot_paths=dot_paths,
+        links=(),
+        variables={},
+        depth=0,
+        downloaded=(),
     )
 
 
