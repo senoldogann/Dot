@@ -31,12 +31,24 @@ can be resumed too.
 - `--mode research` makes the run read-only
 - `--model provider:model` picks the model for this run, for example `ollama:gpt-oss:20b-cloud`
 - `--effort LEVEL` picks the reasoning level for this run (see [Models and providers](models.md#models-and-providers))
-- `--approvals ask|auto|yolo` picks who answers the questions of the policy in this run: you (`ask`, the default), a
-  review model (`auto`) or nobody (`yolo`); `--auto-approve` and `--yolo` are short for the last two. `chat` takes the
-  same flags (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run))
+- `--approvals supervised|ask|auto|yolo` picks who answers the questions of the policy in this run: you, and before
+  every change too (`supervised`), you (`ask`, the default), a review model (`auto`) or nobody (`yolo`);
+  `--auto-approve` and `--yolo` are short for the last two. `chat` takes the same flags (see
+  [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run))
 - `--goal-mode` / `--no-goal-mode` turns the check of the answer against the goal on or off for this run (`run` only)
 - `--thread ID` continues an earlier conversation; the line printed at the end of a run names its thread
 - `--no-input` never prompts: every approval that would wait for you is denied and questions go unanswered. The same
   holds when standard input is not a terminal
 - `--thinking` shows the model's reasoning stream, `--verbose` the tool output and the token use
 - a goal of `-` is read from standard input
+
+`dotx harness` manages the versions of what a run's prompt takes from the harness, which [The harness](harness.md)
+describes: `list`, `show [ID]`, `diff ID [--against ID]`, `set --summary TEXT [--habits FILE] [--tool-guidance FILE]
+[--adopt]` (a component from a file, `-` for standard input, the other kept from the adopted version), `adopt ID` and
+`retire ID`. The daemon reads the adopted version as each run starts, so none of them needs a restart. `propose RUN_ID
+[--scope invariant|domain]` asks the proposer for a candidate from one run; `step [--run ID] [--scripted]` runs one step
+of the improvement loop now, its probes in processes of their own (`probe --ask FILE`, which the step starts), and
+`final [ID]` plays the final set once under the adopted version; `--scripted` plays the references through the scripted
+model and has the roles answer from a script, a check of the loop at no model's cost. `graph [--steps N]` draws the
+provenance (the newest N steps, 50 by default, and four experiences a step) as a Mermaid flowchart, `steps` and
+`experiences` list the newest of each, and `show ID` ends with the version's lineage.

@@ -55,7 +55,7 @@ export function lookOf(id, look) {
 }
 
 /** Whether the actor wears a look of its own rather than the fallback. */
-export function hasLook(id, look) {
+function hasLook(id, look) {
   return look !== null || looks.has(id);
 }
 

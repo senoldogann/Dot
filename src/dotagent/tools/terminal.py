@@ -9,7 +9,7 @@ read, and once a line has run the program may be in another directory, so later 
 as a line typed into a terminal application is. What the program prints is untrusted: an installer, a remote shell
 or a REPL prints what other people wrote. Text typed while
 the program's last line asks for a password is a ``credential``: a ``yolo`` run types it, alone so that no command goes
-with it unjudged, and the policy records it; in ``ask`` and ``auto`` the tool refuses, as the browser refuses a password
+with it unjudged, and the policy records it; in every other mode the tool refuses, as the browser refuses a password
 field, since nobody else can type into the session.
 
 A command opened with ``background`` (item 229) runs on its own, past the shell's time limit and unread, and its end is

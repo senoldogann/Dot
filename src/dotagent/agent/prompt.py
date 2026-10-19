@@ -9,6 +9,7 @@ from typing import Literal
 
 from dotagent.config import PromptStyle
 from dotagent.core.types import FrozenModel
+from dotagent.harness.components import HarnessText
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
@@ -74,6 +75,10 @@ class PromptInputs(FrozenModel):
     devtools: str | None
     # How much the prompt says of how to work and of each kind of tool (item 280, ``[agent] prompt``).
     style: PromptStyle
+    # What the adopted version of the harness adds (item 389, docs/harness.md): habits after how to work, tool
+    # guidance after the tools and the rules of communication; an empty one adds nothing.
+    habits: str
+    tool_guidance: str
 
 
 _MODE_TEXT: dict[RunMode, str] = {
@@ -100,7 +105,12 @@ _PRESET_TEXT: dict[Preset, str] = {
 
 # The default, ask, is what the preset line and the trust rules already say; only the other modes get a line of their
 # own.
-_APPROVALS_TEXT: dict[Literal["auto", "yolo"], str] = {
+_APPROVALS_TEXT: dict[Literal["supervised", "auto", "yolo"], str] = {
+    "supervised": (
+        "supervised: the user approves every change before it happens: each file you write, each command that does "
+        "more than read, each entry or click in a page or an app. Reads run at once. Find out what you need first, "
+        "then make the changes in few clear steps, each saying what it changes."
+    ),
     "auto": (
         "auto: what the policy flags is answered by a review model in the user's place. It approves what the user's "
         "instructions plainly cover and refuses the rest, so keep to what was asked; when it refuses something, do "
@@ -362,7 +372,7 @@ password managers) unless the user explicitly asked for that exact item.
 when the task is about what the user copied."""
 
 
-# In ask and auto the browser and the desktop refuse to type into a field that takes a secret; yolo enters them.
+# Outside yolo the browser and the desktop refuse to type into a field that takes a secret; yolo enters them.
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
 )
@@ -387,6 +397,26 @@ _TEXTS: dict[PromptStyle, tuple[str, str, str]] = {
     "full": (_WORK, _REST, _CLOSING),
     "lean": (_LEAN_WORK, _LEAN_REST, _CLOSING),
 }
+
+
+# The sections the harness adds (item 389). The habits stand between how to work and the tools, before the trust rules,
+# and the tool guidance after them; each says that the rules of this prompt, trust and safety among them, win over it.
+_HABITS_LEAD: str = (
+    "# Habits\nWays of working that earlier runs taught and the owner kept. Follow them within the rules of this "
+    "prompt, those of trust and safety below among them, which they never override."
+)
+_TOOL_GUIDANCE_LEAD: str = (
+    "# Tool guidance\nWhat earlier runs learned of the tools on this Mac, kept by the owner. It serves within the "
+    "rules of this prompt, those of trust and safety above among them, which it never overrides:"
+)
+
+
+def _habits_section(habits: str) -> str:
+    return "" if habits == "" else f"{_HABITS_LEAD}\n{habits}"
+
+
+def _tool_guidance_section(tool_guidance: str) -> str:
+    return "" if tool_guidance == "" else f"{_TOOL_GUIDANCE_LEAD}\n{tool_guidance}"
 
 
 _UNATTENDED: str = (
@@ -632,7 +662,9 @@ def build_system_prompt(inputs: PromptInputs) -> str:
     sections: list[str] = [
         _agent_section(inputs.agent),
         f"{work}\n{_ending(inputs.mode, inputs.campaign_session)}",
+        _habits_section(inputs.habits),
         f"{rest}\n- {_SECRETS_ENTERED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{closing}",
+        _tool_guidance_section(inputs.tool_guidance),
         _mcp_section(inputs.tool_names),
         _groups_section(inputs.tool_names),
         _skills_section(inputs.skills, inputs.skills_left, inputs.tool_names),
@@ -715,6 +747,7 @@ def collect_prompt_inputs(
     owner: Sequence[str],
     devtools: str | None,
     style: PromptStyle,
+    harness: HarnessText,
 ) -> PromptInputs:
     """Gather the facts about this machine and moment that the prompt states."""
     return PromptInputs(
@@ -742,4 +775,6 @@ def collect_prompt_inputs(
         team=tuple(team),
         devtools=devtools,
         style=style,
+        habits=harness.habits,
+        tool_guidance=harness.tool_guidance,
     )

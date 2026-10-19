@@ -25,6 +25,7 @@ from dotagent.policy.paths import (
     classify_path,
     expand_path,
     glob_reaches_protected,
+    kernel_path,
     mentions_protected,
     within,
 )
@@ -1257,7 +1258,7 @@ def _through_links(path: Path, links: tuple[tuple[Path, Path], ...]) -> Path:
         if found is None:
             return current
         link, target = found
-        current = Path(os.path.realpath(f"{target}{str(current)[len(str(link)) :]}"))
+        current = kernel_path(Path(os.path.realpath(f"{target}{str(current)[len(str(link)) :]}")))
     return current
 
 

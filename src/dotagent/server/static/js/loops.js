@@ -12,6 +12,19 @@ import { attempt, confirmDialog } from "./ui.js";
 const NAME_CHARS = 80;
 const RUN_MOMENTS = new Set(["run_queued", "run_finished"]);
 const READ_AGAIN_MS = 400;
+// "/loop", a rhythm (30m, 2h) and the message that the chat asks again on it (item 281); "/loop" alone or with a word
+// that is not a rhythm is said how to write it (LOOP_HOW).
+const LOOP_PATTERN = /^\/loop\s+(\d+\s*[mh])\s+([\s\S]+)$/i;
+export const LOOP_WORD = /^\/loop(?:\s|$)/i;
+export const LOOP_HOW = "Write /loop, how often and the message: /loop 30m check the build";
+/** "/loop" in the slash menu (composer.js `commands`) of the box of a run, and of a new chat's (item 400). */
+export const LOOP_COMMAND = { label: "/loop", hint: "Ask again on a rhythm until it is done: /loop 30m <message>", insert: "/loop " };
+
+/** The rhythm (`every`, as the daemon reads it) and the message of `text` written as "/loop 30m <message>", or null. */
+export function loopOf(text) {
+  const found = LOOP_PATTERN.exec(text);
+  return found === null ? null : { every: found[1].replace(/\s+/g, ""), message: found[2].trim() };
+}
 
 /** How often a loop asks again, in words, for the rhythms "/loop" makes (scheduler/loops.py); another schedule of the
  * chat (one a run made) is said as the daemon says it. */

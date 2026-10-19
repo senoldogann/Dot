@@ -198,6 +198,10 @@ class StoreError(DotError):
     """The persistent store rejected an operation."""
 
 
+class HarnessError(DotError):
+    """A step or a probe of the harness (docs/harness.md) could not be carried out."""
+
+
 class NotFoundError(StoreError):
     """The thread, run, approval, note, schedule or terminal session asked for does not exist."""
 

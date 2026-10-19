@@ -34,6 +34,7 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     ChatChoices,
+    HarnessVersion,
     MemoryRecord,
     MemoryScore,
     QueuedMessage,
@@ -183,7 +184,8 @@ class StartRunRequest(FrozenModel):
     its independent parts across delegated runs, while the chat keeps ``effort``. ``plugins``, ``skills`` and
     ``plan_first`` are what the owner picked in the composer for this message (item 318, :func:`picks_of`).
     ``standing`` ("Keep going until done") starts a campaign on the goal instead, with this run as its opening session:
-    a task, without goal mode and without picks (see ``RunManager.start_campaign``)."""
+    a task, without goal mode and without picks (see ``RunManager.start_campaign``). ``loop``, a rhythm (``30m``,
+    ``2h``), makes the goal a loop of the run's chat too, as ``/loop`` in a new chat's box does (item 400)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: RunMode = "task"
@@ -203,6 +205,8 @@ class StartRunRequest(FrozenModel):
     plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
     skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
     plan_first: bool = False
+    # How often the goal is asked again in the run's chat (LoopRequest.every); None for no loop. Not with standing.
+    loop: str | None = Field(default=None, min_length=2, max_length=8)
     key: MessageKey | None = None
 
     @model_validator(mode="after")
@@ -211,6 +215,8 @@ class StartRunRequest(FrozenModel):
             raise ValueError("a campaign (standing) is Dot's own: it cannot be started for an agent")
         if self.standing and (self.plugins or self.skills or self.plan_first):
             raise ValueError("plugins, skills and Plan first go with a message, not with a campaign (standing)")
+        if self.standing and self.loop is not None:
+            raise ValueError("a loop asks again in a chat; a campaign (standing) goes on by itself")
         if self.browser is not None and not self.standing:
             raise ValueError("browser chooses the Chrome of a campaign: it goes with standing only")
         return self
@@ -569,10 +575,41 @@ class LearnedSkillView(FrozenModel):
 
 class LearningHealthView(FrozenModel):
     """``GET /api/memories/learning``: how Dot's learning fares (:mod:`dotagent.agent.learning_health`, review O25):
-    the record, ``None`` before the first outcome, and why learning has stopped (``None`` while it works)."""
+    the record, ``None`` before the first outcome, why learning has stopped (``None`` while it works), and whether the
+    harness's nightly step is set to run (``[harness] step_time``, item 391), so that a step that never ran reads as
+    off, not as failing."""
 
     health: LearningHealth | None
     stalled: str | None
+    harness_on: bool
+
+
+class HarnessView(FrozenModel):
+    """``GET /api/harness`` (item 389, docs/harness.md): the adopted version, ``None`` while a run's prompt is Dot's
+    own text alone, every version the newest first, the bounds a component keeps to, and how the nightly step is set
+    (item 393): when it runs ("off" never), the scoring and final sets, the repeats, and who adopts a version the probe
+    showed better."""
+
+    adopted: HarnessVersion | None
+    versions: tuple[HarnessVersion, ...]
+    habits_chars: int
+    tool_guidance_chars: int
+    component_lines: int
+    step_time: str
+    scoring_tasks: tuple[str, ...]
+    final_tasks: tuple[str, ...]
+    step_repeats: int
+    adopt: Literal["owner", "auto"]
+
+
+class HarnessRequest(FrozenModel):
+    """``POST /api/harness``: a version of the owner's. A component given replaces the adopted version's text, one left
+    out (``None``) keeps it; ``summary`` says in a line what the version is; ``adopt`` adopts it at once."""
+
+    habits: str | None
+    tool_guidance: str | None
+    summary: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=200)]
+    adopt: bool
 
 
 class LearnedSkillsView(FrozenModel):
@@ -808,17 +845,18 @@ class ScheduleView(FrozenModel):
 
 class ContextChoice(FrozenModel):
     """The context size of a model's runs as Settings › Models shows and chooses it (item 250). ``tokens`` is the budget
-    of its next run; ``chosen`` the size chosen for it, ``None`` when its runs have ``[agent] context_tokens``
-    (``configured``); ``default`` the budget it has without a choice, ``configured`` cut to three quarters of its window
-    when that is less; ``floor`` and ``ceiling`` the least and the most it may be given (``ceiling`` is three quarters
-    of its window, ``None`` when its provider does not say); ``sizes`` the sizes besides the default that it may be
-    given, smallest first, none when its window allows none; ``summarise_at`` the estimated prompt past which its next
-    run summarises its older part."""
+    of its next run; ``chosen`` the size chosen for it, ``None`` when its runs have the default; ``default`` the budget
+    it has without a choice: three quarters of its window while ``[agent] context_tokens`` is ``"most"`` (item 396),
+    96,000 when its provider does not say its window, else ``configured``, cut to three quarters of its window when that
+    is less; ``configured`` the number ``[agent] context_tokens`` sets, ``None`` while it is ``"most"``; ``floor`` and
+    ``ceiling`` the least and the most it may be given (``ceiling`` is three quarters of its window, ``None`` when its
+    provider does not say); ``sizes`` the sizes besides the default that it may be given, smallest first, none when its
+    window allows none; ``summarise_at`` the estimated prompt past which its next run summarises its older part."""
 
     tokens: int
     chosen: int | None
     default: int
-    configured: int
+    configured: int | None
     floor: int
     ceiling: int | None
     sizes: list[int]
@@ -826,7 +864,7 @@ class ContextChoice(FrozenModel):
 
 
 class ContextSizeRequest(FrozenModel):
-    """The context size to give the runs of ``model`` (item 250); ``None`` gives them ``[agent] context_tokens``."""
+    """The context size to give the runs of ``model`` (item 250); ``None`` gives them the default one."""
 
     model: ModelReference
     tokens: int | None

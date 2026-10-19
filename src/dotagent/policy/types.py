@@ -44,17 +44,23 @@ Flag = Literal[
     "outside_workspace",
     "persistence",
     "upload",
+    # The action changes Dot's own files: what it loads and runs, or its emergency stop (item 398).
+    "self_change",
 ]
 
 Preset = Literal["aggressive", "balanced", "cautious"]
 # What the pace of a site counts an action as (:mod:`dotagent.policy.pace`).
 PaceClass = Literal["public", "social"]
 Verdict = Literal["allow", "ask", "handoff", "deny"]
-DecisionSource = Literal["auto_review", "mode", "hard_stop", "rule", "taint", "preset", "pace", "spend"]
+DecisionSource = Literal[
+    "auto_review", "mode", "own_files", "hard_stop", "rule", "taint", "preset", "supervised", "pace", "spend"
+]
 
-# Who answers a question the policy raised: ``ask`` the user, ``auto`` a reviewer model (which can hand the question on
-# to the user), ``yolo`` nobody (the action is allowed and only recorded).
-ApprovalMode = Literal["ask", "auto", "yolo"]
+# Who answers a question the policy raised, strictest first: ``supervised`` the user, who is also asked before every
+# change the policy lets through (item 398); ``ask`` the user (the web UI calls it Auto-accept edits: edits and routine
+# work run); ``auto`` a reviewer model (which can hand the question on to the user); ``yolo`` nobody (the action is
+# allowed and only recorded). A change of Dot's own files is the user's in every mode but yolo.
+ApprovalMode = Literal["supervised", "ask", "auto", "yolo"]
 # What the agent's own question (``ask_user``) does in a run: ``wait`` for the answer, or ``leave`` it for the user and
 # go on. A run leaves its questions only where nobody can answer them during the run (``agent.progress.can_ask_user``).
 QuestionMode = Literal["leave", "wait"]

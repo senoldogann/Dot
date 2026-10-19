@@ -14,6 +14,7 @@ import pytest
 from dotagent.agent.prompt import build_system_prompt, collect_prompt_inputs
 from dotagent.config import AppConfig, load_config
 from dotagent.core.types import JsonObject
+from dotagent.harness.components import NO_HARNESS
 from dotagent.memory.service import (
     LiveNotes,
     MemoryIndex,
@@ -139,6 +140,7 @@ async def test_a_marked_note_is_left_out_of_the_start_and_the_prompt_says_how_ma
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
     assert "1 note was left out: saved while reading outside content" in prompt

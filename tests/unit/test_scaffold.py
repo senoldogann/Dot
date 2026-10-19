@@ -33,10 +33,11 @@ from dotagent.store.models import RunRecord
 from dotagent.store.stats import ModelProfile, read_model_profile
 from dotagent.tools.desktop import snapshot_budget
 
-# The packaged defaults: context_tokens 96 000, tool_output_chars 12 000, scaffold "fixed", profile_min_calls 50,
+# The packaged defaults: context_tokens "most", tool_output_chars 12 000, scaffold "fixed", profile_min_calls 50,
 # weak_refusal_share 0.1, reminder_every 6.
 DEFAULTS: AgentConfig = load_default_config().agent
 MEASURED: AgentConfig = DEFAULTS.model_copy(update={"scaffold": "measured"})
+NUMBERED: AgentConfig = DEFAULTS.model_copy(update={"context_tokens": 96_000})
 
 
 def _info(window: int | None) -> ModelInfo:
@@ -75,11 +76,17 @@ def test_the_budget_follows_a_small_window_and_the_tool_output_shrinks_with_it()
     # Tool output never shrinks below 2000 characters.
     tiny: Scaffold = scaffold_for(DEFAULTS, _info(8192), quiet, None)
     assert (tiny.context_tokens, tiny.tool_output_chars) == (6144, 2000)
-    # A large window, or none reported, leaves the configured budgets as they are.
-    for window in (128_000, 1_048_576, None):
+    # A large window gives a run three quarters of it (item 396), and none reported 96,000; the tool output keeps its
+    # most, and no window cut the budget.
+    for window, budget in ((128_000, 96_000), (1_048_576, 786_432), (None, 96_000)):
         roomy: Scaffold = scaffold_for(DEFAULTS, _info(window), quiet, None)
-        assert (roomy.context_tokens, roomy.tool_output_chars) == (96000, 12000)
+        assert (roomy.context_tokens, roomy.tool_output_chars) == (budget, 12000)
         assert scaffold_event(roomy, DEFAULTS)["cut_to_window"] is False
+    # A number in [agent] context_tokens is every model's budget, and the small window cuts it as "most" is cut.
+    assert scaffold_for(NUMBERED, _info(1_048_576), quiet, None).context_tokens == 96_000
+    assert scaffold_event(scaffold_for(NUMBERED, _info(32768), quiet, None), NUMBERED) == scaffold_event(
+        small, DEFAULTS
+    )
     assert scaffold_event(small, DEFAULTS) == {
         "model": "ollama:a",
         "window": 32768,

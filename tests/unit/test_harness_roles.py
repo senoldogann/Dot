@@ -1,0 +1,194 @@
+"""The roles of the harness (item 390): which model plays each, and what their checks refuse before an answer counts."""
+
+import pytest
+
+from dotagent.agent.review import (
+    CandidateBrief,
+    CompositionDecision,
+    CompositionRequest,
+    EditEffect,
+    EditOutcome,
+    ExperienceDraft,
+    ExperienceEntry,
+    ExperienceRequest,
+    HarnessBounds,
+    HarnessComposition,
+    HarnessProposal,
+    HarnessSelection,
+    ProposalRequest,
+    SelectionRequest,
+    composition_check,
+    experience_check,
+    proposal_check,
+    selection_check,
+)
+from dotagent.config import load_default_config
+from dotagent.core.errors import ProviderProtocolError
+from dotagent.harness.roles import ROLE_NAMES, role_model
+from dotagent.llm.roles import ModelRoles
+
+BOUNDS: HarnessBounds = HarnessBounds(habits_chars=200, tool_guidance_chars=200, component_lines=4)
+HABIT: str = "- Read a file before you change it."
+
+
+def _proposal_request(habits: str = "") -> ProposalRequest:
+    return ProposalRequest(
+        goal="g",
+        digest="d",
+        signals=(),
+        answer="a",
+        reached_goal=True,
+        habits=habits,
+        tool_guidance="",
+        experience=(),
+        scope="invariant",
+        bounds=BOUNDS,
+    )
+
+
+def _proposal(**fields: object) -> HarnessProposal:
+    given: dict[str, object] = {"keep": False, "habits": None, "tool_guidance": None, "moments": [], "summary": "s"}
+    given.update(fields)
+    return HarnessProposal.model_validate(given)
+
+
+def test_each_role_plays_on_the_review_model_unless_the_configuration_names_one() -> None:
+    config = load_default_config()
+    roles: ModelRoles = ModelRoles(config.models)
+    assert {role: role_model(config.harness, roles, role) for role in ROLE_NAMES} == {
+        role: config.models.review for role in ROLE_NAMES
+    }
+    named = config.harness.model_copy(update={"selector": "openai:gpt-5"})
+    assert role_model(named, roles, "selector") == "openai:gpt-5"
+    assert role_model(named, roles, "proposer") == config.models.review
+
+
+def test_a_proposal_that_keeps_gives_no_text_and_a_change_names_its_moment() -> None:
+    check = proposal_check(_proposal_request(), ())
+    assert check(_proposal(keep=True, summary="keep")).keep is True
+    # A model that keeps often explains why in moments, or gives the text back as it is: that is keep too.
+    kept_with_words = check(_proposal(keep=True, habits="", moments=["the run went as it should"], summary="keep"))
+    assert (kept_with_words.keep, kept_with_words.habits, kept_with_words.moments) == (True, None, [])
+    with pytest.raises(ProviderProtocolError, match="keep is true, yet a text differs"):
+        check(_proposal(keep=True, habits=HABIT))
+    with pytest.raises(ProviderProtocolError, match="keep must be true"):
+        check(_proposal())
+    with pytest.raises(ProviderProtocolError, match="names the moment"):
+        check(_proposal(habits=HABIT))
+    kept: HarnessProposal = check(_proposal(habits=HABIT + "\n\n\n", moments=["step 3 overwrote the file"]))
+    assert (kept.habits, kept.tool_guidance) == (HABIT, None)
+
+
+def test_a_proposal_is_held_to_the_bounds_and_to_what_a_component_may_hold() -> None:
+    check = proposal_check(_proposal_request(), ())
+    with pytest.raises(ProviderProtocolError, match=r"habits cannot be a component.*too long"):
+        check(_proposal(habits="x" * 201, moments=["m"]))
+    with pytest.raises(ProviderProtocolError, match=r"tool guidance cannot be a component.*a link"):
+        check(_proposal(tool_guidance="see https://x.y", moments=["m"]))
+    # A value Dot holds is refused whatever its shape.
+    with pytest.raises(ProviderProtocolError, match=r"habits cannot be a component.*a secret"):
+        proposal_check(_proposal_request(), ("pw-7731-kxq9-zz",))(
+            _proposal(habits="- the password is pw-7731-kxq9-zz", moments=["m"])
+        )
+    # A text equal to the one in place is no change.
+    with pytest.raises(ProviderProtocolError, match="keep must be true"):
+        proposal_check(_proposal_request(HABIT), ())(_proposal(habits=HABIT, moments=["m"]))
+
+
+def _composition_request() -> CompositionRequest:
+    return CompositionRequest(
+        goal="g",
+        habits="",
+        tool_guidance="",
+        candidates=(
+            CandidateBrief(
+                number=1, scope="invariant", summary="s", habits=HABIT, tool_guidance="", moments=("m",), contrast=""
+            ),
+        ),
+        bounds=BOUNDS,
+    )
+
+
+def _composition(**fields: object) -> HarnessComposition:
+    given: dict[str, object] = {"keep_base": False, "habits": "", "tool_guidance": "", "decisions": [], "summary": "s"}
+    given.update(fields)
+    return HarnessComposition.model_validate(given)
+
+
+def test_a_composition_keeps_the_base_as_it_is_or_changes_it_with_decisions() -> None:
+    check = composition_check(_composition_request(), ())
+    assert check(_composition(keep_base=True)).keep_base is True
+    with pytest.raises(ProviderProtocolError, match="given back as they are"):
+        check(_composition(keep_base=True, habits=HABIT))
+    with pytest.raises(ProviderProtocolError, match="keep_base must be true"):
+        check(_composition())
+    with pytest.raises(ProviderProtocolError, match="decisions it is made of"):
+        check(_composition(habits=HABIT))
+    decision: CompositionDecision = CompositionDecision(candidate=1, edit="e", verdict="kept", evidence="m")
+    assert check(_composition(habits=HABIT + "\n", decisions=[decision])).habits == HABIT
+    with pytest.raises(ProviderProtocolError, match="numbered from 1 to 1"):
+        check(_composition(habits=HABIT, decisions=[decision.model_copy(update={"candidate": 2})]))
+
+
+def test_a_selection_names_one_of_the_answers() -> None:
+    check = selection_check(SelectionRequest(goal="g", checks=(), answers=("a", "b")))
+    assert check(HarnessSelection(choice=2, why="w")).choice == 2
+    with pytest.raises(ProviderProtocolError, match="numbered from 1 to 2"):
+        check(HarnessSelection(choice=3, why="w"))
+
+
+def test_an_experience_rests_on_an_edit_that_helped_or_hurt_with_one_effect_for_each_edit() -> None:
+    request: ExperienceRequest = ExperienceRequest(
+        goal="g",
+        edits=(
+            EditOutcome(component="habits", change="c", observed="o"),
+            EditOutcome(component="tool_guidance", change="c2", observed="o2"),
+        ),
+        adopted=True,
+        summary="s",
+    )
+    check = experience_check(request, ())
+    entry: ExperienceEntry = ExperienceEntry(cue="cue", lesson="lesson", evidence="e", confidence="low")
+    effects: list[EditEffect] = [
+        EditEffect(edit=1, effect="confounded", why="w"),
+        EditEffect(edit=2, effect="no_effect", why="w"),
+    ]
+    assert check(ExperienceDraft(effects=effects, entry=None)).entry is None
+    with pytest.raises(ProviderProtocolError, match="helped or hurt"):
+        check(ExperienceDraft(effects=effects, entry=entry))
+    helped: list[EditEffect] = [
+        EditEffect(edit=1, effect="helped", why="w"),
+        EditEffect(edit=2, effect="no_effect", why="w"),
+    ]
+    assert check(ExperienceDraft(effects=helped, entry=entry)).entry == entry
+    with pytest.raises(ProviderProtocolError, match="one effect for each"):
+        check(ExperienceDraft(effects=helped[:1], entry=None))
+    with pytest.raises(ProviderProtocolError, match="each verdict must name another edit"):
+        check(ExperienceDraft(effects=[helped[0], helped[0]], entry=None))
+
+
+def test_an_experience_entry_is_held_to_what_may_stand_in_the_library() -> None:
+    request: ExperienceRequest = ExperienceRequest(
+        goal="g", edits=(EditOutcome(component="habits", change="c", observed="o"),), adopted=True, summary="s"
+    )
+    helped: list[EditEffect] = [EditEffect(edit=1, effect="helped", why="w")]
+    with pytest.raises(ProviderProtocolError, match=r"lesson cannot stand in the library.*a link"):
+        experience_check(request, ())(
+            ExperienceDraft(
+                effects=helped, entry=ExperienceEntry(cue="c", lesson="see https://x.y", evidence="e", confidence="low")
+            )
+        )
+    with pytest.raises(ProviderProtocolError, match=r"cue cannot stand in the library.*a secret"):
+        experience_check(request, ("pw-7731-kxq9-zz",))(
+            ExperienceDraft(
+                effects=helped, entry=ExperienceEntry(cue="pw-7731-kxq9-zz", lesson="l", evidence="e", confidence="low")
+            )
+        )
+
+
+def test_a_text_given_as_the_word_null_and_moments_given_as_null_are_none() -> None:
+    proposal: HarnessProposal = HarnessProposal.model_validate(
+        {"keep": True, "habits": "null", "tool_guidance": "None", "moments": None, "summary": "keep"}
+    )
+    assert (proposal.habits, proposal.tool_guidance, proposal.moments) == (None, None, [])
+    assert proposal_check(_proposal_request(), ())(proposal).keep is True

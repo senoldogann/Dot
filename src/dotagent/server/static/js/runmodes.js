@@ -7,17 +7,37 @@
 
 import { el, switchRow } from "./dom.js";
 import { icon } from "./icons.js";
-import { segmented } from "./panels.js";
 import { readPref, writePref } from "./prefs.js";
 import { getSnapshot } from "./state.js";
 
 const APPROVALS_KEY = "dot.approvals";
 const GOAL_MODE_KEY = "dot.goalMode";
 
+// The approval modes, strictest first (item 398), each with its name, the shorter one the Options pill wears, what it
+// does and its icon. "ask" keeps its id, so the choices kept under it hold as they were.
 export const APPROVAL_OPTIONS = [
-  { id: "ask", label: "Ask", hint: "You answer every question the safety policy raises" },
-  { id: "auto", label: "Auto", hint: "A review model answers in your place; what it is unsure about still comes to you" },
-  { id: "yolo", label: "YOLO", hint: "Nobody is asked: what the policy would ask runs at once and is recorded" },
+  {
+    id: "supervised",
+    label: "Supervised",
+    short: "Supervised",
+    hint: "You approve every change: files, commands, clicks, messages",
+    icon: "lock",
+  },
+  {
+    id: "ask",
+    label: "Auto-accept edits",
+    short: "Edits",
+    hint: "Edits and routine work run; you answer what the policy asks",
+    icon: "pencil",
+  },
+  {
+    id: "auto",
+    label: "Auto",
+    short: "Auto",
+    hint: "A review model answers; its doubts and Dot's own files come to you",
+    icon: "shield",
+  },
+  { id: "yolo", label: "YOLO", short: "YOLO", hint: "Nobody is asked; each step runs at once and is recorded", icon: "lockOpen" },
 ];
 const YOLO_NOTE = "YOLO: nothing asks for confirmation, so this run acts without waiting for you. It also reads secrets, sends files out, pays and signs in by itself.";
 const GOAL_MODE_HINT = "A checker compares the answer with the goal and sends the run back to work until the goal is really reached";
@@ -28,6 +48,12 @@ const STANDING_NOTE = "Keep going is on: Dot works on this goal in sessions unti
 export function approvalLabel(id) {
   const option = APPROVAL_OPTIONS.find((candidate) => candidate.id === id);
   return option === undefined ? id : option.label;
+}
+
+/** The shorter words and the icon of an approval mode, which the Options pill wears (item 398). */
+export function approvalBadge(id) {
+  const option = APPROVAL_OPTIONS.find((candidate) => candidate.id === id);
+  return option === undefined ? { short: id, icon: "lock" } : { short: option.short, icon: option.icon };
 }
 
 /** The approval mode this browser chose, or null when it never chose one. */
@@ -67,6 +93,46 @@ function pick(caption, control) {
   return el("div", { class: "composer-pick", role: "group", "aria-label": caption }, el("span", { class: "composer-pick-label" }, caption), control);
 }
 
+/** The approval modes as a list (item 398), each with its icon, its name and what it does, the one chosen ticked:
+ * `value()` is the mode chosen, `set(id)` shows another, and a click chooses a mode and tells `onSelect(id)`. */
+function approvalList(selected, onSelect) {
+  let current = selected;
+  const rows = new Map();
+  const element = el("div", { class: "approval-list", role: "listbox", "aria-label": "Approval mode" });
+
+  function paint() {
+    for (const [id, row] of rows) {
+      row.setAttribute("aria-selected", String(id === current));
+    }
+  }
+
+  for (const option of APPROVAL_OPTIONS) {
+    const row = el(
+      "button",
+      { class: "pop-option", type: "button", role: "option", dataset: { mode: option.id } },
+      icon(option.icon),
+      el("span", { class: "pop-option-text" }, el("span", null, option.label), el("span", { class: "pop-option-hint" }, option.hint)),
+      icon("check"),
+    );
+    row.addEventListener("click", () => {
+      current = option.id;
+      paint();
+      onSelect(option.id);
+    });
+    rows.set(option.id, row);
+    element.append(row);
+  }
+  paint();
+  return {
+    element,
+    value: () => current,
+    set: (id) => {
+      current = id;
+      paint();
+    },
+  };
+}
+
 /**
  * The control that picks the approval mode of a new run, its choice in `kept` (`KEPT_APPROVALS` or a `heldChoice`).
  * `value()` is the mode chosen, or null while it follows the daemon (that is what a run is started with, so a later
@@ -79,7 +145,7 @@ export function approvalsPicker(onPaint, kept) {
     const { status } = getSnapshot();
     return kept.read() ?? (status === null ? null : status.approvals);
   }
-  const control = segmented(APPROVAL_OPTIONS, shown(), (id) => {
+  const control = approvalList(shown(), (id) => {
     kept.write(id);
     paint();
   });
@@ -99,7 +165,7 @@ export function approvalsPicker(onPaint, kept) {
 
   paint();
   return {
-    element: pick("Approvals", control.element),
+    element: el("div", { class: "pop-group", role: "group", "aria-label": "Approvals" }, el("div", { class: "pop-heading", "aria-hidden": "true" }, "Approvals"), control.element),
     warning,
     value: kept.read,
     sync: () => {
@@ -111,9 +177,9 @@ export function approvalsPicker(onPaint, kept) {
 
 /**
  * The switch that makes a new task a campaign: Dot keeps going on its goal in sessions until the outcome is verified. It
- * starts off on every page. `value()` is whether it is on; `setAvailable(false)` hides it and turns it off, for the kinds of
- * run that cannot be a campaign (a chat, research); `onToggle(on)` runs after every change; `note` is the one line to show
- * under the composer while it is on.
+ * starts off on every page, and `set(on)` turns it as a new chat left it (item 397). `value()` is whether it is on;
+ * `setAvailable(false)` hides it and turns it off, for the kinds of run that cannot be a campaign (a chat, research);
+ * `onToggle(on)` runs after every change; `note` is the one line to show under the composer while it is on.
  */
 export function standingPicker(onToggle) {
   let on = false;
@@ -133,6 +199,7 @@ export function standingPicker(onToggle) {
   return {
     element,
     note,
+    set,
     value: () => on,
     setAvailable: (available) => {
       element.hidden = !available;
@@ -151,7 +218,7 @@ export function standingPicker(onToggle) {
 export function goalModePicker(kept) {
   function shown() {
     const { status } = getSnapshot();
-    return kept.read() ?? (status !== null && status.goal_mode);
+    return kept.read() ?? status?.goal_mode === true;
   }
   const toggle = el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": "Goal mode" });
   const element = switchRow(pick("Goal mode", toggle), toggle);

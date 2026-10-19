@@ -37,7 +37,7 @@ function baseName(path) {
   return path.slice(path.lastIndexOf("/") + 1);
 }
 
-export function columnLetters(number) {
+function columnLetters(number) {
   let letters = "";
   let rest = number;
   while (rest > 0) {

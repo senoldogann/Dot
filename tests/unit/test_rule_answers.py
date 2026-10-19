@@ -60,4 +60,4 @@ def test_hand_it_to_me_is_the_users_in_every_approval_mode() -> None:
     handed: Decision | None = owner_handoff(_PUSH, [_rule("handoff", "")])
     assert handed is not None and handed.verdict == "handoff" and handed.rule_id == "rule-1"
     assert owner_handoff(_PUSH, [_rule("ask", "")]) is None
-    assert [route_for("handoff", mode) for mode in ("ask", "auto", "yolo")] == ["user", "user", "user"]
+    assert [route_for(handed, mode) for mode in ("ask", "auto", "yolo")] == ["user", "user", "user"]

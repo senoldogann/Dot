@@ -319,8 +319,11 @@ async def cmd_stats(command: StatsCommand) -> int:
             )
         )
         health: str | None = await asyncio.to_thread(read_kv, db_path(), LEARNING_HEALTH_KEY)
-        quiet_s: float | None = quiet_limit((await asyncio.to_thread(load_user_config)).agent.reflection_time)
-        lines.extend(render_learning_health(parse_health(health), time.time(), quiet_s))
+        config = await asyncio.to_thread(load_user_config)
+        quiet_s: float | None = quiet_limit(config.agent.reflection_time)
+        lines.extend(
+            render_learning_health(parse_health(health), time.time(), quiet_s, config.harness.step_time != "off")
+        )
         stuck: StuckWork = await asyncio.to_thread(collect_stuck, db_path())
         failing: str | None = await asyncio.to_thread(read_kv, db_path(), SCHEDULE_FAILURES_KEY)
         lines.extend(render_stuck(stuck, parse_failures(failing)))
@@ -341,14 +344,20 @@ def render_reflection(last: Reflection | None, failed: ReflectionFailure | None)
     return f"  reflection: {done}"
 
 
-def render_learning_health(health: LearningHealth | None, now: float, quiet_s: float | None) -> list[str]:
+def render_learning_health(
+    health: LearningHealth | None, now: float, quiet_s: float | None, harness_on: bool
+) -> list[str]:
     """How learning fares (:mod:`dotagent.agent.learning_health`): when each work last went well, its failures in a
-    row since with the last error, and, when learning has stopped, why and whether the owner was told."""
+    row since with the last error, and, when learning has stopped, why and whether the owner was told. The harness's
+    step is "off" while ``[harness] step_time`` keeps it from running (``harness_on``) and it has no record yet."""
     if health is None:
         return ["  learning health: nothing recorded yet"]
     lines: list[str] = []
     for work in LEARNING_WORKS:
         state = work_health(health, work)
+        if work == "harness" and not harness_on and state.last_success is None and state.last_failure is None:
+            lines.append(f"  {WORK_NAMES[work].lower()}: off ([harness] step_time)")
+            continue
         went: str = "never went well" if state.last_success is None else f"last went well {_when(state.last_success)}"
         failing: str = (
             f"; {state.failures_in_row} failed in a row, the last {_when(state.last_failure)}: {state.last_error}"

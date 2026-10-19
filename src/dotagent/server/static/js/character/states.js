@@ -339,7 +339,6 @@ export const STATES = [
 ];
 
 export const STATE_BY_ID = new Map(STATES.map((s) => [s.id, s]));
-export const STATE_IDS = STATES.map((s) => s.id);
 
 // The local time at which each state reads best: the pose of the thumbnails. Deterministic.
 export const POSES = {

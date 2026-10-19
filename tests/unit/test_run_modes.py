@@ -16,9 +16,10 @@ from dotagent.agent.prompt import build_system_prompt, clock_note, collect_promp
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
+from dotagent.harness.components import NO_HARNESS
 from dotagent.llm.types import ImageData, Message, assistant_message, user_message
 from dotagent.policy.engine import route_for
-from dotagent.policy.types import ApprovalMode, QuestionMode, Route
+from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, QuestionMode, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.store.db import Store
 from dotagent.store.models import RunMode, RunRecord
@@ -30,20 +31,25 @@ ENDED: RunOutcome = RunOutcome(status="done", result="the first file is written"
 
 
 @pytest.mark.parametrize(
-    ("verdict", "mode", "route"),
+    ("verdict", "source", "mode", "route"),
     [
-        ("ask", "ask", "user"),
-        ("ask", "auto", "reviewer"),
-        ("ask", "yolo", "waived"),
-        ("handoff", "ask", "user"),
-        ("handoff", "auto", "user"),
-        ("handoff", "yolo", "user"),
+        ("ask", "supervised", "supervised", "user"),
+        ("ask", "preset", "supervised", "user"),
+        ("ask", "preset", "ask", "user"),
+        ("ask", "preset", "auto", "reviewer"),
+        ("ask", "preset", "yolo", "waived"),
+        # A change of Dot's own files is the user's, never the review model's (item 398); a yolo run waives it first.
+        ("ask", "own_files", "ask", "user"),
+        ("ask", "own_files", "auto", "user"),
+        ("handoff", "hard_stop", "ask", "user"),
+        ("handoff", "hard_stop", "auto", "user"),
+        ("handoff", "hard_stop", "yolo", "user"),
     ],
 )
 def test_a_question_goes_where_the_mode_sends_it(
-    verdict: Literal["ask", "handoff"], mode: ApprovalMode, route: Route
+    verdict: Literal["ask", "handoff"], source: DecisionSource, mode: ApprovalMode, route: Route
 ) -> None:
-    assert route_for(verdict, mode) == route
+    assert route_for(Decision(verdict=verdict, source=source, reason="", rule_id=None), mode) == route
 
 
 def _verdict(decision: Literal["achieved", "continue", "blocked"], reason: str) -> GoalVerdict:
@@ -135,6 +141,7 @@ def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 
@@ -212,6 +219,7 @@ def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 
@@ -254,6 +262,7 @@ def _in_mode(mode: RunMode) -> str:
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
 
@@ -295,6 +304,7 @@ def test_task_and_research_runs_keep_acting_and_take_an_ask_to_keep_going_at_its
             (),
             None,
             "full",
+            NO_HARNESS,
         )
     )
     for rule in rules:

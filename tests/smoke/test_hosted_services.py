@@ -234,7 +234,7 @@ async def test_the_hosted_search_of_ollama_answers_with_titles_and_addresses() -
 async def test_typesafe_flags_click_labels_the_patterns_do_not_know() -> None:
     """Labels no pattern of the policy knows, on the pages they belong to, as the judge gets them (a repost, a share, a
     payment and a deletion in other languages): each one gets its flag at ``public_action_threshold``, since a missed
-    flag lets the click through without its question in ask and auto. The probabilities are printed."""
+    flag lets the click through without its question outside yolo. The probabilities are printed."""
     assert TYPESAFE_KEY is not None
     clicks: tuple[tuple[str, str, str], ...] = (
         ("Boost", "https://mastodon.social/home", "public_post"),

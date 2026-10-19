@@ -22,7 +22,7 @@ const KINDS = {
 const PICK_COLOURS = ["blue", "green", "violet", "orange", "teal", "pink", "red", "brown"];
 
 /** The colour of the pick `name`, the same wherever its chip shows: one of `PICK_COLOURS`. */
-export function pickColour(name) {
+function pickColour(name) {
   let hash = 0;
   for (const char of name) {
     hash = (hash * 31 + char.codePointAt(0)) >>> 0;

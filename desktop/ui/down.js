@@ -4,8 +4,8 @@
 // changes.
 
 const heading = document.querySelector("h1");
-const why = document.querySelector(".why");
-const advice = document.querySelectorAll(".start");
+const why = /** @type {HTMLElement} */ (document.querySelector(".why"));
+const advice = /** @type {NodeListOf<HTMLElement>} */ (document.querySelectorAll(".start"));
 const notRunning = heading.textContent;
 
 function tell() {

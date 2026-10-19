@@ -2,7 +2,7 @@
 
 import { DOT_ID, lookOf, rememberLook } from "../actors.js";
 import { api, clearToken } from "../api.js";
-import { AUTO_COMPUTER, AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, valueOf } from "../appearance/settings.js";
+import { AUTO_COMPUTER, AUTO_LINES, BUSY_SEND, SEND_KEY, setValue, settingValue } from "../appearance/settings.js";
 import {
   notificationsAvailable,
   notificationsBlocked,
@@ -176,7 +176,7 @@ function buildComposerCard() {
       { id: "enter", label: "Enter", hint: "Enter sends; Shift+Enter breaks a line." },
       { id: "mod-enter", label: "⌘Enter", hint: "⌘Enter or Ctrl+Enter sends; Enter breaks a line." },
     ],
-    selected: valueOf(SEND_KEY),
+    selected: settingValue(SEND_KEY),
     onSelect: (id) => setValue(SEND_KEY, id),
   });
   const busy = choiceSetting({
@@ -186,7 +186,7 @@ function buildComposerCard() {
       { id: "queue", label: "Queue", hint: "The message waits in the chat's queue." },
       { id: "steer", label: "Steer", hint: "The message goes to the run at work at once." },
     ],
-    selected: valueOf(BUSY_SEND),
+    selected: settingValue(BUSY_SEND),
     onSelect: (id) => setValue(BUSY_SEND, id),
   });
   return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
@@ -197,7 +197,7 @@ function buildChatCard() {
   const lines = switchSetting({
     label: "Show what ran without asking",
     hint: "A line under the step for each action YOLO let through without asking you, or the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows. Kept in this browser.",
-    read: () => valueOf(AUTO_LINES) === "shown",
+    read: () => settingValue(AUTO_LINES) === "shown",
     write: async (on) => setValue(AUTO_LINES, on ? "shown" : "hidden"),
     onToggled: () => lines.paint(),
   });
@@ -286,7 +286,7 @@ function buildFailsafe() {
       el("div", { class: "card-pad row" }, text, engage, release),
     ),
     paint(snapshot) {
-      const engaged = snapshot.status !== null && snapshot.status.failsafe_engaged;
+      const engaged = snapshot.status?.failsafe_engaged === true;
       statusBadge.className = engaged ? "badge b-bad" : "badge b-muted";
       statusBadge.textContent = engaged ? "engaged" : "standby";
       text.textContent = engaged
@@ -409,12 +409,24 @@ function sizeOptions(context) {
   ];
 }
 
+/** Dot's default context size for a model (items 250 and 396): the most its window allows, unless [agent]
+ * context_tokens sets one number for every model. */
+function defaultFacts(context) {
+  if (context.configured !== null) {
+    const cut = context.default < context.configured ? `; three quarters of this model's window cut it to ${tokens(context.default)}` : "";
+    return `${tokens(context.configured)} tokens, set for every model without a size of its own${cut}. `;
+  }
+  if (context.ceiling === null) {
+    return `${tokens(context.default)} tokens, as the model's provider does not say its window. `;
+  }
+  return `The most this model's window allows, ${tokens(context.default)} tokens, as for every model without a size of its own. `;
+}
+
 /** What a model's context size does and where its numbers come from (item 250). */
 function contextFacts(model) {
   const context = model.context;
   const provider = providerOf(model.ref);
   const own = model.own_context_length === null ? "" : ` The model's own window is ${tokens(model.own_context_length)} tokens; a larger num_ctx gives it more of it.`;
-  const cut = context.default < context.configured ? `; three quarters of this model's window cut it to ${tokens(context.default)}` : "";
   return [
     el(
       "p",
@@ -448,13 +460,7 @@ function contextFacts(model) {
           : `${tokens(context.ceiling)} tokens, three quarters of the window: the rest is room for the reply and for the error of Dot's count of the tokens.`,
       ),
       el("dt", null, "Dot's default"),
-      el(
-        "dd",
-        null,
-        `${tokens(context.configured)} tokens, for every model without a size of its own${cut}. `,
-        "Dot comes with 96,000: in a run of 41 steps it measured, 48,000 summarized twice and 96,000 not once, while each step sent a quarter more. ",
-        el("span", { class: "faint" }, "In the config file: [agent] context_tokens."),
-      ),
+      el("dd", null, defaultFacts(context), el("span", { class: "faint" }, 'In the config file: [agent] context_tokens, "most" or one number for every model.')),
       el("dt", null, "Smallest size"),
       el("dd", null, `${tokens(context.floor)} tokens: a run's first step alone sends its instructions, its tools and the request.`),
     ),
@@ -587,7 +593,7 @@ function modelRows(model, mainModel, remember) {
   return [
     el(
       "tr",
-      null,
+      { dataset: { model: model.ref } },
       el(
         "td",
         null,
@@ -797,7 +803,11 @@ function modelSetting({ label, hint, className, fits, choose }) {
   return { element, paint, hide };
 }
 
-function buildModels(isDisposed) {
+/** The Models card. `asked` is the model an address asked for (`#/settings/models?model=<ref>`, the context meter's link,
+ * item 396), "" for none: once listed, its provider's fold and the card open, and its row comes into sight, marked, with
+ * the focus on its context size. */
+function buildModels(isDisposed, asked) {
+  let toShow = asked;
   const list = el("div", null, inlineLoading());
   const main = modelSetting({
     label: "Default model",
@@ -855,6 +865,26 @@ function buildModels(isDisposed) {
     }
     list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider), remember)));
     cueTables();
+    showAsked();
+  }
+
+  // The asked model's row, once: a later paint leaves the page where the owner took it.
+  function showAsked() {
+    const row = [...list.querySelectorAll("tr[data-model]")].find((node) => node.dataset.model === toShow);
+    if (row === undefined) {
+      return;
+    }
+    toShow = "";
+    for (const fold of [row.closest(".fold-group"), card.element]) {
+      if (fold !== null && fold.dataset.open === "false") {
+        fold.querySelector(".fold-toggle").click();
+      }
+    }
+    row.dataset.asked = "";
+    // The size's menu, or its Why where the window allows no other size; on a phone the table scrolls sideways to it.
+    const control = row.querySelector(".context-cell select:not([hidden])") ?? row.querySelector(".context-cell button");
+    (control ?? row).scrollIntoView({ block: "center", inline: "nearest" });
+    control?.focus({ preventScroll: true });
   }
 
   // A context size chosen in a model's row (item 250): the list keeps the model as the daemon answered, so the tables
@@ -1009,7 +1039,7 @@ function buildBrowser(isDisposed) {
     label: "Bring Chrome to the front while working",
     hint:
       "Off, Dot's Chrome stays where it is while a run works and the app you were in keeps the focus; the run's page shows the page under Dot's computer either way, and Take over always brings the tab to the front.",
-    read: () => view !== null && view.raise_window,
+    read: () => view?.raise_window === true,
     write: async (on) => {
       view = await api.post("/browser/raise", { raise_window: on });
     },
@@ -1025,7 +1055,7 @@ function buildBrowser(isDisposed) {
   const enabled = switchSetting({
     label: "Runs may use the browser",
     hint: "Off, no run is offered the browser tools, an agent's neither, from the next run on; computer use still sees the screen.",
-    read: () => view !== null && view.enabled,
+    read: () => view?.enabled === true,
     write: async (on) => {
       view = await api.post("/browser/enabled", { enabled: on });
     },
@@ -1062,7 +1092,7 @@ function buildBrowser(isDisposed) {
   const autoComputer = switchSetting({
     label: "Show Dot's computer when a run opens the browser",
     hint: "On a wide window the details panel opens on the page the run works in, beside the chat; a phone keeps its button. Kept in this browser.",
-    read: () => valueOf(AUTO_COMPUTER) === "shown",
+    read: () => settingValue(AUTO_COMPUTER) === "shown",
     write: async (on) => setValue(AUTO_COMPUTER, on ? "shown" : "hidden"),
     onToggled: () => autoComputer.paint(),
   });
@@ -1642,7 +1672,7 @@ function buildDotLookCard() {
   return { element, dispose: picker.dispose };
 }
 
-export function mountGeneral(root, ctx) {
+export function mountGeneral(root, _ctx) {
   const look = buildDotLookCard();
   root.append(
     paneHead("What Dot is called and calls you, its own face, how it draws your attention, the composer's keys, what a chat shows of what ran without asking, and the token this browser is signed in with.", null),
@@ -1656,10 +1686,11 @@ export function mountGeneral(root, ctx) {
   return look.dispose;
 }
 
-/** The providers Dot can reach and the models each of them offers. */
-export function mountModels(root, ctx) {
+/** The providers Dot can reach and the models each of them offers; `?model=<ref>` in the address shows that model. */
+export function mountModels(root, _ctx) {
   let disposed = false;
-  const models = buildModels(() => disposed);
+  const asked = new URLSearchParams(location.hash.split("?")[1] ?? "").get("model") ?? "";
+  const models = buildModels(() => disposed, asked);
   root.append(paneHead("The providers Dot can reach, the models each of them offers and the reasoning effort of each.", null), models.element);
   const stop = onChange(() => models.paint());
   models.paint();
@@ -1673,7 +1704,7 @@ export function mountModels(root, ctx) {
 }
 
 /** Which Chrome the agent browses with. */
-export function mountBrowser(root, ctx) {
+export function mountBrowser(root, _ctx) {
   let disposed = false;
   const browser = buildBrowser(() => disposed);
   root.append(paneHead("Which Chrome the agent browses with, and what Chrome has to allow first.", null), browser.element);
@@ -1684,7 +1715,7 @@ export function mountBrowser(root, ctx) {
 }
 
 /** The daemon, its emergency stop and its health checks. */
-export function mountSystem(root, ctx) {
+export function mountSystem(root, _ctx) {
   let disposed = false;
   const daemon = buildDaemon();
   const failsafe = buildFailsafe();

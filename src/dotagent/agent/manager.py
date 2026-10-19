@@ -149,8 +149,9 @@ _RESULT_CHARS: int = 20_000
 _REFUSED_RESULT_CHARS: int = 200
 # The earlier runs of a thread whose goals count as the user's instructions to a reviewer.
 _THREAD_INSTRUCTION_RUNS: int = 30
-# The approval modes from the strictest to the loosest: the user answers, the review model answers, no one is asked.
-_APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("ask", "auto", "yolo")
+# The approval modes from the strictest to the loosest: the user answers before every change, the user answers, the
+# review model answers, no one is asked.
+_APPROVALS_STRICTEST_FIRST: tuple[ApprovalMode, ...] = ("supervised", "ask", "auto", "yolo")
 
 
 @dataclass(frozen=True)
