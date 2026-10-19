@@ -79,6 +79,18 @@ def test_every_icon_the_manifest_names_is_a_file_of_the_size_it_claims() -> None
     assert problems == [], problems
 
 
+def test_the_page_names_the_home_screen_icon_ios_asks_for() -> None:
+    """``apple-touch-icon``: iOS draws an added app with it (item 410); a 180 px file at the root of the pages, which
+    iOS also tries by that name, and its ``-precomposed`` twin, which older ones try."""
+    link: re.Match[str] | None = re.search(
+        r'<link rel="apple-touch-icon" sizes="180x180" href="([^"]+)">', PAGE.read_text()
+    )
+    assert link is not None, "index.html names no apple-touch-icon of 180x180"
+    assert link.group(1) == "apple-touch-icon.png"
+    for name in ("apple-touch-icon.png", "apple-touch-icon-precomposed.png"):
+        assert png_size(STATIC_DIR / name) == (180, 180), name
+
+
 def test_at_least_one_icon_is_maskable() -> None:
     """A launcher that rounds or crops the icon draws the maskable one, which keeps its mark inside the safe circle."""
     maskable: list[dict[str, Any]] = [entry for entry in icons_of(manifest()) if entry.get("purpose") == "maskable"]
