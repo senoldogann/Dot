@@ -85,6 +85,9 @@ from dotagent.store.stats import (
 )
 from dotagent.tools.team import TEAM_SOURCE
 
+# How many help texts one SELECT asks for by text (SQLite binds up to 32,766 values a statement).
+_HELP_VECTORS_ASKED: int = 500
+
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL,
@@ -3087,6 +3090,19 @@ class Store:
         """The embeddings kept of the texts help is ranked by (item 404), by text, those ``model`` made."""
         rows = await self._all("SELECT text, vec FROM help_vectors WHERE model = ?", (model,))
         return {str(row["text"]): unpack_vector(bytes(row["vec"])) for row in rows}
+
+    async def help_vectors_of(self, model: str, texts: Sequence[str]) -> dict[str, tuple[float, ...]]:
+        """The embeddings kept of the help texts ``texts``, those ``model`` made, by text; a text with none is left
+        out."""
+        found: dict[str, tuple[float, ...]] = {}
+        for start in range(0, len(texts), _HELP_VECTORS_ASKED):
+            chunk: list[str] = list(texts[start : start + _HELP_VECTORS_ASKED])
+            marks: str = ", ".join("?" for _ in chunk)
+            rows = await self._all(
+                f"SELECT text, vec FROM help_vectors WHERE model = ? AND text IN ({marks})", (model, *chunk)
+            )
+            found.update((str(row["text"]), unpack_vector(bytes(row["vec"]))) for row in rows)
+        return found
 
     @_writing
     async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]], now: float) -> None:

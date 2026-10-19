@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.help.apps import scriptable_apps
+from dotagent.help import meaning
 from dotagent.help.meaning import _BATCH, _COLD_TEXTS, _KEPT_TEXTS, HelpVectors, HelpVectorsCold
 from dotagent.help.rank import rank, words
 from dotagent.help.types import HelpItem
@@ -142,9 +143,14 @@ class _Keeper:
     def __init__(self) -> None:
         self.kept: dict[tuple[str, str], tuple[float, ...]] = {}
         self.used: dict[tuple[str, str], float] = {}
+        self.asked: list[list[str]] = []
 
     async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]:
         return {text: vector for (kept_model, text), vector in self.kept.items() if kept_model == model}
+
+    async def help_vectors_of(self, model: str, texts: Sequence[str]) -> dict[str, tuple[float, ...]]:
+        self.asked.append(list(texts))
+        return {text: self.kept[(model, text)] for text in texts if (model, text) in self.kept}
 
     async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]], now: float) -> None:
         for text, vector in vectors:
@@ -186,6 +192,23 @@ async def test_the_vectors_kept_outlive_the_process_through_the_keeper() -> None
     assert keeper.used[("recording", report)] > 1.0 and keeper.used[("recording", invoice)] == 1.0
     assert await third.prune() == 2
     assert set(keeper.kept) == {("recording", report)}
+
+
+async def test_a_text_cut_from_the_process_is_read_back_from_the_keeper_not_embedded_again(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(meaning, "_KEPT_TEXTS", 1)
+    keeper: _Keeper = _Keeper()
+    embedder: _RecordingEmbedder = _RecordingEmbedder()
+    vectors: HelpVectors = HelpVectors(embedder, 0.5, keeper)
+    report: str = "weekly-report Write the weekly report."
+    invoice: str = "invoice-pdf Fill in an invoice."
+    assert await vectors.closest("rapor", [report, invoice]) == [0]
+    # Past the bound, the process keeps the last search's texts alone; the one cut comes back from the keeper.
+    assert await vectors.closest("fatura", [invoice]) == [0]
+    assert await vectors.closest("rapor", [report]) == [0]
+    assert keeper.asked == [[report]]
+    assert [request for request in embedder.requests if report in request] == [[report, invoice]]
 
 
 def test_a_scriptable_application_is_told_by_its_own_dictionary(tmp_path: Path) -> None:

@@ -142,12 +142,12 @@ answer keeps its words, Ollama's too.
   the run's reasoning level, with the summary of its thinking shown; `off` turns thinking off where the model allows it,
   and is rounded to `low` where it does not. A model without adaptive thinking (the 4.5 generation and older) runs
   without thinking at its default level. The prompt is cached from one step of a run to the next (for five minutes), and
-  from one run of a chat to the next when the system prompt is the same: it names the day and the time zone, while the
-  time of day is in a note after each goal, and the notes from memory it lists are chosen by each run's goal, so other
-  notes start the cache again. A request may use the model's whole output limit. The thinking of earlier steps is sent
-  back; a block whose earlier context has changed since (a run drops an old screenshot, the next run of a chat starts
-  with another system prompt) is dropped by the API instead of failing the request (beta
-  `thinking-binding-controls-2026-08-01`).
+  from one run of a chat to the next: the system prompt is the same bytes from one message of a chat to the next (it
+  names the day and the time zone; the time of day, the notes recalled for the message and the skills that fit it go in
+  a note under the message, item 404), so the cache holds the instructions and the history up to the message. A request
+  may use the model's whole output limit. The thinking of earlier steps is sent back; a block whose earlier context has
+  changed since (a run drops an old screenshot, a compaction folds the history, a new day changes the instructions) is
+  dropped by the API instead of failing the request (beta `thinking-binding-controls-2026-08-01`).
 - **OpenCode** (Zen's free models, item 283): a free model of OpenCode Zen (Big Pickle, Nemotron, Step, Space Bunny and
   the others the day's list has) answers OpenCode's own agent only, so a run on one goes to that agent whole. It needs
   the `opencode` program (`brew install opencode`, or opencode.ai) and no key. Dot starts `opencode serve` on a free

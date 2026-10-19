@@ -20,8 +20,8 @@ notes says nothing, and one handed a new note says how many are new, "(1 new)" (
 the message that recalled them, in the note that gives the time ("[system note] It is now…", item 404), not into the
 instructions: the instructions stay the same bytes from one message of a chat to the next, so the provider serves them
 and the history from its prompt cache (the first word of an answer came after 30 to 50 seconds of a 200,000-token chat
-before, after a few seconds since); a note an earlier message of the chat was handed is not repeated, and a note folded
-into a summary, in the run or since, is handed again after the summary.
+before; `first_token_seconds` on each `model_call` event measures it from now on); a note an earlier message of the chat
+was handed is not repeated, and a note folded into a summary, in the run or since, is handed again after the summary.
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"

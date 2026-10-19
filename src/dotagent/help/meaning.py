@@ -47,6 +47,8 @@ class VectorKeeper(Protocol):
 
     async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]: ...
 
+    async def help_vectors_of(self, model: str, texts: Sequence[str]) -> dict[str, tuple[float, ...]]: ...
+
     async def add_help_vectors(
         self, model: str, vectors: Sequence[tuple[str, Sequence[float]]], now: float
     ) -> None: ...
@@ -68,6 +70,9 @@ class HelpVectors:
         self._kept: dict[str, Vector] = {}
         self._loaded: bool = False
         self._loading: asyncio.Lock = asyncio.Lock()
+        # Whether the vectors kept here were cut to ``_KEPT_TEXTS`` since the keeper's were read: a text missing here
+        # may be with the keeper still, and is read back before it is embedded again.
+        self._trimmed: bool = False
         # The texts the keeper was told are in use since this process started, so each is told once.
         self._touched: set[str] = set()
         self._warming: asyncio.Task[None] | None = None
@@ -101,13 +106,18 @@ class HelpVectors:
             await self._keeper.touch_help_vectors(self._embedder.model, fresh, time.time())
         self._touched.update(fresh)
 
-    def _missing(self, texts: Sequence[str]) -> list[str]:
-        return list(dict.fromkeys(text for text in texts if text not in self._kept))
+    async def _missing(self, texts: Sequence[str]) -> list[str]:
+        """The texts of ``texts`` with no vector here, those the keeper still has read back first."""
+        missing: list[str] = list(dict.fromkeys(text for text in texts if text not in self._kept))
+        if missing and self._trimmed and self._keeper is not None:
+            self._kept.update(await self._keeper.help_vectors_of(self._embedder.model, missing))
+            missing = [text for text in missing if text not in self._kept]
+        return missing
 
     async def prepare(self, texts: Sequence[str]) -> int:
         """Embed the texts of ``texts`` not embedded yet, so that a search finds them ready. Returns how many were."""
         await self._load()
-        missing: list[str] = self._missing(texts)
+        missing: list[str] = await self._missing(texts)
         await self._embed(missing)
         await self._touch(texts)
         return len(missing)
@@ -151,7 +161,7 @@ class HelpVectors:
         search raises :class:`HelpVectorsCold` and embeds them in the background instead. An embedding service that
         fails raises its error."""
         await self._load()
-        missing: list[str] = self._missing(texts)
+        missing: list[str] = await self._missing(texts)
         if len(missing) > _COLD_TEXTS:
             self.warm(texts)
             raise HelpVectorsCold(len(missing))
@@ -160,6 +170,7 @@ class HelpVectors:
         [vector] = await self._embedder.embed([need[:_NEED_CHARS]])
         if len(self._kept) > _KEPT_TEXTS:
             self._kept = {text: self._kept[text] for text in texts}
+            self._trimmed = True
         close: list[Similar] = most_similar(
             vector, ((str(index), self._kept[text]) for index, text in enumerate(texts)), self._minimum, len(texts)
         )
