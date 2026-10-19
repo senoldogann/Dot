@@ -2,6 +2,7 @@
 need, by words and by meaning (item 169), the embeddings that meaning is found by, and what an application's
 Info.plist and scripting dictionary say about it, read from bundles made here."""
 
+import asyncio
 import plistlib
 import shlex
 import time
@@ -192,6 +193,32 @@ async def test_the_vectors_kept_outlive_the_process_through_the_keeper() -> None
     assert keeper.used[("recording", report)] > 1.0 and keeper.used[("recording", invoice)] == 1.0
     assert await third.prune() == 2
     assert set(keeper.kept) == {("recording", report)}
+
+
+class _GatedEmbedder(_RecordingEmbedder):
+    """An embedding service that answers once ``gate`` is set: a warming that is still running."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.gate: asyncio.Event = asyncio.Event()
+
+    async def embed(self, texts: Sequence[str]) -> list[Vector]:
+        await self.gate.wait()
+        return await super().embed(texts)
+
+
+async def test_texts_asked_for_while_a_warming_runs_are_taken_by_it_next() -> None:
+    embedder: _GatedEmbedder = _GatedEmbedder()
+    vectors: HelpVectors = HelpVectors(embedder, 0.5, None)
+    first: asyncio.Task[None] = vectors.warm(["weekly-report Write the weekly report."])
+    await asyncio.sleep(0)
+    assert vectors.warm(["invoice-pdf Fill in an invoice."]) is first
+    embedder.gate.set()
+    await first
+    assert [text for request in embedder.requests for text in request] == [
+        "weekly-report Write the weekly report.",
+        "invoice-pdf Fill in an invoice.",
+    ]
 
 
 async def test_a_text_cut_from_the_process_is_read_back_from_the_keeper_not_embedded_again(

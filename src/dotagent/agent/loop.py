@@ -1779,7 +1779,6 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills, forgotten),
         )
     )
-    messages_before_fit: int = len(history)
     facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,
@@ -1911,17 +1910,16 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         step_system: Message = (
             await _with_plan(agent, system) if config.plan_each_turn and run.mode != "chat" else system
         )
+        compactions_before: int = ledger.compactions
         history, estimated, ledger = await _fit_context(agent, history, step_system, offered, ratio, ledger, scaffold)
-        # A compaction (the history got shorter) folded messages away, and with them the notes recalled for this
-        # message that they carried, this message's own or an earlier one's: those the context no longer carries are
-        # handed again after the summary (item 404), as they stand now, stored, so that the next message's prefix holds
-        # them too.
-        if len(history) < messages_before_fit:
+        # A compaction folded messages away, and with them the notes recalled for this message that they carried, this
+        # message's own or an earlier one's: those the context no longer carries are handed again after the summary
+        # (item 404), as they stand now, stored, so that the next message's prefix holds them too.
+        if ledger.compactions > compactions_before:
             present: str = "\n".join(message.content for message in history if message.role == "user")
             recalled_text: str = await recalled_now(present)
             if recalled_text != "":
                 history.append(await _stored_note(agent, recalled_text))
-        messages_before_fit = len(history)
         routed: _Candidate | None = (
             None
             if route_skip or not candidates

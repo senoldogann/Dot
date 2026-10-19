@@ -76,6 +76,8 @@ class HelpVectors:
         # The texts the keeper was told are in use since this process started, so each is told once.
         self._touched: set[str] = set()
         self._warming: asyncio.Task[None] | None = None
+        # The texts asked for while a warming runs: it takes them next, before it ends.
+        self._queued: set[str] = set()
 
     async def _load(self) -> None:
         """The vectors the keeper holds for this embedding model, once; a second caller waits for the first."""
@@ -86,17 +88,21 @@ class HelpVectors:
                 self._kept.update(await self._keeper.help_vectors(self._embedder.model))
             self._loaded = True
 
-    async def _embed(self, texts: Sequence[str]) -> None:
-        """Embed ``texts``, ``_BATCH`` at a time, and keep the vectors here and with the keeper."""
+    async def _embed(self, texts: Sequence[str]) -> dict[str, Vector]:
+        """Embed ``texts``, ``_BATCH`` at a time, and keep the vectors here and with the keeper; returns them, since
+        the ones kept here may be cut by a search that runs meanwhile."""
+        made: dict[str, Vector] = {}
         for start in range(0, len(texts), _BATCH):
             chunk: list[str] = list(texts[start : start + _BATCH])
             vectors: list[Vector] = await self._embedder.embed(chunk)
+            made.update(zip(chunk, vectors, strict=True))
             self._kept.update(zip(chunk, vectors, strict=True))
             if self._keeper is not None:
                 await self._keeper.add_help_vectors(
                     self._embedder.model, list(zip(chunk, vectors, strict=True)), time.time()
                 )
             self._touched.update(chunk)
+        return made
 
     async def _touch(self, texts: Sequence[str]) -> None:
         """Tell the keeper the kept texts of ``texts`` are in use, once each while this process runs, so that
@@ -130,17 +136,24 @@ class HelpVectors:
         return await self._keeper.prune_help_vectors(self._embedder.model, time.time() - _KEEP_S)
 
     def warm(self, texts: Sequence[str]) -> asyncio.Task[None]:
-        """Start :meth:`prepare` and :meth:`prune` in the background, unless a warming is running: that one is
-        returned, so the work is done once. A failure is logged, and the next search starts it again."""
+        """Start :meth:`prepare` and :meth:`prune` in the background, unless a warming is running: then ``texts``
+        are queued for it to take next, and that warming is returned, so the work is done once. A failure is logged,
+        and the next search starts it again."""
         if self._warming is not None and not self._warming.done():
+            self._queued.update(texts)
             return self._warming
 
         async def run() -> None:
             try:
                 made: int = await self.prepare(texts)
+                while self._queued:
+                    queued: list[str] = sorted(self._queued)
+                    self._queued.clear()
+                    made += await self.prepare(queued)
                 pruned: int = await self.prune()
                 log.info("help_vectors_warmed", texts=len(texts), embedded=made, pruned=pruned)
             except (ProviderError, StoreError) as error:
+                self._queued.clear()
                 log.warning("help_vectors_warming_failed", error_type=type(error).__name__, error=str(error))
 
         self._warming = asyncio.create_task(run(), name="help-vectors")
@@ -165,13 +178,22 @@ class HelpVectors:
         if len(missing) > _COLD_TEXTS:
             self.warm(texts)
             raise HelpVectorsCold(len(missing))
-        await self._embed(missing)
+        made: dict[str, Vector] = await self._embed(missing)
+        # The vectors of this search, held here: a search that runs meanwhile may cut the ones kept by the process.
+        vectors: dict[str, Vector] = {}
+        for text in texts:
+            kept: Vector | None = self._kept.get(text, made.get(text))
+            if kept is not None:
+                vectors[text] = kept
+        cut: list[str] = [text for text in dict.fromkeys(texts) if text not in vectors]
+        if cut:
+            vectors.update(await self._embed(cut))
         await self._touch(texts)
         [vector] = await self._embedder.embed([need[:_NEED_CHARS]])
         if len(self._kept) > _KEPT_TEXTS:
-            self._kept = {text: self._kept[text] for text in texts}
+            self._kept = {text: vectors[text] for text in texts}
             self._trimmed = True
         close: list[Similar] = most_similar(
-            vector, ((str(index), self._kept[text]) for index, text in enumerate(texts)), self._minimum, len(texts)
+            vector, ((str(index), vectors[text]) for index, text in enumerate(texts)), self._minimum, len(texts)
         )
         return [int(item.id) for item in close]
