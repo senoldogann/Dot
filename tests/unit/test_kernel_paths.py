@@ -113,12 +113,19 @@ def test_the_shell_guard_sees_a_protected_location_through_a_link_a_glob_or_a_nu
     # Quotes split the location's letters, so that no text of it is in the line; a glob keeps the first of each part.
     split: str = f"{secret.parent}/se'c'ret"
     globbed: str = "".join(f"/{part[0]}*" for part in secret.parts[1:])
+    # The temporary folders are under /private, which the links /var and /tmp at the root lead into.
+    assert secret.parts[1] == "private"
+    linked: str = "/" + "/".join(secret.parts[2:])
+    linked_glob: str = "".join(f"/{part[0]}*" for part in secret.parts[2:])
     device: int = key.stat().st_dev
     number: int = key.stat().st_ino
     for line in (
         f"ln -s / x; cat x/System/Volumes/Data{split}/key",
         f"cat /S*/V*/D*{globbed}/key",
         f"cat /.nofollow{globbed}/key",
+        f"cat /.resolve/1{globbed}/key",
+        f"cat {linked_glob}/key",
+        f"python3 -c \"print(open('{linked}/key').read())\"",
         f"cat /.vol/{device}/{number}",
         f"python3 -c \"print(open('/.vol/{device}/{number}').read())\"",
         f"cat /.v*/{device}/{number}",

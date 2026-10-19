@@ -160,8 +160,9 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   starts: a call whose path leads elsewhere by then (a link moved while the call waited for its approval) is refused,
   and called again it is decided for where the path leads now. A path is judged by the place it names (item 399):
   through a link, in another letter case, through the Data volume (`/System/Volumes/Data/Users/…`, which macOS joins to
-  `/Users/…`) or behind `/.nofollow`, `~/.ssh` is `~/.ssh`, for the file tools and for the words and globs of a command
-  line; a file named by its number (`/.vol/<device>/<inode>`), which can be any file, is refused as a protected one.
+  `/Users/…`) or behind `/.nofollow` or `/.resolve/<flags>`, `~/.ssh` is `~/.ssh`, for the file tools and for the words
+  and globs of a command line; a file named by its number (`/.vol/<device>/<inode>`), which can be any file, is refused
+  as a protected one.
 - Outside a `yolo` run the agent reads what Dot loads and runs, and runs a skill's files, but never changes them: its
   own code (the folder its package is imported from, the Python environment it runs in and the Python under that, and
   the file of the launchd job that starts the daemon), its plugins and their own files, its skills (with the

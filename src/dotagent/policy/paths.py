@@ -34,16 +34,23 @@ _SYSTEM_PREFIXES: tuple[str, ...] = (
 )
 
 _TEMP_PREFIXES: tuple[str, ...] = ("/tmp", "/private/tmp", "/var/folders", "/private/var/folders")
-# The prefixes under which macOS names a place again (item 399): the Data volume, which firmlinks join to the system
-# volume (``/System/Volumes/Data/Users`` is ``/Users``), and the one that asks the kernel to follow no link
-# (``/.nofollow/Users`` is ``/Users``). :func:`kernel_path` names a path through them as the place it reaches; a glob is
-# matched against each spelling of a location (:func:`glob_reaches_protected`).
-_DATA_VOLUME: Path = Path("/System/Volumes/Data")
-_NO_FOLLOW: Path = Path("/.nofollow")
+# The other names macOS gives the places under its root (item 399): through the Data volume, which firmlinks join to
+# the system volume (``/System/Volumes/Data/Users`` is ``/Users``); behind the prefixes that ask the kernel to follow no
+# link (``/.nofollow/Users``) or to resolve as its flags say (``/.resolve/1/Users``); and through the links at the root
+# into ``/private`` (``/var/…`` is ``/private/var/…``). :func:`kernel_path` names a path through any of them as the
+# place it reaches; a glob, which names no place yet, is matched through each (:func:`glob_reaches_protected`).
+_DATA_VOLUME: tuple[str, ...] = ("System", "Volumes", "Data")
+_NO_FOLLOW: str = ".nofollow"
+_RESOLVE: str = ".resolve"
+_ROOT_LINKS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("tmp", ("private", "tmp")),
+    ("var", ("private", "var")),
+    ("etc", ("private", "etc")),
+)
 # The volfs namespace: ``/.vol/<device>/<inode>`` names a file by its number, a name for every place that no list of
 # places holds, so a path, a glob or a text that spells one reaches every protected location (item 399). A folder
 # spelled so is named as the place it is (:func:`kernel_path`); a file cannot be.
-_BY_NUMBER: tuple[Path, ...] = (Path("/.vol"), _NO_FOLLOW / ".vol")
+_BY_NUMBER: str = ".vol"
 # The room F_GETPATH writes a path into: MAXPATHLEN on macOS.
 _KERNEL_PATH_BYTES: int = 1024
 # How a folder is opened to be asked its path: for its events alone, which reads nothing of it, and only when it is a
@@ -119,9 +126,31 @@ def _is_system(path: Path) -> bool:
     return any(within(path, Path(os.path.realpath(prefix))) for prefix in _SYSTEM_PREFIXES)
 
 
+def _without_root_names(parts: tuple[str, ...]) -> tuple[str, ...]:
+    """The parts of an absolute path without the prefixes that name the root again (the Data volume, ``/.nofollow``,
+    ``/.resolve/<flags>``), however many lead it."""
+    rest: tuple[str, ...] = parts[1:]
+    data_volume: tuple[str, ...] = tuple(name.casefold() for name in _DATA_VOLUME)
+    while True:
+        lead: tuple[str, ...] = tuple(name.casefold() for name in rest[: len(data_volume)])
+        if lead[:1] == (_NO_FOLLOW,):
+            rest = rest[1:]
+        elif lead[:1] == (_RESOLVE,) and len(rest) > 1:
+            rest = rest[2:]
+        elif lead == data_volume:
+            rest = rest[len(data_volume) :]
+        else:
+            return (*parts[:1], *rest)
+
+
+def _by_number(path: Path) -> bool:
+    """Whether ``path`` names a file by its number (``/.vol/…``), behind any prefix that names the root again."""
+    return tuple(name.casefold() for name in _without_root_names(path.parts)[1:2]) == (_BY_NUMBER,)
+
+
 def classify_path(path: Path, workspace: Path, protected: tuple[Path, ...], dot_paths: tuple[Path, ...]) -> PathClass:
     """Classify an already resolved absolute path. A file named by its number (``/.vol``) is protected."""
-    if any(within(path, location) for location in (*_BY_NUMBER, *protected)):
+    if _by_number(path) or any(within(path, location) for location in protected):
         return "protected"
     if any(within(path, location) for location in dot_paths):
         return "dot"
@@ -134,19 +163,31 @@ def classify_path(path: Path, workspace: Path, protected: tuple[Path, ...], dot_
     return "home"
 
 
+def _spelled_from(location: Path, lead: tuple[str, ...], spelled: str) -> str | None:
+    """``location`` with its leading parts ``lead`` (compared letter case aside) written as ``spelled``, or None when it
+    does not begin with them."""
+    if tuple(name.casefold() for name in location.parts[: len(lead)]) != tuple(name.casefold() for name in lead):
+        return None
+    return spelled + "".join(f"/{name}" for name in location.parts[len(lead) :])
+
+
 def mentions_protected(text: str, protected: tuple[Path, ...]) -> bool:
     """True if free text (a shell command, a script) names a protected location in any common spelling, letter case
-    aside, or names a file by its number (``/.vol/``), which reaches any of them."""
-    home: str = str(Path.home())
+    aside (from the home folder, or through a link at the root: ``/var/…`` for ``/private/var/…``), or names a file by
+    its number (``/.vol/``), which reaches any of them."""
     folded: str = text.casefold()
-    if protected and any(f"{root}/".casefold() in folded for root in _BY_NUMBER):
+    if protected and f"/{_BY_NUMBER}/" in folded:
         return True
+    home: tuple[str, ...] = Path.home().parts
     for location in protected:
-        absolute: str = str(location)
-        spellings: list[str] = [absolute]
-        if absolute.casefold().startswith(home.casefold()):
-            relative: str = absolute[len(home) :]
-            spellings.extend((f"~{relative}", f"$HOME{relative}", f"${{HOME}}{relative}"))
+        spellings: list[str] = [str(location)]
+        for lead, spelled in (
+            *((("/", *target), f"/{name}") for name, target in _ROOT_LINKS),
+            *((home, start) for start in ("~", "$HOME", "${HOME}")),
+        ):
+            spelling: str | None = _spelled_from(location, lead, spelled)
+            if spelling is not None:
+                spellings.append(spelling)
         if any(spelling.casefold() in folded for spelling in spellings):
             return True
     return False
@@ -160,29 +201,38 @@ def _part_matches(glob: str, name: str) -> bool:
     return fnmatch.fnmatchcase(name.casefold(), glob.casefold())
 
 
-def _glob_within(pattern: Path, location: Path) -> bool:
-    """Whether the parts of the glob ``pattern`` match those of ``location``, part by part, as far as it goes."""
-    return len(pattern.parts) >= len(location.parts) and all(
-        _part_matches(glob, name) for glob, name in zip(pattern.parts, location.parts, strict=False)
-    )
+def _parts_match(globs: tuple[str, ...], names: tuple[str, ...]) -> bool:
+    """Whether ``globs`` match ``names`` part by part, as far as ``names`` go."""
+    return len(globs) >= len(names) and all(_part_matches(glob, name) for glob, name in zip(globs, names, strict=False))
 
 
-def _spellings(location: Path) -> tuple[Path, ...]:
-    """``location`` as it is, through the Data volume, behind ``/.nofollow``, and both."""
-    rest: tuple[str, ...] = location.parts[1:]
-    return (
-        location,
-        _DATA_VOLUME.joinpath(*rest),
-        _NO_FOLLOW.joinpath(*rest),
-        _NO_FOLLOW.joinpath(*_DATA_VOLUME.parts[1:], *rest),
-    )
+def _glob_reaches(parts: tuple[str, ...], location: tuple[str, ...]) -> bool:
+    """Whether the absolute glob ``parts`` can name the place ``location`` or one inside it: as written, or after a
+    prefix that names the root again, or through a link at the root, as the shell would find them. One that can name a
+    file by its number reaches every place."""
+    if _parts_match(parts, location):
+        return True
+    rest: tuple[str, ...] = parts[1:]
+    if not rest:
+        return False
+    if _part_matches(rest[0], _BY_NUMBER):
+        return True
+    beyond: list[tuple[str, ...]] = [
+        *((*target, *rest[1:]) for name, target in _ROOT_LINKS if _part_matches(rest[0], name))
+    ]
+    if _part_matches(rest[0], _NO_FOLLOW):
+        beyond.append(rest[1:])
+    if _part_matches(rest[0], _RESOLVE) and len(rest) > 1:
+        beyond.append(rest[2:])
+    if len(rest) > len(_DATA_VOLUME) and _parts_match(rest, _DATA_VOLUME):
+        beyond.append(rest[len(_DATA_VOLUME) :])
+    return any(_glob_reaches((*parts[:1], *after), location) for after in beyond)
 
 
 def glob_reaches_protected(pattern: Path, protected: tuple[Path, ...]) -> bool:
     """Whether the glob ``pattern`` (an absolute path with ``*``, ``?`` or ``[``) can name a protected location or a
-    file inside one: its parts match the location's, part by part, as far as the location goes, in any spelling of it
-    (item 399). ``~/.s?h/id_rsa``, ``~/.s*`` and ``/S*/V*/D*/U*/*/.ssh`` reach ``~/.ssh``; ``~/*`` does not, since ``*``
-    leaves the hidden ``.ssh`` out. A glob that can name a file by its number (``/.v*/…``) reaches every location."""
-    if protected and any(_glob_within(pattern, root) for root in _BY_NUMBER):
-        return True
-    return any(_glob_within(pattern, spelling) for location in protected for spelling in _spellings(location))
+    file inside one: its parts match the location's, part by part, as far as the location goes, through any other name
+    of the root too (item 399). ``~/.s?h/id_rsa``, ``~/.s*``, ``/S*/V*/D*/U*/*/.ssh`` and ``/.resolve/1/U*/*/.ssh``
+    reach ``~/.ssh``; ``~/*`` does not, since ``*`` leaves the hidden ``.ssh`` out. A glob that can name a file by its
+    number (``/.v*/…``) reaches every location."""
+    return any(_glob_reaches(pattern.parts, location.parts) for location in protected)

@@ -14915,7 +14915,11 @@ location), a link the command line made (the shell guard resolved the path behin
 `kernel_path`), and a glob that spells the Data volume (`/S*/V*/D*/U*/…`; a glob is now matched against every spelling
 of a location: as it is, through the Data volume, behind `/.nofollow`, and both); with them, one this item brought:
 `mentions_protected` compared a `$HOME` in other letters with the kernel-named locations letter by letter (now letter
-case aside). Each has a test that fails without its fix.
+case aside). Each has a test that fails without its fix. The pre-push review of those fixes (0 Important) named two more
+of the class, fixed too: the prefix `/.resolve/<flags>`, which names the root again as `/.nofollow` does, and the links
+at the root (`/var`, `/tmp`, `/etc` into `/private`), which a glob or a text could spell a protected location through; a
+glob is now matched through every other name of the root (`_glob_reaches`), a text through the links too, and the home
+folder's spellings are made part by part, so a letter whose case folding changes its length cannot cut them wrong.
 
 ## Log
 
