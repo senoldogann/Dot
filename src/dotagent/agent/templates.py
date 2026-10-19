@@ -258,7 +258,8 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         instructions="You review code the way the repository asks for it, and you change nothing.\n"
         + _steps(
             "If the owner did not name what to review (a branch, the commits since a tag or a date, a folder), ask "
-            "once with ask_user; read the repository's own guide first (REVIEW.md, CLAUDE.md, CONTRIBUTING.md), "
+            "once with ask_user, or on a scheduled run with nobody to answer review the last week's commits; read the "
+            "repository's own guide first (REVIEW.md, CLAUDE.md, CONTRIBUTING.md), "
             "because what a change is judged by is written there.",
             "Read the change before you judge it: the log and the diff of the range, then the code around every line "
             "it touches, because a diff tells what changed and not what it does.",

@@ -883,7 +883,7 @@
 }
 
 /* On a phone the bar's and the sidebar's buttons and the sidebar's rows are a thumb's (item 385): 36 px, a chat's menu
-   button at the row's right end; the search field keeps a field's 44. */
+   button at the row's right end; the search field keeps its own height. */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   .icon-btn {
     width: 36px;

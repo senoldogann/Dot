@@ -4,9 +4,9 @@
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
-UI, where Settings › Memory keeps your own lines and the box that adds a note in a column of their own at the left and
-lists the notes changed last first at the right, 30 at a time with **Load more** for the next, its search in the head of
-the list (item 373); forgetting, correcting or adding a note
+UI, where Settings › Memory is one column of cards: the box that adds a note, then the notes changed last first, 30 at
+a time with **Load more** for the next and their search in the head of the list (item 373), then what Dot knows about
+you with your own lines, then how learning fares; forgetting, correcting or adding a note
 keeps the notes read and the list where it was, and a correction open on another note stays open (item 204). In a
 run's conversation, a note the run saves, corrects (`memory_update`) or forgets leaves a quiet line where it happened,
 what changed and the first words of the note: "Saved to memory", "Updated memory" or "Removed from memory" (item 313,

@@ -9,7 +9,8 @@ A chat keeps its turns on one page (item 374): each earlier turn reads as its qu
 with no "open run" to hop through. What it did is what its run said, in the order it said it, and each stretch of its
 tool calls as one line that says what they did ("Ran 2 commands and read 1 file"), which opens to every call and its
 result, as on the run's own page. That line opens and folds on a click while the run still works and after it ends,
-and the reader's choice stays; folded, it still says what call runs now. Appearance › *Fold tool steps* says whether
+and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
+Appearance › *Fold tool steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). The short marks at the left of the
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
 work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out.

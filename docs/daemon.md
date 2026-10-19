@@ -198,8 +198,8 @@ says what they did, "Ran 2 commands and read 1 file", with the time it took besi
 while it runs, "Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and
 screenshot, each call one quiet line with its icon, its result on a hairline under it once opened, while approvals,
 questions and policy notes stay in the open. A click on that line opens or folds it while the run still works and
-after it ends, and the reader's choice stands for the life of the page; folded, it keeps the call under way in sight. The
-lines of how a run was set up (the
+after it ends, and the reader's choice stands for the life of the page; folded, it keeps the call under way in sight (on a phone, only the count).
+The lines of how a run was set up (the
 notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
 model) are not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming
 them in short and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a
