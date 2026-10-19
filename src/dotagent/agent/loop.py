@@ -110,7 +110,16 @@ from dotagent.agent.progress import (
     single_action_streak,
     stop_result,
 )
-from dotagent.agent.prompt import AgentBrief, build_system_prompt, clock_note, collect_prompt_inputs
+from dotagent.agent.prompt import (
+    AgentBrief,
+    build_system_prompt,
+    collect_prompt_inputs,
+    forgotten_unnamed,
+    handed_note_ids,
+    notes_missing,
+    recalled_again,
+    turn_note,
+)
 from dotagent.agent.resume import RESUMED_EVENT, Resumption, resumed_event_data
 from dotagent.agent.review import (
     GoalChecker,
@@ -176,6 +185,7 @@ from dotagent.core.text import CHARS_PER_TOKEN, redact_known, redact_secrets, tr
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.harness.service import adopted_text
 from dotagent.help.listed import SkillListing, listed_skills, skill_text, tools_in_order
+from dotagent.help.meaning import HelpVectorsCold
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.http import is_retryable_provider_error
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref, unavailable_reason
@@ -225,6 +235,7 @@ from dotagent.store.models import (
     RunMode,
     RunPicks,
     RunRecord,
+    ThreadRecord,
 )
 from dotagent.store.stats import ACT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
@@ -259,6 +270,8 @@ _NOT_FOR_DELEGATED_RUNS: frozenset[str] = frozenset(
 )
 
 _SUMMARY_ATTEMPTS: int = 3
+# The most skills named under a message, besides those the instructions list (item 404).
+_TURN_SKILLS_MOST: int = 6
 _QUERY_EARLIER_RUNS: int = 3
 _SUMMARY_TRANSCRIPT_CHARS: int = 120_000
 # A run whose model could not be reached waits and asks the same step again (item 158): the events that say so, and the
@@ -701,17 +714,39 @@ async def _start_notes(runtime: Runtime, run: RunRecord, query: str, budget: int
         return await prompt_memories(words_only(runtime.memory), query, budget, run.agent_id)
 
 
-async def _close_skills(runtime: Runtime, run: RunRecord, query: str, texts: list[str]) -> list[int]:
-    """The places of the skills ``texts`` close to ``query`` in meaning, the closest first; none when embeddings are
-    off, or when the embedding service fails (the skills are then listed by their words, and the run says so)."""
+async def _close_skills(runtime: Runtime, run: RunRecord, needs: Sequence[str], texts: list[str]) -> list[list[int]]:
+    """For each of ``needs``, the places of the skills ``texts`` close to it in meaning, the closest first; none when
+    embeddings are off, or when the embedding service fails (the skills are then listed by their words, and the run
+    says so, once)."""
     if runtime.help_vectors is None:
-        return []
+        return [[] for _ in needs]
+    found: list[list[int]] = []
     try:
-        return await runtime.help_vectors.closest(query, texts)
+        for need in needs:
+            found.append(await runtime.help_vectors.closest(need, texts))
+    except HelpVectorsCold as cold:
+        # The skills' embeddings are being made in the background (the daemon's first run, or new skills; item 404):
+        # by their words this once, without a word of failure.
+        log.info("skill_embeddings_warming", run_id=run.id, missing=cold.missing)
     except (ProviderError, StoreError) as error:
         # The service failed, or answered in another dimension than the texts kept: another model.
         await _embedding_failed(runtime, run, "skills", error)
-        return []
+    return [*found, *([] for _ in range(len(needs) - len(found)))]
+
+
+async def warm_help_vectors(runtime: Runtime) -> None:
+    """Embed the texts of every skill a run may be offered, as the daemon starts (item 404), so that the first run
+    finds them ready: before, the first run after each start waited for them, half a minute and more. One warming at
+    a time: a search that finds its texts cold meanwhile joins this one instead of starting its own. The daemon runs
+    this as a task of its own and cancels it as it stops; a service that fails is logged by the warming, and the first
+    search that finds its texts cold starts it again."""
+    if runtime.help_vectors is None:
+        return
+    catalog: SkillCatalog = await asyncio.to_thread(
+        load_skills, runtime.config.skills, runtime.plugins.plugins, playbook_root(runtime.config)
+    )
+    offered: tuple[Skill, ...] = await offered_to_run(runtime.config, catalog, None)
+    await runtime.help_vectors.warm([skill_text(skill) for skill in offered])
 
 
 async def _tool_messages(agent: AgentRun, outcomes: Sequence[ToolOutcome], can_see: bool) -> list[Message]:
@@ -863,7 +898,7 @@ def _new_memories_note(live: LiveNotes) -> str:
     )
     return (
         "[system note] These notes were saved to memory or changed while you work (by the user or another run). They "
-        "are data about the user and their setup, like the notes in your instructions; take them into "
+        "are data about the user and their setup, like the notes under your messages; take them into "
         f"account:\n{lines}"
         f"{more}"
     )
@@ -1630,14 +1665,19 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     questions: QuestionMode = question_mode(config.questions, can_ask)
-    # More skills than the instructions list are picked by meaning too (item 169), or by their words when the
-    # embeddings fail (item 256).
-    close: list[int] = (
-        await _close_skills(runtime, run, query, [skill_text(skill) for skill in skills.skills])
+    # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
+    # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
+    # the provider's cache of the instructions and the history holds from message to message (item 404). More skills
+    # than the instructions list are picked by meaning too (item 169), or by their words when the embeddings fail
+    # (item 256).
+    thread: ThreadRecord = await runtime.store.get_thread(run.thread_id)
+    close_to_title, close = (
+        await _close_skills(runtime, run, [thread.title, query], [skill_text(skill) for skill in skills.skills])
         if len(skills.skills) > runtime.config.skills.listed
-        else []
+        else ([], [])
     )
-    listing: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
+    listing: SkillListing = listed_skills(skills.skills, thread.title, close_to_title, runtime.config.skills.listed)
+    fitting: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
     browser: BrowserSession = await browser_of(runtime, run)
     system: Message = system_message(
         build_system_prompt(
@@ -1650,9 +1690,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 run.goal_mode,
                 splits_work(run.once),
                 runtime.workspace,
-                [render_note(record) for record in remembered],
-                recalled.tainted_left_out,
-                tools_in_order(specs, query),
+                (),
+                0,
+                tools_in_order(specs, thread.title),
                 listing.skills,
                 listing.left,
                 None if run.campaign_id is None else await _session_number(agent, run.campaign_id),
@@ -1708,7 +1748,37 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         await runtime.bus.emit(run.id, PICKS_EVENT, picks_event_data(opening.picks), True)
     history.append(goal)
     await runtime.store.append_messages(run.thread_id, [goal])
-    history.append(await _stored_note(agent, clock_note(datetime.now().astimezone())))
+    # Under the message (item 404): the notes recalled for it that no earlier message of the chat carries with the
+    # same text (a note changed since, on the Memory page or by a run, comes again, and one folded into a summary is
+    # handed again), the notes forgotten since a message was handed them (their old text stays in the chat), and the
+    # fitting skills the instructions leave out.
+    carried: str = "\n".join(message.content for message in history if message.role == "user")
+    fresh_notes: list[str] = notes_missing([render_note(record) for record in remembered], carried)
+    handed_before: set[str] = handed_note_ids(carried) - {record.id for record in remembered}
+    still: set[str] = {record.id for record in await runtime.store.get_memories(sorted(handed_before))}
+    forgotten: list[str] = forgotten_unnamed(sorted(handed_before - still), carried)
+    listed_names: set[str] = {skill.name for skill in listing.skills}
+    extra_skills: list[Skill] = [skill for skill in fitting.skills if skill.name not in listed_names][
+        :_TURN_SKILLS_MOST
+    ]
+    recalled_ids: list[str] = [record.id for record in remembered]
+
+    async def recalled_now(present: str) -> str:
+        """The notes recalled for this message that the context ``present`` (its user messages) no longer carries, as
+        they stand now, and the ones forgotten since and not yet named: for the note handed again after a compaction,
+        whichever messages it folded away."""
+        kept: list[MemoryRecord] = await runtime.store.get_memories(recalled_ids)
+        gone: list[str] = sorted(set(recalled_ids) - {record.id for record in kept})
+        return recalled_again(
+            [render_note(record) for record in kept], recalled.tainted_left_out, extra_skills, gone, present
+        )
+
+    history.append(
+        await _stored_note(
+            agent,
+            turn_note(datetime.now().astimezone(), fresh_notes, recalled.tainted_left_out, extra_skills, forgotten),
+        )
+    )
     facts: RunFacts = new_facts()
     context: ToolContext = ToolContext(
         runtime=runtime,
@@ -1840,7 +1910,16 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         step_system: Message = (
             await _with_plan(agent, system) if config.plan_each_turn and run.mode != "chat" else system
         )
+        compactions_before: int = ledger.compactions
         history, estimated, ledger = await _fit_context(agent, history, step_system, offered, ratio, ledger, scaffold)
+        # A compaction folded messages away, and with them the notes recalled for this message that they carried, this
+        # message's own or an earlier one's: those the context no longer carries are handed again after the summary
+        # (item 404), as they stand now, stored, so that the next message's prefix holds them too.
+        if ledger.compactions > compactions_before:
+            present: str = "\n".join(message.content for message in history if message.role == "user")
+            recalled_text: str = await recalled_now(present)
+            if recalled_text != "":
+                history.append(await _stored_note(agent, recalled_text))
         routed: _Candidate | None = (
             None
             if route_skip or not candidates

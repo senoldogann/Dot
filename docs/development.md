@@ -117,14 +117,15 @@ calls of its runs took, the median and the 90th percentile of one step's model c
 seconds of the compactions and of all side calls (every call but a step: compactions, approvals the review model
 answered, the goal check, the watchdog's second opinion, lessons, descriptions of images, side questions), and the
 tokens the provider served from its prompt cache. A call's seconds include the retries its connector made and the waits
-between them. Every model call of a run leaves a `model_call` event with its purpose, model, seconds and tokens (and,
-for a call that failed or was cut off, the error), and its tokens count in the run's totals; runs made before calls were
-timed have none, are left out of the table and are counted below it. A **Tools** table lists the 15 tools whose calls
-took the most seconds: calls, failures, seconds in all, the median call and the seconds spent at the gate (waiting for
-your approval or the review model's answer), which the seconds include. The seconds of `ask_user` are the wait for your
-answer (none for a question the run left), and those of `delegate` hold the whole delegated run, whose own tool calls
-are listed too. The database file is opened read-only, so it is safe to run while the daemon works, and the numbers hold
-no text of your chats.
+between them. Every model call of a run leaves a `model_call` event with its purpose, model, seconds, the seconds its
+first streamed word took (`first_token_seconds`, item 404: the prompt's processing, which the provider's cache shortens;
+null when nothing streamed) and tokens (and, for a call that failed or was cut off, the error), and its tokens count in
+the run's totals; runs made before calls were timed have none, are left out of the table and are counted below it. A
+**Tools** table lists the 15 tools whose calls took the most seconds: calls, failures, seconds in all, the median call
+and the seconds spent at the gate (waiting for your approval or the review model's answer), which the seconds include.
+The seconds of `ask_user` are the wait for your answer (none for a question the run left), and those of `delegate` hold
+the whole delegated run, whose own tool calls are listed too. The database file is opened read-only, so it is safe to
+run while the daemon works, and the numbers hold no text of your chats.
 
 Two more numbers say how many round trips a run spends. Under each model, an **acts** line counts its `browser_act`
 and `desktop_act` calls, the share that carried one step (a round trip spent on a single click or keystroke: the

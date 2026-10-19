@@ -85,6 +85,9 @@ from dotagent.store.stats import (
 )
 from dotagent.tools.team import TEAM_SOURCE
 
+# How many help texts one SELECT asks for by text (SQLite binds up to 32,766 values a statement).
+_HELP_VECTORS_ASKED: int = 500
+
 _SCHEMA: str = """
 CREATE TABLE IF NOT EXISTS threads (
     id TEXT PRIMARY KEY, title TEXT NOT NULL, source TEXT NOT NULL,
@@ -155,6 +158,10 @@ CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
     id UNINDEXED, content, tags, tokenize = 'unicode61 remove_diacritics 2'
 );
 CREATE TABLE IF NOT EXISTS memory_vectors (id TEXT PRIMARY KEY, dim INTEGER NOT NULL, vec BLOB NOT NULL);
+CREATE TABLE IF NOT EXISTS help_vectors (
+    model TEXT NOT NULL, text TEXT NOT NULL, dim INTEGER NOT NULL, vec BLOB NOT NULL, used_at REAL NOT NULL,
+    PRIMARY KEY(model, text)
+);
 CREATE TABLE IF NOT EXISTS memory_uses (
     run_id TEXT NOT NULL, memory_id TEXT NOT NULL, handed_at REAL NOT NULL, how TEXT NOT NULL, status TEXT
 );
@@ -3078,6 +3085,51 @@ class Store:
     async def all_memory_vectors(self) -> list[tuple[str, tuple[float, ...]]]:
         rows = await self._all("SELECT id, vec FROM memory_vectors", ())
         return [(str(row["id"]), unpack_vector(bytes(row["vec"]))) for row in rows]
+
+    async def help_vectors(self, model: str) -> dict[str, tuple[float, ...]]:
+        """The embeddings kept of the texts help is ranked by (item 404), by text, those ``model`` made."""
+        rows = await self._all("SELECT text, vec FROM help_vectors WHERE model = ?", (model,))
+        return {str(row["text"]): unpack_vector(bytes(row["vec"])) for row in rows}
+
+    async def help_vectors_of(self, model: str, texts: Sequence[str]) -> dict[str, tuple[float, ...]]:
+        """The embeddings kept of the help texts ``texts``, those ``model`` made, by text; a text with none is left
+        out."""
+        found: dict[str, tuple[float, ...]] = {}
+        for start in range(0, len(texts), _HELP_VECTORS_ASKED):
+            chunk: list[str] = list(texts[start : start + _HELP_VECTORS_ASKED])
+            marks: str = ", ".join("?" for _ in chunk)
+            rows = await self._all(
+                f"SELECT text, vec FROM help_vectors WHERE model = ? AND text IN ({marks})", (model, *chunk)
+            )
+            found.update((str(row["text"]), unpack_vector(bytes(row["vec"]))) for row in rows)
+        return found
+
+    @_writing
+    async def add_help_vectors(self, model: str, vectors: Sequence[tuple[str, Sequence[float]]], now: float) -> None:
+        """Keep the embeddings ``model`` made of help texts, each by its text and in use as of ``now``; a text
+        embedded again takes the new one."""
+        await self._db.executemany(
+            "INSERT INTO help_vectors(model, text, dim, vec, used_at) VALUES(?, ?, ?, ?, ?) ON CONFLICT(model, text)"
+            " DO UPDATE SET dim = excluded.dim, vec = excluded.vec, used_at = excluded.used_at",
+            [(model, text, len(vector), pack_vector(vector), now) for text, vector in vectors],
+        )
+        await self._db.commit()
+
+    @_writing
+    async def touch_help_vectors(self, model: str, texts: Sequence[str], now: float) -> None:
+        """The help texts of ``texts`` are in use as of ``now``: a search asked for them."""
+        await self._db.executemany(
+            "UPDATE help_vectors SET used_at = ? WHERE model = ? AND text = ?", [(now, model, text) for text in texts]
+        )
+        await self._db.commit()
+
+    @_writing
+    async def prune_help_vectors(self, model: str, before: float) -> int:
+        """Drop the help vectors no search asked for since ``before``, and those of any model but ``model``; returns
+        how many went."""
+        cursor = await self._db.execute("DELETE FROM help_vectors WHERE model != ? OR used_at < ?", (model, before))
+        await self._db.commit()
+        return int(cursor.rowcount)
 
     async def find_memory_by_content(self, content: str, agent_id: str | None) -> MemoryRecord | None:
         """The note with this text that a run of ``agent_id`` (``None`` for Dot) is handed: the agent's own first, else
