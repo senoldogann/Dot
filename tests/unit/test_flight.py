@@ -14,7 +14,7 @@ from dotagent.desktop.flight import (
     read_command,
     to_appkit,
 )
-from dotagent.desktop.show_dot import browsers_first
+from dotagent.desktop.show_dot import browsers_first, tab_prefixes
 
 
 def test_a_flight_is_short_for_a_hop_and_at_most_its_bound_across_the_screen() -> None:
@@ -61,3 +61,11 @@ def test_the_browser_of_the_page_is_asked_first_for_dots_tab_and_only_running_br
     assert browsers_first(safari, running) == ["com.apple.Safari", "com.google.Chrome", "company.thebrowser.Browser"]
     assert browsers_first(None, running) == ["com.apple.Safari", "com.google.Chrome", "company.thebrowser.Browser"]
     assert browsers_first(chrome, ["com.apple.finder"]) == []
+
+
+def test_a_tab_is_dots_only_under_one_of_its_addresses_not_a_site_whose_name_starts_like_it() -> None:
+    prefixes: list[str] = tab_prefixes(["http://127.0.0.1:8765", "https://dot.example/"])
+    assert prefixes == ["http://127.0.0.1:8765/", "https://dot.example/"]
+    assert any("https://dot.example/#/chat".startswith(prefix) for prefix in prefixes)
+    assert not any("https://dot.example.net/".startswith(prefix) for prefix in prefixes)
+    assert not any("http://127.0.0.1:87650/".startswith(prefix) for prefix in prefixes)

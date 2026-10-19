@@ -366,7 +366,7 @@ otherwise, in one row that scrolls sideways with the open tab in sight and stays
 272); on a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
-the box by a double tap of the Command key: see below.
+the box by both Command keys pressed together: see below.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its

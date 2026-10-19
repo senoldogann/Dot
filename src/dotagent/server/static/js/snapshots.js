@@ -134,7 +134,7 @@ export function takesSnapshots(take) {
   wire();
   current = take;
   if (onThisMac(location.hostname)) {
-    void claim();
+    claimInSight();
   }
   return () => {
     if (current === take) {
