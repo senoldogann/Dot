@@ -502,6 +502,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     sendLabel: "Steer",
     draftKey: runId,
     listener: null,
+    threadId: run.thread_id,
   });
   const { textarea: input, attachments, sendButton: send } = frame;
   // How much of its context budget the run's last step filled (item 222), beside the send.

@@ -12,11 +12,13 @@ import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
 import { icon, toolIconName } from "./icons.js";
+import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
 import { arePicks, createPicks, pickColour } from "./picks.js";
 import { clearPref, readPref, writePref } from "./prefs.js";
 import { takesSnapshots } from "./snapshots.js";
 import { filterGroups, menuWord, paletteGroups, pickGroups, replaceMenuWord } from "./slash.js";
+import { openTeachPanel } from "./teach.js";
 
 const DRAFT_PREFIX = "dot.draft.";
 // The draft key of a new chat's composer.
@@ -287,7 +289,7 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
  * files; the picks wait for `picks.sent()`), `pauseDraft()` and `resumeDraft()` (while the box holds what is not the
  * draft, a queued message being edited, item 376, the draft stays as it was) and `dispose()`.
  */
-export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener }) {
+export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, send, sendLabel, draftKey, listener, threadId = null }) {
   const textarea = el("textarea", { class: "textarea", rows: "1", placeholder, "aria-label": boxLabel });
   const element = el("section", { class: "card composer", "aria-label": label });
   const key = draftKey === null ? null : `${DRAFT_PREFIX}${draftKey}`;
@@ -349,9 +351,24 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
   }
 
   const wired = wireComposer(textarea, { maxPx, send, commands, edited, picked: (pick) => picks.add(pick.kind, pick.name) });
+  // The "+" opens a menu: the files, and the task the owner shows Dot once (item 423, teach.js). A composer with no chat
+  // behind it (the curtain while Dot opens) adds files alone.
+  function plusMenu() {
+    const box = plusButton.getBoundingClientRect();
+    const items = [{ label: "Add files", icon: "plus", run: () => attachments.openPicker() }];
+    if (threadId !== null) {
+      items.push({
+        label: "Teach a task",
+        icon: "monitor",
+        run: () => openTeachPanel({ threadId, onSaved: (name) => listener?.({ kind: "taught", name }) }),
+      });
+    }
+    openMenu({ label: "Add", items, at: { x: box.left, y: box.top - 4 }, back: plusButton, button: plusButton });
+  }
+
   const plusButton = el(
     "button",
-    { class: "btn ghost sm plus-button", type: "button", title: "Add files", "aria-label": "Add files", onclick: () => attachments.openPicker() },
+    { class: "btn ghost sm plus-button", type: "button", title: "Add files or teach a task", "aria-label": "Add files or teach a task", onclick: plusMenu },
     icon("plus"),
   );
   element.append(wired.menu, attachments.list, picks.list, attachments.picker, el("div", { class: "composer-bar" }, plusButton, wired.field, options, sendButton));

@@ -204,6 +204,28 @@ Both modes share what follows.
 - Dot's Chrome is the same application as yours, only with another profile. To give it an application of its own, run
   `uv run playwright install chromium` and set `channel = "chromium"`.
 
+## Teaching a task
+
+The composer's "+" offers **Teach a task** (item 423). The owner shows the task once in the chat's tab: the tab comes to
+the front on the Mac, and the panel shows it as Chrome paints it and lists the steps as they come: a page opened, a click
+on a named control, a field filled, a choice made, Enter pressed. The script that reports them goes into the page and runs
+again in every document the tab loads, so a task that moves from page to page is one recording. It reports no value of
+any field, and for a password, one-time-code or card field (a `password` input, or an `autocomplete` of
+`one-time-code`, `cc-number`, `cc-exp` or `cc-csc`) not the field's name either: the step says a secret field was filled.
+
+**Stop** ends it, and **Write the skill** has the review model write what the owner showed: the kind of work, one line
+of what it does, when it fits, the steps and their parameters, and the lines the owner's own steps made. The owner reads
+it and saves it or throws it away; a saved one is a skill under the playbooks with the header of a taught skill, offered
+by the `skill` tool to later runs like a learned one and listed under Skills, and **Run it now** starts the run it is for
+in the chat, with the skill picked. No run stands behind it, so no failure retires it: whether it still fits is the
+owner's to say, and a run of its kind learns a skill of its own rather than rewriting the owner's.
+
+A browser without a window refuses to record (there is nothing for the owner to work in: turn `[browser] headless` off),
+a second recording is refused while the first goes on, as is one started while a run works in that chat (a run's own
+clicks are real ones, and a step of them would read as the owner's; while a run is at work in the chat mid-recording, its
+steps are not taken). A recording is only ever of the tab it was started on and only while it goes on: closing the panel,
+or the tab, throws it away.
+
 ## Computer use
 
 The desktop tools see and drive any application through the accessibility tree and, where an application has none,

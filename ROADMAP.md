@@ -15586,6 +15586,23 @@ next item. Tests: `tests/unit/test_oauth.py`, `tests/smoke/test_oauth_accounts.p
 and the client, a throw-away keychain), `tests/smoke/test_oauth_routes.py`; the smoke tests' `DOT_KEYCHAIN` names a
 missing keychain, so that none touches the owner's. Docs: `docs/extending.md`, `docs/safety.md`.
 
+### 423. Teach a task: the owner shows it once, Dot keeps the skill
+
+**Status: done (2026-10-20), on `teach-a-task`.** The owner's word of 2026-10-20, and `PLAN.md`'s seven criteria. **As
+built.** The composer's "+" opens a menu, Add files and Teach a task, and the panel records the steps the owner takes in
+the chat's tab (`dotagent.browser.teach`): the script goes in with `add_init_script` so a task that moves from page to
+page is one recording, the tab comes to the front, and each step is a line (a page opened, a click on a named control, a
+field filled, a choice made, Enter pressed). No field's value is reported, and a password, one-time-code or card field
+reports not its name either: the line says a secret field was filled. Stop hands the steps and the owner's words to the
+review model (`dotagent.teach.draft_taught_skill`), which writes the skill, its secrets masked as a learned skill's are;
+Save writes it under the playbooks as `taught-<kind>` with its own header, `taught: true` in its record, no run behind it
+and never retired for failures (`retires`), offered by the `skill` tool like a learned one and read by no run's update
+(`owned` leaves it alone); Run it now starts a run of its description with the skill picked. A headless browser refuses
+to record, one recording at a time, and another tab's steps are not taken. Tests: `tests/unit/test_teach.py` (the lines,
+the secret rule, the taught skill's folder and its record), `tests/smoke/test_teach.py` (a real headless Chrome on a page
+served here: the steps across a navigation, a password field's value out of them, the scripted writer and the save).
+Docs: `docs/browser-and-computer-use.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16454,3 +16471,6 @@ missing keychain, so that none touches the owner's. Docs: `docs/extending.md`, `
   Tailscale from the App Store, the HTTPS page Tailscale names, Restart Dot and QR codes for the phone.
 - 2026-10-20 (Opus 5.5): item 422 on `google-microsoft-sign-in` from `main`: the official sign-ins of Google and
   Microsoft, their tokens in the Keychain, an Accounts card in Customize › Plugins.
+- 2026-10-20 (Opus 5.5): item 423 on `teach-a-task` from `main`: the composer's + menu, a recording of the owner's
+  steps in the chat's tab with every secret field left out, the review model's skill of what they showed, its saving as
+  a taught skill that no failure retires, and Run it now.
