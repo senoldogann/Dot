@@ -1,4 +1,4 @@
-// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns and Customize,
+// The sidebar: a new chat, a search over the chats, the ways to the agents, the activity, the campaigns, the schedules and Customize,
 // what waits and what works (folded or not, as the owner left them), the chats themselves (several of them can be
 // deleted at once) and, in the foot, the way to the settings; a run stops from its composer (item 289). A row whose
 // run works says Working and for how long (item 122). A chat's menu (item 130) pins it,
@@ -367,7 +367,9 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
   const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
-  // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns.
+  // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns
+  // and Schedules.
+  const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
   const customizeLink = el("a", { class: "side-link", href: "#/customize/plugins", onclick: onNavigate }, icon("plug"), el("span", null, "Customize"));
 
   // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
@@ -1129,7 +1131,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       el("span", { class: "grow" }, "New chat"),
       el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
     ),
-    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, customizeLink),
+    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink, customizeLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
   );
@@ -1169,6 +1171,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     setRoute({ tab, runId }) {
       mark(agentsLink, tab === "agents");
       mark(campaignsLink, tab === "campaigns");
+      mark(schedulesLink, tab === "schedules");
       mark(settingsLink, tab === "settings");
       mark(customizeLink, tab === "customize");
       routeRunId = runId;

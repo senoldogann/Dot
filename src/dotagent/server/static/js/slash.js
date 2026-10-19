@@ -21,15 +21,21 @@ export function menuWord(text, caret) {
 export function paletteGroups(commands, palette) {
   const groups = [];
   if (commands.length > 0) {
-    groups.push({ title: "Commands", items: commands.map((command) => ({ ...command, id: `command-${command.label.slice(1)}` })) });
+    groups.push({
+      title: "Commands",
+      kind: "command",
+      items: commands.map((command) => ({ ...command, id: `command-${command.label.slice(1)}`, kind: "command" })),
+    });
   }
   if (palette !== null && palette.skills.length > 0) {
     groups.push({
       title: "Skills",
+      kind: "skill",
       items: palette.skills.map((skill) => ({
         id: `skill-${skill.name}`,
         label: skill.name,
         hint: skill.description,
+        kind: "skill",
         pick: { kind: "skill", name: skill.name },
       })),
     });
@@ -38,7 +44,15 @@ export function paletteGroups(commands, palette) {
     for (const server of palette.servers) {
       groups.push({
         title: `MCP · ${server.name}`,
-        items: server.tools.map((tool) => ({ id: `tool-${tool.name}`, label: tool.name, hint: tool.description, pick: { kind: "plugin", name: server.name } })),
+        kind: "plugin",
+        items: server.tools.map((tool) => ({
+          id: `tool-${tool.name}`,
+          label: tool.name,
+          hint: tool.description,
+          kind: "tool",
+          serverName: server.name,
+          pick: { kind: "plugin", name: server.name },
+        })),
       });
     }
   }
@@ -57,10 +71,12 @@ export function pickGroups(palette) {
       : [
           {
             title: "MCP servers",
+            kind: "plugin",
             items: palette.servers.map((server) => ({
               id: `server-${server.name}`,
               label: server.name,
               hint: `${server.tools.length} ${server.tools.length === 1 ? "tool" : "tools"}`,
+              kind: "plugin",
               pick: { kind: "plugin", name: server.name },
             })),
           },

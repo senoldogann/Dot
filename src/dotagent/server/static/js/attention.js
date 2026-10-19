@@ -205,7 +205,7 @@ function tellAboutCampaign(event) {
 
 function tellAboutMissedFiring(event) {
   const { schedule_id: id, name, status } = event.data;
-  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/settings/schedules", state: "failed" });
+  tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/schedules", state: "failed" });
 }
 
 function tellAboutLearningStalled(event) {

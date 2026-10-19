@@ -4,7 +4,7 @@ final answer of the first in front of the goal, while its chat, its record and i
 alone. With the same chat chosen, the second firing goes on in the first one's chat and reads its conversation instead.
 Either way the second run starts tainted when the first one ended tainted, since it reads the first one's words without
 a message of the owner.
-Settings › Schedules shows the two choices and the row says them, and the chat of the second firing shows the goal
+The Schedules page shows the two choices and the row says them, and the chat of the second firing shows the goal
 alone, in Chrome, wide and on a phone, light and dark. Before, each firing started a fresh chat told its goal alone.
 
 No network and no model service is used.
@@ -291,7 +291,7 @@ async def test_settings_show_the_two_choices_and_the_chat_shows_the_goal_alone(
                     viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                 )
                 await page.goto(ui_url(host, port, TOKEN))
-                await page.goto(f"{served}/#/settings/schedules")
+                await page.goto(f"{served}/#/schedules")
                 # Each schedule's line of when and how it went is drawn, its parts kept by a dot (item 379).
                 await expect(page.locator(".when-line").first).to_contain_text(" · ")
                 await page.get_by_role("button", name="New schedule").click()

@@ -16,16 +16,17 @@ rules, which still hold; its tools are the ones the agent names plus finishing, 
 The run's page wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on the
 home's Today strip wear the face too. Deleting an agent leaves its chats, its lessons and its learned skills to Dot.
 
-An agent can start from a template (item 315). Under the list, **Start from a template** shows eight: Sales
-Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health and Chief
-of Staff, each with its face, its role, what it needs of the Mac and the schedule it suggests. **Use template** makes
-the agent in one click and opens its page; it is then an agent like any other, to change in the editor. Every
-template's instructions say that what leaves the Mac for a person is a draft for you to send (`draft_message`, see
-[Drafts](runs.md#drafts)). Sales Outbound, Talent Scout, Paid Media and Product Performance work on the web and in files
-and name their tools: the web, Dot's Chrome, files, memory, plans, pages and `draft_message`, none of which drives
-Mail, Messages or a terminal; a Send pressed on a web page is an external send, under your approvals. Expense Manager,
-Bug Reproduction, Account Health and Chief of Staff read your mail, calendar or code and have every tool. A suggested
-schedule is only words on the card; Schedules makes one. An agent's page has **Export** in its bar: a file
+An agent can start from a template (item 315). Under the list, **Start from a template** shows nine: Sales
+Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief
+of Staff and Reviewer, each with its face, its role, what it needs of the Mac and the schedule it suggests. **Use
+template** makes the agent in one click and opens its page; it is then an agent like any other, to change in the
+editor. Every template's instructions say that what leaves the Mac for a person is a draft for you to send
+(`draft_message`, see [Drafts](runs.md#drafts)). Sales Outbound, Talent Scout, Paid Media and Product Performance work
+on the web and in files and name their tools: the web, Dot's Chrome, files, memory, plans, pages and `draft_message`,
+none of which drives Mail, Messages or a terminal; a Send pressed on a web page is an external send, under your
+approvals. Expense Manager, Bug Reproduction, Account Health, Chief of Staff and Reviewer read your mail, calendar or
+code and have every tool. A suggested schedule is only words on the card; Schedules makes one. An agent's page has
+**Export** in its bar: a file
 `<name>.dot-agent.json` with the agent's name, role, instructions, model, reasoning level, approvals, tools and look
 (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An agent whose name, role
 or instructions hold a secret is not exported, and the page says to take it out first: a value Dot holds (any value
@@ -91,10 +92,9 @@ dotx campaign stop|resume|achieved ID
 ```
 
 A campaign is a task that Dot keeps working on until its outcome is verified or you stop it. Switch on **Keep going** in
-the composer's **+** (it is there for a task of Dot's), or pass `--standing` to `dotx run`. The run you start is its
-first session, in your conversation; the daemon runs the sessions after it, each a run in a thread of its own, through
-restarts and days.
-A campaign whose first session cannot start is not kept.
+the Execution group of the composer's **Options** menu (it is there for a task of Dot's), or pass `--standing` to `dotx
+run`. The run you start is its first session, in your conversation; the daemon runs the sessions after it, each a run in
+a thread of its own, through restarts and days. A campaign whose first session cannot start is not kept.
 
 - **Targets.** The first session records the campaign's targets and how a session verifies them (`campaign_targets`). A
   session that wants to end while the campaign has no targets is sent back once to record them; targets a later session

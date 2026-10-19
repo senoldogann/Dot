@@ -249,7 +249,7 @@ export function mount(root, _ctx) {
   const count = el("div", { class: "hint" });
   const holder = el("div", null, loadingPanel());
   const more = el("button", { class: "btn", type: "button", hidden: true }, "Load more");
-  const awakeCard = el("div", { class: "card list-box" });
+  const awakeCard = el("div", { class: "list-box" });
   // The hint under the name, on a line of its own: beside it, a hint longer than the row left the name no room.
   const restingHead = el(
     "div",
@@ -261,7 +261,7 @@ export function mount(root, _ctx) {
       "Runs no longer start with these: no run was handed them lately, they did not help, their time ran out, or another note replaced them. A search still finds the ones with no rest tag that have not run out.",
     ),
   );
-  const restingCard = el("div", { class: "card list-box" });
+  const restingCard = el("div", { class: "list-box" });
   // The note a line of a conversation leads to (item 313), named in the address after the tab's name: shown first, to be
   // read, changed or forgotten there; a note forgotten since is said to be gone.
   const askedId = new URLSearchParams(location.hash.split("?")[1] ?? "").get("note") ?? "";
@@ -361,7 +361,7 @@ export function mount(root, _ctx) {
     let shown;
     try {
       const record = await api.get(`/memories/${encodeURIComponent(askedId)}`);
-      shown = el("div", { class: "card list-box" }, memoryRow({ record, similarity: null, score: undefined }, rowActions));
+      shown = el("div", { class: "card" }, memoryRow({ record, similarity: null, score: undefined }, rowActions));
     } catch (error) {
       if (error.status !== 404) {
         throw error;
@@ -552,45 +552,50 @@ export function mount(root, _ctx) {
       "div",
       { class: "memory-layout" },
       el(
-        "div",
-        { class: "memory-side" },
+        "section",
+        { class: "card" },
+        el("div", { class: "card-head" }, el("span", { class: "grow" }, "Remember something")),
         el(
-          "section",
-          { class: "memory-panel" },
-          el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "What Dot knows about you")),
-          dotLines,
-          field("Your lines", ownLines, "Corrections and facts in your own words; Dot's lines above never contradict them."),
-          el("div", { class: "panel-foot" }, ownerHint, el("span", { class: "spacer" }), saveOwn),
-        ),
-        el(
-          "section",
-          { class: "memory-panel" },
-          el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "Remember something")),
+          "div",
+          { class: "card-pad stack" },
           field("Note", content, "One fact, preference or instruction per note."),
           field("Tags", tags, "Optional, separated by commas."),
-          el("div", { class: "panel-foot" }, el("span", { class: "hint" }, "⌘ / Ctrl + Enter"), el("span", { class: "spacer" }), add),
+          el("div", { class: "row" }, el("span", { class: "hint" }, "⌘ / Ctrl + Enter"), el("span", { class: "spacer" }), add),
           outcome,
-        ),
-        el(
-          "section",
-          { class: "memory-panel learning-panel", "data-learning": "" },
-          el("div", { class: "panel-head" }, el("h2", { class: "panel-title" }, "How learning fares"), el("span", { class: "spacer" }), learningHint),
-          learningLines,
         ),
       ),
       el(
         "section",
-        { class: "memory-panel notes-panel" },
+        { class: "card notes-panel" },
         el(
           "div",
-          { class: "panel-head" },
-          el("h2", { class: "panel-title" }, "Notes"),
+          { class: "card-head" },
+          el("span", { class: "grow" }, "Notes"),
           count,
           el("span", { class: "spacer" }),
           search,
         ),
         holder,
-        el("div", { class: "panel-foot" }, more),
+        el("div", { class: "card-pad row" }, more),
+      ),
+      el(
+        "section",
+        { class: "card" },
+        el("div", { class: "card-head" }, el("span", { class: "grow" }, "What Dot knows about you"), el("span", { class: "spacer" }), ownerHint),
+        el(
+          "div",
+          { class: "card-pad stack" },
+          el("div", { class: "field-label" }, "Learned by reflection"),
+          dotLines,
+          field("Your lines", ownLines, "Corrections and facts in your own words; Dot's lines above never contradict them."),
+          el("div", { class: "row" }, el("span", { class: "spacer" }), saveOwn),
+        ),
+      ),
+      el(
+        "section",
+        { class: "card learning-panel", dataset: { learning: "" } },
+        el("div", { class: "card-head" }, el("span", { class: "grow" }, "How learning fares"), el("span", { class: "spacer" }), learningHint),
+        el("div", { class: "card-pad" }, learningLines),
       ),
     ),
   );

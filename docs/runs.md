@@ -8,10 +8,12 @@ that pass (up to `parallel_tools` at once) and hands the results back, until the
 A chat keeps its turns on one page (item 374): each earlier turn reads as its question, what it did and its answer,
 with no "open run" to hop through. What it did is what its run said, in the order it said it, and each stretch of its
 tool calls as one line that says what they did ("Ran 2 commands and read 1 file"), which opens to every call and its
-result, as on the run's own page. Appearance › *Fold tool steps* says whether those lines start folded (Neutral and
-the palettes fold them, Paper does not). The short marks at the left of the conversation stand for its messages, and a
-click on one goes to it — the last of them to the newest question and the work under it. A very long conversation
-keeps its last forty turns on the page and says how many it leaves out.
+result, as on the run's own page. That line opens and folds on a click while the run still works and after it ends,
+and the reader's choice stays; folded, it still says what call runs now, except on a phone, where it keeps only the count.
+Appearance › *Fold tool steps* says whether
+those lines start folded (Neutral and the palettes fold them, Paper does not). The short marks at the left of the
+conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
+work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out.
 
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
 figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI
@@ -60,7 +62,8 @@ ready now (open, waiting for nothing open or failed) and which are held by a fai
 are independent, so the run can hand each to `delegate` in one turn, naming the step; the delegated run's report then
 closes the step (done with the report's start as evidence, or failed) without a mark of the run's own; a step the plan
 does not have (a slip, or a delegate before the plan) does not stop the delegation: the run goes, the result's first
-line says the step was not in the plan, and nothing is marked. A run that calls `finish` with steps still open is asked
+line says the step was not in the plan, and nothing is marked. A `delegate` call waits up to four hours for its
+run's report. A run that calls `finish` with steps still open is asked
 once to close them. A plan can also hold the run's targets (`targets` of `update_plan`, at most 600 characters): for a
 goal that names an outcome, what the run will reach and how its own tools measure it. They stay until new targets
 replace them (an `update_plan` without `targets`, or with an empty text, keeps them), are the first line of the plan in
@@ -197,12 +200,15 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   the message that starts it), and a schedule of the chat (item 291) asks it again every 5, 10, 15, 20 or 30 minutes or
   every 1, 2, 3, 4, 6, 8 or 12 hours, in the chat, as its follow-ups start (its model, reasoning level, speed, approvals
   and goal mode). Each run of it is told how the loop ends: it deletes its schedule (`schedule_delete`) once the work is
-  done for good. Right above the composer a line shows each loop of the chat, how often it asks again, when next, and a
-  Stop that deletes it. A rhythm a cron expression cannot keep exactly, or one shorter than
+  done for good. Right above the composer, in the bar that also says how long the run has worked and how its helpers
+  stand (one pane of glass on a phone, item 401), a line shows each loop of the chat, how often it asks again, when
+  next, and a Stop that deletes it. A rhythm a cron expression cannot keep exactly, or one shorter than
   `[scheduler] min_interval_s`, is refused (422); a new chat then starts nothing, nor when `[scheduler] max_schedules`
   are switched on already. A loop does not go with Keep going, whose campaign goes on by itself.
-- Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB each). A
-  text pasted into the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
+- Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
+  each). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
+  thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into
+  the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it
   reads any attached file, as material rather than instructions; the pencil on its chip puts it back into the box as
   text. A message is still the owner's words: a send with files and an empty box asks for a few words and sends

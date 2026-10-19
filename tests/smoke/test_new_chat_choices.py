@@ -147,9 +147,9 @@ async def _pick(page: Page, pill: str, menu: str, option: str) -> None:
 
 
 async def _keep_going(page: Page) -> Locator:
-    """Keep going's switch, in the "+" menu opened."""
-    await page.get_by_role("button", name="Add", exact=True).click()
-    return _menu(page, "Add").get_by_role("switch", name="Keep going until done")
+    """Keep going's switch, in the Options menu opened (its Execution group)."""
+    await _pill(page, "options").click()
+    return _menu(page, "Options").get_by_role("switch", name="Keep going until done")
 
 
 async def _away_and_back(page: Page, address: str) -> None:

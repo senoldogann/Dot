@@ -1,4 +1,4 @@
-"""Templates and agent files (item 315, after Grok's): each of the eight templates becomes an agent in one click, with
+"""Templates and agent files (item 315, after Grok's): each of the nine templates becomes an agent in one click, with
 the template's role, instructions, tools and face; an agent's page saves it as a file that holds its profile and
 nothing else, and refuses to while its words hold what looks like a key; Import in another home makes the same agent,
 and refuses a file that names tools that home lacks, saying which. Two real daemons, one home after the other, in

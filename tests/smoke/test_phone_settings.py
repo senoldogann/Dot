@@ -1,10 +1,10 @@
 """On a phone the settings are a list of their tabs in groups (item 330), in WebKit as the owner's iPhone (440 px wide)
-and as a small one (320 px), on a served daemon with two schedules, three notes and the Ocean theme.
+and as a small one (320 px), on a served daemon with three notes and the Ocean theme.
 
 On a phone:
 
-- `#/settings` is four groups of rows, ten in all (Skills is a tab of Customize, item 317): Appearance tells the theme
-  on screen, Models the main model, Memory how many notes Dot keeps and Schedules how many schedules there are;
+- `#/settings` is four groups of rows, nine in all (Skills is a tab of Customize, item 317, Schedules a page of its
+  own): Appearance tells the theme on screen, Models the main model and Memory how many notes Dot keeps;
 - a row opens its tab as a page of its own: the bar names the tab, its Back at the top left (item 338) is the one
   way back and no rail or row of tabs shows; Back leads to the list;
 - a card's name stands over the card, out of its surface;
@@ -51,28 +51,21 @@ _TABS: dict[str, str] = {
     "keys": "Providers",
     "rules": "Rules",
     "memory": "Memory",
-    "schedules": "Schedules",
     "harness": "Harness",
     "browser": "Browser",
     "phone": "Phone",
     "system": "System",
 }
-_SCHEDULES: tuple[tuple[str, str, str], ...] = (
-    ("Morning brief", "Summarise my unread mail and today's calendar", "0 8 * * 1-5"),
-    ("Weekly report", "Write the weekly report from the tasks done this week", "0 17 * * 5"),
-)
 _NOTES: tuple[str, ...] = (
     "Prefers window seats and morning flights.",
     "The team stand-up is at 09:30 on weekdays.",
     "Writes reports in British English.",
 )
-# What the rows that hold something say: the theme picked (`dot.theme`), the main model's name, the notes, the
-# schedules.
+# What the rows that hold something say: the theme picked (`dot.theme`), the main model's name and the notes.
 _VALUES: dict[str, str] = {
     "Appearance": "Ocean",
     "Models": SCRIPTED_MODEL.partition(":")[2],
     "Memory": str(len(_NOTES)),
-    "Schedules": str(len(_SCHEDULES)),
 }
 # How far past the screen's edge the page may reach: none, but the rounding of a fraction.
 _OVER_PX: int = 1
@@ -104,7 +97,7 @@ def own_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Iterator[Path]:
 
 @asynccontextmanager
 async def _served(home: Path) -> AsyncIterator[str]:
-    """A daemon on the Dot home ``home`` whose main model is the scripted one, with the schedules and the notes: the
+    """A daemon on the Dot home ``home`` whose main model is the scripted one, with the notes: the
     address it is at."""
     (home / "config.toml").write_text(
         f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
@@ -134,11 +127,6 @@ async def _served(home: Path) -> AsyncIterator[str]:
         address: str = f"http://127.0.0.1:{port}"
         try:
             async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
-                for name, goal, cron in _SCHEDULES:
-                    made: httpx.Response = await client.post(
-                        "/api/schedules", json={"name": name, "goal": goal, "cron": cron}
-                    )
-                    assert made.status_code == 201, made.text
                 for content in _NOTES:
                     made = await client.post("/api/memories", json={"content": content, "tags": []})
                     assert made.status_code == 201, made.text

@@ -26,8 +26,9 @@ them, and the fold is kept. Working lists too what is no chat's: a schedule abou
 (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
 days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
 chat in sight, and the search finds the chats at work
-too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
-and **Customize** ([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
+too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**,
+**Schedules** (a page of its own since item 401) and **Customize**
+([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the approvals waiting, and the connection to the daemon while it is being made or lost; what
@@ -105,7 +106,9 @@ per model) and **Options** (the approval mode, which the pill always shows by it
 Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock for YOLO, in the warn ink, on no
 fill; its menu lists the four modes with what each does, item 398, see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)) and the round send, quiet while the box is
-empty. Each pill is an icon and its value, on no ground until the
+empty. The files under the box stand in one row that wraps only when the frame runs out of width: a photo shows itself
+at a thumbnail's size, its name its tooltip and its × at its corner, where another file keeps its icon, its name and its
+size. Each pill is an icon and its value, on no ground until the
 pointer is over it; as the frame narrows the mode's name folds to its icon, then the chevrons and the agent's name go
 and the model's name gives way with an ellipsis, while the reasoning keeps its level's word (item 273), so on a phone
 the bar is still one line. On a phone the bar's buttons are 36 px, and the box's text is the size chosen for it, at
@@ -142,17 +145,17 @@ the MCP servers by name with the number of their tools, then the skills and each
 after it; a pick is a chip and the at word goes. An `@` inside a word, as in an address, opens nothing. A run that waits
 for your approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
-The **+** at the left of the bar (item 318, after Codex's composer) opens **Add files**, in the box of a run **Save
-skill**, the **Goal mode** switch, on the home for a task of Dot's **Keep going** (item 353), and **Plan first**, then
-**Plugins**, the MCP servers with tools (a connected app's
-among them), and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked, there or in the slash or
-at menu, is a chip under the box in a colour of its name, which its × takes away; Plan first is a chip too, and a chat
-has neither it nor goal mode. The picks go with the message (`plugins`, `skills` and `plan_first` of `POST /api/runs`,
-and of a message the queue holds), and once it is sent they stand under it as chips (the run's `picks` event); a message
-that steers the run under way leaves them for the next one, and the page says so, and a queued message with picks is not
-steered into the run at work: it stays queued to start a run of its own. A run sent with picks starts with each
-picked server's tool group on from its first step when its tools are grouped (with every tool offered they are on
-anyway), and its first message is your words, then a line that names the servers to use, Plan first's (write the plan
+The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
+screenshots alike; a phone opens its own sheet); in the box of a run a **More** button beside it holds **Save skill**.
+The slash and at menus pick **Plugins** (the MCP servers with tools) and **Skills**, both as `GET /api/palette` lists
+them. A plugin or a skill picked is a chip under the box in a colour of its name, which its × takes away; Plan first is
+a chip too, and a chat has neither it nor goal mode nor Keep going; all three switches stand in the **Options** menu's
+Execution group, under the approvals (item 353). The picks go with the message (`plugins`, `skills` and `plan_first` of
+`POST /api/runs`, and of a message the queue holds), and once it is sent they stand under it as chips (the run's `picks`
+event); a message that steers the run under way leaves them for the next one, and the page says so, and a queued message
+with picks is not steered into the run at work: it stays queued to start a run of its own. A run sent with picks starts
+with each picked server's tool group on from its first step when its tools are grouped (with every tool offered they are
+on anyway), and its first message is your words, then a line that names the servers to use, Plan first's (write the plan
 with `update_plan`, then ask with `ask_user` and act once you agree: the prompt asks it, nothing holds the run's tools
 back), and each picked skill's instructions as the `skill` tool gives them; the run's goal stays your words. Picks a run
 cannot start with are refused, with why, and nothing starts: a server that is not connected or none of whose tools the
@@ -160,10 +163,10 @@ run may use (its mode's, within its agent's bounds), a skill it is not offered, 
 YOLO run does not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is OpenCode's own
 agent. A run that goes on from another (Resume, or an answer that came after its run ended) starts without the picks:
 the first message, with their lines and skills, stays in the chat, and with grouped tools `use_tools` turns a picked
-server's group on. **Save skill** (`POST /api/runs/{id}/skill`) has the review model
-write the skill of the run as a learned skill, as one is written when a run ends, also after fewer acting steps than
-`[agent] skill_min_steps`; it is refused while learned skills are off, and for a run that did not end done or took no
-acting step, a delegated run, an eval's and one of OpenCode's agent.
+server's group on. **Save skill** (`POST /api/runs/{id}/skill`) has the review model write the skill of the run as a
+learned skill, as one is written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is
+refused while learned skills are off, and for a run that did not end done or took no acting step, a delegated run, an
+eval's and one of OpenCode's agent.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
@@ -200,7 +203,9 @@ how long it took ("Completed in 1m 46s", "Working for 2m"), whether its parent s
 says what they did, "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it
 while it runs, "Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and
 screenshot, each call one quiet line with its icon, its result on a hairline under it once opened, while approvals,
-questions and policy notes stay in the open. The lines of how a run was set up (the
+questions and policy notes stay in the open. A click on that line opens or folds it while the run still works and
+after it ends, and the reader's choice stands for the life of the page; folded, it keeps the call under way in sight (on a phone, only the count).
+The lines of how a run was set up (the
 notes and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another
 model) are not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming
 them in short and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a
@@ -309,8 +314,10 @@ sight (a phone that put the app away) starts again once it is back (item 276). T
 first browser step, and a run at work that first uses its browser opens the panel on the Screen tab beside the chat,
 unless Settings › Browser turned that off (item 354); until a frame comes it keeps the shape of a screen and says why,
 with a mark and a title (no page yet, waiting for the page, the view closed, the run ended, or a run in a `dotx`
-command, item 220). **Watch** and **Close the view** open and close it by hand; once the run has ended it keeps the last
-screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the agent's name). Since that
+command, item 220). A Screen tab that has had no page at all says instead, in the empty panel the other tabs use, that
+Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the setting under
+Settings › Browser that opens it when a run starts its browser (item 401). **Watch** and **Close the view** open and
+close it by hand; once the run has ended it keeps the last screen and Watch goes. A pill under it says who has the browser ("Dot has control", or the agent's name). Since that
 view shows the page, Dot's own Chrome stays in the background while a run works (`[browser] raise_window`, off by
 default, items 97 and 118): the tabs Dot opens are opened behind, the app you were in gets the focus back right after
 Chrome starts and after a page opens a tab of its own, and switching tabs does not raise the window; Settings › Browser
@@ -344,7 +351,7 @@ one; a provider without a key, or whose key was refused (HTTP 401), says so and 
 access (HTTP 403) says that, with its words), **Providers** (the providers Dot signs in with, each with its key and the
 models it brings; see [Models and providers](models.md#models-and-providers)), **Browser** (which Chrome Dot browses
 with and what Chrome has to allow first; see [Browser use](browser-and-computer-use.md#browser-use)), **Rules**,
-**Memory**, **Skills**, **Schedules**, **Harness** (what Dot improves around its model: the version in use, a form for
+**Memory**, **Skills**, **Harness** (what Dot improves around its model: the version in use, a form for
 one of your own, every version with Adopt and Retire, the steps of the loop, the experiences and how the nightly step is
 set; see [The harness](harness.md)), **Phone** (the addresses a phone reaches Dot at and a pairing code for its
 home-screen app; see [Dot on the phone](phone.md#dot-on-the-phone)) and **System** (the daemon, its facts in four
@@ -354,7 +361,8 @@ ways to **Diagnostics** and **Open source licences**, pages of their own). Which
 The tabs sit beside their content when the window has the room and above it otherwise, in one row that scrolls sideways
 with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they are a list in groups
 whose rows open each tab as a page of its own (item 330, under [Dot on the phone](phone.md#dot-on-the-phone)). The
-earlier addresses of the memory, schedules, rules and system pages lead to their tabs.
+earlier addresses of the memory, rules and system pages lead to their tabs, and the schedules' tab
+(`#/settings/schedules`) to the Schedules page.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its

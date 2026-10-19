@@ -257,7 +257,7 @@ function buildDaemon() {
   }
 
   return {
-    element: section("Daemon", refreshButton, el("div", null, body, el("div", { class: "card-pad" }, goOn.element))),
+    element: section("Daemon", refreshButton, el("div", null, body, el("div", { class: "card-pad daemon-resume" }, goOn.element))),
     paint(snapshot) {
       if (snapshot.status !== null) {
         body.replaceChildren(...statusFacts(snapshot.status));
@@ -270,7 +270,8 @@ function buildDaemon() {
 }
 
 function buildFailsafe() {
-  const text = el("div", { class: "grow" });
+  const text = el("div", { class: "grow muted" });
+  const statusBadge = el("span", { class: "badge b-muted" }, "standby");
   const engage = el(
     "button",
     { class: "btn danger solid", type: "button", onclick: () => attempt(engageFailsafe) },
@@ -279,9 +280,15 @@ function buildFailsafe() {
   );
   const release = el("button", { class: "btn", type: "button", onclick: () => attempt(releaseFailsafe) }, "Release");
   return {
-    element: el("section", { class: "card card-pad row" }, text, engage, release),
+    element: section(
+      "Emergency stop",
+      statusBadge,
+      el("div", { class: "card-pad row" }, text, engage, release),
+    ),
     paint(snapshot) {
       const engaged = snapshot.status?.failsafe_engaged === true;
+      statusBadge.className = engaged ? "badge b-bad" : "badge b-muted";
+      statusBadge.textContent = engaged ? "engaged" : "standby";
       text.textContent = engaged
         ? "The emergency stop is engaged: every run was cancelled and desktop control is blocked."
         : "The emergency stop cancels every running task and blocks desktop control until you release it.";

@@ -347,7 +347,8 @@ async def test_the_run_page_has_no_character_card_and_its_answer_wears_the_face(
             )
             await page.goto(f"{base}/#/runs/{run.id}")
             await expect(page.locator(".run-layout")).to_have_attribute("data-stage", "wide")
-            await expect(page.locator(".inspector section.computer")).to_be_visible()
+            # A run that has had no page: the Screen tab says Dot's computer is quiet (item 401).
+            await expect(page.locator(".inspector").get_by_text("Dot's computer is quiet")).to_be_visible()
             await expect(page.locator(".answer .turn-face .avatar[data-state='done']")).to_have_count(1)
             assert await page.locator(".character-card, .run-chat-head").count() == 0
             await expect(page.locator(".stage-title .avatar")).to_be_visible()

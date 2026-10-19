@@ -2,7 +2,7 @@
 
 ## Customize › Plugins
 
-**Customize**, the sidebar's page under Campaigns (items 278, 289 and 316), has two tabs: **Plugins**, the services Dot
+**Customize**, the sidebar's page under Campaigns and Schedules (items 278, 289, 316 and 401), has two tabs: **Plugins**, the services Dot
 works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
 leads to Plugins.
 

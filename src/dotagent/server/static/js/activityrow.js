@@ -18,8 +18,8 @@ const KIND_ICON = {
   question: "help",
   takeover: "hand",
   schedule: "calendar",
-  reflection: "sparkle",
-  lesson: "sparkle",
+  reflection: "brain",
+  lesson: "brain",
   journal: "file",
 };
 

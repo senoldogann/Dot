@@ -32,6 +32,7 @@ import { changesSection } from "../changes.js";
 import { setupSection } from "../setup.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { createStageSize } from "../stagesize.js";
+import { RUN_BACK_EVENT } from "../shell.js";
 import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFailed } from "../state.js";
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
@@ -195,6 +196,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // has a pill where the composer would be: the model, how long it took, whether its parent still works, the way back.
   // The pill is in the dock, so it stays at the window's foot as the conversation scrolls (item 244).
   const parentId = run.parent_run_id;
+  // A phone's way back from a chat's page is the sidebar in place, never a page of chats to walk through; from a
+  // delegated run it is the run that started it (item 401). The shell draws the button, the page says where it leads.
+  window.dispatchEvent(new CustomEvent(RUN_BACK_EVENT, { detail: { to: parentId === null ? null : `#/runs/${parentId}` } }));
   const crumb = parentId === null ? null : el("a", { class: "stage-crumb", href: `#/runs/${parentId}` }, "Parent run");
   const crumbSep = parentId === null ? null : el("span", { class: "stage-sep", "aria-hidden": "true" }, "/");
   const stageName = el("span", { class: "stage-name" }, parentId !== null ? clip(run.goal, CRUMB_CHARS) : agent !== null ? agent.name : dotName());
@@ -335,7 +339,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     el(
       "summary",
       { class: "lessons-head" },
-      el("span", { class: "lessons-mark" }, icon("sparkle")),
+      el("span", { class: "lessons-mark" }, icon("brain")),
       el("span", { class: "lessons-title" }, "Lessons from this run"),
       lessonsCount,
       el("span", { class: "lessons-chevron" }, icon("chevron")),
@@ -631,8 +635,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   const background = backgroundWork({ threadId: run.thread_id });
   // The chat's loops (item 281), beside its commands at work.
   const loops = chatLoops({ threadId: run.thread_id });
-  // The line over the composer (items 297, 352 and 360): the run's time, its helpers and the messages queued, each the
-  // way to where it is told of.
+  // The bar over the composer (items 297, 352, 360 and 401): the run's time, its helpers and the messages queued at its
+  // left, and the way down at its right end, all in one pane of glass.
   const capsule = createCapsule({
     onWork: () => inspector.openTab("run"),
     onHelpers: () => inspector.openTab("agents"),
@@ -641,7 +645,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       queue.element.scrollIntoView({ block: "nearest" });
     },
   });
-  const dock = el("div", { class: "dock" }, capsule.element, resumeLine, queue.element, loops.element, background.element, frame.element, foot);
+  const statusBar = el("div", { class: "status-bar", hidden: true }, capsule.element);
+  const dock = el("div", { class: "dock" }, statusBar, resumeLine, queue.element, loops.element, background.element, frame.element, foot);
 
   // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
   const waitingMessages = [];
@@ -921,7 +926,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     footStop.hidden = !active;
     // Short enough for one line of a phone's composer (item 111).
     const working = steers(false) ? "Steer this run, or /btw to ask on the side" : "Queue a message, or /btw to ask on the side";
-    input.placeholder = active ? working : "Follow up, or /btw to ask on the side";
+    input.placeholder = active ? working : "Follow up (@ for skills, / for commands, or /btw to ask on the side)";
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
@@ -953,10 +958,19 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       helpers: timeline.helperStatuses(),
       queued: queue.count(),
     });
+    paintBar();
+  }
+
+  // The bar stands while one of its parts has something to say or the way down is offered in it (item 401).
+  let jumpVisible = false;
+
+  function paintBar() {
+    statusBar.hidden = capsule.element.hidden && !jumpVisible;
   }
 
   // ------------------------------------------------------------------------------------------------ scroll
-  // The way down (item 96): a round arrow just above the composer while the end, or the answer, is below the window.
+  // The way down (item 96): an arrow at the right end of the bar over the composer while the end, or the answer, is
+  // below the window (item 401).
   const jump = el(
     "button",
     {
@@ -966,7 +980,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       title: "Jump to latest",
       "aria-label": "Jump to latest",
       onclick: () => {
+        jumpVisible = false;
         jump.hidden = true;
+        paintBar();
         if (answerNode !== null) {
           answerNode.scrollIntoView({ block: "start", behavior: "smooth" });
           return;
@@ -977,7 +993,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     },
     icon("arrowDown"),
   );
-  dock.prepend(jump);
+  statusBar.append(jump);
 
   // What scrolls the conversation (item 352): on a phone the conversation itself, between the top bar and the composer,
   // which stay put (`html.chat-shell`, run.css); on a wider window the window, as before. The conversation's box is
@@ -1006,11 +1022,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   /** The button leads to the answer once there is one that is still below the window, else to the end of a live run. */
   function paintJump() {
     const below = answerNode !== null ? answerNode.getBoundingClientRect().top > seenEnd() : active && !following;
-    const unseen = below && !landing;
-    jump.hidden = !unseen;
+    // The arrow shows while the end, or the answer, is below the window and the answer is not on its way into view.
+    const show = below && !landing;
+    jumpVisible = show;
+    jump.hidden = !show;
     const words = answerNode !== null ? "Jump to the answer" : "Jump to latest";
     jump.title = words;
     jump.setAttribute("aria-label", words);
+    paintBar();
   }
 
   // The reader leaves the end by scrolling up, not because the end moved on while a scroll of the page's own was on its
@@ -1202,6 +1221,21 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   });
   // The agents of the chat: the runs its runs handed work to (item 227).
   const agents = agentList({ threadId: run.thread_id, helper: (id) => timeline.helper(id) });
+  // The Screen tab with nothing yet (item 401): Dot's computer is quiet, and what it shows and the screenshots it takes
+  // stand there once it works. The empty panel is the page's own, in Dot's voice; the card of the page takes its place
+  // as soon as there is a page.
+  const screenQuiet = el(
+    "div",
+    { class: "empty" },
+    icon("monitor"),
+    el("div", null, "Dot's computer is quiet: the screenshots it takes while it works will appear here."),
+    el("div", { class: "hint" }, "Settings › Browser opens Dot's computer when a run starts its browser."),
+  );
+  let screenContent = detail.held;
+  function paintScreen() {
+    screenQuiet.hidden = screenContent;
+    computer.element.hidden = !screenContent;
+  }
   // The side panel (item 84), in tabs (item 203), each with its icon (item 227): the run (its details, its cost, item
   // 96, and the files of the conversation), the plan, the agents of the chat and the screen (Dot's computer and the
   // screenshots). The run's state is the top bar's face and the Details section's first
@@ -1213,10 +1247,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
-      { id: "screen", label: "Screen", icon: "monitor", sections: [computer.element] },
+      { id: "screen", label: "Screen", icon: "monitor", sections: [screenQuiet, computer.element] },
     ],
     screensIn: "screen",
   });
+  paintScreen();
 
   /** Read the chat's agents again; their tab counts them, and so does a phone's bar. */
   async function paintAgents() {
@@ -1272,10 +1307,22 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     },
     onRunStatus,
     onAnswer,
-    onImage: inspector.addImage,
+    onImage: (name) => {
+      screenContent = true;
+      paintScreen();
+      inspector.addImage(name);
+    },
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
-    onHeld: computer.setHeld,
+    onHeld: (held) => {
+      computer.setHeld(held);
+      if (held) {
+        screenContent = true;
+        paintScreen();
+      }
+    },
     onBrowserStep: () => {
+      screenContent = true;
+      paintScreen();
       computer.notePage();
       screenButton.hidden = false;
       // A run at work that opens its browser shows its page beside the chat (item 354) unless Settings › Browser turned

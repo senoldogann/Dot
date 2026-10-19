@@ -18,7 +18,7 @@ from dotagent.tools.context import DelegateOutcome, Spawner, ToolContext
 DELEGATE_TOOL: str = "delegate"
 DELEGATE_SOURCE: str = "delegate"
 _NONCE_BYTES: int = 8
-_TIMEOUT_S: float = 3600.0
+_TIMEOUT_S: float = 4 * 3600.0
 _SUMMARY_CHARS: int = 100
 _NO_REPORT: str = "(the run reported nothing)"
 # How much of a delegated run's report goes into the evidence of the plan step it closes.

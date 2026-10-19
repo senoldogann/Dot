@@ -277,13 +277,13 @@ async def _shoot(context: BrowserContext, base: str, pages: tuple[tuple[str, str
             )
             assert clipped == [], clipped
             if await page.locator(".inspector[data-mode='docked']").is_visible():
-                # The panel at half the page (item 109), the character at the head of the conversation; then back.
+                # A run that has had no page: its Screen tab says Dot's computer is quiet (item 401); the panel's sizes
+                # come with a page (test_takeover.py).
                 await page.locator(".inspector").get_by_role("tab", name="Screen").click()
-                sizes = page.locator("section.computer .stage-sizes")
-                await sizes.get_by_role("button", name="Wide").click()
+                await expect(page.locator(".inspector").get_by_text("Dot's computer is quiet")).to_be_visible()
+                await expect(page.locator("section.computer")).to_be_hidden()
                 await page.wait_for_timeout(_SETTLE_MS)
-                await page.screenshot(path=str(out / f"{tag}-run-wide.png"), full_page=False)
-                await sizes.get_by_role("button", name="Compact").click()
+                await page.screenshot(path=str(out / f"{tag}-run-screen.png"), full_page=False)
     await page.close()
 
 

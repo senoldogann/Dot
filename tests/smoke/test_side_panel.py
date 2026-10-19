@@ -320,24 +320,11 @@ async def test_the_side_panel_slides_in_and_out_beside_the_conversation(
             for width, scheme in _SHOTS:
                 page = await _open_panel(browser, address, run.id, width, scheme)
                 await page.locator(".inspector").get_by_role("tab", name="Screen").click()
-                empty: Locator = page.locator(".inspector .computer-empty")
-                await expect(empty).to_have_attribute("data-state", "ended")
-                await expect(empty.locator(".computer-empty-title")).to_have_text("The run has ended")
-                await expect(empty.locator(".hint")).to_have_text(
-                    "Its browser's page is shown here only while a run is going on."
-                )
-                ratio: float = await page.locator(".inspector .computer-screen").evaluate(
-                    "node => node.clientWidth / node.clientHeight"
-                )
-                assert 1.5 < ratio < 1.7, ratio
-                # Beside the conversation the toolbar holds the panel's sizes; the drawer has none, and with no
-                # address either, nothing stands between the title and the screen.
-                toolbar: Locator = page.locator(".inspector .computer-toolbar")
-                if width < 960:
-                    await expect(toolbar).to_be_hidden()
-                else:
-                    await expect(toolbar).to_be_visible()
-                await _shoot(page, tmp_path / f"panel-screen-ended-{width}-{scheme}.png")
+                # A run that has had no page: the Screen tab says Dot's computer is quiet, in the empty panel the other
+                # tabs use (item 401); the computer's card, with its sizes and its states, comes with a page.
+                await expect(page.locator(".inspector").get_by_text("Dot's computer is quiet")).to_be_visible()
+                await expect(page.locator(".inspector section.computer")).to_be_hidden()
+                await _shoot(page, tmp_path / f"panel-screen-quiet-{width}-{scheme}.png")
                 await page.close()
         finally:
             await browser.close()

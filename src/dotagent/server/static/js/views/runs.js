@@ -88,7 +88,7 @@ function buildComposer(ctx, listener) {
   const frame = composerFrame({
     label: "New chat",
     boxLabel: "Goal",
-    placeholder: "Message Dot",
+    placeholder: "Message Dot (@ for skills, / for commands)",
     maxPx: MAX_GOAL_PX,
     commands: [
       ...MODES.map((option) => ({
@@ -116,12 +116,12 @@ function buildComposer(ctx, listener) {
     onChange: keepChoices,
   });
   // A campaign checks its outcome itself, so goal mode does not apply to one; the switch only shows for a task. It is a
-  // row of the "+" menu after Goal mode's (item 353).
+  // row of the Options menu's Execution group (item 353).
   const standing = standingPicker((on) => {
     choices.goalMode.setAvailable(!on);
     keepChoices();
   });
-  frame.addMenuItems(() => [standing.element]);
+  choices.addExecutionItem(() => [standing.element]);
   // Only a task of Dot's keeps going, and goal mode waits while it does.
   function modePicked(id) {
     standing.setAvailable(id === "task" && agentId === "");
@@ -144,7 +144,8 @@ function buildComposer(ctx, listener) {
   }
   function paintAgent() {
     const chosen = chosenAgent();
-    goal.placeholder = chosen === null ? "Message Dot" : `Message ${chosen.name}`;
+    const name = chosen === null ? "Dot" : chosen.name;
+    goal.placeholder = `Message ${name} (@ for skills, / for commands)`;
     agentPill.setValue(chosen === null ? "Dot" : chosen.name, "");
     agentPill.setIcon(chosen === null ? actorFace(DOT_ID, "idle", null) : actorFace(chosen.id, "idle", chosen.look));
     standing.setAvailable(chosen === null && choices.value().mode === "task");

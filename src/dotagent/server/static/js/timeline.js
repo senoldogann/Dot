@@ -34,6 +34,9 @@ const FINISH_TOOL = "finish";
 const VERDICT_TEXT = { ask: "Needs approval", handoff: "Handed to you", deny: "Blocked by policy" };
 // The ways a model turn ends that need no word of their own.
 const ORDINARY_ENDS = new Set(["stop", "tool_calls", ""]);
+// The open state of each group of steps the reader chose on this page, by the group's element (see buildGroup): a later
+// event that repaints the head leaves the group as they left it, and so does the end of the run.
+const READER_OPEN = new WeakMap();
 // The words of a delegated run's status ring, for its tooltip and for a screen reader.
 const RING_LABELS = { blocked: "waiting" };
 // The faces the head of a group of helpers shows, the rest counted (item 245), and how much of a helper's answer its row
@@ -254,7 +257,8 @@ function memoryLine(data, args) {
     : el("a", { class: "note memory-line", href: `#/settings/memory?note=${encodeURIComponent(id)}` }, ...parts);
 }
 
-/** An empty group of tool steps that starts at `ts` (seconds); it is "working" until something ends it. */
+/** An empty group of tool steps that starts at `ts` (seconds); it is "working" until something ends it. Its fold is the
+ * reader's once they touch its summary, and kept by its element for the life of the page. */
 function buildGroup(ts) {
   const state = el("span", { class: "steps-state" });
   const title = el("span", { class: "steps-title" });
@@ -264,6 +268,18 @@ function buildGroup(ts) {
   const body = el("div", { class: "steps-body" });
   const head = el("summary", { class: "steps-head" }, state, title, count, failed, el("span", { class: "chev" }, icon("chevron")), latest);
   const node = el("details", { class: "steps", open: !foldSteps() }, head, body);
+  // A click or a key on the summary is the reader's choice, written down once the browser has turned the group; the page's
+  // own opening of it (a thought it takes in) never becomes their choice, and never undoes one they made.
+  let byReader = false;
+  head.addEventListener("click", () => {
+    byReader = true;
+  });
+  node.addEventListener("toggle", () => {
+    if (byReader) {
+      READER_OPEN.set(node, node.open);
+    }
+    byReader = false;
+  });
   return { node, body, state, title, count, failed, latest, live: null, tail: true, pending: 0, calls: 0, kinds: {}, failedCalls: 0, cutCalls: 0, start: ts, end: ts, longest: 0, last: "" };
 }
 
@@ -285,6 +301,10 @@ function paintGroup(group) {
   setText(group.failed, troubles.filter((text) => text !== "").join(" · "));
   group.latest.hidden = !live;
   setText(group.latest, live ? group.last : "");
+  // The fold is the reader's once they chose it: a paint leaves it as they left it, whatever else touched the head.
+  if (READER_OPEN.has(group.node) && group.node.open !== READER_OPEN.get(group.node)) {
+    group.node.open = READER_OPEN.get(group.node);
+  }
 }
 
 /**
@@ -477,10 +497,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       scope.turnGroup = group;
       scope.groups.push(group);
       // The thinking of the step whose calls start the group, with nothing after it, is the group's first row (item 246);
-      // a thought the reader opened stays in sight, the group opening with it.
+      // a thought the reader opened stays in sight, the group opening with it unless they chose its fold themselves.
       if (scope.thought !== null && scope.container.lastElementChild === scope.thought.node) {
         group.body.append(scope.thought.node);
-        group.node.open = group.node.open || scope.thought.node.open;
+        if (scope.thought.node.open && !READER_OPEN.has(group.node)) {
+          group.node.open = true;
+        }
         scope.thought.group = group;
       }
       scope.container.append(group.node);

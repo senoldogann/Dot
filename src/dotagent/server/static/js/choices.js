@@ -65,7 +65,8 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * them), and `once` (the id of a choice for one message armed as the box opens, or null; item 397).
  * `optionsTitle` is the Options pill's tooltip, `more()` the lines its menu shows after the approvals, `onMode(id)` runs
  * after a mode was chosen, and `onChange()` after any choice was made (`value()` has it then). Goal mode's switch is a
- * row of the frame's "+" menu (item 318), and a chat, which has neither, hides it and Plan first.
+ * row of the Options menu's Execution group (`addExecutionItem`, item 353), and a chat, which has neither, hides it
+ * and Plan first.
  *
  * Returns `pills` (`{ mode, model, reasoning, options }`, the elements), `setMode(id)`, `goalMode` (its picker),
  * `ready()` (resolves once the models are loaded), `value()` (what the next message starts its run with: `{ mode, model,
@@ -109,12 +110,34 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));
-  frame.addMenuItems(() => [goalMode.element]);
+  const executionItems = [];
+  function addExecutionItem(build) {
+    executionItems.push(build);
+  }
+  const executionGroup = el(
+    "div",
+    { class: "pop-group pop-execution", role: "group", "aria-label": "Execution" },
+  );
   const optionsMenu = anchoredPopover({
     anchor: optionsPill.element,
     frame: frame.element,
     label: "Options",
-    build: () => [approvals.element, ...more(), approvals.warning],
+    build: () => {
+      const isChat = modeId === "chat";
+      executionGroup.hidden = isChat;
+      executionGroup.replaceChildren(
+        el("div", { class: "pop-heading" }, "Execution"),
+        ...executionItems.flatMap((build) => build()),
+        goalMode.element,
+        frame.picks.planRow(),
+      );
+      return [
+        approvals.element,
+        approvals.warning,
+        ...(isChat ? [] : [executionGroup]),
+        ...more(),
+      ];
+    },
   });
 
   // The mode (item 108): a pill with the mode's icon, its menu the three modes with what each does. A chat has no goal
@@ -133,6 +156,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     paintMode();
     goalMode.setAvailable(id !== "chat");
     frame.picks.setPlanAvailable(id !== "chat");
+    executionGroup.hidden = id === "chat";
   }
   function setMode(id) {
     showMode(id);
@@ -162,6 +186,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
   paintMode();
   goalMode.setAvailable(modeId !== "chat");
   frame.picks.setPlanAvailable(modeId !== "chat");
+  executionGroup.hidden = modeId === "chat";
 
   // The model: the daemon's default until one is picked, worn with its provider's mark (item 108).
   const modelPill = composerPill({ id: "model", caption: "Model", value: "", icon: null });
@@ -410,6 +435,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     pills,
     setMode,
     goalMode,
+    addExecutionItem,
     ready,
     value: () => {
       const boost = onceFor(selectedInfo());

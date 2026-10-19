@@ -1,6 +1,6 @@
 """A chat's loop (item 281): ``/loop 30m <message>`` in a chat asks Dot that message again on a rhythm, in that chat, as
 one of its schedules (item 291), until the owner stops it or a run of it deletes it once its work is done for good.
-A loop is a schedule like any other: Settings › Schedules lists it, and its runs start as the chat's follow-ups do."""
+A loop is a schedule like any other: the Schedules page lists it, and its runs start as the chat's follow-ups do."""
 
 import re
 

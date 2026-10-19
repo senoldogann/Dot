@@ -3,8 +3,9 @@ pick its group is off (a grouped run, the fixture MCP server); a picked skill an
 the run's first message, while the run's goal stays the owner's words; a queued message keeps its picks; picks a run
 cannot start with are refused, and nothing starts; Save skill writes the skill of a run that ended done after fewer
 acting steps than a skill needs on its own, and refuses a run with none. In the browser, wide and light, and on a phone
-and dark: the "+" menu picks plugins, skills and Plan first as chips, the slash menu too, a chip goes with its ×, the
-picks go with the message and stand under it, and on a phone the chips wrap inside the box.
+and dark: the "+" opens the file picker, the at and slash menus pick plugins and skills and the Options menu Plan first,
+as chips, a chip goes with its ×, the picks go with the message and stand under it, and on a phone the chips wrap inside
+the box.
 
 No network and no model service is used: the scripted model plays the runs and answers as the review model too; the
 homes are throw-away directories.
@@ -68,7 +69,7 @@ TOKEN: str = "composer-picks-test-token"
 WAIT_S: float = 60.0
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _MAX_EVENTS: int = 10_000
-# The browser's window height; the "+" menu must fit in it.
+# The browser's window height; the Options menu must fit in it.
 _HEIGHT: int = 900
 
 
@@ -486,7 +487,7 @@ async def _fits(page: Page, inner: Locator, outer: Locator) -> None:
 
 
 @pytest.mark.browser
-async def test_the_plus_menu_picks_plugins_skills_and_plan_first_as_chips_that_go_with_the_message(
+async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_with_the_message(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
     passes: tuple[tuple[int, Literal["light", "dark"], tuple[str, ...]], ...] = (
@@ -512,39 +513,34 @@ async def test_the_plus_menu_picks_plugins_skills_and_plan_first_as_chips_that_g
                     goal: Locator = page.locator("textarea[aria-label='Goal']")
                     chips: Locator = composer.locator(".pick-list .pick-chip")
                     await expect(chips).to_have_count(0)
-                    # The "+" opens Add files, goal mode, Plan first, then the servers and the skills to pick.
-                    await composer.get_by_role("button", name="Add", exact=True).click()
-                    menu: Locator = composer.locator(".composer-popover[aria-label='Add']")
-                    await expect(menu.get_by_role("button", name=re.compile("^Add files"))).to_be_visible()
-                    await expect(menu.get_by_role("switch", name="Goal mode")).to_be_visible()
-                    plugin: Locator = (
-                        menu.get_by_role("listbox", name="Plugins").get_by_role("option").filter(has_text=SERVER)
-                    )
-                    await expect(plugin).to_contain_text("10 tools")
-                    await plugin.click()
-                    await expect(plugin).to_have_attribute("aria-selected", "true")
-                    await menu.get_by_role("switch", name="Plan first").click()
-                    await expect(menu.get_by_role("switch", name="Plan first")).to_have_attribute(
+                    # The "+" opens the file picker directly.
+                    await expect(composer.get_by_role("button", name="Add files")).to_be_visible()
+                    await expect(composer.get_by_role("button", name="More")).to_be_hidden()
+                    # The "@" menu picks servers and skills.
+                    await goal.click()
+                    await goal.type(f"@{SERVER}")
+                    await expect(composer.locator(".slash-menu [role=option]").first).to_contain_text(SERVER)
+                    await goal.press("Enter")
+                    for name in skills:
+                        await goal.type(f"@{name}")
+                        await expect(composer.locator(".slash-menu [role=option]").first).to_contain_text(name)
+                        await goal.press("Enter")
+                    # Options holds Goal mode and Plan first.
+                    await composer.locator(".composer-pill[data-pill='options']").click()
+                    options_menu: Locator = composer.locator(".composer-popover[aria-label='Options']")
+                    await expect(options_menu.get_by_role("switch", name="Goal mode")).to_be_visible()
+                    await options_menu.get_by_role("switch", name="Plan first").click()
+                    await expect(options_menu.get_by_role("switch", name="Plan first")).to_have_attribute(
                         "aria-checked", "true"
                     )
-                    for name in skills:
-                        await (
-                            menu.get_by_role("listbox", name="Skills")
-                            .get_by_role("option")
-                            .filter(has_text=re.compile(f"^{name}"))
-                            .click()
-                        )
+                    await page.keyboard.press("Escape")
                     await expect(chips).to_have_count(2 + len(skills))
                     await expect(composer.locator(".pick-chip[data-kind='plugin']")).to_have_attribute(
                         "data-name", SERVER
                     )
-                    menu_box: dict[str, float] | None = await menu.bounding_box()
-                    assert menu_box is not None
-                    assert menu_box["x"] >= 0 and menu_box["x"] + menu_box["width"] <= width, menu_box
-                    assert menu_box["y"] >= 0 and menu_box["y"] + menu_box["height"] <= _HEIGHT, menu_box
-                    await page.screenshot(path=str(tmp_path / f"plus-menu-{width}-{scheme}.png"), animations="disabled")
-                    await page.keyboard.press("Escape")
-                    await expect(menu).to_be_hidden()
+                    await page.screenshot(
+                        path=str(tmp_path / f"chips-before-{width}-{scheme}.png"), animations="disabled"
+                    )
                     # A chip goes with its ×; the slash menu picks a skill as the same chip, and nothing is typed.
                     await composer.get_by_role("button", name=f"Remove {SKILL_NAME}").click()
                     await expect(chips).to_have_count(1 + len(skills))

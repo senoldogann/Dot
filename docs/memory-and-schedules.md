@@ -4,19 +4,19 @@
 
 Dot keeps short notes between runs: facts about you, your machine and how you like things done. `memory_save`,
 `memory_search` and `memory_forget` are tools of the agent; you manage the same notes with `dotx memory` and in the web
-UI, where Settings › Memory keeps your own lines and the box that adds a note in a column of their own at the left and
-lists the notes changed last first at the right, 30 at a time with **Load more** for the next, its search in the head of
-the list (item 373); forgetting, correcting or adding a note
-keeps the notes read and the list where it was, and a correction open on another note stays open (item 204). In a
-run's conversation, a note the run saves, corrects (`memory_update`) or forgets leaves a quiet line where it happened,
-what changed and the first words of the note: "Saved to memory", "Updated memory" or "Removed from memory" (item 313,
-after Grok's "Updated memory"). The line of a saved or corrected note opens Settings › Memory with that note first,
-to read, correct or forget (`#/settings/memory?note=ID`, `GET /api/memories/{id}`); a note forgotten since is said to
-be gone. A note saved again, or a call that failed, changed nothing and leaves no line. The line names no agent: a
-note a run saves is Dot's, for every run (item 94). The notes a run is handed at its start leave a line too, "Recalled 3
-memories", not in the conversation but under Set up in the side panel's Run tab (item 365), and only when its chat
-had not been handed one of them before: a follow-up handed the same notes says
-nothing, and one handed a new note says how many are new, "(1 new)" (item 335).
+UI, where Settings › Memory is one column of cards: the box that adds a note, then the notes changed last first, 30 at a
+time with **Load more** for the next and their search in the head of the list (item 373), then what Dot knows about you
+with your own lines, then how learning fares; a note's actions show when the pointer is on its row (always on a touch
+screen); forgetting, correcting or adding a note keeps the notes read and the list where it was, and a correction open
+on another note stays open (item 204). In a run's conversation, a note the run saves, corrects (`memory_update`) or
+forgets leaves a quiet line where it happened, what changed and the first words of the note: "Saved to memory", "Updated
+memory" or "Removed from memory" (item 313, after Grok's "Updated memory"). The line of a saved or corrected note opens
+Settings › Memory with that note first, to read, correct or forget (`#/settings/memory?note=ID`, `GET
+/api/memories/{id}`); a note forgotten since is said to be gone. A note saved again, or a call that failed, changed
+nothing and leaves no line. The line names no agent: a note a run saves is Dot's, for every run (item 94). The notes a
+run is handed at its start leave a line too, "Recalled 3 memories", not in the conversation but under Set up in the side
+panel's Run tab (item 365), and only when its chat had not been handed one of them before: a follow-up handed the same
+notes says nothing, and one handed a new note says how many are new, "(1 new)" (item 335).
 
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
@@ -142,7 +142,7 @@ mode and goal mode; item 291). `/loop 30m <message>` in the box of a run or of a
 composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the nightly reflection at
 `[agent] reflection_time` (see Reflection above); it is not a schedule and does not count against `max_schedules`.
 
-On Settings › Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
+On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat and whether it is on
 (`history_runs`, `same_chat` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the
