@@ -1450,6 +1450,35 @@ def _line_scope(line: str, scope: ShellScope) -> ShellScope:
     return state
 
 
+def _run_by_wrappers(words: list[str], scope: ShellScope) -> tuple[list[str], ShellScope]:
+    """The command one simple command's ``words`` come to through the assignments, precommand modifiers and wrappers
+    in front of it (``X=1 timeout 5 curl -o y.sh U``, ``env -C /tmp nice sh``), with its arguments, and the scope it
+    runs in (``env -C`` moves it); a wrapper given a whole line (``watch``, ``env -S``) stands as the command, as only
+    the line's own reading judges it. What a line fetches and what it feeds a shell are read through them (item 385)."""
+    rest: list[str] = words
+    here: ShellScope = scope
+    while rest:
+        while rest and _ENV_ASSIGNMENT.fullmatch(rest[0]):
+            rest = rest[1:]
+        rest = _past_modifiers(rest)
+        if not rest:
+            break
+        command: str = Path(rest[0]).name
+        if command not in _WRAPPERS:
+            break
+        options, after = _options(rest[1:], _WRAPPER_VALUES.get(command, frozenset()))
+        if command == "watch" or (command == "env" and any(name in ("-S", "--split-string") for name, _ in options)):
+            break
+        if command == "env":
+            places: list[str] = [value for name, value in options if name in ("-C", "--chdir")]
+            if places:
+                here = _with_places(here, _places(places[-1], here))
+            if after[:1] == ["-"]:
+                after = after[1:]
+        rest = after[_WRAPPER_SKIPS.get(command, 0) :]
+    return rest, here
+
+
 def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
     """The scope after one simple command: the directories a ``cd`` or ``pushd`` may have moved the line to, the
     values an assignment, ``export`` or ``for`` gave a variable, the links an ``ln -s`` made."""
@@ -1476,8 +1505,10 @@ def _next_scope(words: list[str], scope: ShellScope) -> ShellScope:
         return _with_places(assigned, [*assigned.cwds, *(_places(operands[0], assigned) if wanted else [Path.home()])])
     if command == "ln":
         return _linked(assigned, rest[1:])
-    places: list[Path] = _fetched_places(command, rest[1:], assigned) or _located_all(
-        _carried_download(command, rest[1:], assigned), assigned
+    run, where = _run_by_wrappers(rest, assigned)
+    ran: str = Path(run[0]).name if run else ""
+    places: list[Path] = _fetched_places(ran, run[1:], where) or _located_all(
+        _carried_download(ran, run[1:], where), where
     )
     if places:
         return replace(assigned, downloaded=(*assigned.downloaded, *places))
@@ -1880,7 +1911,8 @@ def _carried_download(command: str, args: list[str], scope: ShellScope) -> list[
     then still counts as downloaded (item 385)."""
     if command not in ("cp", "mv", "ditto", "install", "rsync") or not scope.downloaded:
         return []
-    words, folders = _target_folders(args)
+    # ``-t dir`` names the folder for GNU cp, mv and install alone; rsync's ``-t`` keeps times, ditto has none.
+    words, folders = _target_folders(args) if command in _TARGET_FOLDER_COMMANDS else (args, [])
     operands: list[str] = _positional(words)
     sources, destinations = (operands, folders) if folders else (operands[:-1], operands[-1:])
     if any(_runs_download(source, scope) for source in sources):
@@ -1893,8 +1925,8 @@ def _fed_a_download(stages: list[list[str]], scope: ShellScope) -> list[Finding]
     the line downloaded reaches its standard input: by ``<`` (``sh < y.sh``) or as an operand of a command before it in
     the pipe (``cat y.sh | bash``). That runs the download as naming it does (item 385)."""
     words, _, _, _ = _split_redirects(stages[-1], ())
-    plain: list[str] = _plain(words)
-    if not plain or Path(plain[0]).name not in (_SHELLS | _INTERPRETERS):
+    run, _ = _run_by_wrappers(_plain(words), scope)
+    if not run or Path(run[0]).name not in (_SHELLS | _INTERPRETERS):
         return []
     redirected: list[str] = [stages[-1][index + 1] for index, token in enumerate(stages[-1][:-1]) if token == "<"]
     piped: list[str] = [word for stage in stages[:-1] for word in _positional(_plain(stage)[1:])]
@@ -1991,7 +2023,8 @@ def _fetched_files(command: str, args: list[str]) -> list[str]:
         else []
     )
     files: list[str] = [
-        str(Path(folder[-1]) / name) if folder and not name.startswith(("/", "~", "$")) else name for name in named
+        str(Path(folder[-1]) / name) if folder and name != "-" and not name.startswith(("/", "~", "$")) else name
+        for name in named
     ]
     if command == "curl" and any(
         arg in ("--remote-name", "--remote-name-all") or re.fullmatch(r"-[A-Za-z#]*O[A-Za-z#]*", arg) for arg in args

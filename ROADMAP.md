@@ -14760,8 +14760,10 @@ event loop, as `re` holds the interpreter's lock, so a fix needs the `regex` pac
 its own, which is the owner's to choose. A security review by a separate agent found the thread did not help, a file
 named as the terminal app slipped by, and interpreters other than the shells were missed; the pre-push review found
 `open -na`, a download fed on standard input, a path given by a variable, the other copy commands, `git -C` and curl's
-`--output-dir`; each is fixed or taken back. Tests: `tests/unit/test_spend.py`, `tests/unit/test_shell_policy.py`. Docs:
-`docs/safety.md`.
+`--output-dir`; each is fixed or taken back. Its merge with main of the same day (Fable 5.1) took two more: `rsync -t`
+read as a target folder (it keeps times), and a download behind a wrapper or an assignment (`timeout 60 curl -o`, `cat
+y.sh | env bash`, `X=1 sh < y.sh`) not followed; both fixed. Tests: `tests/unit/test_spend.py`,
+`tests/unit/test_shell_policy.py`. Docs: `docs/safety.md`.
 
 ### 386. The deep review of 2026-10-19: what was found outside the paths a human merges, fixed
 

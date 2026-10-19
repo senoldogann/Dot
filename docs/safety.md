@@ -110,10 +110,10 @@ currency, so list sites that bill in one currency. Empty by default.
 | `cautious`             | everything that is not read-only                                                                                            |
 
 A shell line is destructive outside the workspace when it removes, cuts or moves away a file there (item 385: `mv` takes
-its sources from where they were), and when it replaces one that is
-there: a redirect that empties it (`>`, `>|`, `&>`), a copy or a move onto it or into a folder that holds a file of its
-name (not `cp -n`), `ln -f`, `tee` without `-a`, `dd` without `conv=notrunc`. The shell keeps no copy of what it
-replaces, unlike the file tools, whose changes `dotx undo` writes back.
+its sources from where they were), and when it replaces one that is there: a redirect that empties it (`>`, `>|`, `&>`),
+a copy or a move onto it or into a folder that holds a file of its name (not `cp -n`), `ln -f`, `tee` without `-a`, `dd`
+without `conv=notrunc`. The shell keeps no copy of what it replaces, unlike the file tools, whose changes `dotx undo`
+writes back.
 
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The second step and your hand-off rules
@@ -313,12 +313,11 @@ or your own words. The run reads which option you chose, and whether it was the 
 > program run a command line), compares paths without case, and treats what it cannot read (a command named by a
 > substitution or a pattern, `eval` of one, a setting of git it does not know, a line it cannot parse) as a destructive
 > step outside the workspace, which every preset asks about. A script the line downloads and then runs (`curl -o`, `wget
-> -O` or `git clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp`, an
-> `mv` or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged as piping the download into a shell; a file named
-> after an at sign (`curl --data-binary @file`) as that file; a script handed to a terminal app (`open -a Terminal`, a
-> `.command` file) as a step outside Dot's sandbox, which every preset asks about (item 385). It does not follow what a
-> recursive command does inside the
-> folders it walks, nor the code of a script it runs; the sandbox keeps those out of Dot's own files, not out of yours,
-> and a shell can do more than any analysis can foresee. Treat Dot as a user of your account with the rights of your
-> account: keep backups, keep the workspace for scratch work, and use `balanced` or `cautious` on a machine where a
-> mistake would be expensive.
+> -O` or `git clone`, then a shell, `source`, its path or an interpreter such as `python3`, also after a `cp`, an `mv`
+> or a `ditto`, or on standard input: `sh < y.sh`, `cat y.sh | bash`) is judged as piping the download into a shell; a
+> file named after an at sign (`curl --data-binary @file`) as that file; a script handed to a terminal app (`open -a
+> Terminal`, a `.command` file) as a step outside Dot's sandbox, which every preset asks about (item 385). It does not
+> follow what a recursive command does inside the folders it walks, nor the code of a script it runs; the sandbox keeps
+> those out of Dot's own files, not out of yours, and a shell can do more than any analysis can foresee. Treat Dot as a
+> user of your account with the rights of your account: keep backups, keep the workspace for scratch work, and use
+> `balanced` or `cautious` on a machine where a mistake would be expensive.
