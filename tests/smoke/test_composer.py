@@ -154,8 +154,9 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await goal.type("/")
                 await expect(menu).to_be_visible()
                 await expect(menu.locator(".slash-group")).to_have_text(["Commands", "Skills"])
-                # Three commands, the owner's skill and the three that come with Dot (item 196).
-                await expect(menu.locator("[role=option]")).to_have_count(7)
+                # Four commands (the three modes and /loop, item 400), the owner's skill and the three that come with
+                # Dot (item 196).
+                await expect(menu.locator("[role=option]")).to_have_count(8)
                 await expect(menu.locator("[role=option][aria-selected=true]")).to_contain_text("/task")
                 assert await goal.get_attribute("aria-expanded") == "true"
                 await page.screenshot(path=str(tmp_path / f"slash-open-{width}.png"))

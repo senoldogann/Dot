@@ -1,10 +1,12 @@
 """A chat's loop (item 281): "/loop 30m <message>" makes a schedule of the chat that starts its runs as the chat's
-follow-ups do, the message goes at once, the line over the composer shows the loop, and its Stop deletes it.
+follow-ups do, the message goes at once, the line over the composer shows the loop, and its Stop deletes it. In a new
+chat's box (item 400) the message starts the chat with its loop.
 
 The scripted model plays the runs; the daemon is served on this Mac in a throw-away home.
 """
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
@@ -36,6 +38,8 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 TOKEN: str = "chat-loop-test-token"
 _RUN_WAIT_S: float = 60.0
+# Room for two schedules switched on, so that a test reaches the limit in a few steps.
+_MAX_SCHEDULES: int = 2
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
 
 
@@ -46,7 +50,10 @@ def _finish(answer: str) -> ScriptedTurn:
 @asynccontextmanager
 async def _daemon(turns: Sequence[ScriptedTurn]) -> AsyncIterator[tuple[RunManager, str]]:
     """A daemon in a throw-away home whose scripted model plays ``turns``: its manager, and the address it serves on."""
-    config: AppConfig = eval_config(load_default_config())
+    defaults: AppConfig = eval_config(load_default_config())
+    config: AppConfig = defaults.model_copy(
+        update={"scheduler": defaults.scheduler.model_copy(update={"max_schedules": _MAX_SCHEDULES})}
+    )
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     with scratch_home() as home, eval_environment(home, {}):
         runtime: Runtime = await open_runtime(config, login_env)
@@ -119,6 +126,43 @@ async def test_a_loop_is_a_schedule_of_the_chat_that_starts_as_its_follow_ups_do
             assert refused.status_code == 422 and "a loop asks again every" in refused.text
 
 
+async def test_a_new_chat_sent_with_a_loop_starts_with_it_or_not_at_all() -> None:
+    async with (
+        _daemon((_finish("Hello."), _finish("Again."))) as (manager, address),
+        httpx.AsyncClient(
+            base_url=f"{address}/api", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30.0
+        ) as client,
+    ):
+        message: dict[str, object] = {"goal": "check the build", "model": SCRIPTED_MODEL, "thread_id": None}
+        # A rhythm a loop cannot keep, or a loop with Keep going, starts nothing.
+        odd = await client.post("/runs", json={**message, "loop": "7m"})
+        assert odd.status_code == 422 and "a loop asks again every" in odd.text, odd.text
+        standing = await client.post("/runs", json={**message, "standing": True, "loop": "30m"})
+        assert standing.status_code == 422 and "a campaign (standing) goes on by itself" in standing.text
+        assert (await client.get("/runs")).json() == []
+        started = await client.post("/runs", json={**message, "loop": "30m", "key": "new-chat-loop-0001"})
+        assert started.status_code == 201, started.text
+        run: dict[str, object] = started.json()
+        # Sent again with its key, the message is the run and the loop it made.
+        again = await client.post("/runs", json={**message, "loop": "30m", "key": "new-chat-loop-0001"})
+        assert again.status_code == 201 and again.json()["id"] == run["id"], again.text
+        schedules = (await client.get("/schedules")).json()
+        assert [
+            (view["record"]["thread_id"], view["record"]["cron"], view["record"]["name"]) for view in schedules
+        ] == [(run["thread_id"], "*/30 * * * *", "Loop: check the build")]
+        assert str(schedules[0]["record"]["goal"]).startswith("check the build\n\n(This message is a loop of this chat")
+        other = await client.post("/runs", json={**message, "goal": "tidy the notes", "loop": "1h"})
+        assert other.status_code == 201, other.text
+        # With no room for one more schedule switched on, a new chat with a loop starts nothing.
+        full = await client.post("/runs", json={**message, "goal": "water the plants", "loop": "2h"})
+        assert full.status_code == 422 and "too many schedules are switched on" in full.text, full.text
+        runs = (await client.get("/runs")).json()
+        assert sorted(record["id"] for record in runs) == sorted([run["id"], other.json()["id"]])
+        async with asyncio.timeout(_RUN_WAIT_S):
+            for record in runs:
+                await manager.wait(str(record["id"]))
+
+
 async def _page(browser: Browser, address: str, width: int, scheme: Literal["light", "dark"]) -> Page:
     page: Page = await browser.new_page(
         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
@@ -156,6 +200,46 @@ async def test_slash_loop_shows_the_loop_over_the_composer_and_its_stop_ends_it(
                 await box.fill("/loop check the build")
                 await box.press("Enter")
                 await expect(page.get_by_text("Write /loop, how often and the message")).to_be_visible()
+                await page.close()
+        finally:
+            await browser.close()
+
+
+@pytest.mark.browser
+async def test_slash_loop_in_a_new_chat_starts_it_with_its_loop(tmp_path: Path) -> None:
+    turns: tuple[ScriptedTurn, ...] = tuple(_finish(f"Answer {number}.") for number in range(1, len(_SHOTS) + 1))
+    async with _daemon(turns) as (_manager, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            for width, scheme in _SHOTS:
+                page: Page = await _page(browser, address, width, scheme)
+                box: Locator = page.locator("textarea[aria-label='Goal']")
+                # A loop with no rhythm is said how to write it, and no chat starts.
+                await box.fill("/loop check the build")
+                await box.press("Enter")
+                await expect(page.get_by_text("Write /loop, how often and the message")).to_be_visible()
+                await expect(page).to_have_url(f"{address}/#/runs")
+                # The slash menu offers /loop beside the modes; picked, it is written for the rhythm and the message.
+                await box.fill("")
+                await box.type("/lo")
+                menu: Locator = page.locator(".composer .slash-menu")
+                await expect(menu.locator("[role=option]")).to_have_count(1)
+                await expect(menu.locator("[role=option]")).to_contain_text("/loop")
+                await box.press("Tab")
+                await expect(box).to_have_value("/loop ")
+                await box.type("30m check the build")
+                await box.press("Enter")
+                # The message starts the chat, whose loop shows over its composer.
+                await expect(page).to_have_url(re.compile(r"#/runs/run_"))
+                await expect(page.locator(".run-thread")).to_contain_text("check the build")
+                loops: Locator = page.get_by_role("region", name="Loops of this chat")
+                await expect(loops).to_contain_text("check the build")
+                await expect(loops).to_contain_text("every 30 minutes")
+                await page.screenshot(path=tmp_path / f"new-chat-loop-{width}-{scheme}.png")
+                # Stopped, the loop leaves room for the next width's.
+                await page.get_by_role("button", name="Stop the loop check the build").click()
+                await page.get_by_role("dialog").get_by_role("button", name="Stop").click()
+                await expect(loops).to_be_hidden()
                 await page.close()
         finally:
             await browser.close()

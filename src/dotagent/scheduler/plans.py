@@ -67,7 +67,9 @@ def _check_options(options: ScheduleOptions) -> None:
         raise ToolInputError("a time zone cannot be blank; leave it out to use the configured one", {})
 
 
-async def _ensure_room(store: Store, config: SchedulerConfig) -> None:
+async def ensure_room(store: Store, config: SchedulerConfig) -> None:
+    """Refuse one more schedule switched on once ``[scheduler] max_schedules`` are; a new chat's loop is checked so
+    before its run starts (item 400)."""
     switched_on: int = sum(1 for record in await store.list_schedules() if record.enabled)
     if switched_on >= config.max_schedules:
         raise ToolExecutionError(
@@ -97,7 +99,7 @@ async def create_schedule(
     _check_options(request.options)
     zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
     timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
-    await _ensure_room(store, config)
+    await ensure_room(store, config)
     return await store.add_schedule(
         request.name,
         timing.cron,
@@ -155,7 +157,7 @@ async def edit_schedule(
             {"schedule_id": schedule_id},
         )
     if enabled and not record.enabled:
-        await _ensure_room(store, config)
+        await ensure_room(store, config)
     return await store.update_schedule(
         schedule_id,
         request.name,
@@ -188,7 +190,7 @@ async def enable_schedule(
     record: ScheduleRecord = await store.get_schedule(schedule_id)
     if record.enabled:
         return record
-    await _ensure_room(store, config)
+    await ensure_room(store, config)
     upcoming: float | None = _upcoming(record, await schedule_zone(record.options, fallback_zone), now)
     if upcoming is None:
         raise ToolExecutionError(

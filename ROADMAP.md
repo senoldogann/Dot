@@ -15064,6 +15064,25 @@ at the root (`/var`, `/tmp`, `/etc` into `/private`), which a glob or a text cou
 glob is now matched through every other name of the root (`_glob_reaches`), a text through the links too, and the home
 folder's spellings are made part by part, so a letter whose case folding changes its length cannot cut them wrong.
 
+### 400. `/loop` in a new chat's box
+
+**Status: done (2026-10-19), on `item-400-loop-new-chat`.** The owner's word of 2026-10-19, asked whether the new chat's
+box should have `/loop` too: "evet lütfen ekle ardindan yeniden baslat projemizde ne özellik var ise uygulama icinde
+olmali yani" (yes, please add it, then restart; whatever our project has should be in the app). `/loop` and `/btw` were
+not gone: the box of a run offers both, the new chat's box had only its three modes; `/btw` asks a run on the side, so a
+chat with no run yet has no use for it. **As built (2026-10-19).** The new chat's slash menu offers `/loop` after
+`/task`, `/chat` and `/research`; `/loop 30m <message>` sends the message as the one that starts the chat, with `loop`
+on `POST /runs`, which makes it a loop of the run's chat as `POST /runs/{id}/loop` does (`routes_runs.make_loop`, which
+both share), so the chat opens with the loop's line over its composer. A rhythm a loop cannot keep, a loop with Keep
+going (refused by `StartRunRequest`) and no room for one more schedule switched on (`scheduler.plans.ensure_room`, asked
+before the run starts) start nothing; the message sent again with its key is the run and the loop its first sending
+made. The words of `/loop` (its pattern, its row in the menu and how to write it) are `loops.js`'s, for both boxes.
+Tests: `tests/smoke/test_chat_loop.py` (`POST /runs` with `loop`: a rhythm it cannot keep, Keep going and a full
+scheduler start nothing, a second sending makes no second loop; the new chat's box: a `/loop` without a rhythm is said
+how to write it and starts nothing, the menu's `/loop` written and sent starts the chat with its loop, wide and on a
+phone), `tests/smoke/test_composer.py` (the new chat's menu has four commands). Docs: `docs/runs.md`, `docs/daemon.md`,
+`docs/memory-and-schedules.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -15876,3 +15895,4 @@ folder's spellings are made part by part, so a letter whose case folding changes
 - 2026-10-19 (Opus 5.5): item 397 on the owner's word of the same day, on `item-397-new-chat-choices` from `main`, while other agents of the owner's work on items 385 to 393: a new chat keeps its choices with its draft until its message goes.
 - 2026-10-19 (Opus 5.5): item 398 on the owner's word of the same day and their two choices, on `item-398-approval-modes` from `main`: the approval modes in four steps, and Dot's own files asked about instead of refused; for the owner to merge.
 - 2026-10-19 (Opus 5.5): item 399 on `item-399-kernel-paths` from `main`, found by the `/security-review` of item 398: a path spelled through the Data volume is classified by the place it names; for the owner to merge.
+- 2026-10-19 (Opus 5.5): item 400 on the owner's word of the same day, on `item-400-loop-new-chat` from `main`: `/loop` in a new chat's box; items 394 to 399 merged on the same word ("Hepsini birleştir").

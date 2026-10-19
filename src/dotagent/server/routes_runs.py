@@ -29,7 +29,7 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
-from dotagent.scheduler.plans import ScheduleRequest, create_schedule
+from dotagent.scheduler.plans import ScheduleRequest, create_schedule, ensure_room
 from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
@@ -124,13 +124,19 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     @router.post("/runs", status_code=201)
     async def start_run(request: StartRunRequest) -> RunRecord:
         """Start a run, or with ``standing`` a campaign whose opening session the returned run is. The message sent
-        again with its ``key`` gets the run its first sending started (:func:`send_once`)."""
+        again with its ``key`` gets the run its first sending started (:func:`send_once`). With ``loop`` the goal is a
+        loop of the run's chat too (item 400, :func:`make_loop`); a rhythm a loop cannot keep, or no room for one more
+        schedule, starts nothing."""
         if request.model is not None:
             parse_model_ref(request.model)
+        if request.loop is not None:
+            loop_rhythm(request.loop)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
         picks: RunPicks = picks_of(request.plugins, request.skills, request.plan_first)
 
         async def start() -> str:
+            if request.loop is not None:
+                await ensure_room(store, ctx.runtime.config.scheduler)
             run: RunRecord
             if request.standing:
                 run = await ctx.manager.start_campaign(
@@ -182,7 +188,10 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                 )
             return run.id
 
-        return await store.get_run(await send_once(store, "run", request.key, start))
+        run_id: str = await send_once(store, "run", request.key, start)
+        if request.loop is not None:
+            await make_loop(run_id, request.loop, request.goal)
+        return await store.get_run(run_id)
 
     @router.post("/runs/{run_id}/skill", status_code=201)
     async def save_skill(run_id: str) -> SavedSkill:
@@ -292,18 +301,16 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         """A side question about the run, answered without the run seeing it (see ``agent.aside``)."""
         return await answer_aside(ctx.runtime, run_id, request.text)
 
-    @router.post("/runs/{run_id}/loop", status_code=201)
-    async def start_loop(run_id: str, request: LoopRequest) -> ScheduleRecord:
+    async def make_loop(run_id: str, every: str, text: str) -> ScheduleRecord:
         """Make the chat of the run ask ``text`` again on the rhythm ``every`` (item 281): one of the chat's schedules,
         whose runs go on in it as its follow-ups do and start as they do (item 291). The same loop asked for again is
-        the one there is, so a page that sends it once more makes no second one. The page sends the message itself as a
-        follow-up at once."""
+        the one there is, so a page that sends it once more makes no second one."""
         run: RunRecord = await store.get_run(run_id)
         owner: RunRecord = run if run.parent_run_id is None else await store.get_run(run.parent_run_id)
         choices: ChatChoices | None = await store.chat_choices(owner.thread_id)
-        rhythm: LoopRhythm = loop_rhythm(request.every)
-        name: str = loop_name(request.text)
-        goal: str = loop_goal(request.text, rhythm, name)
+        rhythm: LoopRhythm = loop_rhythm(every)
+        name: str = loop_name(text)
+        goal: str = loop_goal(text, rhythm, name)
         # The same loop asked for again (a page that sends it once more after a failure) is the one there is.
         for kept in await store.list_schedules():
             if (kept.thread_id, kept.enabled, kept.cron, kept.goal) == (owner.thread_id, True, rhythm.cron, goal):
@@ -319,6 +326,12 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         return await create_schedule(
             store, ctx.runtime.config.scheduler, ctx.runtime.schedule_zone, plan, time.time(), owner.thread_id
         )
+
+    @router.post("/runs/{run_id}/loop", status_code=201)
+    async def start_loop(run_id: str, request: LoopRequest) -> ScheduleRecord:
+        """A loop of the chat of the run (:func:`make_loop`), from ``/loop`` in the box of a run; the page sends the
+        message itself as a follow-up at once."""
+        return await make_loop(run_id, request.every, request.text)
 
     @router.post("/runs/{run_id}/resume", status_code=201)
     async def resume_run(run_id: str) -> RunRecord:

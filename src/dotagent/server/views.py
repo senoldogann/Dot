@@ -184,7 +184,8 @@ class StartRunRequest(FrozenModel):
     its independent parts across delegated runs, while the chat keeps ``effort``. ``plugins``, ``skills`` and
     ``plan_first`` are what the owner picked in the composer for this message (item 318, :func:`picks_of`).
     ``standing`` ("Keep going until done") starts a campaign on the goal instead, with this run as its opening session:
-    a task, without goal mode and without picks (see ``RunManager.start_campaign``)."""
+    a task, without goal mode and without picks (see ``RunManager.start_campaign``). ``loop``, a rhythm (``30m``,
+    ``2h``), makes the goal a loop of the run's chat too, as ``/loop`` in a new chat's box does (item 400)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
     mode: RunMode = "task"
@@ -204,6 +205,8 @@ class StartRunRequest(FrozenModel):
     plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
     skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
     plan_first: bool = False
+    # How often the goal is asked again in the run's chat (LoopRequest.every); None for no loop. Not with standing.
+    loop: str | None = Field(default=None, min_length=2, max_length=8)
     key: MessageKey | None = None
 
     @model_validator(mode="after")
@@ -212,6 +215,8 @@ class StartRunRequest(FrozenModel):
             raise ValueError("a campaign (standing) is Dot's own: it cannot be started for an agent")
         if self.standing and (self.plugins or self.skills or self.plan_first):
             raise ValueError("plugins, skills and Plan first go with a message, not with a campaign (standing)")
+        if self.standing and self.loop is not None:
+            raise ValueError("a loop asks again in a chat; a campaign (standing) goes on by itself")
         if self.browser is not None and not self.standing:
             raise ValueError("browser chooses the Chrome of a campaign: it goes with standing only")
         return self

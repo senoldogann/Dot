@@ -21,7 +21,7 @@ import { BACKGROUND_SOURCE, backgroundNote, earlierTurns, loadHistory, RESUME_SO
 import { dotName, faceState, faceStateAtEnd } from "../face.js";
 import { icon } from "../icons.js";
 import { createInspector } from "../inspector.js";
-import { chatLoops } from "../loops.js";
+import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { createQueue } from "../queue.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
@@ -47,10 +47,6 @@ const APPROVAL_WORDS = { supervised: "Supervised", auto: "Auto-approve", yolo: "
 const NEAR_BOTTOM_PX = 140;
 // "/btw" followed by the side question; the question may span lines.
 const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
-// "/loop", a rhythm (30m, 2h) and the message that the chat asks again on it (item 281); "/loop" alone or with a
-// word that is not a rhythm is said how to write it.
-const LOOP_PATTERN = /^\/loop\s+(\d+\s*[mh])\s+([\s\S]+)$/i;
-const LOOP_WORD = /^\/loop(?:\s|$)/i;
 const TITLE_CHARS = 70;
 const QUOTE_CHARS = 160;
 // What cut a run off (agent/resume.py `CutOff`), as the line that offers to resume it says it (item 299).
@@ -496,7 +492,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
     maxPx: CHAT_BOX_PX,
     commands: [
       { label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " },
-      { label: "/loop", hint: "Ask again on a rhythm until it is done: /loop 30m <message>", insert: "/loop " },
+      LOOP_COMMAND,
     ],
     send: () => submit(false),
     sendLabel: "Steer",
@@ -776,22 +772,22 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // "/loop 30m <message>" (item 281): the chat asks the message again on that rhythm, from a schedule of its own, until
   // it is stopped or a run of it ends it; the message itself goes now, as any message does.
   async function startLoop(text, other) {
-    const loop = LOOP_PATTERN.exec(text);
+    const loop = loopOf(text);
     if (loop === null) {
-      toast("error", "Write /loop, how often and the message: /loop 30m check the build");
+      toast("error", LOOP_HOW);
       input.focus();
       return;
     }
     if (!readyToSend(attachments)) {
       return;
     }
-    const message = loop[2].trim();
+    const message = loop.message;
     const files = attachments.ids();
     sending = true;
     send.disabled = true;
     try {
       await attempt(async () => {
-        await api.post(`/runs/${runId}/loop`, { every: loop[1].replace(/\s+/g, ""), text: message });
+        await api.post(`/runs/${runId}/loop`, { every: loop.every, text: message });
         loops.refresh();
         const next = await deliver(message, files, other);
         frame.clear();
