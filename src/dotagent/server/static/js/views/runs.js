@@ -5,10 +5,13 @@
 import { actorFace, DOT_ID } from "../actors.js";
 import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
+import { assistant, loadAssistant, onAssistant } from "../assistant.js";
 import { askForWords, readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el, modelName } from "../dom.js";
+import { dotName } from "../face.js";
+import { buildFirstChat } from "../firstchat.js";
 import { forgetLevel, KEPT_SPEED, ONE_MESSAGE, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
@@ -83,12 +86,17 @@ const HOME_KEPT = {
 };
 
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
+/** The words in the home's empty box, with the name the owner calls Dot by (item 420). */
+function placeholderFor(name) {
+  return `Message ${name} (@ for skills, / for commands)`;
+}
+
 function buildComposer(ctx, listener) {
   const start = readHomeChoices();
   const frame = composerFrame({
     label: "New chat",
     boxLabel: "Goal",
-    placeholder: "Message Dot (@ for skills, / for commands)",
+    placeholder: placeholderFor(dotName()),
     maxPx: MAX_GOAL_PX,
     commands: [
       ...MODES.map((option) => ({
@@ -272,6 +280,14 @@ function buildComposer(ctx, listener) {
     // Keep going's line sits under the frame, not in it.
     element: el("div", { class: "composer-stack" }, frame.element, standing.note),
     focus: () => goal.focus(),
+    // Send `text` as the owner would, with the choices of the box (the first conversation's look, item 420).
+    send: (text) => {
+      goal.value = text;
+      return submit();
+    },
+    rename: (name) => {
+      goal.placeholder = placeholderFor(name);
+    },
     dispose: () => {
       stopStatus();
       choices.dispose();
@@ -388,9 +404,29 @@ function buildSetup() {
   return { element, sync };
 }
 
+/** Whether a first open is due its first conversation (item 420): Dot has not introduced itself, and there is no
+ * chat yet. */
+async function firstChatDue() {
+  const names = assistant() ?? (await loadAssistant());
+  if (names.introduced) {
+    return false;
+  }
+  const chats = await api.get("/threads?limit=1");
+  return chats.length === 0;
+}
+
 export function mount(root, ctx) {
   const presence = buildPresence();
-  const composer = buildComposer(ctx, presence.listen);
+  let first = null;
+  // A message the owner sends ends the first conversation too.
+  const listen = {
+    ...presence.listen,
+    sending: () => {
+      presence.listen.sending();
+      first?.sent();
+    },
+  };
+  const composer = buildComposer(ctx, listen);
   const approvals = buildApprovals();
   const setup = buildSetup();
   // The setup card stands over the greeting, in the block the page keeps in the middle.
@@ -411,7 +447,33 @@ export function mount(root, ctx) {
   }
   const stopCompose = onCompose(offerCaret);
   offerCaret();
+  const stopNames = onAssistant((names) => composer.rename(names.name));
+  let disposed = false;
+  // The first conversation stands in the place of the greeting, over the composer, once it is known to be due.
+  firstChatDue()
+    .then((due) => {
+      if (!due || disposed) {
+        return;
+      }
+      first = buildFirstChat({
+        startLook: (goal) => composer.send(goal),
+        onSkipped: () => {
+          first.element.replaceWith(presence.element);
+          first.dispose();
+          first = null;
+          home.classList.remove("home-first");
+        },
+      });
+      presence.element.replaceWith(first.element);
+      home.classList.add("home-first");
+    })
+    .catch((error) => {
+      console.warn("whether Dot introduced itself could not be read", error);
+    });
   return () => {
+    disposed = true;
+    first?.dispose();
+    stopNames();
     stopCentring();
     stopApprovals();
     stopSetup();

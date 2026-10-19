@@ -87,9 +87,11 @@ progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link t
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
 with "Faces that move" off), and shows the state of the whole of Dot (waiting when something waits for you, working
-while a run is active, else idle) under Dot's name (yours to give in Settings › General; Dot until then, and kept in
-this browser only); a greeting by the hour says your name when you gave one there ("Good morning, Ada. What should I
-work on?"; "Something waits for you." when it does) and one line says what is going on ("Working on 2 runs · 1 waits for
+while a run is active, else idle) under the name you call Dot by, and a greeting by the hour says your name ("Good
+morning, Ada. What should I work on?"; "Something waits for you." when it does). Both names are yours to give in
+Settings › General, and the daemon keeps them for every browser and phone (`[assistant] name` and `owner`, `GET` and
+`PUT /api/assistant`, item 420); your name is the first name of your account on this Mac until you give one, and the
+model is told both. One line says what is going on ("Working on 2 runs · 1 waits for
 you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under the composer, the **Today** strip
 lists it: what waits for you, what works, what is due later today (the schedules that fire and the campaigns whose next
 session starts), what was learned today (the lessons and the day's journal) and what ended, each row opening what it is
@@ -367,6 +369,15 @@ otherwise, in one row that scrolls sideways with the open tab in sight and stays
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
+
+**Dot's first conversation** (item 420). On a first open, while Dot has not introduced itself (`[assistant] introduced`)
+and there is no chat yet, New chat shows Dot's first conversation in the place of the greeting, over the composer, with
+no model called: Dot greets you by name and asks what to call it (a few names to pick, or one to type; "Name changed to
+Miro" notes a new one), says in a few lines what it does (and, outside yolo, what it asks you about), and offers to
+connect Gmail and Google Calendar: Connect takes the Google sign-in step in Dot's browser and the card follows it until
+you are signed in (a browser without a window says so instead). Then it offers to look through your inbox for something
+to take off your hands: that look is a run of its own that only reads and asks you which to do. The look, Not now, Skip
+the introduction and the first message you send end it, and the daemon keeps that it was had.
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its

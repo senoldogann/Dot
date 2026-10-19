@@ -165,6 +165,7 @@ from dotagent.agent.verify import (
     with_outcomes,
 )
 from dotagent.agent.vision import text_for_blind_model
+from dotagent.assistant import AssistantView, called_lines, owner_name_lines
 from dotagent.browser.devtools import devtools_address
 from dotagent.browser.session import BrowserSession
 from dotagent.config import AgentConfig
@@ -1682,6 +1683,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     listing: SkillListing = listed_skills(skills.skills, thread.title, close_to_title, runtime.config.skills.listed)
     fitting: SkillListing = listed_skills(skills.skills, query, close, runtime.config.skills.listed)
     browser: BrowserSession = await browser_of(runtime, run)
+    names: AssistantView = runtime.assistant.view()
     system: Message = system_message(
         build_system_prompt(
             collect_prompt_inputs(
@@ -1714,7 +1716,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     )
                     for member in team
                 ],
-                owner_prompt_lines(await owner_section(runtime.store)),
+                (
+                    *owner_name_lines(names.owner, names.mac_name),
+                    *(called_lines(names.name) if agent_record is None else ()),
+                    *owner_prompt_lines(await owner_section(runtime.store)),
+                ),
                 devtools_address(browser.config),
                 config.prompt,
                 harness_text,

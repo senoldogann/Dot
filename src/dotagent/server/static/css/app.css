@@ -2202,6 +2202,161 @@ a.pill:hover {
   gap: 24px;
 }
 
+/* Dot's first conversation (item 420), in the place of the greeting over the composer: what Dot says reads as its
+   answers do, the owner's choices sit in their bubble, and the cards are the page's own. */
+.first-chat {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.first-head {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.first-flow {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.first-say {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  animation: first-in var(--motion-slow) ease-out both;
+}
+
+.first-say p {
+  margin: 0;
+}
+
+.first-list {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-left: var(--space-5);
+}
+
+.first-note {
+  margin: 0;
+  align-self: flex-end;
+  color: var(--muted);
+  font-size: var(--text-sm);
+}
+
+.first-card,
+.first-connect {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  animation: first-in var(--motion-slow) ease-out both;
+}
+
+.first-question {
+  margin: 0;
+  color: var(--muted);
+  font-weight: var(--weight-label);
+}
+
+.first-names {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.first-name {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.first-name:hover,
+.first-name:focus-visible {
+  background: var(--surface-2);
+}
+
+.first-name:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.first-name-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  color: var(--surface);
+  font-weight: var(--weight-title);
+}
+
+.first-own {
+  gap: var(--space-2);
+}
+
+.first-own .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.first-connect .row {
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.first-connect-mark {
+  flex: none;
+}
+
+.first-connect-name {
+  font-weight: var(--weight-title);
+}
+
+.first-connect-hint {
+  margin: 0;
+}
+
+.first-connect.connected .first-connect-hint {
+  color: var(--ok);
+}
+
+.first-actions {
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+@keyframes first-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .first-say,
+  .first-card,
+  .first-connect {
+    animation: none;
+  }
+}
+
 /* The card that leads to a model while the default one cannot answer (item 333), over the greeting. */
 .home-setup-body {
   display: flex;

@@ -32,8 +32,9 @@ _FILE_MODE: int = 0o600
 _EDITING: threading.Lock = threading.Lock()
 
 # The tables this module changes a setting of, the settings of each, and the TOML literal of each value.
-type ConfigTable = Literal["agent", "browser", "judge", "models", "server", "shell", "snapshots"]
+type ConfigTable = Literal["agent", "assistant", "browser", "judge", "models", "server", "shell", "snapshots"]
 type AgentSetting = Literal["resume"]
+type AssistantSetting = Literal["name", "owner", "introduced"]
 type BrowserSetting = Literal[
     "mode",
     "raise_window",
@@ -52,7 +53,14 @@ type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
 type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
 type SettingKey = (
-    AgentSetting | BrowserSetting | JudgeSetting | ModelsSetting | ServerSetting | ShellSetting | SnapshotsSetting
+    AgentSetting
+    | AssistantSetting
+    | BrowserSetting
+    | JudgeSetting
+    | ModelsSetting
+    | ServerSetting
+    | ShellSetting
+    | SnapshotsSetting
 )
 # A list of names is ``[server] reach`` (item 271).
 type SettingValue = str | bool | int | list[str]
