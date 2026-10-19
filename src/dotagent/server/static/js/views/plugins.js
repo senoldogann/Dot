@@ -246,6 +246,20 @@ export function mount(root, ctx) {
     return el("span", { class: "chip" }, WAY_NAMES[first.kind]);
   }
 
+  /** Where a service of the catalogue stands before it is added, in a badge's words (item 408). */
+  function serviceWords(service) {
+    if (service === undefined || service === null) {
+      return "Open to all";
+    }
+    if (service.kind === "local") {
+      return "On this Mac";
+    }
+    if (service.secrets.length > 0) {
+      return "Takes a key";
+    }
+    return service.signs_in ? "Signs in" : "Open to all";
+  }
+
   /** How a service of the catalogue connects, in the chip's words (item 408): signed in, with a key, open to all, or
    * started on this Mac. */
   function mcpWords(service) {
@@ -622,10 +636,13 @@ export function mount(root, ctx) {
         badge = el("span", { class: "badge b-muted" }, "Name taken");
         guideLine = `A server of Dot's config or of a plugin is named ${way.ref} already: Connected lists it.`;
       } else if (now.server === null) {
+        const service = now.service;
+        const keyed = service !== null && service !== undefined && service.secrets.length > 0;
         const button = el("button", { class: "btn sm primary", type: "button", disabled: busy.has(`mcp:${way.ref}`) }, "Add");
-        button.addEventListener("click", () => attempt(() => add({ service: way.ref, name: null, address: null })));
-        actions = el("div", { class: "plugin-actions" }, button);
-        badge = el("span", { class: "badge b-muted" }, now.service?.signs_in ? "Signs in" : "Open to all");
+        button.addEventListener("click", () => attempt(() => (keyed ? askSecrets(service) : add({ service: way.ref, name: null, address: null, secrets: {} }))));
+        // A service that takes a key asks for it here too (item 408), under the row.
+        actions = el("div", { class: "plugin-actions" }, button, keyed && asking === way.ref ? secretsForm(service) : null);
+        badge = el("span", { class: "badge b-muted" }, serviceWords(service));
       } else {
         badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
         guideLine = serverGuide(now.server);

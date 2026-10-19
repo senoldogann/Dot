@@ -9,7 +9,7 @@ import os
 import re
 import subprocess
 import tempfile
-from collections.abc import Iterator
+from collections.abc import Collection, Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Literal
@@ -120,6 +120,25 @@ def write_env_value(path: Path, name: str, value: str) -> None:
     with _changing(path):
         current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
         _write_env_file(path, render_env_file({**current, name: value}))
+
+
+def write_env_values(path: Path, entries: Mapping[str, str]) -> None:
+    """Set every entry of ``entries`` in the env file (mode 0600) at once, keeping every other, under the file's lock:
+    all of a service's secrets, or none (item 408)."""
+    with _changing(path):
+        current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
+        _write_env_file(path, render_env_file({**current, **entries}))
+
+
+def remove_env_values(path: Path, names: Collection[str]) -> int:
+    """Drop every entry of ``names`` from the env file keeping every other, under the file's lock; how many were
+    there."""
+    with _changing(path):
+        current: dict[str, str] = parse_env_file(path.read_text(encoding="utf-8")) if path.exists() else {}
+        gone: int = sum(1 for name in names if name in current)
+        if gone:
+            _write_env_file(path, render_env_file({key: value for key, value in current.items() if key not in names}))
+        return gone
 
 
 def remove_env_value(path: Path, name: str) -> bool:

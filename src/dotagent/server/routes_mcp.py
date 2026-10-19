@@ -29,7 +29,7 @@ from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_conn
 from dotagent.mcp.hub import McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
-from dotagent.secrets import write_env_value
+from dotagent.secrets import remove_env_values, write_env_values
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import origin_is_local
 from dotagent.server.views import (
@@ -327,11 +327,14 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(config.name)
         if found is not None and found[1] != "connected":
             raise RunConflict(_TAKEN_NAME, {"server": config.name, "set_up": found[1]})
+        current: _Try | None = tries.get(config.name)
+        if current is not None and current.running():
+            raise RunConflict("Dot is trying this server already", {"server": config.name})
         service: McpService | None = requested_service(body)
-        if service is not None:
-            # The secrets go into Dot's .env first, under the names the server's config refers to (item 408).
-            for kept_name, value in secret_entries(service, body.secrets).items():
-                await asyncio.to_thread(write_env_value, env_file_path(), kept_name, value)
+        if service is not None and service.secrets:
+            # The secrets go into Dot's .env, all at once, under the names the server's config refers to (item 408),
+            # once nothing stands in the add's way.
+            await asyncio.to_thread(write_env_values, env_file_path(), secret_entries(service, body.secrets))
         return await start(config, "connected", page)
 
     @router.post("/api/mcp/servers/{name}/connect")
@@ -370,6 +373,11 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         refresh_mcp_tools(ctx.runtime.registry, hub)
         await asyncio.to_thread(forget_connected, connected_servers_path(), name)
         await asyncio.to_thread(forget_sign_in, sign_in_path(name))
+        # The key of a service of the catalogue goes with its server (item 408).
+        service_id: str | None = _service_of(found[0])
+        service: McpService | None = next((one for one in MCP_SERVICES if one.id == service_id), None)
+        if service is not None and service.secrets:
+            await asyncio.to_thread(remove_env_values, env_file_path(), set(kept_secret_names(service).values()))
         log.info("mcp_server_removed", server=name)
         return await listing()
 

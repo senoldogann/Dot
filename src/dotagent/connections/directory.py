@@ -635,6 +635,15 @@ _MCP_SIGNS_IN: str = (
     "Its own MCP server: you sign in on the service's page with your account, and Dot keeps the sign-in."
 )
 _MCP_OPEN: str = "Its own MCP server, open to all: there is nothing to sign in to."
+_MCP_KEY: str = (
+    "Its own MCP server, with a key of yours (item 408): Dot asks for it once, keeps it in its own .env (mode 0600) and"
+    " sends it with every request; no record holds it, and Remove takes it out."
+)
+_MCP_LOCAL: str = (
+    "A server Dot starts on this Mac with {command} and talks to over standard input and output (item 408); it runs"
+    " while Dot does."
+)
+_MCP_LOCAL_KEY: str = " It takes a key of yours, which Dot asks for once and keeps in its own .env (mode 0600)."
 _MAC_HOW: str = "Dot drives it with AppleScript once macOS lets it (Privacy & Security › Automation)."
 _MAC_DATA: str = (
     "Dot reads and acts in it through macOS on this Mac; what a run reads there goes to the run's model, as every "
@@ -665,7 +674,17 @@ def _way_view(way: PluginWay) -> PluginWayView:
             data = f"On this Mac, a server Dot starts with {service.command}; {_TO_MODEL}"
         if service.signs_in:
             data += " Dot keeps your sign-in in its home."
-        how: str = _MCP_SIGNS_IN if service.signs_in else _MCP_OPEN
+        if service.secrets:
+            data += " Your key is kept in Dot's .env and goes to the service alone."
+        how: str
+        if service.command is not None:
+            how = _MCP_LOCAL.format(command=service.command) + (_MCP_LOCAL_KEY if service.secrets else "")
+        elif service.signs_in:
+            how = _MCP_SIGNS_IN
+        elif service.secrets:
+            how = _MCP_KEY
+        else:
+            how = _MCP_OPEN
         return PluginWayView(kind="mcp", ref=service.id, how=how, data=data, does=service.does)
     if way.kind == "mac":
         app = next((one for one in MAC_APPS if one.id == way.ref), None)

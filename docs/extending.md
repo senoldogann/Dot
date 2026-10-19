@@ -23,38 +23,42 @@ clients registered by hand. Any MCP server can still be added by its address (be
 The ways a service connects:
 
 - **AppleScript** (This Mac): Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint and Outlook.
-macOS lets an app send Apple events to another only once you have said yes to its question (Privacy & Security ›
-Automation), so a tile says **Allowed**, **Not asked yet**, **Refused**, **Not checked** or **Not installed**. macOS
-tells about an application only while it runs: while one is closed, its tile keeps the last answer macOS gave about it
-(item 288), kept for the program macOS asks for Dot, and says **Not checked** only when there is none. **Allow** asks
-macOS, which shows its question on the Mac; an application that is not open is opened hidden first, without coming to
-the front. The page waits a minute for your answer, then says that the question waits on the Mac. After a no macOS does
-not ask again: **Open System Settings** opens the Automation pane, and the service's page says what to switch on there,
-under the program macOS asks for Dot: Dot for the service, else the app Dot was started from (Terminal, iTerm, Claude).
+  macOS lets an app send Apple events to another only once you have said yes to its question (Privacy & Security ›
+  Automation), so a tile says **Allowed**, **Not asked yet**, **Refused**, **Not checked** or **Not installed**. macOS
+  tells about an application only while it runs: while one is closed, its tile keeps the last answer macOS gave about
+  it (item 288), kept for the program macOS asks for Dot, and says **Not checked** only when there is none. **Allow**
+  asks macOS, which shows its question on the Mac; an application that is not open is opened hidden first, without
+  coming to the front. The page waits a minute for your answer, then says that the question waits on the Mac. After a
+  no macOS does not ask again: **Open System Settings** opens the Automation pane, and the service's page says what to
+  switch on there, under the program macOS asks for Dot: Dot for the service, else the app Dot was started from
+  (Terminal, iTerm, Claude).
 - **Synced folder**: OneDrive, whose folders (`~/Library/CloudStorage/OneDrive-*`) Dot's `onedrive` skill works in. It
-says **Syncing** once a folder of it is there; else **Open** opens OneDrive to sign in. - **Dot's browser**: Google,
-Microsoft 365, GitHub, Slack, Notion, LinkedIn, X and Instagram. A tile says **Signed in** when that browser holds a
-cookie the site keeps only for a signed-in visitor, read by host and name and never by value: from Chrome while it runs,
-else from a copy of its profile's cookie file. **Sign in** opens the sign-in page in a tab of Dot's browser on the Mac.
-With My Chrome (Settings › Browser) Dot works in your own Chrome, where you are signed in as you always are; a browser
-without a window (`headless = true` under `[browser]`) has none to sign in in, which the service's page says. A sign-in
-is told by its cookie alone: a session the site ended stays **Signed in** until its cookie expires. - **MCP server**
-(item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account, Supabase and
-monday.com too (item 408), DeepWiki, Microsoft Learn, Context7 and Exa, open to all, and the services that take a key
-(**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix, Firecrawl and Tavily; a few run on
-this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx`: Memory, Sequential Thinking, Fetch, Playwright and
-Brave Search (a key). A service that takes a key asks for it under its tile, with where to get one; Dot keeps each in
-its `.env` (mode 0600) under `MCP_<SERVICE>_<NAME>`, and the server's headers or environment refer to it as `${...}`, so
-the value is in no record and leaves the daemon only to the service. The addresses, keys and commands are as the
-services' own docs read on 2026-10-19 (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it
-answered with its tools, which go to the runs that start next, without a restart. A server that asks for a sign-in gets
-one in the browser you are using: its tile says **Waiting for your sign-in**, and its page has **Open the sign-in
-page**, the service's own page, which sends you back to Dot's `/oauth/callback` on the address you added it from (the
-Mac's, or your phone's through `[server] reach`); then it turns **Ready**. This is MCP's own authorization: OAuth with
-PKCE, Dot registering itself with the service as a client without a secret. Dot keeps the tokens in
-`mcp-sign-ins/<server>.json` (mode 0600) and renews them before they run out, after a restart too; a run never signs in,
-so a server whose sign-in is gone is left out with words that bring you back here (**Sign in again**). **Remove** takes
-a server added here out, with its tools and its sign-in; one set up elsewhere is removed there.
+  says **Syncing** once a folder of it is there; else **Open** opens OneDrive to sign in.
+- **Dot's browser**: Google, Microsoft 365, GitHub, Slack, Notion, LinkedIn, X and Instagram. A tile says **Signed in**
+  when that browser holds a cookie the site keeps only for a signed-in visitor, read by host and name and never by
+  value: from Chrome while it runs, else from a copy of its profile's cookie file. **Sign in** opens the sign-in page in
+  a tab of Dot's browser on the Mac. With My Chrome (Settings › Browser) Dot works in your own Chrome, where you are
+  signed in as you always are; a browser without a window (`headless = true` under `[browser]`) has none to sign in
+  in, which the service's page says. A sign-in is told by its cookie alone: a session the site ended stays **Signed
+  in** until its cookie expires.
+- **MCP server** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
+  Supabase and monday.com too (item 408), DeepWiki, Microsoft Learn, Context7 and Exa, open to all, and the services
+  that take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix, Firecrawl and
+  Tavily; a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to over standard
+  input and output: Memory, Sequential Thinking, Fetch, Playwright and Brave Search (a key). A service that takes a key
+  asks for it under its tile and on its page, with where to get one; Dot keeps each in its `.env` (mode 0600) under
+  `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the server's headers or environment refer to it as
+  `${...}`, so the value is in no record and leaves the daemon only to the service; **Remove** takes the key out of
+  `.env` with the server. The addresses, keys and commands are as the services' own docs read on 2026-10-19
+  (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools, which go to
+  the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using:
+  its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own page, which
+  sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through
+  `[server] reach`); then it turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself
+  with the service as a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and
+  renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left
+  out with words that bring you back here (**Sign in again**). **Remove** takes a server added here out, with its tools
+  and its sign-in; one set up elsewhere is removed there.
 
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
 command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
@@ -115,22 +119,25 @@ without one, or with one the interface lacks, shows the icon its words choose, e
 `references/` and `assets/`. Every model is given, in its instructions, the `name: description` line of each skill its
 run is offered, and reads the rest with the `skill` tool when a task matches; instructions longer than one tool result
 come in parts, each saying where the next one starts, so none is cut out of the middle. A run offered more than `listed`
-under `[skills]` (20) is given those that fit its goal and the goals of the latest earlier runs of its thread best, as
-its notes are chosen, the best fit first and at most that many, and is told how many more there are: `find_help`
-searches them all, and `skill` reads one by its name. A skill fits by the words it shares with the goal and, with the
-memory's embeddings on, by how close it is to the goal in meaning (at least `min_similarity` under `[memory]`), the two
-rankings fused as the notes' are; bge-m3 reads Turkish as well as English, so a goal in one language is given the skills
-described in the other, while by words alone it shares none with them. Each skill is embedded once and kept while Dot
-runs; when the skills must be picked and the embedding service fails, the run fails to start, as it does when its notes
-cannot be searched. A skill that shares only some of the goal's words is kept, as a goal can ask for more than one kind
-of work. Dot always looks in `<home>/skills` and in the `skills/` folder of every plugin; `[skills] dirs` lists more
-directories (each holds skill folders; `~` expands). Skills written for Claude Code load unchanged: Dot reads only
-`name` and `description` of the frontmatter, so other keys (a date or a nested map under `metadata`, a list of
-`allowed-tools`) do not leave a skill out. To use your own, put `dirs = ["~/.claude/skills"]` under `[skills]` in your
-`config.toml`; Dot reads nothing there until you do. An entry may also be one skill folder (`~/.claude/skills/<name>`),
-to take some skills only: `~/.claude/skills` can hold skills written for Claude Code's own tools, such as the
-superpowers bundle or the skills synced from claude.ai. The skills you wrote for Claude Code are then the playbook a
-campaign can work from.
+under `[skills]` (20) is given, in its instructions, those that fit the first words of its chat (the chat's title) best,
+the same at every message of the chat so that the provider's cache of the instructions holds (item 404), at most that
+many, and is told how many more there are; under each message stand up to six more that fit the message and the goals of
+the latest earlier runs of its thread, as its notes are chosen, the best fit first: `find_help` searches them all, and
+`skill` reads one by its name. A skill fits by the words it shares with the goal and, with the memory's embeddings on,
+by how close it is to the goal in meaning (at least `min_similarity` under `[memory]`), the two rankings fused as the
+notes' are; bge-m3 reads Turkish as well as English, so a goal in one language is given the skills described in the
+other, while by words alone it shares none with them. The embedding of each skill is made once, kept in the store across
+restarts and made as the daemon starts (item 404; one no search asked for in thirty days goes); when the skills must be
+picked and the embedding service fails, or the embeddings are still being made, the run lists them by their words and
+goes on, as it recalls its notes by words then. A skill that shares only some of the goal's words is kept, as a goal can
+ask for more than one kind of work. Dot always looks in `<home>/skills` and in the `skills/` folder of every plugin;
+`[skills] dirs` lists more directories (each holds skill folders; `~` expands). Skills written for Claude Code load
+unchanged: Dot reads only `name` and `description` of the frontmatter, so other keys (a date or a nested map under
+`metadata`, a list of `allowed-tools`) do not leave a skill out. To use your own, put `dirs = ["~/.claude/skills"]`
+under `[skills]` in your `config.toml`; Dot reads nothing there until you do. An entry may also be one skill folder
+(`~/.claude/skills/<name>`), to take some skills only: `~/.claude/skills` can hold skills written for Claude Code's own
+tools, such as the superpowers bundle or the skills synced from claude.ai. The skills you wrote for Claude Code are then
+the playbook a campaign can work from.
 
 Dot comes with three skills of its own, for work that has to know this Mac: `excel` (reading and changing a workbook
 with openpyxl, getting the results of its formulas from LibreOffice or Excel, which openpyxl does not compute, and
