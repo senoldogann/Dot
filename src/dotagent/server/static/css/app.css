@@ -2787,7 +2787,7 @@ a.pill:hover {
   gap: 4px;
   width: 320px;
   max-width: calc(100% - 16px);
-  max-height: 360px;
+  max-height: min(360px, var(--room-above, 360px));
   overflow-y: auto;
   padding: 8px;
   border-radius: var(--radius);
@@ -2795,6 +2795,12 @@ a.pill:hover {
   background: var(--surface);
   box-shadow: var(--shadow-float);
   animation: fade-in var(--motion-quick) var(--ease);
+}
+
+/* The Options menu: the four approval modes with what each does, and YOLO's warning once it is chosen (item 398), whole
+   where the window has the room. */
+.composer-popover:has(.approval-list) {
+  max-height: min(480px, var(--room-above, 480px));
 }
 
 .pop-option {

@@ -20,24 +20,24 @@ export const APPROVAL_OPTIONS = [
     id: "supervised",
     label: "Supervised",
     short: "Supervised",
-    hint: "You approve every command and file change, and every entry or click in a page or an app; reads run",
+    hint: "You approve every change: files, commands, clicks, messages",
     icon: "lock",
   },
   {
     id: "ask",
     label: "Auto-accept edits",
     short: "Edits",
-    hint: "Edits and routine work run; you answer what the safety policy raises",
+    hint: "Edits and routine work run; you answer what the policy asks",
     icon: "pencil",
   },
   {
     id: "auto",
     label: "Auto",
     short: "Auto",
-    hint: "A review model answers in your place; what it is unsure about, and a change of Dot's own files, still come to you",
+    hint: "A review model answers; its doubts and Dot's own files come to you",
     icon: "shield",
   },
-  { id: "yolo", label: "YOLO", short: "YOLO", hint: "Nobody is asked: what the policy would ask runs at once and is recorded", icon: "lockOpen" },
+  { id: "yolo", label: "YOLO", short: "YOLO", hint: "Nobody is asked; each step runs at once and is recorded", icon: "lockOpen" },
 ];
 const YOLO_NOTE = "YOLO: nothing asks for confirmation, so this run acts without waiting for you. It also reads secrets, sends files out, pays and signs in by itself.";
 const GOAL_MODE_HINT = "A checker compares the answer with the goal and sends the run back to work until the goal is really reached";

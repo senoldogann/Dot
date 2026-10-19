@@ -14941,7 +14941,11 @@ guard's hint to use the file tools, wrong for a delete and for OpenCode's agent,
 said before. The second pass (1 Important, 1 Nit) is fixed too: the docs, `defaults.toml` and the docstrings that named
 the modes but yolo as `ask` and `auto` (the secret fields, the click questions, a run that waits for its answer) say
 every mode but yolo, the foot of a delegated run in supervised says so, and the `auto` and `yolo` bullets of
-`docs/autonomy.md` are wrapped again.
+`docs/autonomy.md` are wrapped again. Clicked through on a phone (Pixel 7, iPhone SE, landscape) and wide, light and
+dark: the four rows with their first hints and YOLO's warning outgrew the composer's menus (360 px), so the warning was
+cut; the hints are one short line each now, as in the picture, the Options menu may grow to 480 px, and every menu of
+the composer keeps within the window above its pill (`popover.js` `--room-above`), so none leaves it at the top;
+`test_composer.py` checks the menu shows the modes and the warning whole.
 
 ## Log
 

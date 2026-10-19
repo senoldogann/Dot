@@ -317,6 +317,9 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await popover.locator(".pop-option[data-mode='yolo']").click()
                 await expect(options_pill).to_contain_text("YOLO")
                 await expect(options_pill).to_have_attribute("data-tone", "warn")
+                # The four modes and YOLO's warning show whole, with no scroll, where the window has the room.
+                await expect(popover.locator(".note.warn")).to_be_visible()
+                assert await popover.evaluate("(menu) => menu.scrollHeight <= menu.clientHeight")
                 await expect(options_pill.locator("[data-icon='lockOpen']")).to_have_count(1)
                 await popover.locator(".pop-option[data-mode='supervised']").click()
                 await expect(options_pill).to_contain_text("Supervised")
