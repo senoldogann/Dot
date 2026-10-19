@@ -447,7 +447,7 @@ async def test_auto_mode_tells_the_review_model_when_the_run_read_untrusted_cont
 
 async def test_a_change_of_dots_own_files_asks_the_user_and_goes_ahead_when_allowed(room: Room) -> None:
     """Item 398: in every mode but yolo, the user answers it, never the review model, and the run makes the change once
-    the user allows it; before, the change was refused outright in ask and auto."""
+    the user allows it."""
     for approvals in ("supervised", "ask", "auto"):
         question: Question = await _ask(room, _gate(room, "task", "aggressive", approvals, _nobody), OWN_FILE)
         assert question.record.tool == "edit_file"
