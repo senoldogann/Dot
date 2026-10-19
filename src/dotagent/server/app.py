@@ -23,6 +23,7 @@ from dotagent.core.errors import (
     PreviewError,
     ProviderError,
     RunConflict,
+    SignInError,
     ToolExecutionError,
     ToolInputError,
     UndoError,
@@ -36,6 +37,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.guard import LocalGuard
 from dotagent.server.kept_pages import KeptPages, ServedPages, keep_pages
 from dotagent.server.routes_about import about_router
+from dotagent.server.routes_accounts import accounts_router
 from dotagent.server.routes_agents import agents_router
 from dotagent.server.routes_assistant import assistant_router
 from dotagent.server.routes_browser import browser_router
@@ -81,6 +83,7 @@ _STATUS_BY_ERROR: tuple[tuple[type[DotError], int], ...] = (
     (BrowserError, 422),
     (PreviewError, 422),
     (PhoneSetupError, 422),
+    (SignInError, 422),
     (ProviderError, 502),
 )
 
@@ -127,6 +130,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(phone_router(ctx))
     app.include_router(snapshots_router(ctx))
     app.include_router(assistant_router(ctx))
+    app.include_router(accounts_router(ctx))
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:

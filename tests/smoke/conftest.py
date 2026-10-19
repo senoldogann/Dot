@@ -13,6 +13,9 @@ MISSING_OPENCODE: str = "/nonexistent/dot-tests/opencode"
 MISSING_TAILSCALE: str = "/nonexistent/dot-tests/tailscale"
 MISSING_CAFFEINATE: str = "/nonexistent/dot-tests/caffeinate"
 MISSING_OPEN: str = "/nonexistent/dot-tests/open"
+# The keychain the accounts of the official sign-ins keep their tokens in (item 422): one that does not exist, so that
+# no test reads or writes the owner's login keychain through them; the tests of the sign-ins make one of their own.
+MISSING_KEYCHAIN: str = "/nonexistent/dot-tests/accounts.keychain-db"
 
 
 def pytest_configure(config: pytest.Config) -> None:
@@ -20,3 +23,4 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["DOT_TAILSCALE"] = MISSING_TAILSCALE
     os.environ["DOT_CAFFEINATE"] = MISSING_CAFFEINATE
     os.environ["DOT_OPEN"] = MISSING_OPEN
+    os.environ["DOT_KEYCHAIN"] = MISSING_KEYCHAIN

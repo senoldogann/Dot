@@ -228,6 +228,11 @@ class ServiceError(DotError):
     """The daemon does not answer, or its launchd job cannot be installed, removed or inspected."""
 
 
+class SignInError(DotError):
+    """An official sign-in of Google or Microsoft could not be made or used (item 422): its client is not set, the
+    provider refused, its tokens cannot be read or refreshed, or the Keychain did not answer."""
+
+
 class PhoneSetupError(DotError):
     """What a phone needs to reach Dot away from home could not be set up (item 271): Tailscale is missing, not running
     or refused to serve, or the Mac cannot be kept awake."""

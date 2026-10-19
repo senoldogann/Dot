@@ -60,6 +60,8 @@ from dotagent.mcp.connected import ConnectedServers, read_connected
 from dotagent.mcp.hub import McpHub, open_hub
 from dotagent.memory.service import MemoryIndex, close_memory_index, open_memory_index
 from dotagent.notify.push import PushKeys, read_or_create_keys
+from dotagent.oauth.accounts import Accounts
+from dotagent.oauth.keychain import Keychain, keychain_file
 from dotagent.plugins.catalog import load_plugins, plugin_roots
 from dotagent.plugins.types import PluginCatalog
 from dotagent.policy.paths import expand_protected
@@ -122,6 +124,8 @@ class Runtime:
     awake: KeepAwake
     # The name the owner calls Dot by and the owner's own (item 420), as the web UI changes them.
     assistant: Assistant
+    # The accounts of Google and Microsoft signed in through their official sign-ins (item 422).
+    accounts: Accounts
     terminals: Terminals
     web: WebClient
     # Whether the key of Ollama's hosted search was found when the runtime was built: the first rung of web_search's
@@ -400,6 +404,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             site_locks=SiteLocks(),
             awake=KeepAwake(),
             assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),
+            accounts=Accounts(store, Keychain(keychain_file()), None),
             router=ModelRouter(config, _call_recorder(store, bus), login_env),
             roles=ModelRoles(config.models),
             context_sizes=ContextSizes(config.models.context),

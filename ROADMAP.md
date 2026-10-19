@@ -15567,6 +15567,25 @@ generator, of Tailscale's download page and, once the daemon answers to its name
 `tests/smoke/test_phone_reach.py` (the App Store and the app opened, the QR codes, the HTTPS page in the error, the
 guide on a desktop and a phone, light and dark). Docs: `docs/phone.md`, `docs/daemon.md`.
 
+### 422. The official sign-ins of Google and Microsoft, their tokens in the Keychain
+
+**Status: done (2026-10-20), on `google-microsoft-sign-in`.** The owner's word of 2026-10-19: Gmail and Calendar through
+OAuth rather than AppleScript and Chrome's cookies, official flows for Google and Microsoft, and the tokens in the
+Keychain. **As built (2026-10-20).** `dotagent.oauth`: the providers (Google's Desktop app client with its secret,
+Microsoft's public client), PKCE (S256) and a state good once, the code traded for tokens and the account named by its
+address (Google's `email`, Microsoft's `mail` or user name), an access token refreshed once it is about to run out (the
+refresh token kept when the provider gives no new one), signing out. The clients are read as Dot's keys are
+(`DOT_GOOGLE_CLIENT_ID`, `DOT_GOOGLE_CLIENT_SECRET`, `DOT_MS_CLIENT_ID`: environment, `.env`, the Keychain's
+`dot-agent`); the tokens of each account are in the login Keychain under `dot-oauth`, written through `security`'s own
+prompt so that no token is on a command line, in pieces short enough for a line of that prompt and in one of two slots
+named last, so that tokens cut off half-written leave the ones before whole, and the list of accounts in the store. The browser comes back to the
+daemon's `/oauth/callback`, which hands it to the accounts first and to an MCP server's sign-in otherwise; a sign-in
+starts only from this Mac's own address. Customize › Plugins opens on an Accounts card with Sign in, the accounts and
+Sign out. Nothing logs a token, a code or an address. The tools that use the accounts (Gmail, Google Calendar) are the
+next item. Tests: `tests/unit/test_oauth.py`, `tests/smoke/test_oauth_accounts.py` (a stand-in provider that checks PKCE
+and the client, a throw-away keychain), `tests/smoke/test_oauth_routes.py`; the smoke tests' `DOT_KEYCHAIN` names a
+missing keychain, so that none touches the owner's. Docs: `docs/extending.md`, `docs/safety.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16433,3 +16452,5 @@ guide on a desktop and a phone, light and dark). Docs: `docs/phone.md`, `docs/da
   the names of Dot and its owner kept by the daemon and told to the model.
 - 2026-10-20 (Opus 5.5): item 421 on `phone-guide` from `main`: Settings › Phone guides the setup a step at a time, with
   Tailscale from the App Store, the HTTPS page Tailscale names, Restart Dot and QR codes for the phone.
+- 2026-10-20 (Opus 5.5): item 422 on `google-microsoft-sign-in` from `main`: the official sign-ins of Google and
+  Microsoft, their tokens in the Keychain, an Accounts card in Customize › Plugins.

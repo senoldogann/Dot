@@ -1516,6 +1516,52 @@ a.pill:hover {
   white-space: nowrap;
 }
 
+/* The accounts of the official sign-ins (item 422), at the head of Customize › Plugins: a provider a block, its mark
+   and name over its accounts, each a row with its Sign out. */
+.accounts-list {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.account-provider {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.account-provider > .row {
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.account-provider > .hint {
+  margin: 0;
+}
+
+.account-mark {
+  display: inline-grid;
+  flex: none;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--text);
+  font-weight: var(--weight-title);
+}
+
+.account-name {
+  font-weight: var(--weight-title);
+}
+
+.account-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding-left: 36px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
 /* The cards of Customize › Plugins (item 316): a card's lines stand clear of the line under its head and of its first
    row, as far from them as a row's text is from its own lines (item 287); a second line follows the first closely. The
    form that adds an MCP server by its address (item 279) sits under the servers, its fields side by side when they fit. */

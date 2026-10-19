@@ -9,6 +9,7 @@
 // offers no step. Under the sections, an MCP server of one's own by its address; Connected lists too the servers that
 // come from Dot's config, a plugin or another agent of the Mac.
 
+import { accountsCard } from "../accounts.js";
 import { api } from "../api.js";
 import { el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
@@ -741,10 +742,13 @@ export function mount(root, ctx) {
     }
   }
 
-  root.append(bar, holder);
+  // The official sign-ins of Google and Microsoft (item 422) head the page.
+  const accounts = accountsCard();
+  root.append(bar, accounts.element, holder);
   attempt(load);
   return () => {
     disposed = true;
     clearTimeout(polling);
+    accounts.dispose();
   };
 }

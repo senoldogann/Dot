@@ -168,6 +168,12 @@ class PairRequest(FrozenModel):
     code: str = Field(min_length=1, max_length=32)
 
 
+class SignInLink(FrozenModel):
+    """The address of a provider's page that asks the owner for a yes (item 422)."""
+
+    link: str
+
+
 class PairedView(FrozenModel):
     """The access token a pairing code was traded for (item 267)."""
 
