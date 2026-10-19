@@ -349,7 +349,7 @@ async def test_a_queued_message_keeps_its_picks(login_env: dict[str, str]) -> No
 async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(login_env: dict[str, str]) -> None:
     with scratch_home() as home, eval_environment(home, {}):
         async with (
-            _daemon(login_env, _config("full"), [DONE]) as (runtime, manager, model),
+            _daemon(login_env, _config("full"), [DONE, DONE]) as (runtime, manager, model),
             _client(runtime, manager) as client,
         ):
             bounded: httpx.Response = await client.post(
@@ -368,8 +368,8 @@ async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(logi
             refused: dict[str, tuple[JsonObject, str]] = {
                 "a server that is not connected": (
                     {"plugins": ["nowhere"]},
-                    "the MCP server nowhere is not connected, or none of its tools is open to this run (the servers "
-                    f"it can use: {SERVER})",
+                    f"the MCP server nowhere is not connected (the servers connected now: {SERVER}); Customize › "
+                    "Plugins says why",
                 ),
                 "a skill not offered": ({"skills": ["nope"]}, "no skill offered to this run is called nope"),
                 "Plan first in yolo": (
@@ -379,11 +379,6 @@ async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(logi
                 "Plan first in a chat": (
                     {"plan_first": True, "mode": "chat"},
                     "Plan first is for task and research runs: a chat changes nothing",
-                ),
-                "a server outside an agent's bounds": (
-                    {"plugins": [SERVER], "agent_id": bounded.json()["id"]},
-                    f"the MCP server {SERVER} is not connected, or none of its tools is open to this run (the servers "
-                    "it can use: none)",
                 ),
                 "picks with Keep going": (
                     {"plugins": [SERVER], "standing": True},
@@ -401,6 +396,17 @@ async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(logi
                 assert answer.status_code == 422, (case, answer.text)
                 assert says in answer.text, (case, answer.text)
             assert await runtime.store.list_runs(10, None) == []
+            # A server the owner picks for a message to an agent is open to its run, whatever the agent's tools (item
+            # 415): before, it was refused as "not connected".
+            for_agent: httpx.Response = await client.post(
+                "/api/runs",
+                json={"goal": GOAL, "model": SCRIPTED_MODEL, "plugins": [SERVER], "agent_id": bounded.json()["id"]},
+            )
+            assert for_agent.status_code == 201, for_agent.text
+            by_agent: Played = await _ended(runtime, manager, model, for_agent.json()["id"], 0)
+            assert f"{GROUP}__add" in [spec.name for spec in by_agent.steps[0].tools]
+            assert "memory_save" in [spec.name for spec in by_agent.steps[0].tools]
+            assert "write_file" not in [spec.name for spec in by_agent.steps[0].tools]
             # Picks the run can start with start it.
             started: httpx.Response = await client.post(
                 "/api/runs", json={"goal": GOAL, "model": SCRIPTED_MODEL, "plugins": [SERVER]}

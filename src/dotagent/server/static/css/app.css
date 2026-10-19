@@ -6473,6 +6473,16 @@ button.attach-chip:hover {
   }
 }
 
+/* A picture of SnapShots on its way into its chip (item 414): drawn over the page, the script moves it. */
+.attach-flight {
+  position: fixed;
+  z-index: 100;
+  transform-origin: top left;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-composer);
+  pointer-events: none;
+}
+
 .snapshots-keys {
   font: inherit;
   padding: var(--space-half) var(--space-3);

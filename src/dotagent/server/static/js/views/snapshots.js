@@ -81,7 +81,7 @@ export function mount(root, _ctx) {
       el(
         "div",
         { class: "hint" },
-        "Capture the window you're using without switching apps: tap the Command key twice. Another key between the taps, as in ⌘C ⌘V, is not a capture. Dot's own window and a password manager's are never captured.",
+        "Capture the window you're using without switching apps: press both Command keys together, or tap the Command key twice. Another key in between, as in ⌘C ⌘V, is not a capture. Dot's own window and a password manager's are never captured.",
       ),
     );
     const sound = choiceSetting({
@@ -103,12 +103,36 @@ export function mount(root, _ctx) {
       },
     });
     animations.paint();
+    const flash = switchSetting({
+      label: "Capture flash",
+      hint: "A soft flash over the window as it is captured.",
+      read: () => view.flash,
+      write: (on) => change("flash", on),
+      onToggled: () => {
+        if (!disposed) {
+          flash.paint();
+        }
+      },
+    });
+    flash.paint();
+    const openDot = switchSetting({
+      label: "Open Dot after a capture",
+      hint: "Bring Dot's window, or its tab in your browser, to the front with the capture in the box. macOS asks once whether Dot may choose the browser's tab.",
+      read: () => view.open_dot,
+      write: (on) => change("open_dot", on),
+      onToggled: () => {
+        if (!disposed) {
+          openDot.paint();
+        }
+      },
+    });
+    openDot.paint();
     holder.replaceChildren(
       el(
         "section",
         { class: "card", "aria-label": "SnapShots" },
         el("div", { class: "card-head" }, el("span", { class: "grow" }, "SnapShots")),
-        el("div", { class: "card-pad stack" }, enabled.element, listening(), appText.element, shortcut, sound.element, animations.element),
+        el("div", { class: "card-pad stack" }, enabled.element, listening(), appText.element, shortcut, sound.element, animations.element, flash.element, openDot.element),
       ),
     );
   }

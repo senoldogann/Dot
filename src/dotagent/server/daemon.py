@@ -22,6 +22,8 @@ from dotagent.config import AppConfig
 from dotagent.core.errors import ConfigError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import dot_home, pid_path, running_mark_path, token_path
+from dotagent.desktop.flight import FlightOverlay
+from dotagent.desktop.show_dot import dot_shower
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
 from dotagent.notify.push import PUSH_KINDS, watch_pushes
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -29,7 +31,7 @@ from dotagent.scheduler.runner import Scheduler
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import read_or_create_token, require_loopback
-from dotagent.server.links import base_url
+from dotagent.server.links import base_url, ui_url
 from dotagent.store.models import RunRecord
 
 log = get_logger(__name__)
@@ -230,7 +232,17 @@ async def run_daemon(config: AppConfig) -> int:
             warming.add_done_callback(_log_warm_end)
             cleanup.push_async_callback(_cancelled, warming)
             # The Command key is watched for SnapShots while they are on (item 405); the watch ends with the daemon.
-            await runtime.snapshots.start(stored_taker(config.desktop, runtime.workspace))
+            # Dot's own pages are looked for at its addresses: this Mac's and the names it is reached by (item 414).
+            addresses: list[str] = [
+                base_url(host, port),
+                f"http://localhost:{port}",
+                *(f"https://{name}" for name in config.server.reach),
+            ]
+            await runtime.snapshots.start(
+                stored_taker(config.desktop, runtime.workspace),
+                dot_shower(addresses, ui_url(host, port, token)),
+                FlightOverlay(),
+            )
             cleanup.push_async_callback(runtime.snapshots.stop)
             recovered: int = await manager.recover()
             if unclean:

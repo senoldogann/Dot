@@ -158,15 +158,18 @@ its tools are grouped (with every tool offered they are on anyway), and its firs
 that names the servers to use, Plan first's (write the plan with `update_plan`, then ask with `ask_user` and act once
 you agree: the prompt asks it, nothing holds the run's tools back), and each picked skill's instructions as the `skill`
 tool gives them; the run's goal stays your words. Picks a run cannot start with are refused, with why, and nothing
-starts: a server that is not connected or none of whose tools the run may use (its mode's, within its agent's bounds), a
-skill it is not offered, Plan first in a chat or under YOLO (a YOLO run does not ask), any pick with Keep going, and any
-pick on one of OpenCode's models, whose run is OpenCode's own agent. A run that goes on from another (Resume, or an
-answer that came after its run ended) starts without the picks: the first message, with their lines and skills, stays in
-the chat, and with grouped tools `use_tools` turns a picked server's group on. **Save from a chat**, on the Skills page
-(`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's last run as a learned skill, as one is
-written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is refused while learned
-skills are off, and for a run that did not end done or took no acting step, a delegated run, an eval's and one of
-OpenCode's agent. The box of a run held it as **Save skill**, under a **More** button, until item 406.
+starts: a server that is not connected, or none of whose tools a run of its mode may use (a chat's, when the server's
+tools all act), each in its own words, a skill it is not offered, Plan first in a chat or under YOLO (a YOLO run does
+not ask), any pick with Keep going, and any pick on one of OpenCode's models, whose run is OpenCode's own agent. A
+server picked for a message is open to its run whatever the agent's tools are (item 415): the owner's word for the
+message widens the agent's bounds, and an MCP server the chat used stays open to the agent's later runs in it; before, a
+pick for an agent whose tools named no MCP tool was refused as if the server were not connected. A run that goes on from
+another (Resume, or an answer that came after its run ended) starts without the picks: the first message, with their
+lines and skills, stays in the chat, and with grouped tools `use_tools` turns a picked server's group on. **Save from a
+chat**, on the Skills page (`POST /api/runs/{id}/skill`), has the review model write the skill of a chat's last run as a
+learned skill, as one is written when a run ends, also after fewer acting steps than `[agent] skill_min_steps`; it is
+refused while learned skills are off, and for a run that did not end done or took no acting step, a delegated run, an
+eval's and one of OpenCode's agent. The box of a run held it as **Save skill**, under a **More** button, until item 406.
 
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
@@ -546,8 +549,9 @@ dotx service uninstall   # stop the daemon and remove the job
   launcher, the daemon's parent), **Restart Dot** (`POST /api/system/restart`): the daemon stops with an exit launchd
   does not count as clean, so the job starts it again, with what was granted meanwhile; a daemon run by hand is refused
   the restart, and so is one when launchd cannot be asked. The SnapShots page offers the Accessibility pane the same
-  way. Measured through the service with all three granted: the model opened the fixture app, typed a name, pressed a
-  button twice and ticked a checkbox in 4 steps and 13 seconds.
+  way. Each section of Settings › System folds (item 411), as the reader leaves it in this browser; the Permissions fold
+  says what is missing beside its title. Measured through the service with all three granted: the model opened the
+  fixture app, typed a name, pressed a button twice and ticked a checkbox in 4 steps and 13 seconds.
 - The job does not see the environment of your shell. Give it its API keys through `dotx auth set` or the Keychain.
 - When Dot's files are under Desktop, Documents or Downloads, the first start of the job waits for you: macOS asks once
   whether Dot may use that folder, and `service install` waits up to 60 seconds for the answer. Measured on an
@@ -606,20 +610,30 @@ Errors come as `{"message": …, "context": {…}}`, those of the web framework 
 a path does not take) included; an error Dot did not expect is a 500 whose context names its kind and its words, and the
 log keeps its traceback. Invalid input is a 422 with the validation errors in the context.
 
-**SnapShots** (item 405, after another coding agent's). In any application, a double tap of the Command key (⌘ ⌘)
-captures the window in front and puts it in the box of the open chat (or of the new chat) as a picture, without
-switching to Dot; a short sound says it was taken, and the chip springs into the box. With **Include app text** the
-window's text and controls, as the application shows them to accessibility and as the model reads a window, come as a
-Markdown file beside the picture. The key is watched by the daemon through a listen-only event tap once macOS has
-granted Accessibility to the app that runs Dot; it reads only whether the Command key went down or up and whether
-another key was pressed meanwhile (⌘C ⌘V is two shortcuts, not a tap), never which key. Dot's own window (the desktop
-app, or a browser showing Dot) and a password manager's are never captured; what lies over the window shows in the
-picture, as on the screen. A box on screen takes the capture as it comes; with none on screen (another page open) the
-daemon keeps it until a box is made. Settings › SnapShots switches it (`[snapshots] enabled`), the text (`app_text`),
-the sound (`sound`: click, pop, glass or off), the spring (`animations`), and says whether the key is watched and, when
-it is not, why; while the permission is missing the daemon tries the watch again every few seconds, so granting it needs
-no restart. A capture past the ten files of a message is left out, and the box says so. Left for later: a flash on the
-captured window and a shortcut of your own; the shortcut is ⌘ ⌘.
+**SnapShots** (item 405, after another coding agent's). In any application, both Command keys pressed together (⌘ ⌘,
+item 414, as another coding agent's shortcut is), or the Command key tapped twice, captures the window in front and puts
+it in the box of the open chat (or of the new chat) as a picture, without switching to Dot; a short sound says it was
+taken, a soft white flash goes over the window (`flash`), and a card with the picture lifts off it and flies to Dot's
+window as it comes to the front (`open_dot`): the desktop app, or the tab of a browser that shows Dot's pages, chosen
+with AppleScript (Safari, Chrome and the browsers built on it, Arc; macOS asks once whether Dot may drive the browser,
+and one it may not is brought to the front as it is), else Dot opened in the default browser; the browser of the page
+that took the last capture is asked first. A helper process draws the flash and the flight (`python -m
+dotagent.desktop.flight`, an application without a Dock icon that reads nothing of the screen), as the daemon has no
+window of its own. The page takes the capture once it is seen, so the picture flies into its chip and the chip springs
+into the box (`animations`); a page of this Mac with no box that came to the front goes to the new chat, whose box takes
+it. With **Include app text** the window's text and controls, as the application shows them to accessibility and as the
+model reads a window, come as a Markdown file beside the picture. The keys are watched by the daemon through a
+listen-only event tap once macOS has granted Accessibility to the app that runs Dot; it reads only whether a Command key
+went down or up (the left and the right apart) and whether another key was pressed meanwhile (⌘C ⌘V is two shortcuts,
+not a capture), never which key. Only the pages of this Mac take captures: a phone's page, reached through `[server]
+reach`, does not take one away from the Mac's box. Dot's own window (the desktop app, or a browser showing Dot) and a
+password manager's are never captured; what lies over the window shows in the picture, as on the screen. A box on screen
+takes the capture as it comes; with none on screen (another page open) the daemon keeps it until a box is made. Settings
+› SnapShots switches it (`[snapshots] enabled`), the text (`app_text`), the sound (`sound`: click, pop, glass or off),
+the flight and the spring (`animations`), the flash (`flash`), Dot coming to the front (`open_dot`), and says whether
+the key is watched and, when it is not, why; while the permission is missing the daemon tries the watch again every few
+seconds, so granting it needs no restart. A capture past the ten files of a message is left out, and the box says so.
+Left for later: a shortcut of your own.
 
 ## The desktop shell
 

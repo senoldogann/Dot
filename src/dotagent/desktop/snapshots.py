@@ -1,14 +1,18 @@
-"""SnapShots (item 405): a double tap of the Command key, in whatever application the owner is in, captures the window
-in front and hands it to the composer of the open chat as a file, with the window's text when the application shows
-it to accessibility and the setting asks for it; a short sound says it was taken. The key is watched by a listen-only
-event tap on a thread of its own: it reads only whether the Command key went down or up and whether any other key was
-pressed meanwhile (⌘C ⌘V is not a double tap), never which. Dot's own window and a password manager's are never
-captured. Settings › SnapShots switches it and its parts (``[snapshots]``)."""
+"""SnapShots (item 405): both Command keys pressed together (item 414), or the Command key tapped twice, in whatever
+application the owner is in, captures the window in front and hands it to the composer of the open chat as a file,
+with the window's text when the application shows it to accessibility and the setting asks for it; a short sound says
+it was taken, a soft flash over the window and a card that flies to Dot's window show it
+(:mod:`dotagent.desktop.flight`), and Dot's window or tab comes to the front with the capture in its box
+(:mod:`dotagent.desktop.show_dot`). The keys are watched by a listen-only event tap on a thread of its own: it reads
+only whether a Command key went down or up and whether any other key was pressed meanwhile (⌘C ⌘V is not a capture),
+never which. Dot's own window and a password manager's are never captured. Settings › SnapShots switches it and its
+parts (``[snapshots]``)."""
 
 import asyncio
 import threading
 import time
 from collections.abc import Callable
+from typing import Protocol
 
 import AppKit
 import Quartz
@@ -19,6 +23,8 @@ from dotagent.core.errors import DesktopError, DotError, InvalidValueError
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel
 from dotagent.desktop import apps, ax, capture, perms, render, safety, screen
+from dotagent.desktop.flight import FlightCommand, Frame
+from dotagent.desktop.show_dot import Shower
 from dotagent.desktop.types import AppInfo, AXElement, WindowInfo
 from dotagent.events import SNAPSHOT_EVENT, SNAPSHOT_FAILED_EVENT, SYSTEM_RUN_ID, EventBus
 
@@ -36,6 +42,10 @@ _JPEG_QUALITY: int = 85
 # How long the thread that watches the key gets to stand up.
 _READY_S: float = 3.0
 _STOP_S: float = 3.0
+# The left and the right Command keys in an event's flags (NX_DEVICELCMDKEYMASK, NX_DEVICERCMDKEYMASK): both down
+# together is the shortcut another coding agent gives its own captures (item 414).
+_LEFT_COMMAND: int = 0x08
+_RIGHT_COMMAND: int = 0x10
 # A tap refused (the permission missing) is tried again this often, so the grant needs no restart of Dot.
 _RETRY_S: float = 5.0
 _SLOW: str = "the watch of the Command key did not start in time"
@@ -53,13 +63,24 @@ class SnapshotTaken(FrozenModel):
 
 class Capture(FrozenModel):
     """A capture as taken, before it is kept: the application and the title of the window, the name its files take
-    before their extension, the picture as JPEG, and the window's text ("" without)."""
+    before their extension, the picture as JPEG, the window's text ("" without) and where the window is on the screen
+    (for the flash and the flight, item 414)."""
 
     app: str
     title: str
     stem: str
     image: bytes
     text: str
+    frame: Frame
+
+
+class Kept(FrozenModel):
+    """A capture kept: what the composer is handed (``snapshot``), where the window was (``frame``) and the picture's
+    file (``picture``), which the card of the flight shows."""
+
+    snapshot: SnapshotTaken
+    frame: Frame
+    picture: str
 
 
 class TapDetector:
@@ -72,6 +93,7 @@ class TapDetector:
         self._first: float | None = None
         self._held: bool = False
         self._keyed: bool = False
+        self._both: bool = False
 
     def command(self, down: bool, now: float) -> bool:
         """The Command key went ``down`` (or up) at ``now``; whether that completes a double tap."""
@@ -93,6 +115,17 @@ class TapDetector:
     def key(self) -> None:
         """Another key was pressed: what was begun is a shortcut, not a tap."""
         self._keyed = True
+
+    def sides(self, left: bool, right: bool) -> bool:
+        """The left and the right Command keys are down (or up) after a change: whether both just went down together,
+        with no other key pressed since the first did (item 414). A double tap begun is let go, so it does not
+        capture again."""
+        both: bool = left and right
+        fired: bool = both and not self._both and not self._keyed
+        self._both = both
+        if fired:
+            self._first = None
+        return fired
 
 
 def _front_window(pid: int, windows: tuple[WindowInfo, ...]) -> WindowInfo | None:
@@ -150,12 +183,14 @@ def capture_front_window(desktop: DesktopConfig, with_text: bool) -> Capture:
             text = window_text(desktop, pid, window)
         except DesktopError as error:
             log.warning("snapshot_text_skipped", app=window.owner, error=error.message)
+    bounds = window.bounds
     return Capture(
         app=window.owner,
         title=window.title,
         stem=_stem(window.owner, window.title),
         image=capture.render_jpeg(picture, width, height, _JPEG_QUALITY),
         text=text,
+        frame=Frame(x=bounds.x, y=bounds.y, width=bounds.width, height=bounds.height),
     )
 
 
@@ -191,8 +226,10 @@ class SnapshotWatcher(threading.Thread):
                 Quartz.CGEventTapEnable(self._tap, True)
             return event
         if kind == Quartz.kCGEventFlagsChanged:
-            down: bool = bool(Quartz.CGEventGetFlags(event) & Quartz.kCGEventFlagMaskCommand)
-            if self._detector.command(down, time.monotonic()):
+            flags: int = int(Quartz.CGEventGetFlags(event))
+            tapped: bool = self._detector.command(bool(flags & Quartz.kCGEventFlagMaskCommand), time.monotonic())
+            paired: bool = self._detector.sides(bool(flags & _LEFT_COMMAND), bool(flags & _RIGHT_COMMAND))
+            if tapped or paired:
                 self._on_double()
         else:
             # A key, a click or a scroll while the key is held: a shortcut (⌘C, ⌘-click), not a tap.
@@ -253,23 +290,40 @@ class SnapshotWatcher(threading.Thread):
         self.join(_STOP_S)
 
 
-type Taker = Callable[[bool], SnapshotTaken]
+type Taker = Callable[[bool], Kept]
+
+
+class Overlay(Protocol):
+    """What draws the flash and the flight (:class:`dotagent.desktop.flight.FlightOverlay`; a test gives its own)."""
+
+    async def warm(self) -> None: ...
+
+    async def send(self, command: FlightCommand) -> None: ...
+
+    async def aclose(self) -> None: ...
 
 
 class SnapshotService:
     """SnapShots as the daemon runs them: the settings as they stand (changed live from the page), the watch of the
     key while they are on, the captures taken and not yet claimed by a composer, and the event that tells the pages
     of each. :meth:`start` is given what captures the window in front and keeps it (``agent/snapshots.py``'s
-    ``stored_taker``; a test gives one of its own)."""
+    ``stored_taker``), what brings Dot's window to the front (``show_dot``'s ``dot_shower``) and what draws the flash
+    and the flight (``FlightOverlay``); a test gives its own of each."""
 
     def __init__(self, config: SnapshotsConfig, bus: EventBus) -> None:
         self.enabled: bool = config.enabled
         self.app_text: bool = config.app_text
         self.sound: SnapshotSound = config.sound
         self.animations: bool = config.animations
+        self.flash: bool = config.flash
+        self.open_dot: bool = config.open_dot
+        # The User-Agent of the page that last claimed captures: Dot's tab is looked for in its browser first.
+        self.agent: str | None = None
         self._within_s: float = config.double_tap_ms / 1000
         self._bus: EventBus = bus
         self._taker: Taker | None = None
+        self._shower: Shower | None = None
+        self._overlay: Overlay | None = None
         self._loop: asyncio.AbstractEventLoop | None = None
         self._watcher: SnapshotWatcher | None = None
         self._pending: list[SnapshotTaken] = []
@@ -294,13 +348,18 @@ class SnapshotService:
             return watcher.problem
         return _SLOW if self._slow else None
 
-    async def start(self, taker: Taker) -> None:
-        """Take ``taker`` as what captures the window in front and keeps it, and start watching the key when SnapShots
-        are on; called once the event loop runs."""
+    async def start(self, taker: Taker, shower: Shower, overlay: Overlay) -> None:
+        """Take ``taker`` as what captures the window in front and keeps it, ``shower`` as what brings Dot's window to
+        the front and ``overlay`` as what draws the flash and the flight, and start watching the keys when SnapShots
+        are on (the overlay's helper with them, so the first flash is not late); called once the event loop runs."""
         self._loop = asyncio.get_running_loop()
         self._taker = taker
+        self._shower = shower
+        self._overlay = overlay
         if self.enabled:
             await asyncio.to_thread(self._listen)
+            if self.flash or self.animations:
+                await overlay.warm()
 
     def _listen(self) -> None:
         watcher: SnapshotWatcher = SnapshotWatcher(self._within_s, self._tapped)
@@ -334,11 +393,13 @@ class SnapshotService:
             await self._bus.emit(SYSTEM_RUN_ID, SNAPSHOT_FAILED_EVENT, {"reason": reason}, False)
 
     async def stop(self) -> None:
-        """End the watch of the key, if any."""
+        """End the watch of the keys, if any, and the overlay's helper."""
         watcher: SnapshotWatcher | None = self._watcher
         self._watcher = None
         if watcher is not None:
             await asyncio.to_thread(watcher.stop)
+        if self._overlay is not None:
+            await self._overlay.aclose()
 
     async def apply(self, key: str, value: bool | SnapshotSound) -> None:
         """A setting changed on the page: it holds from now; SnapShots switched on start the watch, off end it. A
@@ -353,20 +414,25 @@ class SnapshotService:
             self.app_text = value
         elif key == "animations" and isinstance(value, bool):
             self.animations = value
+        elif key == "flash" and isinstance(value, bool):
+            self.flash = value
+        elif key == "open_dot" and isinstance(value, bool):
+            self.open_dot = value
         elif key == "sound" and isinstance(value, str) and value in SOUND_NAMES:
             self.sound = value
         else:
             raise InvalidValueError("the setting does not take this value", {"key": key, "value": str(value)})
 
     async def take(self) -> SnapshotTaken:
-        """Capture the window in front now: the files are kept for the composer to claim, the sound plays, and the
-        pages hear of it. A capture that fails tells the pages why and raises."""
-        if self._taker is None:
+        """Capture the window in front now: the files are kept for the composer to claim, the sound plays, the window
+        flashes and its card lifts off it, the pages hear of it, and Dot's window comes to the front, where the card
+        lands (item 414). A capture that fails tells the pages why and raises."""
+        if self._taker is None or self._shower is None or self._overlay is None:
             raise DesktopError("SnapShots are not started", {})
         taker: Taker = self._taker
         async with self._taking:
             try:
-                taken: SnapshotTaken = await asyncio.to_thread(taker, self.app_text)
+                kept: Kept = await asyncio.to_thread(taker, self.app_text)
             except (DesktopError, InvalidValueError, OSError) as error:
                 # Refused (Dot's own window, a password manager, no window, no permission) or the files could not be
                 # stored: the pages hear why, and the caller.
@@ -374,17 +440,31 @@ class SnapshotService:
                 log.warning("snapshot_failed", error=reason)
                 await self._bus.emit(SYSTEM_RUN_ID, SNAPSHOT_FAILED_EVENT, {"reason": reason}, False)
                 raise
+            taken: SnapshotTaken = kept.snapshot
             if self.sound != "off":
                 await asyncio.to_thread(play_sound, self.sound)
+            if self.flash or self.animations:
+                begin: FlightCommand = FlightCommand(
+                    op="begin", frame=kept.frame, picture=kept.picture, flash=self.flash, fly=self.animations
+                )
+                await self._overlay.send(begin)
             self._pending.append(taken)
             log.info("snapshot_taken", app=taken.app, files=len(taken.files))
             await self._bus.emit(
-                SYSTEM_RUN_ID, SNAPSHOT_EVENT, {**taken.model_dump(), "animations": self.animations}, False
+                SYSTEM_RUN_ID,
+                SNAPSHOT_EVENT,
+                {**taken.model_dump(), "animations": self.animations, "open": self.open_dot},
+                False,
             )
+            target: Frame | None = await asyncio.to_thread(self._shower, self.agent) if self.open_dot else None
+            if self.animations:
+                await self._overlay.send(FlightCommand(op="land", frame=target, picture=None, flash=False, fly=True))
             return taken
 
-    def claim(self) -> list[SnapshotTaken]:
-        """The captures not yet claimed, for the composer that asks first; they are its from now."""
+    def claim(self, agent: str | None) -> list[SnapshotTaken]:
+        """The captures not yet claimed, for the composer that asks first, whose page runs in the browser ``agent``
+        (its User-Agent: Dot's tab is looked for there first); they are its from now."""
+        self.agent = agent
         claimed: list[SnapshotTaken] = list(self._pending)
         self._pending.clear()
         return claimed

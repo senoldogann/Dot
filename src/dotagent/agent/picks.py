@@ -24,20 +24,38 @@ def picked_groups(picks: RunPicks) -> frozenset[str]:
     return frozenset(plugin_group(server) for server in picks.plugins)
 
 
+def owner_server_groups(picks: RunPicks, used: frozenset[str]) -> frozenset[str]:
+    """The MCP servers' groups the owner opened to a run whatever its agent's bounds (item 415): the ones picked for
+    its message, and of the groups its chat used (``used``), the MCP servers', which a pick of an earlier message
+    opened."""
+    return picked_groups(picks) | frozenset(group for group in used if group.startswith(PREFIX))
+
+
 def picks_problems(
-    picks: RunPicks, mode: RunMode, groups: frozenset[str], offered: Sequence[str], can_ask: bool
+    picks: RunPicks,
+    mode: RunMode,
+    groups: frozenset[str],
+    connected: Sequence[str],
+    offered: Sequence[str],
+    can_ask: bool,
 ) -> list[str]:
     """Why a run of ``mode`` cannot start with ``picks``, one reason each, none when it can. ``groups`` are the tool
-    groups of the tools it may use (its mode's, within its agent's bounds), so a server that is not connected, or none
-    of whose tools the run may use, is refused; ``offered`` names the skills it is offered; ``can_ask`` is whether it
-    can put a question to the owner, which a plan first needs (a yolo run's owner chose not to be asked)."""
-    servers: list[str] = sorted(group.removeprefix(PREFIX) for group in groups if group.startswith(PREFIX))
-    problems: list[str] = [
-        f"the MCP server {server} is not connected, or none of its tools is open to this run (the servers it can "
-        f"use: {', '.join(servers) or 'none'})"
-        for server in picks.plugins
-        if plugin_group(server) not in groups
-    ]
+    groups of the tools it may use (its mode's; an agent's bounds take in the servers picked, item 415), ``connected``
+    the servers connected now, so a server that is not connected, or none of whose tools a run of ``mode`` may use,
+    is refused, each with its own words; ``offered`` names the skills it is offered; ``can_ask`` is whether it can
+    put a question to the owner, which a plan first needs (a yolo run's owner chose not to be asked)."""
+    problems: list[str] = []
+    for server in picks.plugins:
+        if server not in connected:
+            problems.append(
+                f"the MCP server {server} is not connected (the servers connected now: "
+                f"{', '.join(sorted(connected)) or 'none'}); Customize › Plugins says why"
+            )
+        elif plugin_group(server) not in groups:
+            problems.append(
+                f"the MCP server {server} has no tool a {mode} run may use"
+                + ("; send the message as a task" if mode == "chat" else "")
+            )
     problems.extend(f"no skill offered to this run is called {skill}" for skill in picks.skills if skill not in offered)
     if picks.plan_first and mode == "chat":
         problems.append("Plan first is for task and research runs: a chat changes nothing")

@@ -7,9 +7,12 @@ server's headers or environment refer to it as ``${...}``, so the value never si
 
 Checked on 2026-10-15 in each authorization server's own metadata: every service here that signs in offers dynamic
 client registration and a client without a secret (``none``); Supabase and monday.com say so in their docs
-(2026-10-19). The addresses, the keys they take and the commands are as the services' own docs read on 2026-10-19.
-Left out, as Dot cannot register with them: Asana, Slack, Google, Box and Square (clients registered by hand), Vercel,
-Figma and Canva (approved clients only) and Atlassian (allow-lists). Any of them can still be added by its address."""
+(2026-10-19). The services item 415 added were checked on 2026-10-19 by Dot's own client: it registered with each and
+each opened its sign-in page to it. The addresses, the keys they take and the commands are as the services' own docs
+and package registries read on 2026-10-19. Left out, as Dot cannot connect to them: Asana, Slack, Google, Box, Render,
+HubSpot and Square (clients registered by hand), Vercel and Canva (approved clients only: Canva refused Dot's), Figma's
+own server (it refused Dot's registration; Framelink's server reads Figma with your token instead) and Semgrep's (it
+refused the resource Dot asks for). Any of them can still be added by its address."""
 
 import re
 from typing import Literal, Self
@@ -23,11 +26,12 @@ type ServiceKind = Literal["remote", "local"]
 
 class ServiceSecret(FrozenModel):
     """A secret a service's server takes from the owner: the ``name`` its server knows it by (the ``${name}`` of
-    ``headers`` or ``env``), what to call it on the page, and where the owner gets one."""
+    ``headers`` or ``env``), what to call it on the page, and where the owner gets one (None for a value the owner
+    knows, such as the address of their own site)."""
 
     name: str = Field(pattern=r"^[A-Z][A-Z0-9_]*$")
     label: str
-    help: str
+    help: str | None
 
 
 class McpService(FrozenModel):
@@ -258,5 +262,205 @@ MCP_SERVICES: tuple[McpService, ...] = (
         does="Drive a browser of its own by its accessibility tree, from this Mac.",
         command="npx",
         args=("-y", "@playwright/mcp@latest"),
+    ),
+    McpService(
+        id="gitlab",
+        name="GitLab",
+        does="Search and work on your GitLab projects, issues, merge requests and pipelines.",
+        url="https://gitlab.com/api/v4/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="posthog",
+        name="PostHog",
+        does="Ask your PostHog analytics: insights, feature flags, errors and experiments.",
+        url="https://mcp.posthog.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="zapier",
+        name="Zapier",
+        does="Run the actions you set up in Zapier, across the thousands of apps it reaches.",
+        url="https://mcp.zapier.com/api/mcp/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="webflow",
+        name="Webflow",
+        does="Manage your Webflow sites: their pages, CMS collections and content.",
+        url="https://mcp.webflow.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="clickup",
+        name="ClickUp",
+        does="Find, create and update your ClickUp tasks, lists and docs.",
+        url="https://mcp.clickup.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="postman",
+        name="Postman",
+        does="Work with your Postman workspaces, collections, requests and APIs.",
+        url="https://mcp.postman.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="netlify",
+        name="Netlify",
+        does="Deploy and manage your Netlify sites: their builds, forms and settings.",
+        url="https://netlify-mcp.netlify.app/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="apify",
+        name="Apify",
+        does="Run Apify's ready-made scrapers and actors on the web.",
+        url="https://mcp.apify.com",
+        signs_in=True,
+    ),
+    McpService(
+        id="miro",
+        name="Miro",
+        does="Read and add to your Miro boards: frames, sticky notes, shapes and diagrams.",
+        url="https://mcp.miro.com/",
+        signs_in=True,
+    ),
+    McpService(
+        id="heroku",
+        name="Heroku",
+        does="Manage your Heroku apps: their dynos, add-ons, logs and pipelines.",
+        url="https://mcp.heroku.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="atlassian",
+        name="Atlassian",
+        does="Find and update issues in Jira and pages in Confluence, signed in with your account.",
+        url="https://mcp.atlassian.com/v2/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="cloudflare-docs",
+        name="Cloudflare Docs",
+        does="Search Cloudflare's documentation.",
+        url="https://docs.mcp.cloudflare.com/mcp",
+        signs_in=False,
+    ),
+    McpService(
+        id="jina",
+        name="Jina",
+        does="Read web pages as Markdown and search the web with Jina's reader; a few calls a minute without a key.",
+        url="https://mcp.jina.ai/v1",
+        signs_in=False,
+    ),
+    McpService(
+        id="figma",
+        name="Figma",
+        does="Read your Figma files: their frames, components, styles and layout, with your access token.",
+        command="npx",
+        args=("-y", "figma-developer-mcp", "--stdio"),
+        env={"FIGMA_API_KEY": "${FIGMA_API_KEY}"},
+        secrets=(
+            ServiceSecret(
+                name="FIGMA_API_KEY",
+                label="Personal access token",
+                help="https://help.figma.com/hc/en-us/articles/8085703771159-Manage-personal-access-tokens",
+            ),
+        ),
+    ),
+    McpService(
+        id="atlassian-token",
+        name="Atlassian (API token)",
+        does=(
+            "Find and update issues in Jira and pages in Confluence with an API token, where no admin let Atlassian's "
+            "own server in."
+        ),
+        command="uvx",
+        args=("mcp-atlassian",),
+        env={
+            "JIRA_URL": "${ATLASSIAN_SITE}",
+            "JIRA_USERNAME": "${ATLASSIAN_EMAIL}",
+            "JIRA_API_TOKEN": "${ATLASSIAN_API_TOKEN}",
+            "CONFLUENCE_URL": "${ATLASSIAN_SITE}/wiki",
+            "CONFLUENCE_USERNAME": "${ATLASSIAN_EMAIL}",
+            "CONFLUENCE_API_TOKEN": "${ATLASSIAN_API_TOKEN}",
+        },
+        secrets=(
+            ServiceSecret(name="ATLASSIAN_SITE", label="Site address (https://your-site.atlassian.net)", help=None),
+            ServiceSecret(name="ATLASSIAN_EMAIL", label="E-mail of your Atlassian account", help=None),
+            ServiceSecret(
+                name="ATLASSIAN_API_TOKEN",
+                label="API token",
+                help="https://id.atlassian.com/manage-profile/security/api-tokens",
+            ),
+        ),
+    ),
+    McpService(
+        id="chrome-devtools",
+        name="Chrome DevTools",
+        does="Look into web pages with Chrome's DevTools from this Mac: performance traces, the network, the console.",
+        command="npx",
+        args=("-y", "chrome-devtools-mcp@latest"),
+    ),
+    McpService(
+        id="perplexity",
+        name="Perplexity",
+        does="Search the web and research a question with Perplexity's Sonar models.",
+        command="npx",
+        args=("-y", "@perplexity-ai/mcp-server"),
+        env={"PERPLEXITY_API_KEY": "${PERPLEXITY_API_KEY}"},
+        secrets=(
+            ServiceSecret(name="PERPLEXITY_API_KEY", label="API key", help="https://www.perplexity.ai/settings/api"),
+        ),
+    ),
+    McpService(
+        id="elevenlabs",
+        name="ElevenLabs",
+        does="Turn text into speech, voices and sound effects with ElevenLabs.",
+        command="uvx",
+        args=("elevenlabs-mcp",),
+        env={"ELEVENLABS_API_KEY": "${ELEVENLABS_API_KEY}"},
+        secrets=(
+            ServiceSecret(
+                name="ELEVENLABS_API_KEY", label="API key", help="https://elevenlabs.io/app/settings/api-keys"
+            ),
+        ),
+    ),
+    McpService(
+        id="mapbox",
+        name="Mapbox",
+        does="Search places, turn addresses into coordinates and plan routes with Mapbox.",
+        command="npx",
+        args=("-y", "@mapbox/mcp-server"),
+        env={"MAPBOX_ACCESS_TOKEN": "${MAPBOX_ACCESS_TOKEN}"},
+        secrets=(
+            ServiceSecret(
+                name="MAPBOX_ACCESS_TOKEN", label="Access token", help="https://account.mapbox.com/access-tokens/"
+            ),
+        ),
+    ),
+    McpService(
+        id="aws-docs",
+        name="AWS Documentation",
+        does="Search and read the AWS documentation.",
+        command="uvx",
+        args=("awslabs.aws-documentation-mcp-server@latest",),
+    ),
+    McpService(
+        id="grafana",
+        name="Grafana",
+        does="Query your Grafana dashboards, data sources, alerts and incidents.",
+        command="uvx",
+        args=("mcp-grafana",),
+        env={"GRAFANA_URL": "${GRAFANA_URL}", "GRAFANA_SERVICE_ACCOUNT_TOKEN": "${GRAFANA_SERVICE_ACCOUNT_TOKEN}"},
+        secrets=(
+            ServiceSecret(name="GRAFANA_URL", label="Grafana's address", help=None),
+            ServiceSecret(
+                name="GRAFANA_SERVICE_ACCOUNT_TOKEN",
+                label="Service account token",
+                help="https://grafana.com/docs/grafana/latest/administration/service-accounts/",
+            ),
+        ),
     ),
 )

@@ -54,7 +54,7 @@ def test_a_listing_is_tried_when_one_of_its_ways_is_a_catalogue_s_and_an_untried
             else:
                 assert way.ref and way.how and way.data and way.does, view.id
     untried: list[str] = [view.id for view in plugin_views() if not view.tried]
-    assert untried == ["vercel", "figma", "atlassian", "canva", "asana", "box"]
+    assert untried == ["vercel", "canva", "asana", "box"]
 
 
 def test_a_way_no_catalogue_holds_is_refused() -> None:

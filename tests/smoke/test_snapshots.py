@@ -21,7 +21,8 @@ from dotagent.agent.attachments import attachment_summary, store_attachment
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.paths import config_path
-from dotagent.desktop.snapshots import SnapshotTaken
+from dotagent.desktop.flight import FlightCommand, Frame
+from dotagent.desktop.snapshots import Kept, SnapshotTaken
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
@@ -37,7 +38,7 @@ TOKEN: str = "snapshots-token"
 def _taker(runtime: Runtime, asked: list[bool]):
     """A capture of a window of the test's own: a small picture, and its text when asked, kept as the real one is."""
 
-    def take(with_text: bool) -> SnapshotTaken:
+    def take(with_text: bool) -> Kept:
         asked.append(with_text)
         buffer: io.BytesIO = io.BytesIO()
         Image.new("RGB", (64, 40), (200, 120, 60)).save(buffer, "JPEG")
@@ -45,9 +46,31 @@ def _taker(runtime: Runtime, asked: list[bool]):
         if with_text:
             text: bytes = b'# Finder: Desktop\n\n[a1] window "Desktop"\n[a2] button "New Folder"\n'
             files.append(store_attachment(runtime.workspace, "Finder - Desktop.md", "text/markdown", text))
-        return SnapshotTaken(app="Finder", title="Desktop", files=attachment_summary(files), taken_at=time.time())
+        taken = SnapshotTaken(app="Finder", title="Desktop", files=attachment_summary(files), taken_at=time.time())
+        return Kept(snapshot=taken, frame=Frame(x=0.0, y=0.0, width=64.0, height=40.0), picture=files[0].path)
 
     return take
+
+
+def _no_window(_agent: str | None) -> Frame | None:
+    """Dot's window does not come to the front in a test."""
+    return None
+
+
+class _Drawn:
+    """An overlay that keeps what it was sent and draws nothing."""
+
+    def __init__(self) -> None:
+        self.sent: list[FlightCommand] = []
+
+    async def warm(self) -> None:
+        return None
+
+    async def send(self, command: FlightCommand) -> None:
+        self.sent.append(command)
+
+    async def aclose(self) -> None:
+        return None
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -62,7 +85,8 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
     # SnapShots are off in the config, so the key is not watched here; the service still takes captures by hand.
-    await built.snapshots.start(_taker(built, []))
+    # Nothing is drawn and no browser is driven here: the overlay and what brings Dot forward are the test's own.
+    await built.snapshots.start(_taker(built, []), _no_window, _Drawn())
     try:
         yield built
     finally:
@@ -134,19 +158,36 @@ async def test_the_routes_say_the_settings_change_them_live_and_hand_a_capture_t
         None,
         [],
     )
-    assert (view["app_text"], view["sound"], view["animations"]) == (True, "click", True)
+    assert (view["app_text"], view["sound"], view["animations"], view["flash"], view["open_dot"]) == (
+        True,
+        "click",
+        True,
+        True,
+        True,
+    )
+    # The flash and the opening of Dot after a capture switch as the others do (item 414).
+    assert (await client.post("/api/snapshots/settings", json={"key": "flash", "value": False})).json()[
+        "flash"
+    ] is False
+    assert (await client.post("/api/snapshots/settings", json={"key": "open_dot", "value": False})).json()[
+        "open_dot"
+    ] is False
+    assert (await client.post("/api/snapshots/settings", json={"key": "flash", "value": "pop"})).status_code == 422
+    assert _written() == {"enabled": False, "flash": False, "open_dot": False}
+    await client.post("/api/snapshots/settings", json={"key": "flash", "value": True})
+    await client.post("/api/snapshots/settings", json={"key": "open_dot", "value": True})
     # A setting changed holds at once and is kept in the config file; a value that is not a choice is refused.
     changed = (await client.post("/api/snapshots/settings", json={"key": "sound", "value": "pop"})).json()
     assert changed["sound"] == "pop" and runtime.snapshots.sound == "pop"
     assert (await client.post("/api/snapshots/settings", json={"key": "app_text", "value": False})).json()[
         "app_text"
     ] is False
-    assert _written() == {"enabled": False, "sound": "pop", "app_text": False}
+    assert _written() == {"enabled": False, "flash": True, "open_dot": True, "sound": "pop", "app_text": False}
     assert (await client.post("/api/snapshots/settings", json={"key": "sound", "value": "loud"})).status_code == 422
     # A value that does not fit its key is refused before the config file is touched (the daemon would not start).
     assert (await client.post("/api/snapshots/settings", json={"key": "sound", "value": True})).status_code == 422
     assert (await client.post("/api/snapshots/settings", json={"key": "enabled", "value": "pop"})).status_code == 422
-    assert _written() == {"enabled": False, "sound": "pop", "app_text": False}
+    assert _written() == {"enabled": False, "flash": True, "open_dot": True, "sound": "pop", "app_text": False}
     # A capture waits for the composer that claims it; with the text on, its file comes beside the picture.
     taken = (await client.post("/api/snapshots/take")).json()
     assert [capture["app"] for capture in taken["pending"]] == ["Finder"]
