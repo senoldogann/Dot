@@ -10,10 +10,18 @@ It runs on models from **Ollama** (local models, and cloud models through the lo
 **OpenCode Zen**'s free models. A daemon on the Mac serves a web UI and a REST API and runs the schedules, and
 `dotx run` and `dotx chat` work in the terminal. Dot runs on macOS only.
 
-By default Dot acts without asking. It stops for what it must not decide alone (money, credentials, public posts,
-messages sent for you, privilege, system settings), everything it does is recorded, and it can be stopped at once. Read
-[Safety](docs/safety.md#safety) before you let it work on a machine that holds data you care about, and
-[What leaves this Mac](docs/safety.md#what-leaves-this-mac): by default its models run on Ollama's servers.
+Dot works on a goal on its own, and by default it asks you before a risky step. In the default approval mode, `ask`,
+edits and routine work run without a question, and what the policy raises waits for your answer on a card in the chat.
+It stops for what it must not decide alone (money, credentials, public posts, messages sent for you, privilege, system
+settings), everything it does is recorded, and it can be stopped at once. In `yolo` nobody is asked: see
+[Autonomy](docs/autonomy.md). Read [Safety](docs/safety.md#safety) before you let it work on a machine that holds data
+you care about.
+
+**With the default models, what a run reads leaves this Mac.** They are cloud models of Ollama: the Ollama server on
+this Mac passes each call on to Ollama's servers, with the goal, the messages, the text of the files and pages the run
+read, what its commands printed and its screenshots. To keep a run's conversation on this Mac, choose a local model for
+each role in Settings › Models: the default model, and the fast, review and vision models.
+[What leaves this Mac](docs/safety.md#what-leaves-this-mac) lists everything that goes out.
 
 <p align="center">
   <img src="docs/images/mac.png" alt="A finished task in Dot's web UI on a Mac: the goal, the two tool calls it made and its answer, with the chats in the sidebar" width="70%">

@@ -295,8 +295,7 @@ class ModelRouter:
                 purpose=call.purpose,
                 model=call.model,
                 call_error=call.error,
-                error_type=type(error).__name__,
-                error=str(error),
+                exc_info=error,
             )
 
     async def model_info(self, ref: ModelRef) -> ModelInfo:

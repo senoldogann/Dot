@@ -81,7 +81,7 @@ src = ["src", "tests"]
 extend-exclude = ["integrations"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "B", "UP", "ANN", "ASYNC", "SIM", "RUF", "PLE", "PLW"]
+select = ["E", "F", "W", "I", "B", "BLE", "UP", "ANN", "ASYNC", "SIM", "RUF", "PLE", "PLW"]
 ignore = ["RUF001", "RUF002", "RUF003", "PLW0603"]
 
 [tool.ruff.lint.per-file-ignores]

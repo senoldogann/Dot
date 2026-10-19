@@ -900,7 +900,7 @@ class BrowserSession:
                 _log.info("browser_idle_thread_released", thread_id=thread_id)
                 try:
                     await self.release_thread(thread_id)
-                except Exception:
+                except Exception:  # noqa: BLE001 - logged with its traceback
                     _log.exception("browser_idle_release_failed", thread_id=thread_id)
 
     async def attachment(self) -> Attachment:
@@ -965,7 +965,7 @@ class BrowserSession:
         that closes itself while this runs (a sign-in callback) is a note on its opener, not an error."""
         try:
             opener: Page | None = await page.opener()
-        except Exception as error:
+        except Exception as error:  # noqa: BLE001 - _popup_lost raises it unless the page or the browser is gone
             self._popup_lost(error, page, None)
             return
         if opener is None:
@@ -981,7 +981,7 @@ class BrowserSession:
         try:
             try:
                 await self._register(tab)
-            except Exception as error:
+            except Exception as error:  # noqa: BLE001 - _popup_lost raises it unless the page or the browser is gone
                 self._popup_lost(error, page, opener_tab)
                 return
             if page.is_closed():
@@ -1264,7 +1264,7 @@ class BrowserSession:
             verdict: UrlVerdict = request_verdict(
                 url, navigation, self._config.allowed_hosts, self._config.blocked_hosts, self._server
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - logged with its traceback, and the request is refused
             _log.exception("browser_request_unjudged", url=truncate_middle(url, _LAUNCH_ERROR_CHARS))
             verdict = UrlVerdict(allowed=False, reason="the URL rules could not read this address")
         if not verdict.allowed:

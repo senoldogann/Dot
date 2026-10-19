@@ -65,6 +65,8 @@ headless against a local server. A few drive WebKit, the engine of Safari on the
   into a model where it comes in.
 - An error says what failed, with what was asked and what came back, and is raised where it happens. A fallback that
   hides a failure is not added.
+- A handler that catches `Exception` raises it again, logs it with its traceback, or says where it goes in a
+  `# noqa: BLE001 - <reason>` comment: `ruff check` refuses one that does none of these.
 - A comment or a docstring says what the code does now, not how it came to be.
 - A line of Python is at most 120 characters, and `ruff check` holds it to that; new Markdown prose is wrapped the same
   way.

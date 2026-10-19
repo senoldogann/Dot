@@ -16,6 +16,7 @@ import sys
 import sysconfig
 from collections.abc import AsyncIterator, Awaitable, Callable
 from pathlib import Path
+from typing import get_args
 
 import pytest
 import pytest_asyncio
@@ -202,6 +203,18 @@ async def test_a_command_of_a_run_neither_reads_nor_changes_dots_own_files_whate
     assert await asyncio.to_thread(config_path().read_text, encoding="utf-8") == settings
     assert everyday.startswith("[exit 0") and "fine" in everyday, everyday
     assert TOKEN in await _run(await _context(runtime, "yolo"), "shell", {"command": f"python3 {script}"})
+
+
+@pytest.mark.parametrize("approvals", [mode for mode in get_args(ApprovalMode) if mode != "yolo"])
+async def test_a_command_starts_in_the_sandbox_in_every_approval_mode_but_yolo(
+    runtime: Runtime, approvals: ApprovalMode
+) -> None:
+    script: Path = workspace_dir() / "peek.py"
+    await asyncio.to_thread(script.write_text, f"print(open({str(token_path())!r}).read())\n", encoding="utf-8")
+    read: str = await _run(
+        await _context(runtime, approvals), "shell", {"command": f"python3 {shlex.quote(str(script))}"}
+    )
+    assert _refused(read) and TOKEN not in read, read
 
 
 async def test_a_search_of_a_run_reads_neither_dots_own_files_nor_the_protected_locations(runtime: Runtime) -> None:

@@ -43,7 +43,8 @@ _OPEN_TIMEOUT_S: float = 10.0
 _FRONT_WITHIN_S: float = 1.0
 _FRONT_EVERY_S: float = 0.05
 
-# Each script runs with the addresses Dot is reached at as its arguments, and says "found" or "none".
+# Each script runs with what a tab of Dot's starts with as its arguments (:func:`tab_prefixes`), and says "found" or
+# "none".
 _SCRIPTS: dict[TabWords, str] = {
     "chrome": """on run argv
   tell application id "{bundle}"
@@ -124,6 +125,13 @@ def browsers_first(agent: str | None, running: Sequence[str]) -> list[str]:
     return [bundle for bundle in known if bundle in family] + [bundle for bundle in known if bundle not in family]
 
 
+def tab_prefixes(addresses: Sequence[str]) -> list[str]:
+    """What the address of a tab that shows one of Dot's pages starts with: each of ``addresses`` with the ``/`` after
+    its host, so that a site whose name merely starts with Dot's (``dot.example.net`` for ``dot.example``) is not taken
+    for Dot's."""
+    return [f"{address.rstrip('/')}/" for address in addresses]
+
+
 def _run(arguments: list[str], timeout_s: float) -> subprocess.CompletedProcess[str]:
     return subprocess.run(arguments, capture_output=True, text=True, timeout=timeout_s, check=False)
 
@@ -149,7 +157,9 @@ def _choose_tab(bundle: str, addresses: Sequence[str]) -> TabFound:
     Privacy & Security › Automation), or it did not answer in time (``unasked``)."""
     script: str = _SCRIPTS[BROWSERS[bundle]].replace("{bundle}", bundle)
     try:
-        done: subprocess.CompletedProcess[str] = _run([_OSASCRIPT, "-e", script, *addresses], _SCRIPT_TIMEOUT_S)
+        done: subprocess.CompletedProcess[str] = _run(
+            [_OSASCRIPT, "-e", script, *tab_prefixes(addresses)], _SCRIPT_TIMEOUT_S
+        )
     except subprocess.TimeoutExpired:
         log.warning("dot_tab_unasked", browser=bundle, error="the browser did not answer in time")
         return "unasked"

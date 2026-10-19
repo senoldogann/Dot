@@ -28,4 +28,6 @@ config.toml
 *.db
 *.log
 .DS_Store
+# The AppleDouble files macOS writes beside a file on a volume without its extended attributes
+._*
 node_modules/

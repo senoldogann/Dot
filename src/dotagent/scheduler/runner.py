@@ -236,7 +236,7 @@ class Scheduler:
             log.error("harness_step_failed", error=exc.message, context=exc.context)
             outcome: LearningOutcome = failed_with(exc.message)
         except Exception as exc:
-            log.exception("harness step crashed")
+            log.exception("harness_step_crashed")
             outcome = failed_with(f"{type(exc).__name__}: {exc}")
         else:
             log.info("harness_step_fired", step=step.id, state=step.state)
@@ -275,7 +275,7 @@ class Scheduler:
             log.error("reflection_failed", error=exc.message, context=exc.context)
             outcome: LearningOutcome = failed_with(exc.message)
         except Exception as exc:
-            log.exception("reflection crashed")
+            log.exception("reflection_crashed")
             outcome = failed_with(f"{type(exc).__name__}: {exc}")
         else:
             log.info("reflection_fired", summary=summary_line(reflection))

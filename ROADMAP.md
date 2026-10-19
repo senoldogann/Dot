@@ -15439,6 +15439,41 @@ connected (with those that are), or one with no tool a run of its mode may use (
 cannot use: send it as a task). Tests: `tests/unit/test_picks.py`, `tests/smoke/test_composer_picks.py` (a bounded
 agent's run starts with the picked server's tools and still without the ones it does not name). Docs: `docs/daemon.md`.
 
+### 416. Catch-all handlers under ruff, and the README on the default mode and the data that leaves the Mac
+
+**Status: done (2026-10-19), on `faz10-cleanup`.** The owner's plan of 2026-10-19 (its Faz 10) and the owner's word of
+the same evening: each of the 34 `except Exception` blocks must log its error or show it, never swallow it; the README's
+"By default Dot acts without asking" contradicts `approvals = "ask"`, and it should say plainly that the default models
+run on Ollama's servers, so data leaves the Mac; `desktop/src-tauri/target`, `._*` and `.mypy_cache` belong in
+`.gitignore`; the memory's start-note half waits for a decision. **As built (2026-10-19).** Each of the 34 blocks was
+read, and none swallows its error: each raises it again, logs it with its traceback, or shows it on a page or to the
+model. ruff's `BLE` rule now refuses a block that does none of these, and CONTRIBUTING says so; the five whose handling
+ruff cannot see (a logger named `_log`, a helper that raises or logs, a report shown on the server's card) say where the
+error goes in a `# noqa: BLE001` comment, the router logs a recorder's failure with its traceback, and the scheduler's
+two crash events are snake_case like the rest. The README says that the default mode, `ask`, runs edits and routine work
+and asks on a card in the chat for what the policy raises, and that the default models are cloud models of Ollama, so a
+run's conversation leaves the Mac unless each role is given a local model. `._*` joins the ignored files; the other two
+were ignored already, and none of the three is tracked. The start-note half of the memory was built in item 384 (the
+owner chose (A) on 2026-10-19). A smoke test runs a command in every approval mode but yolo, taken from the type, and
+the sandbox refuses Dot's token to each; the defaults say a yolo run's processes start without the sandbox whatever its
+switch says. The three notes of the pre-push review of items 411 to 415 are answered: a browser's tab is Dot's only
+under one of its addresses followed by `/` (`tab_prefixes`), a composer made in a hidden tab claims a capture only once
+the tab is seen, and `docs/daemon.md` names both Command keys. Tests: `tests/smoke/test_sandbox.py`,
+`tests/unit/test_flight.py`. Docs: README, CONTRIBUTING, `docs/daemon.md`, `defaults.toml`.
+
+### 417. A terminal session keeps what a program printed as it ended
+
+**Status: done (2026-10-19), on `faz10-cleanup`.** The gate of the pull request of items 411 to 415 failed once on the
+sandbox's terminal test: for a `cat` the sandbox refused, the session said "[no new output]" and "[the program ended
+with exit 1]", without the refusal. **As built (2026-10-19).** Dot closed its copy of the terminal's other end as soon
+as the program started, so the program's exit closed it last; macOS then keeps what the program printed last from the
+read side, and a program that leads its session (each session's zsh does) waits in its exit for that output to drain,
+for good (`ps` showed such programs `E`, trying to exit). With forty sessions at once, every output was lost. Dot now
+holds that end until the program has exited, takes what it printed last, then closes it
+(`TerminalSession.release_follower`); a session closed by hand takes nothing more. Tests: `tests/smoke/test_terminal.py`
+(forty programs that print and end at once: each output is read and each session ends; without the change every output
+is lost).
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16288,3 +16323,7 @@ agent's run starts with the picked server's tools and still without the ones it 
   word of the same evening: the System page's null and folds, the harness's form explained, 21 more MCP services with
   Figma and Atlassian addable, SnapShots on both Command keys with a flash, a flight and Dot brought forward, and a
   server picked for an agent's message open to its run.
+- 2026-10-19 (Opus 5.5): items 416 and 417 on `faz10-cleanup` from `main`: the rest of the owner's earlier asks outside
+  the paths that need a human (the catch-all handlers under ruff's BLE rule, the README on the default mode and the data
+  that leaves the Mac, AppleDouble files ignored, the sandbox pinned in every mode but yolo, the notes of the last
+  pre-push review), and a terminal session that keeps what a program printed as it ended.

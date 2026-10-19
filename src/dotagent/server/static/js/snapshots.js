@@ -25,6 +25,8 @@ let current = null;
 let held = [];
 let wired = false;
 let waitingToBeSeen = false;
+// Whether a claim already waits for the page to come into sight, so that it claims once when it does.
+let claimWaits = false;
 
 async function claim() {
   let claimed;
@@ -92,9 +94,14 @@ function claimInSight() {
     void claim();
     return;
   }
+  if (claimWaits) {
+    return;
+  }
+  claimWaits = true;
   const seen = () => {
     if (document.visibilityState === "visible") {
       document.removeEventListener("visibilitychange", seen);
+      claimWaits = false;
       if (current !== null) {
         void claim();
       }
@@ -134,7 +141,7 @@ export function takesSnapshots(take) {
   wire();
   current = take;
   if (onThisMac(location.hostname)) {
-    void claim();
+    claimInSight();
   }
   return () => {
     if (current === take) {
