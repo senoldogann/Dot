@@ -67,9 +67,7 @@ def _check_options(options: ScheduleOptions) -> None:
         raise ToolInputError("a time zone cannot be blank; leave it out to use the configured one", {})
 
 
-async def ensure_room(store: Store, config: SchedulerConfig) -> None:
-    """Refuse one more schedule switched on once ``[scheduler] max_schedules`` are; a new chat's loop is checked so
-    before its run starts (item 400)."""
+async def _ensure_room(store: Store, config: SchedulerConfig) -> None:
     switched_on: int = sum(1 for record in await store.list_schedules() if record.enabled)
     if switched_on >= config.max_schedules:
         raise ToolExecutionError(
@@ -87,6 +85,20 @@ def _upcoming(record: ScheduleRecord, zone: ZoneInfo, now: float) -> float | Non
     return None
 
 
+async def plan_schedule(
+    store: Store, config: SchedulerConfig, fallback_zone: ZoneInfo, request: ScheduleRequest, now: float
+) -> Timing:
+    """How the new schedule ``request`` would fire, asked without saving it, or what saving it refuses: options that
+    could never start a run, a time it cannot keep (a moment past, a gap under ``[scheduler] min_interval_s``), no room
+    for one more switched on. A new chat's loop asks it before its run starts, so that a refusal starts nothing (item
+    400)."""
+    _check_options(request.options)
+    zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
+    timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
+    await _ensure_room(store, config)
+    return timing
+
+
 async def create_schedule(
     store: Store,
     config: SchedulerConfig,
@@ -95,11 +107,9 @@ async def create_schedule(
     now: float,
     thread_id: str | None,
 ) -> ScheduleRecord:
-    """Save a new schedule; ``thread_id`` is the chat it goes on in, for a schedule made in a chat (item 291)."""
-    _check_options(request.options)
-    zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
-    timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
-    await ensure_room(store, config)
+    """Save a new schedule, unless :func:`plan_schedule` refuses it; ``thread_id`` is the chat it goes on in, for a
+    schedule made in a chat (item 291)."""
+    timing: Timing = await plan_schedule(store, config, fallback_zone, request, now)
     return await store.add_schedule(
         request.name,
         timing.cron,
@@ -157,7 +167,7 @@ async def edit_schedule(
             {"schedule_id": schedule_id},
         )
     if enabled and not record.enabled:
-        await ensure_room(store, config)
+        await _ensure_room(store, config)
     return await store.update_schedule(
         schedule_id,
         request.name,
@@ -190,7 +200,7 @@ async def enable_schedule(
     record: ScheduleRecord = await store.get_schedule(schedule_id)
     if record.enabled:
         return record
-    await ensure_room(store, config)
+    await _ensure_room(store, config)
     upcoming: float | None = _upcoming(record, await schedule_zone(record.options, fallback_zone), now)
     if upcoming is None:
         raise ToolExecutionError(

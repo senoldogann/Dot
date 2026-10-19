@@ -38,8 +38,10 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 TOKEN: str = "chat-loop-test-token"
 _RUN_WAIT_S: float = 60.0
-# Room for two schedules switched on, so that a test reaches the limit in a few steps.
+# Room for two schedules switched on, so that a test reaches the limit in a few steps; and ten minutes between two
+# firings at least, so that a five-minute loop, a rhythm a loop keeps, is one the scheduler refuses.
 _MAX_SCHEDULES: int = 2
+_MIN_INTERVAL_S: int = 600
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
 
 
@@ -52,7 +54,11 @@ async def _daemon(turns: Sequence[ScriptedTurn]) -> AsyncIterator[tuple[RunManag
     """A daemon in a throw-away home whose scripted model plays ``turns``: its manager, and the address it serves on."""
     defaults: AppConfig = eval_config(load_default_config())
     config: AppConfig = defaults.model_copy(
-        update={"scheduler": defaults.scheduler.model_copy(update={"max_schedules": _MAX_SCHEDULES})}
+        update={
+            "scheduler": defaults.scheduler.model_copy(
+                update={"max_schedules": _MAX_SCHEDULES, "min_interval_s": _MIN_INTERVAL_S}
+            )
+        }
     )
     login_env: dict[str, str] = await read_login_env(config.shell.login_env_timeout_s, ())
     with scratch_home() as home, eval_environment(home, {}):
@@ -134,9 +140,11 @@ async def test_a_new_chat_sent_with_a_loop_starts_with_it_or_not_at_all() -> Non
         ) as client,
     ):
         message: dict[str, object] = {"goal": "check the build", "model": SCRIPTED_MODEL, "thread_id": None}
-        # A rhythm a loop cannot keep, or a loop with Keep going, starts nothing.
+        # A rhythm a loop cannot keep, one the scheduler refuses, or a loop with Keep going, starts nothing.
         odd = await client.post("/runs", json={**message, "loop": "7m"})
         assert odd.status_code == 422 and "a loop asks again every" in odd.text, odd.text
+        often = await client.post("/runs", json={**message, "loop": "5m"})
+        assert often.status_code == 422 and "fires too often" in often.text, often.text
         standing = await client.post("/runs", json={**message, "standing": True, "loop": "30m"})
         assert standing.status_code == 422 and "a campaign (standing) goes on by itself" in standing.text
         assert (await client.get("/runs")).json() == []

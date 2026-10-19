@@ -198,9 +198,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   every 1, 2, 3, 4, 6, 8 or 12 hours, in the chat, as its follow-ups start (its model, reasoning level, speed, approvals
   and goal mode). Each run of it is told how the loop ends: it deletes its schedule (`schedule_delete`) once the work is
   done for good. Right above the composer a line shows each loop of the chat, how often it asks again, when next, and a
-  Stop that deletes it. A rhythm a cron expression cannot keep exactly is refused (422); a new chat then starts nothing,
-  nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going, whose campaign goes
-  on by itself.
+  Stop that deletes it. A rhythm a cron expression cannot keep exactly, or one shorter than
+  `[scheduler] min_interval_s`, is refused (422); a new chat then starts nothing, nor when `[scheduler] max_schedules`
+  are switched on already. A loop does not go with Keep going, whose campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB each). A
   text pasted into the box that is long (2,000 characters or 40 lines) goes as a file of its own (item 269),
   `pasted-text-<time>.md` when it reads as Markdown and `pasted-text-<time>.txt` otherwise, which the model reads as it

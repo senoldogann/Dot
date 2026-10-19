@@ -15073,15 +15073,21 @@ not gone: the box of a run offers both, the new chat's box had only its three mo
 chat with no run yet has no use for it. **As built (2026-10-19).** The new chat's slash menu offers `/loop` after
 `/task`, `/chat` and `/research`; `/loop 30m <message>` sends the message as the one that starts the chat, with `loop`
 on `POST /runs`, which makes it a loop of the run's chat as `POST /runs/{id}/loop` does (`routes_runs.make_loop`, which
-both share), so the chat opens with the loop's line over its composer. A rhythm a loop cannot keep, a loop with Keep
-going (refused by `StartRunRequest`) and no room for one more schedule switched on (`scheduler.plans.ensure_room`, asked
-before the run starts) start nothing; the message sent again with its key is the run and the loop its first sending
-made. The words of `/loop` (its pattern, its row in the menu and how to write it) are `loops.js`'s, for both boxes.
-Tests: `tests/smoke/test_chat_loop.py` (`POST /runs` with `loop`: a rhythm it cannot keep, Keep going and a full
-scheduler start nothing, a second sending makes no second loop; the new chat's box: a `/loop` without a rhythm is said
-how to write it and starts nothing, the menu's `/loop` written and sent starts the chat with its loop, wide and on a
-phone), `tests/smoke/test_composer.py` (the new chat's menu has four commands). Docs: `docs/runs.md`, `docs/daemon.md`,
-`docs/memory-and-schedules.md`.
+both share), so the chat opens with the loop's line over its composer. What the scheduler would refuse of the loop's
+schedule is asked before the run starts (`scheduler.plans.plan_schedule`, which `create_schedule` asks too: a rhythm a
+loop cannot keep, a gap under `[scheduler] min_interval_s`, no room for one more switched on), and a loop with Keep
+going is refused by `StartRunRequest`: either starts nothing. The message sent again with its key is the run and the
+loop its first sending made. The words of `/loop` (its pattern, its row in the menu and how to write it) are
+`loops.js`'s, for both boxes. Tests: `tests/smoke/test_chat_loop.py` (`POST /runs` with `loop`: a rhythm a loop cannot
+keep, one under the scheduler's shortest gap, Keep going and a full scheduler start nothing, a second sending makes no
+second loop; the new chat's box: a `/loop` without a rhythm is said how to write it and starts nothing, the menu's
+`/loop` written and sent starts the chat with its loop, wide and on a phone), `tests/smoke/test_composer.py` (the new
+chat's menu has four commands). Docs: `docs/runs.md`, `docs/daemon.md`, `docs/memory-and-schedules.md`. **Review
+(2026-10-19).** The pre-push review's Important: the first version asked only the rhythm and the room before the run, so
+a gap under `[scheduler] min_interval_s` refused the loop after the chat had started; now every refusal of
+`create_schedule` is asked first, from the one function both use. Left: a schedule made elsewhere (another tab, a run's
+`schedule_create`) between that question and the loop can still take the last room; the page then says why and keeps the
+message, and the chat has started without its loop.
 
 ## Log
 

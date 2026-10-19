@@ -29,7 +29,7 @@ from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
 from dotagent.scheduler.loops import LoopRhythm, loop_goal, loop_name, loop_rhythm
-from dotagent.scheduler.plans import ScheduleRequest, create_schedule, ensure_room
+from dotagent.scheduler.plans import ScheduleRequest, create_schedule, plan_schedule
 from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
@@ -68,8 +68,10 @@ from dotagent.store.models import (
     ChatChoices,
     EventRecord,
     RewindCut,
+    RunMode,
     RunPicks,
     RunRecord,
+    ScheduleOptions,
     ScheduleRecord,
 )
 from dotagent.store.stats import RunCosts
@@ -78,6 +80,36 @@ from dotagent.undo.runs import UndoPlan, active_run_ids, plan_for, runs_with_chi
 
 # As many events as the Actions panel reads of a run: the acting steps are among them.
 _ACTION_EVENTS: int = 20_000
+
+
+def _loop_schedule(text: str, every: str, mode: RunMode, options: ScheduleOptions) -> ScheduleRequest:
+    """The schedule of a chat's loop (item 281): its message ``text``, with how the loop ends, asked again on the rhythm
+    ``every``, named for the message, in the chat's mode and with the chat's ``options``."""
+    rhythm: LoopRhythm = loop_rhythm(every)
+    name: str = loop_name(text)
+    return ScheduleRequest(
+        name=name,
+        goal=loop_goal(text, rhythm, name),
+        cron=rhythm.cron,
+        at=None,
+        mode=schedule_mode(None, mode),
+        options=options,
+    )
+
+
+def _opening_options(request: StartRunRequest) -> ScheduleOptions:
+    """The options a schedule of the chat that ``request`` opens takes (``chat_options`` of its first run), read from
+    the request before the run is: what the configuration fills in stays None, as a schedule reads it."""
+    return ScheduleOptions(
+        model=request.model,
+        effort=request.effort,
+        speed=request.speed,
+        approvals=request.approvals,
+        goal_mode=request.goal_mode,
+        timezone=None,
+        history_runs=None,
+        same_chat=True,
+    )
 
 
 def runs_router(ctx: ServerContext) -> APIRouter:
@@ -125,18 +157,21 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def start_run(request: StartRunRequest) -> RunRecord:
         """Start a run, or with ``standing`` a campaign whose opening session the returned run is. The message sent
         again with its ``key`` gets the run its first sending started (:func:`send_once`). With ``loop`` the goal is a
-        loop of the run's chat too (item 400, :func:`make_loop`); a rhythm a loop cannot keep, or no room for one more
-        schedule, starts nothing."""
+        loop of the run's chat too (item 400, :func:`make_loop`); what the scheduler would refuse of the loop
+        (:func:`plan_schedule`) starts nothing."""
         if request.model is not None:
             parse_model_ref(request.model)
-        if request.loop is not None:
-            loop_rhythm(request.loop)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
         picks: RunPicks = picks_of(request.plugins, request.skills, request.plan_first)
 
         async def start() -> str:
             if request.loop is not None:
-                await ensure_room(store, ctx.runtime.config.scheduler)
+                # The loop's schedule is asked of the scheduler before the run starts: what it would refuse (a rhythm a
+                # loop cannot keep, a gap under min_interval_s, no room for one more) starts nothing.
+                loop: ScheduleRequest = _loop_schedule(
+                    request.goal, request.loop, request.mode, _opening_options(request)
+                )
+                await plan_schedule(store, ctx.runtime.config.scheduler, ctx.runtime.schedule_zone, loop, time.time())
             run: RunRecord
             if request.standing:
                 run = await ctx.manager.start_campaign(
@@ -308,21 +343,13 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         run: RunRecord = await store.get_run(run_id)
         owner: RunRecord = run if run.parent_run_id is None else await store.get_run(run.parent_run_id)
         choices: ChatChoices | None = await store.chat_choices(owner.thread_id)
-        rhythm: LoopRhythm = loop_rhythm(every)
-        name: str = loop_name(text)
-        goal: str = loop_goal(text, rhythm, name)
+        plan: ScheduleRequest = _loop_schedule(
+            text, every, owner.mode if choices is None else choices.mode, chat_options(owner, choices)
+        )
         # The same loop asked for again (a page that sends it once more after a failure) is the one there is.
         for kept in await store.list_schedules():
-            if (kept.thread_id, kept.enabled, kept.cron, kept.goal) == (owner.thread_id, True, rhythm.cron, goal):
+            if (kept.thread_id, kept.enabled, kept.cron, kept.goal) == (owner.thread_id, True, plan.cron, plan.goal):
                 return kept
-        plan: ScheduleRequest = ScheduleRequest(
-            name=name,
-            goal=goal,
-            cron=rhythm.cron,
-            at=None,
-            mode=schedule_mode(None, owner.mode if choices is None else choices.mode),
-            options=chat_options(owner, choices),
-        )
         return await create_schedule(
             store, ctx.runtime.config.scheduler, ctx.runtime.schedule_zone, plan, time.time(), owner.thread_id
         )
