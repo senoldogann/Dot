@@ -133,12 +133,12 @@ links in the colour of links; the box is still a text field, with its caret, sel
 sent is the text as typed. A message whose answer was lost on its way back (the page says the sending failed and keeps
 the message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a
 key of its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of
-a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` here; `/btw` and
-`/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools, read from
-the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and Escape
-closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the slash
-word goes; a command does its work. `@` at the start of a word opens the same menu for the picks alone (item 367): the
-MCP servers by name with the number of their tools, then the skills and each server's tools, filtered by the letters
+a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` and `/loop` here;
+`/btw` and `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools,
+read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
+Escape closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the
+slash word goes; a command does its work. `@` at the start of a word opens the same menu for the picks alone (item 367):
+the MCP servers by name with the number of their tools, then the skills and each server's tools, filtered by the letters
 after it; a pick is a chip and the at word goes. An `@` inside a word, as in an address, opens nothing. A run that waits
 for your approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
 
@@ -550,7 +550,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |
 | `GET /models/context?model=provider:model`                                    | what the model's runs of the last 30 days measured about its context size |
-| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs                                    |
+| `GET /runs`, `POST /runs`, `GET /runs/{id}`, `GET /runs/{id}/events`            | list, start and read runs; `POST /runs` with `loop` (`"30m"`) makes the goal a loop of the run's chat too (item 400) |
 | `GET /runs/{id}/stream?after=N`, `GET /stream`                                  | live events of a run with its sub-runs; lifecycle of all runs |
 | `POST /runs/{id}/steer`, `POST /runs/{id}/cancel`                               | message a running run; stop it (a `dotx` command's run: the command is asked to stop it) |
 | `POST /runs/{id}/btw` (`{"text": …}`)                                           | a side question, answered without the run seeing it          |

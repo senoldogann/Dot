@@ -12,6 +12,7 @@ import { el, modelName } from "../dom.js";
 import { forgetLevel, KEPT_SPEED, ONE_MESSAGE, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst, trackHeight } from "../layout.js";
+import { LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { anchoredPopover } from "../popover.js";
 import { readPref, removePref, writePref } from "../prefs.js";
 import { buildPresence } from "../presence.js";
@@ -89,12 +90,15 @@ function buildComposer(ctx, listener) {
     boxLabel: "Goal",
     placeholder: "Message Dot",
     maxPx: MAX_GOAL_PX,
-    commands: MODES.map((option) => ({
-      label: `/${option.id}`,
-      hint: `${option.label}: ${option.hint}`,
-      insert: "",
-      run: () => choices.setMode(option.id),
-    })),
+    commands: [
+      ...MODES.map((option) => ({
+        label: `/${option.id}`,
+        hint: `${option.label}: ${option.hint}`,
+        insert: "",
+        run: () => choices.setMode(option.id),
+      })),
+      LOOP_COMMAND,
+    ],
     send: submit,
     sendLabel: "Start",
     draftKey: NEW_CHAT_DRAFT,
@@ -211,6 +215,14 @@ function buildComposer(ctx, listener) {
       goal.focus();
       return;
     }
+    // "/loop 30m <message>" (item 400): the message starts the chat, and a schedule of the chat asks it again on that
+    // rhythm, as "/loop" in the box of a run makes one (item 281).
+    const loop = loopOf(text);
+    if (loop === null && LOOP_WORD.test(text)) {
+      toast("error", LOOP_HOW);
+      goal.focus();
+      return;
+    }
     if (!readyToSend(attachments)) {
       return;
     }
@@ -223,7 +235,7 @@ function buildComposer(ctx, listener) {
         await choices.ready();
         const chosen = choices.value();
         const body = {
-          goal: text,
+          goal: loop === null ? text : loop.message,
           mode: chosen.mode,
           model: chosen.model,
           effort: chosen.effort,
@@ -235,6 +247,7 @@ function buildComposer(ctx, listener) {
           thread_id: null,
           attachments: attachments.ids(),
           agent_id: agentId === "" ? null : agentId,
+          loop: loop === null ? null : loop.every,
           ...frame.picks.body(),
         };
         const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
