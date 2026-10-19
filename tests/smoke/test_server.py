@@ -33,7 +33,7 @@ from dotagent.config import AppConfig, load_config
 from dotagent.core.errors import NotFoundError, ServiceError
 from dotagent.core.paths import themes_dir
 from dotagent.core.types import JsonObject
-from dotagent.desktop.perms import check_permissions, responsible_program
+from dotagent.desktop.perms import PANE_TITLES, check_permissions, responsible_program
 from dotagent.desktop.types import Permissions
 from dotagent.llm.types import ChatProvider, ImageData, Message
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -691,6 +691,10 @@ async def _no_job(_uid: int) -> None:
     return None
 
 
+async def _launchd_down(_uid: int) -> None:
+    raise ServiceError("launchctl cannot describe the job", {"code": 1})
+
+
 async def test_the_permissions_are_read_without_a_prompt_a_pane_opens_and_a_daemon_of_no_service_stays(
     client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -709,6 +713,12 @@ async def test_the_permissions_are_read_without_a_prompt_a_pane_opens_and_a_daem
     assert (await client.post("/api/desktop/permissions/open", json={"pane": "camera"})).status_code == 422
     refused: httpx.Response = await client.post("/api/system/restart")
     assert refused.status_code == 422 and "service" in refused.json()["message"]
+    # launchd that does not answer: the page says so, and the restart is not risked.
+    monkeypatch.setattr(routes_system, "inspect_job", _launchd_down)
+    unsure: PermissionsView = PermissionsView.model_validate((await client.get("/api/desktop/permissions")).json())
+    assert (unsure.service, unsure.service_problem) == (False, "launchctl cannot describe the job")
+    held: httpx.Response = await client.post("/api/system/restart")
+    assert held.status_code == 422 and "could not be told" in held.json()["message"]
 
 
 @pytest.mark.skipif(
@@ -725,7 +735,9 @@ async def test_the_daemon_asks_macos_for_its_own_permissions_and_reports_them(cl
         input_events=True,
         screen_recording=True,
         panes=[],
+        titles=dict(PANE_TITLES),
         service=False,
+        service_problem=None,
     )
 
 

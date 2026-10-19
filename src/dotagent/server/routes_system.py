@@ -46,6 +46,7 @@ from dotagent.core.paths import (
     skills_dir,
 )
 from dotagent.desktop.perms import (
+    PANE_TITLES,
     check_permissions,
     missing_panes,
     open_settings,
@@ -71,7 +72,7 @@ from dotagent.help.elsewhere import (
     FoundSkill,
     found_elsewhere,
 )
-from dotagent.launchd import JobState, inspect_job
+from dotagent.launchd import JobState, inspect_job, service_runs
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, ModelRouter, offers_fast_mode, parse_model_ref
 from dotagent.llm.traits import effective_effort
@@ -512,22 +513,28 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         judge_config: JudgeConfig = config.judge.model_copy(update={"provider": ctx.runtime.judge.provider})
         return await run_quick_checks(config.model_copy(update={"models": models_now(), "judge": judge_config}))
 
-    async def _as_service() -> bool:
-        """Whether this daemon is the service's own process: a stop then has launchd start it again."""
+    async def _service() -> tuple[bool, str | None]:
+        """Whether this daemon is the service's own process (launchd's job runs Dot.app's launcher, the daemon's
+        parent), so that a stop has launchd start it again; and why that could not be told, when launchd did not
+        answer, which the page shows and the log keeps."""
         try:
             job: JobState | None = await inspect_job(os.getuid())
-        except ServiceError:
-            return False
-        return job is not None and job.pid == os.getpid()
+        except ServiceError as error:
+            log.warning("launchd_unanswered", error=error.message, context=error.context)
+            return False, error.message
+        return service_runs(job, (os.getpid(), os.getppid())), None
 
     async def _permissions_view(granted: Permissions) -> PermissionsView:
+        service, problem = await _service()
         return PermissionsView(
             program=str(responsible_program()),
             accessibility=granted.accessibility,
             input_events=granted.post_event,
             screen_recording=granted.screen_recording,
             panes=list(missing_panes(granted)),
-            service=await _as_service(),
+            titles=dict(PANE_TITLES),
+            service=service,
+            service_problem=problem,
         )
 
     @router.get("/desktop/permissions")
@@ -551,7 +558,19 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
     @router.post("/system/restart")
     async def restart_daemon() -> RestartView:
         """Stop the daemon so that its service starts it again (item 409): a running process keeps the permissions it
-        had when it started. Refused when nothing would start it again."""
+        had when it started. Refused when nothing would start it again: a daemon run by hand, or one whose service
+        launchd could not be asked about."""
+        service, problem = await _service()
+        if problem is not None:
+            raise ConfigError(
+                "whether the service runs this daemon could not be told, so it is not stopped", {"error": problem}
+            )
+        if not service:
+            raise ConfigError(
+                "Dot was not started by its service, so it cannot start itself again: stop it and start it again by "
+                "hand, or install the service (dotx service install)",
+                {},
+            )
         ctx.restart()
         return RestartView(restarting=True)
 

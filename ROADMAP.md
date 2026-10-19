@@ -15270,12 +15270,14 @@ service use `dotx service permissions`"): let the permission be granted easily f
 reports them for the program that runs the daemon (`GET /api/desktop/permissions`, `check_permissions`, no dialog), the
 program's path, the steps in words, **Ask macOS** (the `POST` of item 251, which also puts the program in the panes'
 lists), **Open <pane>** for each permission missing (`POST /api/desktop/permissions/open`, `perms.open_settings`), and
-**Restart Dot** when the daemon is the service's own process (`inspect_job`'s pid is ours): `POST /api/system/restart`
-has the daemon stop and `run_daemon` return `RESTART_CODE` (75), an exit launchd does not count as clean, so the job
-(`KeepAlive` `SuccessfulExit: false`) starts it again with what was granted meanwhile; a daemon run by hand is refused
-(`ServerContext.restart`, `no_restart` by default). The SnapShots page's problem line got the same **Open System
-Settings**, and the hint in the errors names the card. Tests: `tests/smoke/test_server.py` (the read, the pane, the
-refusal). Docs: `docs/daemon.md`, `docs/browser-and-computer-use.md`.
+**Restart Dot** when the daemon is the service's own process (`inspect_job`'s pid is the daemon's own or its parent's,
+Dot.app's launcher: `service_runs`; launchd that does not answer is shown on the card and the restart refused, the
+review's findings): `POST /api/system/restart` has the daemon stop and `run_daemon` return `RESTART_CODE` (75), an exit
+launchd does not count as clean, so the job (`KeepAlive` `SuccessfulExit: false`) starts it again with what was granted
+meanwhile; a daemon run by hand is refused (`ServerContext.restart`, `no_restart` by default). The SnapShots page's
+problem line got the same **Open System Settings**, and the hint in the errors names the card. Tests:
+`tests/smoke/test_server.py` (the read, the pane, the refusal). Docs: `docs/daemon.md`,
+`docs/browser-and-computer-use.md`.
 
 ## Log
 

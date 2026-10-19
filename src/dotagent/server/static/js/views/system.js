@@ -269,14 +269,8 @@ function buildDaemon() {
   };
 }
 
-// The panes of System Settings > Privacy & Security, as their titles read (desktop/perms.py).
-const PANE_TITLES = {
-  accessibility: "Accessibility",
-  screen_recording: "Screen & System Audio Recording",
-  input_monitoring: "Input Monitoring",
-  automation: "Automation",
-  full_disk_access: "Full Disk Access",
-};
+// How long "Restart now?" stands before the button is the quiet "Restart Dot" again (item 409).
+const RESTART_ARMED_MS = 6000;
 
 /** The desktop's permissions (item 409): what macOS granted the program that runs Dot, a button that makes macOS ask
  * (and puts the program in the panes' lists), one that opens the pane of each permission missing, and, when the daemon
@@ -284,7 +278,20 @@ const PANE_TITLES = {
 function buildPermissions() {
   let view = null;
   let armed = false;
+  let disarm = null;
   const body = el("div", { class: "card-pad stack" }, inlineLoading());
+
+  function arm(on) {
+    armed = on;
+    if (disarm !== null) {
+      clearTimeout(disarm);
+      disarm = null;
+    }
+    if (on) {
+      disarm = setTimeout(() => arm(false), RESTART_ARMED_MS);
+    }
+    paint();
+  }
 
   async function load() {
     view = await api.get("/desktop/permissions");
@@ -304,12 +311,11 @@ function buildPermissions() {
 
   async function restart() {
     if (!armed) {
-      armed = true;
-      paint();
+      arm(true);
       return;
     }
+    arm(false);
     await api.post("/system/restart", null);
-    armed = false;
     toast("ok", "Dot stops and the service starts it again; this page answers again in a moment.");
   }
 
@@ -325,9 +331,10 @@ function buildPermissions() {
     const steps = missing
       ? `Switch Dot on in the pane (Touch ID or password). If it is not in the list, press +, then Cmd+Shift+G, paste the program's path and choose Open. ${view.service ? "Then press Restart Dot:" : "Then start Dot again:"} a running process keeps what it had when it started.`
       : "macOS granted everything the desktop needs.";
+    const serviceNote = view.service_problem === null ? null : el("p", { class: "hint" }, icon("alert"), ` launchd could not be asked whether its service runs this Dot: ${view.service_problem}`);
     const askButton = el("button", { class: "btn sm", type: "button", onclick: () => attempt(ask) }, icon("hand"), "Ask macOS");
     const panes = view.panes.map((pane) =>
-      el("button", { class: "btn sm", type: "button", onclick: () => attempt(() => open(pane)) }, icon("external"), `Open ${PANE_TITLES[pane] ?? pane}`),
+      el("button", { class: "btn sm", type: "button", onclick: () => attempt(() => open(pane)) }, icon("external"), `Open ${view.titles[pane] ?? pane}`),
     );
     const restartButton = el(
       "button",
@@ -338,12 +345,18 @@ function buildPermissions() {
     body.replaceChildren(
       el("dl", { class: "kv kv-rows" }, row("Accessibility", view.accessibility), row("Input events", view.input_events), row("Screen Recording", view.screen_recording), wideEntry("Program", el("span", { class: "mono" }, view.program))),
       el("p", { class: "hint" }, steps),
+      serviceNote,
       el("div", { class: "cluster" }, askButton, ...panes, restartButton),
     );
   }
 
   const refreshButton = el("button", { class: "btn ghost sm", type: "button", title: "Read the permissions again", "aria-label": "Read the permissions again", onclick: () => attempt(load) }, icon("refresh"));
-  return { element: section("Permissions", refreshButton, body), load };
+  async function loadQuiet() {
+    arm(false);
+    await load();
+  }
+
+  return { element: section("Permissions", refreshButton, body), load: loadQuiet };
 }
 
 function buildFailsafe() {

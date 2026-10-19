@@ -542,15 +542,17 @@ dotx service uninstall   # stop the daemon and remove the job
   recording. Settings › System › **Permissions** in the web UI does the same from the page (item 409): the three
   permissions as macOS reports them for the daemon (`GET /api/desktop/permissions`, no dialog), **Ask macOS** (`POST`,
   which also puts the program in the panes' lists), **Open** for the pane of each permission missing (`POST
-  /api/desktop/permissions/open`), and, when the daemon is the service's own process, **Restart Dot** (`POST
-  /api/system/restart`): the daemon stops with an exit launchd does not count as clean, so the job starts it again, with
-  what was granted meanwhile; a daemon run by hand is refused the restart. The SnapShots page offers the Accessibility
-  pane the same way. Measured through the service with all three granted: the model opened the fixture app, typed a
-  name, pressed a button twice and ticked a checkbox in 4 steps and 13 seconds. - The job does not see the environment
-  of your shell. Give it its API keys through `dotx auth set` or the Keychain. - When Dot's files are under Desktop,
-  Documents or Downloads, the first start of the job waits for you: macOS asks once whether Dot may use that folder, and
-  `service install` waits up to 60 seconds for the answer. Measured on an Apple-silicon Mac, with the Python job: 42
-  seconds with a person answering the dialog, then about 1.2 seconds for every later start.
+  /api/desktop/permissions/open`), and, when the daemon is the service's own process (launchd's job runs Dot.app's
+  launcher, the daemon's parent), **Restart Dot** (`POST /api/system/restart`): the daemon stops with an exit launchd
+  does not count as clean, so the job starts it again, with what was granted meanwhile; a daemon run by hand is refused
+  the restart, and so is one when launchd cannot be asked. The SnapShots page offers the Accessibility pane the same
+  way. Measured through the service with all three granted: the model opened the fixture app, typed a name, pressed a
+  button twice and ticked a checkbox in 4 steps and 13 seconds.
+- The job does not see the environment of your shell. Give it its API keys through `dotx auth set` or the Keychain.
+- When Dot's files are under Desktop, Documents or Downloads, the first start of the job waits for you: macOS asks once
+  whether Dot may use that folder, and `service install` waits up to 60 seconds for the answer. Measured on an
+  Apple-silicon Mac, with the Python job: 42 seconds with a person answering the dialog, then about 1.2 seconds for
+  every later start.
 
 The REST API (all under `/api`; bodies and replies are JSON, event streams are server-sent events):
 
