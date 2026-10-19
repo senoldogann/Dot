@@ -119,8 +119,9 @@ def secret_entries(service: McpService, given: Mapping[str, str]) -> dict[str, s
         raise ConfigError(
             "the service asks for its secrets by name", {"service": service.id, "missing": missing, "unknown": unknown}
         )
-    # A value is one line, as the env file takes it: refused here, before any of them is written.
-    broken: list[JsonValue] = [name for name in kept if "\n" in given[name] or "\r" in given[name]]
+    # A value is one line, as the env file's writer takes it (every line boundary str.splitlines knows, not the
+    # newline alone): refused here, before any of them is written, so a service with two keys never keeps one alone.
+    broken: list[JsonValue] = [name for name in kept if len(given[name].strip().splitlines()) != 1]
     if broken:
         raise ConfigError("a secret is one line", {"service": service.id, "secrets": broken})
     return {kept[name]: given[name].strip() for name in kept}
