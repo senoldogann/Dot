@@ -263,11 +263,6 @@
     text-overflow: ellipsis;
   }
 
-  /* The last tool's name is the count's detail, and on a phone the count has the room (item 401). */
-  .steps-latest {
-    display: none;
-  }
-
   /* The bar's parts are a phone's width together (item 401): the three counters and the way down fit one row. */
   .status-bar .capsule-part {
     padding-inline: var(--space-1);
@@ -764,6 +759,12 @@
 
 /* An open group already shows every step, so the line about the latest one would only say it twice. */
 .steps[open] .steps-latest {
+  display: none;
+}
+
+/* A folded group at work names the command that runs now, where its count would stand: how much it did so far is for
+   the open group, which shows the calls themselves. */
+.steps.working:not([open]) .steps-count {
   display: none;
 }
 

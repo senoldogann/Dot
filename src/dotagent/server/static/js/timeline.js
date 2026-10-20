@@ -270,7 +270,9 @@ function buildGroup(ts) {
   const failed = el("span", { class: "badge b-warn" });
   const latest = el("span", { class: "steps-latest" });
   const body = el("div", { class: "steps-body" });
-  const head = el("summary", { class: "steps-head" }, state, title, count, failed, el("span", { class: "chev" }, icon("chevron")), latest);
+  // The command that runs now stands right after the title, before the count and the chevron, so that a folded group
+  // names what the agent does at this moment where the eye already is.
+  const head = el("summary", { class: "steps-head" }, state, title, latest, count, failed, el("span", { class: "chev" }, icon("chevron")));
   const node = el("details", { class: "steps", open: !foldSteps() }, head, body);
   // A click or a key on the summary is the reader's choice, written down once the browser has turned the group; the page's
   // own opening of it (a thought it takes in) never becomes their choice, and never undoes one they made.
@@ -305,6 +307,8 @@ function paintGroup(group) {
   setText(group.failed, troubles.filter((text) => text !== "").join(" · "));
   group.latest.hidden = !live;
   setText(group.latest, live ? group.last : "");
+  // A group at work and folded shows the command that runs, not how much it did so far: the style hides the count then.
+  group.node.classList.toggle("working", live);
   // The fold is the reader's once they chose it: a paint leaves it as they left it, whatever else touched the head.
   if (READER_OPEN.has(group.node) && group.node.open !== READER_OPEN.get(group.node)) {
     group.node.open = READER_OPEN.get(group.node);

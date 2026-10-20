@@ -16521,3 +16521,6 @@ providers stood in for, after a real sign-in into a keychain of the test's own: 
   was told to the chat again in a message of its queue, which started a run for what the first knew. The bar is as wide
   as what it holds (`run.css`); a read of the end (`terminal_read`) takes the queued message back out unless it has
   already started its run (`RunManager.command_read`). Measured in WebKit at 320, 360, 390 and 430 px, light and dark.
+- 2026-10-20 (Opus 5.5): item 430 on the owner's word of the same day, on `steps-live-line` from `main`: a folded group of
+  tool steps at work shows the command that runs now right after "Working…", in place of "ran 11 commands, wrote 11 files
+  and used 1 tool so far"; the count stays for the open group, and the line is gone once the group is open or over.
