@@ -183,9 +183,10 @@ answer does: its headings, lists, tables, code, quotes and emphasis (item 206). 
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
 rests) and a copy of it as you wrote it (item 205); the files a message came with stand between it and that line, in the
 earlier turns of the chat as under the latest message (item 403), the pictures among them as small squares side by side
-over the message, each the picture itself with its name where the pointer rests (item 431). A command or a script of a
-call's row shows as itself, cut in the middle past 4000 characters; only a blob without words, a picture's base64, is
-shown as its length. Under a message that opened a turn stands **Edit from
+over the message, each the picture itself with its name where the pointer rests (item 431; a delegated run's goal has no
+bubble, so its files stand where the run starts, pictures first). A picture that cannot be read shows the mark of a
+fault and why. A command or a script of a call's row shows as itself, cut in the middle past 4000 characters; only a
+blob without words, a picture's base64, is shown as its length. Under a message that opened a turn stands **Edit from
 here** too (item 282), which asks whether to "rewind chat to before this message". **Revert and keep changes** takes
 that turn and the ones after it out of the chat (they still count in what Dot spent, and a question they left for you
 waits no more) and ends the history the model reads where it ended before the message, a summary made since included;
@@ -292,16 +293,16 @@ every name, the tabs not chosen show their icon and count alone (item 227). The 
 the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
 provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how long it
 took, and a row opens its page (item 296); the pointer at rest on a row, or the focus on it, shows the helper's card as
-the conversation's rows do, with its whole goal, and a phone has none (item 426). It stays closed until the panel button in the head of the run opens it (the
-choice is kept in the browser); open, it sits beside the conversation from 960 px, is a drawer below that, and on a
-phone a sheet that rises from the foot (item 296). The run's head is the top bar itself: Dot's face and name on the
-left, the panel button on the right; the bar is solid with a hairline under it, so nothing scrolls under a blur, the
-panel stays in place under it, and the box stays at the bottom. Every other page names itself in the same bar (Agents,
-Campaigns, Settings) and opens with one line of description. A live run's page opens at its end, where its next words
-come, and stays there as the earlier turns fill in above (item 403). The six runs opened last are kept while the page
-lives, so that coming back to one (from a delegated run's page, say) draws it at once as it stood and follows its stream
-on from the last message read, not from the first; what the lessons, the questions and the cost show is read again
-(item 426).
+the conversation's rows do, with its whole goal, and a phone has none (item 426). It stays closed until the panel button
+in the head of the run opens it (the choice is kept in the browser); open, it sits beside the conversation from 960 px,
+is a drawer below that, and on a phone a sheet that rises from the foot (item 296). The run's head is the top bar
+itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a hairline under it, so
+nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
+itself in the same bar (Agents, Campaigns, Settings) and opens with one line of description. A live run's page opens at
+its end, where its next words come, and stays there as the earlier turns fill in above (item 403). The six runs opened
+last are kept while the page lives, so that coming back to one (from a delegated run's page, say) draws it at once as it
+stood and follows its stream on from the last message read, not from the first; what the lessons, the questions and the
+cost show is read again (item 426).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it

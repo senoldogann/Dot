@@ -2,6 +2,7 @@
 under it; a file that is no picture stays a chip under it. A real server on a scripted model."""
 
 import asyncio
+import re
 import struct
 import time
 import zlib
@@ -64,7 +65,8 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     )
     # The pictures are described first, by the vision model, which is the scripted one here.
     described: ScriptedTurn = ScriptedTurn(text="A red square and a blue one.", calls=())
-    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [described, answer]))
+    # Two runs of the module, each described and answered: the turns are taken in order, whichever test runs first.
+    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [described, answer, described, answer]))
     try:
         yield built
     finally:
@@ -164,5 +166,33 @@ async def test_pictures_stand_over_the_message_as_small_squares_and_a_text_file_
                 await expect(message.locator(".attach-chip")).to_contain_text("notes.txt")
                 await page.screenshot(path=tmp_path / f"pictures-{width}.png", animations="disabled")
                 await page.close()
+        finally:
+            await browser.close()
+
+
+async def test_a_picture_that_cannot_be_read_says_so_where_it_stands(
+    runtime: Runtime, served: tuple[RunManager, str]
+) -> None:
+    """A picture whose file is gone shows the mark of a fault and why, as a chip of the box does, not a plain image."""
+    manager, address = served
+    gone: StoredAttachment = await asyncio.to_thread(
+        store_attachment, runtime.workspace, "lost.png", "image/png", _png(10, 10, 10)
+    )
+    run: RunRecord = await manager.start(
+        _GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, (gone,)
+    )
+    assert (await _ended(runtime, run.id)).status == "done"
+    await asyncio.to_thread(Path(gone.path).unlink)
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 800}, color_scheme="dark")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+            await page.goto(f"{address}/#/runs/{run.id}")
+            tile: Locator = page.locator(".run-thread > .user-message .sent-picture")
+            await expect(tile).to_have_count(1)
+            await expect(tile).to_have_attribute("title", re.compile(r"^lost\.png: \S"))
+            await expect(tile.locator("img")).to_have_count(0)
         finally:
             await browser.close()

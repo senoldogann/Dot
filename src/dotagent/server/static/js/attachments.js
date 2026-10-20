@@ -83,8 +83,25 @@ export function sentFiles(files) {
   );
 }
 
+// The blob URL of each picture a message carried, made once for the page: a chat drawn again (another visit, a resync)
+// shows the same picture without fetching it and opening a new URL each time, so they do not pile up as it stays open.
+const sentUrls = new Map();
+
+/** The blob URL of the picture `id`, made once; one that could not be made is not kept, so the next drawing asks again
+ * (the drawing that asked shows why it failed). */
+function sentPictureUrl(id) {
+  const kept = sentUrls.get(id);
+  if (kept !== undefined) {
+    return kept;
+  }
+  const made = blobUrl(`/attachments/${encodeURIComponent(id)}/image`);
+  sentUrls.set(id, made);
+  made.then(null, () => sentUrls.delete(id));
+  return made;
+}
+
 /** One picture a message carried, as a small square of the picture itself; its name is its tooltip, and a click shows it
- * beside the conversation. A picture that cannot be read leaves the mark of an image where it was. */
+ * beside the conversation. A picture that cannot be read shows the mark of a fault and why, and still opens. */
 function sentPicture(file) {
   const picture = el("img", { class: "sent-picture-image", alt: "" });
   const tile = el(
@@ -99,12 +116,15 @@ function sentPicture(file) {
     },
     picture,
   );
-  blobUrl(`/attachments/${encodeURIComponent(file.id)}/image`).then(
+  sentPictureUrl(file.id).then(
     (url) => {
       picture.src = url;
     },
-    () => {
-      tile.replaceChildren(icon("image"));
+    (error) => {
+      // The picture could not be read: the square says so where it stands, as a chip of the box does.
+      tile.replaceChildren(icon("alert"));
+      tile.title = `${file.name}: ${error.message}`;
+      tile.setAttribute("aria-label", `${file.name}: ${error.message}`);
     },
   );
   return tile;
