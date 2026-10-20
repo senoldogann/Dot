@@ -15705,9 +15705,12 @@ mode. Tests: unit (`test_guard.py`: the waiver's reason and what the layers afte
 the yolo prompt), smoke (`test_approval_modes.py`: `ask` refuses the read, yolo reads it with a record, still hands
 money off and asks before a message that also reads a secret; a research run's secret write is refused). Docs:
 `docs/safety.md` (the decision order, and that a yolo run can now read Dot's own key), `docs/autonomy.md`, `README.md`,
-`CHANGELOG.md` (Unreleased). ### 434. An approval's card stays in its own chat, and leaves it once allowed
+`CHANGELOG.md` (Unreleased).
 
-**Status: done (2026-10-20), on `item-434-approved-cards`.** The owner's words of 2026-10-20: "diğer modlarda da izin
+### 434. An approval's card stays in its own chat, and leaves it once allowed
+
+**Status: done (2026-10-20), on `item-433-434-yolo-and-cards` with item 433.** The owner's words of 2026-10-20: "diğer
+modlarda da izin
 verdikten sonra sohbet içinde bir başarı kartı göstermeye gerek yok" and, with a screenshot of the home holding the
 hand-off card of another chat, "devam eden sohbetin izin penceresi neden başka yeni bir chat içinde gösteriliyor bu da
 yanlış". **As built.** In the chat (`timeline.js`), an approval or a hand-off that is approved leaves with the line the
@@ -16633,6 +16636,6 @@ stay gone after a reload; denied, they stay; wide and on a phone; the test fails
 - 2026-10-20 (Opus 5.5): item 433 on the owner's word of 2026-10-20, on `item-433-yolo-secrets` from `main`: a yolo
   run reads a secret store and sends data out without a question, recorded; money, credentials, messages and posts
   stay the owner's.
-- 2026-10-20 (Opus 5.5): item 434 on the owner's words of 2026-10-20, on `item-434-approved-cards` from `main`: an
+- 2026-10-20 (Opus 5.5): item 434 on the owner's words of 2026-10-20, on `item-433-434-yolo-and-cards` from `main`: an
   approval's card stays in its own chat, the home lists the run without it, and an allowed card leaves the chat with
   its line.

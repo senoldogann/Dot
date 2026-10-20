@@ -243,7 +243,8 @@ def _lines(approvals: ApprovalMode) -> set[str]:
 def test_yolo_changes_only_the_approvals_line_of_the_prompt() -> None:
     ask: set[str] = _lines("ask")
     yolo: set[str] = _lines("yolo")
-    # Secrets are the user's in yolo too (item 429): the line that says so is the same in every mode.
+    # The model's line about secret stores is the same in every mode, yolo too, though a yolo run no longer asks
+    # the user before one is read (item 433).
     assert sorted(ask - yolo) == []
     added: list[str] = sorted(yolo - ask)
     assert len(added) == 1, added
