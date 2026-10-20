@@ -15880,6 +15880,18 @@ Tests: smoke (`test_helpers.py`: the move to the standby model, and the end with
 **Left for a human** (paths REVIEW.md keeps): `Cache-Control: no-store` for `/oauth/callback` (`server/guard.py`), and a
 job of browser tests in CI (`.github/workflows/gate.yml` runs none, which is how two browser failures reached `main`).
 
+### 438. A run's rows stand close on a phone
+
+**Status: done (2026-10-20), on `phone-rows`.** The owner's word of 2026-10-20, with a screenshot of a run on a phone:
+the space between the rows of its flow was too wide to read a long run there. **As built.** A row of the flow carried two
+things on a phone: a 40 px head (a touch target) and, under it, the 8 px gap of the stack a call stands in for its
+screenshots, empty nine calls of ten and still a flex item. Now the head is 32 px (`html.chat-shell`, run.css), an empty
+`.shots` stack draws nothing (`:empty`), a step body's margin goes, and a thought or a group of calls after another keeps
+4 px instead of the breath of 8 a turn keeps. The pitch of a row goes from 50 px to 34; a wide window keeps what it had,
+and so do the approval and question cards, which stand in a stack of their own and are not touched. A phone held
+sideways takes the head, the empty stack and the 4 px between rows too. Measured in `tests/smoke/test_phone_rows.py`, which reads the rows at
+390 on a touch screen and fails on the CSS before this change.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16822,3 +16834,5 @@ job of browser tests in CI (`.github/workflows/gate.yml` runs none, which is how
 - 2026-10-20 (Opus 5.5): item 437 on the owner's words of 2026-10-20, on `item-437-logos-and-polish` from `main`: every
   plugin's own logo and the Mac apps' own icons, sign-in pages that look like Dot, a background command's end no queued
   message, and the daemon-log, UI and browser-test fixes of a sweep of the app; one pull request.
+- 2026-10-20 (Opus 5.5): item 438 on `phone-rows` from `main`: a run's rows stand 32 px tall with 2 px between the calls
+  of a group and 4 px between rows on a phone, so a long run reads as a list; a wide window keeps what it had.

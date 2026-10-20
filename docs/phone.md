@@ -95,8 +95,9 @@ in the middle of the dock, not across all of it (item 427).
 A list row (Campaigns, Schedules, agents, notes) is its face or switch, its title and its buttons on one line, and
 what else it says (chips, text, times) under them across the row's whole width; a card's head with a line beside its
 name puts the line under the name (item 436). The conversation keeps a chat's rhythm (item 401):
-the gap between its rows is 4 px, a message's bubble holds its words in 4 px above and below, and a step's head is 40 px
-tall, so a phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
+a turn after a turn keeps 8 px and the rows of what a run did 4, a message's bubble holds its words in 4 px above and
+below, a step's head is 32 px tall with a call's row 34 px from the next and no empty line under it (item 438), so a
+phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the
 keyboard move nothing else. The composer floats over the conversation's foot as a pane of glass, with no band of the
 page's colour behind it, and the conversation scrolls under it, its last line kept clear of the bar however tall the
