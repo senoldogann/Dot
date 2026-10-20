@@ -2,8 +2,9 @@
 which stands in for Dot's interface and counts what reaches it.
 
 Covers the ways a page can send the browser to the interface: a popup, a resource it loads, a fetch, a service worker,
-a link, a script and a redirect on the way; and the daemon's own refusal of navigations that pages of other sites start
-(``Sec-Fetch-Site``), but for the page a sign-in comes back to, measured with the real guard behind a real server.
+a link, a script and a redirect on the way; the way back of a sign-in, the one page of it that opens; and the daemon's
+own refusal of navigations that pages of other sites start (``Sec-Fetch-Site``), but for the page a sign-in comes back
+to, measured with the real guard behind a real server.
 """
 
 import asyncio
@@ -97,6 +98,7 @@ def _site_pages(inside: str, guarded: str) -> dict[str, str]:
 <a href="{guarded}/">Guarded link</a>
 <a href="/hop-guarded">Hop to guarded</a>
 <a href="/allow">Allow sign-in</a>
+<a href="/back">Back to Dot</a>
 <img src="{inside}/pixel.png" alt="pixel">
 <img src="/own.png" alt="own">
 <p id="out">quiet</p>""",
@@ -118,6 +120,10 @@ def _site_handler(inside: str, guarded: str) -> type[BaseHTTPRequestHandler]:
                 return
             if path == "/hop-guarded":
                 self._redirect(f"{guarded}/")
+                return
+            if path == "/back":
+                # The page of a sign-in that opened in Dot's own Chrome sends the browser back to the daemon (item 445).
+                self._redirect(f"{inside}{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
                 return
             if path == "/allow":
                 # An authorization server that the owner allowed a sign-in on sends the browser back to the daemon.
@@ -344,6 +350,22 @@ async def test_a_redirect_to_the_interface_is_stopped_before_it_is_fetched(brows
     assert refused.value.resource_type == "document"
     assert browser.current_url("hop") == "about:blank"
     assert _InsideHandler.arrivals.items == []
+
+
+async def test_the_way_back_of_a_sign_in_reaches_the_daemon_and_the_run_reads_nothing_of_it(
+    browser: BrowserSession, site: str
+) -> None:
+    """A sign-in that opened in Dot's own Chrome ends in a redirect to the daemon's ``/oauth/callback`` (item 445): the
+    hop is sent, so the code reaches the sign-in that waits for it, and the landing check still resets the tab of a run
+    that came there, as on every other page of the interface."""
+    view: PageView = await browser.open_url("back", f"{site}/")
+    with pytest.raises(ForbiddenUrlError) as refused:
+        await act(browser, "back", [Step(action="click", ref=ref_of(view.body, 'link "Back to Dot"'))], False)
+    assert "Dot's own interface" in refused.value.reason, refused.value
+    assert browser.current_url("back") == "about:blank"
+    callbacks: list[Arrival] = _InsideHandler.arrivals.of(f"{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
+    assert [arrival.fetch_mode for arrival in callbacks] == ["navigate"], _InsideHandler.arrivals.items
+    assert [arrival.path for arrival in _InsideHandler.arrivals.items] == [callbacks[0].path]
 
 
 async def test_a_link_that_redirects_to_the_interface_is_stopped(

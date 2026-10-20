@@ -16011,6 +16011,23 @@ status `left`) is still not counted by the bell: it is in the home's list, and t
 pending approvals. Measured in `tests/smoke/test_approval_target.py`, which clicks the bell on a wide window and a phone
 and finds the card in the chat it opens; on the CSS before this change the page it opens is the home.
 
+### 445. A sign-in that opens in Dot's own Chrome comes back
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21, with two screenshots: the Google and the Microsoft
+sign-ins of Customize › Plugins ended on Chrome's `ERR_BLOCKED_BY_CLIENT` at `127.0.0.1:8765/oauth/callback` and
+`localhost:8765/oauth/callback`. The daemon's log had `browser_request_refused` for both, "it is Dot's own interface":
+macOS handed the provider's page to the Chrome that ran, Dot's own, whose guard (item 135) refuses every address of the
+interface. **As built.** `browser.safety.sign_in_return` names the way back: the path `/oauth/callback` exactly, as
+Chrome read it, on a loopback address at `[server] port`; `request_verdict` lets it through as a navigation only, so a
+script, a picture or a fetch to it is still refused, and `check_browser_url` (what a tool opens, the landing check)
+still refuses it, so a run whose tab lands there has the tab reset and reads nothing of it. The names of
+`[server] reach` stay refused: a sign-in starts from a page on this Mac and comes back to its loopback address. A run
+gains nothing by the page: the daemon takes only a state it handed out itself, once, for ten minutes, and the page
+carries no token. Tests: `tests/unit/test_own_interface.py` (the way back, and the spellings that are not it: a slash
+more, another case, a dot segment, the path in the query, the tailnet's name, a request that is not a page) and
+`tests/smoke/test_browser_boundary.py` (a link whose redirect ends there reaches the daemon as one navigation and the
+tab is reset; on the code before this change it is refused). Docs: `docs/browser-and-computer-use.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16964,3 +16981,5 @@ and finds the card in the chat it opens; on the CSS before this change the page 
   recorded, and only a refusal (a research run's) stands; the secret fields it can fill it fills itself.
 - 2026-10-20 (Opus 5.5): item 444: the header's bell leads to the chat of the approval that waits longest — its card and
   its buttons there — and to the home only when nothing waits.
+- 2026-10-21 (Opus 5.5): item 445: the way back of a sign-in (`/oauth/callback` on this Mac at the daemon's port) opens in
+  Dot's own Chrome as a page, and nothing else of the interface does.
