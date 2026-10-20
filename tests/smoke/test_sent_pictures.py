@@ -165,6 +165,18 @@ async def test_pictures_stand_over_the_message_as_small_squares_and_a_text_file_
                 await expect(message.locator(".attach-chip")).to_have_count(1)
                 await expect(message.locator(".attach-chip")).to_contain_text("notes.txt")
                 await page.screenshot(path=tmp_path / f"pictures-{width}.png", animations="disabled")
+                # A page change lets the pictures' URLs go, and the chat drawn again makes them anew.
+                shown: list[str] = await tiles.locator("img").evaluate_all("images => images.map((image) => image.src)")
+                await page.evaluate("location.hash = '#/settings'")
+                await expect(message).to_have_count(0)
+                assert await page.evaluate("url => fetch(url).then(() => 'read', () => 'gone')", shown[0]) == "gone"
+                await page.evaluate("id => { location.hash = `#/runs/${id}`; }", run.id)
+                await expect(tiles.locator("img")).to_have_count(2)
+                await page.wait_for_function(
+                    "() => [...document.querySelectorAll('.sent-picture img')].every((i) => i.naturalWidth === 64)"
+                )
+                again: list[str] = await tiles.locator("img").evaluate_all("images => images.map((image) => image.src)")
+                assert not set(again) & set(shown), (shown, again)
                 await page.close()
         finally:
             await browser.close()

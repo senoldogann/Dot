@@ -44,10 +44,10 @@ function editFromHereButton(editFromHere) {
 
 /**
  * What the user wrote, as a bubble on the right, the pictures that came with it (`files`, as the timeline has them) as
- * small squares over it, its other files under it, and under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `editFromHere` is null,
- * Edit from here, which rewinds the chat to before it (item 282). The foot shows once the turn has its
- * answer: a run at work keeps it back (`.run-working`, `.turn-working`). The text reads as markdown, as an answer does
- * (item 206).
+ * small squares over it, its other files under it, and under them (item 205): when it was sent (`sentAt`), a copy of it
+ * as it was written and, unless `editFromHere` is null, Edit from here, which rewinds the chat to before it (item 282).
+ * The foot shows once the turn has its answer: a run at work keeps it back (`.run-working`, `.turn-working`). The text
+ * reads as markdown, as an answer does (item 206).
  */
 export function userMessage({ text, sentAt, files, editFromHere }) {
   return el(
