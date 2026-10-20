@@ -198,6 +198,9 @@ async def test_each_way_of_the_card_leads_to_a_model(own_home: Path) -> None:
                 await page.get_by_role("textbox", name="Goal").fill("Good morning")
                 await page.locator(".home .send").click()
                 await expect(page).to_have_url(re.compile(r"#/runs/"))
-                await expect(page.get_by_text(ANSWER).first).to_be_visible(timeout=15_000)
+                # The answer's own card: the sidebar, closed on a phone, draws the chat's last line with the same words.
+                await expect(page.get_by_role("article", name="Answer").get_by_text(ANSWER)).to_be_visible(
+                    timeout=15_000
+                )
             finally:
                 await browser.close()

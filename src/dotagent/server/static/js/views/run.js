@@ -133,7 +133,9 @@ function planStep(step) {
  */
 // The runs opened last, kept while the page lives (`{ detail, history, messages }`, the stream's messages so far), so
 // that coming back to one (from a delegated run's page, say) draws it at once as it stood and follows its stream on
-// from there, instead of an empty page that fills again as the whole stream is read once more.
+// from there, instead of an empty page that fills again as the whole stream is read once more. The kept `detail` is the
+// run as it was loaded, brought up to its end when the run ends on the page (`onRunStatus`), so that a run that is over
+// comes back at rest.
 const KEPT_RUNS = 6;
 const keptRuns = new Map();
 
@@ -1108,6 +1110,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
         setActorState(face, faceStateAtEnd(update.status));
       }
       active = false;
+      // The snapshot kept for a return to this page is of a run that is over: it draws at rest, and its replayed end
+      // gives no tick.
+      kept.detail = { ...kept.detail, active: false, elsewhere: false, run: { ...kept.detail.run, status: update.status, finished_at: update.endedAt } };
       computer.setActive(false);
       messagesMissed();
       finishedAt = update.endedAt;

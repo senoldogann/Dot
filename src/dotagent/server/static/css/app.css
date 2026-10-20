@@ -7307,6 +7307,12 @@ button.attach-chip:hover {
     grid-area: tools;
   }
 
+  /* The count that opens the tools is tapped: a 40 px row, like the other rows a finger opens, its marker kept. */
+  .template-tools > summary {
+    min-height: 40px;
+    padding-block: var(--space-2);
+  }
+
   .template-card > .btn.template-use {
     grid-area: use;
     height: 44px;

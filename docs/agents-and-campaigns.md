@@ -30,7 +30,7 @@ Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Re
 Staff, Reviewer, Research Desk, Competitor Watch, Release QA, Copy Editor and Design Critic, each with its face, its
 role, what it needs of the Mac and the schedule it suggests. **Use template** makes the agent in one click and opens
 its page; it is then an agent like any other, to change in the
-editor. Every template names the tools its agent may use (item 425), and its card counts them under **Tools** and lists
+editor. Every template names the tools its agent may use (item 425), and its card counts them under **Tools** (a 40 px row to tap on a phone) and lists
 the names a click below it: no template starts an agent with every tool, and a tool this home does not have (its group
 off in the configuration, or its app not here) is struck through with the reason, since such a template is refused on use. Every
 template's instructions also say that what leaves the Mac for a person is a draft for you to send (`draft_message`, see [Drafts](runs.md#drafts)). Sales
