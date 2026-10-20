@@ -467,7 +467,7 @@ export function mount(root, _ctx) {
       el(
         "span",
         null,
-        "Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, and money or credentials are handed to you. A yolo run goes past all of these but the read-only research runs, and a hand-off rule still stops it there too.",
+        "Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, money or credentials are handed to you, and a message or a post in your name waits for your yes. A yolo run keeps all of these, but it asks you before reading secrets or sending them out, where the other modes refuse.",
       ),
     ),
     sandbox.element,

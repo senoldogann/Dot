@@ -49,14 +49,15 @@ _PAYMENT_FIELD: re.Pattern[str] = re.compile(
     r"|account number|kart numaras[ıi]|son kullanma)\b"
 )
 
-_FLAG_OF_REASON: dict[str, Flag] = {
-    "credential": "credential",
-    "payment": "financial",
-    "financial": "financial",
-    "destructive": "destructive",
-    "send": "external_send",
-    "post": "public_post",
-    "social": "social",
+# The flags of each reason: a send is a message sent for the owner too (item 429), which no rule of theirs lets through.
+_FLAGS_OF_REASON: dict[str, tuple[Flag, ...]] = {
+    "credential": ("credential",),
+    "payment": ("financial",),
+    "financial": ("financial",),
+    "destructive": ("destructive",),
+    "send": ("external_send", "message_send"),
+    "post": ("public_post",),
+    "social": ("social",),
 }
 _HIGH_REASONS: frozenset[str] = frozenset({"credential", "payment", "financial"})
 # A follow or a like is outward-facing but small: it keeps the risk of a plain click.
@@ -133,7 +134,7 @@ def quiet_assessment() -> StepAssessment:
 def assessment_for(reasons: Sequence[str]) -> StepAssessment:
     """Risk and flags of an acting step: low without reasons or with only a follow or a like, medium with others, high
     when money or secrets are involved."""
-    flags: tuple[Flag, ...] = tuple(dict.fromkeys(_FLAG_OF_REASON[reason] for reason in reasons))
+    flags: tuple[Flag, ...] = tuple(dict.fromkeys(flag for reason in reasons for flag in _FLAGS_OF_REASON[reason]))
     if any(reason in _HIGH_REASONS for reason in reasons):
         return StepAssessment(risk="high", flags=flags, reasons=tuple(reasons))
     if any(reason not in _LOW_REASONS for reason in reasons):

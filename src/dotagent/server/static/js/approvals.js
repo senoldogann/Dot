@@ -122,6 +122,16 @@ function takeoverOffer(runId) {
   return el("div", { class: "row takeover-offer" }, button, text);
 }
 
+// What the policy asks the owner about in every mode, whatever their rules say (item 429): a rule offered for it would
+// never apply.
+const GUARDED_FLAGS = new Set(["financial", "credential", "message_send", "public_post", "secret_access", "exfiltration"]);
+
+/** Whether the owner answers `approval` in every mode, whatever their rules say (item 429). */
+function guarded(approval) {
+  const flags = approval.args.flags;
+  return Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && GUARDED_FLAGS.has(flag));
+}
+
 /**
  * The way from an approval to a rule (item 110): the Rules page with a sentence in its box that names the tool and the
  * action, for the owner to change before Dot drafts the rule.
@@ -276,7 +286,11 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
         several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
         isLeft ? el("div", { class: "small muted" }, leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
-        isQuestion || isHandoff ? null : ruleOffer(approval),
+        isQuestion || isHandoff
+          ? null
+          : guarded(approval)
+            ? el("div", { class: "small muted" }, "Dot asks you about this in every mode; no rule turns that off.")
+            : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId) : null,
         el(
           "div",

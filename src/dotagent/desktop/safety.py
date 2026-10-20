@@ -311,7 +311,11 @@ def _typing_parts(
     if context.role == "terminal" and step.action != "set_value":
         parts.append(_terminal_input(context.line, text, workspace, protected, dot_paths))
     if context.role == "messaging" and step.action == "type" and "\n" in text:
-        parts.append(StepAssessment(risk="medium", flags=("external_send",), reasons=("a newline sends the message",)))
+        parts.append(
+            StepAssessment(
+                risk="medium", flags=("external_send", "message_send"), reasons=("a newline sends the message",)
+            )
+        )
     return parts
 
 
@@ -343,7 +347,9 @@ def _chord_parts(
     sends_with_return: bool = chord.key == "return" and modifiers in _SEND_KEYS
     sends_mail: bool = chord.key == "d" and modifiers == _MAIL_SEND_MODIFIERS
     if context.role == "messaging" and (sends_with_return or sends_mail):
-        parts.append(StepAssessment(risk="medium", flags=("external_send",), reasons=("sends the message",)))
+        parts.append(
+            StepAssessment(risk="medium", flags=("external_send", "message_send"), reasons=("sends the message",))
+        )
     return parts
 
 
