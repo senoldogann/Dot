@@ -54,7 +54,8 @@ ENDED: RunOutcome = RunOutcome(status="done", result="the first file is written"
         ("ask", "own_files", "auto", "user"),
         ("handoff", "hard_stop", "ask", "user"),
         ("handoff", "hard_stop", "auto", "user"),
-        ("handoff", "hard_stop", "yolo", "user"),
+        # A yolo run asks nothing at all (item 443), money and credentials included.
+        ("handoff", "hard_stop", "yolo", "waived"),
     ],
 )
 def test_a_question_goes_where_the_mode_sends_it(
@@ -160,9 +161,11 @@ def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
 def test_the_prompt_tells_the_model_how_its_questions_are_answered() -> None:
     assert "Approvals:" not in _prompt("ask", False)
     assert "answered by a review model" in _prompt("auto", False)
-    assert "what the policy flags runs at once" in _prompt("yolo", False)
-    # Money, passwords, messages and posts wait for the user in yolo too (item 429); secrets do not (item 433).
-    assert "still wait for the user, as in every mode" in _prompt("yolo", False)
+    assert "nothing waits for the user" in _prompt("yolo", False)
+    # A yolo run asks nothing at all (item 443): money, a password and a message in the owner's name included; a
+    # code it can read or a password it was given it types itself.
+    assert "not a password or a one-time code" in _prompt("yolo", False)
+    assert "you type in yourself" in _prompt("yolo", False)
     assert "other secrets" not in _prompt("yolo", False)
     assert "answered by a review model" not in _prompt("yolo", False)
 
@@ -240,15 +243,16 @@ def _lines(approvals: ApprovalMode) -> set[str]:
     return {line for line in _prompt(approvals, False).splitlines() if not line.startswith("- Today:")}
 
 
-def test_yolo_changes_only_the_approvals_line_of_the_prompt() -> None:
+def test_yolo_changes_the_approvals_line_and_what_a_secret_field_takes() -> None:
+    """Item 443: the approvals line and the rule about a secret field are the two lines a yolo run says differently;
+    what a run reads and how it ends is the same in every mode."""
     ask: set[str] = _lines("ask")
     yolo: set[str] = _lines("yolo")
-    # The model's line about secret stores is the same in every mode, yolo too, though a yolo run no longer asks
-    # the user before one is read (item 433).
-    assert sorted(ask - yolo) == []
+    assert sorted(ask - yolo) == sorted(line for line in ask - yolo if "are never typed by you" in line)
     added: list[str] = sorted(yolo - ask)
-    assert len(added) == 1, added
-    assert added[0].startswith("- Approvals: yolo: what the policy flags runs at once")
+    assert len(added) == 2, added
+    assert added[0].startswith("- A password, a one-time code or a card's details")
+    assert added[1].startswith("- Approvals: yolo: nothing waits for the user")
     assert _lines("auto") - _lines("ask") == {line for line in _lines("auto") if line.startswith("- Approvals: auto")}
 
 

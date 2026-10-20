@@ -171,8 +171,9 @@ Both modes share what follows.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
   and the line above the page says how many are open. A click that another element takes fails with the name of that
   element and what to do about it (close or answer the box, or press Escape).
-- Password, one-time-code and card fields are never filled by Dot: outside `yolo` the step is refused, and in `yolo`
-  the field is handed to you, with the browser to take over (item 429, see [Safety](safety.md#safety)). Cookie banners
+- Password, one-time-code and card fields are never filled by Dot outside `yolo`: there the step is refused, and the
+  browser is yours to take over; in `yolo` the run fills the field itself and the record of the step says why it would
+  have asked (items 429 and 443, see [Safety](safety.md#safety)). Cookie banners
   are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails
   with the banner still there is logged as `consent_decline_failed` with the page's address).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
@@ -277,7 +278,8 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
   (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920).
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
-  are secure fields: in `yolo` a step the review sees typing a credential is handed to you (item 429, see
+  are secure fields outside `yolo`, where the step is the user's; in `yolo` the run types the field itself (item 443),
+  and a step the review sees take a credential keeps that reason in its record (item 429, see
   [Safety](safety.md#safety)).
 - `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show
   what the agent would see.

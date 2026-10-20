@@ -13,12 +13,9 @@ from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
 from dotagent.policy.engine import (
-    YOLO_WAIVED_SOURCES,
     approval_severity,
     decide,
     decide_past_review,
-    held_in_yolo,
-    owner_handoff,
     route_for,
     supervised,
     waived_in_yolo,
@@ -104,10 +101,10 @@ class RunGate:
 
     ``approval_mode`` says who answers a question the policy raises: the user (``supervised``, which also asks before
     every change the policy lets through, and ``ask``), the review model (``auto``) or nobody (``yolo``: the action runs
-    and only a record is kept), but for the guard no rule turns off (item 429): money and credentials are handed to the
-    user and a message or a post in their name waits for their yes in yolo too. What the other modes refuse (secrets,
-    exfiltration) a yolo run does without asking (item 433), and a change of Dot's own files is the user's in every
-    mode but yolo (item 398); a research run stays read-only and a hand-off rule of the user still stops it.
+    and only a record is kept). A yolo run asks nothing at all (item 443) — the guard of money, credentials, messages
+    and posts of item 429 included, and the refusal of secrets and exfiltration of item 433 — and the record of the step
+    keeps the reason it would have asked for. A change of Dot's own files is the user's in every mode but yolo (item
+    398); a research run stays read-only and a refusal that stands still refuses.
     ``instructions`` are the user's own words so far, which is all the reviewer takes as authority. ``pace`` bounds the
     public and social actions of the browser on each site, in every mode. ``locks`` are the runtime's
     :class:`SiteLocks`, shared with the gates of the other runs.
@@ -248,15 +245,30 @@ class RunGate:
         allowance: Decision | None = None if state is None else spend_allowance(state)
         decided: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
         if self._approval_mode == "yolo" and decided.source == "auto_review":
-            # What the always-on review refuses in every other mode, a yolo run does without asking (item 433), unless a
-            # layer after the review keeps the step for the user or refuses it.
+            # What the always-on review refuses in every other mode, a yolo run does without asking: the layers
+            # after the review still judge the step, and a refusal among them stands (item 443).
             rest: Decision = decide_past_review(info, self._mode, self.tainted, self._preset, rules, allowance)
-            decided = rest if held_in_yolo(rest) else waived_in_yolo(info)
+            review: Decision = waived_in_yolo(info)
+            if rest.verdict == "allow":
+                decided = review
+            elif rest.verdict == "deny":
+                decided = rest
+            else:
+                # A step that both reads a secret and hands money over is waived for both: its record says what each
+                # would have asked (item 443).
+                decided = rest.model_copy(update={"reason": f"{rest.reason}; also {review.reason}"})
         decision: Decision = supervised(decided, info) if self._approval_mode == "supervised" else decided
         note: str = "" if decision.verdict == "allow" else await self._authorize_decision(info, decision, rules)
         if allowance is not None and state is not None:
             # The payment goes ahead under its caps, whichever question let it through (the guard asks first when the
             # step also sends or posts, item 429): it counts against the site's day. A refusal or a hand-off raised.
+            await self._store.record_spend(
+                state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
+            )
+            log.info("spend_recorded", run_id=self._run_id, host=state.host, amount=state.amount.value)
+        elif self._approval_mode == "yolo" and state is not None:
+            # A yolo run does the payment a cap would have held (item 443), and what it spends counts against the site's
+            # day as any other payment's does: a later run of a mode that asks must meet the true total.
             await self._store.record_spend(
                 state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
             )
@@ -279,10 +291,10 @@ class RunGate:
         """What the decision means in this approval mode: a waiver, a refusal, the review model or the user."""
         if decision.verdict == "allow":
             return ""
-        if self._approval_mode == "yolo" and decision.source in YOLO_WAIVED_SOURCES:
-            handoff: Decision | None = owner_handoff(info, rules)
-            if handoff is not None:
-                return await self._ask_user(info, handoff, "")
+        if self._approval_mode == "yolo" and decision.verdict != "deny":
+            # A yolo run asks nothing (the owner's word of 2026-10-20, item 443): money, a credential, a message or a
+            # post in their name, a spend, Dot's own files, the review's refusal — the step does it, and the record says
+            # what it would have asked. A refusal is not a question and stands below.
             return await self._waive(info, decision)
         if decision.verdict == "deny":
             await self._emit_policy(info, decision)

@@ -23,7 +23,7 @@ from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
 from dotagent.policy.types import ActionInfo
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import UI_SOURCE
-from dotagent.store.models import ApprovalRecord, RunRecord
+from dotagent.store.models import RunRecord
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -104,21 +104,13 @@ async def test_two_runs_of_one_manager_cannot_both_take_the_last_public_action_o
         async with asyncio.timeout(WAIT_S):
             await model.all_held.wait()
         gates: list[RunGate] = [manager._handle(run.id).gate for run in runs]
-        # A post waits for the user's yes in yolo too (item 429): the run that takes the last post of the day asks, and
-        # the other is refused by the pace without a question.
-        tasks: list[asyncio.Task[str]] = [asyncio.create_task(gate.authorize(POST)) for gate in gates]
-        pending: list[ApprovalRecord] = []
-        async with asyncio.timeout(WAIT_S):
-            while not pending:
-                pending = await runtime.store.list_approvals("pending", 10)
-                await asyncio.sleep(0 if pending else _POLL_S)
-        (asked,) = pending
-        await manager.decide(asked.id, True, "test", "post it")
+        # A yolo run asks nothing (item 443): the two runs race for the last public action of the day, and the site's
+        # pace lets one of them take it and refuses the other.
         outcomes: list[str | BaseException] = await asyncio.wait_for(
-            asyncio.gather(*tasks, return_exceptions=True), WAIT_S
+            asyncio.gather(*(gate.authorize(POST) for gate in gates), return_exceptions=True), WAIT_S
         )
         assert sorted(outcome if isinstance(outcome, str) else type(outcome).__name__ for outcome in outcomes) == [
+            "",
             PolicyDenied.__name__,
-            "post it",
         ]
         assert len(await runtime.store.paced_times("social.example", "public", 0.0)) == 1

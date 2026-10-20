@@ -3,7 +3,7 @@
 
 import pytest
 
-from dotagent.policy.engine import decide, owner_handoff, route_for
+from dotagent.policy.engine import decide, route_for
 from dotagent.policy.types import ActionInfo, Decision, Verdict
 from dotagent.store.models import Behavior, RuleRecord
 
@@ -55,9 +55,9 @@ def test_an_action_the_pattern_does_not_match_is_left_to_the_preset(behavior: Be
     assert (decision.verdict, decision.source, decision.rule_id) == ("ask", "preset", None)
 
 
-def test_hand_it_to_me_is_the_users_in_every_approval_mode() -> None:
-    """The hand-off goes to the user, never to the review model, and a yolo run checks it before it waives the rest."""
-    handed: Decision | None = owner_handoff(_PUSH, [_rule("handoff", "")])
-    assert handed is not None and handed.verdict == "handoff" and handed.rule_id == "rule-1"
-    assert owner_handoff(_PUSH, [_rule("ask", "")]) is None
-    assert [route_for(handed, mode) for mode in ("ask", "auto", "yolo")] == ["user", "user", "user"]
+def test_hand_it_to_me_is_the_users_in_every_mode_but_yolo() -> None:
+    """The hand-off goes to the user, never to the review model; a yolo run asks nothing, that question included."""
+    handed: Decision = decide(_PUSH, "task", False, "aggressive", [_rule("handoff", "")], None)
+    assert handed.verdict == "handoff" and handed.rule_id == "rule-1"
+    assert decide(_PUSH, "task", False, "aggressive", [_rule("ask", "")], None).verdict != "handoff"
+    assert [route_for(handed, mode) for mode in ("ask", "auto")] == ["user", "user"]

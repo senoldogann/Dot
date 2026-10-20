@@ -9,7 +9,7 @@ import pytest
 from dotagent.desktop.safety import StepContext, assess_step
 from dotagent.desktop.types import Step
 from dotagent.policy.elements import Element, assessment_for, naming_reasons
-from dotagent.policy.engine import auto_review, decide, decide_past_review, held_in_yolo, route_for, waived_in_yolo
+from dotagent.policy.engine import auto_review, decide, decide_past_review, route_for, waived_in_yolo
 from dotagent.policy.shell import assess_applescript, assess_shell
 from dotagent.policy.types import ActionInfo, ApprovalMode, Decision
 from dotagent.store.models import Behavior, RuleRecord
@@ -82,10 +82,12 @@ def test_a_rule_that_hands_a_message_off_is_stricter_and_holds() -> None:
     assert (decision.verdict, decision.source) == ("handoff", "rule")
 
 
-@pytest.mark.parametrize("mode", ["supervised", "ask", "yolo"])
-def test_money_and_messages_are_the_users_in_yolo_too(mode: ApprovalMode) -> None:
+@pytest.mark.parametrize("mode", ["supervised", "ask"])
+def test_money_and_messages_are_the_users_in_every_mode_that_asks(mode: ApprovalMode) -> None:
+    """Item 443: the modes that ask still ask; a yolo run is the one that does not, and waives them with the review."""
     for action in (MESSAGE, POST, PAYMENT):
         assert route_for(decide(action, "task", False, "aggressive", [], None), mode) == "user", action.summary
+        assert route_for(decide(action, "task", False, "aggressive", [], None), "yolo") == "waived", action.summary
 
 
 def test_the_review_model_answers_a_message_in_auto_but_never_money() -> None:
@@ -99,18 +101,20 @@ def test_yolo_still_waives_what_the_preset_asks() -> None:
     assert route_for(decision, "yolo") == "waived"
 
 
-def test_what_the_always_on_review_refuses_elsewhere_a_yolo_run_waives_but_what_comes_after_it() -> None:
+def test_a_yolo_run_waives_the_review_and_every_question_below_it_and_asks_nothing() -> None:
+    """Item 443: money, a message and a credential are the run's in yolo, with the reason each would have asked for kept
+    in the step's record; a research run's refusal stands."""
     refusal: Decision | None = auto_review(SECRET)
     assert refusal is not None and refusal.verdict == "deny"
     assert waived_in_yolo(SECRET).reason == "every mode but yolo refuses this (secret_access)"
-    assert not held_in_yolo(decide_past_review(SECRET, "task", False, "balanced", [], None))
-    # Money, a message and a research run's limit hold in a step that also reads a secret.
     paying: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "financial")})
     mailing: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "external_send", "message_send")})
+    for action in (paying, mailing):
+        below: Decision = decide_past_review(action, "task", False, "aggressive", [], None)
+        assert below.verdict in ("handoff", "ask"), (action.flags, below)
+        assert route_for(below, "yolo") == "waived", action.flags
     writing: ActionInfo = SECRET.model_copy(update={"kind": "write"})
-    for action, mode, verdict in ((paying, "task", "handoff"), (mailing, "task", "ask"), (writing, "research", "deny")):
-        held: Decision = decide_past_review(action, mode, False, "aggressive", [], None)
-        assert held.verdict == verdict and held_in_yolo(held), action.flags
+    assert decide_past_review(writing, "research", False, "aggressive", [], None).verdict == "deny"
 
 
 def test_every_classifier_that_knows_a_message_goes_out_says_so() -> None:

@@ -8,8 +8,9 @@ it lets a run do as much as by how it reads.
 ## Goals and non-goals
 
 - Goal: work on a goal until it is done, acting without asking, but stop for what it must not decide alone (money,
-  credentials, public posts, messages sent for the owner, privilege, system settings), record everything it does, and
-  stop at once when told to. [Safety](docs/safety.md) is the contract.
+  credentials, public posts, messages sent for the owner, privilege, system settings) — in every mode but `yolo`, which
+  asks nothing at all (item 443) — record everything it does, and stop at once when told to.
+  [Safety](docs/safety.md) is the contract.
 - Non-goal: any platform but macOS (it depends on PyObjC and drives macOS's own applications).
 
 ## Checks

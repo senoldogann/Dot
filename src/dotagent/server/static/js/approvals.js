@@ -122,11 +122,11 @@ function takeoverOffer(runId) {
   return el("div", { class: "row takeover-offer" }, button, text);
 }
 
-// What the policy asks the owner about in every mode, whatever their rules say (item 429): a rule offered for it would
-// never apply.
+// What the policy asks the owner about in every mode that asks, whatever their rules say (item 429): a rule offered for
+// it would never apply. A yolo run asks nothing at all (item 443), so no card of these comes its way.
 const GUARDED_FLAGS = new Set(["financial", "credential", "message_send", "public_post"]);
 
-/** Whether the owner answers `approval` in every mode, whatever their rules say (item 429). */
+/** Whether the owner answers `approval` in every mode that asks, whatever their rules say (item 429). */
 function guarded(approval) {
   const flags = approval.args.flags;
   return Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && GUARDED_FLAGS.has(flag));
@@ -289,7 +289,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
         isQuestion || isHandoff
           ? null
           : guarded(approval)
-            ? el("div", { class: "small muted" }, "Dot asks you about this in every mode; no rule turns that off.")
+            ? el("div", { class: "small muted" }, "Dot asks you about this in every mode but yolo; no rule turns that off.")
             : ruleOffer(approval),
         isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId) : null,
         el(

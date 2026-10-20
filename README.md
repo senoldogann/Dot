@@ -13,8 +13,9 @@ It runs on models from **Ollama** (local models, and cloud models through the lo
 Dot works on a goal on its own, and by default it asks you before a risky step. In the default approval mode, `ask`,
 edits and routine work run without a question, and what the policy raises waits for your answer on a card in the chat.
 It stops for what it must not decide alone (money, credentials, public posts, messages sent for you, privilege, system
-settings), everything it does is recorded, and it can be stopped at once. In `yolo` nobody is asked, but money,
-credentials, messages and posts in your name still wait for you: see [Autonomy](docs/autonomy.md). Read
+settings), everything it does is recorded, and it can be stopped at once. In `yolo` nobody is asked at all: money,
+credentials, messages and posts in your name are the run's too, each step recorded with the reason it would have asked
+for. See [Autonomy](docs/autonomy.md). Read
 [Safety](docs/safety.md#safety) before you let it work on a machine that holds data you care about.
 
 **With the default models, what a run reads leaves this Mac.** They are cloud models of Ollama: the Ollama server on
@@ -93,10 +94,11 @@ on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the s
 ## Safety in short
 
 - **Who answers the policy's questions.** Most actions need no answer. For those that do, `ask` (the default) puts the
-  question to you, `auto` lets a review model answer, and `yolo` lets the run go on alone. In every mode, `yolo` too,
+  question to you, `auto` lets a review model answer, and `yolo` lets the run go on alone. In every mode that asks,
   money and credentials are handed to you and a message or a post in your name needs a yes (the review model's in
-  `auto`), whatever your rules say; what the other modes refuse, a read of your secrets or data sent out, a `yolo` run
-  does without asking. See [Autonomy](docs/autonomy.md).
+  `auto`), whatever your rules say; a `yolo` run asks nothing at all — those steps it does, and each step's record keeps
+  the reason it would have asked for — and what the other modes refuse, a read of your secrets or data sent out, it does
+  as well. See [Autonomy](docs/autonomy.md).
 - **What leaves this Mac.** There is no telemetry; the desktop app asks GitHub for its latest version and, on your
   yes, downloads it from there. The models get the run's conversation, and the sites, search engines and services a run
   uses get what it sends them. See [What leaves this Mac](docs/safety.md#what-leaves-this-mac).

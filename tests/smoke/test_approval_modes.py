@@ -246,39 +246,31 @@ async def test_yolo_also_waives_the_question_that_untrusted_content_raises(room:
     }
 
 
-async def test_yolo_leaves_money_and_messages_to_the_user_and_reads_a_secret_without_asking(room: Room) -> None:
-    """The guard no rule turns off (item 429): in yolo too, money is handed to the user and a message sent for them
-    waits for their yes, even in a step that also reads a secret. A secret store read, which every other mode refuses,
-    goes ahead without a question and is recorded (item 433)."""
+async def test_a_yolo_run_asks_nothing_at_all_and_the_record_says_what_it_would_have_asked(room: Room) -> None:
+    """Item 443, the owner's word of 2026-10-20: a yolo run asks nothing — money, a message or a post in their name
+    and a secret store read alike — and each step's record keeps the reason it would have asked for."""
     with pytest.raises(PolicyDenied):
         await asyncio.wait_for(_gate(room, "task", "aggressive", "ask", _nobody).authorize(SECRET), WAIT_S)
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
-    paying: Question = await _ask(room, gate, PAYMENT)
-    assert paying.record.severity == "handoff"
-    await room.broker.resolve(paying.record.id, True, "user", "paid it myself")
-    with pytest.raises(HandedOff):
-        await asyncio.wait_for(paying.answer, WAIT_S)
-    assert await asyncio.wait_for(gate.authorize(SECRET), WAIT_S) == ""
     mailing: ActionInfo = MESSAGE.model_copy(update={"flags": ("secret_access", "external_send", "message_send")})
-    sending: Question = await _ask(room, gate, mailing)
-    assert "Dot asks you before a message or a post in your name" in sending.record.summary
-    await room.broker.resolve(sending.record.id, True, "user", "send it")
-    assert await asyncio.wait_for(sending.answer, WAIT_S) == "send it"
+    for action in (PAYMENT, mailing, SECRET):
+        assert await asyncio.wait_for(gate.authorize(action), WAIT_S) == "", action.summary
     waived: list[ApprovalRecord] = [record for record in await _decided(room) if record.decided_by == YOLO_DECIDER]
-    assert [(record.summary, record.note) for record in waived] == [
-        (SECRET.summary, "every mode but yolo refuses this (secret_access)")
-    ]
+    notes: dict[str, str] = {record.summary: record.note for record in waived}
+    assert set(notes) == {PAYMENT.summary, mailing.summary, SECRET.summary}, notes
+    assert notes[PAYMENT.summary].startswith("financial actions are handed to the user"), notes
+    assert "Dot asks before a message or a post in your name" in notes[mailing.summary], notes
+    assert notes[SECRET.summary] == "every mode but yolo refuses this (secret_access)", notes
     assert "approval_auto" in await _kinds(room)
 
 
-async def test_in_yolo_the_hand_off_of_money_holds_in_a_step_that_reads_a_secret(room: Room) -> None:
+async def test_in_yolo_money_is_the_runs_even_in_a_step_that_reads_a_secret(room: Room) -> None:
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
     paying: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "financial")})
-    handed: Question = await _ask(room, gate, paying)
-    assert handed.record.severity == "handoff"
-    await room.broker.resolve(handed.record.id, False, "user", "")
-    with pytest.raises(ApprovalRejected):
-        await asyncio.wait_for(handed.answer, WAIT_S)
+    assert await asyncio.wait_for(gate.authorize(paying), WAIT_S) == ""
+    waived: list[ApprovalRecord] = [record for record in await _decided(room) if record.decided_by == YOLO_DECIDER]
+    assert [record.summary for record in waived] == [paying.summary]
+    assert "handed to the user" in waived[0].note
 
 
 async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Room) -> None:
@@ -288,29 +280,33 @@ async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Roo
     assert "whatever your rules say" in question.record.summary
     await room.broker.resolve(question.record.id, True, "user", "send it")
     assert await asyncio.wait_for(question.answer, WAIT_S) == "send it"
-    # A rule that hands the message to the user is stricter, and it holds.
+    # A rule that hands the message to the user is stricter, and it holds where the modes ask.
     await room.store.add_rule("handoff", "apple_script", "reply", "Replies are mine")
     for rule in await room.store.list_rules():
         if rule.description == "Mail is fine":
             await room.store.delete_rule(rule.id)
-    handed: Question = await _ask(room, _gate(room, "task", "aggressive", "yolo", _nobody), MESSAGE)
+    handed: Question = await _ask(room, _gate(room, "task", "aggressive", "ask", _nobody), MESSAGE)
     assert handed.record.severity == "handoff" and handed.record.summary.endswith("Replies are mine")
     await room.broker.resolve(handed.record.id, True, "user", "sent it myself")
     with pytest.raises(HandedOff):
         await asyncio.wait_for(handed.answer, WAIT_S)
+    # A yolo run asks nothing, the owner's own hand-off among them (item 443).
+    assert await asyncio.wait_for(_gate(room, "task", "aggressive", "yolo", _nobody).authorize(MESSAGE), WAIT_S) == ""
 
 
-async def test_a_hand_off_rule_of_the_user_still_stops_a_yolo_run(room: Room) -> None:
-    # Money is handed off in yolo anyway (item 429): a rule of the user's hands off what the guard leaves to the run.
+async def test_a_hand_off_rule_of_the_user_stops_a_run_that_asks_and_is_waived_in_yolo(room: Room) -> None:
     await room.store.add_rule("handoff", "schedule_create", "", "Schedules are mine")
-    gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
-    question: Question = await _ask(room, gate, SCHEDULE)
-    assert question.record.summary == f"{SCHEDULE.summary} — Schedules are mine"
-    await room.broker.resolve(question.record.id, True, "user", "saved it myself")
+    asked: Question = await _ask(room, _gate(room, "task", "aggressive", "ask", _nobody), SCHEDULE)
+    assert asked.record.summary == f"{SCHEDULE.summary} — Schedules are mine"
+    await room.broker.resolve(asked.record.id, True, "user", "saved it myself")
     with pytest.raises(HandedOff):
-        await asyncio.wait_for(question.answer, WAIT_S)
-    # What no rule hands off and the guard does not hold still goes through.
+        await asyncio.wait_for(asked.answer, WAIT_S)
+    # A yolo run asks nothing (item 443): the rule's hand-off is recorded with the step and the step goes on.
+    gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
+    assert await asyncio.wait_for(gate.authorize(SCHEDULE), WAIT_S) == ""
     assert await asyncio.wait_for(gate.authorize(WRITE), WAIT_S) == ""
+    waived: list[ApprovalRecord] = [record for record in await _decided(room) if record.decided_by == YOLO_DECIDER]
+    assert [record.summary for record in waived] == [SCHEDULE.summary]
 
 
 async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_against_the_day(room: Room) -> None:
@@ -340,7 +336,8 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
     await room.broker.resolve(over.record.id, True, "user", "paid it myself")
     with pytest.raises(HandedOff):
         await asyncio.wait_for(over.answer, WAIT_S)
-    # A yolo run asks within the caps as an ask run does, and hands a payment no cap covers to the user (item 429).
+    # A yolo run asks nothing (item 443): a payment within the caps and one no cap covers both go through, and each
+    # counts against the day as any other does.
     yolo: RunGate = RunGate(
         room.store,
         room.bus,
@@ -355,17 +352,17 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
         (),
         SiteLocks(),
     )
-    capped: Question = await _ask(room, yolo, PAID.model_copy(update={"amount": Amount(value=5.0, currency="EUR")}))
-    assert capped.record.severity == "high"
-    await room.broker.resolve(capped.record.id, True, "user", "fine")
-    assert await asyncio.wait_for(capped.answer, WAIT_S) == "fine"
+    within: ActionInfo = PAID.model_copy(update={"amount": Amount(value=5.0, currency="EUR")})
+    assert await asyncio.wait_for(yolo.authorize(within), WAIT_S) == ""
     assert await room.store.spent_since("shop.example", 0.0) == 17.0
-    uncapped: Question = await _ask(room, yolo, PAYMENT)
-    assert uncapped.record.severity == "handoff"
-    await room.broker.resolve(uncapped.record.id, False, "user", "")
-    with pytest.raises(ApprovalRejected):
-        await asyncio.wait_for(uncapped.answer, WAIT_S)
-    assert await room.store.spent_since("shop.example", 0.0) == 17.0
+    # A payment past the caps is the one the hand-off held: a yolo run makes it, and what it spends counts against the
+    # site's day as any other payment's does, so a later run of a mode that asks meets the true total (item 443).
+    over: ActionInfo = PAID.model_copy(update={"amount": Amount(value=40.0, currency="EUR")})
+    assert await asyncio.wait_for(yolo.authorize(over), WAIT_S) == ""
+    assert await room.store.spent_since("shop.example", 0.0) == 57.0
+    waived: list[ApprovalRecord] = [record for record in await _decided(room) if record.decided_by == YOLO_DECIDER]
+    assert [record.summary for record in waived] == [within.summary, over.summary]
+    assert all(record.note for record in waived)
 
 
 async def test_a_capped_payment_that_also_posts_asks_and_still_counts_against_the_day(room: Room) -> None:
@@ -387,7 +384,7 @@ async def test_a_capped_payment_that_also_posts_asks_and_still_counts_against_th
     )
     sharing: ActionInfo = PAID.model_copy(update={"flags": ("financial", "public_post")})
     question: Question = await _ask(room, gate, sharing)
-    assert "Dot asks you before a message or a post in your name" in question.record.summary
+    assert "Dot asks before a message or a post in your name" in question.record.summary
     await room.broker.resolve(question.record.id, True, "user", "fine")
     assert await asyncio.wait_for(question.answer, WAIT_S) == "fine"
     assert await room.store.spent_since("shop.example", 0.0) == 12.0
@@ -461,20 +458,14 @@ async def test_two_runs_cannot_both_take_the_last_public_action_of_the_day_on_a_
         )
         for _ in range(2)
     ]
-    # A post waits for the user's yes in yolo too (item 429): the run that takes the last post of the day asks, and the
-    # other is refused by the pace without a question.
-    async with room.bus.subscribe(room.run.id) as events, asyncio.timeout(WAIT_S):
-        tasks: list[asyncio.Task[str]] = [asyncio.create_task(gate.authorize(POST)) for gate in gates]
-        event: EventRecord = await events.queue.get()
-        while event.kind != "approval_requested":
-            event = await events.queue.get()
-        approval_id: object = event.data["approval_id"]
-        assert isinstance(approval_id, str)
-        await room.broker.resolve(approval_id, True, "user", "post it")
-        outcomes: list[str | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
+    # A yolo run asks nothing (item 443): the two runs race for the last public action of the day, and the site's pace
+    # lets one of them take it and refuses the other.
+    outcomes: list[str | BaseException] = await asyncio.gather(
+        *(gate.authorize(POST) for gate in gates), return_exceptions=True
+    )
     assert sorted(outcome if isinstance(outcome, str) else type(outcome).__name__ for outcome in outcomes) == [
+        "",
         "PolicyDenied",
-        "post it",
     ]
     assert len(await room.store.paced_times("social.example", "public", 0.0)) == 1
 

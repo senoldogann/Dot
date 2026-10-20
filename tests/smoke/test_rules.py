@@ -299,9 +299,10 @@ async def test_an_approval_card_offers_to_make_a_rule_of_its_action(
 async def test_a_card_the_guard_raised_offers_no_rule_and_says_why(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
-    """A message sent for the user waits for their yes in every mode, yolo too, whatever their rules say (item 429): its
+    """A message sent for the user waits for their yes in every mode that asks, whatever their rules say (item 429): its
     card, in the chat, offers no rule, which would never apply, and says so; on a desktop and on a phone. The card is
-    refused at the end, so nothing is sent."""
+    refused at the end, so nothing is sent. (A yolo run asks nothing at all, item 443, so the card is of a mode that
+    asks.)"""
     MODEL.script = ScriptedProvider(
         _PROVIDER,
         [
@@ -319,12 +320,12 @@ async def test_a_card_the_guard_raised_offers_no_rule_and_says_why(
         None,
         "standard",
         None,
-        "yolo",
+        "ask",
         False,
         (),
     )
     asked: ApprovalRecord = await _pending(runtime, run.id)
-    assert "Dot asks you before a message or a post in your name" in asked.summary, asked
+    assert "Dot asks before a message or a post in your name" in asked.summary, asked
     host, port = _address(client)
     try:
         async with async_playwright() as playwright:

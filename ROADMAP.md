@@ -15977,6 +15977,29 @@ to 441 left open, gathered in one place to come back to; each point names where 
 - The plugin page loads slowly under load (`test_phone_lists` waited past 5 s before item 437 made it wait for its
   state).
 
+### 443. In yolo nothing is asked: the agent does what it can itself
+
+**Status: done (2026-10-20).** The owner's word of 2026-10-20, with two screenshots of a yolo run: Dot stopped to ask
+them to type a one-time code it had already read from the mail, and a `browser_click` on "Send" waited for their yes
+"in every mode, whatever your rules say". A yolo run is theirs to be done with: "eğer yapabileceği bir şey ise bana
+sormasın, ayrıca izin de istemesin" — if it can do it, it does not ask, and it does not ask for permission.
+**As built.** In the approval mode `yolo` nothing is asked (`agent/gate.py`): every layer below it — the always-on
+review, Dot's own files, the guard of money and credentials and of a message or a post in the owner's name, a
+pre-approved spend, a rule of the owner's that hands a step off — is waived, and the action's record keeps the reason it
+would have asked for (`_waive`, one `approval_auto` row per step). A refusal is not a question and stands: a `research`
+run's limit still refuses. (A rule of the owner's cannot refuse one — its behaviours are allow, preapproved, ask and
+hand off — and the hand-off a rule asks for is waived with the rest.) The secret-field rule follows: the browser's batch, the
+desktop's step and `terminal_send` type a password, a one-time code or a card's details themselves in a yolo run
+(`desktop.actions.enter_secure_field`), where every other mode still refuses them and hands the field to the owner (item
+429). The prompt says the same in the two lines a yolo run reads differently: the approvals line ("nothing waits for the
+user … do what was asked yourself") and the rule of trust and safety about a field that takes a secret (a code it can
+read or a password it was given, it types itself). `mode_gate`, the sandbox and everything else are as they were.
+Tests: `tests/unit/test_guard.py`, `test_run_modes.py`, `test_rule_answers.py`, `test_supervised_and_own_files.py`,
+`tests/smoke/test_approval_modes.py` (nothing asked for money, a message, a secret read, a capped payment; the record
+says what it would have asked), `test_site_locks.py` (the two runs race for the day's last public action instead of
+asking), `test_terminal.py` (the password is typed in yolo and refused where the modes ask). Docs: `docs/autonomy.md`,
+`docs/safety.md`, `defaults.toml`, the `--help` of the CLI and the approvals card.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16925,3 +16948,6 @@ to 441 left open, gathered in one place to come back to; each point names where 
   run works, after a run's `launchctl submit` restarted the daemon every 30 s while it was idle; the job was removed.
 - 2026-10-20 (Opus 5.5): item 442 planned on the owner's word, on `item-442-open-points` from `main`: the open points of
   items 433 to 441 in one list, for later.
+- 2026-10-20 (Opus 5.5): item 443: in yolo the agent asks nothing — money, a password or a one-time code, a message or
+  a post in the owner's name, a capped payment, Dot's own files and the always-on review are waived with the reason
+  recorded, and only a refusal (a research run's) stands; the secret fields it can fill it fills itself.

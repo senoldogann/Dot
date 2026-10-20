@@ -69,7 +69,7 @@ def _prompt(style: PromptStyle, approvals: ApprovalMode) -> str:
 
 @pytest.mark.parametrize(
     ("approvals", "secrets"),
-    [("ask", "are never typed by you"), ("yolo", "are never typed by you")],
+    [("ask", "are never typed by you"), ("yolo", "you type in yourself")],
 )
 def test_the_lean_prompt_keeps_every_rule_of_trust_and_safety_and_how_a_run_ends(
     approvals: ApprovalMode, secrets: str
