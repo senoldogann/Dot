@@ -181,8 +181,8 @@ missing command or secret. It is tried again when Dot starts again; `enabled = f
 servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`. MCP results are
 untrusted content, and the stderr of a stdio server goes to `<logs>/mcp-<name>.log`. A tool whose name's first verb
 sends or posts (`send_email`, `slack_post_message`, `reply_to_thread`, `create_post`) is a message for you whatever its
-server declares (`external_send` and `message_send`): it waits for your yes in every mode, and no rule of yours turns
-that off (item 429). Any other tool that its server declares read-only (`readOnlyHint`) is taken at its word and runs
+server declares (`external_send` and `message_send`): it waits for your yes in every mode that asks, and no rule of
+yours turns that off (item 429); a `yolo` run asks nothing and sends it, its record keeping the reason (item 443). Any other tool that its server declares read-only (`readOnlyHint`) is taken at its word and runs
 as a read, with no flag; any other counts as one that may change things (`destructive`) and send to the world
 (`external_send`), unless its server says it does not.
 

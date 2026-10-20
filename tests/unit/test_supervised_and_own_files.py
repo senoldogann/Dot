@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.policy.engine import YOLO_WAIVED_SOURCES, decide, route_for, supervised
+from dotagent.policy.engine import decide, route_for, supervised
 from dotagent.policy.paths import CHANGES_DOT
 from dotagent.policy.types import ActionInfo, ActionKind, ApprovalMode, Decision, Flag, Risk
 from dotagent.store.models import Behavior, RuleRecord
@@ -45,7 +45,7 @@ def test_a_change_of_dots_own_files_asks_the_user_in_every_mode_but_yolo(tmp_pat
     ruled: Decision = decide(write, "task", False, "aggressive", [_rule("edit_file", "allow")], None)
     assert ruled.source == "own_files"
     # Yolo waives it, as it waived the refusal before; a research run still writes nothing.
-    assert "own_files" in YOLO_WAIVED_SOURCES
+    assert route_for(decision, "yolo") == "waived"
     assert decide(write, "research", False, "aggressive", [], None).verdict == "deny"
     # Reading Dot's own files is a read like any other.
     read: ActionInfo = read_action("read_file", path, workspace, (), (own,), "Read")

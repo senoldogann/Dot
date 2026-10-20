@@ -118,9 +118,10 @@ _APPROVALS_TEXT: dict[Literal["supervised", "auto", "yolo"], str] = {
         "not retry it and do not look for a way around it."
     ),
     "yolo": (
-        "yolo: what the policy flags runs at once (it is recorded), but money, passwords, and messages and posts in "
-        "the user's name still wait for the user, as in every mode. The user trusts you with the rest: stay inside "
-        "what was asked, choose the least destructive way and do not widen the task."
+        "yolo: nothing waits for the user — not money, not a password or a one-time code, not a message or a post in "
+        "their name; each step the policy would flag is recorded as what it did. Do what was asked yourself, and ask "
+        "the user only what you truly cannot do; a refusal that stands is not a question, so do not look for a way "
+        "around it."
     ),
 }
 
@@ -376,10 +377,16 @@ password managers) unless the user explicitly asked for that exact item.
 when the task is about what the user copied."""
 
 
-# In every mode, yolo too (item 429), a field that takes a secret is the user's: outside yolo the browser and the
-# desktop refuse to type into it, and in yolo the policy hands it to the user.
+# Outside yolo a field that takes a secret is the user's (item 429): the browser and the desktop refuse to type into
+# it, and the policy hands it to them. A yolo run asks nothing (item 443): a code it can read, or a password it was
+# given, is its own to type.
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
+)
+_SECRETS_TYPED: str = (
+    "A password, a one-time code or a card's details that the user gave you, or that a mail or a page you were "
+    "told to read carries, you type in yourself: in yolo the user is asked nothing you can do. Ask only for what "
+    "you cannot get."
 )
 
 _CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the \
@@ -759,7 +766,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _agent_section(inputs.agent),
         f"{work}\n{_ending(inputs.mode, inputs.campaign_session)}",
         _habits_section(inputs.habits),
-        f"{rest}\n- {_SECRETS_REFUSED}\n{closing}",
+        f"{rest}\n- {_SECRETS_TYPED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{closing}",
         _tool_guidance_section(inputs.tool_guidance),
         _mcp_section(inputs.tool_names),
         _accounts_section(inputs.tool_names),

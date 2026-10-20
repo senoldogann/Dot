@@ -23,7 +23,7 @@ from dotagent.core.errors import ToolInputError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import RunRecord, ThreadRecord
+from dotagent.store.models import EventRecord, RunRecord, ThreadRecord
 from dotagent.terminal.session import Terminals, TerminalSession, ended_notices
 from dotagent.tools.base import PreparedCall
 from dotagent.tools.context import ToolContext
@@ -145,8 +145,9 @@ async def test_a_repl_answers_what_is_typed_and_its_session_closes_when_it_ends(
         runtime.terminals.get(ctx.thread_id, session)
 
 
-async def test_a_password_prompt_is_refused_in_every_mode_and_the_secret_shows_nowhere(runtime: Runtime) -> None:
-    # Credentials are the user's in every mode, yolo too (item 429): nobody else can type into the session.
+async def test_a_password_prompt_is_the_run_s_in_yolo_and_refused_where_the_modes_ask(runtime: Runtime) -> None:
+    """Outside yolo credentials are the user's (item 429) and nobody else can type into the session; a yolo run asks
+    nothing (item 443) and types the password itself."""
     ctx: ToolContext = await _yolo_context(runtime)
     _, opened = await _call(
         ctx, "terminal_open", {"command": 'read -s "pw?Password: "; echo; echo "got ${#pw} characters"'}
@@ -154,14 +155,34 @@ async def test_a_password_prompt_is_refused_in_every_mode_and_the_secret_shows_n
     session: str = _session(opened)
     typing: JsonObject = {"session": session, "text": f"{SECRET}\n"}
     assert "Password:" in opened, opened
-    for approvals in ("ask", "yolo"):
-        with pytest.raises(
-            ToolInputError, match="asks for a password, and Dot never types one into a terminal"
-        ) as refused:
-            await runtime.registry.tools["terminal_send"].prepare(typing, dataclasses.replace(ctx, approvals=approvals))
-        assert SECRET not in str(refused.value)
-    assert await runtime.store.events_of_kind(ctx.run_id, "approval_auto", 10) == []
-    await _call(ctx, "terminal_close", {"session": session})
+    with pytest.raises(
+        ToolInputError, match="asks for a password, and this run does not type one into a terminal"
+    ) as refused:
+        await runtime.registry.tools["terminal_send"].prepare(typing, dataclasses.replace(ctx, approvals="ask"))
+    assert SECRET not in str(refused.value)
+    # Nothing of the password is in what the step is called by, which the events and any record of a waived step carry.
+    prepared: PreparedCall = await runtime.registry.tools["terminal_send"].prepare(typing, ctx)
+    assert prepared.action.summary == f"Type into {session}: a password", prepared.action.summary
+    assert SECRET not in prepared.action.summary
+    # One line is the password; a second line would be a command the step never assessed, and a yolo run refuses it.
+    for second in ("\nrm -rf /tmp/nothing-here\n", "\rrm -rf /tmp/nothing-here\r"):
+        with pytest.raises(ToolInputError, match="a line is all this step types"):
+            await runtime.registry.tools["terminal_send"].prepare(
+                {"session": session, "text": f"{SECRET}{second}"}, ctx
+            )
+    # In yolo the same line goes in, and the program answers with the length of what it read.
+    _, typed = await _call(ctx, "terminal_send", typing)
+    assert f"got {len(SECRET)} characters" in typed, typed
+    assert SECRET not in typed
+    # The step is waived with the reason it would have asked for, as the browser's secret fields are (item 443).
+    waived: list[EventRecord] = await runtime.store.events_of_kind(ctx.run_id, "approval_auto", 10)
+    assert [(event.data["decided_by"], event.data["note"]) for event in waived] == [
+        ("yolo", f"credential actions are handed to the user: Type into {session}: a password")
+    ]
+    # The program read the line and ended with it: the session closed itself, as an ended program's does; the close is
+    # for the one time it had not.
+    with contextlib.suppress(ToolInputError):
+        await _call(ctx, "terminal_close", {"session": session})
 
 
 async def test_a_server_stays_up_between_calls_and_stops_with_its_session(runtime: Runtime, tmp_path: Path) -> None:

@@ -68,12 +68,17 @@ type SecureFieldCheck = Callable[[Inspection, str], None]
 
 
 def refuse_secure_field(inspection: Inspection, what: str) -> None:
-    """The secure-field check of every mode, yolo too (item 429): nothing goes into a secure text field."""
+    """The secure-field check of every mode but yolo (item 429): nothing goes into a secure text field."""
     raise DesktopError(
-        f"{what} into a secure text field is refused: Dot never enters passwords or codes. "
-        "Ask the user to type it themselves",
+        f"{what} into a secure text field is refused in this mode: a password or a code is the user's here. "
+        "Ask the user to type it themselves, or go on without it",
         {"target": inspection.target},
     )
+
+
+def enter_secure_field(_inspection: Inspection, _what: str) -> None:
+    """The check a yolo run keeps at a secure text field (item 443): the text goes in. A yolo run asks nothing, and a
+    password or a code it was given — or read from the mail that carried it — is the run's to type."""
 
 
 @dataclass(frozen=True, slots=True)

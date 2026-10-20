@@ -154,17 +154,9 @@ async def _act(ctx: ToolContext, steps: list[JsonObject]) -> PreparedCall:
 
 
 async def _answered(ctx: ToolContext, steps: list[JsonObject]) -> PreparedCall:
-    """``browser_act`` through the gate, the user saying yes to the post: a post in their name is theirs in yolo too
-    (item 429)."""
-    async with ctx.runtime.bus.subscribe(ctx.run_id) as events, asyncio.timeout(_ANSWER_WITHIN_S):
-        acting: asyncio.Task[PreparedCall] = asyncio.create_task(_act(ctx, steps))
-        event: EventRecord = await events.queue.get()
-        while event.kind != "approval_requested":
-            event = await events.queue.get()
-        approval_id: object = event.data["approval_id"]
-        assert isinstance(approval_id, str)
-        await ctx.runtime.approvals.resolve(approval_id, True, "user", "")
-        return await acting
+    """``browser_act`` through the gate: in yolo the post in the user's name is the run's to make, and nothing is asked
+    (item 443) — only the site's pace has a word on it."""
+    return await _act(ctx, steps)
 
 
 async def test_public_actions_are_spaced_and_stop_at_the_limit_in_yolo_and_a_follow_is_counted_apart(
@@ -188,12 +180,8 @@ async def test_public_actions_are_spaced_and_stop_at_the_limit_in_yolo_and_a_fol
     # The second repost was let through a spacing after the first; the event loop may wake a hair early.
     assert len(public) == 2 and public[1] - public[0] >= SPACING_S - 0.01, public
     assert refused.value.message.startswith("Pace for 127.0.0.1: 2 of 2 public actions in the last hour"), refused.value
-    # Each repost asked the user (item 429); the pace refused the third before any question.
-    assert [(event.data["verdict"], event.data["source"]) for event in events] == [
-        ("ask", "guard"),
-        ("ask", "guard"),
-        ("deny", "pace"),
-    ]
+    # A yolo run asks nothing (item 443), so the pace alone refuses the third.
+    assert [(event.data["verdict"], event.data["source"]) for event in events] == [("deny", "pace")]
     assert (followed.action.risk, followed.action.flags) == ("low", ("social",))
     assert await runtime.store.paced_times("127.0.0.1", "social", 0.0) != []
 

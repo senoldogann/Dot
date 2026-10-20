@@ -144,7 +144,8 @@ max_concurrent = 4
 # campaign's claim of its targets hold, or a run's answer in goal mode reach its goal? Below target_threshold the claim
 # is refused before the goal checker is asked. And when a browser_act names what it expects to see (expect), the result
 # opens with the probability that the page shows it and that it is a login wall, a CAPTCHA or an error page. The click
-# questions are asked in every mode, yolo too, where a payment, a message or a post they find is yours as well
+# questions are asked in every mode, a yolo run's included (it pays the judge for each click as any other mode does):
+# the payment, message or post they find is the run's to make in yolo (item 443), and the user's where the modes ask
 # (item 429).
 # "none" leaves both to the patterns and the goal checker; "typesafe" asks TypeSafe's System One API, a paid service:
 # one request per judged click or claim, bounded by timeout_s. A missing key or a failed request leaves the decisions
@@ -358,10 +359,12 @@ preset = "aggressive"
 # = you, while edits and routine work run (the web UI calls it Auto-accept edits); "auto" = the review model decides
 # and passes on what it cannot decide; "yolo" = nobody is asked, the action is allowed and recorded. In every mode but
 # yolo a change of Dot's own files (its code, plugins, skills, playbooks, emergency stop) asks you, never the review
-# model, and secrets and exfiltration are refused (yolo lets them through without asking, item 433). In every mode,
-# yolo too, money and credentials are handed to you, a message or a post in your name waits for your yes (the review
-# model answers it in auto), and Dot never types into a password, one-time-code or card field. A research run stays
-# read-only, your own hand-off rules still stop a run, and the desktop tools never control a password manager.
+# model, and secrets and exfiltration are refused (yolo lets them through without asking, item 433). In every mode
+# that asks, money and credentials are handed to you, a message or a post in your name waits for your yes (the review
+# model answers it in auto), and Dot types into no password, one-time-code or card field. A yolo run asks nothing at
+# all (item 443): those steps it does, records what it would have asked, and types the code it can read or the password
+# it was given. A research run stays read-only, the desktop tools never control a password manager, and the pace of a
+# site holds (a rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off).
 approvals = "ask"
 approval_timeout_s = 900.0
 protected_paths = [
