@@ -293,7 +293,16 @@ the agent's); another owner's skill of the same name keeps its folder, and the n
 (`learned-<kind>-2`). Later runs see it under Skills like any skill (its source is `learned`) with a note that it is
 advice from Dot's own work, to follow with their own parameters and judgement, and read it with the `skill` tool. Every
 run that ended done or failed counts the learned skills it read; one read by two runs in a row that then failed (none
-ended done between them) is retired, moved under `<home>/playbooks/.retired`, and no longer offered. A review model that
+ended done between them) is retired, moved under `<home>/playbooks/.retired`, and no longer offered.
+
+A skill whose name starts with `taught-` is one the owner showed Dot once (item 423, Teach a task in the composer):
+they did the task in a tab, the review model wrote its steps from what they did and from their words, and they read
+the draft and saved it or threw it away. It stands behind no run, so its record says `taught` and no failure retires
+it: whether it still fits is the owner's to say, and a run of its kind writes a `learned-` skill of its own rather
+than rewriting theirs. Its trust is the owner's reading of that draft and nothing else: the steps a page put in front
+of them (a link's text, a label, a page's own call of the recorder's binding) are in the draft they approved, so a page
+that lies reads as a strange step in the panel, not as something withheld later. It holds no value typed into a field,
+and no secret field's name, which the recorder leaves out before the draft is written. A review model that
 fails, or a folder that cannot be written, leaves a `playbook_failed` event on the run; a written or updated one a
 `playbook_written` event and a retired one a `playbook_retired` event. A run that read content third parties can author
 (a web page, a message, a result of an MCP server) is distilled from its own steps alone: the model sees each call and

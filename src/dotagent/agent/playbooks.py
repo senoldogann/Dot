@@ -83,9 +83,12 @@ if TYPE_CHECKING:
 log = get_logger(__name__)
 
 PLAYBOOK_PREFIX: str = "learned-"
+# The prefix of a skill the owner taught by showing the task once (item 423): it is Dot's to offer and read, and the
+# owner's to keep.
+TAUGHT_PREFIX: str = "taught-"
 # The prefix of the folders written before item 92, which a run may still read.
 _OLD_PREFIX: str = "playbook-"
-_FOLDER_NAME: re.Pattern[str] = re.compile(r"(?:learned|playbook)-[a-z0-9-]*")
+_FOLDER_NAME: re.Pattern[str] = re.compile(r"(?:learned|taught|playbook)-[a-z0-9-]*")
 META_FILE: str = "playbook.json"
 RETIRED_DIR: str = ".retired"
 _LOCK_FILE: str = ".lock"
@@ -197,6 +200,9 @@ class Playbook(FrozenModel):
     written_at: float
     acting_steps: int
     tainted: bool
+    # A skill the owner taught by showing the task once (item 423) rather than one Dot learned from its own work: its
+    # own header, no run behind it, and never retired for failures.
+    taught: bool = False
 
 
 class PlaybookMeta(FrozenModel):
@@ -224,6 +230,9 @@ class PlaybookMeta(FrozenModel):
     failing: int = 0
     tainted: bool | None = None
     tainted_runs: tuple[str, ...] = ()
+    # A skill the owner taught (item 423): trusted as they showed it, and never retired for the runs that failed with
+    # it, which is the owner's to decide.
+    taught: bool = False
 
 
 class PlaybookEntry(FrozenModel):
@@ -238,6 +247,11 @@ def slug(text: str) -> str:
     """The folder part of a skill's name for ``text`` (the kind of work): lower-case letters and digits with single
     hyphens between, at most :data:`_SLUG_CHARS` long, empty when the text has none."""
     return _UNSAFE.sub("-", text.lower()).strip("-")[:_SLUG_CHARS].strip("-")
+
+
+def taught_name(kind: str) -> str:
+    """The folder of a skill taught from a recording of ``kind`` (item 423)."""
+    return f"{TAUGHT_PREFIX}{slug(kind)}"
 
 
 def playbook_name(kind: str) -> str:
@@ -345,7 +359,7 @@ def used_playbooks(events: Sequence[EventRecord]) -> tuple[str, ...]:
             continue
         arguments: JsonValue = event.data.get("args")
         name: JsonValue = arguments.get("name") if isinstance(arguments, dict) else None
-        if isinstance(name, str) and name.startswith((PLAYBOOK_PREFIX, _OLD_PREFIX)):
+        if isinstance(name, str) and name.startswith((PLAYBOOK_PREFIX, TAUGHT_PREFIX, _OLD_PREFIX)):
             names[name] = None
     return tuple(names)
 
@@ -375,10 +389,23 @@ def render_playbook(playbook: Playbook, earlier: PlaybookMeta | None) -> str:
     when: str = " ".join(draft.when.split())
     steps: str = "\n".join(f"{number}. {' '.join(step.split())}" for number, step in enumerate(draft.steps, start=1))
     parameters: str = "\n".join(f"- {' '.join(parameter.split())}" for parameter in draft.parameters) or "- none"
+    where: str = f" on {playbook.host}" if playbook.host != NO_SITE else ""
+    if playbook.taught:
+        # A skill the owner taught (item 423): its own header, no run behind it, and the same sections a run reads.
+        return (
+            f"---\n{_frontmatter(playbook.name, description)}---\n\n"
+            f"# {playbook.name}\n\n"
+            f"Taught by the owner on {_date(playbook.written_at)}, showing the task once in Dot's browser{where}: the "
+            "steps they took, written down so that a later run can do it again. It is the owner's own instruction to "
+            "Dot, not advice learned from a run.\n\n"
+            f"## Kind of work\n\n{kind}\n\n"
+            f"## When\n\n{when}\n\n"
+            f"## Steps\n\n{steps}\n\n"
+            f"## Parameters\n\n{parameters}\n"
+        )
     runs: list[str] = [*(earlier.runs if earlier is not None else ()), playbook.run_id]
     counts: list[int] = [*(earlier.acting_steps if earlier is not None else ()), playbook.acting_steps]
     evidence: str = "\n".join(f"- Run {run}: {count} acting steps" for run, count in zip(runs, counts, strict=True))
-    where: str = f" on {playbook.host}" if playbook.host != NO_SITE else ""
     return (
         f"---\n{_frontmatter(playbook.name, description)}---\n\n"
         f"# {playbook.name}\n\n"
@@ -399,6 +426,25 @@ def meta_of(playbook: Playbook, earlier: PlaybookMeta | None) -> PlaybookMeta:
     the kind and the counts kept). The steps are the run's alone either way, and so is the mark of content third
     parties can author (``tainted``): a run of the kind that read none clears it."""
     tainted_runs: tuple[str, ...] = (playbook.run_id,) if playbook.tainted else ()
+    if playbook.taught:
+        # The owner showed it, so no run stands behind it and nothing of it is withheld: it is trusted as they gave it.
+        return PlaybookMeta(
+            name=playbook.name,
+            kind=playbook.kind,
+            host=playbook.host,
+            runs=(),
+            acting_steps=(),
+            written_at=playbook.written_at,
+            updated_at=playbook.written_at,
+            uses=0,
+            failures=0,
+            agent_id=playbook.agent_id,
+            shared=False,
+            failing=0,
+            tainted=False,
+            tainted_runs=(),
+            taught=True,
+        )
     if earlier is None:
         return PlaybookMeta(
             name=playbook.name,
@@ -436,8 +482,9 @@ def recorded(meta: PlaybookMeta, succeeded: bool) -> PlaybookMeta:
 
 def retires(meta: PlaybookMeta) -> bool:
     """Whether the playbook is retired: :data:`MAX_FAILURES` runs in a row read it and failed, none since ending done
-    (a skill that served forty runs is not retired for two failures among them)."""
-    return meta.failing >= MAX_FAILURES
+    (a skill that served forty runs is not retired for two failures among them). A skill the owner taught is never
+    retired: whether it still fits is theirs to say (item 423)."""
+    return False if meta.taught else meta.failing >= MAX_FAILURES
 
 
 def offered_to(meta: PlaybookMeta, agent_id: str | None) -> bool:
@@ -674,7 +721,7 @@ def _entries(folder: Path, retired: bool) -> list[PlaybookEntry]:
         return entries
     for child in sorted(folder.iterdir()):
         file: Path = child / SKILL_FILE
-        if not child.name.startswith((PLAYBOOK_PREFIX, _OLD_PREFIX)) or not file.is_file():
+        if not child.name.startswith((PLAYBOOK_PREFIX, TAUGHT_PREFIX, _OLD_PREFIX)) or not file.is_file():
             continue
         try:
             skill: Skill = read_skill(file, PLAYBOOK_SOURCE)
@@ -733,8 +780,11 @@ def same_kind(kind: str, entries: Sequence[PlaybookEntry], vectors: Sequence[Vec
 
 def owned(entries: Sequence[PlaybookEntry], agent_id: str | None) -> list[PlaybookEntry]:
     """The active skills a run of ``agent_id`` may update: its owner's own (Dot's for Dot's runs, an agent's for its
-    runs). A skill of another owner, shared or not, is never rewritten by a run that is not its owner's."""
-    return [entry for entry in entries if not entry.retired and entry.meta.agent_id == agent_id]
+    runs). A skill of another owner, shared or not, is never rewritten by a run that is not its owner's, and neither is
+    a skill the owner taught (item 423): a run of its kind learns one of its own."""
+    return [
+        entry for entry in entries if not entry.retired and not entry.meta.taught and entry.meta.agent_id == agent_id
+    ]
 
 
 def kinds_shown(entries: Sequence[PlaybookEntry], host: str) -> tuple[str, ...]:

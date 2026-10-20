@@ -81,6 +81,7 @@ from dotagent.browser.snapshot import (
     squeeze_text,
     viewport_filter,
 )
+from dotagent.browser.teach import TEACH_BINDING, TEACH_SCRIPT, Recording
 from dotagent.browser.types import (
     ActOutcome,
     Attachment,
@@ -100,7 +101,14 @@ from dotagent.browser.types import (
 from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.browser.window import chrome_to_watch, focused_app, front_pid, give_focus_back, return_front
 from dotagent.config import BrowserConfig, ServerConfig
-from dotagent.core.errors import ApprovalRejected, BrowserError, ForbiddenUrlError, HandedOff, PolicyDenied
+from dotagent.core.errors import (
+    ApprovalRejected,
+    BrowserError,
+    ForbiddenUrlError,
+    HandedOff,
+    PolicyDenied,
+    RunConflict,
+)
 from dotagent.core.images import jpeg_of_size
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -452,6 +460,11 @@ class BrowserSession:
         # tellings under way: the connection does not wait for them.
         self._on_reconnect: Callable[[], Awaitable[None]] | None = None
         self._telling: set[asyncio.Task[None]] = set()
+        # The task the owner is showing Dot now (item 423): the one recording of the tab they work in, and the pages
+        # whose recorder's binding and script are already there (a page keeps them across the documents it loads).
+        self._teaching: Recording | None = None
+        self._teach_armed: set[Page] = set()
+        self._teach_lock: asyncio.Lock = asyncio.Lock()
 
     # ------------------------------------------------------------------ lifecycle
 
@@ -1051,6 +1064,10 @@ class BrowserSession:
 
     def _on_page_closed(self, tab: Tab, _page: Page) -> None:
         self._refusals.pop(tab.page, None)
+        self._teach_armed.discard(tab.page)
+        if self._teaching is not None and self._teaching.page is tab.page:
+            # The tab the owner showed the task in is gone: there is nothing more to record.
+            self._teaching = None
         for thread in self._threads.values():
             if tab in thread.tabs:
                 thread.remove(tab)
@@ -1664,6 +1681,84 @@ class BrowserSession:
             return None
         await bring_to_front(tab.page)
         return tab.page.url
+
+    @property
+    def teaching(self) -> Recording | None:
+        """The task the owner is showing Dot now, or ``None`` when nothing is being recorded."""
+        return self._teaching
+
+    async def start_teaching(self, thread_id: str) -> Recording:
+        """Start recording the steps the owner takes in the thread's current tab (item 423): the recorder's script goes
+        into the page, the tab comes to the front, and every step they take there is kept until :meth:`stop_teaching`
+        or the tab closes. A browser without a window refuses: there is nothing for the owner to work in."""
+        if self._config.headless:
+            raise BrowserError(
+                "a task cannot be shown in a browser without a window: [browser] headless is on, so Dot's Chrome has "
+                "none; turn it off in the config file and start the daemon again",
+                {"headless": True},
+            )
+        if thread_id in self._kept():
+            raise RunConflict(
+                "a run is working in this chat now: show the task while none is, so that the steps recorded are "
+                "yours alone",
+                {"thread_id": thread_id},
+            )
+        async with self._teach_lock:
+            if self._teaching is not None:
+                raise RunConflict("a task is being recorded already", {"thread_id": self._teaching.thread_id})
+            async with self._locked(thread_id) as thread:
+                tab: Tab = await self._current_tab(thread)
+                recording: Recording = Recording(thread_id=thread_id, page=tab.page, tab_index=thread.active + 1)
+                # In place before the script goes in: the page it is put into reports itself at once, and a step that
+                # comes before the recording would be dropped.
+                self._teaching = recording
+                try:
+                    await self._arm_teaching(tab.page)
+                except Exception:
+                    # Nothing is recorded, and the next start must not meet a recording that was never one.
+                    self._teaching = None
+                    raise
+                recording.opened(tab.page.url)
+                await bring_to_front(tab.page)
+                return recording
+
+    def stop_teaching(self) -> Recording | None:
+        """End the recording and return it: its steps are what the owner showed. The page keeps the script that reported
+        them, which reports nothing while no recording is on."""
+        recording, self._teaching = self._teaching, None
+        return recording
+
+    async def _arm_teaching(self, page: Page) -> None:
+        """Put the recorder's binding and its script into ``page``, once: the script runs again in every document the
+        tab loads, and the binding outlives them."""
+        if page in self._teach_armed:
+            return
+        await page.expose_binding(TEACH_BINDING, self._taught)
+        # Marked before the script goes in: the binding is in the page now, and a second one would be refused.
+        self._teach_armed.add(page)
+        await page.add_init_script(TEACH_SCRIPT)
+        try:
+            await page.evaluate(TEACH_SCRIPT)
+        except PlaywrightError as error:
+            # The document may still be loading: the script is among the page's init scripts now and runs at its next
+            # load. Steps of this document alone are lost, and the panel shows the first one it gets.
+            _log.warning("teach_script_not_put", url=page.url, error=str(error))
+
+    def _taught(self, source: dict[str, object], payload: str) -> None:
+        """What the recorder in a page reports: a step of the recording, when it is the recorded page and no run works
+        in that chat. A run's own clicks are real ones, and they are not the owner's steps, and neither is anything an
+        iframe says: the binding is in every frame of the page, and a reCAPTCHA's or an advert's words are not the task
+        the owner showed (item 423)."""
+        recording: Recording | None = self._teaching
+        if recording is None:
+            return
+        frame: object | None = source.get("frame")
+        if frame is not None and frame is not recording.page.main_frame:  # type: ignore[attr-defined]
+            return
+        if recording.thread_id in self._kept():
+            _log.warning("teach_step_dropped_run_at_work", thread_id=recording.thread_id)
+            return
+        recording.take(source, payload)
 
     async def screencast(self, thread_id: str) -> AsyncGenerator[Frame | None]:
         """Frames of the thread's current tab as Chrome paints it (``Page.startScreencast``), for as long as the caller

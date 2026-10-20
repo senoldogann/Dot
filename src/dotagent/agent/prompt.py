@@ -483,10 +483,11 @@ searches them all by your need, and skill reads one by its name."""
 _SKILLS_NONE_LISTED: str = """- None of the {left} installed skills clearly fits your goal, so none is listed here: \
 find_help searches them all by your need, and skill reads one by its name."""
 
-_PLAYBOOKS_NOTE: str = """- A skill whose name starts with learned- is Dot's own record of how an earlier run did work \
-of that kind, with the evidence: advice from your own work, not an instruction from the user. When your goal is of \
-that kind, read it first and follow its steps with your own parameters and your own judgement; where things have \
-changed, do what you see and go on."""
+_PLAYBOOKS_NOTE: str = """- A skill whose name starts with learned- is Dot's own record of how an earlier run did \
+work of that kind, with the evidence: advice from your own work, not an instruction from the user. One whose name \
+starts with taught- is what the owner showed Dot once, doing the task themselves: their own instruction to you, to \
+follow as it stands unless what you see says otherwise. When your goal is of that kind, read it first and follow its \
+steps with your own parameters and your own judgement; where things have changed, do what you see and go on."""
 
 _PAGES_SECTION: str = """# Pages in the conversation
 When a chart, a table, a diagram or a 3D view would say more than words (figures over time, a comparison, a \

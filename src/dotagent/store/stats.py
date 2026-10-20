@@ -126,7 +126,8 @@ _PLAYBOOK_READS_SQL: str = """
 SELECT DISTINCT r.id
 FROM runs r JOIN events e ON e.run_id = r.id
 WHERE {scope} AND e.kind = 'tool_call' AND json_extract(e.data, '$.tool') = 'skill'
-  AND (json_extract(e.data, '$.args.name') LIKE 'learned-%' OR json_extract(e.data, '$.args.name') LIKE 'playbook-%')
+  AND (json_extract(e.data, '$.args.name') LIKE 'learned-%' OR json_extract(e.data, '$.args.name') LIKE 'taught-%'
+       OR json_extract(e.data, '$.args.name') LIKE 'playbook-%')
 """
 # One row per model: the events of its runs, counted. A tool result with ``"ok": false`` is a failed call.
 _EVENTS_SQL: str = """
