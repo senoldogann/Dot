@@ -4085,6 +4085,18 @@ a.pill:hover {
   margin-bottom: -4px;
 }
 
+/* A block of code has its copy on a line over its right edge, as a table has (item 439): the code scrolls sideways
+   under it untouched, and on a touch screen the button is as large as the others. */
+.prose .prose-code-bar {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: -4px;
+}
+
+.prose .prose-code {
+  min-width: 0;
+}
+
 /* A tool step is one quiet line with its icon, not a box (item 121); open, its body hangs under it on a hairline. */
 .tool {
   min-width: 0;
@@ -5221,7 +5233,7 @@ a.memory-line:hover .memory-change {
 
 /* Under a block (code, a table, a picture) or with no copy button to stand for the space under the line, the foot
    keeps clear of what is above it. */
-.answer > .prose:has(> :is(pre, table, .table-scroll, figure, img, hr):last-child) + .answer-foot,
+.answer > .prose:has(> :is(pre, table, .table-scroll, .prose-code, .prose-table, figure, img, hr):last-child) + .answer-foot,
 .answer-foot:not(:has(.btn)) {
   margin-top: var(--space-2);
 }

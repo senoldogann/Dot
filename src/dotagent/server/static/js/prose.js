@@ -50,7 +50,14 @@ function cellRow(tag, cells) {
 export function blockNode(block) {
   switch (block.type) {
     case "code":
-      return el("pre", null, el("code", null, block.text));
+      // A block of code has a copy of itself a press away, as a table does (item 439), on a line over its right edge,
+      // so that the code scrolls sideways under it untouched. It copies the text as it was written, not as drawn.
+      return el(
+        "div",
+        { class: "prose-code" },
+        el("div", { class: "prose-code-bar" }, copyButton(block.text, "Copy the code")),
+        el("pre", null, el("code", null, block.text)),
+      );
     case "heading":
       return el(`h${Math.min(block.level + 1, 4)}`, { dataset: { level: String(block.level) } }, inlineNodes(block.inline));
     case "list":

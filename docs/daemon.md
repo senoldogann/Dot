@@ -243,7 +243,8 @@ keeps its markdown (item 206): a selection that starts in a message or an answer
 it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy alongside for the
 applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its
 code. A table in a message or an answer has a copy of its own over its right edge, which takes it as markdown (item
-403). The box stands at the foot of the window from the first message, the conversation filling the space above it from
+403), and so has a block of code, which takes its text as it was written (item 439).
+The box stands at the foot of the window from the first message, the conversation filling the space above it from
 the top, and is the same frame as the home's, with the attach button and the send in its bar; what you typed there and
 did not send waits for you. While the end of the conversation, or its answer, is below the window, a round arrow just
 above the composer leads there; it stays away while the page follows a working run down, as the page does until you

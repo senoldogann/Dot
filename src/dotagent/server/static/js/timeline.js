@@ -110,6 +110,10 @@ const LINE_HOLDERS = new Set(["UL", "OL", "TABLE", "THEAD", "TBODY", "TR"]);
 /** The element the last line of `node` (a `div.prose`) ends in: its last block, or the last item or cell in it. */
 function lastLine(node) {
   let at = node.lastElementChild ?? node;
+  // A block of code is drawn in its own box with a copy bar over it (item 439): the caret is in the code, not after it.
+  if (at.classList.contains("prose-code") && at.lastElementChild !== null) {
+    at = at.lastElementChild;
+  }
   while (LINE_HOLDERS.has(at.tagName) && at.lastElementChild !== null) {
     at = at.lastElementChild;
   }
