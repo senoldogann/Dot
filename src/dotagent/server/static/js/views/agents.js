@@ -7,7 +7,7 @@
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook } from "../actors.js";
 import { api } from "../api.js";
-import { askForWords, readyToSend } from "../attachments.js";
+import { messageText, readyToSend } from "../attachments.js";
 import { runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
@@ -567,10 +567,8 @@ function agentComposer(record, ctx) {
   const keys = messageKeys();
 
   async function submit() {
-    const text = goal.value.trim();
-    if (text === "" && !starting) {
-      askForWords(attachments);
-    }
+    // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
+    const text = messageText(goal.value, attachments);
     if (starting || text === "") {
       goal.focus();
       return;
