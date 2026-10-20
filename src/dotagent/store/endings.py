@@ -26,8 +26,9 @@ PREFIX_STALLED: str = "Stopped: the agent was not making progress"
 # A run that reached a limit of [agent] run_max_minutes or run_max_tokens and did not finish when it was told to.
 PREFIX_LIMIT: str = "Stopped: the run reached its limit"
 RESULT_EMPTY_REPLIES: str = "The model returned empty replies and did not finish."
-# A run whose replies the model service kept ending before they were complete (its output limit, or a reason such
-# as a content filter), followed by the reason the last one ended with.
+# A run whose replies the model service kept ending before they were complete (its output limit, or another abnormal
+# reason it gave; a content filter's stop ends a run with its own words, agent.loop.filtered_stop), followed by the
+# reason the last one ended with.
 PREFIX_CUT_SHORT: str = "The model's replies were cut short"
 PREFIX_EMERGENCY_STOP: str = "Emergency stop: "
 # The result of a run the emergency stop of the web UI or the API ended (``RunManager.emergency_stop``).

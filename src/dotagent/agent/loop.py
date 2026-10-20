@@ -2018,6 +2018,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     True,
                 )
                 route_skip = True
+                if isinstance(error, ProviderFilterError):
+                    # Its filter stops the same conversation again: no later step of the run is routed to it.
+                    candidates = still_routable(candidates, frozenset({routed.ref.label}))
                 await sink(_RESET)
                 steps -= 1
                 continue
