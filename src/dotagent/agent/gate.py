@@ -15,6 +15,7 @@ from dotagent.events import EventBus
 from dotagent.policy.engine import (
     YOLO_WAIVED_SOURCES,
     approval_severity,
+    asked_in_yolo,
     decide,
     owner_handoff,
     route_for,
@@ -276,6 +277,11 @@ class RunGate:
             if handoff is not None:
                 return await self._ask_user(info, handoff, "")
             return await self._waive(info, decision)
+        if self._approval_mode == "yolo" and decision.source == "auto_review":
+            # What the always-on review refuses in every other mode, a yolo run asks the user about (item 427); a
+            # hand-off rule of theirs is stricter.
+            stricter: Decision | None = owner_handoff(info, rules)
+            return await self._ask_user(info, stricter if stricter is not None else asked_in_yolo(info), "")
         if decision.verdict == "deny":
             await self._emit_policy(info, decision)
             raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})

@@ -287,3 +287,57 @@ async def test_an_approval_card_offers_to_make_a_rule_of_its_action(
         async with asyncio.timeout(_RUN_WAIT_S):
             ended: RunRecord = await manager.wait(run.id)
     assert ended.status == "done", ended
+
+
+async def test_a_card_the_guard_raised_offers_no_rule_and_says_why(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """A message sent for the user waits for their yes in every mode, yolo too, whatever their rules say (item 427): its
+    card, in the chat, offers no rule, which would never apply, and says so; on a desktop and on a phone. The card is
+    refused at the end, so nothing is sent."""
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn("shell", {"command": "echo hi | mail -s Hello ada@example.com"}),
+            _turn(FINISH_TOOL, {"answer": "The mail was not sent.", "success": True}),
+        ],
+    )
+    run: RunRecord = await manager.start(
+        "Mail Ada hello",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        None,
+        None,
+        "standard",
+        None,
+        "yolo",
+        False,
+        (),
+    )
+    asked: ApprovalRecord = await _pending(runtime, run.id)
+    assert "Dot asks you before a message or a post in your name" in asked.summary, asked
+    host, port = _address(client)
+    try:
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width, height in ((1280, 900), (390, 844)):
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": height}, color_scheme="dark"
+                    )
+                    await page.goto(ui_url(host, port, TOKEN))
+                    await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
+                    await expect(page.get_by_text("no rule turns that off").first).to_be_visible()
+                    await expect(page.get_by_role("link", name="Make a rule of this")).to_have_count(0)
+                    await page.screenshot(path=str(tmp_path / f"guard-{width}-dark.png"))
+                    await page.close()
+            finally:
+                await browser.close()
+    finally:
+        if (await runtime.store.get_approval(asked.id)).status == "pending":
+            await manager.decide(asked.id, False, "test", "")
+        async with asyncio.timeout(_RUN_WAIT_S):
+            ended: RunRecord = await manager.wait(run.id)
+    assert ended.status == "done", ended

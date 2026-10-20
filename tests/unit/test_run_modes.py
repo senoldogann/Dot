@@ -160,7 +160,9 @@ def _prompt(approvals: ApprovalMode, goal_mode: bool) -> str:
 def test_the_prompt_tells_the_model_how_its_questions_are_answered() -> None:
     assert "Approvals:" not in _prompt("ask", False)
     assert "answered by a review model" in _prompt("auto", False)
-    assert "nothing waits for the user" in _prompt("yolo", False)
+    assert "what the policy flags runs at once" in _prompt("yolo", False)
+    # Money, secrets, data sent out, messages and posts wait for the user in yolo too (item 427).
+    assert "still wait for the user, as in every mode" in _prompt("yolo", False)
     assert "answered by a review model" not in _prompt("yolo", False)
 
 
@@ -237,17 +239,14 @@ def _lines(approvals: ApprovalMode) -> set[str]:
     return {line for line in _prompt(approvals, False).splitlines() if not line.startswith("- Today:")}
 
 
-def test_yolo_changes_only_the_secrets_line_and_the_approvals_line_of_the_prompt() -> None:
+def test_yolo_changes_only_the_approvals_line_of_the_prompt() -> None:
     ask: set[str] = _lines("ask")
     yolo: set[str] = _lines("yolo")
-    removed: list[str] = sorted(ask - yolo)
+    # Secrets are the user's in yolo too (item 427): the line that says so is the same in every mode.
+    assert sorted(ask - yolo) == []
     added: list[str] = sorted(yolo - ask)
-    assert len(removed) == 1 and removed[0].startswith(
-        "- Passwords, payment details and one-time codes are never typed"
-    )
-    assert len(added) == 2, added
-    assert added[0].startswith("- Approvals: yolo: nothing waits for the user")
-    assert added[1].startswith("- Passwords, one-time codes and payment details: enter them when you can read them")
+    assert len(added) == 1, added
+    assert added[0].startswith("- Approvals: yolo: what the policy flags runs at once")
     assert _lines("auto") - _lines("ask") == {line for line in _lines("auto") if line.startswith("- Approvals: auto")}
 
 

@@ -1,5 +1,6 @@
 """Tools of MCP servers: each tool a connected server offers becomes a tool named ``mcp__<server>__<tool>``."""
 
+import re
 import secrets
 
 from dotagent.config import AppConfig
@@ -28,6 +29,35 @@ def _clip(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
+# What the name of a tool says it does with a message (item 427): the first verb of the name decides, after any word
+# before it such as the name of the service (slack_post_message, gmail_send_email).
+_SEND_VERBS: frozenset[str] = frozenset(
+    {"send", "reply", "forward", "post", "publish", "tweet", "retweet", "comment", "dm"}
+)
+_MAKE_VERBS: frozenset[str] = frozenset({"create", "add", "new", "write"})
+_READ_VERBS: frozenset[str] = frozenset(
+    {"get", "list", "search", "read", "fetch", "find", "query", "describe", "view", "show", "count", "download"}
+)
+_MESSAGE_NOUNS: frozenset[str] = frozenset(
+    {"message", "post", "tweet", "comment", "reply", "email", "mail", "dm", "chat"}
+)
+_NAME_WORD: re.Pattern[str] = re.compile(r"[A-Z]?[a-z]+|[A-Z]+(?![a-z])|[0-9]+")
+
+
+def sends_messages(name: str) -> bool:
+    """Whether the name of an MCP tool says it sends a message or posts for the owner: its first verb sends, or makes
+    a message, a post or a comment. A name with no verb this knows says nothing."""
+    words: list[str] = [word.lower() for word in _NAME_WORD.findall(name)]
+    for at, word in enumerate(words):
+        if word in _SEND_VERBS:
+            return True
+        if word in _MAKE_VERBS:
+            return any(noun in _MESSAGE_NOUNS for noun in words[at + 1 :])
+        if word in _READ_VERBS:
+            return False
+    return False
+
+
 def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
     """Tools that declare themselves read-only only look. Any other tool may change things and may reach out to the
     world, unless the server says it does not: servers that declare nothing get the careful treatment."""
@@ -42,6 +72,9 @@ def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
         flags.append("destructive")
     if tool.hints.open_world is not False:
         flags.append("external_send")
+    if sends_messages(tool.remote_name):
+        # A message or a post for the owner is theirs to let go, in every mode (item 427), whatever the hints say.
+        flags.extend(flag for flag in ("external_send", "message_send") if flag not in flags)
     return ActionInfo(
         tool=tool.exposed_name, kind="mcp", risk="medium", summary=summary, target=tool.server, flags=tuple(flags)
     )

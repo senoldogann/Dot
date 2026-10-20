@@ -15624,6 +15624,27 @@ events changed) is not in it. Tests: `tests/unit/test_mail_calendar.py`, `tests/
 providers stood in for, after a real sign-in into a keychain of the test's own: a token turned away and refreshed, a
 "not now" waited out, an address no account has). Docs: `docs/runs.md`, `docs/extending.md`, `docs/safety.md`.
 
+### 427. The guard no rule turns off: money, passwords, secrets and messages are the owner's in every mode, yolo too
+
+**Status: done (2026-10-20), on `yolo-guard`; paths a human merges (REVIEW.md), merged on the owner's word of
+2026-10-20 to merge every open branch once all was done.** The owner's word of 2026-10-19: "Onayları sohbetin içine taşı. Her riskli işlem için sohbette onay kartı
+göster. yolo modunda da para, şifre ve mesaj gönderme gibi işler için kuralla kapatılamayan bir koruma bırak." The card
+was already in the chat (the timeline's `approval_requested`); the guard was not. DOT_PLAN.md's "yolo serbest" is
+overridden by the owner's own later word. **As built.** A flag `message_send` (an email, a chat or text message, a
+reply or a forward) comes with `external_send` from AppleScript's `send`, a messaging app's Return, newline or ⌘D, a
+click on a control named Send, Reply or Forward (the patterns and the typed judge alike), an MCP tool whose name's first
+verb sends or posts (`sends_messages`), and the command line's mailers. `policy.engine.guard` asks before a message or
+a public post in every mode, after the hard stop and before the owner's rules: a rule that allows it does not answer,
+one that hands it off does. In `yolo` the hard stop holds (money and credentials handed to the owner; a pre-approved
+spend asks them), the guard and the spend go to the owner (`GUARDED_SOURCES`), and what the always-on review refuses
+elsewhere (secret stores, data sent out) asks them (`asked_in_yolo`); only Dot's own files, untrusted content, the
+preset and `ask` rules are still waived. The browser's click judge reads in `yolo` too, a terminal password prompt is
+refused in every mode, and the yolo prompt's secrets line is the one of every mode. The CLI's help, the composer's
+YOLO hint and note, the Rules page and the rule drafter say the guard. Tests: unit (the flags of a send, the MCP
+names, the prompt), smoke (`test_approval_modes.py`: yolo hands money off, asks before a secret and a message, a capped
+spend asks, no allow rule lets a message go, a hand-off rule holds; the pace race answered). Docs: `docs/safety.md`,
+`docs/autonomy.md`, `README.md`, `CHANGELOG.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16515,3 +16536,5 @@ providers stood in for, after a real sign-in into a keychain of the test's own: 
   to ask could be sent with yolo; a server left out for too many tools could not be chosen from until the daemon
   restarted, and a choice that could not connect was kept anyway; the template cards hid a failing tool list. The
   agent's box shares fast mode and goal mode with the home's, as the pickers always did.
+- 2026-10-20 (Opus 5.5): item 427 on `yolo-guard` from `main`: the guard no rule turns off, money, credentials,
+  secrets, messages and posts in the owner's name theirs in every mode, yolo too.

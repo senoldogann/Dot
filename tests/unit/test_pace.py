@@ -21,8 +21,8 @@ def _flags(label: str) -> tuple[str, tuple[Flag, ...]]:
 def test_reposts_quotes_follows_and_likes_are_seen_in_english_turkish_and_finnish_and_plain_text_is_not() -> None:
     assert _flags("Repost") == _flags("5 reposts. Repost") == _flags("Quote") == ("medium", ("public_post",))
     assert _flags("Julkaise") == ("medium", ("public_post",))
-    assert _flags("Yeniden gönder") == ("medium", ("external_send", "public_post"))
-    assert _flags("Lähetä") == ("medium", ("external_send",))
+    assert _flags("Yeniden gönder") == ("medium", ("external_send", "message_send", "public_post"))
+    assert _flags("Lähetä") == ("medium", ("external_send", "message_send"))
     for social in ("Follow @dot", "12 Likes. Like", "Takip et", "Beğen", "Seuraa", "Tykkää", "Subscribe"):
         assert _flags(social) == ("low", ("social",)), social
     for plain in ("Get a quote", "Posts you might like", "Reposted by Dot", "Following @dot", "Likes"):

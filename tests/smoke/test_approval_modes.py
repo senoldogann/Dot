@@ -70,6 +70,15 @@ SECRET: ActionInfo = ActionInfo(
     target="~/.ssh/id_ed25519",
     flags=("secret_access",),
 )
+# A message sent for the user (item 427), as AppleScript's send is classified.
+MESSAGE: ActionInfo = ActionInfo(
+    tool="apple_script",
+    kind="app_control",
+    risk="high",
+    summary='Run applescript: tell application "Mail" to send the reply',
+    target="Mail",
+    flags=("external_send", "message_send"),
+)
 SCHEDULE: ActionInfo = ActionInfo(
     tool="schedule_create",
     kind="schedule",
@@ -237,25 +246,58 @@ async def test_yolo_also_waives_the_question_that_untrusted_content_raises(room:
     }
 
 
-async def test_yolo_lets_secrets_and_money_through_and_keeps_a_record(room: Room) -> None:
+async def test_yolo_leaves_money_secrets_and_messages_to_the_user(room: Room) -> None:
+    """The guard no rule turns off (item 427): in yolo too, money is handed to the user, a secret store read asks them
+    where every other mode refuses it, and a message sent for them waits for their yes."""
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
-    assert await asyncio.wait_for(gate.authorize(SECRET), WAIT_S) == ""
-    assert await asyncio.wait_for(gate.authorize(PAYMENT), WAIT_S) == ""
-    assert sorted((record.tool, record.status, record.decided_by) for record in await _decided(room)) == sorted(
-        [(SECRET.tool, "approved", YOLO_DECIDER), (PAYMENT.tool, "approved", YOLO_DECIDER)]
-    )
+    paying: Question = await _ask(room, gate, PAYMENT)
+    assert paying.record.severity == "handoff"
+    await room.broker.resolve(paying.record.id, True, "user", "paid it myself")
+    with pytest.raises(HandedOff):
+        await asyncio.wait_for(paying.answer, WAIT_S)
+    reading: Question = await _ask(room, gate, SECRET)
+    assert "in yolo Dot asks you before it reads where secrets are kept" in reading.record.summary
+    await room.broker.resolve(reading.record.id, False, "user", "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(reading.answer, WAIT_S)
+    sending: Question = await _ask(room, gate, MESSAGE)
+    assert "Dot asks you before a message or a post in your name" in sending.record.summary
+    await room.broker.resolve(sending.record.id, True, "user", "send it")
+    assert await asyncio.wait_for(sending.answer, WAIT_S) == "send it"
+    assert {record.decided_by for record in await _decided(room)} == {"user"}
+    assert "approval_auto" not in await _kinds(room)
+
+
+async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Room) -> None:
+    await room.store.add_rule("allow", "apple_script", "", "Mail is fine")
+    allowing: RunGate = _gate(room, "task", "aggressive", "ask", _nobody)
+    question: Question = await _ask(room, allowing, MESSAGE)
+    assert "whatever your rules say" in question.record.summary
+    await room.broker.resolve(question.record.id, True, "user", "send it")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == "send it"
+    # A rule that hands the message to the user is stricter, and it holds.
+    await room.store.add_rule("handoff", "apple_script", "reply", "Replies are mine")
+    for rule in await room.store.list_rules():
+        if rule.description == "Mail is fine":
+            await room.store.delete_rule(rule.id)
+    handed: Question = await _ask(room, _gate(room, "task", "aggressive", "yolo", _nobody), MESSAGE)
+    assert handed.record.severity == "handoff" and handed.record.summary.endswith("Replies are mine")
+    await room.broker.resolve(handed.record.id, True, "user", "sent it myself")
+    with pytest.raises(HandedOff):
+        await asyncio.wait_for(handed.answer, WAIT_S)
 
 
 async def test_a_hand_off_rule_of_the_user_still_stops_a_yolo_run(room: Room) -> None:
-    await room.store.add_rule("handoff", "browser_act", "invoice", "Payments are mine")
+    # Money is handed off in yolo anyway (item 427): a rule of the user's hands off what the guard leaves to the run.
+    await room.store.add_rule("handoff", "schedule_create", "", "Schedules are mine")
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
-    question: Question = await _ask(room, gate, PAYMENT)
-    assert question.record.summary == f"{PAYMENT.summary} — Payments are mine"
-    await room.broker.resolve(question.record.id, True, "user", "paid it myself")
+    question: Question = await _ask(room, gate, SCHEDULE)
+    assert question.record.summary == f"{SCHEDULE.summary} — Schedules are mine"
+    await room.broker.resolve(question.record.id, True, "user", "saved it myself")
     with pytest.raises(HandedOff):
         await asyncio.wait_for(question.answer, WAIT_S)
-    # What no rule hands off still goes through.
-    assert await asyncio.wait_for(gate.authorize(SECRET), WAIT_S) == ""
+    # What no rule hands off and the guard does not hold still goes through.
+    assert await asyncio.wait_for(gate.authorize(WRITE), WAIT_S) == ""
 
 
 async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_against_the_day(room: Room) -> None:
@@ -285,7 +327,7 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
     await room.broker.resolve(over.record.id, True, "user", "paid it myself")
     with pytest.raises(HandedOff):
         await asyncio.wait_for(over.answer, WAIT_S)
-    # A yolo run spends within the caps without a question; an unlisted site or no amount keeps the hand-off's waiver.
+    # A yolo run asks within the caps as an ask run does, and hands a payment no cap covers to the user (item 427).
     yolo: RunGate = RunGate(
         room.store,
         room.bus,
@@ -300,14 +342,16 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
         (),
         SiteLocks(),
     )
-    assert (
-        await asyncio.wait_for(
-            yolo.authorize(PAID.model_copy(update={"amount": Amount(value=5.0, currency="EUR")})), WAIT_S
-        )
-        == ""
-    )
+    capped: Question = await _ask(room, yolo, PAID.model_copy(update={"amount": Amount(value=5.0, currency="EUR")}))
+    assert capped.record.severity == "high"
+    await room.broker.resolve(capped.record.id, True, "user", "fine")
+    assert await asyncio.wait_for(capped.answer, WAIT_S) == "fine"
     assert await room.store.spent_since("shop.example", 0.0) == 17.0
-    assert await asyncio.wait_for(yolo.authorize(PAYMENT), WAIT_S) == ""
+    uncapped: Question = await _ask(room, yolo, PAYMENT)
+    assert uncapped.record.severity == "handoff"
+    await room.broker.resolve(uncapped.record.id, False, "user", "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(uncapped.answer, WAIT_S)
     assert await room.store.spent_since("shop.example", 0.0) == 17.0
 
 
@@ -372,11 +416,21 @@ async def test_two_runs_cannot_both_take_the_last_public_action_of_the_day_on_a_
         )
         for _ in range(2)
     ]
-    outcomes: list[str | BaseException] = await asyncio.wait_for(
-        asyncio.gather(*(gate.authorize(POST) for gate in gates), return_exceptions=True), WAIT_S
-    )
-    assert outcomes[0] == ""
-    assert isinstance(outcomes[1], PolicyDenied)
+    # A post waits for the user's yes in yolo too (item 427): the run that takes the last post of the day asks, and the
+    # other is refused by the pace without a question.
+    async with room.bus.subscribe(room.run.id) as events, asyncio.timeout(WAIT_S):
+        tasks: list[asyncio.Task[str]] = [asyncio.create_task(gate.authorize(POST)) for gate in gates]
+        event: EventRecord = await events.queue.get()
+        while event.kind != "approval_requested":
+            event = await events.queue.get()
+        approval_id: object = event.data["approval_id"]
+        assert isinstance(approval_id, str)
+        await room.broker.resolve(approval_id, True, "user", "post it")
+        outcomes: list[str | BaseException] = await asyncio.gather(*tasks, return_exceptions=True)
+    assert sorted(outcome if isinstance(outcome, str) else type(outcome).__name__ for outcome in outcomes) == [
+        "PolicyDenied",
+        "post it",
+    ]
     assert len(await room.store.paced_times("social.example", "public", 0.0)) == 1
 
 

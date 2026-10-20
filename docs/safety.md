@@ -58,13 +58,13 @@ AppleScript) or of Messages (its database, read-only; the program that runs Dot 
 doctor` says whether the database opens) from a sender or with a subject within the last minutes, and returns the code
 alone, with who sent it and how old the message is; the message never reaches the model. It is a high-risk action of
 the Mac: the aggressive preset allows it, balanced and cautious ask, a research run has no such tool. Typing the code
-into the field is still what the approval mode allows (only `yolo` types one-time codes).
+into a field is yours in every mode, `yolo` too (item 427): Dot hands the field to you.
 
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
 per_day = 50 }`. Dot reads the amount of a payment step from the labels of its controls ("Pay €19.90") and from the
 total on the page, and takes the largest (item 385: a coupon or a basket line in the same step cannot stand for the
 payment), so that a misread errs towards the hand-off; under both caps the step is a
-question instead of a hand-off (a `yolo` run goes on, `auto` lets the review model answer, `ask` asks you once), it
+question instead of a hand-off (`auto` lets the review model answer, `ask` and `yolo` ask you once), it
 is recorded with its amount, shown in the timeline, and counts against the site's day.
 The payments of a site are decided one at a time, each from what the ones before it spent, so two runs paying at once
 cannot both take what is left of the day. Over a cap, on a site not listed, or when the page does not show the amount,
@@ -74,14 +74,18 @@ currency, so list sites that bill in one currency. Empty by default.
 **Decision order**, strictest first:
 
 1. *Auto-review* denies actions that read secrets or send data out (`secret_access`, `exfiltration`), whatever else is
-   configured.
+   configured; a `yolo` run asks you instead (item 427).
 2. The *run mode* denies what a research run may not do.
 3. *Dot's own files*: a change of them (`self_change`, below) is a question to you in every approval mode but `yolo`,
    which no rule of yours and no review model answers in your place (item 398). Allowed, the run makes the change.
 4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
    yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
    one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
-5. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
+5. *The guard* (item 427): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
+   forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
+   mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode, whatever your
+   rules say; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you.
+6. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
    it needs done and waits; on a browser step you can take the browser over, do it and give it back; when you say you
@@ -102,7 +106,7 @@ currency, so list sites that bill in one currency. Empty by default.
    use of any tool: Dot does it without asking."), which the protections that are always on still bound; words that
    make no rule are answered with the reason, in English.
    An approval card offers *Make a rule of this*, which opens the tab with a sentence about the action in the box.
-6. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
+7. *The preset* decides everything that is left; in the approval mode `supervised` an action it allows still asks you
    when it changes something (see [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
 
 | Preset                 | Asks before                                                                                                                 |
@@ -119,8 +123,9 @@ writes back.
 
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The second step and your hand-off rules
-hold in every mode; the refusals of the first step, the questions of the third and the hand-offs of the fourth are
-what a `yolo` run waives, and it records each.
+hold in every mode, and so do the hand-offs of the fourth step and the questions of the fifth, `yolo` too (item 427):
+what the first step refuses, a `yolo` run asks you. What a `yolo` run waives are the questions of the third step, of
+your `ask` rules, of the preset and of untrusted content, and it records each.
 
 **Untrusted content.** Web pages, screens, MCP results and the mail and calendars of the accounts you signed in (item
 424) can be written by third parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`,
@@ -146,11 +151,11 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
 - The memory tools refuse a note that holds a key-like string or one of the secrets Dot holds (`memory_save`,
   `memory_update`), and tell the model to record where the key lives, not the key. A note you write yourself, with
   `dotx memory add` or on the Memory page, is yours and not refused.
-- Outside `yolo` the browser and desktop tools never type into password, one-time-code and card fields: the field
-  that would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). A
-  `yolo` run types into them what it can read itself (see
-  [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). In the same way `terminal_send` types nothing outside
-  `yolo` while the program's last line asks for a password, a passphrase or a PIN. The desktop tools never control a
+- The browser and desktop tools never type into password, one-time-code and card fields themselves: the field that
+  would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). Outside
+  `yolo` they refuse; in `yolo` the field is handed to you (item 427), and on a browser step you can take the browser
+  over to fill it. In the same way `terminal_send` types nothing, in any mode, while the program's last line asks for
+  a password, a passphrase or a PIN: that step is yours, in a terminal of your own. The desktop tools never control a
   password manager or Keychain Access, in any mode, nor a window of Dot's outside `yolo`: the desktop app's, or one of
   another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
@@ -159,7 +164,8 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
-- Outside a `yolo` run the agent can neither read nor change `~/.ssh`, `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
+- Outside a `yolo` run (which asks you first, item 427) the agent can neither read nor change `~/.ssh`, `~/.gnupg`,
+  `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud`, the data of your browsers (Chrome, Safari, Firefox, Brave, Edge and Arc) and their cookies, the
   tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
   `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
@@ -233,31 +239,30 @@ label they do not know (Mastodon's "Boost", the German "Teilen") passes as an or
 "typesafe"` (the switch "Typed judge (Jev)" on the page of TypeSafe in Settings › Providers writes it and switches the
 judge from the next judgment on, with no restart; item 255) and `TYPESAFE_API_KEY` saved (made at console.typesafe.ai;
 Settings › Providers, or `dotx auth set TYPESAFE_API_KEY`), TypeSafe's System One API is asked about such a click in
-four yes/no questions (does it publish,
-send, pay or delete?) over the label, the role and the page's address (without its query and fragment). A probability of
-at least `public_action_threshold` (0.45: below each yes measured; a wrong flag only asks) gives the click that flag, so
-the policy treats it as a click on "Post" or "Delete", and the action's summary says so: `(judge: public_post 0.93)`.
-The judge also reads a campaign's claim of its targets before the goal checker does, and refuses a claim below
-`target_threshold` (0.15: only a clearly false one, since a true claim it refused would keep the campaign from ending)
-at once. It never allows anything and never decides a step; it only adds flags, or stops a claim early. With `[judge]
-second_opinion = true` (off by default) every question is asked a second time, in a request of its own with an
-independent phrasing, and the two answers are read together: a click gets its flag when either answer is at the
-threshold, and the summary names both and says when they disagreed (`judge: public_post 0.62/0.31 (disagreed)`), so a
-disagreement ends in the policy's question rather than in a silent pass; a claim is refused only when both answers are
-below `target_threshold`, and a disagreement leaves it to the goal checker. It is a paid service, though a cheap one
-(input tokens only, $0.042 a million on 2026-10-10): one request per judged click or claim, two with a second opinion,
-at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.0`, the version `[judge] model` names;
-move them together. A missing or refused key, a spent quota or a failed request turns it off for `[models]
-helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker decide alone; a key
-saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key. The click questions
-are asked in every mode but `yolo`, where a flag asks nothing, so a click sends nothing to TypeSafe. Two more
-checks run before a model call when the judge is on. A `browser_act` that names what it expects to see after its steps
-(`expect`: "the reply shows under the post") gets, above its result, the probability that the page's text shows it and
-that the page is a login wall, a CAPTCHA or an error page, from one request over the page's visible text, so the next
-turn starts from those numbers instead of reading the whole page. And the goal check of a run in goal mode asks the
-judge first, as a campaign's claim does: an answer whose claim of success scores below `target_threshold` is sent back
-with the judge's number and without the review model's call; a clear yes and the uncertain middle go to the review
-model as before.
+four yes/no questions (does it publish, send, pay or delete?) over the label, the role and the page's address (without
+its query and fragment). A probability of at least `public_action_threshold` (0.45: below each yes measured; a wrong
+flag only asks) gives the click that flag, so the policy treats it as a click on "Post" or "Delete", and the action's
+summary says so: `(judge: public_post 0.93)`. The judge also reads a campaign's claim of its targets before the goal
+checker does, and refuses a claim below `target_threshold` (0.15: only a clearly false one, since a true claim it
+refused would keep the campaign from ending) at once. It never allows anything and never decides a step; it only adds
+flags, or stops a claim early. With `[judge] second_opinion = true` (off by default) every question is asked a second
+time, in a request of its own with an independent phrasing, and the two answers are read together: a click gets its flag
+when either answer is at the threshold, and the summary names both and says when they disagreed (`judge: public_post
+0.62/0.31 (disagreed)`), so a disagreement ends in the policy's question rather than in a silent pass; a claim is
+refused only when both answers are below `target_threshold`, and a disagreement leaves it to the goal checker. It is a
+paid service, though a cheap one (input tokens only, $0.042 a million on 2026-10-10): one request per judged click or
+claim, two with a second opinion, at most `timeout_s` (5 s) each. The thresholds were set on answers of `jev-1.13.0`,
+the version `[judge] model` names; move them together. A missing or refused key, a spent quota or a failed request turns
+it off for `[models] helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker
+decide alone; a key saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key.
+The click questions are asked in every mode, `yolo` too, where a payment, a message or a post they find is yours as well
+(item 427). Two more checks run before a model call when the judge is on. A `browser_act` that names what it expects to
+see after its steps (`expect`: "the reply shows under the post") gets, above its result, the probability that the page's
+text shows it and that the page is a login wall, a CAPTCHA or an error page, from one request over the page's visible
+text, so the next turn starts from those numbers instead of reading the whole page. And the goal check of a run in goal
+mode asks the judge first, as a campaign's claim does: an answer whose claim of success scores below `target_threshold`
+is sent back with the judge's number and without the review model's call; a clear yes and the uncertain middle go to the
+review model as before.
 
 **A step's model chosen by a typed judgment (off by default).** With `[agent] step_router = true` and
 `TYPESAFE_API_KEY` saved, every step of a run starts with one Choice of TypeSafe's over the run's models, from the goal,
@@ -300,11 +305,13 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
 counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`,
 and `supervised` asks before every change as well; in `auto` and `yolo` the questions of the policy are answered for
-you. A question of the agent itself (`ask_user`) waits the same way, except in a run nobody can answer during it (see
-[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with what it
-leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows ticked
-are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by commas)
-or your own words. The run reads which option you chose, and whether it was the one it recommended.
+you, but for what is yours in every mode (item 427): money, credentials, messages and posts in your name, and in `yolo`
+a read of your secrets or data sent out, each a card in the chat. A question of the agent itself (`ask_user`) waits the
+same way, except in a run nobody can answer during it (see
+[Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
+what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
+ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
+commas) or your own words. The run reads which option you chose, and whether it was the one it recommended.
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 

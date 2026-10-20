@@ -328,9 +328,9 @@ def _act_kind(steps: list[Step]) -> ActionKind:
 
 
 def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretFieldCheck:
-    """What a batch does at a field that takes a secret: every mode but yolo refuses it. Yolo types into it after asking
-    the gate, which waives the hand-off and records it, unless the batch was authorized for that kind of secret
-    already."""
+    """What a batch does at a field that takes a secret: every mode but yolo refuses it. Yolo asks the gate, which hands
+    the field to the user (item 427: money and credentials are theirs in every mode), unless the batch was authorized
+    for that kind of secret already."""
     if ctx.approvals != "yolo":
         return refuse_secret_field
 
@@ -381,17 +381,11 @@ def _act_tool() -> RegisteredTool:
         summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
-        # In yolo a flag asks nothing, so nothing is asked.
-        judgments: list[ClickJudgment] = (
-            []
-            if ctx.approvals == "yolo"
-            else await asyncio.gather(
-                *(
-                    ctx.runtime.judge.judge_click(
-                        ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id
-                    )
-                    for element in unexplained_clicks([(step, element) for step, element, _ in judged])
-                )
+        # It reads them in yolo too: a payment, a message or a post it finds is the user's there as well (item 427).
+        judgments: list[ClickJudgment] = await asyncio.gather(
+            *(
+                ctx.runtime.judge.judge_click(ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id)
+                for element in unexplained_clicks([(step, element) for step, element, _ in judged])
             )
         )
         found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]

@@ -16,7 +16,8 @@ The first public version of Dot, an always-on autonomous agent for macOS.
   local model. See [Models and providers](docs/models.md) and
   [What leaves this Mac](docs/safety.md#what-leaves-this-mac).
 - **A policy** records everything a run does. In the approval modes `ask` (the default) and `auto` it hands money and
-  credentials to you and asks before a risky action; in `yolo` only your hand-off rules stop a run. See
+  credentials to you and asks before a risky action. In every mode, `yolo` too, money, credentials, your secrets,
+  messages and posts in your name wait for you, and no rule of yours turns that off. See
   [Safety and privacy](docs/safety.md) and [Autonomy](docs/autonomy.md).
 - **A web UI** comes from a daemon on the Mac. It is also an app on a phone's home screen, reached through Tailscale,
   with notifications. See [The daemon, the web UI and the desktop shell](docs/daemon.md) and

@@ -10,8 +10,8 @@
   see: whether it shows that, and whether it is a login wall, a CAPTCHA or an error page, so the next turn starts from
   those numbers.
 
-The click questions are asked in every mode but ``yolo``, where a flag asks nothing, so a click sends nothing to the
-judge.
+The click questions are asked in every mode, ``yolo`` too: a payment, a message or a post they find is the user's there
+as well (item 427).
 
 The judge never decides a step and never grants anything: it adds flags that make the policy ask, stops a claim the
 goal checker would have examined, or puts numbers above a page the model reads anyway. What it sends has its secrets

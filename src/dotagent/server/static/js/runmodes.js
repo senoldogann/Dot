@@ -37,9 +37,16 @@ export const APPROVAL_OPTIONS = [
     hint: "A review model answers; its doubts and Dot's own files come to you",
     icon: "shield",
   },
-  { id: "yolo", label: "YOLO", short: "YOLO", hint: "Nobody is asked; each step runs at once and is recorded", icon: "lockOpen" },
+  {
+    id: "yolo",
+    label: "YOLO",
+    short: "YOLO",
+    hint: "Nobody is asked but for money, passwords, secrets, messages and posts; each step is recorded",
+    icon: "lockOpen",
+  },
 ];
-const YOLO_NOTE = "YOLO: nothing asks for confirmation, so this run acts without waiting for you. It also reads secrets, sends files out, pays and signs in by itself.";
+const YOLO_NOTE =
+  "YOLO: this run acts without waiting for you, but money, passwords, your secrets, messages and posts in your name still come to you, whatever your rules say.";
 const GOAL_MODE_HINT = "A checker compares the answer with the goal and sends the run back to work until the goal is really reached";
 const STANDING_HINT = "Keep going until done: Dot works on the goal in sessions until a check confirms the outcome or you stop it";
 const STANDING_NOTE = "Keep going is on: Dot works on this goal in sessions until a check confirms it; Campaigns shows it.";

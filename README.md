@@ -13,9 +13,9 @@ It runs on models from **Ollama** (local models, and cloud models through the lo
 Dot works on a goal on its own, and by default it asks you before a risky step. In the default approval mode, `ask`,
 edits and routine work run without a question, and what the policy raises waits for your answer on a card in the chat.
 It stops for what it must not decide alone (money, credentials, public posts, messages sent for you, privilege, system
-settings), everything it does is recorded, and it can be stopped at once. In `yolo` nobody is asked: see
-[Autonomy](docs/autonomy.md). Read [Safety](docs/safety.md#safety) before you let it work on a machine that holds data
-you care about.
+settings), everything it does is recorded, and it can be stopped at once. In `yolo` nobody is asked, but money,
+credentials, your secrets, messages and posts in your name still wait for you: see [Autonomy](docs/autonomy.md). Read
+[Safety](docs/safety.md#safety) before you let it work on a machine that holds data you care about.
 
 **With the default models, what a run reads leaves this Mac.** They are cloud models of Ollama: the Ollama server on
 this Mac passes each call on to Ollama's servers, with the goal, the messages, the text of the files and pages the run
@@ -89,8 +89,9 @@ on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the s
 ## Safety in short
 
 - **Who answers the policy's questions.** Most actions need no answer. For those that do, `ask` (the default) puts the
-  question to you, `auto` lets a review model answer, and `yolo` lets the run go on alone: then only your hand-off rules
-  stop it. See [Autonomy](docs/autonomy.md).
+  question to you, `auto` lets a review model answer, and `yolo` lets the run go on alone, but for the guard no rule
+  turns off: money, credentials, your secrets, messages and posts in your name wait for you in every mode. See
+  [Autonomy](docs/autonomy.md).
 - **What leaves this Mac.** There is no telemetry. The models get the run's conversation, and the sites, search engines
   and services a run uses get what it sends them. See [What leaves this Mac](docs/safety.md#what-leaves-this-mac).
 - **The daemon** listens on this Mac's loopback address alone. Its API needs its token, except for a health check,

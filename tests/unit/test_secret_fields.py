@@ -65,7 +65,7 @@ def test_a_key_that_puts_text_in_is_typing(key: str, enters: bool) -> None:
     ("target", "flags"),
     [
         (Element(role="list", name="Delete forever"), ("destructive",)),
-        (Element(role="region", name="Send to customer"), ("external_send",)),
+        (Element(role="region", name="Send to customer"), ("external_send", "message_send")),
         (Element(role="textbox", name="Account password"), ("credential",)),
         (Element(role="list", name="Done"), ()),
     ],
