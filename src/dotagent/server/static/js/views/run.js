@@ -46,6 +46,8 @@ const FOOT_WORDS = { done: "Completed in", failed: "Failed after", cancelled: "S
 // The words of a delegated run's pill for its approvals, but for the default's, which needs none.
 const APPROVAL_WORDS = { supervised: "Supervised", auto: "Auto-approve", yolo: "YOLO" };
 const NEAR_BOTTOM_PX = 140;
+// How long a chat that opens finished keeps its foot in sight while what is above it settles (item 440).
+const SETTLE_OPEN_MS = 2500;
 // "/btw" followed by the side question; the question may span lines.
 const BTW_PATTERN = /^\/btw(?:\s+([\s\S]*))?$/i;
 const TITLE_CHARS = 70;
@@ -164,7 +166,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   let resumable = detail.resumable;
   let cutOff = detail.cut_off;
   let finishedAt = run.finished_at;
-  let following = active;
+  // A chat opens at its foot, a live run and a finished one alike (item 440), and keeps there as it settles.
+  let following = true;
   let ticker = null;
   let costTicker = null;
   let scrollQueued = false;
@@ -172,7 +175,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // From the answer's coming until the frame that lands the page on it, the way down is not offered: the page is about
   // to move there (item 274).
   let landing = false;
-  // A run that is over when the page opens lands on its answer; a live one only when the reader follows it.
+  // A run that is over when the page opens starts at the chat's foot, where its newest message stands (item 440).
   const openedFinished = !active;
   const seen = { steps: 0, input: 0, output: 0, calls: 0, failed: 0, compactions: 0, flagged: 0 };
 
@@ -501,7 +504,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   }
 
   // ------------------------------------------------------------------------------------------------ dock
-  // The shared frame (composer.js): Enter or ⌘Enter sends, as Settings › General chooses; "/" opens the slash menu,
+  // The shared frame (composer.js): Enter or ⌘Enter sends, as Settings › General chooses (never plain Return on a touch screen); "/" opens the slash menu,
   // whose one command here asks on the side; what is typed and not sent is kept for this run.
   const frame = composerFrame({
     label: "Message",
@@ -1043,7 +1046,21 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
 
   function onAnswer(node) {
     answerNode = node;
-    if (following || openedFinished) {
+    if (openedFinished) {
+      // A chat that is over when it opens starts at its foot, on the newest message (item 440), and keeps there while
+      // what is above it settles (pictures, a table's width) until the reader scrolls up.
+      following = true;
+      landing = true;
+      requestAnimationFrame(() => {
+        landing = false;
+        if (!signal.aborted) {
+          toEnd("auto");
+          paintJump();
+        }
+      });
+      return;
+    }
+    if (following) {
       following = false;
       landing = true;
       requestAnimationFrame(() => {
@@ -1390,11 +1407,18 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   paintCost();
   paintFiles(thread);
   syncControls();
-  // A live run opens at its end, where its next words come (item 403); before, the page stood at its top until its
-  // first event moved it, which read as a jump up after every message sent.
-  if (following) {
-    toEnd("auto");
-  }
+  // A chat opens at its end, where its next words come (item 403) or where its newest message stands (item 440); before,
+  // the page stood at its top until its first event moved it, which read as a jump up after every message sent.
+  toEnd("auto");
+  // What is above the foot settles after the page opens (pictures, a table's width, a folded group's height): the
+  // foot is held for a moment, until the reader's own scroll moves it (item 440).
+  const settling = new ResizeObserver(() => {
+    if (following && openedFinished) {
+      toEnd("auto");
+    }
+  });
+  settling.observe(timeline.element);
+  const settled = setTimeout(() => settling.disconnect(), SETTLE_OPEN_MS);
   paintLessons(detail.lessons);
   attempt(changes.refresh);
   paintQuestions(detail.questions);
@@ -1485,6 +1509,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     document.documentElement.classList.remove("chat-shell");
     filesWatch.disconnect();
     lessonCuts.disconnect();
+    settling.disconnect();
+    clearTimeout(settled);
     stopDockHeight();
     outline.dispose();
     stopLifecycle();

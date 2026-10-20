@@ -16656,3 +16656,8 @@ stay gone after a reload; denied, they stay; wide and on a phone; the test fails
   in an answer: the table had a copy over its right edge and the block of code, which stood under it, had none. It
   has one now, the same bar (`prose.js`, `app.css`), taking the code as it was written. `test_markdown_copy.py` presses
   it in Chrome and checks it is in sight over the block's right edge at 1280 and 390 px, light and dark.
+- 2026-10-20 (Opus 5.5): item 440 on `chat-scroll-enter` from `main`, on the owner's two words about the chat: a chat
+  that was over opened at the top of its last answer, wide and on a phone, where a live one opened at its end; and on a
+  phone the keyboard's Return sent the message, where the round send button sends. A run opens at its foot now, live or
+  over, and keeps it while what is above settles (`run.js`); on a touch screen Return breaks the line whatever the
+  setting says (`composer.js`). `test_chat_scroll.py` measures both, wide in Chrome and on a phone.

@@ -119,7 +119,8 @@ export const CHAT_WIDTH = {
 };
 
 /** The key that sends what a composer holds (item 230): Enter, Shift+Enter breaking a line, or ⌘Enter (Ctrl+Enter),
- * Enter breaking it. Settings › General chooses it; it puts nothing on the page. */
+ * Enter breaking it. Settings › General chooses it; it puts nothing on the page. On a touch screen Return always
+ * breaks the line (item 440). */
 export const SEND_KEY = {
   key: "dot.sendKey",
   initial: "enter",
