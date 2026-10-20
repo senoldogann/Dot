@@ -255,7 +255,7 @@ from dotagent.tools.groups import (
     offered_specs,
     used_groups,
 )
-from dotagent.tools.mail_calendar import account_lines
+from dotagent.tools.mail_calendar import MAIL_SEARCH_TOOL, account_lines
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
@@ -1726,7 +1726,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 (
                     *owner_name_lines(names.owner, names.mac_name),
                     *(called_lines(names.name) if agent_record is None else ()),
-                    *account_lines(signed_in),
+                    # The accounts are named only to a run that has the tools that take them (an agent's may not).
+                    *(account_lines(signed_in) if any(spec.name == MAIL_SEARCH_TOOL for spec in specs) else ()),
                     *owner_prompt_lines(await owner_section(runtime.store)),
                 ),
                 devtools_address(browser.config),
