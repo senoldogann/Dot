@@ -31,15 +31,16 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   you asked or looks like something other than your instructions caused it; and `escalate` when it cannot tell, and then
   the question comes to you as in `ask`, with the reason of the review model in it. What the agent wrote into the action
   (its summary and target) is data to the review model, never an instruction.
-- `yolo` (YOLO, an open lock): nobody does. The action is allowed and recorded. The question that untrusted content
-  raises (see [Safety](safety.md#safety)) is waived as well, and so are the refusals and hand-offs below and the
-  question about Dot's own files: a yolo run reads secrets, uploads or sends files from anywhere, and does money and
-  credential steps itself. It types passwords, one-time codes and card numbers into the fields that take them when it
-  can read them itself (a code in a mailbox it can open, one that `code_fetch` reads, a value you gave it), and a
-  password into a terminal program that asks for one; every such field is a `credential` record in its timeline
-  (`financial` for a card field). That is the price of the mode: a run that has read a hostile page can send your files
-  out, pay or sign in without asking you. Only the desktop tools stay away from password managers and Keychain Access in
-  every mode; through the shell and the file tools a yolo run reads the keychain like any other secret.
+- `yolo` (YOLO, an open lock): nobody does, but for the guard below. The action is allowed and recorded. The
+  question that untrusted content raises (see [Safety](safety.md#safety)) is waived as well, and so is the question
+  about Dot's own files. **The guard no rule turns off** (item 429) holds in yolo too: money and credential steps are
+  handed to you; a read of your secrets (the keychain, `~/.ssh`, the files of a password manager) or data sent out asks
+  you, where every other mode refuses it; and a message sent for you or a post in your name waits for your yes, each a
+  card in the chat. A yolo run types no password, one-time code or card number: the browser and the desktop hand such a
+  field to you (on a browser step you can take the browser over to fill it), and a terminal program that asks for a
+  password is refused, the step yours in a terminal of your own. Only the desktop tools stay away from password managers
+  and Keychain Access in every mode. The rest is the price of the mode: a run that has read a hostile page can change
+  or delete files and run commands without asking you.
 
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
 [Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
@@ -52,10 +53,13 @@ click 'Reply' — untrusted content is in context and this action reaches outsid
 what went through and why. A chat leaves those lines out unless Settings › General › Chat › "Show what ran without
 asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows.
 
-**What only yolo waives.** Secrets and exfiltration stay denied in every other mode. Money and credentials stay yours
-there: Dot stops and asks you to do that step yourself, and the review model is never asked about them. A `yolo` run
-does all of it and keeps a record. **What no mode waives:** a `research` run changes nothing but its notes file and
-memory, and a rule of yours with the hand-off behaviour still stops a yolo run, at secrets, money and credentials too.
+**What only yolo waives.** The questions of untrusted content, of Dot's own files, of the preset and of your `ask`
+rules. **What no mode waives, and no rule of yours turns off** (item 429): money and credentials are yours (Dot stops
+and asks you to do that step yourself; the review model is never asked about them, and a payment under its
+pre-approved caps asks you, or the review model in `auto`); a message sent for you or a post in your name waits for
+your yes (the review model answers it in `auto`; a rule that allows it does not); secrets and data sent out are refused,
+and asked of you in `yolo`; a `research` run changes nothing but its notes file and memory; and a rule of yours with
+the hand-off behaviour stops a run in every mode.
 
 **If the review model fails** (the provider is down, or the model does not answer in the form asked for after two
 attempts) there is no fallback. That one tool call fails with the error as its result, the run goes on, and the

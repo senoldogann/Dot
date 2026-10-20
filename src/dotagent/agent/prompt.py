@@ -118,8 +118,9 @@ _APPROVALS_TEXT: dict[Literal["supervised", "auto", "yolo"], str] = {
         "not retry it and do not look for a way around it."
     ),
     "yolo": (
-        "yolo: nothing waits for the user and what the policy flags runs at once (it is recorded). The user trusts you "
-        "with that: stay inside what was asked, choose the least destructive way and do not widen the task."
+        "yolo: what the policy flags runs at once (it is recorded), but money, passwords and other secrets, data sent "
+        "out, and messages and posts in the user's name still wait for the user, as in every mode. The user trusts you "
+        "with the rest: stay inside what was asked, choose the least destructive way and do not widen the task."
     ),
 }
 
@@ -375,14 +376,10 @@ password managers) unless the user explicitly asked for that exact item.
 when the task is about what the user copied."""
 
 
-# Outside yolo the browser and the desktop refuse to type into a field that takes a secret; yolo enters them.
+# In every mode, yolo too (item 429), a field that takes a secret is the user's: outside yolo the browser and the
+# desktop refuse to type into it, and in yolo the policy hands it to the user.
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
-)
-_SECRETS_ENTERED: str = (
-    "Passwords, one-time codes and payment details: enter them when you can read them yourself (a code in a mailbox "
-    "you can open, one that code_fetch reads when the user offers that tool, a value the user gave you). Never guess "
-    "one, never read a secret store the task does not need, and say in the answer which ones you entered."
 )
 
 _CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the \
@@ -762,7 +759,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _agent_section(inputs.agent),
         f"{work}\n{_ending(inputs.mode, inputs.campaign_session)}",
         _habits_section(inputs.habits),
-        f"{rest}\n- {_SECRETS_ENTERED if inputs.approvals == 'yolo' else _SECRETS_REFUSED}\n{closing}",
+        f"{rest}\n- {_SECRETS_REFUSED}\n{closing}",
         _tool_guidance_section(inputs.tool_guidance),
         _mcp_section(inputs.tool_names),
         _accounts_section(inputs.tool_names),

@@ -29,6 +29,8 @@ from dotagent.tools.base import PreparedCall
 from dotagent.tools.context import ToolContext
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+# How long a test waits for the question a post raises and for the step once it is answered.
+_ANSWER_WITHIN_S: float = 60.0
 
 GOAL: str = "Share the post and follow its author."
 SPACING_S: float = 1.0
@@ -151,6 +153,20 @@ async def _act(ctx: ToolContext, steps: list[JsonObject]) -> PreparedCall:
     return prepared
 
 
+async def _answered(ctx: ToolContext, steps: list[JsonObject]) -> PreparedCall:
+    """``browser_act`` through the gate, the user saying yes to the post: a post in their name is theirs in yolo too
+    (item 429)."""
+    async with ctx.runtime.bus.subscribe(ctx.run_id) as events, asyncio.timeout(_ANSWER_WITHIN_S):
+        acting: asyncio.Task[PreparedCall] = asyncio.create_task(_act(ctx, steps))
+        event: EventRecord = await events.queue.get()
+        while event.kind != "approval_requested":
+            event = await events.queue.get()
+        approval_id: object = event.data["approval_id"]
+        assert isinstance(approval_id, str)
+        await ctx.runtime.approvals.resolve(approval_id, True, "user", "")
+        return await acting
+
+
 async def test_public_actions_are_spaced_and_stop_at_the_limit_in_yolo_and_a_follow_is_counted_apart(
     runtime: Runtime, site: str
 ) -> None:
@@ -161,8 +177,8 @@ async def test_public_actions_are_spaced_and_stop_at_the_limit_in_yolo_and_a_fol
     follow: JsonObject = {"action": "click", "ref": _ref(page, "Follow @author")}
     with pytest.raises(ToolInputError, match="one public or social action at most"):
         await runtime.registry.tools["browser_act"].prepare({"steps": [repost, follow]}, ctx)
-    first: PreparedCall = await _act(ctx, [repost])
-    await _act(ctx, [repost])
+    first: PreparedCall = await _answered(ctx, [repost])
+    await _answered(ctx, [repost])
     public: list[float] = await runtime.store.paced_times("127.0.0.1", "public", 0.0)
     with pytest.raises(PolicyDenied) as refused:
         await ctx.gate.authorize(first.action)
@@ -172,7 +188,12 @@ async def test_public_actions_are_spaced_and_stop_at_the_limit_in_yolo_and_a_fol
     # The second repost was let through a spacing after the first; the event loop may wake a hair early.
     assert len(public) == 2 and public[1] - public[0] >= SPACING_S - 0.01, public
     assert refused.value.message.startswith("Pace for 127.0.0.1: 2 of 2 public actions in the last hour"), refused.value
-    assert [(event.data["verdict"], event.data["source"]) for event in events] == [("deny", "pace")]
+    # Each repost asked the user (item 429); the pace refused the third before any question.
+    assert [(event.data["verdict"], event.data["source"]) for event in events] == [
+        ("ask", "guard"),
+        ("ask", "guard"),
+        ("deny", "pace"),
+    ]
     assert (followed.action.risk, followed.action.flags) == ("low", ("social",))
     assert await runtime.store.paced_times("127.0.0.1", "social", 0.0) != []
 

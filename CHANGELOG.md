@@ -15,8 +15,10 @@ The first public version of Dot, an always-on autonomous agent for macOS.
   cloud models of Ollama, which run on Ollama's servers: a run's conversation leaves the Mac unless each role is given a
   local model. See [Models and providers](docs/models.md) and
   [What leaves this Mac](docs/safety.md#what-leaves-this-mac).
-- **A policy** records everything a run does. In the approval modes `ask` (the default) and `auto` it hands money and
-  credentials to you and asks before a risky action; in `yolo` only your hand-off rules stop a run. See
+- **A policy** records everything a run does. In the approval modes `ask` (the default) and `auto` it asks before a
+  risky action. In every mode, `yolo` too, money and credentials are handed to you and a message or a post in your name
+  needs a yes (the review model's in `auto`), and no rule of yours turns that off; a `yolo` run also asks you before it
+  reads your secrets. See
   [Safety and privacy](docs/safety.md) and [Autonomy](docs/autonomy.md).
 - **A web UI** comes from a daemon on the Mac. It is also an app on a phone's home screen, reached through Tailscale,
   with notifications. See [The daemon, the web UI and the desktop shell](docs/daemon.md) and

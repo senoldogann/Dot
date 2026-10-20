@@ -332,10 +332,10 @@ _RULE_SYSTEM: str = (
     "- When the words leave it open how much a rule that lets Dot act should cover, cover less. Words that cover "
     "every action (everything, anything, all of it) leave nothing open: they make a rule for every tool, tool * with "
     "no commands and no mentions.\n"
-    "- No rule lifts the protections that are always on: reading secrets and sending them out is refused, and money "
-    "or credentials are handed to the owner. They stay on whatever a rule says, so a rule for every tool is no "
-    "problem; only a sentence that asks for one of those actions itself gets a problem saying that no rule can allow "
-    "it."
+    "- No rule lifts the protections that are always on: reading secrets and sending them out is refused, money "
+    "or credentials are handed to the owner, and a message or a post in the owner's name waits for their yes. They "
+    "stay on whatever a rule says, so a rule for every tool is no problem; only a sentence that asks for one of those "
+    "actions itself gets a problem saying that no rule can allow it."
 )
 
 

@@ -1,7 +1,7 @@
 """Programs on a terminal of their own, through the terminal tools and the gate as the executor runs them: a REPL
-answers what is typed, a password prompt takes a secret only in a ``yolo`` run and the secret shows nowhere, a server
-stays up until its session is closed, and a chat keeps at most its limit of sessions, each closed once it is idle. No
-model is called.
+answers what is typed, a password prompt takes no secret in any mode, ``yolo`` too, and the secret shows nowhere, a
+server stays up until its session is closed, and a chat keeps at most its limit of sessions, each closed once it is
+idle. No model is called.
 """
 
 import asyncio
@@ -23,7 +23,7 @@ from dotagent.core.errors import ToolInputError
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import RunRecord, ThreadRecord
 from dotagent.terminal.session import Terminals, TerminalSession
 from dotagent.tools.base import PreparedCall
 from dotagent.tools.context import ToolContext
@@ -145,25 +145,23 @@ async def test_a_repl_answers_what_is_typed_and_its_session_closes_when_it_ends(
         runtime.terminals.get(ctx.thread_id, session)
 
 
-async def test_a_password_prompt_takes_a_secret_only_in_yolo_and_the_secret_shows_nowhere(runtime: Runtime) -> None:
+async def test_a_password_prompt_is_refused_in_every_mode_and_the_secret_shows_nowhere(runtime: Runtime) -> None:
+    # Credentials are the user's in every mode, yolo too (item 429): nobody else can type into the session.
     ctx: ToolContext = await _yolo_context(runtime)
     _, opened = await _call(
         ctx, "terminal_open", {"command": 'read -s "pw?Password: "; echo; echo "got ${#pw} characters"'}
     )
     session: str = _session(opened)
     typing: JsonObject = {"session": session, "text": f"{SECRET}\n"}
-    with pytest.raises(ToolInputError, match="asks for a password, and only a yolo run types secrets"):
-        await runtime.registry.tools["terminal_send"].prepare(typing, dataclasses.replace(ctx, approvals="ask"))
-    with pytest.raises(ToolInputError, match="type the password alone"):
-        await runtime.registry.tools["terminal_send"].prepare({"session": session, "text": f"{SECRET}\nls\n"}, ctx)
-    typed, answer = await _call(ctx, "terminal_send", typing)
-    waived: list[EventRecord] = await runtime.store.events_of_kind(ctx.run_id, "approval_auto", 10)
     assert "Password:" in opened, opened
-    assert (typed.action.kind, typed.action.risk, typed.action.flags) == ("shell", "high", ("credential",))
-    assert f"got {len(SECRET)} characters" in answer, answer
-    assert len(waived) == 1, waived
-    for shown in (typed.action.summary, typed.action.target, answer, str(waived[0].data)):
-        assert SECRET not in shown, shown
+    for approvals in ("ask", "yolo"):
+        with pytest.raises(
+            ToolInputError, match="asks for a password, and Dot never types one into a terminal"
+        ) as refused:
+            await runtime.registry.tools["terminal_send"].prepare(typing, dataclasses.replace(ctx, approvals=approvals))
+        assert SECRET not in str(refused.value)
+    assert await runtime.store.events_of_kind(ctx.run_id, "approval_auto", 10) == []
+    await _call(ctx, "terminal_close", {"session": session})
 
 
 async def test_a_server_stays_up_between_calls_and_stops_with_its_session(runtime: Runtime, tmp_path: Path) -> None:

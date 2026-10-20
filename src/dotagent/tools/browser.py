@@ -327,17 +327,15 @@ def _act_kind(steps: list[Step]) -> ActionKind:
     return "browser_read"
 
 
-def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretFieldCheck:
-    """What a batch does at a field that takes a secret: every mode but yolo refuses it. Yolo types into it after asking
-    the gate, which waives the hand-off and records it, unless the batch was authorized for that kind of secret
-    already."""
+def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
+    """What a batch does at a field that takes a secret: every mode but yolo refuses it. Yolo asks the gate, which hands
+    every such field to the user (item 429: money and credentials are theirs in every mode); a yes to the batch, a
+    payment under its caps among them, never covers typing a card number or a password."""
     if ctx.approvals != "yolo":
         return refuse_secret_field
 
     async def enter(field: SecretField) -> None:
         flag: Flag = secret_field_flag(field.kind)
-        if flag in authorized.flags:
-            return
         summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
         await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, field.url, (flag,)))
 
@@ -381,17 +379,11 @@ def _act_tool() -> RegisteredTool:
         summary: str = "; ".join(_step_label(step, element, target) for step, element, target in judged)
         target: str = ctx.browser.current_url(ctx.thread_id) or ""
         # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
-        # In yolo a flag asks nothing, so nothing is asked.
-        judgments: list[ClickJudgment] = (
-            []
-            if ctx.approvals == "yolo"
-            else await asyncio.gather(
-                *(
-                    ctx.runtime.judge.judge_click(
-                        ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id
-                    )
-                    for element in unexplained_clicks([(step, element) for step, element, _ in judged])
-                )
+        # It reads them in yolo too: a payment, a message or a post it finds is the user's there as well (item 429).
+        judgments: list[ClickJudgment] = await asyncio.gather(
+            *(
+                ctx.runtime.judge.judge_click(ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id)
+                for element in unexplained_clicks([(step, element) for step, element, _ in judged])
             )
         )
         found: list[StepAssessment] = [assessment_for(judgment.reasons) for judgment in judgments if judgment.reasons]
@@ -425,7 +417,7 @@ def _act_tool() -> RegisteredTool:
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         limit: int = ctx.runtime.config.browser.max_batch_steps
         outcome: ActOutcome = await ctx.browser.act(
-            ctx.thread_id, first_steps(args.steps, limit), args.accept_dialogs, _secret_field_check(ctx, authorized)
+            ctx.thread_id, first_steps(args.steps, limit), args.accept_dialogs, _secret_field_check(ctx)
         )
         rendered: str = render_act_outcome(outcome, _nonce(), _body_budget(ctx))
         note: str = batch_cut_note(len(args.steps), limit)

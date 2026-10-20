@@ -7,16 +7,16 @@ completes, with what was typed before on that line, so that a command typed in p
 acts upon (Tab, the arrows, a Ctrl- shortcut) leave a line that cannot be told, which is judged as code that cannot be
 read, and once a line has run the program may be in another directory, so later lines are judged from the home folder,
 as a line typed into a terminal application is. What the program prints is untrusted: an installer, a remote shell
-or a REPL prints what other people wrote. Text typed while
-the program's last line asks for a password is a ``credential``: a ``yolo`` run types it, alone so that no command goes
-with it unjudged, and the policy records it; in every other mode the tool refuses, as the browser refuses a password
-field, since nobody else can type into the session.
+or a REPL prints what other people wrote. Text typed while the program's last line asks for a password is refused in
+every mode, yolo too (item 429): credentials are the user's, and nobody else can type into the session, so the step is
+theirs to run in a terminal of their own.
 
 A command opened with ``background`` (item 229) runs on its own, past the shell's time limit and unread, and its end is
 told to its chat; a delegated run and a campaign's session have no chat of their own to tell, and open none.
 """
 
 from pathlib import Path
+from typing import NoReturn
 
 from pydantic import Field
 
@@ -94,29 +94,12 @@ def _output(session: TerminalSession, text: str, wait_s: float) -> str:
     return body if body else f"[no new output from {session.id} in {wait_s:g} s]"
 
 
-def _secret_action(
-    session: TerminalSession, lines: tuple[str | None, ...], rest: str | None, ctx: ToolContext
-) -> ActionInfo:
-    """Typing at a password prompt: ``lines`` and ``rest`` are what the text completes and leaves on the line."""
-    if ctx.approvals != "yolo":
-        raise ToolInputError(
-            f"The program of {session.id} asks for a password, and only a yolo run types secrets into a terminal. "
-            "Ask the user to run this step in their own terminal, or go on without it.",
-            {"session": session.id, "command": session.command},
-        )
-    if len(lines) > 1 or (lines and rest):
-        raise ToolInputError(
-            f"The program of {session.id} asks for a password: type the password alone, ending with \\n, and what "
-            "comes after it in another terminal_send.",
-            {"session": session.id},
-        )
-    return _action(
-        "terminal_send",
-        "shell",
-        "high",
-        f"Type the secret that {session.id} asks for ({truncate_middle(session.command, _PREVIEW_CHARS)})",
-        session.command,
-        ("credential",),
+def _refuse_secret(session: TerminalSession) -> NoReturn:
+    """Typing at a password prompt is the user's, in every mode (item 429)."""
+    raise ToolInputError(
+        f"The program of {session.id} asks for a password, and Dot never types one into a terminal: credentials are "
+        "the user's. Ask the user to run this step in their own terminal, or go on without it.",
+        {"session": session.id, "command": session.command},
     )
 
 
@@ -162,7 +145,7 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
         session: TerminalSession = ctx.runtime.terminals.get(ctx.thread_id, args.session)
         lines, rest = typed_lines(session.pending_line, args.text)
         if session.awaiting_secret:
-            return _secret_action(session, lines, rest, ctx)
+            _refuse_secret(session)
         if run_sandbox(ctx).commands and not session.sandboxed:
             raise ToolInputError(
                 f"{session.id} was opened outside the sandbox the commands of this run start in (by a yolo run, or "
@@ -219,7 +202,7 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
             name="terminal_send",
             description=(
                 "Type into a terminal session and return what the program printed back. End a line with \\n to "
-                "press Enter. When the program asks for a password, only a yolo run types it."
+                "press Enter. When the program asks for a password, the user types it in a terminal of their own."
             ),
             args_model=SendArgs,
             modes=ACTING_MODES,

@@ -1,5 +1,5 @@
-"""A field that takes a secret, through the browser tools and the gate: in ask mode the step is refused, a yolo run
-types the code it read and the gate keeps a credential record of it.
+"""A field that takes a secret, through the browser tools and the gate: in ask mode the step is refused, and a yolo run
+hands the field to the user (item 429), whose answer the gate keeps.
 
 The fixture page asks for a code from an e-mail in a field marked ``autocomplete="one-time-code"`` whose label names
 nothing secret, so only the field's own marking, read when the step runs, tells what it takes. The check is what reached
@@ -16,19 +16,24 @@ from pathlib import Path
 import pytest
 import pytest_asyncio
 
-from dotagent.agent.gate import YOLO_DECIDER, RunGate, SiteLocks
+from dotagent.agent.gate import RunGate, SiteLocks
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
+from dotagent.browser.types import SecretField, SecretFieldCheck
 from dotagent.config import load_config
+from dotagent.core.errors import HandedOff
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.store.models import ApprovalRecord, RunRecord, ThreadRecord
+from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
+from dotagent.tools.browser import _secret_field_check
 from dotagent.tools.context import ToolContext
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+# How long the test waits for the hand-off's card and for the step once it is answered.
+_ANSWER_WITHIN_S: float = 30.0
 
 GOAL: str = "Confirm the sign-up with the code from the e-mail."
 CODE: str = "482913"
@@ -264,15 +269,45 @@ async def test_ask_mode_refuses_text_for_an_editor_once_the_focus_went_to_the_co
     assert await _records(ctx) == []
 
 
-async def test_a_yolo_run_types_the_code_and_the_gate_records_it_as_a_credential(runtime: Runtime, site: _Site) -> None:
+async def test_a_yolo_run_hands_the_code_field_to_the_user(runtime: Runtime, site: _Site) -> None:
+    """In yolo too a field that takes a secret is the user's (item 429): the gate hands it to them, and the steps after
+    it wait for the run to look at the page again."""
     ctx, gate = await _context(runtime, "yolo")
     field: str = await _code_field(ctx, gate, site)
     steps: list[JsonObject] = [{"action": "fill", "ref": field, "text": CODE}, {"action": "press", "key": "Enter"}]
-    acted: ToolResult = await _call(ctx, gate, "browser_act", {"steps": steps})
-    assert "refusing" not in acted.text
-    assert site.submissions == [f"/verified?code={CODE}"]
+    async with runtime.bus.subscribe(ctx.run_id) as events, asyncio.timeout(_ANSWER_WITHIN_S):
+        acting: asyncio.Task[ToolResult] = asyncio.create_task(_call(ctx, gate, "browser_act", {"steps": steps}))
+        event: EventRecord = await events.queue.get()
+        while event.kind != "approval_requested":
+            event = await events.queue.get()
+        approval_id: object = event.data["approval_id"]
+        assert isinstance(approval_id, str)
+        await runtime.approvals.resolve(approval_id, True, "user", "typed it myself")
+        acted: ToolResult = await acting
+    assert "the user handled this step themselves (typed it myself)" in acted.text
+    assert site.submissions == []
     records: list[ApprovalRecord] = await _records(ctx)
-    assert [(record.status, record.decided_by, record.args["flags"]) for record in records] == [
-        ("approved", YOLO_DECIDER, ["credential"])
+    assert [(record.status, record.decided_by, record.severity) for record in records] == [
+        ("approved", "user", "handoff")
     ]
     assert records[0].summary.startswith(f"Type into a one-time-code field ({field})")
+
+
+async def test_a_yolo_run_hands_every_card_field_to_the_user_whatever_its_batch_was_allowed(runtime: Runtime) -> None:
+    """A yes to a batch, a payment under its caps among them, never covers typing a card number (item 429): the field
+    is asked of the gate on its own, which hands it to the user."""
+    ctx, _ = await _context(runtime, "yolo")
+    check: SecretFieldCheck = _secret_field_check(ctx)
+    field: SecretField = SecretField(ref="e7", kind="cc-number", url="https://shop.example/checkout")
+    async with runtime.bus.subscribe(ctx.run_id) as events, asyncio.timeout(_ANSWER_WITHIN_S):
+        typing: asyncio.Task[None] = asyncio.create_task(check(field))
+        event: EventRecord = await events.queue.get()
+        while event.kind != "approval_requested":
+            event = await events.queue.get()
+        approval_id: object = event.data["approval_id"]
+        assert isinstance(approval_id, str)
+        await runtime.approvals.resolve(approval_id, True, "user", "typed it myself")
+        with pytest.raises(HandedOff):
+            await typing
+    records: list[ApprovalRecord] = await _records(ctx)
+    assert [(record.severity, record.args["flags"]) for record in records] == [("handoff", ["financial"])]

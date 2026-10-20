@@ -747,7 +747,8 @@ async def test_an_action_that_names_what_it_expects_gets_the_judges_numbers_abou
     assert plain.text.startswith("Steps: 1 done") and len(service.requests) == before + 1
 
 
-async def test_in_yolo_a_click_no_pattern_knows_sends_nothing_to_the_judge(runtime: Runtime, service: _Service) -> None:
+async def test_in_yolo_a_click_no_pattern_knows_is_judged_too(runtime: Runtime, service: _Service) -> None:
+    # A post the judge finds is the user's in yolo as well (item 429), so the click is judged in every mode.
     ctx: ToolContext = await _context_in(runtime, None, "yolo")
     opened: PreparedCall = await runtime.registry.tools["browser_open"].prepare({"url": f"{service.base}/"}, ctx)
     page: ToolResult = await opened.run(ctx)
@@ -755,8 +756,9 @@ async def test_in_yolo_a_click_no_pattern_knows_sends_nothing_to_the_judge(runti
     boost: ActionInfo = await _classified(
         ctx, "browser_act", {"steps": [{"action": "click", "ref": _ref(page.text, "button", "Boost")}]}
     )
-    assert (boost.flags, len(service.requests)) == ((), before)
-    assert "judge" not in boost.summary
+    assert (boost.risk, boost.flags) == ("medium", ("public_post",))
+    assert boost.summary.endswith("(judge: public_post 0.95)"), boost.summary
+    assert len(service.requests) > before
 
 
 async def test_in_goal_mode_a_claim_the_judge_finds_false_is_sent_back_without_the_review_model(

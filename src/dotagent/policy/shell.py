@@ -299,6 +299,10 @@ _REMOTE_COPY: frozenset[str] = frozenset({"scp", "sftp", "rsync", "nc", "ncat", 
 # A path of another machine as scp and rsync take one: ``host:path``, ``user@host:path``, ``host::module``, ``rsync://``.
 _REMOTE_PATH: re.Pattern[str] = re.compile(r"[^/]*:")
 _TUNNELS: frozenset[str] = frozenset({"ngrok", "cloudflared", "localtunnel", "lt", "bore", "serveo"})
+# The mailers of the command line (item 429): sendmail and msmtp send what they are given; mail, mailx and mutt send
+# when a word follows them (a recipient), and only open the mailbox otherwise.
+_SENDERS: frozenset[str] = frozenset({"sendmail", "msmtp"})
+_MAILERS: frozenset[str] = frozenset({"mail", "mailx", "mutt"})
 # Command lines of code hosts: what they print (issues, reviews, comments) is written by other people.
 _CODE_HOSTS: frozenset[str] = frozenset({"gh", "glab", "hub", "tea"})
 # What a code host's command line does that only reads (``gh pr view``, ``gh run list``, ``gh repo clone``).
@@ -2519,7 +2523,7 @@ def _applescript_findings(script: str, scope: ShellScope) -> list[Finding]:
         risk = "high"
         reasons.append("changes power or session state")
     if _AS_SEND.search(script):
-        flags.append("external_send")
+        flags.extend(("external_send", "message_send"))
         risk = "high" if risk != "high" else risk
         reasons.append("sends a message")
     if _AS_DELETE.search(script):
@@ -2594,6 +2598,8 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         return [talks, _assess_writes(command, args, scope)] if command in _COPIES else [talks]
     if command in _CODE_HOSTS:
         return [_assess_code_host(command, args)]
+    if command in _SENDERS or (command in _MAILERS and _positional(args)):
+        return [_finding("high", ("external_send", "message_send"), f"{command} sends an email")]
     if command in _TUNNELS:
         return [_finding("high", ("external_send",), f"{command} exposes this machine to the internet")]
     if command == "osascript":
