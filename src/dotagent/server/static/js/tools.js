@@ -259,9 +259,6 @@ export function toolRow({ tool, args }) {
     // A command keeps its own words, what it came to its tooltip; a failure's first line is the tooltip of any call.
     head.title = outcome.ok ? outcome.summary || tool : firstLine(outcome.text) || "failed";
     time.textContent = duration(outcome.seconds);
-    if (outcome.risk !== "" && outcome.risk !== "safe") {
-      badges.replaceChildren(el("span", { class: `badge r-${outcome.risk}` }, outcome.risk));
-    }
     shots.replaceChildren(...outcome.images.map(thumbnail));
     if (details.open) {
       buildBody();

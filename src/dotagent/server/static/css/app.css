@@ -1479,30 +1479,26 @@ a.pill:hover {
 }
 
 .badge.s-done,
-.badge.b-ok,
-.badge.r-safe {
+.badge.b-ok {
   background: var(--ok-weak);
   color: var(--ok);
 }
 
 .badge.s-failed,
-.badge.b-bad,
-.badge.r-high {
+.badge.b-bad {
   background: var(--bad-weak);
   color: var(--bad);
 }
 
 .badge.s-blocked,
-.badge.b-warn,
-.badge.r-medium {
+.badge.b-warn {
   background: var(--warn-weak);
   color: var(--warn);
 }
 
 .badge.s-cancelled,
 .badge.s-queued,
-.badge.b-muted,
-.badge.r-low {
+.badge.b-muted {
   background: var(--surface-3);
   color: var(--muted);
 }

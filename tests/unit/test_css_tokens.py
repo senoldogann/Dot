@@ -241,3 +241,12 @@ def test_the_sunshine_over_work_that_goes_on_is_the_texts_own_colour_not_an_ambe
     gradient: str = block[block.index("linear-gradient(") : block.index(");")]
     assert "var(--text) 50%" in gradient, gradient
     assert "--warn" not in gradient and "--accent" not in gradient, gradient
+
+
+def test_a_call_in_the_chat_wears_no_low_medium_high_badge() -> None:
+    """The row of a command or any other call says what it did, not a risk level (item 438): the owner took the label
+    off, and it came back. The approval card keeps its own severity, which is a question, not a label of a call."""
+    tools: str = (_CSS.parent / "js" / "tools.js").read_text(encoding="utf-8")
+    assert "badge r-" not in tools
+    assert "outcome.risk" not in tools
+    assert ".r-low" not in (_CSS / "app.css").read_text(encoding="utf-8")
