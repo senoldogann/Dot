@@ -47,6 +47,12 @@ at the top, until a release names it; how a release is made is in [Releasing](do
   nothing. A run's command may ask only for the latter (the restart now and `service install` refuse in a run), and the
   shell tool tells the model to, never to load a launchd job of its own, which launchd started again every 30 seconds.
   `dotx service status` says whether a restart waits and `dotx service uninstall` cancels it (item 441).
+- A chat you go to from the side menu opens at its foot, on its newest message: one whose run ended while you were in
+  another chat no longer lands on the top of its answer and writes it in again, and one whose run is at work no
+  longer stands the composer's height above its end on a phone (item 446).
+- Every run, a chat's too, is told that there is always a way: it does not give up on a step while a way is left
+  untried and says that something cannot be done only after trying it, naming each way it tried; a chat does not end
+  its turn announcing a step it could take now. No way goes around a refusal, a denial or your decision (item 446).
 
 ## 0.1.0 (2026-10-20)
 

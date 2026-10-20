@@ -52,6 +52,10 @@ _TIME_LIMIT_S: float = 60.0
 _MAX_EVENTS: int = 10_000
 _SUMMARY_KEY: str = ":summary"
 _BROKEN_FAST: str = "broken"
+# The window of the runs whose summaries are measured: three quarters of it hold the fixed part of the prompt with a
+# little room, so that forty pages make the run summarize again and again. 24 000 held it with a few tokens to spare
+# until every run was told that there is always a way (item 446).
+_SMALL_WINDOW: int = 26_000
 # Every section the continuity check asks for, and no identifier the run's history does not hold.
 _SUMMARY: str = (
     "GOAL: find why the backup failed.\nDONE: read the log page by page.\nSTATE: no failure found so far.\n"
@@ -371,7 +375,7 @@ async def test_a_fast_model_that_fails_leaves_the_summary_to_the_runs_own_model_
         update={"models": config.models.model_copy(update={"fast": f"{_PROVIDER}:{_BROKEN_FAST}"})}
     )
     played: Played = await _play_with(
-        broken, login_env, BrokenFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+        broken, login_env, BrokenFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW)
     )
     assert played.record.status == "done"
     assert len(played.compactions) > 1
@@ -388,7 +392,7 @@ async def test_a_fast_model_paused_after_a_rate_limit_is_not_asked_again_and_the
     limited: AppConfig = config.model_copy(
         update={"models": config.models.model_copy(update={"fast": f"{_PROVIDER}:{_BROKEN_FAST}"})}
     )
-    model: RateLimitedFastProvider = RateLimitedFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+    model: RateLimitedFastProvider = RateLimitedFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW)
     played: Played = await _play_with(limited, login_env, model)
     assert played.record.status == "done"
     assert len(played.compactions) > 1
@@ -411,7 +415,7 @@ async def test_a_summary_that_lacks_a_section_is_asked_for_again_with_the_sectio
     login_env: dict[str, str],
 ) -> None:
     played: Played = await _play_with(
-        _config({}, 6), login_env, ForgetfulFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+        _config({}, 6), login_env, ForgetfulFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW)
     )
     assert played.record.status == "done"
     assert len(played.compactions) > 1
@@ -434,7 +438,7 @@ async def test_a_summary_that_still_lacks_a_section_keeps_its_heading_empty_and_
     heading; the check and the note name the section, and the log says it was left empty."""
     with capture_logs() as logs:
         played: Played = await _play_with(
-            _config({}, 6), login_env, StubbornFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000)
+            _config({}, 6), login_env, StubbornFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW)
         )
     assert played.record.status == "done"
     assert played.compactions
@@ -452,7 +456,7 @@ async def test_a_summary_that_still_lacks_a_section_keeps_its_heading_empty_and_
 async def test_every_model_call_of_a_run_leaves_its_seconds_and_tokens_and_the_totals_hold_them_all(
     login_env: dict[str, str],
 ) -> None:
-    played: Played = await _play(_config({}, 6), login_env, 24_000, _reading(20))
+    played: Played = await _play(_config({}, 6), login_env, _SMALL_WINDOW, _reading(20))
     assert played.record.status == "done"
     assert len(played.compactions) >= 1
     purposes: list[JsonValue] = [call["purpose"] for call in played.calls]
@@ -520,7 +524,7 @@ async def test_a_summary_keeps_no_secret_dot_holds_nor_one_of_a_known_form(
     monkeypatch.setenv("DOT_TEST_SUMMARY_KEY", held)
     assert resolve_secret("DOT_TEST_SUMMARY_KEY") == held
     played: Played = await _play_with(
-        _config({}, 6), login_env, TellingFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), 24_000, held)
+        _config({}, 6), login_env, TellingFastProvider(ScriptedProvider(_PROVIDER, _reading(40)), _SMALL_WINDOW, held)
     )
     assert played.record.status == "done"
     assert played.compactions and all(compaction["method"] == "model" for compaction in played.compactions)
