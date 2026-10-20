@@ -8,7 +8,7 @@ acts upon (Tab, the arrows, a Ctrl- shortcut) leave a line that cannot be told, 
 read, and once a line has run the program may be in another directory, so later lines are judged from the home folder,
 as a line typed into a terminal application is. What the program prints is untrusted: an installer, a remote shell
 or a REPL prints what other people wrote. Text typed while the program's last line asks for a password is refused in
-every mode, yolo too (item 427): credentials are the user's, and nobody else can type into the session, so the step is
+every mode, yolo too (item 429): credentials are the user's, and nobody else can type into the session, so the step is
 theirs to run in a terminal of their own.
 
 A command opened with ``background`` (item 229) runs on its own, past the shell's time limit and unread, and its end is
@@ -95,7 +95,7 @@ def _output(session: TerminalSession, text: str, wait_s: float) -> str:
 
 
 def _refuse_secret(session: TerminalSession) -> NoReturn:
-    """Typing at a password prompt is the user's, in every mode (item 427)."""
+    """Typing at a password prompt is the user's, in every mode (item 429)."""
     raise ToolInputError(
         f"The program of {session.id} asks for a password, and Dot never types one into a terminal: credentials are "
         "the user's. Ask the user to run this step in their own terminal, or go on without it.",

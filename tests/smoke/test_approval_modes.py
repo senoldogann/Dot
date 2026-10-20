@@ -70,7 +70,7 @@ SECRET: ActionInfo = ActionInfo(
     target="~/.ssh/id_ed25519",
     flags=("secret_access",),
 )
-# A message sent for the user (item 427), as AppleScript's send is classified.
+# A message sent for the user (item 429), as AppleScript's send is classified.
 MESSAGE: ActionInfo = ActionInfo(
     tool="apple_script",
     kind="app_control",
@@ -247,7 +247,7 @@ async def test_yolo_also_waives_the_question_that_untrusted_content_raises(room:
 
 
 async def test_yolo_leaves_money_secrets_and_messages_to_the_user(room: Room) -> None:
-    """The guard no rule turns off (item 427): in yolo too, money is handed to the user, a secret store read asks them
+    """The guard no rule turns off (item 429): in yolo too, money is handed to the user, a secret store read asks them
     where every other mode refuses it, and a message sent for them waits for their yes."""
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
     paying: Question = await _ask(room, gate, PAYMENT)
@@ -298,7 +298,7 @@ async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Roo
 
 
 async def test_a_hand_off_rule_of_the_user_still_stops_a_yolo_run(room: Room) -> None:
-    # Money is handed off in yolo anyway (item 427): a rule of the user's hands off what the guard leaves to the run.
+    # Money is handed off in yolo anyway (item 429): a rule of the user's hands off what the guard leaves to the run.
     await room.store.add_rule("handoff", "schedule_create", "", "Schedules are mine")
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
     question: Question = await _ask(room, gate, SCHEDULE)
@@ -337,7 +337,7 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
     await room.broker.resolve(over.record.id, True, "user", "paid it myself")
     with pytest.raises(HandedOff):
         await asyncio.wait_for(over.answer, WAIT_S)
-    # A yolo run asks within the caps as an ask run does, and hands a payment no cap covers to the user (item 427).
+    # A yolo run asks within the caps as an ask run does, and hands a payment no cap covers to the user (item 429).
     yolo: RunGate = RunGate(
         room.store,
         room.bus,
@@ -366,7 +366,7 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
 
 
 async def test_a_capped_payment_that_also_posts_asks_and_still_counts_against_the_day(room: Room) -> None:
-    """A payment under its caps whose step also posts is asked by the guard (item 427), and once it goes ahead its spend
+    """A payment under its caps whose step also posts is asked by the guard (item 429), and once it goes ahead its spend
     counts against the day as any other's: a page cannot keep the day's cap from filling by adding a post."""
     gate: RunGate = RunGate(
         room.store,
@@ -458,7 +458,7 @@ async def test_two_runs_cannot_both_take_the_last_public_action_of_the_day_on_a_
         )
         for _ in range(2)
     ]
-    # A post waits for the user's yes in yolo too (item 427): the run that takes the last post of the day asks, and the
+    # A post waits for the user's yes in yolo too (item 429): the run that takes the last post of the day asks, and the
     # other is refused by the pace without a question.
     async with room.bus.subscribe(room.run.id) as events, asyncio.timeout(WAIT_S):
         tasks: list[asyncio.Task[str]] = [asyncio.create_task(gate.authorize(POST)) for gate in gates]

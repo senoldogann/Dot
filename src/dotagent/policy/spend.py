@@ -4,7 +4,7 @@
 of its controls ("Pay €19.90") and from the totals on the page ("Order total: $12.00"); where several amounts stand, the
 largest is taken, so a misread errs towards the hand-off. A step whose amount cannot be read keeps the hand-off. Under
 both caps the policy asks instead of handing the step to the user, so an ``auto`` run lets the review model answer, and
-an ``ask`` or a ``yolo`` run asks the user once (item 427); the spend is recorded once the step goes ahead, whichever
+an ``ask`` or a ``yolo`` run asks the user once (item 429); the spend is recorded once the step goes ahead, whichever
 question let it through, and counts against the site's day. The caps are plain numbers compared with the number on the
 page, whatever its currency: set caps for sites that bill in one currency.
 """

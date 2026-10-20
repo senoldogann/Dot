@@ -68,7 +68,7 @@ type SecureFieldCheck = Callable[[Inspection, str], None]
 
 
 def refuse_secure_field(inspection: Inspection, what: str) -> None:
-    """The secure-field check of every mode, yolo too (item 427): nothing goes into a secure text field."""
+    """The secure-field check of every mode, yolo too (item 429): nothing goes into a secure text field."""
     raise DesktopError(
         f"{what} into a secure text field is refused: Dot never enters passwords or codes. "
         "Ask the user to type it themselves",

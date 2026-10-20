@@ -748,7 +748,7 @@ async def test_an_action_that_names_what_it_expects_gets_the_judges_numbers_abou
 
 
 async def test_in_yolo_a_click_no_pattern_knows_is_judged_too(runtime: Runtime, service: _Service) -> None:
-    # A post the judge finds is the user's in yolo as well (item 427), so the click is judged in every mode.
+    # A post the judge finds is the user's in yolo as well (item 429), so the click is judged in every mode.
     ctx: ToolContext = await _context_in(runtime, None, "yolo")
     opened: PreparedCall = await runtime.registry.tools["browser_open"].prepare({"url": f"{service.base}/"}, ctx)
     page: ToolResult = await opened.run(ctx)

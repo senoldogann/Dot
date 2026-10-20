@@ -15624,7 +15624,7 @@ events changed) is not in it. Tests: `tests/unit/test_mail_calendar.py`, `tests/
 providers stood in for, after a real sign-in into a keychain of the test's own: a token turned away and refreshed, a
 "not now" waited out, an address no account has). Docs: `docs/runs.md`, `docs/extending.md`, `docs/safety.md`.
 
-### 427. The guard no rule turns off: money, passwords, secrets and messages are the owner's in every mode, yolo too
+### 429. The guard no rule turns off: money, passwords, secrets and messages are the owner's in every mode, yolo too
 
 **Status: done (2026-10-20), on `yolo-guard`; paths a human merges (REVIEW.md), merged on the owner's word of
 2026-10-20 to merge every open branch once all was done.** The owner's word of 2026-10-19: "Onayları sohbetin içine taşı. Her riskli işlem için sohbette onay kartı
@@ -16536,5 +16536,5 @@ spend asks, no allow rule lets a message go, a hand-off rule holds; the pace rac
   to ask could be sent with yolo; a server left out for too many tools could not be chosen from until the daemon
   restarted, and a choice that could not connect was kept anyway; the template cards hid a failing tool list. The
   agent's box shares fast mode and goal mode with the home's, as the pickers always did.
-- 2026-10-20 (Opus 5.5): item 427 on `yolo-guard` from `main`: the guard no rule turns off, money, credentials,
+- 2026-10-20 (Opus 5.5): item 429 on `yolo-guard` from `main`: the guard no rule turns off, money, credentials,
   secrets, messages and posts in the owner's name theirs in every mode, yolo too.

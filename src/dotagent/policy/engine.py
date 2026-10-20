@@ -28,9 +28,9 @@ RULE_MATCH_TIMEOUT_S: float = 0.25
 _TAINT_REASON: str = "untrusted content is in context and this action reaches outside the Mac"
 # What a yolo run lets through as well: the changes of Dot's own files, unless a hand-off rule of the user matches the
 # action (:func:`owner_handoff`). Money, credentials, the always-on refusals (asked instead), messages and posts stay
-# the user's (item 427), and a research run stays read-only (``mode``).
+# the user's (item 429), and a research run stays read-only (``mode``).
 YOLO_WAIVED_SOURCES: frozenset[DecisionSource] = frozenset({"own_files"})
-# The questions a yolo run asks the user rather than waive (item 427): the hand-off of money and credentials, the
+# The questions a yolo run asks the user rather than waive (item 429): the hand-off of money and credentials, the
 # guard of messages and posts, and a pre-approved spend, which asks in place of the hand-off.
 GUARDED_SOURCES: frozenset[DecisionSource] = frozenset({"hard_stop", "guard", "spend"})
 # Why a change of Dot's own files waits for the user (item 398).
@@ -41,7 +41,7 @@ _UNSUPERVISED_KINDS: frozenset[ActionKind] = RESEARCH_KINDS
 # The run's own notes and memory notes, which shape later runs as well but are its own to keep, as in a research run.
 _OWN_NOTE_KINDS: frozenset[ActionKind] = frozenset({"notes_write", "memory_write"})
 _HARD_HANDOFF_FLAGS: frozenset[Flag] = frozenset({"financial", "credential"})
-# What waits for the user's yes in every mode, whatever their rules say (item 427): a message sent for them, a post in
+# What waits for the user's yes in every mode, whatever their rules say (item 429): a message sent for them, a post in
 # their name.
 _GUARD_FLAGS: frozenset[Flag] = frozenset({"message_send", "public_post"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset({"privilege", "system_settings", "public_post", "external_send"})
@@ -62,7 +62,7 @@ def _intersect(info: ActionInfo, flags: frozenset[Flag]) -> list[Flag]:
 
 def auto_review(info: ActionInfo) -> Decision | None:
     """Always-on review: secret access and exfiltration are refused whatever the preset or rules say (a yolo run asks
-    the user instead, item 427)."""
+    the user instead, item 429)."""
     hits: list[Flag] = _intersect(info, _DENY_FLAGS)
     if hits:
         return Decision(
@@ -75,7 +75,7 @@ def auto_review(info: ActionInfo) -> Decision | None:
 
 
 def asked_in_yolo(info: ActionInfo) -> Decision:
-    """What a yolo run makes of an action the always-on review refuses (:func:`auto_review`, item 427): a question for
+    """What a yolo run makes of an action the always-on review refuses (:func:`auto_review`, item 429): a question for
     the user, who may let a secret store be read or data be sent out, where every other mode refuses it. The question
     names every guarded flag of the step, a message or a post it also sends among them, as the one yes answers for
     all; the hand-off of money or credentials, which is stricter, the gate puts first (:func:`hard_stop`)."""
@@ -110,7 +110,7 @@ def own_files(info: ActionInfo) -> Decision | None:
 
 
 def hard_stop(info: ActionInfo, allowance: Decision | None) -> Decision | None:
-    """Money and credentials are the user's to handle, regardless of rules and in every mode, yolo too (item 427). A
+    """Money and credentials are the user's to handle, regardless of rules and in every mode, yolo too (item 429). A
     payment step with a pre-approved ``allowance`` (:mod:`dotagent.policy.spend`) is not stopped for its money; a
     credential it also carries still stops it."""
     waived: frozenset[Flag] = frozenset({"financial"}) if allowance is not None else frozenset()
@@ -127,7 +127,7 @@ def hard_stop(info: ActionInfo, allowance: Decision | None) -> Decision | None:
 
 def guard(info: ActionInfo) -> Decision | None:
     """A message sent for the user, or a post in their name, waits for their yes in every mode, yolo too, and no rule
-    of theirs lets it through (item 427): only a rule that hands it off is stricter (:func:`decide`)."""
+    of theirs lets it through (item 429): only a rule that hands it off is stricter (:func:`decide`)."""
     hits: list[Flag] = _intersect(info, _GUARD_FLAGS)
     if not hits:
         return None
@@ -286,7 +286,7 @@ def supervised(decision: Decision, info: ActionInfo) -> Decision:
 def route_for(decision: Decision, mode: ApprovalMode) -> Route:
     """Who answers a question the engine raised. A hand-off is the user's: money and credentials never go to a
     reviewer, and neither does a change of Dot's own files (item 398). A plain question follows the mode, but a yolo
-    run waives none of the guarded ones (:data:`GUARDED_SOURCES`, item 427): they are the user's."""
+    run waives none of the guarded ones (:data:`GUARDED_SOURCES`, item 429): they are the user's."""
     if decision.verdict == "handoff" or decision.source == "own_files":
         return "user"
     if mode == "auto":

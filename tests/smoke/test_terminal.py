@@ -146,7 +146,7 @@ async def test_a_repl_answers_what_is_typed_and_its_session_closes_when_it_ends(
 
 
 async def test_a_password_prompt_is_refused_in_every_mode_and_the_secret_shows_nowhere(runtime: Runtime) -> None:
-    # Credentials are the user's in every mode, yolo too (item 427): nobody else can type into the session.
+    # Credentials are the user's in every mode, yolo too (item 429): nobody else can type into the session.
     ctx: ToolContext = await _yolo_context(runtime)
     _, opened = await _call(
         ctx, "terminal_open", {"command": 'read -s "pw?Password: "; echo; echo "got ${#pw} characters"'}

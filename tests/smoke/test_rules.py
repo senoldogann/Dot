@@ -292,7 +292,7 @@ async def test_an_approval_card_offers_to_make_a_rule_of_its_action(
 async def test_a_card_the_guard_raised_offers_no_rule_and_says_why(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
 ) -> None:
-    """A message sent for the user waits for their yes in every mode, yolo too, whatever their rules say (item 427): its
+    """A message sent for the user waits for their yes in every mode, yolo too, whatever their rules say (item 429): its
     card, in the chat, offers no rule, which would never apply, and says so; on a desktop and on a phone. The card is
     refused at the end, so nothing is sent."""
     MODEL.script = ScriptedProvider(

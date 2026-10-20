@@ -49,7 +49,7 @@ _PAYMENT_FIELD: re.Pattern[str] = re.compile(
     r"|account number|kart numaras[ıi]|son kullanma)\b"
 )
 
-# The flags of each reason: a send is a message sent for the owner too (item 427), which no rule of theirs lets through.
+# The flags of each reason: a send is a message sent for the owner too (item 429), which no rule of theirs lets through.
 _FLAGS_OF_REASON: dict[str, tuple[Flag, ...]] = {
     "credential": ("credential",),
     "payment": ("financial",),

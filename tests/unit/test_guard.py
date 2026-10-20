@@ -1,4 +1,4 @@
-"""The guard no rule turns off (item 427): a message sent for the user or a post in their name asks in every mode and
+"""The guard no rule turns off (item 429): a message sent for the user or a post in their name asks in every mode and
 no rule that allows it answers for them; a yolo run leaves money, credentials, the guard and a pre-approved spend to the
 user and asks before their secrets; and every classifier that knows a message goes out says so."""
 

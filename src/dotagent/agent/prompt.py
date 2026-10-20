@@ -376,7 +376,7 @@ password managers) unless the user explicitly asked for that exact item.
 when the task is about what the user copied."""
 
 
-# In every mode, yolo too (item 427), a field that takes a secret is the user's: outside yolo the browser and the
+# In every mode, yolo too (item 429), a field that takes a secret is the user's: outside yolo the browser and the
 # desktop refuse to type into it, and in yolo the policy hands it to the user.
 _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."

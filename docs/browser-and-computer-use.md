@@ -172,7 +172,7 @@ Both modes share what follows.
   and the line above the page says how many are open. A click that another element takes fails with the name of that
   element and what to do about it (close or answer the box, or press Escape).
 - Password, one-time-code and card fields are never filled by Dot: outside `yolo` the step is refused, and in `yolo`
-  the field is handed to you, with the browser to take over (item 427, see [Safety](safety.md#safety)). Cookie banners
+  the field is handed to you, with the browser to take over (item 429, see [Safety](safety.md#safety)). Cookie banners
   are declined (`decline_cookie_banners`).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
@@ -273,7 +273,7 @@ owner's: a desktop step on chrome://inspect's switch or on the Allow Chrome asks
 - `desktop_screenshot` captures the screen with ScreenCaptureKit as a JPEG of at most `screenshot_max_edge` pixels
   (1366 by default: about 1 600 tokens on the hosted providers, against about 2 500 at 1920).
 - `desktop.keep_awake` keeps the display awake while Dot works. Password managers are refused in every mode, and so
-  are secure fields: in `yolo` a step the review sees typing a credential is handed to you (item 427, see
+  are secure fields: in `yolo` a step the review sees typing a credential is handed to you (item 429, see
   [Safety](safety.md#safety)).
 - `dotx desktop apps`, `dotx desktop snapshot [app] [--scope …] [--query …]` and `dotx desktop screenshot PATH` show
   what the agent would see.

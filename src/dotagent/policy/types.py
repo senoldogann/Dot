@@ -36,7 +36,7 @@ Flag = Literal[
     "system_settings",
     "privilege",
     "external_send",
-    # A message sent for the owner: an email, a chat or text message, a reply or a forward (item 427). It comes with
+    # A message sent for the owner: an email, a chat or text message, a reply or a forward (item 429). It comes with
     # external_send, and no rule of the owner's lets it through (``policy.engine.guard``).
     "message_send",
     "public_post",
@@ -62,7 +62,7 @@ DecisionSource = Literal[
 # Who answers a question the policy raised, strictest first: ``supervised`` the user, who is also asked before every
 # change the policy lets through (item 398); ``ask`` the user (the web UI calls it Auto-accept edits: edits and routine
 # work run); ``auto`` a reviewer model (which can hand the question on to the user); ``yolo`` nobody (the action is
-# allowed and only recorded), but for the guard (item 427): money, credentials, secret stores, data sent out, messages
+# allowed and only recorded), but for the guard (item 429): money, credentials, secret stores, data sent out, messages
 # and posts in the user's name are the user's in every mode. A change of Dot's own files is the user's in every mode but
 # yolo.
 ApprovalMode = Literal["supervised", "ask", "auto", "yolo"]

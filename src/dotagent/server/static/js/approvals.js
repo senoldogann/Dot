@@ -122,11 +122,11 @@ function takeoverOffer(runId) {
   return el("div", { class: "row takeover-offer" }, button, text);
 }
 
-// What the policy asks the owner about in every mode, whatever their rules say (item 427): a rule offered for it would
+// What the policy asks the owner about in every mode, whatever their rules say (item 429): a rule offered for it would
 // never apply.
 const GUARDED_FLAGS = new Set(["financial", "credential", "message_send", "public_post", "secret_access", "exfiltration"]);
 
-/** Whether the owner answers `approval` in every mode, whatever their rules say (item 427). */
+/** Whether the owner answers `approval` in every mode, whatever their rules say (item 429). */
 function guarded(approval) {
   const flags = approval.args.flags;
   return Array.isArray(flags) && flags.some((flag) => typeof flag === "string" && GUARDED_FLAGS.has(flag));

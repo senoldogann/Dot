@@ -58,7 +58,7 @@ AppleScript) or of Messages (its database, read-only; the program that runs Dot 
 doctor` says whether the database opens) from a sender or with a subject within the last minutes, and returns the code
 alone, with who sent it and how old the message is; the message never reaches the model. It is a high-risk action of
 the Mac: the aggressive preset allows it, balanced and cautious ask, a research run has no such tool. Typing the code
-into a field is yours in every mode, `yolo` too (item 427): Dot hands the field to you.
+into a field is yours in every mode, `yolo` too (item 429): Dot hands the field to you.
 
 **Pre-approved spending.** `[policy.spend]` lists sites with caps, for example `"namecheap.com" = { per_purchase = 20,
 per_day = 50 }`. Dot reads the amount of a payment step from the labels of its controls ("Pay €19.90") and from the
@@ -74,14 +74,14 @@ currency, so list sites that bill in one currency. Empty by default.
 **Decision order**, strictest first:
 
 1. *Auto-review* denies actions that read secrets or send data out (`secret_access`, `exfiltration`), whatever else is
-   configured; a `yolo` run asks you instead (item 427).
+   configured; a `yolo` run asks you instead (item 429).
 2. The *run mode* denies what a research run may not do.
 3. *Dot's own files*: a change of them (`self_change`, below) is a question to you in every approval mode but `yolo`,
    which no rule of yours and no review model answers in your place (item 398). Allowed, the run makes the change.
 4. *Hard stops* hand money and credentials to you (`financial`, `credential`): Dot stops and asks you to do that step
    yourself. A payment under the pre-approved caps of its site (above) is a question instead of a hand-off, unless
    one of your rules hands that step to you (item 385): the caps stand in for the money hand-off, not for your rules.
-5. *The guard* (item 427): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
+5. *The guard* (item 429): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode, whatever your
    rules say; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you. What
@@ -125,7 +125,7 @@ writes back.
 
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The second step and your hand-off rules
-hold in every mode, and so do the hand-offs of the fourth step and the questions of the fifth, `yolo` too (item 427):
+hold in every mode, and so do the hand-offs of the fourth step and the questions of the fifth, `yolo` too (item 429):
 what the first step refuses, a `yolo` run asks you. What a `yolo` run waives are the questions of the third step, of
 your `ask` rules, of the preset and of untrusted content, and it records each.
 
@@ -155,7 +155,7 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   `dotx memory add` or on the Memory page, is yours and not refused.
 - The browser and desktop tools never type into password, one-time-code and card fields themselves: the field that
   would take the text is checked, whatever element the step names (a desktop `menu` step that pastes is not). Outside
-  `yolo` they refuse; in `yolo` the field is handed to you (item 427), and on a browser step you can take the browser
+  `yolo` they refuse; in `yolo` the field is handed to you (item 429), and on a browser step you can take the browser
   over to fill it. In the same way `terminal_send` types nothing, in any mode, while the program's last line asks for
   a password, a passphrase or a PIN: that step is yours, in a terminal of your own. The desktop tools never control a
   password manager or Keychain Access, in any mode, nor a window of Dot's outside `yolo`: the desktop app's, or one of
@@ -166,7 +166,7 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
-- Outside a `yolo` run (which asks you first, item 427) the agent can neither read nor change `~/.ssh`, `~/.gnupg`,
+- Outside a `yolo` run (which asks you first, item 429) the agent can neither read nor change `~/.ssh`, `~/.gnupg`,
   `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud`, the data of your browsers (Chrome, Safari, Firefox, Brave, Edge and Arc) and their cookies, the
   tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
@@ -258,7 +258,7 @@ the version `[judge] model` names; move them together. A missing or refused key,
 it off for `[models] helper_cooldown_s`, with a note in the timeline, and meanwhile the patterns and the goal checker
 decide alone; a key saved in Settings turns it on again at once. `dotx doctor` shows whether it is on and has its key.
 The click questions are asked in every mode, `yolo` too, where a payment, a message or a post they find is yours as well
-(item 427). Two more checks run before a model call when the judge is on. A `browser_act` that names what it expects to
+(item 429). Two more checks run before a model call when the judge is on. A `browser_act` that names what it expects to
 see after its steps (`expect`: "the reply shows under the post") gets, above its result, the probability that the page's
 text shows it and that the page is a login wall, a CAPTCHA or an error page, from one request over the page's visible
 text, so the next turn starts from those numbers instead of reading the whole page. And the goal check of a run in goal
@@ -307,7 +307,7 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
 counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`,
 and `supervised` asks before every change as well; in `auto` and `yolo` the questions of the policy are answered for
-you, but for what is yours in every mode (item 427): money, credentials, messages and posts in your name, and in `yolo`
+you, but for what is yours in every mode (item 429): money, credentials, messages and posts in your name, and in `yolo`
 a read of your secrets or data sent out, each a card in the chat. A question of the agent itself (`ask_user`) waits the
 same way, except in a run nobody can answer during it (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with

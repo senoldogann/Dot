@@ -33,7 +33,7 @@ strictest first (item 398). The composer's Options menu lists them with their ic
   (its summary and target) is data to the review model, never an instruction.
 - `yolo` (YOLO, an open lock): nobody does, but for the guard below. The action is allowed and recorded. The
   question that untrusted content raises (see [Safety](safety.md#safety)) is waived as well, and so is the question
-  about Dot's own files. **The guard no rule turns off** (item 427) holds in yolo too: money and credential steps are
+  about Dot's own files. **The guard no rule turns off** (item 429) holds in yolo too: money and credential steps are
   handed to you; a read of your secrets (the keychain, `~/.ssh`, the files of a password manager) or data sent out asks
   you, where every other mode refuses it; and a message sent for you or a post in your name waits for your yes, each a
   card in the chat. A yolo run types no password, one-time code or card number: the browser and the desktop hand such a
@@ -54,7 +54,7 @@ what went through and why. A chat leaves those lines out unless Settings › Gen
 asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows.
 
 **What only yolo waives.** The questions of untrusted content, of Dot's own files, of the preset and of your `ask`
-rules. **What no mode waives, and no rule of yours turns off** (item 427): money and credentials are yours (Dot stops
+rules. **What no mode waives, and no rule of yours turns off** (item 429): money and credentials are yours (Dot stops
 and asks you to do that step yourself; the review model is never asked about them, and a payment under its
 pre-approved caps asks you, or the review model in `auto`); a message sent for you or a post in your name waits for
 your yes (the review model answers it in `auto`; a rule that allows it does not); secrets and data sent out are refused,

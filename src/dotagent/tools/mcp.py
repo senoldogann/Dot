@@ -29,7 +29,7 @@ def _clip(text: str, limit: int) -> str:
     return flat if len(flat) <= limit else f"{flat[: limit - 1]}…"
 
 
-# What the name of a tool says it does with a message (item 427): the first verb of the name decides, after any word
+# What the name of a tool says it does with a message (item 429): the first verb of the name decides, after any word
 # before it such as the name of the service (slack_post_message, gmail_send_email).
 _SEND_VERBS: frozenset[str] = frozenset(
     {"send", "reply", "forward", "post", "publish", "tweet", "retweet", "comment", "dm"}
@@ -60,7 +60,7 @@ def sends_messages(name: str) -> bool:
 
 def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
     """A tool whose name says it sends a message or posts is a message for the owner whatever its server's hints say
-    (item 427): a hint is the server's word, and a server may be wrong or hostile. Other tools that declare themselves
+    (item 429): a hint is the server's word, and a server may be wrong or hostile. Other tools that declare themselves
     read-only only look. Any other tool may change things and may reach out to the world, unless the server says it
     does not: servers that declare nothing get the careful treatment."""
     shown: str = _clip(redact_secrets(dumps_compact(arguments)), _ARGUMENT_CHARS)

@@ -1,5 +1,5 @@
 """A field that takes a secret, through the browser tools and the gate: in ask mode the step is refused, and a yolo run
-hands the field to the user (item 427), whose answer the gate keeps.
+hands the field to the user (item 429), whose answer the gate keeps.
 
 The fixture page asks for a code from an e-mail in a field marked ``autocomplete="one-time-code"`` whose label names
 nothing secret, so only the field's own marking, read when the step runs, tells what it takes. The check is what reached
@@ -270,7 +270,7 @@ async def test_ask_mode_refuses_text_for_an_editor_once_the_focus_went_to_the_co
 
 
 async def test_a_yolo_run_hands_the_code_field_to_the_user(runtime: Runtime, site: _Site) -> None:
-    """In yolo too a field that takes a secret is the user's (item 427): the gate hands it to them, and the steps after
+    """In yolo too a field that takes a secret is the user's (item 429): the gate hands it to them, and the steps after
     it wait for the run to look at the page again."""
     ctx, gate = await _context(runtime, "yolo")
     field: str = await _code_field(ctx, gate, site)
@@ -294,7 +294,7 @@ async def test_a_yolo_run_hands_the_code_field_to_the_user(runtime: Runtime, sit
 
 
 async def test_a_yolo_run_hands_every_card_field_to_the_user_whatever_its_batch_was_allowed(runtime: Runtime) -> None:
-    """A yes to a batch, a payment under its caps among them, never covers typing a card number (item 427): the field
+    """A yes to a batch, a payment under its caps among them, never covers typing a card number (item 429): the field
     is asked of the gate on its own, which hands it to the user."""
     ctx, _ = await _context(runtime, "yolo")
     check: SecretFieldCheck = _secret_field_check(ctx)

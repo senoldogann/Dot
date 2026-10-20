@@ -299,7 +299,7 @@ _REMOTE_COPY: frozenset[str] = frozenset({"scp", "sftp", "rsync", "nc", "ncat", 
 # A path of another machine as scp and rsync take one: ``host:path``, ``user@host:path``, ``host::module``, ``rsync://``.
 _REMOTE_PATH: re.Pattern[str] = re.compile(r"[^/]*:")
 _TUNNELS: frozenset[str] = frozenset({"ngrok", "cloudflared", "localtunnel", "lt", "bore", "serveo"})
-# The mailers of the command line (item 427): sendmail and msmtp send what they are given; mail, mailx and mutt send
+# The mailers of the command line (item 429): sendmail and msmtp send what they are given; mail, mailx and mutt send
 # when a word follows them (a recipient), and only open the mailbox otherwise.
 _SENDERS: frozenset[str] = frozenset({"sendmail", "msmtp"})
 _MAILERS: frozenset[str] = frozenset({"mail", "mailx", "mutt"})

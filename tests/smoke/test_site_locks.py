@@ -104,7 +104,7 @@ async def test_two_runs_of_one_manager_cannot_both_take_the_last_public_action_o
         async with asyncio.timeout(WAIT_S):
             await model.all_held.wait()
         gates: list[RunGate] = [manager._handle(run.id).gate for run in runs]
-        # A post waits for the user's yes in yolo too (item 427): the run that takes the last post of the day asks, and
+        # A post waits for the user's yes in yolo too (item 429): the run that takes the last post of the day asks, and
         # the other is refused by the pace without a question.
         tasks: list[asyncio.Task[str]] = [asyncio.create_task(gate.authorize(POST)) for gate in gates]
         pending: list[ApprovalRecord] = []
