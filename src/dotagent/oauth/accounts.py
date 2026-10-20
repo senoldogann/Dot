@@ -150,7 +150,8 @@ class Accounts:
         self._waiting: dict[str, Waiting] = {}
         self._refreshing: dict[str, asyncio.Lock] = {}
 
-    def _client(self) -> httpx.AsyncClient:
+    def client(self) -> httpx.AsyncClient:
+        """A client for the providers: the network, or the test's transport the accounts were made with."""
         return httpx.AsyncClient(
             transport=self._transport, timeout=_HTTP_TIMEOUT_S, headers={"Accept": "application/json"}
         )
@@ -179,6 +180,22 @@ class Accounts:
             raise SignInError(
                 "the list of accounts in the store could not be read", {"errors": error.error_count()}
             ) from error
+
+    async def account_of(self, address: str) -> Account:
+        """The account signed in whose address is ``address``, in any case; an error that names the accounts signed in
+        when there is none."""
+        accounts: list[Account] = await self.accounts()
+        found: Account | None = next(
+            (account for account in accounts if account.address.casefold() == address.strip().casefold()), None
+        )
+        if found is None:
+            signed: str = ", ".join(f"{account.address} ({PROVIDERS[account.provider].name})" for account in accounts)
+            raise SignInError(
+                f"no account {address!r} is signed in: "
+                + (f"the accounts are {signed}" if signed else "the owner signs one in on Customize › Plugins"),
+                {"accounts": len(accounts)},
+            )
+        return found
 
     async def _keep(self, accounts: list[Account]) -> None:
         await self._store.kv_set(_ACCOUNTS_KEY, _ACCOUNT_LIST.dump_json(accounts).decode("utf-8"))
@@ -269,7 +286,7 @@ class Accounts:
         if secret is not None:
             form["client_secret"] = secret
         # A code is good once: the trade is not tried again.
-        async with self._client() as client:
+        async with self.client() as client:
             try:
                 response: httpx.Response = await client.post(provider.token_url, data=form)
             except httpx.HTTPError as error:
@@ -295,10 +312,16 @@ class Accounts:
 
     async def _address(self, provider: Provider, access_token: str) -> str:
         async def ask() -> httpx.Response:
-            async with self._client() as client:
+            async with self.client() as client:
                 return await client.get(provider.profile_url, headers={"Authorization": f"Bearer {access_token}"})
 
-        response: httpx.Response = await retry_async(ask, _transient, _no_hint, _RETRY, f"{provider.id}_profile")
+        try:
+            response: httpx.Response = await retry_async(ask, _transient, _no_hint, _RETRY, f"{provider.id}_profile")
+        except httpx.HTTPError as error:
+            raise SignInError(
+                f"{provider.name} could not be reached to say who signed in",
+                {"provider": provider.id, "error": type(error).__name__},
+            ) from error
         if response.status_code != 200:
             raise _refused(provider, response, "to say who signed in")
         return address_from(_json(provider, response))
@@ -325,6 +348,30 @@ class Accounts:
             await self._keychain.save(provider.id, address, fresh)
             return fresh.access_token
 
+    async def refreshed_token(self, provider_id: ProviderId, address: str, refused: str) -> str:
+        """An access token in place of ``refused``, which the provider turned away before its time: refreshed, unless
+        another call refreshed it meanwhile."""
+        provider: Provider = PROVIDERS[provider_id]
+        lock: asyncio.Lock = self._refreshing.setdefault(f"{provider_id}:{address}", asyncio.Lock())
+        async with lock:
+            tokens: Tokens | None = await self._keychain.read(provider.id, address)
+            if tokens is None:
+                raise SignInError(
+                    f"this account is not signed in to {provider.name}: sign in in Customize › Plugins",
+                    {"provider": provider.id},
+                )
+            if tokens.access_token != refused:
+                return tokens.access_token
+            if tokens.refresh_token is None:
+                raise SignInError(
+                    f"{provider.name} turned the sign-in away and gave no way to stay signed in: sign in again in "
+                    "Customize › Plugins",
+                    {"provider": provider.id},
+                )
+            fresh: Tokens = await self._refresh(provider, tokens.refresh_token)
+            await self._keychain.save(provider.id, address, fresh)
+            return fresh.access_token
+
     async def _refresh(self, provider: Provider, refresh_token: str) -> Tokens:
         client_id, secret = await self._client_of(provider)
         form: dict[str, str] = {"grant_type": "refresh_token", "refresh_token": refresh_token, "client_id": client_id}
@@ -332,10 +379,16 @@ class Accounts:
             form["client_secret"] = secret
 
         async def ask() -> httpx.Response:
-            async with self._client() as client:
+            async with self.client() as client:
                 return await client.post(provider.token_url, data=form)
 
-        response: httpx.Response = await retry_async(ask, _transient, _no_hint, _RETRY, f"{provider.id}_refresh")
+        try:
+            response: httpx.Response = await retry_async(ask, _transient, _no_hint, _RETRY, f"{provider.id}_refresh")
+        except httpx.HTTPError as error:
+            raise SignInError(
+                f"{provider.name} could not be reached to refresh the sign-in",
+                {"provider": provider.id, "error": type(error).__name__},
+            ) from error
         if response.status_code != 200:
             raise _refused(provider, response, "to refresh the sign-in (sign in again in Customize › Plugins)")
         return tokens_from(_json(provider, response), time.time(), refresh_token)

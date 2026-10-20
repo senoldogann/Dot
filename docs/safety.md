@@ -122,8 +122,9 @@ Who answers what the policy asks depends on the approval mode of the run: you, a
 hold in every mode; the refusals of the first step, the questions of the third and the hand-offs of the fourth are
 what a `yolo` run waives, and it records each.
 
-**Untrusted content.** Web pages, screens and MCP results can be written by third parties. Dot wraps them in a fence
-with a random marker per call (`<web_content …>`, `<screen_content …>`) and tells the model that what is inside is data,
+**Untrusted content.** Web pages, screens, MCP results and the mail and calendars of the accounts you signed in (item
+424) can be written by third parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`,
+`<screen_content …>`, `<account_content …>`) and tells the model that what is inside is data,
 never instructions; only the end that carries the marker closes a fence, and a closing tag inside, in any case, is
 broken. The reply of a teammate that read such content and the files you attach to a message are fenced the same way.
 What a shell command printed after it reached the network (`curl`, `ssh`, `git clone`, `gh`, a line

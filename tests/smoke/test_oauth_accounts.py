@@ -5,12 +5,10 @@ account is named by its address and kept, an access token is refreshed once it r
 tokens away. Tokens longer than a line of ``security``'s prompt are kept whole, in pieces that leave nothing behind."""
 
 import asyncio
-import fcntl
 import re
 import subprocess
-import tempfile
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
@@ -28,52 +26,14 @@ from dotagent.store.db import Store
 
 pytestmark = pytest.mark.asyncio(loop_scope="function")
 
-_PASSWORD: str = "dot-test"
 _SECURITY: str = "/usr/bin/security"
-# Held while a test's keychain is made or removed, so that the workers put the owner's search list back one at a time.
-_LOCK: Path = Path(tempfile.gettempdir()) / "dot-tests-keychains.lock"
 _ACCOUNT: re.Pattern[str] = re.compile(r'"acct"<blob>="([^"]*)"')
-
-
-def _search_list() -> list[str]:
-    said: str = subprocess.run(
-        [_SECURITY, "list-keychains", "-d", "user"], check=True, capture_output=True, text=True
-    ).stdout
-    return [line.strip().strip('"') for line in said.splitlines() if line.strip()]
-
-
-def _keeping_search_list(arguments: list[str]) -> None:
-    """Run ``security`` with ``arguments`` and put the owner's search list back as it was, should they change it
-    (``security``'s manual says making a keychain adds it to the list)."""
-    with _LOCK.open("a") as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX)
-        try:
-            before: list[str] = _search_list()
-            subprocess.run([_SECURITY, *arguments], check=True, capture_output=True)
-            if _search_list() != before:
-                subprocess.run(
-                    [_SECURITY, "list-keychains", "-d", "user", "-s", *before], check=True, capture_output=True
-                )
-        finally:
-            fcntl.flock(lock, fcntl.LOCK_UN)
 
 
 def _items(file: str) -> list[str]:
     """The accounts of the items ``file`` holds, sorted."""
     said: str = subprocess.run([_SECURITY, "dump-keychain", file], check=True, capture_output=True, text=True).stdout
     return sorted(_ACCOUNT.findall(said))
-
-
-@pytest.fixture
-def keychain_file(tmp_path: Path) -> Iterator[str]:
-    """A keychain file of the test's own, unlocked, removed at the end; the owner's search list is left as it was."""
-    file: str = str(tmp_path / "test.keychain-db")
-    _keeping_search_list(["create-keychain", "-p", _PASSWORD, file])
-    subprocess.run([_SECURITY, "unlock-keychain", "-p", _PASSWORD, file], check=True, capture_output=True)
-    try:
-        yield file
-    finally:
-        _keeping_search_list(["delete-keychain", file])
 
 
 @pytest.fixture

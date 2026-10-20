@@ -4,7 +4,8 @@ The core group holds what most runs need: the files, the shell, the web, searchi
 skills, the helper models and the meta tools (the plan, questions, finish). The other groups are named after what they
 reach: ``browser`` (Chrome), ``desktop`` (the Mac's applications and AppleScript), ``schedule`` (goals that run later),
 ``memory_admin`` (correcting and forgetting notes), ``pages`` (pages of HTML shown in the conversation), ``drafts`` (an
-email or a message for the owner to send) and one group per MCP server, ``mcp__<server>``. Which groups are on is up to
+email or a message for the owner to send), ``accounts`` (the mail and calendars of the accounts the owner signed in) and
+one group per MCP server, ``mcp__<server>``. Which groups are on is up to
 the loop; everything here is pure.
 """
 
@@ -17,6 +18,8 @@ from dotagent.mcp.naming import PREFIX
 CORE_GROUP: str = "core"
 # The browser tools, which Settings › Browser can keep from every run (item 354).
 BROWSER_GROUP: str = "browser"
+# The mail and calendar tools (item 424), a run's only when the owner signed an account in.
+ACCOUNTS_GROUP: str = "accounts"
 
 # The groups whose tools share a name prefix. A tool with none of these prefixes is in its group of _GROUP_OF_TOOL, or
 # in core.
@@ -25,6 +28,9 @@ _PREFIX_GROUPS: tuple[tuple[str, str], ...] = (
     ("desktop_", "desktop"),
     ("schedule_", "schedule"),
     ("terminal_", "terminal"),
+    # The mail and the calendars of the accounts the owner signed in (item 424).
+    ("mail_", ACCOUNTS_GROUP),
+    ("calendar_", ACCOUNTS_GROUP),
 )
 _GROUP_OF_TOOL: dict[str, str] = {
     "apple_script": "desktop",
@@ -45,6 +51,7 @@ _PURPOSES: dict[str, str] = {
     "drafts": "an email or a message you write for the owner, who sends it from the conversation",
     "team": "making a lasting teammate agent for a role the work needs again or in parallel",
     "pages": "showing a page you write in HTML in the conversation: charts, tables, diagrams, 3D views",
+    "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.
 LISTED_TOOLS: int = 16

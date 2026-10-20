@@ -266,6 +266,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 | Campaigns       | `campaign_targets`, `campaign_note`, `campaign_schedule`, `campaign_achieved`; with TypeSafe's key `rank_posts`, `pick_draft`, `check_draft` |
 | Pages           | `show_page`                                                                                                        |
 | Drafts          | `draft_message`                                                                                                    |
+| Mail, calendars | `mail_search`, `mail_read`, `calendar_events`                                                                      |
 | Skills          | `skill`, `find_help`                                                                                               |
 | MCP             | `mcp__<server>__<tool>`                                                                                            |
 
@@ -407,6 +408,29 @@ out. The API: `GET /api/drafts/{id}`, `POST /api/drafts/{id}/send` (`{"to", "cc"
 go; a message has no cc and no subject) and `POST /api/drafts/{id}/discard`. The scripts were not run against Mail or
 Messages themselves, which would send for real: the tests give them to a stand-in of `osascript` that writes down what
 it was handed.
+
+### Mail and calendars
+
+`mail_search`, `mail_read` and `calendar_events` (item 424) read your mail and calendars in the Google and Microsoft
+accounts you signed in on Customize › Plugins ([Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)),
+through Gmail's, Google Calendar's and Microsoft Graph's own APIs, so that neither Mail, Outlook nor a browser has to
+be open. They are a run's only once an account is signed in: until then neither they nor their part of the prompt
+are in it. `account` is the address of one of the accounts: the run's prompt names them, and an address no account
+has is refused with their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`)
+or Outlook's (`from:ada`, `subject:invoice`) and, without any, lists the newest messages of the inbox; `mail_read`
+reads one whole: its people, its date, its text (the HTML of a message with no text made text) and the names of its
+files; `calendar_events` lists the events between two days or moments, in the Mac's time zone, each repeat on its own,
+with your answer to each. They only read: nothing is sent, moved or marked read, so research runs have them too, and
+the policy sees a read through the network (`network`, `low`). An email for you to send is still a draft
+(`draft_message`).
+
+What they return is written by others, since anyone can send you a mail or an invitation: it comes inside an
+`<account_content …>` fence and marks the run untrusted, as a web page does ([Safety](safety.md)). A token the
+provider turns away before its time is refreshed once and the call made again; a call the provider answers with 429 or
+a 5xx, or that does not reach it, is made again after the wait it asks for (half a minute at most), three times in
+all; any other refusal is the call's error, with the provider's own words. The tools are in the `accounts` group.
+Their tests run against a stand-in of both providers after a real sign-in into a keychain of their own
+(`tests/smoke/test_mail_calendar.py`).
 
 ## Delegation
 

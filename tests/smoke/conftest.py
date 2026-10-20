@@ -3,9 +3,15 @@ does not exist, so that no test starts the owner's OpenCode or reaches Zen by li
 OpenCode point it back at the real one. Tailscale's command line and ``caffeinate`` (item 271) are ones that do not
 exist too, so that no test reads or changes the owner's tailnet or keeps the Mac awake, and so is the ``open`` that
 Settings › Phone opens the App Store or Tailscale with (item 421); the tests of Settings › Phone point them at
-stand-ins."""
+stand-ins. The tests of the accounts signed in (items 422 and 424) keep their tokens in a keychain of their own
+(``keychain_file``)."""
 
+import fcntl
 import os
+import subprocess
+import tempfile
+from collections.abc import Iterator
+from pathlib import Path
 
 import pytest
 
@@ -24,3 +30,44 @@ def pytest_configure(config: pytest.Config) -> None:
     os.environ["DOT_CAFFEINATE"] = MISSING_CAFFEINATE
     os.environ["DOT_OPEN"] = MISSING_OPEN
     os.environ["DOT_KEYCHAIN"] = MISSING_KEYCHAIN
+
+
+KEYCHAIN_PASSWORD: str = "dot-test"
+_SECURITY: str = "/usr/bin/security"
+# Held while a test's keychain is made or removed, so that the workers put the owner's search list back one at a time.
+_KEYCHAINS_LOCK: Path = Path(tempfile.gettempdir()) / "dot-tests-keychains.lock"
+
+
+def _search_list() -> list[str]:
+    said: str = subprocess.run(
+        [_SECURITY, "list-keychains", "-d", "user"], check=True, capture_output=True, text=True
+    ).stdout
+    return [line.strip().strip('"') for line in said.splitlines() if line.strip()]
+
+
+def _keeping_search_list(arguments: list[str]) -> None:
+    """Run ``security`` with ``arguments`` and put the owner's search list back as it was, should they change it
+    (``security``'s manual says making a keychain adds it to the list)."""
+    with _KEYCHAINS_LOCK.open("a") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        try:
+            before: list[str] = _search_list()
+            subprocess.run([_SECURITY, *arguments], check=True, capture_output=True)
+            if _search_list() != before:
+                subprocess.run(
+                    [_SECURITY, "list-keychains", "-d", "user", "-s", *before], check=True, capture_output=True
+                )
+        finally:
+            fcntl.flock(lock, fcntl.LOCK_UN)
+
+
+@pytest.fixture
+def keychain_file(tmp_path: Path) -> Iterator[str]:
+    """A keychain file of the test's own, unlocked, removed at the end; the owner's search list is left as it was."""
+    file: str = str(tmp_path / "test.keychain-db")
+    _keeping_search_list(["create-keychain", "-p", KEYCHAIN_PASSWORD, file])
+    subprocess.run([_SECURITY, "unlock-keychain", "-p", KEYCHAIN_PASSWORD, file], check=True, capture_output=True)
+    try:
+        yield file
+    finally:
+        _keeping_search_list(["delete-keychain", file])
