@@ -16536,5 +16536,11 @@ spend asks, no allow rule lets a message go, a hand-off rule holds; the pace rac
   to ask could be sent with yolo; a server left out for too many tools could not be chosen from until the daemon
   restarted, and a choice that could not connect was kept anyway; the template cards hid a failing tool list. The
   agent's box shares fast mode and goal mode with the home's, as the pickers always did.
+- 2026-10-20 (Opus 5.5): item 427 on `phone-bar-fix` from `main`, on the owner's word of 04:19: the bar over the
+  composer on a phone was the dock's whole width, its few words at the left and the way down far from them, where it
+  should be as wide as its parts and in the middle; and a command in the background whose end the run had read itself
+  was told to the chat again in a message of its queue, which started a run for what the first knew. The bar is as wide
+  as what it holds (`run.css`); a read of the end (`terminal_read`) takes the queued message back out unless it has
+  already started its run (`RunManager.command_read`). Measured in WebKit at 320, 360, 390 and 430 px, light and dark.
 - 2026-10-20 (Opus 5.5): item 429 on `yolo-guard` from `main`: the guard no rule turns off, money, credentials,
   secrets, messages and posts in the owner's name theirs in every mode, yolo too.

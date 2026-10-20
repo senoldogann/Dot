@@ -133,6 +133,12 @@ class TerminalSession:
         self.closing: bool = False
         # The program's exit status, once it ended by itself.
         self.exit_status: int | None = None
+        # The message of the chat's queue that told the end of this command (item 427), until a run has read the end
+        # itself: that run has the news, and the message is taken back out.
+        self.told: str | None = None
+        # A run read the program's end and closed the session (:meth:`Terminals.close_read`), as opposed to a close by
+        # the owner, the run's own ``terminal_close``, the idle reaper or the daemon's stop, which read nothing.
+        self.end_read: bool = False
         self._arrived: asyncio.Event = asyncio.Event()
         # Neither a read nor a write of the terminal waits in the event loop: what is not there yet comes with the
         # loop's next word on the descriptor.
@@ -323,6 +329,10 @@ class TerminalWatcher(Protocol):
         """The program of ``session``, a command in the background of the chat ``thread_id``, ended by itself."""
         ...
 
+    async def command_read(self, thread_id: str, session: TerminalSession) -> None:
+        """A run read the end of ``session``, a command in the background of the chat ``thread_id``, and closed it."""
+        ...
+
 
 class Terminals:
     """The terminal sessions of the daemon, by thread."""
@@ -423,6 +433,16 @@ class Terminals:
         await session.close()
         log.info("terminal_closed", thread_id=thread_id, session=session_id)
         await self._changed(thread_id)
+
+    async def close_read(self, thread_id: str, session_id: str) -> None:
+        """Close a session whose program's end a run has read (item 427): a command in the background that ended is not
+        told to the chat again, or is taken back from it if it was told already
+        (:meth:`TerminalWatcher.command_read`)."""
+        session: TerminalSession = self.get(thread_id, session_id)
+        session.end_read = True
+        await self.close(thread_id, session_id)
+        if session.background and self._watcher is not None:
+            await self._watcher.command_read(thread_id, session)
 
     async def _changed(self, thread_id: str) -> None:
         if self._watcher is not None:

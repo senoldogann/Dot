@@ -196,12 +196,16 @@ class _Watcher:
     def __init__(self) -> None:
         self.changed: list[str] = []
         self.ended: asyncio.Queue[tuple[str, str, int | None]] = asyncio.Queue()
+        self.read: list[tuple[str, str]] = []
 
     async def sessions_changed(self, thread_id: str) -> None:
         self.changed.append(thread_id)
 
     async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
         self.ended.put_nowait((thread_id, session.id, session.exit_status))
+
+    async def command_read(self, thread_id: str, session: TerminalSession) -> None:
+        self.read.append((thread_id, session.id))
 
 
 async def test_a_command_in_the_background_runs_unread_and_its_end_alone_is_told(runtime: Runtime) -> None:

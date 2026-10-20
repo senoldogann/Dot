@@ -312,10 +312,13 @@
     padding-bottom: calc(var(--space-1) + var(--safe-bottom));
   }
 
-  /* The bar over the composer is a phone's line (item 401): one row across the dock, the parts at its left and the way
-     down in the same pane at its right, never a circle of its own over the conversation. */
+  /* The bar over the composer is a phone's line (item 401): one pane across the dock, as wide as its parts and the way
+     down beside them and no wider, in the middle (item 427; it was the dock's whole width, its few words at the left
+     and the way down far from them), never a circle of its own over the conversation. It gives way, and never goes
+     past the dock, on the narrowest phone. */
   .status-bar {
-    width: 100%;
+    width: fit-content;
+    max-width: 100%;
     min-height: 40px;
   }
 
