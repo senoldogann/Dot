@@ -182,7 +182,10 @@ first message, in the bubble of your messages on the raised surface. What you wr
 answer does: its headings, lists, tables, code, quotes and emphasis (item 206). Under each of your messages, once its
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
 rests) and a copy of it as you wrote it (item 205); the files a message came with stand between it and that line, in the
-earlier turns of the chat as under the latest message (item 403). Under a message that opened a turn stands **Edit from
+earlier turns of the chat as under the latest message (item 403), the pictures among them as small squares side by side
+over the message, each the picture itself with its name where the pointer rests (item 431). A command or a script of a
+call's row shows as itself, cut in the middle past 4000 characters; only a blob without words, a picture's base64, is
+shown as its length. Under a message that opened a turn stands **Edit from
 here** too (item 282), which asks whether to "rewind chat to before this message". **Revert and keep changes** takes
 that turn and the ones after it out of the chat (they still count in what Dot spent, and a question they left for you
 waits no more) and ends the history the model reads where it ended before the message, a summary made since included;

@@ -2,7 +2,7 @@
 
 import { dateTimeFull, duration, el, messageTime } from "./dom.js";
 import { actorFace } from "./actors.js";
-import { sentFiles } from "./attachments.js";
+import { sentFiles, sentPictures } from "./attachments.js";
 import { copyButton } from "./copybutton.js";
 import { faceStateAtEnd } from "./face.js";
 import { icon } from "./icons.js";
@@ -43,8 +43,8 @@ function editFromHereButton(editFromHere) {
 }
 
 /**
- * What the user wrote, as a bubble on the right, the files that came with it (`files`, as the timeline has them), and
- * under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `editFromHere` is null,
+ * What the user wrote, as a bubble on the right, the pictures that came with it (`files`, as the timeline has them) as
+ * small squares over it, its other files under it, and under them (item 205): when it was sent (`sentAt`), a copy of it as it was written and, unless `editFromHere` is null,
  * Edit from here, which rewinds the chat to before it (item 282). The foot shows once the turn has its
  * answer: a run at work keeps it back (`.run-working`, `.turn-working`). The text reads as markdown, as an answer does
  * (item 206).
@@ -53,8 +53,9 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
   return el(
     "div",
     { class: "user-message" },
+    sentPictures(files),
     el("div", { class: "bubble user" }, prose(text)),
-    files.length > 0 ? sentFiles(files) : null,
+    sentFiles(files),
     el(
       "div",
       { class: "message-foot" },
@@ -65,9 +66,16 @@ export function userMessage({ text, sentAt, files, editFromHere }) {
   );
 }
 
-/** The files that came with the message `message` (a `userMessage`), once they are known: over its foot. */
+/** The files that came with the message `message` (a `userMessage`), once they are known: its pictures over its bubble,
+ * the other files over its foot. */
 export function showMessageFiles(message, files) {
-  message.querySelector(".message-foot").before(sentFiles(files));
+  message.querySelector(".bubble.user").before(...nodes(sentPictures(files)));
+  message.querySelector(".message-foot").before(...nodes(sentFiles(files)));
+}
+
+/** A node as a list of nodes to insert: none for null. */
+function nodes(node) {
+  return node === null ? [] : [node];
 }
 
 /** What the owner picked for the message `message` in the composer (item 318; `picks`, a `picks` event's data), once

@@ -55,12 +55,17 @@ function readBase64(file) {
   });
 }
 
-/** The attachments a message carried, as chips (used by the timeline for sent messages); a chip shows its file beside the conversation. */
+/** The files a message carried that are no pictures, as chips (used by the timeline for sent messages); a chip shows its
+ * file beside the conversation. Null when every file is a picture, which `sentPictures` shows. */
 export function sentFiles(files) {
+  const others = files.filter((file) => file.kind !== "image");
+  if (others.length === 0) {
+    return null;
+  }
   return el(
     "div",
     { class: "attach-list sent" },
-    files.map((file) =>
+    others.map((file) =>
       el(
         "button",
         {
@@ -70,12 +75,46 @@ export function sentFiles(files) {
           dataset: { attachment: file.id, name: file.name },
           onclick: (event) => requestFile(event.currentTarget),
         },
-        icon(file.kind === "image" ? "image" : "file"),
+        icon("file"),
         el("span", null, clip(file.name, NAME_CHARS)),
         el("span", { class: "muted" }, sizeLabel(file.size)),
       ),
     ),
   );
+}
+
+/** One picture a message carried, as a small square of the picture itself; its name is its tooltip, and a click shows it
+ * beside the conversation. A picture that cannot be read leaves the mark of an image where it was. */
+function sentPicture(file) {
+  const picture = el("img", { class: "sent-picture-image", alt: "" });
+  const tile = el(
+    "button",
+    {
+      class: "sent-picture",
+      type: "button",
+      title: `Show ${file.name}`,
+      "aria-label": `Show ${file.name}`,
+      dataset: { attachment: file.id, name: file.name },
+      onclick: (event) => requestFile(event.currentTarget),
+    },
+    picture,
+  );
+  blobUrl(`/attachments/${encodeURIComponent(file.id)}/image`).then(
+    (url) => {
+      picture.src = url;
+    },
+    () => {
+      tile.replaceChildren(icon("image"));
+    },
+  );
+  return tile;
+}
+
+/** The pictures a message carried, side by side as small squares: they stand over the message, as a chat shows them.
+ * Null when it carried none. */
+export function sentPictures(files) {
+  const pictures = files.filter((file) => file.kind === "image");
+  return pictures.length === 0 ? null : el("div", { class: "attach-list sent pictures" }, pictures.map(sentPicture));
 }
 
 /**

@@ -43,7 +43,8 @@ class ToolOutcome:
 
 
 def _safe_json(value: JsonObject) -> JsonObject:
-    sanitized = redact_json(strip_blobs(value))
+    # A command or a script longer than a blob's size stays readable in the call's row; only a picture's base64 goes.
+    sanitized = redact_json(strip_blobs(value, _EVENT_TEXT_CHARS))
     return sanitized if isinstance(sanitized, dict) else {}
 
 
