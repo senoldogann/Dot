@@ -234,16 +234,34 @@ def until_text(until: float, now: float) -> str:
     return end.strftime("%H:%M" if today else "%Y-%m-%d %H:%M")
 
 
+def _is_blob(text: str) -> bool:
+    """Whether a long string is a blob (a base64 picture, a data URL), not words: it holds next to no white space."""
+    return sum(char.isspace() for char in text) * 50 < len(text)
+
+
 def strip_blobs(value: JsonValue) -> JsonValue:
-    """Replace long strings (base64 images, huge prompts) so payloads stay readable in logs."""
+    """Replace long strings (base64 images, huge prompts) by their size, so payloads stay readable in logs."""
     if isinstance(value, str):
-        if len(value) > _BLOB_THRESHOLD:
-            return f"<{len(value)} chars>"
-        return value
+        return f"<{len(value)} chars>" if len(value) > _BLOB_THRESHOLD else value
     if isinstance(value, list):
         return [strip_blobs(item) for item in value]
     if isinstance(value, dict):
         return {key: strip_blobs(item) for key, item in value.items()}
+    return value
+
+
+def strip_blobs_keep_text(value: JsonValue, text_chars: int) -> JsonValue:
+    """Replace only a blob (a picture's base64) by its size; a long text (a command, a script) stays, cut in the middle
+    where it passes ``text_chars``, since a reader of the call wants to see what it ran. Mask secrets before this: a cut
+    in the middle of a key leaves halves no pattern knows (item 431)."""
+    if isinstance(value, str):
+        if len(value) > _BLOB_THRESHOLD and _is_blob(value):
+            return f"<{len(value)} chars>"
+        return truncate_middle(value, text_chars)
+    if isinstance(value, list):
+        return [strip_blobs_keep_text(item, text_chars) for item in value]
+    if isinstance(value, dict):
+        return {key: strip_blobs_keep_text(item, text_chars) for key, item in value.items()}
     return value
 
 

@@ -16563,3 +16563,7 @@ spend asks, no allow rule lets a message go, a hand-off rule holds; the pace rac
 - 2026-10-20 (Opus 5.5): item 430 on the owner's word of the same day, on `steps-live-line` from `main`: a folded group of
   tool steps at work shows the command that runs now right after "Working…", in place of "ran 11 commands, wrote 11 files
   and used 1 tool so far"; the count stays for the open group, and the line is gone once the group is open or over.
+- 2026-10-20 (Opus 5.5): item 431 on the owner's word of the same day, on `chat-thumbs` from `main`: the pictures a sent
+  message carried stand over it as small squares side by side (the picture itself, its name a tooltip), the other files
+  stay chips under it; and a command or script longer than 400 characters shows as itself in a call's row, cut in the
+  middle past 4000, instead of `<N chars>`, which only a blob without words (a picture's base64) still gets.

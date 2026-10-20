@@ -6605,6 +6605,37 @@ dialog.lightbox img {
   padding-right: 8px;
 }
 
+/* The pictures a sent message carried: small squares side by side over its bubble, at the bubble's right edge, each the
+   picture itself cropped to fill its square (the composer's tiles, item 318, sent). */
+.attach-list.sent.pictures {
+  margin-bottom: var(--space-half);
+}
+
+.sent-picture {
+  flex: none;
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.sent-picture:hover {
+  border-color: var(--border-strong);
+}
+
+.sent-picture-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* A sent file's chip shows the file beside the conversation (item 195). */
 button.attach-chip {
   color: inherit;

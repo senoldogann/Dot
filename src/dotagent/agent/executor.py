@@ -17,7 +17,7 @@ from dotagent.core.errors import (
     ToolInputError,
 )
 from dotagent.core.logs import get_logger
-from dotagent.core.text import redact_json, strip_blobs, truncate_middle
+from dotagent.core.text import redact_json, redact_secrets, strip_blobs_keep_text, truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ToolCall, invalid_arguments_text
 from dotagent.policy.types import ActionInfo
@@ -43,7 +43,9 @@ class ToolOutcome:
 
 
 def _safe_json(value: JsonObject) -> JsonObject:
-    sanitized = redact_json(strip_blobs(value))
+    # A command or a script longer than a blob's size stays readable in the call's row; only a picture's base64 goes.
+    # Secrets are masked first: a cut in the middle of a key would leave halves no pattern knows (item 431).
+    sanitized = strip_blobs_keep_text(redact_json(value), _EVENT_TEXT_CHARS)
     return sanitized if isinstance(sanitized, dict) else {}
 
 
@@ -236,7 +238,7 @@ async def _execute_one(
             "call_id": call.id,
             "tool": call.name,
             "ok": not clipped.is_error,
-            "text": redact_json(truncate_middle(clipped.text, _EVENT_TEXT_CHARS)),
+            "text": truncate_middle(redact_secrets(clipped.text), _EVENT_TEXT_CHARS),
             "images": list(files),
             "seconds": round(seconds, 2),
             "waited_s": round(waited_s, 2),

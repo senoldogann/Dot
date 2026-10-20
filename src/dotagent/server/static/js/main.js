@@ -5,6 +5,7 @@ import { ApiError, clearToken, forgetImages, hasToken, loadToken, onAuthLost, pa
 import { loadOwnThemes } from "./appearance/own.js";
 import { loadAssistant } from "./assistant.js";
 import { applyStoredSettings } from "./appearance/settings.js";
+import { forgetSentPictures } from "./attachments.js";
 import { setPageTitle, watchAttention } from "./attention.js";
 import { wireConversationCopy } from "./clipboard.js";
 import { el, OPEN_FILE_EVENT } from "./dom.js";
@@ -436,6 +437,7 @@ function beginSession() {
     shell.main.replaceChildren();
     clearStage();
     forgetImages();
+    forgetSentPictures();
     const path = currentPath();
     const moved = MOVED.get(path);
     if (moved !== undefined) {

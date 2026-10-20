@@ -7,7 +7,7 @@
 
 import { AUTO_LINES, settingValue } from "./appearance/settings.js";
 import { approvalCard, fromEvent, LEFT_IN_RUN } from "./approvals.js";
-import { sentFiles } from "./attachments.js";
+import { sentFiles, sentPictures } from "./attachments.js";
 import { clip, clock, compact, dateTime, duration, el, plural, setText } from "./dom.js";
 import { draftCard, draftsBar } from "./drafts.js";
 import { actorFace } from "./actors.js";
@@ -1117,7 +1117,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
         onGoalFiles(record.data.files);
         return;
       }
-      place(scope, sentFiles(record.data.files), record.ts);
+      for (const shown of [sentPictures(record.data.files), sentFiles(record.data.files)]) {
+        if (shown !== null) {
+          place(scope, shown, record.ts);
+        }
+      }
     },
 
     // What the goal was sent with from the composer (item 318): its chips sit under the goal's bubble too.

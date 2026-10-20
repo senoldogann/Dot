@@ -490,7 +490,7 @@ class _Follow:
                 "call_id": event.call_id,
                 "tool": name,
                 "ok": ok,
-                "text": redact_json(truncate_middle(text, _EVENT_TEXT_CHARS)),
+                "text": truncate_middle(redact_secrets(text), _EVENT_TEXT_CHARS),
                 "images": [],
                 "seconds": round(seconds, 2),
                 "waited_s": round(call.waited_s, 2),

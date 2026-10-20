@@ -55,12 +55,17 @@ function readBase64(file) {
   });
 }
 
-/** The attachments a message carried, as chips (used by the timeline for sent messages); a chip shows its file beside the conversation. */
+/** The files a message carried that are no pictures, as chips (used by the timeline for sent messages); a chip shows
+ * its file beside the conversation. Null when every file is a picture, which `sentPictures` shows. */
 export function sentFiles(files) {
+  const others = files.filter((file) => file.kind !== "image");
+  if (others.length === 0) {
+    return null;
+  }
   return el(
     "div",
     { class: "attach-list sent" },
-    files.map((file) =>
+    others.map((file) =>
       el(
         "button",
         {
@@ -70,12 +75,80 @@ export function sentFiles(files) {
           dataset: { attachment: file.id, name: file.name },
           onclick: (event) => requestFile(event.currentTarget),
         },
-        icon(file.kind === "image" ? "image" : "file"),
+        icon("file"),
         el("span", null, clip(file.name, NAME_CHARS)),
         el("span", { class: "muted" }, sizeLabel(file.size)),
       ),
     ),
   );
+}
+
+// The blob URL of each picture a message carried, made once for the page on screen: a chat drawn again (a resync)
+// shows the same picture without fetching it and opening a new URL each time, and a page change lets them go
+// (`forgetSentPictures`), so they do not pile up in a window kept open for days.
+const sentUrls = new Map();
+
+/** The blob URL of the picture `id`, made once; one that could not be made is not kept, so the next drawing asks again
+ * (the drawing that asked shows why it failed). */
+function sentPictureUrl(id) {
+  const kept = sentUrls.get(id);
+  if (kept !== undefined) {
+    return kept;
+  }
+  const made = blobUrl(`/attachments/${encodeURIComponent(id)}/image`);
+  sentUrls.set(id, made);
+  made.then(null, () => {
+    if (sentUrls.get(id) === made) {
+      sentUrls.delete(id);
+    }
+  });
+  return made;
+}
+
+/** Let go of the sent pictures' blob URLs: the page that showed them has closed. */
+export function forgetSentPictures() {
+  for (const pending of sentUrls.values()) {
+    // A picture that could not be read was reported where it was shown; there is no URL to let go of.
+    pending.then((url) => URL.revokeObjectURL(url), () => undefined);
+  }
+  sentUrls.clear();
+}
+
+/** One picture a message carried, as a small square of the picture itself; its name is its tooltip, and a click shows
+ * it beside the conversation. A picture that cannot be read shows the mark of a fault and why, and still opens. */
+function sentPicture(file) {
+  const picture = el("img", { class: "sent-picture-image", alt: "" });
+  const tile = el(
+    "button",
+    {
+      class: "sent-picture",
+      type: "button",
+      title: `Show ${file.name}`,
+      "aria-label": `Show ${file.name}`,
+      dataset: { attachment: file.id, name: file.name },
+      onclick: (event) => requestFile(event.currentTarget),
+    },
+    picture,
+  );
+  sentPictureUrl(file.id).then(
+    (url) => {
+      picture.src = url;
+    },
+    (error) => {
+      // The picture could not be read: the square says so where it stands, as a chip of the box does.
+      tile.replaceChildren(icon("alert"));
+      tile.title = `${file.name}: ${error.message}`;
+      tile.setAttribute("aria-label", `${file.name}: ${error.message}`);
+    },
+  );
+  return tile;
+}
+
+/** The pictures a message carried, side by side as small squares: they stand over the message, as a chat shows them.
+ * Null when it carried none. */
+export function sentPictures(files) {
+  const pictures = files.filter((file) => file.kind === "image");
+  return pictures.length === 0 ? null : el("div", { class: "attach-list sent pictures" }, pictures.map(sentPicture));
 }
 
 /**
