@@ -48,6 +48,9 @@ _TRAILING_PUNCTUATION: str = ".,;:!?…"
 # A known identifier this long, lengthened by a fragment, a query or a closing slash the history did not have, is that
 # address (``_lengthens``); a shorter known identifier says little about what follows it.
 _LONG_IDENTIFIER_CHARS: int = 24
+# What a model writes where it shortens a value: an ellipsis inside it, or a placeholder in angle brackets (the address
+# pattern stops at the closing bracket, so a name that holds ``<`` has an unclosed one).
+_ABBREVIATION_MARKS: tuple[str, ...] = ("...", "…", "<")
 # Where a Mac's paths have a second spelling: ``/tmp`` and ``/var`` are ``/private/tmp`` and ``/private/var``.
 _PRIVATE_PREFIXES: tuple[tuple[str, str], ...] = (("/tmp/", "/private/tmp/"), ("/var/", "/private/var/"))
 
@@ -145,6 +148,12 @@ def identifiers(text: str) -> set[str]:
     return {match.rstrip(_TRAILING_PUNCTUATION) for match in _IDENTIFIER.findall(text)}
 
 
+def _abbreviated(name: str) -> bool:
+    """Whether ``name`` is written as a model shortens a value (:data:`_ABBREVIATION_MARKS`): it stands for no one
+    path or address, so no history is expected to hold it."""
+    return any(mark in name for mark in _ABBREVIATION_MARKS)
+
+
 def history_text(messages: Sequence[Message]) -> str:
     """Everything the messages say, untruncated: the reference a summary is checked against."""
     parts: list[str] = []
@@ -228,13 +237,17 @@ def check_continuity(summary: str, reference: str, ledger: RunLedger, home: str)
     value Dot cut, is not part of it), or when it is a known identifier of at least 24 characters with a fragment, a
     query or a closing slash the history did not have; a path or a page under a known one does not count by that. A
     path counts in any of its spellings: ``~`` for ``home``, the home folder, and ``/tmp`` or ``/var`` with or without
-    ``/private``.
+    ``/private``. A name the summary abbreviates (an ellipsis inside it, a ``<placeholder>``) is not checked.
     """
     missing: tuple[str, ...] = missing_sections(summary)
     known: str = "\n".join([reference, ledger.goal, *ledger.instructions, *ledger.touched])
     known_names: set[str] = identifiers(known)
     unverified: tuple[str, ...] = tuple(
-        sorted(name for name in identifiers(summary) if not _is_known(name, known, known_names, home))
+        sorted(
+            name
+            for name in identifiers(summary)
+            if not _abbreviated(name) and not _is_known(name, known, known_names, home)
+        )
     )
     return ContinuityCheck(
         ok=bool(summary.strip()) and not missing and not unverified,

@@ -89,7 +89,13 @@ def bind_listener(host: str, port: int) -> socket.socket:
         listener.close()
         raise ConfigError(
             "the server cannot listen on its address",
-            {"host": host, "port": port, "error": str(exc), "fix": "change [server] port in the configuration"},
+            {
+                "host": host,
+                "port": port,
+                "error": str(exc),
+                "fix": "a daemon of Dot that is still stopping holds the port for a few seconds: start again; if "
+                "another program holds it, change [server] port in the configuration",
+            },
         ) from exc
     return listener
 

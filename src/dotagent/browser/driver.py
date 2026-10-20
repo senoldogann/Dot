@@ -765,10 +765,22 @@ async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) 
 
 
 async def install_consent_handler(page: Page) -> None:
-    """Decline cookie banners whenever one blocks an action; banners without a decline button are left alone."""
+    """Decline cookie banners whenever one blocks an action; banners without a decline button are left alone. A click
+    that fails because the banner went away under it (it closed, or the page did) is the outcome the handler is after;
+    any other failure of the click is logged with the page's address. Neither reaches Playwright, which would print
+    the error to stderr and count the use all the same."""
     banner: Locator = page.locator(_CONSENT_BANNERS).filter(has=page.get_by_role("button", name=_DECLINE_BUTTON)).first
 
     async def decline() -> None:
-        await banner.get_by_role("button", name=_DECLINE_BUTTON).first.click(timeout=_CONSENT_CLICK_TIMEOUT_MS)
+        try:
+            await banner.get_by_role("button", name=_DECLINE_BUTTON).first.click(timeout=_CONSENT_CLICK_TIMEOUT_MS)
+        except PlaywrightError as error:
+            if page.is_closed() or await banner.count() == 0:
+                return
+            _log.warning(
+                "consent_decline_failed",
+                url=truncate_middle(page.url, _ERROR_CHARS),
+                error=truncate_middle(str(error), _ERROR_CHARS),
+            )
 
     await page.add_locator_handler(banner, decline, no_wait_after=True, times=_CONSENT_HANDLER_TIMES)

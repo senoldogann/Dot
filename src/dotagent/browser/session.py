@@ -171,6 +171,8 @@ _DOCUMENT_RESOURCE: str = "Document"
 _BLOCKED_BY_CLIENT: str = "ERR_BLOCKED_BY_CLIENT"
 _ABORT_REASON: str = "blockedbyclient"
 _FAIL_REASON: str = "BlockedByClient"
+# What Chrome answers to a verdict for a request the page cancelled or finished while the verdict was being made.
+_REQUEST_GONE: str = "Invalid InterceptionId"
 _FORBIDDEN_MESSAGE: str = "this URL may not be opened"
 # Chrome exits by itself a few seconds after the driver that started it died.
 _CHROME_EXIT_WAIT_S: float = 10.0
@@ -1382,7 +1384,9 @@ class BrowserSession:
 
     async def _answer_hop(self, cdp: CDPSession, page: Page, request_id: str, url: str, allowed: bool) -> None:
         """Let the request ``request_id`` go on, or fail it as blocked by the client. A page that closed under its
-        request has nothing left to answer."""
+        request, or that cancelled or finished the request before this answer came (:data:`_REQUEST_GONE`), has nothing
+        left to answer: the first is not logged and the second only at debug level, as it happens with the ordinary
+        traffic of a page. Any other failure to answer is a warning."""
         try:
             if allowed:
                 await cdp.send("Fetch.continueRequest", {"requestId": request_id})
@@ -1390,6 +1394,9 @@ class BrowserSession:
                 await cdp.send("Fetch.failRequest", {"requestId": request_id, "errorReason": _FAIL_REASON})
         except PlaywrightError as error:
             if page.is_closed():
+                return
+            if _REQUEST_GONE in str(error):
+                _log.debug("browser_hop_gone", url=truncate_middle(url, _LAUNCH_ERROR_CHARS), allowed=allowed)
                 return
             _log.warning(
                 "browser_hop_unanswered",

@@ -726,15 +726,35 @@ def load_defaults() -> JsonObject:
     return parsed
 
 
+# How many of the errors of a configuration its message names; the context holds them all.
+_PROBLEMS_NAMED: int = 5
+
+
+def describe_problems(exc: ValidationError) -> str:
+    """What failed validation, in a line: a key the schema does not have is named as one a newer Dot may add (a daemon
+    that runs an older checkout than the one that wrote the file refuses it), any other error by its path and its
+    message. At most :data:`_PROBLEMS_NAMED` errors are named."""
+    problems: list[str] = []
+    for error in exc.errors(include_url=False, include_context=False, include_input=False):
+        path: str = ".".join(str(part) for part in error["loc"])
+        if error["type"] == "extra_forbidden":
+            problems.append(f"{path} is not a setting this version of Dot knows (a newer Dot may add it)")
+        else:
+            problems.append(f"{path}: {error['msg']}")
+    named: str = "; ".join(problems[:_PROBLEMS_NAMED])
+    return named if len(problems) <= _PROBLEMS_NAMED else f"{named}; and {len(problems) - _PROBLEMS_NAMED} more"
+
+
 def _validated(merged: JsonObject, source: str) -> AppConfig:
     try:
         return AppConfig.model_validate(merged)
     except ValidationError as exc:
         raise ConfigError(
-            "configuration failed validation",
+            f"configuration failed validation: {describe_problems(exc)}",
             {
                 "path": source,
                 "errors": exc.json(include_url=False, include_context=False, include_input=False),
+                "fix": f"correct or remove the setting in {source}, or update the Dot that reads it",
             },
         ) from exc
 

@@ -110,6 +110,23 @@ def test_the_check_takes_an_address_cut_short_or_lengthened_as_known_and_another
     )
 
 
+def test_the_check_leaves_a_name_the_summary_abbreviates_alone() -> None:
+    reference: str = history_text([user_message(GOAL, ())])
+    ledger = new_ledger(GOAL)
+    # An elided path, an elided query and a placeholder in angle brackets stand for no one value: nothing to look up.
+    abbreviated = check_continuity(
+        SUMMARY + "\nSee ~/.cargo/registry/.../tauri-2.12.3/build.rs, http://127.0.0.1:8888/search?q=...&format=json"
+        " and https://api.example.com/u/0/mailbox/<id>.",
+        reference,
+        ledger,
+        HOME,
+    )
+    assert abbreviated.ok, abbreviated.unverified
+    # A whole name beside them is still looked up.
+    beside = check_continuity(SUMMARY + "\nSee ~/a/.../b.rs and /tmp/jobscan/cands.json.", reference, ledger, HOME)
+    assert beside.unverified == ("/tmp/jobscan/cands.json",)
+
+
 def test_the_check_knows_a_path_in_the_other_spellings_a_mac_has_for_it() -> None:
     reference: str = history_text(
         [

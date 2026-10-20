@@ -11,6 +11,10 @@ from dotagent.core.errors import InvalidValueError
 _MODULE_PX: int = 8
 # Medium error correction: the code stays readable with a glare or a smudge on part of the screen.
 _CORRECTION: str = "M"
+# The transform is made here, once, on the thread that imports this module: PyObjC binds a Core Graphics function the
+# first time the name is read, and two worker threads reading a name that is still unbound at once make the second one
+# fail with a KeyError. Settings › Phone asks for two codes together, each on a worker thread.
+_SCALE = Quartz.CGAffineTransformMakeScale(_MODULE_PX, _MODULE_PX)
 
 
 def qr_png(text: str) -> bytes:
@@ -22,6 +26,6 @@ def qr_png(text: str) -> bytes:
     image = generator.outputImage()
     if image is None:
         raise InvalidValueError("macOS made no QR code of this text", {"chars": len(text)})
-    scaled = image.imageByApplyingTransform_(Quartz.CGAffineTransformMakeScale(_MODULE_PX, _MODULE_PX))
+    scaled = image.imageByApplyingTransform_(_SCALE)
     picture = NSBitmapImageRep.alloc().initWithCIImage_(scaled)
     return bytes(picture.representationUsingType_properties_(NSPNGFileType, {}))

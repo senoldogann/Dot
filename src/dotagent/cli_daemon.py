@@ -6,6 +6,7 @@ import os
 import secrets
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
 
 import httpx
@@ -24,6 +25,7 @@ from dotagent.cli_commands import (
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import ConfigError, InvalidValueError, ServiceError
 from dotagent.core.paths import dot_home, log_dir, token_path
+from dotagent.daemon_failure import DaemonFailure, daemon_failure_in, failure_text
 from dotagent.desktop.perms import Pane, open_settings, settings_url
 from dotagent.dot_app import app_path, ensure_app
 from dotagent.launchd import (
@@ -65,6 +67,10 @@ def _clip(text: str, limit: int) -> str:
 
 def _listener_fix(port: int) -> str:
     return f"see what listens on the port with 'lsof -nP -iTCP:{port} -sTCP:LISTEN'"
+
+
+def _own_log() -> Path:
+    return log_dir() / "dotx.log"
 
 
 def _plist_path() -> Path:
@@ -178,7 +184,7 @@ async def open_in_browser(address: str) -> None:
 async def cmd_daemon(command: DaemonCommand) -> int:
     config: AppConfig = load_user_config()
     sys.stderr.write(
-        f"Dot daemon on {base_url(config.server.host, config.server.port)}; log: {log_dir() / 'dotx.log'}. "
+        f"Dot daemon on {base_url(config.server.host, config.server.port)}; log: {_own_log()}. "
         "Open the UI with 'dotx open' from another terminal; stop with Ctrl-C.\n"
     )
     return await run_daemon(config)
@@ -220,6 +226,9 @@ async def cmd_service_status(command: ServiceStatusCommand) -> int:
     sys.stdout.write(f"launchd  {_job_line(status)}\n")
     if health is None:
         sys.stdout.write(f"daemon   does not answer at {base_url(config.server.host, config.server.port)}\n")
+        failure: DaemonFailure | None = await asyncio.to_thread(daemon_failure_in, _own_log())
+        if failure is not None:
+            sys.stdout.write(f"failure  the daemon ended with: {failure_text(failure)}\n")
     else:
         sys.stdout.write(
             f"daemon   answers at {base_url(config.server.host, config.server.port)} (version {health.version})\n"
@@ -233,6 +242,7 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
     url: str = health_url(config.server.host, config.server.port)
     uid: int = os.getuid()
     plist: Path = _plist_path()
+    began: datetime = datetime.now()
     before: ServiceStatus = await service_status(plist, uid)
     if before.job is None and await probe_daemon(url) is not None:
         raise ServiceError(
@@ -246,8 +256,15 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
     health: HealthView | None = await wait_for_daemon(url, _START_WAIT_S)
     if health is None:
         after: ServiceStatus = await service_status(plist, uid)
+        ended: DaemonFailure | None = await asyncio.to_thread(daemon_failure_in, _own_log())
+        # A failure from before this install is not why the daemon of this one does not answer.
+        reason: str = (
+            "the daemon does not answer"
+            if ended is None or ended.at < began
+            else f"the daemon ended with an error: {ended.error}"
+        )
         raise ServiceError(
-            "the launchd job is loaded but the daemon does not answer",
+            f"the launchd job is loaded but {reason}",
             {
                 "url": url,
                 "waited_s": _START_WAIT_S,

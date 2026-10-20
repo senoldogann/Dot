@@ -549,7 +549,11 @@ dotx service uninstall   # stop the daemon and remove the job
 
 - Run `service install` again to restart the daemon after you changed the configuration. It stops the running job before
   it writes the new job's file; when launchd does not load the new job, the file of before is put back and its job
-  started again, and the install fails with launchd's words.
+  started again, and the install fails with launchd's words. When the job loads and the daemon does not answer within a
+  minute, the error says why when the daemon's own start failed since the install began (`dotx.log`'s `command_failed`
+  of `daemon`: a setting this version of Dot does not know, a daemon already running, an address taken), and
+  `service status`, when the daemon does not answer, shows the failure that ended the latest `dotx daemon` unless a
+  start that went well came after it. Without such a failure, read `daemon.err.log`.
 - The job runs **Dot.app** (item 288), a small app in Dot's home (`~/Library/Application Support/Dot/Dot.app`) whose
   program starts the daemon's Python and waits for it. macOS holds the program launchd starts responsible for all it
   starts, so its questions and System Settings name **Dot**, and Accessibility (it covers posting input events),

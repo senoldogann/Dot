@@ -19,8 +19,9 @@ from pydantic import JsonValue
 
 from dotagent import __version__
 from dotagent.config import OpenRouterConfig
-from dotagent.core.errors import ProviderProtocolError
+from dotagent.core.errors import ProviderCreditError, ProviderProtocolError
 from dotagent.core.jsonutil import dumps_compact
+from dotagent.core.logs import get_logger
 from dotagent.core.retry import RetryPolicy
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.codec_chat import ChatOptions, build_chat_body, chat_codec
@@ -28,8 +29,10 @@ from dotagent.llm.connector import get_json, retry_with_reset, stream_model_repl
 from dotagent.llm.http import build_client, request_context
 from dotagent.llm.provider_errors import classify_generic, classify_openrouter
 from dotagent.llm.traits import ModelTraits, info_from_traits, is_known_label
-from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, StreamDelta
 from dotagent.llm.wire import get_float, get_int, get_list, get_obj, get_str
+
+log = get_logger(__name__)
 
 # OpenRouter takes ``max_tokens``, sends the usage with the last chunk unasked, reads the level as its ``reasoning``
 # object and wants the reasoning details of a turn back beside its tool calls.
@@ -41,6 +44,9 @@ _CHAT_OPTIONS: ChatOptions = ChatOptions(
     reasoning_object=True,
     replay_details=True,
 )
+# The shortest answer worth asking for again when OpenRouter says the credits pay for no more: a shorter one is cut off
+# before it says anything, so the 402 stands.
+_LEAST_AFFORDABLE_TOKENS: int = 1_024
 _FREE_SUFFIX: str = ":free"
 _ZERO_PRICE: str = "0"
 # The limits of a model OpenRouter lists without them, or does not list at all: assumed, as other providers assume.
@@ -240,6 +246,32 @@ class OpenRouterProvider:
         return parse_key(payload)
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        """The reply to ``request``. Dot sends no ``max_tokens`` unless a call sets one, and OpenRouter then prices the
+        request at the model's longest answer (131072 tokens for some), so an account with few credits is refused (HTTP
+        402) a call whose answer would be short. When the refusal names the longest answer the credits pay for, the
+        request is sent once more with that as its ``max_tokens``; a refusal that names none, or less than
+        :data:`_LEAST_AFFORDABLE_TOKENS`, or more than the request asked for, or the second one, is raised."""
+        try:
+            return await self._complete_once(request, sink)
+        except ProviderCreditError as error:
+            affordable: int | None = error.affordable_tokens
+            asked: int | None = request.max_output_tokens
+            if (
+                affordable is None
+                or affordable < _LEAST_AFFORDABLE_TOKENS
+                or (asked is not None and asked <= affordable)
+            ):
+                raise
+            log.warning(
+                "openrouter_max_tokens_lowered",
+                model=request.model,
+                asked_tokens=asked,
+                affordable_tokens=affordable,
+            )
+            await sink(StreamDelta(kind="reset", text=""))
+            return await self._complete_once(request.model_copy(update={"max_output_tokens": affordable}), sink)
+
+    async def _complete_once(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         traits: ModelTraits = await self._traits(request.model)
         body: JsonObject = build_chat_body(request, traits, _CHAT_OPTIONS, f"openrouter:{request.model}")
         url: str = self._url("/chat/completions")

@@ -173,7 +173,8 @@ Both modes share what follows.
   element and what to do about it (close or answer the box, or press Escape).
 - Password, one-time-code and card fields are never filled by Dot: outside `yolo` the step is refused, and in `yolo`
   the field is handed to you, with the browser to take over (item 429, see [Safety](safety.md#safety)). Cookie banners
-  are declined (`decline_cookie_banners`).
+  are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails
+  with the banner still there is logged as `consent_decline_failed` with the page's address).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
@@ -189,7 +190,9 @@ Both modes share what follows.
   another site started (`Sec-Fetch-Site: cross-site`), save to the page a sign-in comes back to and to the pages runs
   showed. A host is read the way Chrome reads it (international names, the numeric spellings of an IPv4 address, a
   trailing dot), and an address with a backslash before its query is refused. A new tab's first page waits until
-  Dot checks each hop of its redirects.
+  Dot checks each hop of its redirects. A page that cancels a request while Dot is judging it makes Chrome refuse
+  the verdict ("Invalid InterceptionId"); that is logged only at debug level, and any other refusal as
+  `browser_hop_unanswered`.
 - `raise_window = false` (the default) keeps the window in the background while a run works: every tab Dot opens, a
   run's or a quiet read's, is created in the background (a new tab opened the usual way brings Chrome to the front of
   the Mac), and it still paints the page under Dot's computer. macOS brings a newly started Chrome to the front, and
