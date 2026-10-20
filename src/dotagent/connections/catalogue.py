@@ -33,11 +33,13 @@ class WebApp(FrozenModel):
 
 
 class FolderApp(FrozenModel):
-    """An application of the Mac that keeps files in sync in a folder, which Dot reads and writes like any other."""
+    """An application of the Mac that keeps files in sync in a folder, which Dot reads and writes like any other.
+    ``bundle_ids`` name it to macOS: the ids its builds go by, the first Launch Services finds being the one installed
+    (OneDrive's direct download and its App Store build do not share one)."""
 
     id: str
     name: str
-    bundle_id: str
+    bundle_ids: tuple[str, ...]
     does: str
 
 
@@ -70,7 +72,7 @@ FOLDER_APPS: tuple[FolderApp, ...] = (
     FolderApp(
         id="onedrive",
         name="OneDrive",
-        bundle_id="com.microsoft.OneDrive",
+        bundle_ids=("com.microsoft.OneDrive-mac", "com.microsoft.OneDrive"),
         does="Reads and writes the files OneDrive keeps in sync on this Mac.",
     ),
 )

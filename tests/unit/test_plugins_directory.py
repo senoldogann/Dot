@@ -1,8 +1,9 @@
 """Customize › Plugins (item 316): the directory of the services Dot works with. At least 25, each once, each saying
 what Dot does with it; every application and MCP service of Connect apps' catalogues has a listing, so the page holds
 all of them; a listing is tried exactly when one of its ways is a catalogue's, and an untried way says what it would
-take; each mark is a logo file of Simple Icons' (one path, named in the folder's LICENSE), an icon of the interface
-or letters."""
+take; each mark is a logo file (a well-formed SVG that runs nothing and reaches nothing, named in the folder's LICENSE,
+whose source and licence it says), an icon of the interface or letters; an application of the Mac names the application
+whose own icon its mark wears once it is installed."""
 
 import re
 import xml.etree.ElementTree as ET
@@ -66,20 +67,77 @@ def test_a_way_no_catalogue_holds_is_refused() -> None:
         plugin_view(silent)
 
 
-def test_each_mark_is_a_logo_of_one_path_an_icon_of_the_interface_or_letters() -> None:
+# What an SVG that is shown as a picture must not hold: it would run something or load something.
+_FORBIDDEN_TAGS: frozenset[str] = frozenset({"script", "foreignObject", "image", "use", "style", "a", "animate", "set"})
+_FILL: re.Pattern[str] = re.compile(r"#[0-9A-Fa-f]{6}")
+_LOGO_REFERENCE: re.Pattern[str] = re.compile(r"/icons/plugins/([A-Za-z0-9-]+\.svg)")
+
+
+def _licence_paragraph(licence: str, start: str) -> str:
+    return next(paragraph for paragraph in licence.split("\n\n") if paragraph.startswith(start))
+
+
+def _logo_names(paragraph: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9-]+\.svg", paragraph))
+
+
+def test_each_mark_is_a_logo_file_an_icon_of_the_interface_or_letters() -> None:
     icons: set[str] = _icon_names()
-    licence: str = (_LOGOS / "LICENSE").read_text(encoding="utf-8")
     logos: set[str] = set()
     for listing in PLUGINS:
         assert listing.colour is None or re.fullmatch(r"[0-9A-F]{6}", listing.colour), listing.id
         if listing.logo is not None:
             logos.add(listing.logo)
-            root: ET.Element = ET.fromstring((_LOGOS / listing.logo).read_text(encoding="utf-8"))
-            assert root.get("viewBox") == "0 0 24 24" and [child.tag for child in root] == [f"{_SVG}path"]
-            assert listing.logo.removesuffix(".svg") in licence, listing.logo
+            # A logo is drawn in its own colours: the listing's colour is for a glyph or letters.
+            assert listing.colour is None and listing.glyph is None and listing.monogram is None, listing.id
         elif listing.glyph is not None:
             assert listing.glyph in icons, listing.glyph
+            assert listing.monogram is None, listing.id
         else:
             assert listing.monogram is not None and 1 <= len(listing.monogram) <= 2, listing.id
-    # Every file of the folder is a mark some listing shows.
+    # Every file of the folder is a mark some listing shows, and every listing's file is there.
     assert {file.name for file in _LOGOS.glob("*.svg")} == logos
+
+
+def test_the_logo_files_are_svg_pictures_that_run_nothing_and_reach_nothing_each_named_in_the_licence() -> None:
+    licence: str = (_LOGOS / "LICENSE").read_text(encoding="utf-8")
+    assert "CC0 1.0" in licence and "trademarks of their owners" in licence
+    full: set[str] = _logo_names(_licence_paragraph(licence, "gilbarbara/logos"))
+    simple: set[str] = _logo_names(_licence_paragraph(licence, "Simple Icons"))
+    files: set[str] = {file.name for file in _LOGOS.glob("*.svg")}
+    # Each file is named once in the paragraph of its source; the files of the two sources do not overlap.
+    assert full | simple == files and not full & simple
+    for name in sorted(files):
+        root: ET.Element = ET.fromstring((_LOGOS / name).read_text(encoding="utf-8"))
+        assert root.tag == f"{_SVG}svg", name
+        box: list[str] = (root.get("viewBox") or "").split()
+        assert len(box) == 4 and all(float(number) >= 0 for number in box[2:]), name
+        for element in root.iter():
+            assert element.tag.removeprefix(_SVG) not in _FORBIDDEN_TAGS, (name, element.tag)
+            for attribute, value in element.attrib.items():
+                assert not attribute.startswith("on"), (name, attribute)
+                if "href" in attribute or "url(" in value:
+                    assert value.startswith("#") or value.startswith("url(#"), (name, attribute, value)
+        if name in simple:
+            # A Simple Icons symbol is one path in the brand's colour, which the file's fill gives it.
+            assert [child.tag for child in root] == [f"{_SVG}path"], name
+            assert _FILL.fullmatch(root.get("fill") or ""), name
+
+
+def test_the_pages_script_names_only_logo_files_that_are_there() -> None:
+    """The Accounts card and the first chat's card draw Google's and Microsoft's marks by file name."""
+    named: set[str] = set()
+    for script in sorted((_STATIC / "js").rglob("*.js")):
+        named |= set(_LOGO_REFERENCE.findall(script.read_text(encoding="utf-8")))
+    assert {"google-icon.svg", "microsoft-icon.svg"} <= named
+    assert all((_LOGOS / name).is_file() for name in named), named
+
+
+def test_a_listing_of_an_application_of_the_mac_names_it() -> None:
+    apps: dict[str, str] = {app.id: app.name for app in (*MAC_APPS, *FOLDER_APPS)}
+    for view in plugin_views():
+        ways: list[str] = [way.ref for way in view.ways if way.kind in ("mac", "folder") and way.ref is not None]
+        assert view.app == (ways[0] if ways else None), view.id
+        assert view.app is None or view.app in apps, view.id
+    # The ten applications of the Mac and OneDrive, each listed under its own id.
+    assert sorted(view.id for view in plugin_views() if view.app is not None) == sorted(apps)
