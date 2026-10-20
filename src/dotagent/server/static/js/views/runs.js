@@ -455,7 +455,10 @@ export function mount(root, ctx) {
   }
   const stopCompose = onCompose(offerCaret);
   offerCaret();
-  const stopNames = onAssistant((names) => composer.rename(names.name));
+  const stopNames = onAssistant((names) => {
+    composer.rename(names.name);
+    presence.renamed();
+  });
   let disposed = false;
   // The first conversation stands in the place of the greeting, over the composer, once it is known to be due; a
   // daemon that cannot say whether it is is shown, and the home keeps its greeting.

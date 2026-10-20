@@ -130,6 +130,8 @@ async def test_one_moving_face_costs_a_few_milliseconds_a_frame_at_most(
     host: str = client.base_url.host
     port: int | None = client.base_url.port
     assert port is not None
+    # Dot has had its first conversation (item 420): the home shows its face and greeting, which is what is measured.
+    runtime.assistant.mark_introduced(True)
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:

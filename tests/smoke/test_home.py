@@ -251,8 +251,11 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
                 await owner.fill(_OWNER)
                 await owner.press("Enter")
                 await page.goto(f"{base}/#/runs")
-                greeting: str = (await page.locator(".home-greeting").text_content()) or ""
-                assert _GREETING.match(greeting) is not None and ", Ada." in greeting, greeting
+                # The name is kept by the daemon (item 420): the open home takes it once the save lands.
+                hello = page.locator(".home-greeting")
+                await expect(hello).to_contain_text(", Ada.")
+                greeting: str = (await hello.text_content()) or ""
+                assert _GREETING.match(greeting) is not None, greeting
                 assert greeting.endswith("Something waits for you."), greeting
                 now_line = page.locator(".home-now")
                 expected: str = "Working on 1 run · 1 waits for you · 1 ended today · 1 lesson"
