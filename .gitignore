@@ -18,6 +18,8 @@ __pycache__/
 desktop/node_modules/
 desktop/src-tauri/target/
 desktop/src-tauri/gen/
+# What desktop/release.sh builds, each release in its own folder
+desktop/dist/
 
 # Never tracked: the owner's working notes and reports, local data, logs, the real config
 PLAN.md

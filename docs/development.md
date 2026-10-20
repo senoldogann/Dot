@@ -85,13 +85,72 @@ src/dotagent/
   core/       errors, logging, retries, paths, shared types
 ```
 
-## Releasing to PyPI
+## Releasing
+
+A release is one version, the same in `pyproject.toml`, `src/dotagent/__init__.py`, `desktop/package.json`,
+`desktop/src-tauri/Cargo.toml` and `desktop/src-tauri/tauri.conf.json` (`tests/unit/test_version.py` keeps them alike),
+with its section `## <version> (<date>)` in `CHANGELOG.md`. It is made from one commit of `main`, in two parts: the
+desktop app, built on a Mac, and the Python package, which the release's tag publishes on PyPI. A version is released
+once: the next release raises it in the five files first.
+
+### The desktop app
+
+`desktop/release.sh` (item 432) builds it into `desktop/dist/<version>/`, which git ignores:
+
+- `Dot_<version>_universal.dmg`, the disk image to install from: the app for Apple silicon and Intel and a link to
+  Applications, the image and the app each signed with the Developer ID (the app with the hardened runtime), notarized
+  by Apple and stapled, so that Gatekeeper opens them on a Mac that is offline;
+- `Dot_<version>_universal.app.tar.gz` and its `.sig`, the archive the shell's updater installs: the stapled app,
+  signed with the updater's key, the signature naming the version;
+- `latest.json`, what the updater reads from the latest release: the version, and the archive's address and signature
+  for both kinds of Mac;
+- `notes.md`, the version's section of the changelog, the release's notes.
+
+It stops at the first check that fails, and says which: changes not committed, versions that differ, a tag that is
+on GitHub already, a changelog with no section for the version, the app's signature (the Developer ID, the hardened
+runtime, a secure timestamp, both architectures), and a verdict of Apple's notary service other than Accepted, with
+the log of what it found.
+
+Once, on the Mac that builds releases:
+
+- Rust from rustup, first in `PATH` (Homebrew's Rust builds for this Mac only), with the targets of both kinds of Mac:
+  `rustup target add aarch64-apple-darwin x86_64-apple-darwin`; and Node, as for any build of the shell.
+- A Developer ID Application certificate in the login keychain, the only one there: Xcode › Settings › Accounts ›
+  Manage Certificates, or developer.apple.com › Certificates.
+- The notary service's credentials, saved as the profile `dot-notary`:
+  `xcrun notarytool store-credentials dot-notary --apple-id <Apple ID> --team-id <team ID>`, which asks for an
+  app-specific password (account.apple.com › Sign-In and Security › App-Specific Passwords).
+- The updater's key pair: in `desktop/`, `npx tauri signer generate -w ~/.tauri/dot.key`; its password in the Keychain
+  with `security add-generic-password -s dot-release -a TAURI_SIGNING_PRIVATE_KEY_PASSWORD -w`, which asks for it; and
+  the public key, the content of `~/.tauri/dot.key.pub`, as `plugins.updater.pubkey` in
+  `desktop/src-tauri/tauri.conf.json`. Keep the private key and its password: an installed shell takes only updates
+  signed with it, so without them each copy would have to be installed again by hand.
+
+Then, on a clean checkout of the commit to release:
+
+```bash
+desktop/release.sh
+```
+
+The script publishes nothing. It ends with the command that does, with the commit and the files, of this form:
+
+```bash
+gh release create v0.1.0 --target <commit> --title "Dot 0.1.0" --notes-file desktop/dist/0.1.0/notes.md \
+  desktop/dist/0.1.0/Dot_0.1.0_universal.dmg desktop/dist/0.1.0/Dot_0.1.0_universal.app.tar.gz \
+  desktop/dist/0.1.0/latest.json
+```
+
+Once that release is the latest, each installed shell finds it as it starts or from Check for Updates… (see
+[the desktop shell](daemon.md#the-desktop-shell)). The release's tag also publishes the Python package.
+
+### The Python package on PyPI
 
 Dot is published on PyPI as `dotagent-macos` (`dotagent` was taken; the package it installs is still `dotagent`, and
 the command `dotx`), by `.github/workflows/release.yml` (item 348) through trusted publishing, so no token is kept
 anywhere. Once, on pypi.org, with two-factor authentication on: Account settings › Publishing › Add a new pending
 publisher › GitHub, with the project name `dotagent-macos`, the owner `senoldogann`, the repository `Dot`, the workflow
-`release.yml` and the environment `pypi`. Then a release is a tag that says the version in `pyproject.toml`:
+`release.yml` and the environment `pypi`. Then any tag `v<version>` pushed to GitHub, the one `gh release create`
+makes too, publishes the package; on its own:
 
 ```bash
 git tag v0.1.0
@@ -99,9 +158,7 @@ git push origin v0.1.0
 ```
 
 The workflow checks that the tag and the version agree, builds the source distribution and the wheel with `uv build`
-and uploads them with `uv publish`. A version can be uploaded once: the next release raises `version` in
-`pyproject.toml` and `__version__` in `src/dotagent/__init__.py` first (a unit test keeps the two the same, and the
-workflow checks the tag against both). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`,
+and uploads them with `uv publish`. Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`,
 then `dotx setup`.
 
 ## Measuring the agent

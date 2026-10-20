@@ -16,7 +16,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -25,7 +28,17 @@
       "icons/icon.ico"
     ],
     "macOS": {
-      "minimumSystemVersion": "13.0"
+      "minimumSystemVersion": "13.0",
+      "hardenedRuntime": true
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDAzRTA4MTk1MzczN0UwMkEKUldRcTREYzNsWUhnQTVvSGpPQ1dVMU9iVjBLVEkvSHZ0ZmZMS0U1ZHBVc0g1MzdNcFVMdzBEdE8K",
+      "endpoints": [
+        "https://github.com/senoldogann/Dot/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true
     }
   }
 }

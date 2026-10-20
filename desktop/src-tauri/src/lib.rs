@@ -29,7 +29,9 @@ use tauri::{
     AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
+use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 const WINDOW: &str = "main";
 const TRAY: &str = "main";
@@ -545,6 +547,93 @@ fn watch(app: AppHandle, shown: Shown) {
     });
 }
 
+/// Who asked for a look at the releases (item 432): the owner, from the menu, is told also that Dot is the newest or
+/// why it could not look; the look Dot takes as it starts speaks only when it found a newer Dot.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum UpdateCheck {
+    Asked,
+    AtStart,
+}
+
+/// A native message with only an OK button, for what a look at the releases found.
+fn tell(app: &AppHandle, kind: MessageDialogKind, message: String) {
+    app.dialog()
+        .message(message)
+        .title("Dot")
+        .kind(kind)
+        .buttons(MessageDialogButtons::Ok)
+        .show(|_| {});
+}
+
+/// Look for a newer Dot among the releases (`plugins.updater` of tauri.conf.json, item 432). One found is offered;
+/// on yes it is downloaded, its signature checked against the public key the shell carries, installed, and the shell
+/// started again.
+fn check_for_update(app: AppHandle, how: UpdateCheck) {
+    tauri::async_runtime::spawn(async move {
+        let found = match app.updater() {
+            Ok(updater) => updater.check().await,
+            Err(error) => Err(error),
+        };
+        match found {
+            Ok(Some(update)) => offer_update(app, update),
+            Ok(None) => {
+                if how == UpdateCheck::Asked {
+                    let current = app.package_info().version.to_string();
+                    tell(
+                        &app,
+                        MessageDialogKind::Info,
+                        format!("Dot {current} is the newest."),
+                    );
+                }
+            }
+            Err(error) => {
+                eprintln!("dot-shell: the releases could not be read for an update: {error}");
+                if how == UpdateCheck::Asked {
+                    tell(
+                        &app,
+                        MessageDialogKind::Warning,
+                        format!("Dot could not look for an update: {error}"),
+                    );
+                }
+            }
+        }
+    });
+}
+
+/// Ask whether to install `update`; on yes, install it and start the shell again.
+fn offer_update(app: AppHandle, update: Update) {
+    let message = format!(
+        "Dot {} is out (this one is {}). Install it now? Dot starts again with it.",
+        update.version, update.current_version
+    );
+    let asking = app.clone();
+    asking
+        .dialog()
+        .message(message)
+        .title("A newer Dot")
+        .buttons(MessageDialogButtons::OkCancelCustom(
+            "Install and Restart".to_string(),
+            "Later".to_string(),
+        ))
+        .show(move |yes| {
+            if yes {
+                tauri::async_runtime::spawn(async move {
+                    match update.download_and_install(|_, _| {}, || {}).await {
+                        Ok(()) => app.restart(),
+                        Err(error) => {
+                            eprintln!("dot-shell: the update could not be installed: {error}");
+                            tell(
+                                &app,
+                                MessageDialogKind::Warning,
+                                format!("The update could not be installed: {error}"),
+                            );
+                        }
+                    }
+                });
+            }
+        });
+}
+
 /// The menu bar item. `shortcut_taken` says that ⇧⌘Space could not be had: the menu then says so, and New chat is
 /// only in the menu.
 fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
@@ -563,12 +652,28 @@ fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
         false,
         None::<&str>,
     )?;
+    let update = MenuItem::with_id(app, "update", "Check for Updates…", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
+    let before_quit = PredefinedMenuItem::separator(app)?;
     let quit = PredefinedMenuItem::quit(app, Some("Quit Dot"))?;
     let menu = if shortcut_taken {
-        Menu::with_items(app, &[&open, &chat, &taken, &separator, &quit])?
+        Menu::with_items(
+            app,
+            &[
+                &open,
+                &chat,
+                &taken,
+                &separator,
+                &update,
+                &before_quit,
+                &quit,
+            ],
+        )?
     } else {
-        Menu::with_items(app, &[&open, &chat, &separator, &quit])?
+        Menu::with_items(
+            app,
+            &[&open, &chat, &separator, &update, &before_quit, &quit],
+        )?
     };
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon("idle"))
@@ -578,6 +683,7 @@ fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show(app),
             "chat" => new_chat(app),
+            "update" => check_for_update(app.clone(), UpdateCheck::Asked),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -614,6 +720,8 @@ fn shortcut(app: &AppHandle) -> tauri::Result<()> {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Granted::default())
         .setup(|app| {
             let handle = app.handle().clone();
@@ -642,6 +750,7 @@ pub fn run() {
                 }
             };
             tray(&handle, shortcut_taken)?;
+            check_for_update(handle.clone(), UpdateCheck::AtStart);
             watch(handle, shown);
             Ok(())
         })

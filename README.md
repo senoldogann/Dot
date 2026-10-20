@@ -52,6 +52,10 @@ The pictures show a run of Dot's scripted test model, under the name of a real o
 3. Install its packages: `uv sync`.
 4. Set it up: `uv run dotx setup`.
 5. Open it: `uv run dotx open` opens the web UI in your browser, signed in.
+6. If you want Dot in a window of its own, with a menu bar item and ⌘⇧Space: download `Dot_<version>_universal.dmg`
+   from the [latest release](https://github.com/senoldogann/Dot/releases/latest), open it and drag Dot to
+   Applications. The app is signed and notarized, and keeps itself up to date (see
+   [the desktop shell](docs/daemon.md#the-desktop-shell)).
 
 `dotx setup` does the following, then installs the service and gives the address of the web UI:
 
