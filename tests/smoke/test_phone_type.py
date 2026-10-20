@@ -298,7 +298,9 @@ def _faults(label: str, seen: Seen) -> list[str]:
     return faults
 
 
-async def test_every_page_on_a_phone_reads_at_a_phones_size_and_takes_a_finger(own_home: Path) -> None:
+async def test_every_page_on_a_phone_reads_at_a_phones_size_and_takes_a_finger(
+    own_home: Path, mac_at_rest: None
+) -> None:
     async with _served(own_home) as (manager, address), async_playwright() as playwright:
         task, chat, agent = await _seed(manager, address)
         pages: list[tuple[str, str]] = [

@@ -194,7 +194,9 @@ _ROUTES: tuple[str, ...] = (
 )
 
 
-async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(own_home: Path, tmp_path: Path) -> None:
+async def test_the_pages_fit_a_phone_and_their_heads_and_rows_keep_their_words(
+    own_home: Path, tmp_path: Path, mac_at_rest: None
+) -> None:
     async with _served(own_home) as (runtime, port), async_playwright() as playwright:
         await _fill(runtime, port)
         browser: Browser = await playwright.webkit.launch()

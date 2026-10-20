@@ -306,7 +306,8 @@ itself in the same bar (Agents, Campaigns, Settings) and opens with one line of 
 its end, where its next words come, and stays there as the earlier turns fill in above (item 403). The six runs opened
 last are kept while the page lives, so that coming back to one (from a delegated run's page, say) draws it at once as it
 stood and follows its stream on from the last message read, not from the first; what the lessons, the questions and the
-cost show is read again (item 426).
+cost show is read again (item 426). A run that ended while its page was open is kept as ended: coming back to it shows
+its face at rest, not the tick again.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it

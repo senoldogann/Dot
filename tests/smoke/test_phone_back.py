@@ -80,6 +80,22 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
         patch.undo()
 
 
+async def _home_with_links(page: Page, address: str) -> None:
+    """Open the home and put the test's links on it. WebKit loads the page again when it is asked for the address it is
+    at, and the page's `main` is made while it starts, so the links wait for the home to be drawn."""
+    await page.goto(f"{address}/#/runs")
+    await expect(page.locator("main .home")).to_be_visible()
+    await page.evaluate(_LINKS)
+
+
+async def _opens_the_chats(page: Page, address: str, run: RunRecord) -> None:
+    """The chat's page is the one on screen: its address, and its route, which closes a drawer that was open. The button
+    opens the list of chats only after that, or the route would close what it opened."""
+    await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
+    await expect(page.locator("main")).to_have_attribute("data-layout", "run")
+    await expect(page.locator(".stagebar-left button")).to_have_attribute("aria-label", "Show sidebar")
+
+
 async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     button: Locator = page.locator(".stagebar-left button")
     # Settings, opened from the sidebar: the button opens the chats.
@@ -113,8 +129,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     # between them, and the address stays the run's.
     await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
-    await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
-    await expect(button).to_have_attribute("aria-label", "Show sidebar")
+    await _opens_the_chats(page, address, run)
     await button.click()
     await expect(page.locator(".sidebar")).to_be_in_viewport()
     await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
@@ -126,8 +141,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await expect(button).to_have_attribute("aria-label", "Show sidebar")
     # A link to an old address counts for the page it leads to (review B3), and so does a link whose clicks a part of
     # the page stops, or one in a dialog outside the page (review B4).
-    await page.goto(f"{address}/#/runs")
-    await page.evaluate(_LINKS)
+    await _home_with_links(page, address)
     await page.locator("#old-address").click()
     await expect(page).to_have_url(f"{address}/#/settings/memory")
     await expect(page.locator(".memory-layout")).to_be_visible()
@@ -137,8 +151,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     await button.click()
     await expect(page).to_have_url(f"{address}/#/runs")
     await expect(button).to_have_attribute("aria-label", "Show sidebar")
-    await page.goto(f"{address}/#/runs")
-    await page.evaluate(_LINKS)
+    await _home_with_links(page, address)
     await page.locator("#stopped-link").click()
     await expect(page).to_have_url(f"{address}/#/customize/plugins/notion")
     await expect(button).to_have_attribute("aria-label", "Back")
@@ -158,8 +171,7 @@ async def _phone_walk(page: Page, address: str, run: RunRecord) -> None:
     # A chat opened from the sidebar: the button is the way to the list of chats.
     await page.get_by_role("button", name="Show sidebar").click()
     await page.locator(f"#sidebar a[href='#/runs/{run.id}']").first.click()
-    await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
-    await expect(button).to_have_attribute("aria-label", "Show sidebar")
+    await _opens_the_chats(page, address, run)
     await button.click()
     await expect(page.locator(".sidebar")).to_be_in_viewport()
 
@@ -169,18 +181,19 @@ async def _follow_up_walk(page: Page, address: str, run: RunRecord) -> None:
     button: Locator = page.locator(".stagebar-left button")
     await page.goto(f"{address}/#/runs")
     await page.locator(f"main a.activity-row[href='#/runs/{run.id}']").first.click()
-    await expect(page).to_have_url(f"{address}/#/runs/{run.id}")
-    await expect(button).to_have_attribute("aria-label", "Show sidebar")
+    await _opens_the_chats(page, address, run)
     await page.locator(".dock textarea").fill("And the totals, please")
     await page.locator(".dock .btn.send").click()
     await expect(page).to_have_url(re.compile(rf"#/runs/(?!{run.id}$)[^/]+$"))
+    # The page of the follow-up is drawn once it holds the answers of both runs of the chat.
+    await expect(page.locator(".answer")).to_have_count(2)
     await expect(button).to_have_attribute("aria-label", "Show sidebar")
     await button.click()
     await expect(page.locator(".sidebar")).to_be_in_viewport()
     await expect(page).to_have_url(re.compile(rf"#/runs/(?!{run.id}$)[^/]+$"))
 
 
-async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_path: Path) -> None:
+async def test_a_phone_has_one_way_back_at_the_top_left(runtime: Runtime, tmp_path: Path, mac_at_rest: None) -> None:
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, [ScriptedTurn(text="Done.", calls=())] * 4))
     manager: RunManager = RunManager(runtime)
     try:
