@@ -145,7 +145,9 @@ Escape closes. A skill picked is a chip under the box, a tool the chip of its se
 slash word goes; a command does its work. `@` at the start of a word opens the same menu for the picks alone (item 367):
 the MCP servers by name with the number of their tools, then the skills and each server's tools, filtered by the letters
 after it; a pick is a chip and the at word goes. An `@` inside a word, as in an address, opens nothing. A run that waits
-for your approval shows above the composer, as a card, and moves it down only when the cards do not fit there.
+for your approval is listed under Waits for you, below the composer, and leads to its chat: the card stands there alone
+(item 434). Once you allow it, the card leaves the chat with the line that asked for it, as the page opens again too;
+refused, it stays and says so, and a question keeps its answer.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
 screenshots alike; a phone opens its own sheet). The slash and at menus pick **Plugins** (the MCP servers with tools)

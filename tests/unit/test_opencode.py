@@ -156,7 +156,7 @@ def test_a_permission_is_weighed_as_the_same_action_of_dots_own_tools(tmp_path: 
     elsewhere = permission_action(_asked("edit", (), {"filepath": str(secrets / "key")}), workspace, (secrets,), ())
     assert (elsewhere.risk, elsewhere.flags) == ("high", ("secret_access",))
     # A change of Dot's own files, which Dot's file tools make once the user agrees (item 398), stays refused to
-    # OpenCode's agent: it writes past their undo journal.
+    # OpenCode's agent outside yolo (item 433): it writes past their undo journal.
     own: Path = tmp_path / "Dot" / "src"
     into_dot = permission_action(_asked("edit", (), {"filepath": str(own / "app.css")}), workspace, (), (own,))
     assert (into_dot.risk, into_dot.flags) == ("high", ("secret_access",))

@@ -161,8 +161,9 @@ def test_the_prompt_tells_the_model_how_its_questions_are_answered() -> None:
     assert "Approvals:" not in _prompt("ask", False)
     assert "answered by a review model" in _prompt("auto", False)
     assert "what the policy flags runs at once" in _prompt("yolo", False)
-    # Money, secrets, data sent out, messages and posts wait for the user in yolo too (item 429).
+    # Money, passwords, messages and posts wait for the user in yolo too (item 429); secrets do not (item 433).
     assert "still wait for the user, as in every mode" in _prompt("yolo", False)
+    assert "other secrets" not in _prompt("yolo", False)
     assert "answered by a review model" not in _prompt("yolo", False)
 
 
@@ -242,7 +243,8 @@ def _lines(approvals: ApprovalMode) -> set[str]:
 def test_yolo_changes_only_the_approvals_line_of_the_prompt() -> None:
     ask: set[str] = _lines("ask")
     yolo: set[str] = _lines("yolo")
-    # Secrets are the user's in yolo too (item 429): the line that says so is the same in every mode.
+    # The model's line about secret stores is the same in every mode, yolo too, though a yolo run no longer asks
+    # the user before one is read (item 433).
     assert sorted(ask - yolo) == []
     added: list[str] = sorted(yolo - ask)
     assert len(added) == 1, added

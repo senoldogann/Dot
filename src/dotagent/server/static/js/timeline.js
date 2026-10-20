@@ -393,6 +393,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       asking: 0,
       // While the run waits for its model to be reached again: the note that says so and the attempts it counts.
       unreachable: null,
+      // The line of the policy's last question or hand-off, which the card that comes next takes along (item 434).
+      policyLine: null,
       // The helpers whose rows follow one another at the end of the scope (item 245): `members` (their scopes),
       // `anchor` (the last element they make up) and `group` (null while there is only one).
       flock: null,
@@ -558,8 +560,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
   // The compactions of the run so far, and those whose check flagged something (item 260).
   const compactions = { count: 0, flagged: 0 };
 
+  /** Put a line at the end of the scope, as `place` does, and return it. */
   function note(scope, ts, iconName, text, tone) {
-    place(scope, el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text)), ts);
+    const line = el("div", { class: tone === "" ? "note" : `note ${tone}` }, icon(iconName), el("span", null, text));
+    place(scope, line, ts);
+    return line;
   }
 
   /**
@@ -1029,18 +1034,22 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     policy(scope, record) {
       const data = record.data;
       const verdict = VERDICT_TEXT[data.verdict] ?? data.verdict;
-      note(
+      const line = note(
         scope,
         record.ts,
         "shield",
         `${verdict}: ${clip(data.summary, 200)} — ${clip(data.reason, 240)}`,
         data.verdict === "deny" ? "bad" : "warn",
       );
+      // A question or a hand-off: its card comes next (agent/gate.py).
+      scope.policyLine = data.verdict === "deny" ? null : line;
     },
 
     approval_requested(scope, record) {
       const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN });
-      cards.set(record.data.approval_id, { card, scope });
+      const line = scope.policyLine !== null && scope.container.lastElementChild === scope.policyLine ? scope.policyLine : null;
+      scope.policyLine = null;
+      cards.set(record.data.approval_id, { card, scope, line, severity: record.data.severity });
       place(scope, card.node, record.ts);
       reveal(scope);
       markWaiting(scope, true, record.ts);
@@ -1060,7 +1069,15 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const entry = cards.get(record.data.approval_id);
       if (entry !== undefined) {
         cards.delete(record.data.approval_id);
-        entry.card.settle(record.data.status, record.data.note);
+        // An action allowed, or a step the reader did, leaves the chat with the line that asked for it, live and when
+        // the chat opens again (item 434): the run goes on with it. A refusal stays, and so does a question with its
+        // answer.
+        if (record.data.status === "approved" && entry.severity !== "question") {
+          entry.card.node.remove();
+          entry.line?.remove();
+        } else {
+          entry.card.settle(record.data.status, record.data.note);
+        }
         // The time spent waiting for the decision was not spent working.
         entry.scope.boundary = record.ts;
         unreveal(entry.scope);

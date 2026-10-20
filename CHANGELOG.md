@@ -3,6 +3,16 @@
 Each release of Dot lists here what it changes, the newest first. A change not released yet goes under **Unreleased**,
 at the top, until a release names it; how a release is made is in [Releasing](docs/development.md#releasing).
 
+## Unreleased
+
+- In `yolo`, Dot no longer asks you about what every other mode refuses (a read of where your secrets are kept, data
+  sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own files outside the undo
+  journal): the step runs and is recorded. Money and credentials are still handed to you, and a message or a post in
+  your name still waits for your yes (item 433).
+- An approval's card stays in its own chat: the home lists a run that waits under Waits for you without its card,
+  and once you allow it the card leaves the chat with the line that asked for it. A refused card stays, saying so
+  (item 434).
+
 ## 0.1.0 (2026-10-20)
 
 The first public version of Dot, an always-on autonomous agent for macOS.

@@ -26,10 +26,11 @@ _DENY_FLAGS: frozenset[Flag] = frozenset({"secret_access", "exfiltration"})
 RULE_MATCH_TIMEOUT_S: float = 0.25
 # Why an allowed action asks once untrusted content is in context; a yolo run reads it in the line of what it did.
 _TAINT_REASON: str = "untrusted content is in context and this action reaches outside the Mac"
-# What a yolo run lets through as well: the changes of Dot's own files, unless a hand-off rule of the user matches the
-# action (:func:`owner_handoff`). Money, credentials, the always-on refusals (asked instead), messages and posts stay
-# the user's (item 429), and a research run stays read-only (``mode``).
-YOLO_WAIVED_SOURCES: frozenset[DecisionSource] = frozenset({"own_files"})
+# What a yolo run lets through as well: the changes of Dot's own files, and what the always-on review refuses in every
+# other mode (a secret store read, data sent out, item 433), unless a hand-off rule of the user matches the action
+# (:func:`owner_handoff`). Money, credentials, messages and posts stay the user's (item 429), and a research run stays
+# read-only (``mode``).
+YOLO_WAIVED_SOURCES: frozenset[DecisionSource] = frozenset({"own_files", "auto_review"})
 # The questions a yolo run asks the user rather than waive (item 429): the hand-off of money and credentials, the
 # guard of messages and posts, and a pre-approved spend, which asks in place of the hand-off.
 GUARDED_SOURCES: frozenset[DecisionSource] = frozenset({"hard_stop", "guard", "spend"})
@@ -61,8 +62,8 @@ def _intersect(info: ActionInfo, flags: frozenset[Flag]) -> list[Flag]:
 
 
 def auto_review(info: ActionInfo) -> Decision | None:
-    """Always-on review: secret access and exfiltration are refused whatever the preset or rules say (a yolo run asks
-    the user instead, item 429)."""
+    """Always-on review: secret access and exfiltration are refused whatever the preset or rules say, in every mode but
+    yolo, which waives it (:func:`waived_in_yolo`, item 433)."""
     hits: list[Flag] = _intersect(info, _DENY_FLAGS)
     if hits:
         return Decision(
@@ -74,16 +75,14 @@ def auto_review(info: ActionInfo) -> Decision | None:
     return None
 
 
-def asked_in_yolo(info: ActionInfo) -> Decision:
-    """What a yolo run makes of an action the always-on review refuses (:func:`auto_review`, item 429): a question for
-    the user, who may let a secret store be read or data be sent out, where every other mode refuses it. The question
-    names every guarded flag of the step, a message or a post it also sends among them, as the one yes answers for
-    all; the hand-off of money or credentials, which is stricter, the gate puts first (:func:`hard_stop`)."""
+def waived_in_yolo(info: ActionInfo) -> Decision:
+    """What a yolo run makes of an action the always-on review refuses (:func:`auto_review`, item 433): the refusal it
+    waives, which the record of the step keeps as its reason. The layers after the review still judge the step
+    (:func:`decide_past_review`): what they keep for the user stays theirs (:func:`held_in_yolo`)."""
     return Decision(
-        verdict="ask",
+        verdict="deny",
         source="auto_review",
-        reason="in yolo Dot asks you before it reads where secrets are kept, sends secrets out, or sends a message or "
-        f"a post in your name ({', '.join(_intersect(info, _DENY_FLAGS | _GUARD_FLAGS))})",
+        reason=f"every mode but yolo refuses this ({', '.join(_intersect(info, _DENY_FLAGS))})",
         rule_id=None,
     )
 
@@ -217,13 +216,27 @@ def decide(
     rules: list[RuleRecord],
     allowance: Decision | None,
 ) -> Decision:
-    """Combine every policy layer into one decision, strictest layer first. ``allowance`` is the question a
-    pre-approved spend asks instead of the money hand-off (:mod:`dotagent.policy.spend`), ``None`` for any other
-    action; it takes the hand-off's place, and only a rule of the owner's that hands the step off is stricter (item
-    385): the allowance stands in for the money hand-off, not for the owner's rules."""
+    """Combine every policy layer into one decision, strictest layer first: the always-on review, then the layers after
+    it (:func:`decide_past_review`)."""
     refusal: Decision | None = auto_review(info)
     if refusal is not None:
         return refusal
+    return decide_past_review(info, mode, tainted, preset, rules, allowance)
+
+
+def decide_past_review(
+    info: ActionInfo,
+    mode: RunMode,
+    tainted: bool,
+    preset: Preset,
+    rules: list[RuleRecord],
+    allowance: Decision | None,
+) -> Decision:
+    """Every policy layer after the always-on review, strictest first: all of :func:`decide` but the review, which a
+    yolo run waives (item 433). ``allowance`` is the question a pre-approved spend asks instead of the money hand-off
+    (:mod:`dotagent.policy.spend`), ``None`` for any other action; it takes the hand-off's place, and only a rule of the
+    owner's that hands the step off is stricter (item 385): the allowance stands in for the money hand-off, not for the
+    owner's rules."""
     gated: Decision | None = mode_gate(info, mode)
     if gated is not None:
         return gated
@@ -294,6 +307,14 @@ def route_for(decision: Decision, mode: ApprovalMode) -> Route:
     if mode == "yolo":
         return "user" if decision.source in GUARDED_SOURCES else "waived"
     return "user"
+
+
+def held_in_yolo(decision: Decision) -> bool:
+    """Whether a yolo run keeps ``decision``, of the layers after the always-on review (:func:`decide_past_review`), for
+    a step that review refuses elsewhere, rather than waive the step with the review (item 433): a refusal (a research
+    run's), a hand-off (money, credentials, a rule of the user's that hands the step off) and the questions that are the
+    user's in every mode (:data:`GUARDED_SOURCES`)."""
+    return decision.verdict in ("deny", "handoff") or decision.source in GUARDED_SOURCES
 
 
 def approval_severity(info: ActionInfo) -> str:

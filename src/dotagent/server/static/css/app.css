@@ -2228,17 +2228,12 @@ a.pill:hover {
   max-width: var(--lane-w);
   margin-inline: auto;
   display: grid;
-  /* minmax(0, 1fr): a wide child (a long command in an approval) must shrink with the window, not stretch the column */
+  /* minmax(0, 1fr): a wide child must shrink with the window, not stretch the column */
   grid-template-columns: minmax(0, 1fr);
   /* The space under the top bar is the window's height less the bar's and the page's padding above and below. */
   grid-template-rows: minmax(max(0px, calc((100vh - var(--stagebar-h) - 48px - var(--home-start-h, 0px)) / 2 - 16px)), auto) auto auto;
   grid-template-rows: minmax(max(0px, calc((100dvh - var(--stagebar-h) - 48px - var(--home-start-h, 0px)) / 2 - 16px)), auto) auto auto;
   row-gap: 16px;
-}
-
-.home-approvals {
-  grid-row: 1;
-  align-self: end;
 }
 
 .home > .home-start {
