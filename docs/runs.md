@@ -380,7 +380,10 @@ chat's choices once no run works there (a held queue keeps it). The message says
 status and how long it ran, and nothing it printed, which the run reads with `terminal_read`, as untrusted; Dot wrote
 it, so it opens that run as a note and is no instruction of the owner. Right above the composer, the chat's page shows
 each of its commands at work, with the time it has run and a Stop; the dot of a command in the background pulses, as its
-end will wake Dot. A command stopped there, closed by the run or ended by the daemon's stop tells nothing. A delegated
+end will wake Dot. A command stopped there, closed by the run or ended by the daemon's stop tells nothing, and neither
+does one whose end a run has read itself with `terminal_read` (item 427): the message queued the moment it ended is
+taken back out of the queue, so a run that waited for its command and saw it end is not followed by a run that tells it
+the same again; a message that has already started its run is left as it is. A delegated
 run or a campaign's session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends
 with its run: a command in the background lives as long as the daemon.
 

@@ -88,7 +88,8 @@ in one pill: Dot's computer once the run has had a page, the helpers with their 
 composer is one bar of glass (item 401): how long the run has worked (or that it waits for you), how its helpers stand
 and how many messages wait in the queue at its left, each part opening what it tells of, and the way down at its right
 end, in the same pane; it is a row of 40 px, a translucent surface with the page blurred under it, a hairline and a
-rounded pill (items 352 and 360; a wider window has the same bar). The conversation keeps a chat's rhythm (item 401):
+rounded pill (items 352 and 360; a wider window has the same bar), as wide as its parts and the way down and no wider,
+in the middle of the dock, not across all of it (item 427). The conversation keeps a chat's rhythm (item 401):
 the gap between its rows is 4 px, a message's bubble holds its words in 4 px above and below, and a step's head is 40 px
 tall, so a phone shows more of what the run did without shrinking the prose. A chat is one screen (item 352): the bar
 and the composer stay where they are and only the conversation scrolls, so a scroll, its bounce at either end and the

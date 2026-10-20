@@ -2241,7 +2241,7 @@ class RunManager:
             parse_model_ref(choices.model if choices.model is not None else self._main_model)
         )
         effort: Effort | None = choices.effort if choices.effort is not None and _offers(info, choices.effort) else None
-        await self.queue(
+        message: QueuedMessage = await self.queue(
             thread_id,
             text,
             (),
@@ -2256,6 +2256,23 @@ class RunManager:
             newest.agent_id,
             BACKGROUND_SOURCE,
         )
+        session.told = message.id
+        if session.end_read:
+            # A run read the end while the message was being queued: it has the news.
+            await self.command_read(thread_id, session)
+
+    async def command_read(self, thread_id: str, session: TerminalSession) -> None:
+        """A run read the end of its command in the background (item 427): the message that told the chat of it
+        (:meth:`command_ended`) is taken out of the queue, where it would start a run for what that run knows. A message
+        that has started its run, or is gone, is left as it is."""
+        message_id: str | None = session.told
+        if message_id is None:
+            return
+        session.told = None
+        try:
+            await self.remove_queued(message_id)
+        except DotError as exc:
+            log.info("background_notice_not_taken_back", thread_id=thread_id, session_id=session.id, error=exc.message)
 
     async def _tell_campaign_stopped(self, run: RunRecord, campaign: CampaignRecord, note: str) -> None:
         ended: CampaignEnded = CampaignEnded(campaign_id=campaign.id, title=campaign.title, status="stopped", note=note)

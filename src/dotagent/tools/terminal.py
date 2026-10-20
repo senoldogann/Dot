@@ -126,7 +126,7 @@ async def _read(session: TerminalSession, wait_s: float, ctx: ToolContext) -> st
     if not session.ended:
         return text
     code: int = await session.exit_code()
-    await ctx.runtime.terminals.close(ctx.thread_id, session.id)
+    await ctx.runtime.terminals.close_read(ctx.thread_id, session.id)
     return f"{text}\n[the program ended with exit {code}; session {session.id} is closed]"
 
 
