@@ -18,7 +18,7 @@ THEME_VARIABLES: tuple[tuple[str, str], ...] = (
     ("--background", "light-dark(#f8f7f4, #1b1a18)"),
     ("--foreground", "light-dark(#1c1b19, #ecebe6)"),
     ("--muted", "light-dark(#f3f2ee, #2a2927)"),
-    ("--muted-foreground", "light-dark(#6a6965, #a19f98)"),
+    ("--muted-foreground", "light-dark(#696864, #a19f98)"),
     ("--card", "light-dark(#fdfcfa, #22211f)"),
     ("--border", "light-dark(rgb(28 27 25 / 16%), rgb(236 234 229 / 18%))"),
     ("--accent", "light-dark(#2b2a27, #e6e4de)"),

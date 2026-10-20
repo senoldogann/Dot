@@ -411,14 +411,15 @@
   margin-top: 8px;
 }
 
-/* The group labels orient and recede: the lightest ink that still reads, a lighter weight (item 74). */
+/* The group labels orient and recede: the muted ink, the lightest that reads at 4.5:1 on the sidebar, a lighter weight
+   (item 74). */
 .side-label {
   margin: 0;
   padding: 12px 8px 4px;
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
   font-weight: var(--weight-label);
-  color: var(--faint);
+  color: var(--muted);
 }
 
 /* The count after a section's label: the same ink, the text weight. */

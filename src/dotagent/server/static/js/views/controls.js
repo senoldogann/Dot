@@ -115,7 +115,7 @@ export function mount(root, _ctx) {
   const swatches = el(
     "div",
     { class: "swatches" },
-    ...COLOUR_TOKENS.map((token) => el("div", { class: "swatch" }, el("span", { class: "swatch-colour", "data-token": token }), el("code", { class: "mono small" }, `--${token}`))),
+    ...COLOUR_TOKENS.map((token) => el("div", { class: "token-swatch" }, el("span", { class: "swatch-colour", "data-token": token }), el("code", { class: "mono small" }, `--${token}`))),
   );
   const faces = row(...FACE_STATES.map((state) => el("div", { class: "stack tight center" }, dotFace(state), el("span", { class: "small muted" }, state))));
   const buttons = row(

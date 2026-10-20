@@ -183,6 +183,25 @@ def test_every_text_tier_reads_on_every_surface_and_every_ink_on_its_ground(look
     assert short == [], short
 
 
+@pytest.mark.parametrize("look", [look for look, _ in _LOOKS])
+@pytest.mark.parametrize("scheme", [0, 1], ids=["light", "dark"])
+def test_the_muted_ink_and_the_sidebars_group_labels_read_at_aa_in_the_two_looks_of_themes_css(
+    look: str, scheme: int
+) -> None:
+    """Item 437: small labels are set in the muted ink, so it reads at 4.5:1 on every surface, and the sidebar's group
+    labels (Chats, Today) are set in a tier that reads at 4.5:1 on the sidebar, not in the faint one (4.13:1)."""
+    pairs: dict[str, tuple[str, str]] = _pairs(look)
+    for surface in _SURFACES:
+        ratio: float = contrast(pairs["--muted"][scheme], pairs[surface][scheme])
+        assert ratio >= 4.5, f"--muted on {surface}: {ratio:.2f} < 4.5"
+    label: re.Match[str] | None = re.search(
+        r"^\.side-label \{[^}]*?\bcolor: var\((--[a-z0-9-]+)\);", (_CSS / "shell.css").read_text(encoding="utf-8"), re.M
+    )
+    assert label is not None, "the .side-label rule sets no colour token"
+    ratio = contrast(pairs[label.group(1)][scheme], pairs["--sidebar"][scheme])
+    assert ratio >= 4.5, f".side-label ({label.group(1)}) on --sidebar: {ratio:.2f} < 4.5"
+
+
 def test_the_surfaces_step_up_by_lightness_in_dark_and_down_in_light() -> None:
     for look, _ in _LOOKS:
         pairs: dict[str, tuple[str, str]] = _pairs(look)

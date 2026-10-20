@@ -37,7 +37,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFaile
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
-import { PHONE, trackHeight } from "../layout.js";
+import { narrowOr, PHONE, trackHeight } from "../layout.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -904,9 +904,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     // The word in the box arms a choice for one message only where the send can carry it (item 259).
     choices.setWords(!editing && !(active && steers(false)));
     footStop.hidden = !active;
-    // Short enough for one line of a phone's composer (item 111).
-    const working = steers(false) ? "Steer this run, or /btw to ask on the side" : "Queue a message, or /btw to ask on the side";
-    input.placeholder = active ? working : "Follow up (@ for skills, / for commands, or /btw to ask on the side)";
+    // Short enough for one line of a phone's composer, which holds about thirty characters (items 111 and 437).
+    const working = steers(false)
+      ? narrowOr("Steer this run (or /btw)", "Steer this run, or /btw to ask on the side")
+      : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
+    input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for skills, / for commands, or /btw to ask on the side)");
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
@@ -1390,6 +1392,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   paintCost();
   paintFiles(thread);
   syncControls();
+  // The words in the box are read again when the window crosses the phone's width.
+  PHONE.addEventListener("change", syncControls);
   // A live run opens at its end, where its next words come (item 403); before, the page stood at its top until its
   // first event moved it, which read as a jump up after every message sent.
   if (following) {
@@ -1486,6 +1490,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     filesWatch.disconnect();
     lessonCuts.disconnect();
     stopDockHeight();
+    PHONE.removeEventListener("change", syncControls);
     outline.dispose();
     stopLifecycle();
     stopBack();

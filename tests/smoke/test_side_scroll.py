@@ -14,7 +14,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, FloatRect, Locator, Page, async_playwright, expect
 
 from dotagent.agent.learning_health import failed_with, record_learning
 from dotagent.agent.manager import RunManager
@@ -52,6 +52,8 @@ _ROW_SLACK_PX: int = 80
 _SKILLS: int = 20
 _SHOWN_SKILLS: int = 6
 _BOX_MOST_PX: int = 560
+# The most room between the count of the notes and their search, in the head of the card: its gap and a little more.
+_HEAD_GAP_MAX_PX: int = 24
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (1280, "dark"), (390, "light"))
 
 
@@ -373,7 +375,30 @@ async def test_the_memory_page_keeps_the_notes_it_read_and_its_place_when_one_is
             await expect(learning).to_contain_text(
                 "Lessons from runs: has not gone well yet; failed 1 time in a row since: the embedder is down"
             )
-            await expect(learning).to_contain_text("The nightly reflection: has not gone well yet")
+            # A work with neither a success nor a failure recorded has not failed: it says there is nothing yet.
+            await expect(learning).to_contain_text("The nightly reflection: nothing recorded yet")
+            await expect(learning).not_to_contain_text("The nightly reflection: has not gone well yet")
+            # The count of the notes stands beside the search at the head's right, not in the middle of the row
+            # (item 437).
+            head: Locator = page.locator(".notes-panel > .card-head")
+            count: FloatRect | None = await head.locator(".hint").bounding_box()
+            search: FloatRect | None = await head.get_by_role("searchbox", name="Search notes").bounding_box()
+            assert count is not None and search is not None
+            assert 0 <= search["x"] - (count["x"] + count["width"]) < _HEAD_GAP_MAX_PX, (count, search)
+            # Learning that has stopped says why in the head of its card, beside the name and not over it.
+            for _ in range(2):
+                await record_learning(
+                    runtime.store, runtime.bus, "lessons", time.time(), failed_with("the embedder is down " * 20), None
+                )
+            await page.reload()
+            why: Locator = page.locator("[data-learning] .card-head .hint")
+            await expect(why).to_contain_text("Learning has stopped")
+            name: Locator = page.locator("[data-learning] .card-head .grow")
+            name_box: FloatRect | None = await name.bounding_box()
+            why_box: FloatRect | None = await why.bounding_box()
+            assert name_box is not None and why_box is not None
+            assert name_box["x"] + name_box["width"] <= why_box["x"] + 1, (name_box, why_box)
+            assert await name.evaluate("(node) => node.scrollWidth <= node.clientWidth")
             notes: Locator = page.locator("[data-memory]")
             await expect(notes).to_have_count(30)
             # The notes keep a size (item 218): their box scrolls inside, and Load more under it adds the next page.

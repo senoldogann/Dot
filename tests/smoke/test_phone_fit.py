@@ -138,6 +138,16 @@ _KEYBOARD: str = """(() => {
 })();"""
 
 
+# How wide a composer box's placeholder is when set in the box's own font, and how much room the box's line has for it.
+_PLACEHOLDER_FIT: str = """(box) => {
+  const style = getComputedStyle(box);
+  const pen = document.createElement('canvas').getContext('2d');
+  pen.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const room = box.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  return [pen.measureText(box.placeholder).width, room];
+}"""
+
+
 def _edge(selector: str, side: str) -> str:
     """A script that gives where the element `selector` is on the window, at its `side` (top or bottom), in whole
     pixels."""
@@ -326,6 +336,61 @@ async def test_on_an_iphone_a_field_has_the_size_it_has_on_the_mac(own_home: Pat
             finally:
                 await browser.close()
     assert sizes == {_OWNERS_PHONE: ["15px", "16px", "15px"], "Pixel 7": ["16px", "16px", "16px"]}
+
+
+async def test_the_words_in_an_empty_composer_box_fit_its_line_on_every_phone(own_home: Path) -> None:
+    """A textarea's placeholder cannot end in an ellipsis, so a phone's one line cut "Message Dot (@ for skills, / for"
+    in the middle of a word (item 437): on the home, in a finished chat and on an agent's page, the words fit."""
+    async with _served(own_home) as (manager, address), async_playwright() as playwright:
+        async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+            made: httpx.Response = await client.post(
+                "/api/agents",
+                json={
+                    "name": "Scout",
+                    "role": "Finds and checks sources",
+                    "instructions": "Prefer primary sources.",
+                    "model": "",
+                    "effort": None,
+                    "approvals": None,
+                    "tools": None,
+                },
+            )
+            assert made.status_code == 201, made.text
+            agent_id: str = made.json()["id"]
+        run: RunRecord = await manager.start(
+            "Show me the long things",
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "test",
+            None,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+        )
+        await manager.wait(run.id)
+        misfits: list[str] = []
+        for engine, device in _PHONES:
+            browser: Browser = await getattr(playwright, engine).launch(
+                **({"channel": "chrome"} if engine == "chromium" else {}), headless=True
+            )
+            try:
+                page: Page = await _phone(playwright, browser, device, address)
+                for where in ("#/runs", f"#/runs/{run.id}", f"#/agents/{agent_id}"):
+                    await page.goto(f"{address}/{where}")
+                    box: Locator = page.locator(".composer textarea").first
+                    await expect(box).not_to_have_attribute("placeholder", "")
+                    await page.evaluate("() => document.fonts.ready")
+                    words, room = await box.evaluate(_PLACEHOLDER_FIT)
+                    if words > room:
+                        placeholder: str | None = await box.get_attribute("placeholder")
+                        misfits.append(f"{device} {where}: {placeholder!r} is {words:.0f} px, the line {room:.0f} px")
+            finally:
+                await browser.close()
+        assert misfits == [], "\n".join(misfits)
 
 
 async def test_the_bar_the_sidebar_the_composer_and_the_panel_keep_out_of_the_safe_areas(
