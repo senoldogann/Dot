@@ -16643,3 +16643,9 @@ stay gone after a reload; denied, they stay; wide and on a phone; the test fails
   the words of a running call and a live thought was an amber again (`--warn`), where the owner had made it the text's
   own colour, dark on a light theme and light on a dark one. The owner's edit stood in the uncommitted tree that item 426 took
   over (kept at `refs/backup/main-dirty-2026-10-20`) and was not carried into it; it is back, with a test that holds it.
+- 2026-10-20 (Opus 5.5): item 436 on `phone-pages` from `main`, on the owner's screens of Campaigns, Schedules and
+  Customize: a list row on a phone is its face or switch, its title and its buttons on one line, with the rest across
+  the row's whole width, where the face took a column and the buttons a line of their own; a card's head with a line
+  beside its name puts the line under it (Accounts' name was squeezed to nothing and written across); a path in a card
+  is broken where it must (Diagnostics scrolled sideways); the templates' note, a `null` that `replaceChildren` drew as
+  the word, is a child only when there is one. `tests/smoke/test_phone_all_pages.py` measures eight pages at 320 to 430 px.

@@ -375,16 +375,19 @@ function mountList(root, ctx) {
       const known = named.names === null ? null : new Set(named.names);
       const listingProblem = named.problem;
       if (!disposed) {
+        // `replaceChildren` draws a null as the word "null": the cards' note is a child only when there is one.
         templates.replaceChildren(
           el("div", { class: "section-label" }, "Start from a template"),
           el("p", { class: "hint" }, "Each becomes an agent of yours, to change as you like. What one writes to a person is a draft that you send."),
-          listingProblem === null
-            ? null
-            : el(
-                "p",
-                { class: "hint", dataset: { templatesToolsUnknown: "" } },
-                `The tools could not be listed: ${listingProblem.message}. A template that names one this home lacks is refused when used.`,
-              ),
+          ...(listingProblem === null
+            ? []
+            : [
+                el(
+                  "p",
+                  { class: "hint", dataset: { templatesToolsUnknown: "" } },
+                  `The tools could not be listed: ${listingProblem.message}. A template that names one this home lacks is refused when used.`,
+                ),
+              ]),
           el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate, known))),
         );
       }
