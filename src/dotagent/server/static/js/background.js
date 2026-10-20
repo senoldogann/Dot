@@ -1,8 +1,8 @@
 // The commands at work in a chat (item 229): right above the composer, a row
 // for each terminal session of the chat whose program runs, with its command, how long it has run and a Stop. The dot
-// of a command in the background pulses: when it ends, its chat is told, and that starts Dot's next run there. The
-// daemon keeps the sessions, so every open page shows them as they open and end; a list the page could not read says
-// so, with Read again.
+// of a command in the background pulses: when it ends, its chat is told, by a note to the run at work there or, with
+// none, in a run Dot starts (item 437). The daemon keeps the sessions, so every open page shows them as they open and
+// end; a list the page could not read says so, with Read again.
 
 import { api } from "./api.js";
 import { clip, duration, el, setText } from "./dom.js";

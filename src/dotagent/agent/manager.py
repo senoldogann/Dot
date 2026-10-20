@@ -114,7 +114,7 @@ from dotagent.store.models import (
     ThreadRecord,
     WorkingRun,
 )
-from dotagent.terminal.session import TerminalSession, ended_notice
+from dotagent.terminal.session import TerminalSession, ended_notices
 from dotagent.tools.context import DelegateOutcome
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.groups import group_of, groups_of
@@ -128,7 +128,7 @@ log = get_logger(__name__)
 QUEUE_CHANGED_EVENT: str = "queue_changed"
 # The live event that tells the pages a chat's terminal sessions changed (item 229); it carries the chat's id.
 TERMINALS_CHANGED_EVENT: str = "terminals_changed"
-# The source of the message that tells a chat that its command in the background ended (item 229).
+# The source of the run that tells a chat that its command in the background ended (item 229).
 BACKGROUND_SOURCE: str = "background"
 # How often the daemon stores the ends the store refused and looks for the runs of dotx commands that died
 # (:meth:`RunManager.watch_commands`).
@@ -2080,15 +2080,18 @@ class RunManager:
             await self._follow_session(run, run.campaign_id, classify_ending(status, clean), needs)
 
     async def _follow_queue(self, run: RunRecord, status: RunStatus) -> None:
-        """Move the queue of a run's chat on as the run ends: an end done starts its next message (:meth:`_drain`);
-        any other end holds it until the owner resumes it, since what failed would likely fail the next message too
-        and a stop stops the chat. A delegated run and a campaign's session leave it alone, and so does a process that
-        leaves the queues to the daemon (:meth:`leave_queues`)."""
+        """Move the queue of a run's chat on as the run ends: an end done starts its next message (:meth:`_drain`), or,
+        with none waiting, the run that tells the chat of a command in the background that ended in the run's last
+        step (:meth:`_tell_ended_commands`); any other end holds the queue until the owner resumes it, since what failed
+        would likely fail the next message too and a stop stops the chat, and leaves such a command to the next run of
+        the chat, which is told at its first step. A delegated run and a campaign's session leave it alone, and so does
+        a process that leaves the queues to the daemon (:meth:`leave_queues`)."""
         if run.parent_run_id is not None or run.campaign_id is not None or self._leaves_queues:
             return
         store: Store = self._runtime.store
         if status == "done":
             await self._drain(run.thread_id, run.id)
+            await self._tell_ended_commands(run.thread_id)
         elif await store.list_queued(run.thread_id):
             await store.hold_queue(run.thread_id)
             await self._queue_changed(run.thread_id, None, None, None)
@@ -2153,37 +2156,46 @@ class RunManager:
     async def _start_queued(self, message: QueuedMessage) -> RunRecord:
         """Start a queued message as its chat's next run, with the choices and the files it was sent with."""
         files: tuple[StoredAttachment, ...] = await load_attachments(self._runtime.workspace, message.attachments)
-        if message.agent_id is not None:
-            agent: AgentRecord = await self._runtime.store.get_agent(message.agent_id)
-            return await self.start_for_agent(
-                agent,
-                message.text,
-                message.mode,
-                message.model,
-                message.thread_id,
-                message.source,
-                message.effort,
-                message.speed,
-                message.once,
-                message.approvals,
-                message.goal_mode,
-                files,
-                message.picks,
-            )
-        return await self.start_picked(
+        return await self._start_in_chat(
+            message.thread_id,
             message.text,
+            files,
             message.mode,
             message.model,
-            message.thread_id,
-            message.source,
-            None,
             message.effort,
             message.speed,
             message.once,
             message.approvals,
             message.goal_mode,
-            files,
             message.picks,
+            message.agent_id,
+            message.source,
+        )
+
+    async def _start_in_chat(
+        self,
+        thread_id: str,
+        text: str,
+        files: tuple[StoredAttachment, ...],
+        mode: RunMode,
+        model: str | None,
+        effort: Effort | None,
+        speed: Speed,
+        once: OneMessage | None,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        picks: RunPicks,
+        agent_id: str | None,
+        source: str,
+    ) -> RunRecord:
+        """Start ``text`` as the next run of a chat, as its agent's run when the chat has one."""
+        if agent_id is not None:
+            agent: AgentRecord = await self._runtime.store.get_agent(agent_id)
+            return await self.start_for_agent(
+                agent, text, mode, model, thread_id, source, effort, speed, once, approvals, goal_mode, files, picks
+            )
+        return await self.start_picked(
+            text, mode, model, thread_id, source, None, effort, speed, once, approvals, goal_mode, files, picks
         )
 
     async def _queue_changed(
@@ -2210,69 +2222,88 @@ class RunManager:
             await self._runtime.bus.emit(newest_run_id, TERMINALS_CHANGED_EVENT, {"thread_id": thread_id}, False)
 
     async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
-        """Tell a chat that its command in the background ended (item 229): a message at the end of its queue, with the
-        chat's choices and agent, which starts its next run at once when no run works there and the queue is not held,
-        else waits its turn. The message says what Dot saw, and nothing the command printed (:func:`ended_notice`). A
-        chat that a rewind emptied (item 282) is not told: the turn that started the command is gone from it."""
-        store: Store = self._runtime.store
-        runs: list[RunRecord] = await store.list_runs(1, thread_id)
-        if not runs:
-            log.warning("background_command_ended_in_emptied_chat", thread_id=thread_id, session_id=session.id)
-            return
-        newest: RunRecord = runs[0]
-        kept: ChatChoices | None = await store.chat_choices(thread_id)
-        choices: ChatChoices = (
-            kept
-            if kept is not None
-            else ChatChoices(
-                mode=newest.mode,
-                model=newest.model,
-                effort=newest.effort,
-                speed=newest.speed,
-                approvals=newest.approvals,
-                goal_mode=newest.goal_mode,
-            )
-        )
+        """A command in the background of a chat ended by itself (item 229). The run at work on the chat is told at its
+        next step, in a system note (the loop takes the end from :meth:`Terminals.take_ended`); when none works there,
+        :meth:`_tell_ended_commands` starts one. Nothing is ever put in the chat's queue."""
         if session.exit_status is None:
             raise ValueError(f"the command of session {session.id} has not ended")
-        text: str = ended_notice(session.id, session.command, session.exit_status, time.time() - session.started_at)
-        # A kept level the model does not offer is not asked for, as the composer does not ask it (item 116).
-        info: ModelInfo = await self._runtime.router.model_info(
-            parse_model_ref(choices.model if choices.model is not None else self._main_model)
-        )
-        effort: Effort | None = choices.effort if choices.effort is not None and _offers(info, choices.effort) else None
-        message: QueuedMessage = await self.queue(
-            thread_id,
-            text,
-            (),
-            choices.mode,
-            choices.model,
-            effort,
-            choices.speed,
-            None,
-            NO_PICKS,
-            choices.approvals,
-            choices.goal_mode,
-            newest.agent_id,
-            BACKGROUND_SOURCE,
-        )
-        session.told = message.id
-        if session.end_read:
-            # A run read the end while the message was being queued: it has the news.
-            await self.command_read(thread_id, session)
+        await self._tell_ended_commands(thread_id)
 
-    async def command_read(self, thread_id: str, session: TerminalSession) -> None:
-        """A run read the end of its command in the background (item 427): the message that told the chat of it
-        (:meth:`command_ended`) is taken out of the queue, where it would start a run for what that run knows. A message
-        that has started its run, or is gone, is left as it is."""
-        message_id: str | None = session.told
-        if message_id is None:
+    async def _tell_ended_commands(self, thread_id: str) -> None:
+        """Start the run that tells a chat that its commands in the background ended, with the chat's choices and agent
+        and the source :data:`BACKGROUND_SOURCE`: its goal says what Dot saw and nothing the commands printed
+        (:func:`ended_notices`). It starts only when no run works on the chat, in any process, nothing waits in its
+        queue and the queue is not held; any other chat is told by its next run, at its first step (the run at work, a
+        queued message that starts, a message of the owner after a stop), and the queue is never touched. A chat that
+        a rewind emptied (item 282) is not told: the turn that started the command is gone from it. A run that another
+        start of the chat beat to it leaves the news to that run. The pages hear that the run started as they hear of
+        a queued message's (:meth:`_queue_changed`)."""
+        if self._stopping or self._leaves_queues or not self._runtime.terminals.has_untold_ends(thread_id):
             return
-        session.told = None
-        try:
-            await self.remove_queued(message_id)
-        except DotError as exc:
-            log.info("background_notice_not_taken_back", thread_id=thread_id, session_id=session.id, error=exc.message)
+        store: Store = self._runtime.store
+        async with self._draining:
+            if thread_id in self._claimed or self._active_on(thread_id) is not None:
+                return
+            runs: list[RunRecord] = await store.list_runs(1, thread_id)
+            if not runs:
+                log.warning("background_command_ended_in_emptied_chat", thread_id=thread_id)
+                return
+            newest: RunRecord = runs[0]
+            if newest.status in WORKING_STATUSES or newest.parent_run_id is not None or newest.campaign_id is not None:
+                return
+            if await store.queue_held(thread_id) or await store.list_queued(thread_id):
+                return
+            choices: ChatChoices = await self._choices_of(thread_id, newest)
+            # A kept level the model does not offer is not asked for, as the composer does not ask it (item 116).
+            info: ModelInfo = await self._runtime.router.model_info(
+                parse_model_ref(choices.model if choices.model is not None else self._main_model)
+            )
+            effort: Effort | None = (
+                choices.effort if choices.effort is not None and _offers(info, choices.effort) else None
+            )
+            # Taken last, so that a session a run read and closed meanwhile is no longer there.
+            ended: list[TerminalSession] = self._runtime.terminals.take_ended(thread_id)
+            if not ended:
+                return
+            try:
+                run: RunRecord = await self._start_in_chat(
+                    thread_id,
+                    ended_notices(ended),
+                    (),
+                    choices.mode,
+                    choices.model,
+                    effort,
+                    choices.speed,
+                    None,
+                    choices.approvals,
+                    choices.goal_mode,
+                    NO_PICKS,
+                    newest.agent_id,
+                    BACKGROUND_SOURCE,
+                )
+            except RunConflict as exc:
+                self._runtime.terminals.put_back_ended(ended)
+                log.info("background_end_left_to_the_run_that_started", thread_id=thread_id, error=exc.message)
+                return
+            except BaseException:
+                self._runtime.terminals.put_back_ended(ended)
+                raise
+        await self._queue_changed(thread_id, run.id, newest.id, None)
+
+    async def _choices_of(self, thread_id: str, newest: RunRecord) -> ChatChoices:
+        """What the chat's next message asks for: the choices its composer kept, or, for a chat that kept none, those of
+        its newest run."""
+        kept: ChatChoices | None = await self._runtime.store.chat_choices(thread_id)
+        if kept is not None:
+            return kept
+        return ChatChoices(
+            mode=newest.mode,
+            model=newest.model,
+            effort=newest.effort,
+            speed=newest.speed,
+            approvals=newest.approvals,
+            goal_mode=newest.goal_mode,
+        )
 
     async def _tell_campaign_stopped(self, run: RunRecord, campaign: CampaignRecord, note: str) -> None:
         ended: CampaignEnded = CampaignEnded(campaign_id=campaign.id, title=campaign.title, status="stopped", note=note)

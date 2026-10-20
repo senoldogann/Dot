@@ -1,12 +1,13 @@
 """Commands in the background (item 229). A run opens a terminal session with ``background`` for a command that runs
-long and ends by itself, and ends; the command outlives it, and when it ends, its chat is told in a message of its queue
-that starts the chat's next run, with the chat's choices. The message says which command ended, with its exit status and
-how long it ran, and nothing the command printed, which the run reads with ``terminal_read``, as untrusted. The pages
-hear of every change of a chat's sessions. ``GET /api/threads/{id}/terminals`` lists a chat's sessions, and ``DELETE``
-stops one, which tells the chat nothing. The chat's page shows its commands at work right above the composer: a dot that
-pulses for one whose end wakes Dot, the command, the time it has run and a Stop; the run that the end of a command
-started opens with Dot's note, not with a message of the owner. Served by a real server, wide and on a phone, light and
-dark.
+long and ends by itself, and ends; the command outlives it. When it ends, its chat is told once, and never in a message
+of its queue (item 437): the run at work there is told at its next step, in a system note, and when no run works there,
+a run is started that opens with it, with the chat's choices. The notice says which command ended, with its exit status
+and how long it ran, and nothing the command printed, which the run reads with ``terminal_read``, as untrusted. A stop
+leaves it to the next run of the chat. The pages hear of every change of a chat's sessions.
+``GET /api/threads/{id}/terminals`` lists a chat's sessions, and ``DELETE`` stops one, which tells the chat nothing. The
+chat's page shows its commands at work right above the composer: a dot that pulses for one whose end wakes Dot, the
+command, the time it has run and a Stop; the run that the end of a command started opens with Dot's note, not with a
+message of the owner. Served by a real server, wide and on a phone, light and dark.
 
 No network and no model service is used: the scripted model plays each run.
 """
@@ -14,7 +15,7 @@ No network and no model service is used: the scripted model plays each run.
 import asyncio
 import re
 import time
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, Literal
@@ -26,17 +27,20 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 
 from dotagent.agent.manager import BACKGROUND_SOURCE, QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT, RunManager
 from dotagent.config import load_default_config
+from dotagent.core.errors import RunConflict
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
 from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import ChatRequest, DeltaSink, Message, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.server import UI_SOURCE
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.store.models import EventRecord, QueuedMessage, RunRecord
+from dotagent.terminal.session import TerminalSession
 from dotagent.tools.shell import read_login_env
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
@@ -53,7 +57,10 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _FINISH: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool="finish", arguments={"answer": "Done.", "success": True}),)
 )
-# The first line of the message that tells a chat that the command ``_SHORT`` ended.
+# What a system note begins with, and the start of the note that tells a run of the end of a command.
+_SYSTEM_NOTE: str = "[system note] "
+_NOTE_OF_AN_END: str = f"{_SYSTEM_NOTE}The command in the background"
+# The first line of the notice that tells a chat that the command ``_SHORT`` ended.
 _TOLD: re.Pattern[str] = re.compile(
     rf"The command in the background (t\d+) ended with exit 0 after \d+ s: {re.escape(_SHORT)}"
 )
@@ -154,11 +161,14 @@ async def _started(changes: asyncio.Queue[EventRecord], runtime: Runtime, run: R
 async def test_a_command_in_the_background_outlives_its_run_and_its_end_starts_the_chats_next_run(
     login_env: dict[str, str],
 ) -> None:
+    """The run ended before its command did: no run works on the chat, so the end starts one directly, with the chat's
+    choices, and puts nothing in the queue, where the owner would see it wait for a moment (item 437)."""
     model: ScriptedProvider = ScriptedProvider(_PROVIDER, [_open(_SHORT), _FINISH, _FINISH])
     async with (
         _session(login_env, model) as (runtime, manager),
         _heard(runtime, QUEUE_CHANGED_EVENT) as changes,
         _heard(runtime, TERMINALS_CHANGED_EVENT) as sessions,
+        _nothing_queued(runtime),
     ):
         first: RunRecord = await _start(manager)
         assert (await _ended(manager, first.id)).status == "done"
@@ -194,19 +204,75 @@ def _read(session: str, wait_s: float) -> ScriptedTurn:
     )
 
 
+def _wait(seconds: int) -> ScriptedTurn:
+    """The model's call that works elsewhere for ``seconds``: a command that ends by itself."""
+    return ScriptedTurn(text="", calls=(_sleep(seconds),))
+
+
+def _sleep(seconds: int) -> ScriptedCall:
+    return ScriptedCall(tool="shell", arguments={"command": f"sleep {seconds}", "timeout_s": seconds + 10})
+
+
+class _Recording(ScriptedProvider):
+    """The scripted model, keeping the messages of each request it was asked."""
+
+    def __init__(self, name: str, turns: Sequence[ScriptedTurn]) -> None:
+        super().__init__(name, turns)
+        self.asked: list[tuple[Message, ...]] = []
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.asked.append(request.messages)
+        return await super().complete(request, sink)
+
+
+def _notes(messages: Sequence[Message]) -> list[str]:
+    """The system notes among ``messages`` that tell of the end of a command in the background."""
+    return [m.content for m in messages if m.role == "user" and m.content.startswith(_NOTE_OF_AN_END)]
+
+
+@asynccontextmanager
+async def _nothing_queued(runtime: Runtime) -> AsyncIterator[None]:
+    """Fails the test when a message is put in the queue of any chat while it runs: the end of a command in the
+    background never waits there (item 437)."""
+    added: list[str] = []
+    add = runtime.store.add_queued
+
+    async def counting(*args: Any, **kwargs: Any) -> QueuedMessage:
+        added.append(str(args[1]))
+        return await add(*args, **kwargs)
+
+    runtime.store.add_queued = counting  # type: ignore[method-assign]
+    try:
+        yield
+    finally:
+        runtime.store.add_queued = add  # type: ignore[method-assign]
+    assert added == [], added
+
+
+async def _message(manager: RunManager, thread_id: str) -> RunRecord:
+    """The owner's message in the chat ``thread_id``."""
+    return await manager.start(
+        GOAL, "task", SCRIPTED_MODEL, thread_id, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+    )
+
+
 async def test_a_command_the_run_read_to_its_end_tells_the_chat_nothing(login_env: dict[str, str]) -> None:
-    """A run that waits for its command in the background and reads its end has seen it: the chat is not told again
-    in a message of its queue, which would start a run for what that run already knows (item 427)."""
+    """A run that waits for its command in the background and reads its end has seen it: the chat is told nothing
+    more, in no message of its queue and in no run started for it (item 427)."""
     model: ScriptedProvider = ScriptedProvider(
         _PROVIDER, [_open("sleep 3; echo mark-$((40 + 2))"), _read("t1", 20.0), _FINISH, _FINISH]
     )
-    async with _session(login_env, model) as (runtime, manager), _heard(runtime, QUEUE_CHANGED_EVENT) as changes:
+    async with (
+        _session(login_env, model) as (runtime, manager),
+        _heard(runtime, QUEUE_CHANGED_EVENT) as changes,
+        _nothing_queued(runtime),
+    ):
         run: RunRecord = await _start(manager)
         assert (await _ended(manager, run.id)).status == "done"
         # It read the command's end: the exit, and the closing of the session.
         events = await runtime.store.events_of_kind(run.id, "tool_result", 10)
         assert any("the program ended with exit 0" in str(event.data) for event in events), [e.data for e in events]
-        # The chat was told nothing, however long it is waited for: no message in its queue, no run started from it.
+        # The chat was told nothing, however long it is waited for: no run started from it.
         await asyncio.sleep(3.0)
         assert await runtime.store.list_queued(run.thread_id) == []
         started: list[object] = []
@@ -218,87 +284,164 @@ async def test_a_command_the_run_read_to_its_end_tells_the_chat_nothing(login_en
         assert [r.id for r in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
 
 
-def _wait(seconds: int) -> ScriptedTurn:
-    """The model's call that works elsewhere for ``seconds``: a command that ends by itself."""
-    return ScriptedTurn(
-        text="",
-        calls=(ScriptedCall(tool="shell", arguments={"command": f"sleep {seconds}", "timeout_s": seconds + 10}),),
-    )
-
-
-async def test_a_command_that_ended_while_the_run_worked_and_that_it_then_read_tells_the_chat_nothing(
+async def test_a_run_at_work_when_its_command_ends_is_told_at_its_next_step_and_nothing_is_queued(
     login_env: dict[str, str],
 ) -> None:
-    """The run leaves a command in the background and works on; the command ends in the middle of the run's work, and
-    the run reads its end at its next turn. The chat's message for that end was queued the moment it ended, and the run
-    that read it has the news: the message is taken back out, and no run starts for it (item 427)."""
-    model: ScriptedProvider = ScriptedProvider(
-        _PROVIDER, [_open("sleep 2; echo mark-$((40 + 2))"), _wait(5), _read("t1", 5.0), _FINISH, _FINISH]
-    )
-    async with _session(login_env, model) as (runtime, manager), _heard(runtime, QUEUE_CHANGED_EVENT) as changes:
+    """The run leaves a command in the background and works on, in a step that outlasts it, without polling. The end
+    is not put in the chat's queue, where the owner would see it wait with Steer, edit and remove: the run's next step
+    opens with it, once, as a system note, and no run is started for it (item 437)."""
+    model: _Recording = _Recording(_PROVIDER, [_open(_SHORT), _wait(6), _FINISH])
+    async with _session(login_env, model) as (runtime, manager), _nothing_queued(runtime):
         run: RunRecord = await _start(manager)
         assert (await _ended(manager, run.id)).status == "done"
-        events = await runtime.store.events_of_kind(run.id, "tool_result", 10)
-        assert any("the program ended with exit 0" in str(event.data) for event in events), [e.data for e in events]
-        await asyncio.sleep(3.0)
-        assert await runtime.store.list_queued(run.thread_id) == []
-        started: list[object] = []
-        while not changes.empty():
-            change: EventRecord = await changes.get()
-            if change.data["started_run_id"] is not None:
-                started.append(change.data)
-        assert started == [], started
+        # The step before the command ended knows nothing of it; the step after it opens with the note.
+        [opening, working, after] = model.asked
+        assert _notes(opening) == [] and _notes(working) == []
+        [said] = _notes(after)
+        first, then = said.split("\n", 1)
+        match: re.Match[str] | None = _TOLD.fullmatch(first.removeprefix(_SYSTEM_NOTE))
+        assert match is not None and match.group(1) == "t1", first
+        assert "terminal_read t1" in then
+        # What it printed is not in the note: the run reads it as untrusted.
+        assert _PRINTED not in said
+        # It is kept with the conversation, and the session is left open for the run to read.
+        assert _notes(await runtime.store.load_messages(run.thread_id, 0)) == [said]
+        [session] = runtime.terminals.sessions(run.thread_id)
+        assert (session.exit_status, session.told, session.closing) == (0, True, False)
+        # No run follows it, and the end is not told again.
+        await asyncio.sleep(1.0)
         assert [r.id for r in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
 
 
-async def _closed_while_told(login_env: dict[str, str], read: bool) -> int:
-    """A command ends after its run, and the session is closed in the window in which its message is being queued:
-    by a read of its end (``read``), or by a close that read nothing. How many runs the chat has afterwards."""
+async def test_the_end_of_a_command_in_the_last_step_of_a_run_starts_the_run_that_tells_it(
+    login_env: dict[str, str],
+) -> None:
+    """The command ends in the step in which the run finishes, so no step is left to tell it: the run's end done starts
+    a run of the chat, with the chat's choices, that tells it, as the end of a run starts its queue's next message
+    (item 437). It is no message of the queue, and it starts after the run before it has ended."""
+    last: ScriptedTurn = ScriptedTurn(
+        text="",
+        calls=(_sleep(6), ScriptedCall(tool="finish", arguments={"answer": "Done.", "success": True})),
+    )
+    model: ScriptedProvider = ScriptedProvider(_PROVIDER, [_open(_SHORT), last, _FINISH])
+    async with (
+        _session(login_env, model) as (runtime, manager),
+        _heard(runtime, QUEUE_CHANGED_EVENT) as changes,
+        _nothing_queued(runtime),
+    ):
+        first: RunRecord = await _start(manager)
+        ended: RunRecord = await _ended(manager, first.id)
+        assert ended.status == "done" and ended.finished_at is not None
+        told: RunRecord = await _started(changes, runtime, first)
+        assert told.source == BACKGROUND_SOURCE and told.created_at >= ended.finished_at
+        assert _TOLD.fullmatch(told.goal.split("\n", 1)[0]) is not None, told.goal
+        assert (told.mode, told.model, told.approvals) == ("task", SCRIPTED_MODEL, "yolo")
+        assert (await _ended(manager, told.id)).status == "done"
+        assert len(await runtime.store.list_runs(10, first.thread_id)) == 2
+
+
+async def test_a_stop_after_the_end_of_a_command_holds_no_queue_and_the_next_run_is_told_at_its_first_step(
+    login_env: dict[str, str],
+) -> None:
+    """The command ends while the run works, and the owner stops the run before its next step. The chat is not left
+    'paused' with a message of Dot's in its queue (item 437): nothing is queued and the queue is not held, no run
+    starts on its own, and the run of the owner's next message opens with the note."""
+    model: _Recording = _Recording(_PROVIDER, [_open(_SHORT), _wait(12), _FINISH])
+    async with (
+        _session(login_env, model) as (runtime, manager),
+        _heard(runtime, TERMINALS_CHANGED_EVENT) as changes,
+        _nothing_queued(runtime),
+    ):
+        run: RunRecord = await _start(manager)
+        session: TerminalSession = await _command_ended(runtime, changes, run)
+        manager.cancel(run.id)
+        assert (await _ended(manager, run.id)).status == "cancelled"
+        await asyncio.sleep(1.0)
+        assert await runtime.store.list_queued(run.thread_id) == []
+        assert not await runtime.store.queue_held(run.thread_id)
+        assert [r.id for r in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
+        assert session.told is False
+        # The owner's next message: its first step is told.
+        owners: RunRecord = await _message(manager, run.thread_id)
+        assert (await _ended(manager, owners.id)).status == "done"
+        assert [r.source for r in await runtime.store.list_runs(10, run.thread_id)] == [UI_SOURCE, UI_SOURCE]
+        [_, _, owners_first] = model.asked
+        [said] = _notes(owners_first)
+        assert _TOLD.fullmatch(said.removeprefix(_SYSTEM_NOTE).split("\n", 1)[0]) is not None, said
+        assert session.told is True
+
+
+async def _command_ended(runtime: Runtime, changes: asyncio.Queue[EventRecord], run: RunRecord) -> TerminalSession:
+    """The command of the chat of ``run``, once it has ended by itself; the pages are told as it ends."""
+    async with asyncio.timeout(WAIT_S):
+        while True:
+            sessions: list[TerminalSession] = runtime.terminals.sessions(run.thread_id)
+            if sessions and sessions[0].exit_status is not None:
+                return sessions[0]
+            await changes.get()
+
+
+async def test_a_command_closed_while_the_chat_is_being_told_tells_it_nothing(login_env: dict[str, str]) -> None:
+    """A command ends after its run, and the session is closed in the window in which the chat's telling is under way,
+    by a read of its end, the owner's Stop or the run's own ``terminal_close``: nothing is left to tell, and no run
+    starts for it (item 437)."""
     model: ScriptedProvider = ScriptedProvider(_PROVIDER, [_open("sleep 6"), _FINISH, _FINISH])
-    async with _session(login_env, model) as (runtime, manager):
-        queued = manager.queue
+    async with _session(login_env, model) as (runtime, manager), _nothing_queued(runtime):
+        held = runtime.store.queue_held
         arrived: asyncio.Event = asyncio.Event()
         proceed: asyncio.Event = asyncio.Event()
 
-        async def slowly(*args: Any, **kwargs: Any) -> Any:
-            # What the message waits for on its way into the queue, held until the close has come in.
-            arrived.set()
-            await proceed.wait()
-            return await queued(*args, **kwargs)
+        async def slowly(thread_id: str) -> bool:
+            # What the telling waits on once a command has ended, held until the close has come in.
+            if any(session.exit_status is not None for session in runtime.terminals.sessions(thread_id)):
+                arrived.set()
+                await proceed.wait()
+            return await held(thread_id)
 
-        # Held before the command is opened, so that its end (6 s later) cannot come before the hold is in place.
-        manager.queue = slowly  # type: ignore[method-assign]
+        runtime.store.queue_held = slowly  # type: ignore[method-assign]
         try:
             first: RunRecord = await _start(manager)
             assert (await _ended(manager, first.id)).status == "done"
-            session = runtime.terminals.get(first.thread_id, "t1")
-            async with asyncio.timeout(30.0):
+            async with asyncio.timeout(WAIT_S):
                 await arrived.wait()
-            if read:
-                await runtime.terminals.close_read(first.thread_id, session.id)
-            else:
-                await runtime.terminals.close(first.thread_id, session.id)
-            assert session.closing and session.end_read is read
-            manager.queue = queued  # type: ignore[method-assign]
+            await runtime.terminals.close(first.thread_id, "t1")
             proceed.set()
             await asyncio.sleep(2.0)
         finally:
-            manager.queue = queued  # type: ignore[method-assign]
+            runtime.store.queue_held = held  # type: ignore[method-assign]
             proceed.set()
-        return len(await runtime.store.list_runs(10, first.thread_id))
+        assert [r.id for r in await runtime.store.list_runs(10, first.thread_id)] == [first.id]
 
 
-async def test_a_read_of_the_end_after_the_message_started_its_run_leaves_that_run(login_env: dict[str, str]) -> None:
-    """When no run works on the chat, a message starts its run the moment it is queued (item 148), so a read of the end
-    that comes after has nothing to take back: the run is under way, and it is left to run (item 427). The message is
-    taken back only while it waits in the queue behind a run that works, which the test above covers."""
-    assert await _closed_while_told(login_env, read=True) == 2
+async def test_a_run_that_started_first_is_left_to_tell_the_end_at_its_first_step(login_env: dict[str, str]) -> None:
+    """When another start takes the chat in the moment its end is to be told (a message of the owner), the run that
+    tells starts nothing and leaves the news to the run that took the chat: it opens with the note (item 437)."""
+    model: _Recording = _Recording(_PROVIDER, [_open(_SHORT), _FINISH, _FINISH])
+    async with _session(login_env, model) as (runtime, manager), _nothing_queued(runtime):
+        started = manager.start_picked
+        beaten: asyncio.Event = asyncio.Event()
 
+        async def refused(*args: Any, **kwargs: Any) -> RunRecord:
+            beaten.set()
+            raise RunConflict("a run is already active on this thread", {})
 
-async def test_a_close_that_read_nothing_while_the_message_is_being_queued_leaves_it(login_env: dict[str, str]) -> None:
-    """The same window, closed by the owner's Stop or the run's own ``terminal_close``: nothing was read, so the message
-    stays and starts the chat's next run (item 427)."""
-    assert await _closed_while_told(login_env, read=False) == 2
+        first: RunRecord = await _start(manager)
+        assert (await _ended(manager, first.id)).status == "done"
+        # The command ends two seconds after the run did: the start is refused before it does.
+        manager.start_picked = refused  # type: ignore[method-assign]
+        try:
+            async with asyncio.timeout(WAIT_S):
+                await beaten.wait()
+            await asyncio.sleep(0.5)
+        finally:
+            manager.start_picked = started  # type: ignore[method-assign]
+        [session] = runtime.terminals.sessions(first.thread_id)
+        assert session.told is False
+        assert [r.id for r in await runtime.store.list_runs(10, first.thread_id)] == [first.id]
+        owners: RunRecord = await _message(manager, first.thread_id)
+        assert (await _ended(manager, owners.id)).status == "done"
+        [_, _, owners_first] = model.asked
+        assert len(_notes(owners_first)) == 1 and session.told is True
 
 
 async def test_a_chats_sessions_are_listed_and_one_stopped_by_hand_tells_nothing(login_env: dict[str, str]) -> None:
