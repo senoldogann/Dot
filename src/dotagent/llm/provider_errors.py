@@ -15,6 +15,7 @@ from pydantic import JsonValue
 from dotagent.core.errors import (
     ProviderAccessError,
     ProviderAuthError,
+    ProviderCreditError,
     ProviderHttpError,
     ProviderQuotaError,
     ProviderRateLimitError,
@@ -61,6 +62,10 @@ _OPENROUTER_EXCLUDED: re.Pattern[str] = re.compile(
     r"^\s*(.+?)(?: \(account settings\))?: \d+ endpoints? excluded", re.MULTILINE
 )
 _OPENROUTER_PRIVACY: str = "https://openrouter.ai/settings/privacy"
+# How OpenRouter words a 402 for credits that do not pay for the longest answer a request allows: "This request requires
+# more credits, or fewer max_tokens. You requested up to 131072 tokens, but can only afford 29597."
+_OPENROUTER_CREDITS: str = "credits"
+_OPENROUTER_AFFORDABLE: re.Pattern[str] = re.compile(r"can only afford (\d+)")
 # How Ollama's server words a model runner that broke off: its request to the runner on the loopback failed (item 256;
 # seen as an HTTP 400 of the embedding route, `Post "http://127.0.0.1:<port>/tokenize": ... connection reset by peer`).
 _OLLAMA_RUNNER_LOST: re.Pattern[str] = re.compile(
@@ -221,8 +226,13 @@ def classify_anthropic(
 def classify_openrouter(
     status: int, wire: WireError | None, retry_after_s: float | None, detail: JsonObject
 ) -> ProviderHttpError:
-    """OpenRouter: a 404 that says the account's privacy settings leave no provider of the model is a refused access,
-    worded with what excluded them and where to change that (item 361)."""
+    """OpenRouter: a 402 that speaks of credits is :class:`ProviderCreditError`, with the longest answer the credits pay
+    for when the message names it; a 404 that says the account's privacy settings leave no provider of the model is a
+    refused access, worded with what excluded them and where to change that (item 361)."""
+    if status == 402 and wire is not None and _OPENROUTER_CREDITS in wire.message.lower():
+        found: re.Match[str] | None = _OPENROUTER_AFFORDABLE.search(wire.message)
+        affordable: int | None = None if found is None else int(found.group(1))
+        return ProviderCreditError(error_message(status, wire), status, retry_after_s, detail, affordable)
     if status == 404 and wire is not None and _OPENROUTER_POLICY in wire.message:
         reasons: str = redact_secrets("; ".join(_OPENROUTER_EXCLUDED.findall(wire.message)))[:_MESSAGE_CHARS]
         excluded: str = f" ({reasons})" if reasons else ""

@@ -19,7 +19,7 @@ import pytest_asyncio
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import OpenRouterConfig, load_config, load_default_config
-from dotagent.core.errors import ProviderAuthError, ProviderQuotaError
+from dotagent.core.errors import ProviderAuthError, ProviderCreditError, ProviderQuotaError
 from dotagent.core.types import JsonObject
 from dotagent.llm.openrouter import KeyStatus, OpenRouterProvider
 from dotagent.llm.types import ChatRequest, ModelInfo, ModelReply, StreamDelta, ToolSpec, user_message
@@ -86,6 +86,11 @@ def _call(name: str, arguments: JsonObject) -> JsonObject:
     }
 
 
+# How OpenRouter words a 402 for a request whose longest answer the credits do not pay for (2026-10-19).
+_CREDITS: str = (
+    "This request requires more credits, or fewer max_tokens. "
+    "You requested up to 131072 tokens, but can only afford {}."
+)
 _USAGE: JsonObject = {
     "choices": [],
     "usage": {"prompt_tokens": 900, "completion_tokens": 40, "prompt_tokens_details": {"cached_tokens": 512}},
@@ -109,6 +114,9 @@ class StandIn:
         self.authorizations: list[str] = []
         self.key_refused: bool = False
         self.out_of_credits: bool = False
+        # The longest answer the stand-in's credits pay for: a chat request that allows a longer one is refused (402).
+        self.affordable: int | None = None
+        self.priced: list[object] = []
 
 
 def _handler(state: StandIn) -> type[BaseHTTPRequestHandler]:
@@ -142,6 +150,12 @@ def _handler(state: StandIn) -> type[BaseHTTPRequestHandler]:
 
         def do_POST(self) -> None:
             body: JsonObject = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            if state.affordable is not None:
+                asked = body.get("max_tokens")
+                state.priced.append(asked)
+                if not isinstance(asked, int) or asked > state.affordable:
+                    self._json(402, {"error": {"code": 402, "message": _CREDITS.format(state.affordable)}})
+                    return
             if state.out_of_credits:
                 self._stream(
                     [
@@ -275,6 +289,37 @@ async def test_the_connector_lists_reads_its_key_and_says_why_a_call_failed(stan
             await provider.key_status()
         state.key_refused = False
     finally:
+        await provider.aclose()
+
+
+async def test_a_402_that_names_the_answer_the_credits_pay_for_is_asked_again_with_that_max_tokens(
+    stand_in: tuple[StandIn, str],
+) -> None:
+    """Dot sends no ``max_tokens``, so OpenRouter prices the call at the model's longest answer: an account with few
+    credits is refused a call whose answer would be short. The connector asks once more with what the 402 names, and
+    raises the 402 when it names less than an answer is worth."""
+    state, base_url = stand_in
+    config: OpenRouterConfig = load_default_config().providers.openrouter.model_copy(
+        update={"base_url": base_url, "attempts": 1}
+    )
+    provider: OpenRouterProvider = OpenRouterProvider(config, _KEY)
+
+    async def sink(delta: StreamDelta) -> None:
+        return
+
+    try:
+        state.affordable = 29_597
+        state.priced.clear()
+        reply: ModelReply = await provider.complete(_ask(), sink)
+        assert reply.thinking == "First I look."
+        assert state.priced == [None, 29_597]
+        state.affordable = 100
+        state.priced.clear()
+        with pytest.raises(ProviderCreditError) as refused:
+            await provider.complete(_ask(), sink)
+        assert refused.value.affordable_tokens == 100 and state.priced == [None]
+    finally:
+        state.affordable = None
         await provider.aclose()
 
 

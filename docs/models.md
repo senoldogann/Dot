@@ -71,7 +71,12 @@ A model is left out of both lists while its provider has no key (an Ollama model
 for the time the provider named (at most a day) or for `helper_cooldown_s` seconds, until a call to it is answered or a
 new key of its provider is saved. A model the plan of its provider does not include (HTTP 402, "not in the plan") and
 a plan whose included usage is used up (Ollama's 429 that says so) are such errors too: the connector does not retry
-them, and the model is paused for `helper_cooldown_s` at once (item 254). The fast model's work leaves a paused fast model out as well (item 240): a run's
+them, and the model is paused for `helper_cooldown_s` at once (item 254). OpenRouter's 402 that speaks of credits
+pauses it as "out of credits". Dot sends no `max_tokens` unless a call sets one, and OpenRouter then prices a call at
+the model's longest answer (131072 tokens for some), so an account with few credits can be refused a call whose answer
+would be short; when that 402 names the longest answer the credits pay for (`can only afford 29597`) and it is at least
+1,024 tokens, the connector asks once more with that as `max_tokens`, logs `openrouter_max_tokens_lowered`, and the
+model is not paused. The fast model's work leaves a paused fast model out as well (item 240): a run's
 summary is written by the run's own model at once, and `web_extract` reads no source and says until when the fast model
 cannot answer, instead of spending the connector's retries on a provider that has refused already. Each model is paused
 alone: a local Ollama model stays available while a cloud one is paused, and a provider whose key or quota fails all its
