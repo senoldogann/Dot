@@ -9,6 +9,8 @@ here logs a token, a code or an address."""
 
 import asyncio
 import time
+from collections.abc import Mapping
+from typing import Literal
 from urllib.parse import urlencode
 
 import httpx
@@ -31,7 +33,12 @@ log = get_logger(__name__)
 
 _ACCOUNTS_KEY: str = "oauth.accounts"
 # How long a sign-in waits for the browser to come back.
-_WAIT_S: float = 600.0
+WAIT_S: float = 600.0
+# How much of an error code and of its description a page shows: what the provider sent back in the address.
+_CODE_CHARS: int = 100
+_DESCRIPTION_CHARS: int = 200
+# The error a provider sends back when the owner presses No: it says nothing the page's own words do not.
+_NO: str = "access_denied"
 # An access token is refreshed this long before it runs out, so that a call made with it does not meet its end.
 _REFRESH_MARGIN_S: float = 120.0
 _HTTP_TIMEOUT_S: float = 30.0
@@ -64,12 +71,29 @@ class ProviderView(FrozenModel):
     accounts: tuple[AccountView, ...]
 
 
-class CameBack(FrozenModel):
-    """What the page the browser comes back to says, and its status."""
+type CameBackKind = Literal["signed_in", "declined", "expired", "failed"]
 
-    title: str
-    text: str
-    status: int
+
+class CameBack(FrozenModel):
+    """How the browser's return for an account's sign-in went: it signed in (``address`` is the account's), the owner
+    said no, it came after :data:`WAIT_S`, or it failed. ``reason`` is the provider's own words when it gave any (a
+    failure's message with the error code and description of the refusal; a no's, unless it is the plain No). The page
+    that says it is :mod:`dotagent.server.callback_page`."""
+
+    kind: CameBackKind
+    provider: ProviderId
+    address: str | None
+    reason: str | None
+
+
+def denial_reason(error: str | None, description: str | None) -> str | None:
+    """The words of a sign-in that ended without a yes, from what the provider put in the address of the way back: its
+    error code and description, each cut to a line's length; None for the plain No (``access_denied``) and for a way
+    back that carries neither."""
+    if error is None or error == _NO:
+        return None
+    code: str = truncate_middle(error, _CODE_CHARS)
+    return code if not description else f"{code}: {truncate_middle(description, _DESCRIPTION_CHARS)}"
 
 
 def authorize_link(provider: Provider, client_id: str, redirect_uri: str, state: str, challenge: str) -> str:
@@ -99,8 +123,21 @@ def client_names(provider: Provider) -> tuple[str, ...]:
     )
 
 
-def _refused(provider: Provider, response: httpx.Response, what: str) -> SignInError:
-    """The error of a provider's refusal: its status and its own words for it (an error answer holds no token)."""
+class _Refusal(SignInError):
+    """A provider's refusal: its status, and its own words for it, the error code and the description it gave (None
+    for what it did not give). Only these words, and no other detail of a failure, go to the page that says it."""
+
+    def __init__(
+        self, message: str, context: Mapping[str, JsonValue], error: str | None, description: str | None
+    ) -> None:
+        super().__init__(message, context)
+        self.error: str | None = error
+        self.description: str | None = description
+
+
+def _refused(provider: Provider, response: httpx.Response, what: str) -> _Refusal:
+    """The error of a provider's refusal (an error answer holds no token): the text of an answer that is no OAuth
+    error is kept for the log alone."""
     error: object = None
     description: object = None
     try:
@@ -110,15 +147,29 @@ def _refused(provider: Provider, response: httpx.Response, what: str) -> SignInE
     if isinstance(body, dict):
         error = body.get("error")
         description = body.get("error_description")
-    return SignInError(
+    code: str | None = None if error is None else truncate_middle(str(error), 100)
+    words: str | None = None if description is None else truncate_middle(str(description), 300)
+    return _Refusal(
         f"{provider.name} refused {what}",
         {
             "provider": provider.id,
             "status": response.status_code,
-            "error": None if error is None else truncate_middle(str(error), 100),
-            "description": truncate_middle(str(description) if description is not None else response.text, 300),
+            "error": code,
+            "description": words,
+            "body": truncate_middle(response.text, 300) if code is None and words is None else None,
         },
+        code,
+        words,
     )
+
+
+def _failure_reason(failure: SignInError) -> str:
+    """What a failed sign-in tells the owner: the failure's message, with the error code and the description of a
+    provider's refusal where it gave them."""
+    if not isinstance(failure, _Refusal):
+        return failure.message
+    given: list[str] = [part for part in (failure.error, failure.description) if part is not None]
+    return f"{failure.message}: {' - '.join(given)}" if given else failure.message
 
 
 def _json(provider: Provider, response: httpx.Response) -> object:
@@ -226,7 +277,7 @@ class Accounts:
         provider: Provider = PROVIDERS[provider_id]
         client_id, _ = await self._client_of(provider)
         self._waiting = {
-            state: waiting for state, waiting in self._waiting.items() if now - waiting.started_at < _WAIT_S
+            state: waiting for state, waiting in self._waiting.items() if now - waiting.started_at < WAIT_S
         }
         state: str = new_state()
         verifier: str = new_verifier()
@@ -237,42 +288,33 @@ class Accounts:
         log.info("sign_in_started", provider=provider.id)
         return authorize_link(provider, client_id, redirect_uri, state, challenge_of(verifier))
 
-    async def come_back(self, state: str, code: str | None, error: str | None, now: float) -> CameBack | None:
-        """What the page says to the browser that came back with ``state`` at ``now``; None when no sign-in of these
-        waits for it (it may be an MCP server's)."""
+    async def come_back(
+        self, state: str, code: str | None, error: str | None, error_description: str | None, now: float
+    ) -> CameBack | None:
+        """How the browser that came back with ``state`` at ``now`` fared: None when no sign-in of these waits for it
+        (it may be an MCP server's). ``error`` and ``error_description`` are what the provider put in the address when
+        the owner said no."""
         waiting: Waiting | None = self._waiting.pop(state, None)
         if waiting is None:
             return None
         provider: Provider = PROVIDERS[waiting.provider]
-        if now - waiting.started_at >= _WAIT_S:
+        if now - waiting.started_at >= WAIT_S:
             log.info("sign_in_expired", provider=provider.id)
-            return CameBack(
-                title=f"Not signed in to {provider.name}",
-                text=f"The sign-in waited more than {_WAIT_S / 60:g} minutes for the browser to come back. Start it "
-                "again in Customize › Plugins.",
-                status=400,
-            )
+            return CameBack(kind="expired", provider=provider.id, address=None, reason=None)
         if error is not None or code is None:
             log.info("sign_in_declined", provider=provider.id, error=error)
             return CameBack(
-                title=f"Not signed in to {provider.name}",
-                text=f"The sign-in ended without a yes ({error or 'no code'}). Start it again in Customize › Plugins.",
-                status=200,
+                kind="declined",
+                provider=provider.id,
+                address=None,
+                reason=denial_reason(error, error_description),
             )
         try:
             account: Account = await self._finish(provider, waiting, code)
         except SignInError as failure:
             log.warning("sign_in_failed", provider=provider.id, error=failure.message, context=failure.context)
-            return CameBack(
-                title=f"Not signed in to {provider.name}",
-                text=f"{failure.message}. Start it again in Customize › Plugins.",
-                status=400,
-            )
-        return CameBack(
-            title=f"Signed in to {provider.name}",
-            text=f"Dot uses {account.address} from now on. You can close this tab.",
-            status=200,
-        )
+            return CameBack(kind="failed", provider=provider.id, address=None, reason=_failure_reason(failure))
+        return CameBack(kind="signed_in", provider=provider.id, address=account.address, reason=None)
 
     async def _finish(self, provider: Provider, waiting: Waiting, code: str) -> Account:
         client_id, secret = await self._client_of(provider)

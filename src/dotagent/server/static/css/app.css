@@ -6056,6 +6056,108 @@ dialog.lightbox img {
   width: 88px;
 }
 
+/* The page the browser comes back to after a sign-in (item 437, server/callback_page.py): the sign-in card, a disc by the
+   title that says how it went, the account or service it was for, and what the provider said. The page has no script and
+   no inline style, so each of these is a class, and it follows the system's light or dark alone. */
+.callback-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.callback-status {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.callback-status svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.callback-status.ok {
+  border-color: transparent;
+  background: var(--ok-weak);
+  color: var(--ok);
+}
+
+.callback-status.bad {
+  border-color: var(--bad-border);
+  background: var(--bad-weak);
+  color: var(--bad);
+}
+
+.callback-subject {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.callback-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-lg);
+}
+
+/* The marks are drawn in the ink of a light page: in the dark they are inverted, as the page has no script to set it. */
+@media (prefers-color-scheme: dark) {
+  .callback-mark img {
+    filter: invert(1);
+  }
+}
+
+.callback-subject-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.callback-name {
+  font-weight: var(--weight-title);
+}
+
+.callback-detail {
+  color: var(--muted);
+}
+
+.callback-reason {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font: var(--text-sm) / var(--leading-sm) var(--mono);
+  overflow-wrap: anywhere;
+}
+
 .code-line {
   display: block;
   padding: 8px 8px;
