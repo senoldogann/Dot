@@ -37,7 +37,7 @@ own. It needs Chrome 144 or later and its switch "Allow remote debugging for thi
 
 ```bash
 dotx browser attach     # check Chrome, work in one blank test tab, save mode = "attach"
-dotx service install    # restart the service, so that it uses your Chrome
+dotx service restart    # restart the service, so that it uses your Chrome (a run asks for --when-idle)
 dotx browser detach     # go back to Dot's own Chrome (restart the service again)
 ```
 

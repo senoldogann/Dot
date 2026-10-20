@@ -18,6 +18,7 @@ from dotagent.cli_commands import (
     OpenCommand,
     ServiceInstallCommand,
     ServicePermissionsCommand,
+    ServiceRestartCommand,
     ServiceStatusCommand,
     ServiceUninstallCommand,
     UrlCommand,
@@ -30,14 +31,25 @@ from dotagent.desktop.perms import Pane, open_settings, settings_url
 from dotagent.dot_app import app_path, ensure_app
 from dotagent.launchd import (
     LABEL,
+    RESTART_LABEL,
+    RESTART_POLL_S,
+    RESTART_WAIT_LIMIT_S,
     JobState,
     LaunchAgent,
     Removal,
+    RestartJob,
     ServiceStatus,
     build_launch_agent,
+    build_restart_job,
+    inspect_job,
+    inspect_restart_job,
     install_job,
+    install_restart_job,
+    kickstart_job,
     launch_agent_path,
     render_launch_agent,
+    render_restart_job,
+    restart_job_path,
     service_status,
     uninstall_job,
 )
@@ -206,8 +218,7 @@ async def cmd_url(command: UrlCommand) -> int:
     return 0
 
 
-def _job_line(status: ServiceStatus) -> str:
-    job: JobState | None = status.job
+def _job_line(job: JobState | None) -> str:
     if job is None:
         return "not loaded"
     pid: str = "" if job.pid is None else f", pid {job.pid}"
@@ -216,14 +227,35 @@ def _job_line(status: ServiceStatus) -> str:
     return f"{job.state}{pid}{runs}{last}"
 
 
+def _duration(seconds: float) -> str:
+    """``seconds`` in the words the service commands use: hours from one hour on, minutes below."""
+    hours: float = seconds / 3600
+    if hours >= 1:
+        return f"{hours:g} hour{'' if hours == 1 else 's'}"
+    return f"{seconds / 60:g} minutes"
+
+
+def _restart_line(waiting: JobState | None) -> str:
+    """What ``dotx service status`` says about the restart that waits for the runs to end: ``waiting`` is its job in
+    launchd, ``None`` when none waits."""
+    if waiting is None:
+        return "no restart waits for the runs to end ('dotx service restart --when-idle' asks for one)"
+    return (
+        f"the daemon is restarted once no run works ({_job_line(waiting)}); "
+        f"it gives up after {_duration(RESTART_WAIT_LIMIT_S)}"
+    )
+
+
 async def cmd_service_status(command: ServiceStatusCommand) -> int:
     config: AppConfig = load_user_config()
     url: str = health_url(config.server.host, config.server.port)
     status: ServiceStatus = await service_status(_plist_path(), os.getuid())
+    waiting: JobState | None = await inspect_restart_job(os.getuid())
     health: HealthView | None = await probe_daemon(url)
     sys.stdout.write(f"job      {LABEL}\n")
     sys.stdout.write(f"file     {status.plist}{'' if status.installed else '  (not installed)'}\n")
-    sys.stdout.write(f"launchd  {_job_line(status)}\n")
+    sys.stdout.write(f"launchd  {_job_line(status.job)}\n")
+    sys.stdout.write(f"restart  {_restart_line(waiting)}\n")
     if health is None:
         sys.stdout.write(f"daemon   does not answer at {base_url(config.server.host, config.server.port)}\n")
         failure: DaemonFailure | None = await asyncio.to_thread(daemon_failure_in, _own_log())
@@ -235,6 +267,33 @@ async def cmd_service_status(command: ServiceStatusCommand) -> int:
         )
     sys.stdout.write(f"logs     {log_dir()}\n")
     return 0 if status.job is not None and health is not None else 1
+
+
+async def _unanswered(url: str, uid: int, began: datetime) -> ServiceError:
+    """The error for a job that is loaded while the daemon does not answer at ``url`` within :data:`_START_WAIT_S` of
+    ``began``."""
+    after: ServiceStatus = await service_status(_plist_path(), uid)
+    ended: DaemonFailure | None = await asyncio.to_thread(daemon_failure_in, _own_log())
+    # A failure from before ``began`` is not why the daemon of this start does not answer.
+    reason: str = (
+        "the daemon does not answer"
+        if ended is None or ended.at < began
+        else f"the daemon ended with an error: {ended.error}"
+    )
+    return ServiceError(
+        f"the launchd job is loaded but {reason}",
+        {
+            "url": url,
+            "waited_s": _START_WAIT_S,
+            "job": None if after.job is None else after.job.model_dump(mode="json"),
+            "logs": str(log_dir()),
+            "fix": (
+                "read daemon.err.log and dotx.log in the log directory; 'dotx service status' shows the job. "
+                "When Dot lives under Desktop, Documents or Downloads, the first start waits for the answer to "
+                "the dialog in which macOS asks whether Dot may use that folder"
+            ),
+        },
+    )
 
 
 async def cmd_service_install(command: ServiceInstallCommand) -> int:
@@ -255,28 +314,7 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
     sys.stdout.write(f"{'Replaced' if replaced else 'Installed'} the launchd job {LABEL}: {plist}\n")
     health: HealthView | None = await wait_for_daemon(url, _START_WAIT_S)
     if health is None:
-        after: ServiceStatus = await service_status(plist, uid)
-        ended: DaemonFailure | None = await asyncio.to_thread(daemon_failure_in, _own_log())
-        # A failure from before this install is not why the daemon of this one does not answer.
-        reason: str = (
-            "the daemon does not answer"
-            if ended is None or ended.at < began
-            else f"the daemon ended with an error: {ended.error}"
-        )
-        raise ServiceError(
-            f"the launchd job is loaded but {reason}",
-            {
-                "url": url,
-                "waited_s": _START_WAIT_S,
-                "job": None if after.job is None else after.job.model_dump(mode="json"),
-                "logs": str(log_dir()),
-                "fix": (
-                    "read daemon.err.log and dotx.log in the log directory; 'dotx service status' shows the job. "
-                    "When Dot lives under Desktop, Documents or Downloads, the first start waits for the answer to "
-                    "the dialog in which macOS asks whether Dot may use that folder"
-                ),
-            },
-        )
+        raise await _unanswered(url, uid, began)
     sys.stdout.write(
         f"The daemon answers at {base_url(config.server.host, config.server.port)} (version {health.version}). "
         "It starts at every login and again after a crash.\n"
@@ -284,6 +322,68 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
         f"macOS asks for Dot, the app {app_path(dot_home())} that runs the daemon, and grants Accessibility and "
         "Screen Recording to it: allow Dot in System Settings > Privacy & Security, or desktop actions fail. "
         "'dotx service permissions' leads you through them.\n"
+    )
+    return 0
+
+
+def _not_installed(uid: int) -> ServiceError:
+    return ServiceError(
+        f"the service is not installed: launchd has no job {LABEL}",
+        {"target": f"gui/{uid}/{LABEL}", "fix": "install it with 'dotx service install'"},
+    )
+
+
+async def restart_service(uid: int, url: str) -> HealthView:
+    """Restart the daemon now (``launchctl kickstart -k`` of its job, which kills the process that runs) and wait until
+    a new process answers the health check at ``url``: the answer of the process that was killed does not count.
+
+    Raises :class:`ServiceError` when launchd has no job of the service (it is not installed), when launchctl refuses
+    the restart, and when no new process answers within :data:`_START_WAIT_S`.
+    """
+    before: JobState | None = await inspect_job(uid)
+    if before is None:
+        raise _not_installed(uid)
+    began: datetime = datetime.now()
+    await kickstart_job(uid)
+    deadline: float = time.monotonic() + _START_WAIT_S
+    while True:
+        job: JobState | None = await inspect_job(uid)
+        if job is not None and job.pid is not None and job.pid != before.pid:
+            health: HealthView | None = await probe_daemon(url)
+            if health is not None:
+                return health
+        if time.monotonic() >= deadline:
+            raise await _unanswered(url, uid, began)
+        await asyncio.sleep(_POLL_S)
+
+
+async def cmd_service_restart(command: ServiceRestartCommand) -> int:
+    config: AppConfig = load_user_config()
+    url: str = health_url(config.server.host, config.server.port)
+    health: HealthView = await restart_service(os.getuid(), url)
+    sys.stdout.write(
+        f"Restarted the daemon of the launchd job {LABEL}: it answers at "
+        f"{base_url(config.server.host, config.server.port)} (version {health.version}). "
+        "Runs that were at work were cut off by it; 'dotx service restart --when-idle' waits for them to end.\n"
+    )
+    return 0
+
+
+async def cmd_service_restart_when_idle(command: ServiceRestartCommand) -> int:
+    """Load the one-shot job that restarts the daemon once no run works (:mod:`dotagent.restart_when_idle`) and return
+    at once. A restart that waits already is replaced."""
+    uid: int = os.getuid()
+    if await inspect_job(uid) is None:
+        raise _not_installed(uid)
+    plist: Path = restart_job_path(dot_home())
+    job: RestartJob = build_restart_job(sys.executable, dot_home(), log_dir(), os.environ)
+    replaced: bool = await install_restart_job(plist, render_restart_job(job), uid)
+    sys.stdout.write(
+        f"{'Replaced the restart that waited with a new one' if replaced else 'Loaded a restart that waits'} "
+        f"(the launchd job {RESTART_LABEL}: {plist}).\n"
+        f"The daemon is restarted once no run works, the run that asked included; the job looks every "
+        f"{RESTART_POLL_S:g} seconds, gives up after {_duration(RESTART_WAIT_LIMIT_S)} without restarting, and "
+        "unloads itself either way. 'dotx service status' says whether one waits.\n"
     )
     return 0
 
@@ -401,5 +501,9 @@ async def dispatch(command: Command) -> int:
             return await cmd_service_status(command)
         case ServicePermissionsCommand():
             return await cmd_service_permissions(command)
+        case ServiceRestartCommand(when_idle=True):
+            return await cmd_service_restart_when_idle(command)
+        case ServiceRestartCommand(when_idle=False):
+            return await cmd_service_restart(command)
         case _:
             raise InvalidValueError("not a command of this module", {"name": command.name})
