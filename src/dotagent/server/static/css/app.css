@@ -7565,8 +7565,9 @@ button.attach-chip:hover {
 }
 
 /* On a phone what is tapped is a thumb's, not an iOS row's (item 401): the buttons are 36 px tall and the small ones
-   32, the heads of the steps keep a tappable 40, and the dock's send and "+" are a compact 36. A link inside a line of
-   text is no target of its own (WCAG 2.5.8). */
+   32, the heads of the steps keep a tappable 40 — the rows of a run's flow a line's 32, so that a long run reads as a
+   list there (item 438) — and the dock's send and "+" are a compact 36. A link inside a line of text is no target of
+   its own (WCAG 2.5.8). */
 @media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
   .btn,
   .input,

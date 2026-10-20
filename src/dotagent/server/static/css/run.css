@@ -382,6 +382,37 @@
   }
 }
 
+/* The rows of what Dot did sit closer on a phone (the owner's word of 2026-10-20): a call is one line with its icon,
+   and the calls of a step a short list, so a long run reads as a list instead of a page of air. A row keeps the whole
+   width of the screen to be tapped; its height is a line's and a thumb's, not a button's. A narrow window of a Mac,
+   where a pointer rests and a click is a click, keeps the rows it had. */
+@media (pointer: coarse) and (max-width: 720px), (pointer: coarse) and (max-height: 500px) {
+  html.chat-shell .run-thread .tool-head,
+  html.chat-shell .run-thread .steps-head {
+    min-height: 32px;
+  }
+
+  /* A call stands in a stack of its own (tools.js) with the screenshots it may have: with none, the gap that stack keeps
+     would stand under every row as an empty line. The approval and question cards have stacks of their own, and they
+     keep them. */
+  html.chat-shell .run-thread .shots:empty {
+    display: none;
+  }
+
+  html.chat-shell .run-thread .steps-body {
+    margin: 0;
+  }
+
+  /* A thought and a group of calls stand one under the other: the breath between two turns is not theirs. A call after a
+     call is the steps body's own gap, 2 px. */
+  html.chat-shell .run-thread > .thought + .thought,
+  html.chat-shell .run-thread > .thought + .steps,
+  html.chat-shell .run-thread > .steps + .thought,
+  html.chat-shell .run-thread > .steps + .steps {
+    margin-top: var(--space-1);
+  }
+}
+
 /* ---------- the marks of the conversation's messages (item 201) ---------- */
 
 /* A column of marks, one for each message you wrote, at the left edge of the run's layout and in the middle of what the
