@@ -1244,6 +1244,37 @@ a.pill:hover {
   font-weight: var(--weight-label);
 }
 
+/* A line of a card's body that names a path or an address is broken where it must, not carried past the window
+   (item 436): Diagnostics' "No log in /var/folders/...", a hint with a file's whole path. */
+.card-pad.hint,
+.card-pad > .hint {
+  overflow-wrap: anywhere;
+}
+
+/* On a phone a card's head that holds a name and anything beside it (a line that says more of it, a count, a total, a
+   search box: Accounts, Memory's two cards, Diagnostics' Processes) wraps: the name stands on the head's first line and
+   what goes with it under it, where side by side the name was squeezed to nothing and the rest was written across it
+   (item 436). A head of only a name, or a name and small buttons, keeps its row. */
+@media (max-width: 720px) {
+  .card-head:has(> .grow ~ :is(.hint, .input, .count, .badge, .small, .muted, .mono)) {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .card-head:has(> .grow ~ :is(.hint, .input, .count, .badge, .small, .muted, .mono)) > .grow {
+    flex: 1 1 100%;
+  }
+
+  .card-head:has(> .grow ~ :is(.hint, .input, .count, .badge, .small, .muted, .mono)) > .spacer {
+    display: none;
+  }
+
+  .card-head:has(> .grow ~ :is(.hint, .input, .count, .badge, .small, .muted, .mono)) > .input[type="search"] {
+    flex: 1 1 100%;
+    width: auto;
+  }
+}
+
 /* On a phone a card's name stands over the card, out of its surface, as a group's name over its rows: in the
    settings' tabs (item 330), on Customize › Plugins and the agent's editor (item 332). Each such card has one body,
    whose ground the card's is. */

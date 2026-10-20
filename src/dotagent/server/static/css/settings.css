@@ -1738,20 +1738,80 @@
   }
 }
 
+/* A list row that has words and buttons (Campaigns, Schedules, notes) is, on a phone, a head and what hangs under it
+   (item 436): the lead (a face or a switch), the title and the buttons on the first line, and the chips, text and
+   times under them across the row's whole width, where the lead took a column and the buttons a line of their own.
+   Every other row (a face with a line at its side, a chevron, a size, a tile's way) keeps the wrapping row it was. */
 @media (max-width: 720px) {
-  .page[data-layout="page"] .list-row {
+  .page[data-layout="page"] .list-row:not(:has(> .row-main):has(> .row-actions)) {
     align-items: flex-start;
     flex-wrap: wrap;
   }
 
-  .page[data-layout="page"] .row-actions {
+  .page[data-layout="page"] .list-row:not(:has(> .row-main):has(> .row-actions)) > .row-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: var(--space-2);
+    row-gap: var(--space-1);
+    padding: var(--space-3);
+  }
+
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) > .row-main {
+    display: contents;
+  }
+
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) > .row-main > * {
+    grid-column: 1 / -1;
+    min-width: 0;
+  }
+
+  /* The title: after the lead, or from the first column when the row has none. */
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) > .row-main > :first-child {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) > .row-main:first-child > :first-child {
+    grid-column: 1 / 3;
+  }
+
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) > .row-actions {
+    grid-column: 3;
+    grid-row: 1;
+    justify-content: flex-end;
+    margin-inline-end: calc(var(--space-1) * -1);
+  }
+
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) > :is(.avatar, .switch) {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .page[data-layout="page"] .list-row:has(> .row-main):has(> .row-actions) > .avatar {
+    width: 32px;
+    height: 32px;
   }
 }
 
 .when-line .badge {
   margin-inline-start: var(--space-1);
+}
+
+/* The chips of a row are labels, not buttons: on a phone they keep the height of their words (item 436), where the
+   thumb's 36 px made a row of five a wall of boxes. */
+@media (pointer: coarse) and (max-width: 720px) {
+  .row-meta .chip,
+  .note-meta .chip,
+  .schedule-list .chip {
+    min-height: 0;
+    padding-block: 0;
+  }
 }
 
 /* On a phone a schedule's row gives its face back to the words: the switch says whether it runs (item 373). */
