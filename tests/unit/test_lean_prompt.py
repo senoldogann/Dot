@@ -90,6 +90,16 @@ def test_a_file_is_changed_with_the_file_tools_and_the_shell_runs_things(style: 
     assert "To change the text of a file use edit_file" in build_shell_tool().spec.description
 
 
+@pytest.mark.parametrize("style", ["full", "lean"])
+def test_both_prompts_say_there_is_always_a_way_within_the_rules_of_trust(style: PromptStyle) -> None:
+    """Item 446: both styles tell the run not to give up while a way is left untried, and bound every way by the rules
+    of trust and safety that follow."""
+    prompt: str = _prompt(style, "yolo")
+    assert "Do not give up on a step while a way to do it is left untried." in prompt
+    assert "No way goes around a refusal, a denial or a decision that is the user's" in prompt
+    assert prompt.index("# There is always a way") < prompt.index("# Trust and safety")
+
+
 def test_the_lean_prompt_is_less_than_half_of_the_full_one_which_says_each_tool_at_length() -> None:
     full: str = _prompt("full", "ask")
     lean: str = _prompt("lean", "ask")

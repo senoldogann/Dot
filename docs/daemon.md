@@ -313,7 +313,10 @@ its end, where its next words come or its newest message stands, and stays there
 last are kept while the page lives, so that coming back to one (from a delegated run's page, say) draws it at once as it
 stood and follows its stream on from the last message read, not from the first; what the lessons, the questions and the
 cost show is read again (item 426). A run that ended while its page was open is kept as ended: coming back to it shows
-its face at rest, not the tick again.
+its face at rest, not the tick again. One that was still at work when its page was left has its state read again before
+it is drawn, from the side menu or any other way back: if it ended meanwhile, its chat opens at its foot with its answer
+drawn at once and its face at rest, as a run that was over when its page opened does, not on the top of its answer
+written in again (item 446).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it

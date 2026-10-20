@@ -188,6 +188,20 @@ def test_a_run_that_hesitates_over_what_it_was_asked_says_so_at_once() -> None:
         assert rule in _prompt(mode, False), mode
 
 
+def test_every_run_is_told_there_is_always_a_way() -> None:
+    """Item 446: a run takes another way when one fails, instead of giving up, putting a step off or ending its turn on
+    a step it could take now; in every kind of run and under every approval mode."""
+    rule: str = "Do not give up on a step while a way to do it is left untried."
+    kinds: tuple[RunMode, ...] = ("chat", "task", "research")
+    for kind in kinds:
+        assert rule in _in_mode(kind), kind
+    modes: tuple[ApprovalMode, ...] = ("ask", "auto", "yolo")
+    for mode in modes:
+        assert rule in _prompt(mode, False), mode
+    # A chat's reply ends its turn: it takes a next step it can take now instead of announcing it.
+    assert "Never end your turn announcing a next step of the work that you can take now" in _in_mode("chat")
+
+
 def test_the_prompt_names_the_day_and_a_note_after_the_goal_the_time_so_the_prompt_stays_the_same_all_day() -> None:
     today: list[str] = [line for line in _prompt("ask", False).splitlines() if line.startswith("- Today:")]
     assert len(today) == 1 and re.search(r"\d{2}:\d{2}", today[0]) is None, today
