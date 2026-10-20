@@ -179,6 +179,13 @@ def _inputs(tool_names: list[str]) -> PromptInputs:
     )
 
 
+def test_the_section_of_the_accounts_comes_with_any_of_their_tools() -> None:
+    # An agent's tools may hold only some of the tools of the accounts (item 424).
+    assert "# Mail and calendars" in build_system_prompt(_inputs(["read_file", "calendar_events"]))
+    assert "# Mail and calendars" in build_system_prompt(_inputs(["mail_read"]))
+    assert "# Mail and calendars" not in build_system_prompt(_inputs(["read_file", "web_fetch"]))
+
+
 def test_the_prompt_lists_the_groups_only_when_the_tools_are_grouped() -> None:
     inputs: PromptInputs = _inputs(TASK_TOOLS)
     grouped: str = build_system_prompt(inputs)
