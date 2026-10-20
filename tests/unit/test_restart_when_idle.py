@@ -14,7 +14,7 @@ from typing import get_args
 import pytest
 from structlog.testing import capture_logs
 
-from dotagent import launchd, restart_when_idle
+from dotagent import cli_daemon, launchd, restart_when_idle
 from dotagent.cli import build_parser, parse_command
 from dotagent.cli_commands import Command, ServiceInstallCommand, ServiceRestartCommand
 from dotagent.cli_daemon import _duration, _restart_line, dispatch
@@ -421,3 +421,26 @@ async def test_asking_while_a_restart_is_on_its_way_leaves_it_as_it_is(
         call.startswith("bootout") or call.startswith("bootstrap") for call in _calls(launchctl)[len(before) :]
     )
     assert _loaded(launchctl, RESTART_LABEL) == b"<plist>waiting</plist>\n"
+
+
+def test_status_names_a_restart_whose_program_ended_without_restarting() -> None:
+    line: str = _restart_line(JobState(state="not running", pid=None, runs=1, last_exit="2"))
+    assert "has ended without restarting" in line and "asks for a new one" in line
+
+
+async def test_a_restart_left_loaded_without_a_process_is_replaced(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launchctl: Path
+) -> None:
+    """A job whose program failed before it unloaded it waits for nothing: the next ask loads a new one."""
+    monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
+    ensure_layout()
+    _load_the_daemons_job(launchctl)
+    plist: Path = restart_job_path(dot_home())
+    await install_restart_job(plist, b"<plist>dead</plist>\n", UID)
+
+    async def ended(uid: int) -> JobState:
+        return JobState(state="not running", pid=None, runs=1, last_exit="2")
+
+    monkeypatch.setattr(cli_daemon, "inspect_restart_job", ended)
+    assert await dispatch(ServiceRestartCommand(name="service-restart", when_idle=True)) == 0
+    assert _loaded(launchctl, RESTART_LABEL) not in (None, b"<plist>dead</plist>\n")

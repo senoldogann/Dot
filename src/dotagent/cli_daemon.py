@@ -239,9 +239,15 @@ def _duration(seconds: float) -> str:
 
 def _restart_line(waiting: JobState | None) -> str:
     """What ``dotx service status`` says about the restart that waits for the runs to end: ``waiting`` is its job in
-    launchd, ``None`` when none waits."""
+    launchd, ``None`` when none is loaded. A job with no process left (its program failed before it unloaded it) waits
+    for nothing, and the next ``--when-idle`` replaces it."""
     if waiting is None:
         return "no restart waits for the runs to end ('dotx service restart --when-idle' asks for one)"
+    if waiting.pid is None:
+        return (
+            f"a restart was asked for but its program has ended without restarting ({_job_line(waiting)}; see "
+            "dotx.log); 'dotx service restart --when-idle' asks for a new one"
+        )
     return (
         f"the daemon is restarted once no run works ({_job_line(waiting)}); "
         f"it gives up after {_duration(RESTART_WAIT_LIMIT_S)}"
@@ -332,7 +338,7 @@ async def cmd_service_install(command: ServiceInstallCommand) -> int:
     sys.stdout.write(
         f"The daemon answers at {base_url(config.server.host, config.server.port)} (version {health.version}). "
         "It starts at every login and again after a crash.\n"
-        "Open the UI with 'dotx open'. Re-run 'dotx service install' after changing the configuration.\n"
+        "Open the UI with 'dotx open'. Run 'dotx service restart' after changing the configuration.\n"
         f"macOS asks for Dot, the app {app_path(dot_home())} that runs the daemon, and grants Accessibility and "
         "Screen Recording to it: allow Dot in System Settings > Privacy & Security, or desktop actions fail. "
         "'dotx service permissions' leads you through them.\n"
@@ -393,12 +399,14 @@ async def cmd_service_restart_when_idle(command: ServiceRestartCommand) -> int:
     if await inspect_job(uid) is None:
         raise _not_installed(uid)
     plist: Path = restart_job_path(dot_home())
-    if await inspect_restart_job(uid) is not None:
+    waiting: JobState | None = await inspect_restart_job(uid)
+    if waiting is not None and waiting.pid is not None:
         sys.stdout.write(
             f"A restart is on its way already (the launchd job {RESTART_LABEL}: {plist}): it restarts the daemon once "
             "no run works. Nothing changed.\n"
         )
         return 0
+    # A job left loaded with no process (its program failed before it could unload it) is replaced.
     job: RestartJob = build_restart_job(sys.executable, dot_home(), log_dir(), os.environ)
     await install_restart_job(plist, render_restart_job(job), uid)
     sys.stdout.write(
