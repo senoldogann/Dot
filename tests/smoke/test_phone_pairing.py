@@ -137,7 +137,8 @@ async def _one_size(browser: Browser, address: str, size: tuple[int, Literal["li
     shown: Locator = mac.locator("output.pair-code")
     await expect(shown).to_have_text(CODE)
     code: str = await shown.inner_text()
-    await expect(mac.locator(".phone-steps .hint")).to_contain_text("It works once")
+    # The guide of Settings › Phone has hints of its own (item 421): the code's is the one that says when it ends.
+    await expect(mac.locator(".phone-steps .hint", has_text="Type it in Dot")).to_contain_text("It works once")
     await mac.screenshot(path=str(shots / f"settings-{width}-{scheme}.png"))
 
     # A phone with no token: a wrong code is told, the right one lets it in.

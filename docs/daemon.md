@@ -91,7 +91,7 @@ while a run is active, else idle) under the name you call Dot by, and a greeting
 morning, Ada. What should I work on?"; "Something waits for you." when it does). Both names are yours to give in
 Settings › General, and the daemon keeps them for every browser and phone (`[assistant] name` and `owner`, `GET` and
 `PUT /api/assistant`, item 420); your name is the first name of your account on this Mac until you give one, and the
-model is told both. One line says what is going on ("Working on 2 runs · 1 waits for
+model is told both. An open home takes a new name as soon as it is saved, also one saved on another page. One line says what is going on ("Working on 2 runs · 1 waits for
 you · 3 ended today · 1 lesson · 2 things due today"; a quiet day says so). Under the composer, the **Today** strip
 lists it: what waits for you, what works, what is due later today (the schedules that fire and the campaigns whose next
 session starts), what was learned today (the lessons and the day's journal) and what ended, each row opening what it is
