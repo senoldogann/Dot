@@ -59,22 +59,24 @@ def sends_messages(name: str) -> bool:
 
 
 def classify_mcp_call(tool: McpTool, arguments: JsonObject) -> ActionInfo:
-    """Tools that declare themselves read-only only look. Any other tool may change things and may reach out to the
-    world, unless the server says it does not: servers that declare nothing get the careful treatment."""
+    """A tool whose name says it sends a message or posts is a message for the owner whatever its server's hints say
+    (item 427): a hint is the server's word, and a server may be wrong or hostile. Other tools that declare themselves
+    read-only only look. Any other tool may change things and may reach out to the world, unless the server says it
+    does not: servers that declare nothing get the careful treatment."""
     shown: str = _clip(redact_secrets(dumps_compact(arguments)), _ARGUMENT_CHARS)
     summary: str = f"{tool.server}: {tool.remote_name}({shown})"
-    if tool.hints.read_only is True:
+    sends: bool = sends_messages(tool.remote_name)
+    if tool.hints.read_only is True and not sends:
         return ActionInfo(
             tool=tool.exposed_name, kind="mcp_read", risk="low", summary=summary, target=tool.server, flags=()
         )
     flags: list[Flag] = []
-    if tool.hints.destructive is not False:
+    if tool.hints.destructive is not False and tool.hints.read_only is not True:
         flags.append("destructive")
-    if tool.hints.open_world is not False:
+    if tool.hints.open_world is not False or sends:
         flags.append("external_send")
-    if sends_messages(tool.remote_name):
-        # A message or a post for the owner is theirs to let go, in every mode (item 427), whatever the hints say.
-        flags.extend(flag for flag in ("external_send", "message_send") if flag not in flags)
+    if sends:
+        flags.append("message_send")
     return ActionInfo(
         tool=tool.exposed_name, kind="mcp", risk="medium", summary=summary, target=tool.server, flags=tuple(flags)
     )

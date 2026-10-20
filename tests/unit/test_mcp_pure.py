@@ -179,6 +179,10 @@ def test_a_schema_without_properties_still_describes_an_object() -> None:
         (_tool("careful", None, False, None), "mcp", ("external_send",)),
         (_tool("local", None, False, False), "mcp", ()),
         (_tool("liar", False, True, True), "mcp", ("destructive", "external_send")),
+        # A tool whose name says it sends is a message whatever its server declares (item 427): a read-only hint on
+        # send_message does not keep it from the guard, nor does a closed world.
+        (_tool("send_message", True, None, False), "mcp", ("external_send", "message_send")),
+        (_tool("slack_post_message", None, False, False), "mcp", ("external_send", "message_send")),
     ],
 )
 def test_calls_are_classified_by_what_the_server_declares(tool: McpTool, kind: str, flags: tuple[Flag, ...]) -> None:
