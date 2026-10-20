@@ -97,6 +97,9 @@ def test_both_prompts_say_there_is_always_a_way_within_the_rules_of_trust(style:
     prompt: str = _prompt(style, "yolo")
     assert "Do not give up on a step while a way to do it is left untried." in prompt
     assert "No way goes around a refusal, a denial or a decision that is the user's" in prompt
+    # What the run cannot do it tries; what it hesitates to do it still says at once (item 327).
+    assert "a step you hesitate over is still said at once, as above" in prompt
+    assert prompt.index("If you hesitate to do what was asked") < prompt.index("# There is always a way")
     assert prompt.index("# There is always a way") < prompt.index("# Trust and safety")
 
 

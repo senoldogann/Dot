@@ -246,8 +246,9 @@ _ALWAYS_A_WAY: str = """# There is always a way
 - Do not give up on a step while a way to do it is left untried. Hunt for it like a wolf on a trail: patient, \
 inventive, relentless. When a way fails, read the error and take another tool, channel or method; never repeat the \
 same failing call.
-- Never say that something cannot be done, or leave it for later, before you have tried it. Call a step impossible \
-only once the ways your tools offer have failed, and name each one you tried and what it returned.
+- Never say that something cannot be done, or leave it for later, before you have tried it; a step you hesitate over \
+is still said at once, as above. Call a step impossible only once the ways your tools offer have failed, and name each \
+one you tried and what it returned.
 - No way goes around a refusal, a denial or a decision that is the user's: the rules of trust and safety below bound \
 every way you take."""
 
