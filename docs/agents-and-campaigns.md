@@ -9,8 +9,13 @@ editor's Look field with a moving preview, worn as a still face wherever the age
 shape and colour its id's hue gives it (`PUT /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look"
 card of Settings › General, kept by the daemon for every browser). **Agents** in the sidebar lists Dot first and then
 your agents, each with its newest chat; **New agent** opens the editor; an agent's page greets with its face and role,
-takes a message for it ("Message Scout") and lists its chats, with Edit and Delete in the bar. The home composer offers
-an Agent menu once an agent exists, Dot by default. A run of an agent opens its system prompt with the agent's own
+takes a message for it ("Message Scout") and lists its chats, with Edit and Delete in the bar. The box of that page has
+the home's Mode, Model, Reasoning and Options pickers (item 426), starting from the agent's own: its model, its
+reasoning level and its approvals, not what this browser has chosen for the home's box; the mode, model, reasoning
+level and approvals chosen there go with that message, in place of the agent's own for that run, and leave the home's
+choices as they were. Fast mode and goal mode are the home's own, shared with it in this browser: the agent has no
+bounds for them, and turning one on there turns it on in the home's box too. The home composer offers an Agent menu once
+an agent exists, Dot by default. A run of an agent opens its system prompt with the agent's own
 section ("You are Scout, an agent the owner made: ..." and your instructions), ahead of Dot's rules, which still hold;
 its tools are the ones the agent names plus finishing, asking you and turning tool groups on, and the tools of an MCP
 server you pick for its message, or picked for an earlier message of its chat (item 415): your pick widens the agent's
@@ -18,16 +23,22 @@ bounds for that chat; a server the model only called does not. The run's page we
 with a chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. Deleting an agent
 leaves its chats, its lessons and its learned skills to Dot.
 
-An agent can start from a template (item 315). Under the list, **Start from a template** shows nine: Sales
-Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief
-of Staff and Reviewer, each with its face, its role, what it needs of the Mac and the schedule it suggests. **Use
-template** makes the agent in one click and opens its page; it is then an agent like any other, to change in the
-editor. Every template's instructions say that what leaves the Mac for a person is a draft for you to send
-(`draft_message`, see [Drafts](runs.md#drafts)). Sales Outbound, Talent Scout, Paid Media and Product Performance work
-on the web and in files and name their tools: the web, Dot's Chrome, files, memory, plans, pages and `draft_message`,
-none of which drives Mail, Messages or a terminal; a Send pressed on a web page is an external send, under your
-approvals. Expense Manager, Bug Reproduction, Account Health, Chief of Staff and Reviewer read your mail, calendar or
-code and have every tool. A suggested schedule is only words on the card; Schedules makes one. An agent's page has
+An agent can start from a template (item 315). Under the list, **Start from a template** shows fourteen: Sales
+Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of
+Staff, Reviewer, Research Desk, Competitor Watch, Release QA, Copy Editor and Design Critic, each with its face, its
+role, what it needs of the Mac and the schedule it suggests. **Use template** makes the agent in one click and opens
+its page; it is then an agent like any other, to change in the
+editor. Every template names the tools its agent may use (item 425), and its card counts them under **Tools** and lists
+the names a click below it: no template starts an agent with every tool, and a tool this home does not have (its group
+off in the configuration, or its app not here) is struck through with the reason, since such a template is refused on use. Every
+template's instructions also say that what leaves the Mac for a person is a draft for you to send (`draft_message`, see [Drafts](runs.md#drafts)). Sales
+Outbound, Talent Scout, Paid Media, Product Performance, Research Desk, Competitor Watch, Release QA and Design Critic
+name the web, Dot's Chrome, files, memory, plans, pages and `draft_message`, none of which drives Mail, Messages or a
+terminal; a Send pressed on a web page is an external send, under your approvals. Copy Editor names the same without
+the web and Chrome. Chief of Staff and Account Health add `apple_script`, the way into Mail and Calendar. Expense
+Manager adds it with `shell` for the folders the receipts sit in; Bug Reproduction and Reviewer run things, so they
+name the shell and the terminal's tools, and the Reviewer names no web at all. A suggested schedule is only words on
+the card; Schedules makes one. An agent's page has
 **Export** in its bar: a file
 `<name>.dot-agent.json` with the agent's name, role, instructions, model, reasoning level, approvals, tools and look
 (`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An agent whose name, role

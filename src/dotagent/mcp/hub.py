@@ -116,6 +116,19 @@ async def _connect_kept(config: McpServerConfig, login_env: Mapping[str, str]) -
     return await _connect_server(config, login_env, auth)
 
 
+async def _offered_tools(config: McpServerConfig, login_env: Mapping[str, str]) -> tuple[McpTool, ...]:
+    """Every tool ``config`` lists, whatever its allow list, connecting as runs do and closing the connection again."""
+    auth: httpx2.Auth | None = await asyncio.to_thread(kept_sign_in, config) if config.oauth else None
+    secrets: dict[str, str] = await resolve_server_secrets(config)
+    env: dict[str, str] = server_environment(config, login_env, secrets)
+    headers: dict[str, str] = server_headers(config, secrets)
+    connection: McpConnection = McpConnection(config, env, headers, auth, workspace_dir(), server_log_path(config))
+    try:
+        return await connection.list_tools()
+    finally:
+        await connection.close()
+
+
 class McpHub:
     """The connected servers and the tools they offer to the model, and the enabled servers left out at the start. A
     server connected or removed while Dot runs (:meth:`connect`, :meth:`disconnect`) changes the tools of the runs
@@ -159,6 +172,11 @@ class McpHub:
         done: _Connected = await _connect_server(config, self._login_env, auth)
         await done.connection.close()
         return done.tools
+
+    async def offered(self, config: McpServerConfig) -> tuple[McpTool, ...]:
+        """Every tool ``config`` lists, for the owner to choose its allow list from (a server that offers more than
+        ``MAX_UNFILTERED_TOOLS`` is left out until they do)."""
+        return await _offered_tools(config, self._login_env)
 
     async def connect(self, config: McpServerConfig) -> tuple[McpTool, ...]:
         """Connect ``config`` as runs connect to it, in the place of a server of the same name, and return the tools the

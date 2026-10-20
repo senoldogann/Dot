@@ -13,24 +13,18 @@ from dotagent.core.errors import InvalidValueError, NotFoundError
 from dotagent.themes import (
     MAX_THEME_FILE_BYTES,
     MAX_THEME_FILES,
+    RESERVED_THEME_IDS,
     THEME_ROLES,
     ThemeFile,
+    checked_theme_id,
     delete_theme,
     parse_theme_file,
     read_theme_folder,
     save_theme,
 )
 
-_GENERATOR: Path = (
-    Path(__file__).resolve().parents[2]
-    / "src"
-    / "dotagent"
-    / "server"
-    / "static"
-    / "js"
-    / "appearance"
-    / "generator.js"
-)
+_APPEARANCE: Path = Path(__file__).resolve().parents[2] / "src" / "dotagent" / "server" / "static" / "js" / "appearance"
+_GENERATOR: Path = _APPEARANCE / "generator.js"
 # A theme file in full: canonical OKLCH colours, the other scheme under variants.
 _EXPORTED: dict[str, object] = {
     "version": 1,
@@ -170,6 +164,20 @@ def test_only_the_files_the_page_can_draw_are_listed_and_the_others_say_why(tmp_
     assert reasons["folder.json"] == "not a file"
     assert "link" in reasons["linked.json"]
     assert read_theme_folder(tmp_path / "missing").themes == []
+
+
+def test_every_theme_the_page_ships_is_an_id_a_theme_file_may_not_take() -> None:
+    """A theme file named for a built-in theme would be hidden behind it: the page finds the built-in first. The ids the
+    page ships (``theme.js`` and the palettes of ``palettes-more.js``) and the daemon's reserved ones are one list."""
+    theme_js: str = (_APPEARANCE.parent / "theme.js").read_text(encoding="utf-8")
+    more_js: str = (_APPEARANCE / "palettes-more.js").read_text(encoding="utf-8")
+    shipped: set[str] = set(re.findall(r'^\s+(?:look|palette)\("([a-z0-9-]+)"', theme_js, re.M))
+    shipped |= set(re.findall(r'^\s+\["([a-z0-9-]+)", "', more_js, re.M))
+    assert len(shipped) == 14, shipped
+    assert RESERVED_THEME_IDS - {"system", "light", "dark"} == shipped
+    for theme_id in sorted(shipped):
+        with pytest.raises(InvalidValueError):
+            checked_theme_id(theme_id)
 
 
 def test_the_daemon_and_the_page_know_the_same_colour_roles() -> None:

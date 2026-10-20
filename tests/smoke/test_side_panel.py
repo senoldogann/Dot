@@ -279,6 +279,64 @@ async def _ended_run(runtime: Runtime) -> RunRecord:
     return run
 
 
+async def test_the_screenshots_section_folds_away_from_its_title_and_stays_folded_on_the_next_page(
+    runtime: Runtime, served: tuple[RunManager, str]
+) -> None:
+    """The Screenshots section of the Screen tab (item 426): its title is a button that folds the section away, and the
+    choice is kept for the next page, wide and on a phone."""
+    _, address = served
+    # A run that began and ended with no call: the Screen tab's sections do not depend on what it did. The script of
+    # the module is spent by the tests before this one.
+    chat: ThreadRecord = await runtime.store.create_thread("Summarise the brief", "test")
+    run: RunRecord = await runtime.store.create_run(
+        chat.id,
+        "Summarise the brief",
+        "task",
+        SCRIPTED_MODEL,
+        None,
+        "test",
+        "medium",
+        "standard",
+        None,
+        "yolo",
+        False,
+        None,
+        None,
+        None,
+    )
+    await runtime.store.end_run(run.id, "done", "Done.", {"status": "done", "result": "Done.", "needs": ""})
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width in (1280, 390):
+                page: Page = await _open_panel(browser, address, run.id, width, "light")
+                panel: Locator = page.locator(".inspector")
+                await panel.get_by_role("tab", name="Screen").click()
+                section: Locator = panel.locator(".panel-fold", has_text="Screenshots")
+                fold: Locator = section.locator(".panel-fold-toggle")
+                body: Locator = section.locator(".panel-section-body")
+                # Open the first time, its title a button with its state.
+                await expect(fold).to_have_attribute("aria-expanded", "true")
+                await expect(body).to_be_visible()
+                await fold.click()
+                await expect(fold).to_have_attribute("aria-expanded", "false")
+                await expect(body).to_be_hidden()
+                # Folded, it stays folded on the next page; the section above it (Dot's computer) never folds.
+                await page.reload()
+                if width < 960:
+                    await page.get_by_role("button", name="Run details").click()
+                await panel.get_by_role("tab", name="Screen").click()
+                await expect(fold).to_have_attribute("aria-expanded", "false")
+                await expect(body).to_be_hidden()
+                await expect(panel.locator(".panel-fold")).to_have_count(1)
+                await fold.click()
+                await expect(fold).to_have_attribute("aria-expanded", "true")
+                await expect(body).to_be_visible()
+                await page.close()
+        finally:
+            await browser.close()
+
+
 async def test_the_side_panel_slides_in_and_out_beside_the_conversation(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:

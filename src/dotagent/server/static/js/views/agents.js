@@ -5,23 +5,25 @@
 // message for it and lists its chats; the editor makes or changes an agent. An agent goes out as a file from its page
 // and comes back, in this home or another, from the list's Import.
 
-import { actorFace, dotFace, fallbackLook, rememberLook } from "../actors.js";
+import { actorFace, dotFace, fallbackLook, liveFace, rememberLook } from "../actors.js";
 import { api } from "../api.js";
 import { askForWords, readyToSend } from "../attachments.js";
+import { runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName } from "../dom.js";
-import { allModels, chosenLevel, levelLabel } from "../efforts.js";
+import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
+import { readFolds, writePref } from "../prefs.js";
 import { lookPicker } from "../lookpicker.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
-import { APPROVAL_OPTIONS } from "../runmodes.js";
+import { errorPanel, field, loadingPanel, pageHead, statusBadge } from "../panels.js";
+import { APPROVAL_OPTIONS, heldChoice, KEPT_GOAL_MODE } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { setStageTitle, setStageTools } from "../stage.js";
 import { scoreLine } from "./memory.js";
 import { skillRow } from "./skills.js";
 import { messageRow } from "./team.js";
-import { getSnapshot, loadModels, onLifecycle, onStreamBack } from "../state.js";
+import { getSnapshot, loadModels, onChange, onLifecycle, onStreamBack } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
 const DOT_ID = "dot";
@@ -68,8 +70,33 @@ function templateFact(label, text) {
   return el("div", null, el("dt", null, label), el("dd", null, text));
 }
 
-/** A template's card (item 315): its face, name and role, what it needs of the Mac and the schedule it suggests. */
-function templateCard(template, onUse) {
+/** A template's tools (item 425): how many it may use, and the names themselves a click away, so that the owner sees
+    what a click gives before taking it — the card said what a template needs of the Mac, not what it may touch. A tool
+    this home does not have is marked, with the reason, since such a template is refused on use, not quietly cut. */
+function templateTools(template, known) {
+  return el(
+    "details",
+    { class: "template-tools" },
+    el("summary", null, `Tools (${template.tools.length})`),
+    el(
+      "div",
+      { class: "template-tool-chips" },
+      template.tools.map((name) =>
+        el(
+          "code",
+          known !== null && !known.has(name)
+            ? { class: "chip missing", title: "This home has no such tool: its group is off in the configuration, or its app is not here" }
+            : { class: "chip" },
+          name,
+        ),
+      ),
+    ),
+  );
+}
+
+/** A template's card (item 315): its face, name and role, what it needs of the Mac, the schedule it suggests and the
+    tools its agent may use. */
+function templateCard(template, onUse, known) {
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
@@ -100,6 +127,7 @@ function templateCard(template, onUse) {
       templateFact("Needs", template.needs),
       templateFact("Schedule", template.schedule === "" ? "When you ask" : template.schedule),
     ),
+    templateTools(template, known),
     use,
   );
 }
@@ -335,12 +363,29 @@ function mountList(root, ctx) {
 
   async function loadTemplates() {
     try {
-      const listed = await api.get("/agent-templates");
+      // The tools this home has, so that a card marks one it lacks. A home that cannot list them still shows the
+      // templates, their tools unmarked, and says above them that it could not tell which are missing.
+      const [listed, named] = await Promise.all([
+        api.get("/agent-templates"),
+        api.get("/tools").then(
+          (names) => ({ names, problem: null }),
+          (error) => ({ names: null, problem: error }),
+        ),
+      ]);
+      const known = named.names === null ? null : new Set(named.names);
+      const listingProblem = named.problem;
       if (!disposed) {
         templates.replaceChildren(
           el("div", { class: "section-label" }, "Start from a template"),
           el("p", { class: "hint" }, "Each becomes an agent of yours, to change as you like. What one writes to a person is a draft that you send."),
-          el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate))),
+          listingProblem === null
+            ? null
+            : el(
+                "p",
+                { class: "hint", dataset: { templatesToolsUnknown: "" } },
+                `The tools could not be listed: ${listingProblem.message}. A template that names one this home lacks is refused when used.`,
+              ),
+          el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate, known))),
         );
       }
     } catch (error) {
@@ -452,7 +497,42 @@ function runRow(run) {
   );
 }
 
-/** The composer of an agent's page: a message for the agent, sent with Enter; the run takes the agent's bounds. */
+/**
+ * Where the composer of `record`'s page keeps its choices. It starts from the agent's own bounds, its approvals and its
+ * reasoning level (on every model that offers it), and holds what is chosen there for that page alone: this browser's
+ * choices for the home's box would otherwise stand in the agent's place, a mode chosen there for another chat loosening
+ * the agent's, and a choice made here would change the home's. Fast mode and goal mode are the home's, which the agent
+ * has no bounds for.
+ */
+function agentKept(record) {
+  const levels = new Map();
+  return {
+    level: {
+      read: (info) => {
+        if (levels.has(info.ref)) {
+          return levels.get(info.ref);
+        }
+        return record.effort !== null && info.efforts.includes(record.effort) ? record.effort : null;
+      },
+      write: (info, level) => {
+        if (level === null) {
+          levels.delete(info.ref);
+        } else {
+          levels.set(info.ref, level);
+        }
+      },
+    },
+    speed: KEPT_SPEED,
+    approvals: heldChoice(record.approvals ?? null),
+    goalMode: KEPT_GOAL_MODE,
+    mode: "task",
+    model: record.model ?? "",
+    once: null,
+  };
+}
+
+/** The composer of an agent's page: a message for the agent, sent with Enter, with the new chat's mode, model and
+ * reasoning and Options pills; the model starts at the agent's own. */
 function agentComposer(record, ctx) {
   const frame = composerFrame({
     label: `Message ${record.name}`,
@@ -466,6 +546,20 @@ function agentComposer(record, ctx) {
     listener: null,
   });
   const { textarea: goal, attachments } = frame;
+  const choices = runChoices({
+    frame,
+    kept: agentKept(record),
+    optionsTitle: "Approvals",
+    more: () => [],
+    onMode: (id) => {
+      choices.goalMode.setAvailable(id !== "chat");
+      goal.focus();
+    },
+    onChange: () => {},
+  });
+  const { pills } = choices;
+  frame.options.append(pills.mode, pills.model, pills.reasoning, pills.options);
+  const stopStatus = onChange(choices.sync);
   let starting = false;
   const keys = messageKeys();
 
@@ -485,13 +579,18 @@ function agentComposer(record, ctx) {
     frame.sendButton.disabled = true;
     try {
       await attempt(async () => {
+        // A kept reasoning level is checked against the model's own, so the models are known first.
+        await choices.ready();
+        const chosen = choices.value();
         const body = {
           goal: text,
-          mode: "task",
-          model: null,
-          effort: null,
-          approvals: null,
-          goal_mode: null,
+          mode: chosen.mode,
+          model: chosen.model,
+          effort: chosen.effort,
+          speed: chosen.speed,
+          once: chosen.once,
+          approvals: chosen.approvals,
+          goal_mode: chosen.goal_mode,
           standing: false,
           thread_id: null,
           attachments: attachments.ids(),
@@ -500,6 +599,7 @@ function agentComposer(record, ctx) {
         };
         const created = await api.post("/runs", { ...body, key: keys.of("run", body) });
         keys.sent();
+        choices.sent();
         frame.picks.sent();
         frame.clear();
         ctx.navigate(`/runs/${created.id}`);
@@ -510,15 +610,28 @@ function agentComposer(record, ctx) {
     }
   }
 
-  return { element: frame.element, focus: () => goal.focus(), dispose: frame.dispose };
+  return {
+    element: frame.element,
+    focus: () => goal.focus(),
+    dispose: () => {
+      stopStatus();
+      choices.dispose();
+      frame.dispose();
+    },
+  };
 }
 
 /** The agent's greeting: its face, name and role, like Dot's on the home page. */
-function who(record) {
+// The face on the agent's page, as big and as alive as Dot's on the home.
+const FACE_PX = 96;
+// Which sections of an agent's page are folded, kept per browser as the home keeps its own.
+const FOLDS_KEY = "dot.agentFolds";
+
+function who(record, face) {
   return el(
     "div",
     { class: "home-who agent-who" },
-    actorFace(record.id, "idle", record.look),
+    face,
     el("div", { class: "home-name" }, record.name),
     record.role === "" ? null : el("p", { class: "home-greeting" }, record.role),
     record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, "Made by Dot in one of its runs"),
@@ -542,35 +655,39 @@ function lessonRow(record, score, onForget) {
   );
 }
 
-/** What the agent learned for itself (item 94): its lessons, then its skills; empty when it learned nothing yet. */
-function learnedSection(record, learned, actions) {
-  const parts = [el("div", { class: "section-label" }, "What it learned")];
-  if (learned.lessons.length === 0 && learned.skills.length === 0) {
-    parts.push(
-      emptyPanel(
-        "users",
-        "Nothing yet",
-        `${record.name}'s lessons and the skills it learns from its own work will be listed here, for its runs alone.`,
-      ),
-    );
-    return parts;
+/** What the agent learned for itself (item 94): its lessons, then its skills, as rows; none when it learned nothing. */
+function learnedRows(record, learned, actions) {
+  return [
+    ...learned.lessons.map((lesson) => lessonRow(lesson, learned.scores[lesson.id], actions.forget)),
+    ...learned.skills.map((skill) => skillRow({ ...skill, agentName: record.name }, actions.skillsChanged)),
+  ];
+}
+
+/**
+ * A section of the agent's page as the home draws its Today strip: a title with its count that folds it, and its rows;
+ * null for one without rows, so that an empty section takes no room. `folds` and `toggle(key)` keep what is folded.
+ */
+function homeSection(key, title, rows, folds, toggle) {
+  if (rows.length === 0) {
+    return null;
   }
-  if (learned.lessons.length > 0) {
-    parts.push(
-      el("div", { class: "card" }, learned.lessons.map((lesson) => lessonRow(lesson, learned.scores[lesson.id], actions.forget))),
-    );
-  }
-  if (learned.skills.length > 0) {
-    parts.push(
-      el("div", { class: "section-label" }, "Skills"),
+  const folded = folds[key] === true;
+  return el(
+    "div",
+    { class: "home-today-section", "data-section": key },
+    el(
+      "h2",
+      { class: "section-label" },
       el(
-        "div",
-        { class: "card" },
-        learned.skills.map((skill) => skillRow({ ...skill, agentName: record.name }, actions.skillsChanged)),
+        "button",
+        { class: "home-today-title", type: "button", "aria-expanded": folded ? "false" : "true", onclick: () => toggle(key) },
+        icon("chevron"),
+        `${title} `,
+        el("span", { class: "home-today-count" }, String(rows.length)),
       ),
-    );
-  }
-  return parts;
+    ),
+    folded ? null : el("div", { class: "home-today-list card" }, ...rows),
+  );
 }
 
 function mountPage(root, ctx, agentId) {
@@ -578,11 +695,14 @@ function mountPage(root, ctx, agentId) {
   let ticket = 0;
   let composer = null;
   let form = null;
-  const top = el("div", { class: "stack agent-top" });
-  const runs = el("div", { class: "stack" });
-  const messages = el("div", { class: "stack" });
-  const learned = el("div", { class: "stack agent-learned" });
-  const page = el("div", { class: "stack" }, loadingPanel());
+  let face = null;
+  let shownDetail = null;
+  let folds = readFolds(FOLDS_KEY);
+  // The agent's page is laid out as the home is (item 124): its face, name and role over the composer in the middle,
+  // and under them its chats, what it learned and its messages as the home's Today strip, each only when it has rows.
+  const top = el("div", { class: "home-start agent-top" });
+  const sections = el("section", { class: "home-today agent-sections", "aria-label": "The agent's work" });
+  const page = el("div", { class: "home agent-home" }, loadingPanel());
 
   function stageOf(record) {
     setStageTitle(actorFace(record.id, "idle", record.look), el("span", { class: "stage-name" }, record.name));
@@ -606,7 +726,9 @@ function mountPage(root, ctx, agentId) {
     }
     closeForm();
     composer = agentComposer(record, ctx);
-    top.replaceChildren(who(record), composer.element);
+    face?.dispose();
+    face = liveFace(record.id, "idle", record.look, FACE_PX);
+    top.replaceChildren(who(record, face.element), composer.element);
     stageOf(record);
   }
 
@@ -668,30 +790,36 @@ function mountPage(root, ctx, agentId) {
 
   // The lists under the top: chats, lessons and skills, messages. The top stays where it is, so the focus and what is
   // typed in it stay too.
+  function toggleFold(key) {
+    folds = { ...folds, [key]: folds[key] !== true };
+    writePref(FOLDS_KEY, JSON.stringify(folds));
+    if (shownDetail !== null) {
+      paintLists(shownDetail);
+    }
+    sections.querySelector(`[data-section="${key}"] .home-today-title`)?.focus();
+  }
+
   function paintLists(detail) {
-    learned.replaceChildren(
-      ...learnedSection(detail.record, detail.learned, {
-        forget: (record) => attempt(() => forget(record)),
-        skillsChanged: (list) => {
-          if (list !== null) {
-            attempt(refresh);
-          }
-        },
-      }),
-    );
-    runs.replaceChildren(
-      el("div", { class: "section-label" }, "Chats"),
-      detail.runs.length === 0
-        ? emptyPanel("message", "No chats yet", `Send ${detail.record.name} a message above.`)
-        : el("div", { class: "card" }, detail.runs.map(runRow)),
-    );
-    messages.replaceChildren(
-      ...(detail.messages.length === 0
-        ? []
-        : [el("div", { class: "section-label" }, "Messages"), el("div", { class: "card" }, detail.messages.map(messageRow))]),
-    );
+    shownDetail = detail;
+    const learned = learnedRows(detail.record, detail.learned, {
+      forget: (record) => attempt(() => forget(record)),
+      skillsChanged: (list) => {
+        if (list !== null) {
+          attempt(refresh);
+        }
+      },
+    });
+    const parts = [
+      homeSection("chats", "Chats", detail.runs.map(runRow), folds, toggleFold),
+      homeSection("learned", "What it learned", learned, folds, toggleFold),
+      homeSection("messages", "Messages", detail.messages.map(messageRow), folds, toggleFold),
+    ];
+    sections.replaceChildren(...parts.filter((part) => part !== null));
+    sections.hidden = sections.childElementCount === 0;
+    // The tests and the page's own styles find what it learned by this mark.
+    sections.querySelector('[data-section="learned"]')?.classList.add("agent-learned");
     if (top.parentNode !== page) {
-      page.replaceChildren(top, runs, learned, messages);
+      page.replaceChildren(top, sections);
     }
   }
 
@@ -731,6 +859,7 @@ function mountPage(root, ctx, agentId) {
     if (composer !== null) {
       composer.dispose();
     }
+    face?.dispose();
     closeForm();
   };
 }

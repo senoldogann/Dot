@@ -131,7 +131,21 @@ function planStep(step) {
  * before this one; `historyProblem` is the error that kept them from loading, or null. Returns the
  * function that stops everything the page started.
  */
-function showRun({ root, ctx, signal, detail, history, historyProblem, reload }) {
+// The runs opened last, kept while the page lives (`{ detail, history, messages }`, the stream's messages so far), so
+// that coming back to one (from a delegated run's page, say) draws it at once as it stood and follows its stream on
+// from there, instead of an empty page that fills again as the whole stream is read once more.
+const KEPT_RUNS = 6;
+const keptRuns = new Map();
+
+function keepRun(runId, kept) {
+  keptRuns.delete(runId);
+  keptRuns.set(runId, kept);
+  while (keptRuns.size > KEPT_RUNS) {
+    keptRuns.delete(keptRuns.keys().next().value);
+  }
+}
+
+function showRun({ root, ctx, signal, detail, history, historyProblem, reload, kept }) {
   const runId = detail.run.id;
   let run = detail.run;
   let status = run.status;
@@ -1404,32 +1418,47 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload })
   // The run as it stands, its lessons and its questions among it, once the lifecycle stream is back after a break.
   const stopBack = onStreamBack(reconcile);
 
-  follow({
+  const take = (message) => {
+    if (message.data.kind === "steer" && message.data.run_id === runId) {
+      messageRead(message.data.data.text);
+    }
+    timeline.push(message.data);
+    if (message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
+      refreshChanges();
+    }
+    if (message.data.run_id !== runId && RUN_ENDS.has(message.data.kind)) {
+      agentsChanged();
+      paintCapsule();
+    }
+    // A delegated run's row says how long it has worked as soon as its events are in, not at the next second.
+    if (active) {
+      timeline.tick(Date.now() / 1000);
+    }
+  };
+  // What was read of the stream before the page left goes in at once; the stream goes on after its last message.
+  for (const message of kept.messages) {
+    take(message);
+  }
+  keepRun(runId, kept);
+  if (kept.messages.length > 0) {
+    // The lessons, the questions and the cost of a run drawn from what was kept are read again.
+    attempt(reconcile);
+  }
+  const finished = (message) => message.data.kind === "run_finished" && message.data.run_id === runId;
+  const ended = kept.messages.some(finished);
+  (ended ? Promise.resolve() : follow({
     path: `/runs/${runId}/stream`,
-    after: 0,
+    after: kept.messages.length === 0 ? 0 : kept.messages[kept.messages.length - 1].id,
     signal,
-    isFinished: (message) => message.data.kind === "run_finished" && message.data.run_id === runId,
+    isFinished: finished,
     onState: (state) => {
       showConnectionNote(state === "reconnecting");
     },
     onMessage: (message) => {
-      if (message.data.kind === "steer" && message.data.run_id === runId) {
-        messageRead(message.data.data.text);
-      }
-      timeline.push(message.data);
-      if (message.data.kind === "tool_result" && CHANGING_TOOLS.has(message.data.data.tool)) {
-        refreshChanges();
-      }
-      if (message.data.run_id !== runId && RUN_ENDS.has(message.data.kind)) {
-        agentsChanged();
-        paintCapsule();
-      }
-      // A delegated run's row says how long it has worked as soon as its events are in, not at the next second.
-      if (active) {
-        timeline.tick(Date.now() / 1000);
-      }
+      kept.messages.push(message);
+      take(message);
     },
-  }).catch((error) => {
+  })).catch((error) => {
     if (signal.aborted) {
       return;
     }
@@ -1511,9 +1540,17 @@ export function mount(root, ctx) {
   const controller = new AbortController();
   let stopRun = () => undefined;
 
-  async function open() {
+  async function open(again = false) {
     stopRun();
     stopRun = () => undefined;
+    const kept = again ? undefined : keptRuns.get(runId);
+    if (kept !== undefined) {
+      // Drawn at once as it stood; what changed meanwhile comes on the stream, and the rest is read again below.
+      stopRun = showRun({ root, ctx, signal: controller.signal, detail: kept.detail, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept });
+      shown();
+      return;
+    }
+    keptRuns.delete(runId);
     root.replaceChildren(loadingPanel());
     let detail;
     try {
@@ -1538,7 +1575,8 @@ export function mount(root, ctx) {
     if (controller.signal.aborted) {
       return;
     }
-    stopRun = showRun({ root, ctx, signal: controller.signal, detail, history, historyProblem, reload: () => attempt(open) });
+    const fresh = { detail, history, messages: [] };
+    stopRun = showRun({ root, ctx, signal: controller.signal, detail, history, historyProblem, reload: () => attempt(() => open(true)), kept: fresh });
     shown();
   }
 

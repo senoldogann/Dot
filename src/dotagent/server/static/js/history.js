@@ -6,6 +6,7 @@ import { el, plural } from "./dom.js";
 import { icon } from "./icons.js";
 import { foldSteps } from "./layout.js";
 import { answerMessage, showMessageFiles, showMessagePicks, userMessage } from "./messages.js";
+import { pageCard } from "./pageframe.js";
 import { prose } from "./prose.js";
 import { countKinds, flowIcon, flowWords, toolRow } from "./tools.js";
 
@@ -156,6 +157,10 @@ function drawFlow(past, flow, asked, events) {
     } else if (event.kind === "steer") {
       batch = null;
       blocks.push({ steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } });
+    } else if (event.kind === "page_shown") {
+      // A page the run showed (`show_page`, item 193) stands where it came, in its frame, as on the run's own page.
+      batch = null;
+      blocks.push({ page: { id: event.data.page_id, title: event.data.title } });
     } else if (event.kind === "tool_call" && event.data.tool === FINISH_TOOL) {
       finishing.set(event.data.call_id, event.data.args);
     } else if (event.kind === "tool_call") {
@@ -185,7 +190,9 @@ function drawFlow(past, flow, asked, events) {
     }
   }
   const nodes = blocks.map((block) =>
-    block.steer !== undefined
+    block.page !== undefined
+      ? pageCard(block.page.id, block.page.title)
+      : block.steer !== undefined
       ? userMessage({ text: block.steer.text, sentAt: block.steer.sentAt, files: block.steer.files, editFromHere: null })
       : block.say === undefined
         ? stepsBlock(block)

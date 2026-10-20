@@ -157,17 +157,47 @@ export function foldCard({ id, title, actions, body, openByDefault }) {
 /**
  * A section of the run's side panel (item 203): a head with its title, a short line that sums it up
  * (`setSummary(...nodes)`) and `actions` at its right, over `body`, which is always open: the panel's tabs choose what
- * is in sight. Its body is `panel-${id}`. Returns the element and `setSummary`, as
- * `foldCard` does.
+ * is in sight. With `foldable` (item 426) the title is a button that folds the body away, the choice kept per browser
+ * under `dot.fold.panel.${id}` and open the first time. Its body is `panel-${id}`. Returns the element and
+ * `setSummary`, as `foldCard` does.
  */
-export function panelSection({ id, title, actions, body }) {
+export function panelSection({ id, title, actions, body, foldable = false }) {
   const summary = el("span", { class: "panel-summary" });
+  const content = el("div", { class: "panel-section-body", id: `panel-${id}` }, body);
+  if (!foldable) {
+    const element = el(
+      "section",
+      { class: "panel-section" },
+      el("div", { class: "panel-section-head" }, el("h3", { class: "panel-section-title" }, title), summary, actions ?? null),
+      content,
+    );
+    return { element, setSummary: (...nodes) => summary.replaceChildren(...nodes.filter((node) => node !== null)) };
+  }
+  // A foldable section: its title is a button that folds the body away, the choice kept per browser.
+  const state = foldState(`panel.${id}`, true);
+  const toggle = el(
+    "button",
+    { class: "fold-toggle panel-fold-toggle", type: "button", "aria-controls": content.id },
+    el("span", { class: "chev" }, icon("chevron")),
+    el("span", { class: "fold-title" }, title),
+  );
   const element = el(
     "section",
-    { class: "panel-section" },
-    el("div", { class: "panel-section-head" }, el("h3", { class: "panel-section-title" }, title), summary, actions ?? null),
-    el("div", { class: "panel-section-body", id: `panel-${id}` }, body),
+    { class: "panel-section panel-fold" },
+    el("div", { class: "panel-section-head" }, el("h3", { class: "panel-section-title" }, toggle), summary, actions ?? null),
+    content,
   );
+  function paint() {
+    const open = state.isOpen();
+    toggle.setAttribute("aria-expanded", String(open));
+    content.hidden = !open;
+    element.dataset.open = String(open);
+  }
+  toggle.addEventListener("click", () => {
+    state.flip();
+    paint();
+  });
+  paint();
   return { element, setSummary: (...nodes) => summary.replaceChildren(...nodes.filter((node) => node !== null)) };
 }
 

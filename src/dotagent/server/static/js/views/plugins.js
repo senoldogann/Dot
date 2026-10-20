@@ -11,7 +11,7 @@
 
 import { accountsCard } from "../accounts.js";
 import { api } from "../api.js";
-import { el, foldSearch, plural } from "../dom.js";
+import { clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog } from "../ui.js";
@@ -135,6 +135,62 @@ function serverGuide(server) {
     default:
       return null;
   }
+}
+
+/**
+ * The dialog that chooses the tools of an MCP server left out for offering too many (`offered`, of
+ * `GET /mcp/servers/{name}/offered`): a tick for each, those of its allow list ticked, at most `offered.limit`.
+ * Resolves to the names chosen, or null when the owner closed it.
+ */
+function toolsDialog(offered) {
+  return new Promise((resolve) => {
+    const ticks = [];
+    const dialog = el("dialog", { class: "modal import-dialog", "aria-labelledby": "tools-title" });
+    const go = el("button", { class: "btn primary", type: "button", onclick: () => dialog.close("ok") });
+    const cancel = el("button", { class: "btn", type: "button", onclick: () => dialog.close("cancel") }, "Cancel");
+    const count = el("span", { class: "hint" });
+    const chosen = new Set(offered.allow);
+
+    function paint() {
+      const picked = ticks.filter((tick) => tick.box.checked).length;
+      go.textContent = picked === 0 ? "Save" : `Save ${picked}`;
+      go.disabled = picked === 0 || picked > offered.limit;
+      count.textContent = `${picked} of at most ${offered.limit}`;
+      for (const tick of ticks) {
+        tick.box.disabled = !tick.box.checked && picked >= offered.limit;
+      }
+    }
+
+    const rows = offered.tools.map((tool) => {
+      const box = el("input", { type: "checkbox", checked: chosen.has(tool.name), onchange: paint });
+      ticks.push({ box, name: tool.name });
+      return el(
+        "label",
+        { class: "import-row" },
+        box,
+        el("span", { class: "import-row-main" }, el("span", { class: "import-row-name mono" }, tool.name), el("span", { class: "import-row-detail" }, clip(tool.description, 140))),
+      );
+    });
+    dialog.append(
+      el(
+        "div",
+        { class: "modal-body" },
+        el("h3", { id: "tools-title" }, `Choose the tools of ${offered.server}`),
+        el("p", { class: "muted" }, `It offers ${plural(offered.tools.length, "tool", "tools")}, more than Dot hands a model at once. The ones you tick are offered to the runs that start next.`),
+        count,
+        el("div", { class: "import-list" }, rows),
+      ),
+      el("div", { class: "modal-actions" }, cancel, go),
+    );
+    dialog.addEventListener("close", () => {
+      dialog.remove();
+      resolve(dialog.returnValue === "ok" ? ticks.filter((one) => one.box.checked).map((one) => one.name) : null);
+    });
+    paint();
+    document.body.append(dialog);
+    dialog.showModal();
+    go.focus();
+  });
 }
 
 export function mount(root, ctx) {
@@ -422,6 +478,9 @@ export function mount(root, ctx) {
       button.addEventListener("click", () => attempt(() => connectAgain(server)));
       actions.push(button);
     }
+    if (server.picks_tools && server.origin === "connected" && !working) {
+      actions.push(el("button", { class: "btn sm primary", type: "button", disabled: acting, onclick: () => attempt(() => chooseTools(server)) }, "Choose tools"));
+    }
     if (server.origin === "connected") {
       actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => remove(server, service)) }, "Remove"));
     }
@@ -492,6 +551,24 @@ export function mount(root, ctx) {
   function connectAgain(server) {
     return busyWith(`server:${server.name}`, async () => {
       await api.post(`/mcp/servers/${encodeURIComponent(server.name)}/connect`, { origin: location.origin });
+      await refreshServers();
+    });
+  }
+
+  /** Choose the tools of `server`, left out for offering too many: they become its allow list, and Dot connects it
+   * again with them. */
+  async function chooseTools(server) {
+    const path = `/mcp/servers/${encodeURIComponent(server.name)}`;
+    let offered = null;
+    await busyWith(`server:${server.name}`, async () => {
+      offered = await api.get(`${path}/offered`);
+    });
+    const tools = disposed || offered === null ? null : await toolsDialog(offered);
+    if (tools === null) {
+      return;
+    }
+    await busyWith(`server:${server.name}`, async () => {
+      await api.put(`${path}/allow`, { tools });
       await refreshServers();
     });
   }

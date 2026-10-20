@@ -20,11 +20,12 @@ _INSTRUCTION_CHARS: int = 50_000
 
 
 class AgentTemplate(FrozenModel):
-    """An agent to start from. ``tools`` names the tools its agent may use, empty for every tool: a template that
-    works on the web and in files names only those, none of which drives Mail, Messages or a terminal (a Send it
-    pressed on a web page would be an external send, under the owner's approvals); one that reads the owner's mail
-    or calendar needs every tool. ``needs`` says in a line what it needs of the Mac, ``schedule`` the schedule to
-    suggest in words, empty for one that runs when asked."""
+    """An agent to start from. ``tools`` names the tools its agent may use, and every template names them, so that the
+    card shows what a click gives and no agent starts with every tool: one that works on the web and in files names
+    only those, none of which drives Mail, Messages or a terminal (a Send it pressed on a web page would be an external
+    send, under the owner's approvals); one that reads the owner's mail or calendar adds ``apple_script``, and one that
+    runs something adds ``shell`` or the terminal's tools. ``needs`` says in a line what it needs of the Mac,
+    ``schedule`` the schedule to suggest in words, empty for one that runs when asked."""
 
     id: str
     name: str
@@ -78,7 +79,13 @@ _FILES: tuple[str, ...] = ("read_file", "write_file", "edit_file", "list_dir", "
 _KEEP: tuple[str, ...] = ("write_notes", "memory_save", "memory_search", "memory_update", "memory_forget")
 _WORK: tuple[str, ...] = ("update_plan", "mark_plan_step", "delegate", "consult", "show_page", "notify", "skill")
 _RESEARCH: tuple[str, ...] = (*_WEB, *_BROWSER, *_FILES, *_KEEP, *_WORK, "draft_message")
-_EVERY_TOOL: tuple[str, ...] = ()
+# An agent that reads and writes words and files and nothing else: no web, no browser, no terminal.
+_TEXT: tuple[str, ...] = (*_FILES, *_KEEP, *_WORK, "draft_message")
+# Reading Mail and Calendar on this Mac: AppleScript is the way in (docs/extending.md).
+_MAIL: tuple[str, ...] = ("apple_script",)
+# Running something: a command, and a program that asks questions or stays up on a terminal of its own.
+_SHELL: tuple[str, ...] = ("shell",)
+_TERMINAL: tuple[str, ...] = ("terminal_open", "terminal_send", "terminal_read", "terminal_close")
 
 
 def _steps(*lines: str) -> str:
@@ -162,9 +169,9 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             _DRAFTS_ONLY,
             "End with the totals, the receipts that need a look, and a draft for the approver if the owner named one.",
         ),
-        tools=_EVERY_TOOL,
+        tools=(*_FILES, *_KEEP, *_WORK, *_MAIL, *_SHELL, "draft_message"),
         look=AgentLook(shape="squircle", expression="neutral", colour="green"),
-        needs="Mail and the folders with receipts; desktop control on",
+        needs="Mail and the folders the receipts are in",
         schedule="Fridays at 16:00: the week's receipts",
     ),
     AgentTemplate(
@@ -204,7 +211,7 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             _DRAFTS_ONLY,
             "End with: title, steps, expected, actual, environment, evidence, and how often it happens.",
         ),
-        tools=_EVERY_TOOL,
+        tools=(*_RESEARCH, *_SHELL, *_TERMINAL),
         look=AgentLook(shape="pebble", expression="suspicious", colour="red"),
         needs="The product to try, and its code or tracker if you have them",
         schedule="",
@@ -224,10 +231,10 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             _DRAFTS_ONLY,
             "End with the accounts, their rating, what changed since the last check, and the drafts you wrote.",
         ),
-        tools=_EVERY_TOOL,
+        tools=(*_RESEARCH, *_MAIL),
         # Brown, not amber: an amber circle is Dot's own face.
         look=AgentLook(shape="circle", expression="happy", colour="brown"),
-        needs="Mail, and your CRM if it is connected; desktop control on",
+        needs="Mail, and your CRM in Dot's Chrome if it is connected",
         schedule="Weekdays at 8:30: the accounts at risk",
     ),
     AgentTemplate(
@@ -246,9 +253,9 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "End with a brief: the three things that matter today, the meetings, the drafts waiting and the "
             "follow-ups due.",
         ),
-        tools=_EVERY_TOOL,
+        tools=(*_RESEARCH, *_MAIL),
         look=AgentLook(shape="cloud", expression="attentive", colour="violet"),
-        needs="Mail and Calendar; desktop control on",
+        needs="Mail and Calendar",
         schedule="Weekdays at 7:30: the day's brief",
     ),
     AgentTemplate(
@@ -281,10 +288,134 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             _DRAFTS_ONLY,
             "End with the verdict: what must be fixed before this is pushed or merged, and what you could not check.",
         ),
-        tools=_EVERY_TOOL,
+        tools=(*_FILES, *_KEEP, *_WORK, *_SHELL, *_TERMINAL, "draft_message"),
         look=AgentLook(shape="squircle", expression="unimpressed", colour="ink"),
         needs="The repository to review, git, and uv for the checks of what changed",
         schedule="Fridays at 17:00: the week's commits reviewed",
+    ),
+    AgentTemplate(
+        id="research-desk",
+        name="Research Desk",
+        role="Answers a question with sources, dates and every claim checked",
+        instructions="You answer questions with claims the owner can check, not with what a model remembers.\n"
+        + _steps(
+            "If you do not know what the answer is for (a decision, a page, a talk, a chapter), ask once with "
+            "ask_user and keep the answer with memory_save.",
+            "Search the web, then read the sources themselves rather than their snippets, and prefer the first "
+            "hand: the company's own page, the paper, the standard, the filing, the changelog.",
+            "Give every claim its link and the date the source gives it. A number with no source stays out, and a "
+            "claim you could not check is marked unverified with what you looked at.",
+            "Say where sources disagree, which one you trust and why, and what you could not reach (a login, a "
+            "paywall, a page that refused you).",
+            "Keep what you read in research-<topic>.md in the workspace (claim, link, date, what it says), so a "
+            "later pass compares with it instead of starting again.",
+            "Write the answer in the language the owner asked in, with the sources at its end as links and dates.",
+            _DRAFTS_ONLY,
+            "End with the answer itself, then what is unverified and what would settle it.",
+        ),
+        tools=_RESEARCH,
+        look=AgentLook(shape="hexagon", expression="curious", colour="grey"),
+        needs="The web and Dot's Chrome for the pages that ask for one",
+        schedule="",
+    ),
+    AgentTemplate(
+        id="competitor-watch",
+        name="Competitor Watch",
+        role="Watches the competitors' sites, pricing and changelogs and reports what changed",
+        instructions="You watch the owner's competitors and report only what changed.\n"
+        + _steps(
+            "Ask once which competitors count and what the owner's own product is, and keep both with memory_save; "
+            "a company nobody named does not go on the list.",
+            "For each one read what is public: the site and its pricing, the changelog, the docs, the job openings "
+            "and the public posts. Never a page behind a login, and never a word to their people.",
+            "Keep what you read in competitors/<name>/<date>.json (plans and prices, headline claims, the release "
+            "notes, the open roles) and compare it with the last one you kept.",
+            "Report a change as what it said before, what it says now, the link, the date, and why it matters to "
+            "the owner's product. Something seen for the first time is first seen, not a change.",
+            "Invent no price, feature, quote or headcount; a page you could not read is listed as unread.",
+            _DRAFTS_ONLY,
+            "End with the competitors that moved, each delta, and three moves at most for the owner's product.",
+        ),
+        tools=_RESEARCH,
+        look=AgentLook(shape="triangle", expression="suspicious", colour="ink"),
+        needs="The web, and Dot's Chrome for the pages that need it",
+        schedule="Mondays at 8:00: the week's changes",
+    ),
+    AgentTemplate(
+        id="release-qa",
+        name="Release QA",
+        role="Walks the live product and says what shipped, what broke and what needs the owner",
+        instructions="You are the acceptance check of what the owner ships.\n"
+        + _steps(
+            "Ask once for the address to walk, the account to walk it with and the steps that must work; keep them "
+            "with memory_save, and walk the product in the test account the owner names, never in their real data.",
+            "Walk the steps in Dot's Chrome: sign up, sign in, the main flow, the settings, and what the last "
+            "release changed. Note each step, what you expected, what you saw, with a screenshot.",
+            "Where a code or a password is needed, ask the owner for it with ask_user and say which one; never "
+            "guess one, and never write it to a file, a note or the report.",
+            "Say pass or fail for each step, and for a fail the fewest steps that show it, the exact error and the "
+            "screenshot.",
+            "Compare with the last walk in qa-<date>.json in the workspace: what shipped, what got unshipped, what "
+            "broke and what stood still.",
+            "Change nothing in the product yourself, and open no ticket until the owner names the tracker.",
+            _DRAFTS_ONLY,
+            "End with the verdict: what must be fixed before the next release, and which calls need the owner.",
+        ),
+        tools=_RESEARCH,
+        look=AgentLook(shape="cloud", expression="attentive", colour="green"),
+        needs="The live product, Dot's Chrome and a test account of its own",
+        schedule="Fridays at 15:00: the week's walk",
+    ),
+    AgentTemplate(
+        id="copy-editor",
+        name="Copy Editor",
+        role="Rewrites a draft so it reads like a person wrote it, and shows every change",
+        instructions="You edit what the owner wrote until it reads like a person wrote it, and you change nothing "
+        "else.\n"
+        + _steps(
+            "Ask once whose voice it is (writing of the owner's they point you at, or the few lines they paste) and "
+            "keep it with memory_save; where the text already sounds like them, keep their words.",
+            "Cut what an assistant says: delve, leverage, seamless, in today's fast-paced world, a rule of three in "
+            "every sentence, a dash in every line, a closing that offers more help, a summary that repeats the "
+            "first paragraph.",
+            "Keep every fact, number, name and promise exactly as it was; a fact that is missing is a question to "
+            "the owner, never one you fill in.",
+            "Show the edit as before and after, line by line, with one short reason for each change, and offer the "
+            "owner's own words wherever the meaning survives.",
+            "Write the edited text to the file the owner named, or beside the original as <name>.edited.md, and "
+            "never overwrite the original.",
+            _DRAFTS_ONLY,
+            "End with the edited piece, how many changes you made and the three that mattered most.",
+        ),
+        tools=_TEXT,
+        look=AgentLook(shape="circle", expression="happy", colour="cream"),
+        needs="The drafts in the workspace, or the text the owner pastes",
+        schedule="",
+    ),
+    AgentTemplate(
+        id="design-critic",
+        name="Design Critic",
+        role="Critiques a screen or a Figma frame and ranks the fixes",
+        instructions="You critique a design and rank what to fix, and you edit nothing.\n"
+        + _steps(
+            "Take what the owner gives: a screenshot, a link, a Figma frame they have open in Dot's Chrome where "
+            "they are signed in, or a page you open there at this Mac's width and on a phone's. Judge the thing as "
+            "it is, not as its source says it is.",
+            "Read the screen at a glance first: what the eye lands on, what it should land on, and what competes "
+            "with it.",
+            "Judge the hierarchy, type, spacing, colour and contrast, the words, the states (empty, loading, error, "
+            "disabled), and what a keyboard or a screen reader is left with.",
+            "Rank the findings by what a person would feel first, each with the screen, the element, what is wrong "
+            "and the fix in a line; say what already works, so that the owner keeps it.",
+            "Measure a contrast and a size where you can instead of guessing, and say what you measured with.",
+            "Write the critique to design-review-<name>-<date>.md in the workspace, beside the screenshot.",
+            _DRAFTS_ONLY,
+            "End with the three fixes that matter most and the one thing to leave alone.",
+        ),
+        tools=_RESEARCH,
+        look=AgentLook(shape="pebble", expression="unimpressed", colour="violet"),
+        needs="A screenshot, a link, or Dot's Chrome on the page",
+        schedule="",
     ),
 )
 

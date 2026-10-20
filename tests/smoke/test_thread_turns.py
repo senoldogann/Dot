@@ -341,3 +341,64 @@ async def test_an_earlier_turn_says_what_failed_and_shows_a_finish_that_was_refu
             await page.context.close()
         finally:
             await browser.close()
+
+
+async def test_an_earlier_turn_keeps_the_page_its_run_showed(
+    runtime: Runtime, thread: tuple[str, list[RunRecord]], tmp_path: Path
+) -> None:
+    """A page a run showed (``show_page``, item 193) stays in its turn once the chat has gone on: the turn draws it from
+    the run's ``page_shown`` event, in its frame with its title and the way to open it. Its events are seeded."""
+    address, runs = thread
+    first: RunRecord = runs[0]
+    shown = await runtime.store.add_shown_page(first.id, "Tide chart", "<p>High water at noon.</p>")
+    await runtime.store.add_event(first.id, "page_shown", {"page_id": shown.id, "title": shown.title})
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"{address}/#/runs/{runs[-1].id}")
+            turn: Locator = page.locator(".history .turn").first
+            card: Locator = turn.locator(".turn-ops figure.shown-page")
+            await expect(card).to_have_count(1, timeout=15000)
+            await expect(card.locator(".shown-page-title")).to_have_text("Tide chart")
+            await expect(card.locator("iframe.shown-page-frame")).to_have_count(1)
+            await page.screenshot(path=str(tmp_path / "chat-shown-page-turn.png"))
+            await page.context.close()
+        finally:
+            await browser.close()
+
+
+async def test_a_run_opened_again_is_drawn_at_once_from_what_the_page_read_without_reading_its_stream_again(
+    runtime: Runtime, thread: tuple[str, list[RunRecord]], tmp_path: Path
+) -> None:
+    """Leaving a run's page for another (a delegated run's, say) and coming back draws the run as it stood at once: its
+    calls are there without the stream being read again from its start, which emptied the page for seconds."""
+    address, runs = thread
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, color_scheme="light")
+            await page.add_init_script(
+                "sessionStorage.setItem('dot.opened', '1'); localStorage.setItem('dot.foldSteps', 'off')"
+            )
+            streams: list[str] = []
+            page.on("request", lambda request: streams.append(request.url) if "/stream" in request.url else None)
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"{address}/#/runs/{runs[0].id}")
+            calls: Locator = page.locator(".tool-name")
+            await expect(calls.first).to_be_visible(timeout=15000)
+            count: int = await calls.count()
+            opened: int = len([url for url in streams if f"/runs/{runs[0].id}/stream" in url])
+            await page.goto(f"{address}/#/agents")
+            await expect(page.locator(".agent-row").first).to_be_visible()
+            await page.go_back()
+            await expect(calls).to_have_count(count, timeout=500)
+            assert len([url for url in streams if f"/runs/{runs[0].id}/stream" in url]) == opened, streams
+            await page.screenshot(path=str(tmp_path / "chat-opened-again.png"))
+            await page.context.close()
+        finally:
+            await browser.close()

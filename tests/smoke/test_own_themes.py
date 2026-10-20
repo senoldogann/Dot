@@ -30,7 +30,7 @@ from dotagent.server.links import ui_url
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "own-themes-test-token"
-_BUILT_IN: int = 8
+_BUILT_IN: int = 14
 # A VS Code colour theme as an extension ships one: a slug for a name, workbench colours, token colours.
 _VSCODE: dict[str, object] = {
     "name": "harbour-night",

@@ -288,13 +288,17 @@ actions, the agents of the chat and the latest screenshots. Each tab wears its i
 every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
 the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
 provider's mark, model and state, what it does now (or did last, from the conversation on the page) and how long it
-took, and a row opens its page (item 296). It stays closed until the panel button in the head of the run opens it (the
+took, and a row opens its page (item 296); the pointer at rest on a row, or the focus on it, shows the helper's card as
+the conversation's rows do, with its whole goal, and a phone has none (item 426). It stays closed until the panel button in the head of the run opens it (the
 choice is kept in the browser); open, it sits beside the conversation from 960 px, is a drawer below that, and on a
 phone a sheet that rises from the foot (item 296). The run's head is the top bar itself: Dot's face and name on the
 left, the panel button on the right; the bar is solid with a hairline under it, so nothing scrolls under a blur, the
 panel stays in place under it, and the box stays at the bottom. Every other page names itself in the same bar (Agents,
 Campaigns, Settings) and opens with one line of description. A live run's page opens at its end, where its next words
-come, and stays there as the earlier turns fill in above (item 403).
+come, and stays there as the earlier turns fill in above (item 403). The six runs opened last are kept while the page
+lives, so that coming back to one (from a delegated run's page, say) draws it at once as it stood and follows its stream
+on from the last message read, not from the first; what the lessons, the questions and the cost show is read again
+(item 426).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
@@ -304,7 +308,8 @@ chat's runs wrote or created with `write_file` and `edit_file`, up to this run, 
 became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;
 `GET /api/runs/{id}/changes`, item 368), **Plan** (its steps; the tab says how many are done), **Agents** (the agents
 of the chat) and **Screen** (Dot's computer and the screenshots, which the tab counts). A tab shows its sections open,
-on hairlines; the arrow keys, Home and End move between the tabs, and the tab chosen last is kept in the browser
+on hairlines, except Screenshots on the Screen tab, which folds away from its title and stays folded in this browser
+(`dot.fold.panel.run-screen`, item 426); the arrow keys, Home and End move between the tabs, and the tab chosen last is kept in the browser
 (`dot.panelTab`). Beside the conversation the panel slides in as it is shown and out before it hides, the conversation
 taking its room back once the slide is over, at once under reduced motion (item 220). It stands at the window's right
 edge, as far from it as from the top bar, and the conversation keeps its reading width in the room the panel leaves it
@@ -399,12 +404,15 @@ are under, not the page itself.
 
 Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards, each a miniature of Dot's
 window drawn in the scheme it names: System (the default, split down the middle), Light and Dark; ⇧⌥⌘A steps through
-them. **Themes** is a gallery of cards with a light and a dark orb each: the card takes its theme for both schemes, an
-orb for its own scheme only (a sun or a moon marks the picks), so light can wear one theme and dark another. Dot's two
+them. **Themes** is one strip of cards that slides sideways (a mouse drags it, a touch and a trackpad scroll it, the
+arrow keys, Home and End move from card to card, and it opens on the theme in use), each with a light and a dark orb:
+the card takes its theme for both schemes, an orb for its own scheme only (a sun or a moon marks the picks), so light
+can wear one theme and dark another. Dot's two
 looks are **Neutral** (warm grey and ink, round and quiet; the default) and **Paper** (warm paper tones with a serif
-heading and a terracotta accent), whose serif voice follows the scheme it is picked for; Dot's six palettes are
+heading and a terracotta accent), whose serif voice follows the scheme it is picked for; Dot's twelve palettes are
 **Clean** (near-white, grey and a blue accent), **Rose** (blush whites and a raspberry accent), **Grove**, **Ocean**,
-**Ember** and **Iris**. A palette's colours are mapped onto Dot's tokens (the colour a palette paints its solid controls
+**Ember**, **Iris**, **Midnight**, **Nord**, **Solarized**, **Sepia**, **Forest** and **Contrast** (item 426; the
+names of all fourteen themes are taken, so a theme of your own cannot be saved under one). A palette's colours are mapped onto Dot's tokens (the colour a palette paints its solid controls
 with is Dot's accent) and held to the rule of the looks below: a text tier or an ink that would read under its ratio is
 moved in lightness until it reads, and in dark a card lies a step above the page; a browser test measures every theme in
 both schemes as the page paints it. The two picks are written on the page as `light-dark()` pairs (nothing when one look
@@ -609,7 +617,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
 | `GET /connections`, `POST /connections/{id}`                                    | the applications of Customize › Plugins, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
-| `GET\|POST /mcp/servers` (`secrets` by name for a service that takes a key, item 408), `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`, `logo`) and the services to add (`kind`, `secrets`, `logo`); add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there (409 for one set up elsewhere) |
+| `GET\|POST /mcp/servers` (`secrets` by name for a service that takes a key, item 408), `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`, `logo`, `picks_tools`) and the services to add (`kind`, `secrets`, `logo`); add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there (409 for one set up elsewhere) |
+| `GET /mcp/servers/{name}/offered`, `PUT /mcp/servers/{name}/allow` (`{"tools": [...]}`) (item 426) | for a server added on the page (409 for one set up elsewhere, 404 for one that is not there): every tool it lists with what it says it does, and the limit of 30; then the tools to offer, 1 to 30 of the names it lists (422 otherwise, nothing changed), connected first and kept with the server after, so a server that does not answer leaves the choice unwritten and a restart offers the same ones. The page offers the choice when `picks_tools` is true: the server was left out for offering more tools than the model gets at once, also after its first try failed; the endpoint itself also changes the allow list of a server that is ready |
 | `GET /accounts`, `POST /accounts/{provider}/start`, `DELETE /accounts/{provider}/{address}` | the accounts of Google and Microsoft signed in through their own sign-ins and whether the client you registered with each is saved (item 422); start a sign-in, only from this Mac's own address (the provider's page to open; 422 when the client is not saved); sign an account out |
 | `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state`, an account's of Google or Microsoft first, else an MCP server's (400 for none, and for an account's that waited more than 10 minutes) |
 | `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |

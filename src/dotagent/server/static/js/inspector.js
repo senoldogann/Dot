@@ -56,6 +56,7 @@ export function createInspector({ layout, tabs, screensIn, onFile }) {
   const screens = panelSection({
     id: "run-screen",
     title: "Screenshots",
+    foldable: true,
     actions: caption,
     body: el("div", { class: "stack tight" }, empty, preview, strip),
   }).element;
