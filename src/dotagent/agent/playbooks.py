@@ -888,7 +888,8 @@ async def learn_playbook(runtime: "Runtime", run: RunRecord, status: RunStatus) 
         file, name, updated = await _write_from(runtime, run, steps, host, tainted)
     except (DotError, OSError) as error:
         message: str = error.message if isinstance(error, DotError) else str(error)
-        log.warning("playbook_failed", run_id=run.id, host=host, error=message)
+        context: dict[str, JsonValue] = error.context if isinstance(error, DotError) else {}
+        log.warning("playbook_failed", run_id=run.id, host=host, error=message, context=context)
         said: str = f"The skill could not be written: {shorten_reason(message)}"
         await runtime.bus.emit(run.id, PLAYBOOK_FAILED, {"host": host, "error": said}, True)
         return failed_with(said)

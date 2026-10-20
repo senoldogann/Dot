@@ -48,7 +48,8 @@ is the answer (a small model that is offered both writes the call out as text).
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
   ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
-  it). The `compacted` event names the model,
+  it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
+  `compacted` event names the model,
   how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
   and after it (`tokens_before`, `tokens_after`).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
@@ -295,9 +296,11 @@ HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Do
 Dot's own with a visible window (its bot check runs there and passes; a headless Chrome is shown a CAPTCHA, measured
 2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds, SearXNG and the
 Anthropic rung 2 minutes) and the searches of that time skip it at once; the same query within 10 minutes is answered
-from memory. The first line of a result names the engine that answered, every rung skipped with its reason, and the age
-of a remembered answer. Bing is not a rung: without a session its page answers some queries with the results of another
-query. `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web]
+from memory. The first line of a result names the engine that answered, every rung skipped with its reason (for an
+engine that answered with an error: the HTTP status and the start of what it said, secrets masked, so an engine that is
+down reads differently from one out of credit; the log's `search_engine_failed` and `search_engine_benched` carry the
+whole context), and the age of a remembered answer. Bing is not a rung: without a session its page answers some queries
+with the results of another query. `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web]
 allow_private_hosts` is set. A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's
 refusal) or shows little text without JavaScript is read in the run's Chrome, in a tab the owner does not work in that
 closes after the read: a scratch tab of Dot's own Chrome, or a tab opened behind the owner's in the owner's attached
