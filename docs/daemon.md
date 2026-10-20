@@ -562,9 +562,10 @@ dotx service uninstall   # stop the daemon and remove the job
   of `daemon`: a setting this version of Dot does not know, a daemon already running, an address taken), and
   `service status`, when the daemon does not answer, shows the failure that ended the latest `dotx daemon` unless a
   start that went well came after it. Without such a failure, read `daemon.err.log`.
-- `dotx service restart` restarts the daemon without touching the job (item 441): `launchctl kickstart -k` kills the
-  process that runs and launchd starts the job at once, and the command waits up to 60 seconds for a new process to
-  answer `GET /api/health`, then prints its version. It is the way to take up a change of Dot's code, of `config.toml`
+- `dotx service restart` restarts the daemon without changing the job (item 441): the job is unloaded (`bootout`
+  sends the daemon SIGTERM, so it stops as it does at the end of a session, and launchctl waits until it has exited) and
+  loaded again from its property list, and the command waits up to 60 seconds for a new process to answer
+  `GET /api/health`, then prints its version. It is the way to take up a change of Dot's code, of `config.toml`
   or of a key; `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at
   work are cut off, and the daemon's next start resumes them as `[agent] resume` says. When launchd has no job of the
   service, the command says so and names `service install`.
@@ -577,9 +578,9 @@ dotx service uninstall   # stop the daemon and remove the job
   works too), then restarts the daemon as `service restart` does, waits for the health check, writes what it did to
   `dotx.log` (`restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` after 2 hours without a restart, `_failed`),
   unloads itself and deletes its property list. Asking again replaces the one that waits, so there is never more than
-  one; `service status` shows a `restart` line that says whether one waits. A job that a run made with `launchctl
-  submit` is started again by launchd each time its script exits, which restarted the daemon every 30 seconds for as
-  long as no run worked (312 starts in one log).
+  one; `service status` shows a `restart` line that says whether one waits, and `service uninstall` cancels it. A job
+  that a run made with `launchctl submit` is started again by launchd each time its script exits, which restarted the
+  daemon every 30 seconds for as long as no run worked (312 starts in one log).
 - The job runs **Dot.app** (item 288), a small app in Dot's home (`~/Library/Application Support/Dot/Dot.app`) whose
   program starts the daemon's Python and waits for it. macOS holds the program launchd starts responsible for all it
   starts, so its questions and System Settings name **Dot**, and Accessibility (it covers posting input events),

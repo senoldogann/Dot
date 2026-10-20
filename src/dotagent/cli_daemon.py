@@ -41,14 +41,15 @@ from dotagent.launchd import (
     ServiceStatus,
     build_launch_agent,
     build_restart_job,
+    cancel_restart_job,
     inspect_job,
     inspect_restart_job,
     install_job,
     install_restart_job,
-    kickstart_job,
     launch_agent_path,
     render_launch_agent,
     render_restart_job,
+    restart_job,
     restart_job_path,
     service_status,
     uninstall_job,
@@ -153,7 +154,7 @@ async def prove_daemon(client: httpx.AsyncClient, host: str, port: int, token: s
                 "status": response.status_code,
                 "body": _clip(response.text, _BODY_CHARS),
                 "fix": f"{_listener_fix(port)}; a Dot daemon of an older version answers so too, and "
-                "'dotx service install' restarts it",
+                "'dotx service restart' restarts it",
             },
         ) from exc
     if not hmac.compare_digest(answer.proof.encode("utf-8"), daemon_proof(token, nonce).encode("ascii")):
@@ -333,9 +334,10 @@ def _not_installed(uid: int) -> ServiceError:
     )
 
 
-async def restart_service(uid: int, url: str) -> HealthView:
-    """Restart the daemon now (``launchctl kickstart -k`` of its job, which kills the process that runs) and wait until
-    a new process answers the health check at ``url``: the answer of the process that was killed does not count.
+async def restart_service(plist: Path, uid: int, url: str) -> HealthView:
+    """Restart the daemon now (its job unloaded and loaded again from ``plist``, :func:`restart_job`, so the daemon ends
+    as at a stop) and wait until a new process answers the health check at ``url``: the answer of the process that ran
+    before does not count.
 
     Raises :class:`ServiceError` when launchd has no job of the service (it is not installed), when launchctl refuses
     the restart, and when no new process answers within :data:`_START_WAIT_S`.
@@ -344,7 +346,7 @@ async def restart_service(uid: int, url: str) -> HealthView:
     if before is None:
         raise _not_installed(uid)
     began: datetime = datetime.now()
-    await kickstart_job(uid)
+    await restart_job(plist, uid)
     deadline: float = time.monotonic() + _START_WAIT_S
     while True:
         job: JobState | None = await inspect_job(uid)
@@ -360,7 +362,7 @@ async def restart_service(uid: int, url: str) -> HealthView:
 async def cmd_service_restart(command: ServiceRestartCommand) -> int:
     config: AppConfig = load_user_config()
     url: str = health_url(config.server.host, config.server.port)
-    health: HealthView = await restart_service(os.getuid(), url)
+    health: HealthView = await restart_service(_plist_path(), os.getuid(), url)
     sys.stdout.write(
         f"Restarted the daemon of the launchd job {LABEL}: it answers at "
         f"{base_url(config.server.host, config.server.port)} (version {health.version}). "
@@ -414,14 +416,14 @@ def _steps(pane: Pane) -> str:
                 "program on in the list (Touch ID or password). If it is not in the list, press +, then Cmd+Shift+G, "
                 "paste with Cmd+V (the path of the program is on your clipboard), press Return and choose Open. "
                 "Input events follow this switch. A running service keeps what it had when it started: then run "
-                "'dotx service install' to restart it and this command again for the next permission."
+                "'dotx service restart' to restart it and this command again for the next permission."
             )
         case "screen_recording":
             return (
                 "Switch the program on in the pane that just opened (Touch ID or password). If it is not in the "
                 "list, press +, press Cmd+Shift+G, paste with Cmd+V (the path of the program is on your clipboard), "
                 "press Return, choose Open, and switch it on. It takes effect only for a program "
-                "that starts afterwards: run 'dotx service install' to restart the service, then "
+                "that starts afterwards: run 'dotx service restart' to restart the service, then "
                 "'dotx service permissions' to see all three granted."
             )
         case "input_monitoring" | "automation" | "full_disk_access":
@@ -473,6 +475,9 @@ async def cmd_service_permissions(command: ServicePermissionsCommand) -> int:
 
 
 async def cmd_service_uninstall(command: ServiceUninstallCommand) -> int:
+    # A restart that waits would find no job to restart: it goes with the service.
+    if await cancel_restart_job(restart_job_path(dot_home()), os.getuid()):
+        sys.stdout.write(f"Cancelled the restart that waited for the runs to end ({RESTART_LABEL}).\n")
     removal: Removal = await uninstall_job(_plist_path(), os.getuid())
     if not removal.was_loaded and not removal.file_removed:
         sys.stdout.write(f"The launchd job {LABEL} was not installed; nothing to remove.\n")

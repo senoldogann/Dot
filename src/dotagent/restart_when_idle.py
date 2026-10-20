@@ -27,7 +27,13 @@ from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import DotError, ServiceError
 from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.paths import db_path, dot_home, ensure_layout, log_dir
-from dotagent.launchd import RESTART_POLL_S, RESTART_WAIT_LIMIT_S, release_restart_job, restart_job_path
+from dotagent.launchd import (
+    RESTART_POLL_S,
+    RESTART_WAIT_LIMIT_S,
+    launch_agent_path,
+    release_restart_job,
+    restart_job_path,
+)
 from dotagent.server.links import health_url
 from dotagent.server.views import HealthView
 from dotagent.store.models import WORKING_STATUSES
@@ -93,7 +99,9 @@ async def wait_and_restart(database: Path, uid: int) -> int:
     log.info("restart_when_idle_idle", waited_s=waited_s)
     # The address is read now, not when the job was loaded: the configuration may have changed while it waited.
     config: AppConfig = load_user_config()
-    health: HealthView = await restart_service(uid, health_url(config.server.host, config.server.port))
+    health: HealthView = await restart_service(
+        launch_agent_path(Path.home()), uid, health_url(config.server.host, config.server.port)
+    )
     log.info("restart_when_idle_restarted", waited_s=waited_s, version=health.version)
     return 0
 

@@ -28,11 +28,13 @@ from dotagent.launchd import (
     JobState,
     RestartJob,
     build_restart_job,
+    cancel_restart_job,
     inspect_restart_job,
     install_restart_job,
-    kickstart_job,
+    launch_agent_path,
     release_restart_job,
     render_restart_job,
+    restart_job,
     restart_job_path,
 )
 from dotagent.restart_when_idle import count_working_runs, wait_until_idle
@@ -163,10 +165,11 @@ def launchctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """A stand-in for launchctl, which the launchd module runs in its place: it writes each call into ``calls`` of the
     returned directory and keeps each job it loads in a file of its own, ``loaded-gui_501_<label>``, which holds the
     property list the job was loaded from (a job that was never loaded is not described: exit code 113). Every job
-    runs as pid 77, and a job that is kicked runs as pid 78 from then on."""
+    runs as the pid of the last load, 77 at first and one more at each load."""
     state: Path = tmp_path / "launchd"
     state.mkdir()
     (state / "printed").write_text("gui/501/job = {\n\tstate = running\n\tpid = 77\n}\n", encoding="utf-8")
+    (state / "pid").write_text("77\n", encoding="utf-8")
     script: Path = state / "launchctl"
     script.write_text(
         "#!/bin/sh\n"
@@ -176,8 +179,8 @@ def launchctl(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
         'case "$1" in\n'
         'print) [ -f "$(key "$2")" ] || exit 113; cat printed ;;\n'
         'bootout) rm -f "$(key "$2")" ;;\n'
-        'bootstrap) cp "$3" "$(key "$2/$(basename "$3" .plist)")" ;;\n'
-        "kickstart) printf 'gui/501/job = {\\n\\tstate = running\\n\\tpid = 78\\n}\\n' > printed ;;\n"
+        'bootstrap) cp "$3" "$(key "$2/$(basename "$3" .plist)")" || exit 5; n=$(( $(cat pid) + 1 )); echo "$n" > pid;'
+        " printf 'gui/501/job = {\\n\\tstate = running\\n\\tpid = %s\\n}\\n' \"$n\" > printed ;;\n"
         "*) exit 64 ;;\n"
         "esac\n",
         encoding="utf-8",
@@ -194,6 +197,14 @@ def _read(path: Path) -> bytes | None:
 def _loaded(state: Path, label: str) -> bytes | None:
     """The property list the stand-in loaded the job ``label`` from, ``None`` when it is not loaded."""
     return _read(state / f"loaded-gui_{UID}_{label}")
+
+
+def _daemon_plist(folder: Path) -> Path:
+    """The property list of the daemon's job, written into ``folder``."""
+    folder.mkdir(parents=True, exist_ok=True)
+    plist: Path = folder / f"{LABEL}.plist"
+    plist.write_bytes(b"<plist>the daemon</plist>\n")
+    return plist
 
 
 def _load_the_daemons_job(state: Path) -> None:
@@ -224,7 +235,8 @@ async def test_asking_again_replaces_the_restart_that_waits_so_that_there_is_one
         f"print {target}",
         f"bootstrap gui/{UID} {plist}",
     ]
-    assert await inspect_restart_job(UID) == JobState(state="running", pid=77, runs=None, last_exit=None)
+    waiting: JobState | None = await inspect_restart_job(UID)
+    assert waiting is not None and waiting.state == "running"
 
 
 async def test_the_restart_unloads_its_own_job_and_deletes_its_property_list(tmp_path: Path, launchctl: Path) -> None:
@@ -236,9 +248,16 @@ async def test_the_restart_unloads_its_own_job_and_deletes_its_property_list(tmp
     assert await inspect_restart_job(UID) is None
 
 
-async def test_the_restart_now_kicks_the_job_of_the_daemon(launchctl: Path) -> None:
-    await kickstart_job(UID)
-    assert _calls(launchctl) == [f"kickstart -k gui/{UID}/{LABEL}"]
+async def test_the_restart_now_unloads_the_job_of_the_daemon_and_loads_it_again(
+    tmp_path: Path, launchctl: Path
+) -> None:
+    """A restart is a stop and a start (bootout sends SIGTERM), not a kill, so the daemon ends as at a stop."""
+    plist: Path = _daemon_plist(tmp_path)
+    _load_the_daemons_job(launchctl)
+    await restart_job(plist, UID)
+    assert _calls(launchctl)[0] == f"bootout gui/{UID}/{LABEL}"
+    assert _calls(launchctl)[-1] == f"bootstrap gui/{UID} {plist}"
+    assert _loaded(launchctl, LABEL) == _read(plist)
 
 
 async def _health(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
@@ -257,7 +276,10 @@ async def _health(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) ->
 
 async def _scratch_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch, port: int) -> Store:
     """Dot's home and logs in ``tmp_path``, with a store whose runs the program looks at, a configuration that sends
-    its health check to ``port``, and a program that looks every hundredth of a second."""
+    its health check to ``port``, the daemon's property list in a user home of ``tmp_path`` (the restart loads it
+    again), and a program that looks every hundredth of a second."""
+    monkeypatch.setenv("HOME", str(tmp_path / "user"))
+    _daemon_plist(launch_agent_path(tmp_path / "user").parent)
     monkeypatch.setenv("DOT_HOME", str(tmp_path / "home"))
     monkeypatch.setenv("DOT_LOG_DIR", str(tmp_path / "logs"))
     ensure_layout()
@@ -285,7 +307,7 @@ async def test_the_program_waits_for_the_runs_restarts_the_daemon_once_and_unloa
             await asyncio.sleep(0.2)
             # The run that asked still works: the daemon is left alone.
             assert not program.done()
-            assert not any(call.startswith("kickstart") for call in _calls(launchctl))
+            assert not any(call.startswith(f"bootout gui/{UID}/{LABEL}") for call in _calls(launchctl))
             await store.set_run_status(run.id, "done")
             assert await asyncio.wait_for(program, 30.0) == 0
         assert _events(logs) == [
@@ -295,7 +317,7 @@ async def test_the_program_waits_for_the_runs_restarts_the_daemon_once_and_unloa
             "restart_when_idle_unloading",
         ]
         calls: list[str] = _calls(launchctl)
-        assert calls.count(f"kickstart -k gui/{UID}/{LABEL}") == 1
+        assert calls.count(f"bootout gui/{UID}/{LABEL}") == 1
         assert calls[-1] == f"bootout gui/{UID}/{RESTART_LABEL}"
         assert _read(plist) is None
         assert _loaded(launchctl, RESTART_LABEL) is None
@@ -322,7 +344,7 @@ async def test_the_program_gives_up_without_restarting_when_a_run_still_works_at
             "restart_when_idle_gave_up",
             "restart_when_idle_unloading",
         ]
-        assert not any(call.startswith("kickstart") for call in _calls(launchctl))
+        assert not any(call.startswith(f"bootout gui/{UID}/{LABEL}") for call in _calls(launchctl))
         assert _calls(launchctl)[-1] == f"bootout gui/{UID}/{RESTART_LABEL}"
         assert _read(plist) is None
     finally:
@@ -343,7 +365,17 @@ async def test_the_program_that_cannot_restart_the_daemon_says_so_and_still_unlo
         ]
         assert len(failed) == 1
         assert "not installed" in str(failed[0]["error"])
-        assert not any(call.startswith("kickstart") for call in _calls(launchctl))
+        assert not any(call.startswith(f"bootout gui/{UID}/{LABEL}") for call in _calls(launchctl))
         assert _read(plist) is None
     finally:
         await store.close()
+
+
+async def test_uninstall_cancels_the_restart_that_waits(tmp_path: Path, launchctl: Path) -> None:
+    """A restart that waited after the service was removed would find no job to restart: it goes with the service."""
+    plist: Path = tmp_path / "Dot" / f"{RESTART_LABEL}.plist"
+    await install_restart_job(plist, b"<plist/>\n", UID)
+    assert await cancel_restart_job(plist, UID) is True
+    assert await inspect_restart_job(UID) is None
+    assert _read(plist) is None
+    assert await cancel_restart_job(plist, UID) is False

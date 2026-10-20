@@ -37,6 +37,11 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - A reply the model service's content filter stops (`content_filter`) no longer fails the run as "cut short" after
   asking twice more: the run moves to its standby model at once, or, with none, ends saying that the filter stopped it
   and that another model would answer (item 437).
+- `dotx service restart` restarts the daemon now (it stops as at a stop, then the command waits for the health check),
+  and `dotx service restart --when-idle` returns at once and restarts it once no run works, the run that asked included:
+  a one-shot launchd job that unloads itself, gives up after 2 hours and is replaced when you ask again. A run that
+  changed Dot's code asks for this, never for a launchd job of its own, which launchd started again every 30 seconds.
+  `dotx service status` says whether a restart waits and `dotx service uninstall` cancels it (item 441).
 
 ## 0.1.0 (2026-10-20)
 

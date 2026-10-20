@@ -443,11 +443,27 @@ async def _put_back(
     log.warning("service_install_undone", label=label, plist=str(plist), reloaded=reload, error=str(failure))
 
 
-async def kickstart_job(uid: int) -> None:
-    """Start the job of the daemon again now: the process that runs is killed first and the job starts at once
-    (``launchctl kickstart -k``), whatever its throttle interval. Raises :class:`ServiceError` when launchd has no such
-    job."""
-    await _checked(["kickstart", "-k", service_target(uid)], "launchctl cannot restart the job")
+async def restart_job(plist: Path, uid: int) -> None:
+    """Start the job of the daemon again now from its property list ``plist``: unloaded first (``bootout`` sends the
+    daemon SIGTERM, so it closes its browser and servers and records its runs, and waits until it has exited), then
+    loaded, which starts it. Raises :class:`ServiceError` when launchd refuses either step."""
+    target: str = service_target(uid)
+    await _checked(["bootout", target], "launchctl cannot unload the job to restart it")
+    await _wait_until_unloaded(target)
+    await _checked(["bootstrap", domain_target(uid), str(plist)], "launchctl cannot load the job again")
+
+
+async def cancel_restart_job(plist: Path, uid: int) -> bool:
+    """Unload the restart that waits for the runs to end, when one does, and delete its property list. Returns whether
+    one waited."""
+    target: str = job_target(uid, RESTART_LABEL)
+    waited: bool = await _inspect(target) is not None
+    if waited:
+        await _checked(["bootout", target], "launchctl cannot unload the restart that waits")
+        await _wait_until_unloaded(target)
+    await asyncio.to_thread(_remove_file, plist)
+    log.info("restart_when_idle_cancelled", plist=str(plist), waited=waited)
+    return waited
 
 
 async def release_restart_job(plist: Path, uid: int) -> None:
