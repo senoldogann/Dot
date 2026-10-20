@@ -14,6 +14,7 @@ from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.oauth.accounts import CameBack, CameBackKind, denial_reason
 from dotagent.server.callback_page import (
     PLUGINS_LINK,
+    PROVIDER_MARKS,
     WORDMARK,
     Callback,
     Outcome,
@@ -26,8 +27,8 @@ from dotagent.server.callback_page import (
 from dotagent.server.routes_mcp import mcp_subject
 
 _STATIC: Path = Path(__file__).resolve().parents[2] / "src" / "dotagent" / "server" / "static"
-_NOTION: Subject = Subject(name="Notion", detail="mcp.notion.com", mark="notion.svg")
-_GOOGLE: Subject = Subject(name="Google", detail="ada@example.com", mark="google.svg")
+_NOTION: Subject = Subject(name="Notion", detail="mcp.notion.com", mark="notion-icon.svg")
+_GOOGLE: Subject = Subject(name="Google", detail="ada@example.com", mark="google-icon.svg")
 _MICROSOFT: Subject = Subject(name="Microsoft", detail=None, mark=None)
 _OUTCOMES: tuple[Callback, ...] = (
     Callback(outcome="signed_in", subject=_GOOGLE, reason=None),
@@ -74,7 +75,7 @@ def test_the_status_of_a_page_says_whether_the_sign_in_went_on() -> None:
 def test_a_page_names_the_account_with_its_address_and_the_service_with_its_host() -> None:
     signed_in: str = render(_OUTCOMES[0])
     assert '<h1 class="page-title">Signed in to Google</h1>' in signed_in
-    assert 'src="/icons/plugins/google.svg"' in signed_in and "ada@example.com" in signed_in
+    assert 'src="/icons/plugins/google-icon.svg"' in signed_in and "ada@example.com" in signed_in
     assert "Dot on this Mac already shows it" in signed_in
     # A provider with no mark of its own shows its initial.
     declined: str = render(_OUTCOMES[2])
@@ -133,3 +134,10 @@ def test_the_wordmark_is_the_one_of_the_page_kept_for_a_mac_out_of_reach() -> No
     found: re.Match[str] | None = re.search(r'<svg class="wordmark".*?</svg>', offline, re.DOTALL)
     assert found is not None
     assert re.sub(r">\s+<", "><", found.group(0)) == WORDMARK
+
+
+def test_every_provider_mark_is_a_file_of_the_logos() -> None:
+    """The page draws each provider's mark from the plugins' logos, so a file renamed there is caught here."""
+    assert set(PROVIDER_MARKS) == {"google", "microsoft"}
+    for mark in PROVIDER_MARKS.values():
+        assert (_STATIC / "icons" / "plugins" / mark).is_file(), mark

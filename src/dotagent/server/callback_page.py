@@ -22,8 +22,8 @@ type Outcome = Literal["signed_in", "back", "declined", "expired", "failed", "un
 type Tone = Literal["ok", "bad", "neutral"]
 
 PLUGINS_LINK: str = "/#/customize/plugins"
-# The marks of the providers, files of ``static/icons/plugins``; Microsoft has none, so its tile shows its initial.
-_PROVIDER_MARKS: dict[ProviderId, str] = {"google": "google.svg"}
+# The marks of the providers, files of ``static/icons/plugins`` (the Accounts card's, accounts.js).
+PROVIDER_MARKS: dict[ProviderId, str] = {"google": "google-icon.svg", "microsoft": "microsoft-icon.svg"}
 _STATUS_OK: int = 200
 _STATUS_REFUSED: int = 400
 # The wordmark of ``offline.html`` and ``index.html`` (tests/unit/test_callback_page.py keeps it the same).
@@ -86,7 +86,7 @@ def account_callback(came: CameBack) -> Callback:
     provider: Provider = PROVIDERS[came.provider]
     return Callback(
         outcome=came.kind,
-        subject=Subject(name=provider.name, detail=came.address, mark=_PROVIDER_MARKS.get(came.provider)),
+        subject=Subject(name=provider.name, detail=came.address, mark=PROVIDER_MARKS.get(came.provider)),
         reason=came.reason,
     )
 

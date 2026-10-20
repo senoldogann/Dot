@@ -6119,19 +6119,19 @@ dialog.lightbox img {
   height: 40px;
   padding: var(--space-2);
   border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--surface);
-  color: var(--text);
+  /* The plugins' tile (.plugin-mark): a full-colour logo on a ground that stays light in both schemes. */
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
+  color: var(--mark-ink);
   font-size: var(--text-lg);
   font-weight: var(--weight-title);
   line-height: var(--leading-lg);
 }
 
-/* The marks are drawn in the ink of a light page: in the dark they are inverted, as the page has no script to set it. */
-@media (prefers-color-scheme: dark) {
-  .callback-mark img {
-    filter: invert(1);
-  }
+.callback-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
 }
 
 .callback-subject-text {
