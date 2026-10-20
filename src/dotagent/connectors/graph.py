@@ -205,19 +205,18 @@ def _event(event: _Event) -> CalendarEvent:
     )
 
 
-def next_page(link: str | None) -> str | None:
-    """The address of Graph's next page, which carries its own query; an error for one that is not Graph's."""
-    if link is None:
-        return None
-    parts = urlsplit(link)
+def graph_page(address: str) -> str:
+    """``address``, a page of Graph about to be asked for with the account's token; an error for one that is not
+    Graph's. Checked only for a page that is followed: a next page left alone only says the list was cut."""
+    parts = urlsplit(address)
     if parts.scheme != "https" or parts.netloc != _GRAPH_HOST:
         raise AccountApiError("Outlook gave a next page that is not Graph's", {"host": parts.netloc})
-    return link
+    return address
 
 
 def _event_page(answer: object, url: str) -> tuple[tuple[CalendarEvent, ...], str | None]:
     found: _Events = read_answer(_Events, answer, CALENDAR_NAME, url)
-    return tuple(_event(event) for event in found.value), next_page(found.next_link)
+    return tuple(_event(event) for event in found.value), found.next_link
 
 
 def outlook_events_of(answer: object, url: str) -> EventList:
@@ -277,7 +276,7 @@ async def outlook_events(api: AccountApi, start: dt.datetime, end: dt.datetime, 
     pages: int = 0
     while address is not None and pages < (_MOST_PAGES if words else 1) and len(kept) <= limit:
         events: tuple[CalendarEvent, ...]
-        events, link = _event_page(await api.get(CALENDAR_NAME, address, params, _UTC_TIMES), address)
+        events, link = _event_page(await api.get(CALENDAR_NAME, graph_page(address), params, _UTC_TIMES), address)
         kept.extend(event for event in events if has_words(event, query))
         # A next page's address carries the query of the first.
         address, params, pages = link, [], pages + 1

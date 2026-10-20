@@ -111,8 +111,9 @@ after more than 10 minutes is turned away. Nothing logs a token, a code or an ad
 `POST /api/accounts/<provider>/start`, `DELETE /api/accounts/<provider>/<address>`).
 
 Runs read the mail and the calendar of each account with `mail_search`, `mail_read` and `calendar_events` (item 424,
-[Runs and tools](runs.md#mail-and-calendars)); the prompt of every run names the accounts signed in. They only read:
-an email a run writes for you is a draft you send from the conversation.
+[Runs and tools](runs.md#mail-and-calendars)); the prompt of a run that has one of these tools names the accounts
+signed in (an agent of yours may have none of them, or only some). They only read: an email a run writes for you is a
+draft you send from the conversation.
 
 ## MCP servers
 

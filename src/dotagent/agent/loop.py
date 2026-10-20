@@ -1726,7 +1726,9 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 (
                     *owner_name_lines(names.owner, names.mac_name),
                     *(called_lines(names.name) if agent_record is None else ()),
-                    *account_lines(signed_in),
+                    # The accounts are named only to a run that has one of the tools that take them (an agent's may
+                    # have none, or only some).
+                    *(account_lines(signed_in) if any(group_of(spec.name) == ACCOUNTS_GROUP for spec in specs) else ()),
                     *owner_prompt_lines(await owner_section(runtime.store)),
                 ),
                 devtools_address(browser.config),

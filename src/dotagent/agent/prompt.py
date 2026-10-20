@@ -18,9 +18,8 @@ from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
-from dotagent.tools.groups import group_lines
+from dotagent.tools.groups import ACCOUNTS_GROUP, group_lines, group_of
 from dotagent.tools.help import FIND_HELP_TOOL
-from dotagent.tools.mail_calendar import MAIL_SEARCH_TOOL
 from dotagent.tools.meta import ASK_USER_TOOL, USE_TOOLS_TOOL
 from dotagent.tools.pages import SHOW_PAGE_TOOL
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
@@ -608,7 +607,8 @@ def _mcp_section(tool_names: Sequence[str]) -> str:
 
 
 def _accounts_section(tool_names: Sequence[str]) -> str:
-    return _ACCOUNTS_SECTION if MAIL_SEARCH_TOOL in tool_names else ""
+    """Only for a run with one of the tools of the accounts: an agent's tools may hold some of them only."""
+    return _ACCOUNTS_SECTION if any(group_of(name) == ACCOUNTS_GROUP for name in tool_names) else ""
 
 
 def _groups_section(tool_names: Sequence[str]) -> str:
