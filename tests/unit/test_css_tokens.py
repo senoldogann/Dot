@@ -231,3 +231,13 @@ def test_the_content_security_policy_lets_the_page_load_its_own_fonts() -> None:
 
     policy: str = dict(SECURITY_HEADERS)["Content-Security-Policy"]
     assert "font-src 'self'" in policy
+
+
+def test_the_sunshine_over_work_that_goes_on_is_the_texts_own_colour_not_an_amber() -> None:
+    """The light that slides through the words of a running call and a live thought is the text colour, dark on a light
+    theme and light on a dark one (item 435): it was an amber once, and the owner had it black and white."""
+    css: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    block: str = css[css.index("@keyframes sunshine") :]
+    gradient: str = block[block.index("linear-gradient(") : block.index(");")]
+    assert "var(--text) 50%" in gradient, gradient
+    assert "--warn" not in gradient and "--accent" not in gradient, gradient

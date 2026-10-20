@@ -4371,9 +4371,9 @@ a.memory-line:hover .memory-change {
   overflow-wrap: anywhere;
 }
 
-/* Sunshine over the work still going (item 374): the warm light slides through the words of a running call and of a
-   live thought, so each word takes the warmth in turn; the spinner and the shimmer stay, this only warms what they
-   mark. */
+/* Sunshine over the work still going (item 374): the light slides through the words of a running call and of a live
+   thought, so each word takes it in turn; the spinner and the shimmer stay, this only lights what they mark. The light
+   is the text's own colour, dark on a light theme and light on a dark one, not an amber (item 435). */
 @keyframes sunshine {
   from {
     background-position: 130% 0;
@@ -4390,11 +4390,11 @@ a.memory-line:hover .memory-change {
 .thought[data-live="true"] .thought-preview {
   background-image: linear-gradient(
     100deg,
-    var(--text-2) 0%,
-    var(--text-2) 38%,
-    color-mix(in srgb, var(--warn) 70%, var(--text)) 50%,
-    var(--text-2) 62%,
-    var(--text-2) 100%
+    var(--muted) 0%,
+    var(--muted) 38%,
+    var(--text) 50%,
+    var(--muted) 62%,
+    var(--muted) 100%
   );
   background-size: 260% 100%;
   -webkit-background-clip: text;

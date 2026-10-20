@@ -1,4 +1,4 @@
-"""Sunshine over the work still going (item 374): the warm light slides through the words of a call that is running
+"""Sunshine over the work still going (item 374): the light slides through the words of a call that is running
 and of a thought that is live; once the call reports back the light is gone. A real server on a scripted model."""
 
 import asyncio
