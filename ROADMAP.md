@@ -16649,3 +16649,6 @@ stay gone after a reload; denied, they stay; wide and on a phone; the test fails
   beside its name puts the line under it (Accounts' name was squeezed to nothing and written across); a path in a card
   is broken where it must (Diagnostics scrolled sideways); the templates' note, a `null` that `replaceChildren` drew as
   the word, is a child only when there is one. `tests/smoke/test_phone_all_pages.py` measures eight pages at 320 to 430 px.
+- 2026-10-20 (Opus 5.5): item 438 on `risk-badge` from `main`, on the owner's word: the low, medium or high label on
+  the row of a command in the chat, which the owner had taken off, was back (`tools.js` drew the call's risk as a badge
+  after the call reported); it is gone, with its unused `.r-*` colours. The approval card's own severity stays.
