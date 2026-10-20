@@ -470,6 +470,6 @@ async def test_a_reply_its_content_filter_stops_ends_the_run_saying_so_when_no_s
     assert played.record.result.startswith(
         "the model's service stopped its reply with its content filter ('content_filter')"
     ), played.record.result
-    assert "choose another model for this chat" in played.record.result
+    assert "choose another model" in played.record.result
     # One stop is enough to know: the same conversation is not sent again.
     assert len(filtering.requests) == 1

@@ -15873,7 +15873,7 @@ with the same conversation. `agent/loop.py` now reads that end (`_FILTERED`, `fi
 answer this run: a `ProviderFilterError` (`core/errors.py`) raised at the step, so a routed step goes back to the run's
 own model and the run's own model hands over to a standby one at once (`_cannot_answer`, reason "its content filter
 stopped the reply"), without pausing the model in the router for other runs; with no standby model left the run fails at
-the first stop, saying the filter stopped it and that another model for the chat, or a standby model, would answer.
+the first stop, saying the filter stopped it and that another model, or a standby model, would answer.
 Tests: smoke (`test_helpers.py`: the move to the standby model, and the end without one after one request;
 `test_cut_short_replies.py` takes another abnormal end). Docs: `docs/runs.md`, `docs/models.md`.
 

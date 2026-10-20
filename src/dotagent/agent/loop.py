@@ -1454,7 +1454,7 @@ def filtered_stop(reply: ModelReply, model: str) -> ProviderFilterError | None:
         return None
     return ProviderFilterError(
         f"the model's service stopped its reply with its content filter ('{reply.raw_finish}'), and asked again with "
-        "this conversation it stops it again: choose another model for this chat, or name a standby model "
+        "this conversation it stops it again: choose another model, or name a standby model "
         "([models] standby) that the run moves to",
         {"model": model, "input_tokens": reply.usage.input_tokens, "output_tokens": reply.usage.output_tokens},
     )
@@ -2019,8 +2019,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 )
                 route_skip = True
                 if isinstance(error, ProviderFilterError):
-                    # Its filter stops the same conversation again: no later step of the run is routed to it.
-                    candidates = still_routable(candidates, frozenset({routed.ref.label}))
+                    # Its filter stops the same conversation again: no later step is routed to it, and the run does
+                    # not move to it as a standby model either.
+                    left = left | {routed.ref.label}
+                    candidates = still_routable(candidates, left)
                 await sink(_RESET)
                 steps -= 1
                 continue

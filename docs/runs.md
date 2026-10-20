@@ -139,7 +139,7 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
   conversation the model is stopped again (item 437). The run moves to a standby model at once (see
   [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
-  model left, the run fails saying that the filter stopped it and that another model for the chat would answer.
+  model left, the run fails saying that the filter stopped it and that another model would answer.
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
