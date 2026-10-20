@@ -264,7 +264,7 @@ def permission_action(
                 tool, _target_path(asked, workspace), workspace, protected, dot_paths, "Write"
             )
             # OpenCode's agent writes outside Dot's file tools and their undo journal: a change of Dot's own files,
-            # which those tools make once the user agrees (item 398), stays refused to it.
+            # which those tools make once the user agrees (item 398), stays refused to it outside yolo (item 433).
             return edit.model_copy(update={"flags": ("secret_access",)}) if "self_change" in edit.flags else edit
         case "read" | "list" | "glob" | "grep" | "external_directory":
             return read_action(tool, _target_path(asked, workspace), workspace, protected, dot_paths, "Read")

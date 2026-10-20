@@ -15686,24 +15686,26 @@ desktop shell's updates), `README.md` (install the app), `CHANGELOG.md` (0.1.0, 
 
 ### 433. In yolo, a secret store read and data sent out run without a question
 
-**Status: done (2026-10-20), on `item-433-yolo-secrets`; paths a human merges (`src/dotagent/policy/`, REVIEW.md),
-merged on the owner's word of 2026-10-20.** The owner's word of 2026-10-20, with two screenshots of a yolo run asked
-before it read Dot's `api-token` to look at its own API: "YOLO modda daha önce hiç izin sormazdı neden bu olay geldi şu
-an başımıza? Lütfen bunu kaldır". Asked whether runs should get a read-only key instead, the question stay, or yolo
-lose it, and told that a run that reads Dot's key can answer its own questions with it, the owner chose "YOLO'da
-tamamen kaldır". **As built.** A yolo run waives the always-on review (`secret_access`, `exfiltration`), which every
-other mode keeps refusing: `RunGate` judges such a step by the layers after the review (`decide_past_review`) and keeps
-what they leave the user (`held_in_yolo`: a research run's refusal, the hand-off of money and credentials or of a rule
-of the owner's, the guard of messages and posts, a pre-approved spend's question); else the step goes ahead, recorded
-as a yolo waiver whose note is "every mode but yolo refuses this (secret_access)" (`waived_in_yolo`). Item 429's
-`asked_in_yolo` is gone. The yolo prompt, the CLI's help, the composer's YOLO hint and note, the Rules page and
-`defaults.toml` no longer say that a yolo run asks before secrets, and an approval card no longer counts a secret flag
-among those the owner answers in every mode. Tests: unit (`test_guard.py`: the waiver's reason and what the layers after
-the review keep; `test_run_modes.py`: the yolo prompt), smoke (`test_approval_modes.py`: `ask` refuses the read, yolo
-reads it with a record, still hands money off and asks before a message that also reads a secret; a research run's
-secret write is refused). Docs: `docs/safety.md` (the decision order, and that a yolo run can now read Dot's own key),
-`docs/autonomy.md`, `README.md`, `CHANGELOG.md` (Unreleased).
-### 434. An approval's card stays in its own chat, and leaves it once allowed
+**Status: done (2026-10-20), on `item-433-434-yolo-and-cards` with item 434; a path REVIEW.md leaves to a human
+(`src/dotagent/policy/`), merged on the owner's word of 2026-10-20.** The owner's word of 2026-10-20, with two
+screenshots of a yolo run asked before it read Dot's `api-token` to look at its own API: "YOLO modda daha önce hiç izin
+sormazdı neden bu olay geldi şu an başımıza? Lütfen bunu kaldır". Asked whether runs should get a read-only key instead,
+the question stay, or yolo lose it, and told that a run that reads Dot's key can answer its own questions with it, the
+owner chose "YOLO'da tamamen kaldır". Told by the pre-push review that the always-on review also keeps a desktop step in
+Dot's own window, one on Chrome's remote debugging and a change of Dot's own files outside the undo journal, the owner's
+word was "YOLO tamamen bir insan gibi serbest olmalı": yolo waives them too, as before item 429. **As built.** A yolo
+run waives the always-on review (`secret_access`, `exfiltration`), which every other mode keeps refusing: `RunGate`
+judges such a step by the layers after the review (`decide_past_review`) and keeps what they leave the user
+(`held_in_yolo`: a research run's refusal, the hand-off of money and credentials or of a rule of the owner's, the guard
+of messages and posts, a pre-approved spend's question); else the step goes ahead, recorded as a yolo waiver whose note
+is "every mode but yolo refuses this (secret_access)" (`waived_in_yolo`). Item 429's `asked_in_yolo` is gone. The yolo
+prompt, the CLI's help, the composer's YOLO hint and note, the Rules page and `defaults.toml` no longer say that a yolo
+run asks before secrets, and an approval card no longer counts a secret flag among those the owner answers in every
+mode. Tests: unit (`test_guard.py`: the waiver's reason and what the layers after the review keep; `test_run_modes.py`:
+the yolo prompt), smoke (`test_approval_modes.py`: `ask` refuses the read, yolo reads it with a record, still hands
+money off and asks before a message that also reads a secret; a research run's secret write is refused). Docs:
+`docs/safety.md` (the decision order, and that a yolo run can now read Dot's own key), `docs/autonomy.md`, `README.md`,
+`CHANGELOG.md` (Unreleased). ### 434. An approval's card stays in its own chat, and leaves it once allowed
 
 **Status: done (2026-10-20), on `item-434-approved-cards`.** The owner's words of 2026-10-20: "diğer modlarda da izin
 verdikten sonra sohbet içinde bir başarı kartı göstermeye gerek yok" and, with a screenshot of the home holding the

@@ -194,8 +194,9 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   of the MCP servers you added from other agents and on Customize › Plugins, the home of the OpenCode server it starts,
   the playbooks it learned and the file of its emergency stop. The file tools ask you before they write there
   (`self_change`, item 398), in every approval mode but `yolo`, and neither the review model nor a rule of yours answers
-  in your place; OpenCode's own agent, which writes past the journal `dotx undo` reads, is refused. The shell guard
-  refuses a line that writes there: by a copy or a move (its target folder option too), `dd`, a redirect, a download, a
+  in your place; OpenCode's own agent, which writes past the journal `dotx undo` reads, is refused, and so is a line
+  of the shell that writes there (a `yolo` run does both without asking, item 433): by a copy or a move (its target
+  folder option too), `dd`, a redirect, a download, a
   clone, an unpacked archive, git run in one of those folders, a file edited in place (`sed -i`, `perl -i`, `ruby -i`)
   or inline code that names the place (in a word of switches such as `-pe` too). The guard reads the line, not what a
   program does; the sandbox below holds what it cannot read. A plugin's MCP servers, and those you added, start with the
