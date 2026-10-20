@@ -227,9 +227,9 @@ async def _signed_in(runtime: Runtime, keychain: Keychain, providers: _Providers
     for provider in ("google", "microsoft"):
         link: str = await accounts.start(provider, 8765, time.time())
         came: CameBack | None = await accounts.come_back(
-            parse_qs(urlsplit(link).query)["state"][0], "the-code", None, time.time()
+            parse_qs(urlsplit(link).query)["state"][0], "the-code", None, None, time.time()
         )
-        assert came is not None and came.status == 200, came
+        assert came is not None and came.kind == "signed_in", came
     return dataclasses.replace(runtime, accounts=accounts)
 
 
@@ -377,7 +377,7 @@ async def test_a_run_has_the_tools_and_names_the_accounts_only_once_one_is_signe
                         )
                         link: str = await signer.start("google", 8765, time.time())
                         state: str = parse_qs(urlsplit(link).query)["state"][0]
-                        assert await signer.come_back(state, "the-code", None, time.time()) is not None
+                        assert await signer.come_back(state, "the-code", None, None, time.time()) is not None
                     run: RunRecord = await manager.start(
                         "Read my mail.",
                         "task",
