@@ -124,7 +124,7 @@ function takeoverOffer(runId) {
 
 // What the policy asks the owner about in every mode, whatever their rules say (item 429): a rule offered for it would
 // never apply.
-const GUARDED_FLAGS = new Set(["financial", "credential", "message_send", "public_post", "secret_access", "exfiltration"]);
+const GUARDED_FLAGS = new Set(["financial", "credential", "message_send", "public_post"]);
 
 /** Whether the owner answers `approval` in every mode, whatever their rules say (item 429). */
 function guarded(approval) {

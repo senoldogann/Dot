@@ -3,6 +3,12 @@
 Each release of Dot lists here what it changes, the newest first. A change not released yet goes under **Unreleased**,
 at the top, until a release names it; how a release is made is in [Releasing](docs/development.md#releasing).
 
+## Unreleased
+
+- In `yolo`, Dot no longer asks you before it reads where your secrets are kept or sends data out, which every other
+  mode refuses: the step runs and is recorded. Money and credentials are still handed to you, and a message or a post
+  in your name still waits for your yes (item 433).
+
 ## 0.1.0 (2026-10-20)
 
 The first public version of Dot, an always-on autonomous agent for macOS.

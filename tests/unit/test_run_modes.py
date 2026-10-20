@@ -161,8 +161,9 @@ def test_the_prompt_tells_the_model_how_its_questions_are_answered() -> None:
     assert "Approvals:" not in _prompt("ask", False)
     assert "answered by a review model" in _prompt("auto", False)
     assert "what the policy flags runs at once" in _prompt("yolo", False)
-    # Money, secrets, data sent out, messages and posts wait for the user in yolo too (item 429).
+    # Money, passwords, messages and posts wait for the user in yolo too (item 429); secrets do not (item 433).
     assert "still wait for the user, as in every mode" in _prompt("yolo", False)
+    assert "other secrets" not in _prompt("yolo", False)
     assert "answered by a review model" not in _prompt("yolo", False)
 
 

@@ -76,7 +76,7 @@ currency, so list sites that bill in one currency. Empty by default.
 **Decision order**, strictest first:
 
 1. *Auto-review* denies actions that read secrets or send data out (`secret_access`, `exfiltration`), whatever else is
-   configured; a `yolo` run asks you instead (item 429).
+   configured; a `yolo` run waives it, and the steps after it decide (item 433).
 2. The *run mode* denies what a research run may not do.
 3. *Dot's own files*: a change of them (`self_change`, below) is a question to you in every approval mode but `yolo`,
    which no rule of yours and no review model answers in your place (item 398). Allowed, the run makes the change.
@@ -127,9 +127,11 @@ writes back.
 
 Who answers what the policy asks depends on the approval mode of the run: you, a review model or nobody (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). The second step and your hand-off rules
-hold in every mode, and so do the hand-offs of the fourth step and the questions of the fifth, `yolo` too (item 429):
-what the first step refuses, a `yolo` run asks you. What a `yolo` run waives are the questions of the third step, of
-your `ask` rules, of the preset and of untrusted content, and it records each.
+hold in every mode, and so do the hand-offs of the fourth step and the questions of the fifth, `yolo` too (item 429).
+What a `yolo` run waives are the refusal of the first step (item 433), the questions of the third step, of your `ask`
+rules, of the preset and of untrusted content, and it records each. Without the first step, a `yolo` run can also
+read Dot's own key (`api-token` in Dot's home) and with it do what the web UI does, answer a question of the policy
+among it: in `yolo` the guard stops the steps of the work, not a run set on getting around it.
 
 **Untrusted content.** Web pages, screens, MCP results and the mail and calendars of the accounts you signed in (item
 424) can be written by third parties. Dot wraps them in a fence with a random marker per call (`<web_content …>`,
@@ -168,8 +170,8 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
-- Outside a `yolo` run (which asks you first, item 429) the agent can neither read nor change `~/.ssh`, `~/.gnupg`,
-  `~/Library/Keychains`, `~/.aws`,
+- Outside a `yolo` run (which may, without asking, item 433) the agent can neither read nor change `~/.ssh`,
+  `~/.gnupg`, `~/Library/Keychains`, `~/.aws`,
   `~/.config/gcloud`, the data of your browsers (Chrome, Safari, Firefox, Brave, Edge and Arc) and their cookies, the
   tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
   `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
@@ -310,8 +312,8 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
 counts as a refusal. The note you write with your answer reaches the model. This is the default approval mode, `ask`,
 and `supervised` asks before every change as well; in `auto` and `yolo` the questions of the policy are answered for
-you, but for what is yours in every mode (item 429): money, credentials, messages and posts in your name, and in `yolo`
-a read of your secrets or data sent out, each a card in the chat. A question of the agent itself (`ask_user`) waits the
+you, but for what is yours in every mode (item 429): money, credentials, messages and posts in your name, each a card
+in the chat. A question of the agent itself (`ask_user`) waits the
 same way, except in a run nobody can answer during it (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
 what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows

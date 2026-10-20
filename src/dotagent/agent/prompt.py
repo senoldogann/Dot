@@ -118,9 +118,9 @@ _APPROVALS_TEXT: dict[Literal["supervised", "auto", "yolo"], str] = {
         "not retry it and do not look for a way around it."
     ),
     "yolo": (
-        "yolo: what the policy flags runs at once (it is recorded), but money, passwords and other secrets, data sent "
-        "out, and messages and posts in the user's name still wait for the user, as in every mode. The user trusts you "
-        "with the rest: stay inside what was asked, choose the least destructive way and do not widen the task."
+        "yolo: what the policy flags runs at once (it is recorded), but money, passwords, and messages and posts in "
+        "the user's name still wait for the user, as in every mode. The user trusts you with the rest: stay inside "
+        "what was asked, choose the least destructive way and do not widen the task."
     ),
 }
 

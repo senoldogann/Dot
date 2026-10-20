@@ -1,6 +1,6 @@
 """The guard no rule turns off (item 429): a message sent for the user or a post in their name asks in every mode and
 no rule that allows it answers for them; a yolo run leaves money, credentials, the guard and a pre-approved spend to the
-user and asks before their secrets; and every classifier that knows a message goes out says so."""
+user, and reads their secrets without asking (item 433); and every classifier that knows a message goes out says so."""
 
 from pathlib import Path
 
@@ -9,7 +9,7 @@ import pytest
 from dotagent.desktop.safety import StepContext, assess_step
 from dotagent.desktop.types import Step
 from dotagent.policy.elements import Element, assessment_for, naming_reasons
-from dotagent.policy.engine import asked_in_yolo, auto_review, decide, route_for
+from dotagent.policy.engine import auto_review, decide, decide_past_review, held_in_yolo, route_for, waived_in_yolo
 from dotagent.policy.shell import assess_applescript, assess_shell
 from dotagent.policy.types import ActionInfo, ApprovalMode, Decision
 from dotagent.store.models import Behavior, RuleRecord
@@ -99,15 +99,18 @@ def test_yolo_still_waives_what_the_preset_asks() -> None:
     assert route_for(decision, "yolo") == "waived"
 
 
-def test_what_the_always_on_review_refuses_elsewhere_a_yolo_run_asks() -> None:
+def test_what_the_always_on_review_refuses_elsewhere_a_yolo_run_waives_but_what_comes_after_it() -> None:
     refusal: Decision | None = auto_review(SECRET)
     assert refusal is not None and refusal.verdict == "deny"
-    asked: Decision = asked_in_yolo(SECRET)
-    assert (asked.verdict, asked.source) == ("ask", "auto_review")
-    assert asked.reason.endswith("sends secrets out, or sends a message or a post in your name (secret_access)")
-    # One yes answers for the whole step: the question names a message it also sends.
+    assert waived_in_yolo(SECRET).reason == "every mode but yolo refuses this (secret_access)"
+    assert not held_in_yolo(decide_past_review(SECRET, "task", False, "balanced", [], None))
+    # Money, a message and a research run's limit hold in a step that also reads a secret.
+    paying: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "financial")})
     mailing: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "external_send", "message_send")})
-    assert asked_in_yolo(mailing).reason.endswith("(secret_access, message_send)")
+    writing: ActionInfo = SECRET.model_copy(update={"kind": "write"})
+    for action, mode, verdict in ((paying, "task", "handoff"), (mailing, "task", "ask"), (writing, "research", "deny")):
+        held: Decision = decide_past_review(action, mode, False, "aggressive", [], None)
+        assert held.verdict == verdict and held_in_yolo(held), action.flags
 
 
 def test_every_classifier_that_knows_a_message_goes_out_says_so() -> None:

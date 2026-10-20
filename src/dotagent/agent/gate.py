@@ -15,12 +15,13 @@ from dotagent.events import EventBus
 from dotagent.policy.engine import (
     YOLO_WAIVED_SOURCES,
     approval_severity,
-    asked_in_yolo,
     decide,
-    hard_stop,
+    decide_past_review,
+    held_in_yolo,
     owner_handoff,
     route_for,
     supervised,
+    waived_in_yolo,
 )
 from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action, spacing_wait
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
@@ -104,12 +105,12 @@ class RunGate:
     ``approval_mode`` says who answers a question the policy raises: the user (``supervised``, which also asks before
     every change the policy lets through, and ``ask``), the review model (``auto``) or nobody (``yolo``: the action runs
     and only a record is kept), but for the guard no rule turns off (item 429): money and credentials are handed to the
-    user and a message or a post in their name waits for their yes in yolo too, and what the other modes refuse
-    (secrets, exfiltration) a yolo run asks them about. A change of Dot's own files is the user's in every mode but yolo
-    (item 398); a research run stays read-only and a hand-off rule of the user still stops it. ``instructions`` are the
-    user's own words so far, which is all the reviewer takes as authority. ``pace`` bounds the public and social actions
-    of the browser on each site, in every mode. ``locks`` are the runtime's :class:`SiteLocks`, shared with the gates of
-    the other runs.
+    user and a message or a post in their name waits for their yes in yolo too. What the other modes refuse (secrets,
+    exfiltration) a yolo run does without asking (item 433), and a change of Dot's own files is the user's in every
+    mode but yolo (item 398); a research run stays read-only and a hand-off rule of the user still stops it.
+    ``instructions`` are the user's own words so far, which is all the reviewer takes as authority. ``pace`` bounds the
+    public and social actions of the browser on each site, in every mode. ``locks`` are the runtime's
+    :class:`SiteLocks`, shared with the gates of the other runs.
     """
 
     def __init__(
@@ -246,6 +247,11 @@ class RunGate:
         state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
         decided: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
+        if self._approval_mode == "yolo" and decided.source == "auto_review":
+            # What the always-on review refuses in every other mode, a yolo run does without asking (item 433), unless a
+            # layer after the review keeps the step for the user or refuses it.
+            rest: Decision = decide_past_review(info, self._mode, self.tainted, self._preset, rules, allowance)
+            decided = rest if held_in_yolo(rest) else waived_in_yolo(info)
         decision: Decision = supervised(decided, info) if self._approval_mode == "supervised" else decided
         note: str = "" if decision.verdict == "allow" else await self._authorize_decision(info, decision, rules)
         if allowance is not None and state is not None:
@@ -278,13 +284,6 @@ class RunGate:
             if handoff is not None:
                 return await self._ask_user(info, handoff, "")
             return await self._waive(info, decision)
-        if self._approval_mode == "yolo" and decision.source == "auto_review":
-            # What the always-on review refuses in every other mode, a yolo run asks the user about (item 429); a
-            # hand-off rule of theirs, or of money and credentials, is stricter.
-            stricter: Decision | None = owner_handoff(info, rules)
-            if stricter is None:
-                stricter = hard_stop(info, None)
-            return await self._ask_user(info, stricter if stricter is not None else asked_in_yolo(info), "")
         if decision.verdict == "deny":
             await self._emit_policy(info, decision)
             raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})

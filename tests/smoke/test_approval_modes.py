@@ -32,8 +32,8 @@ NO_PACE: PaceConfig = PaceConfig(
 )
 
 # What the cautious preset asks about, a payment (a hard stop that is the user's in every mode), a read of a key
-# (refused in every mode) and a schedule (allowed by the aggressive preset until the run has read content from a
-# stranger).
+# (refused in every mode but yolo, item 433) and a schedule (allowed by the aggressive preset until the run has read
+# content from a stranger).
 WRITE: ActionInfo = ActionInfo(
     tool="write_file", kind="write", risk="medium", summary="Write notes.md", target="notes.md", flags=()
 )
@@ -246,29 +246,32 @@ async def test_yolo_also_waives_the_question_that_untrusted_content_raises(room:
     }
 
 
-async def test_yolo_leaves_money_secrets_and_messages_to_the_user(room: Room) -> None:
-    """The guard no rule turns off (item 429): in yolo too, money is handed to the user, a secret store read asks them
-    where every other mode refuses it, and a message sent for them waits for their yes."""
+async def test_yolo_leaves_money_and_messages_to_the_user_and_reads_a_secret_without_asking(room: Room) -> None:
+    """The guard no rule turns off (item 429): in yolo too, money is handed to the user and a message sent for them
+    waits for their yes, even in a step that also reads a secret. A secret store read, which every other mode refuses,
+    goes ahead without a question and is recorded (item 433)."""
+    with pytest.raises(PolicyDenied):
+        await asyncio.wait_for(_gate(room, "task", "aggressive", "ask", _nobody).authorize(SECRET), WAIT_S)
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
     paying: Question = await _ask(room, gate, PAYMENT)
     assert paying.record.severity == "handoff"
     await room.broker.resolve(paying.record.id, True, "user", "paid it myself")
     with pytest.raises(HandedOff):
         await asyncio.wait_for(paying.answer, WAIT_S)
-    reading: Question = await _ask(room, gate, SECRET)
-    assert "in yolo Dot asks you before it reads where secrets are kept" in reading.record.summary
-    await room.broker.resolve(reading.record.id, False, "user", "")
-    with pytest.raises(ApprovalRejected):
-        await asyncio.wait_for(reading.answer, WAIT_S)
-    sending: Question = await _ask(room, gate, MESSAGE)
+    assert await asyncio.wait_for(gate.authorize(SECRET), WAIT_S) == ""
+    mailing: ActionInfo = MESSAGE.model_copy(update={"flags": ("secret_access", "external_send", "message_send")})
+    sending: Question = await _ask(room, gate, mailing)
     assert "Dot asks you before a message or a post in your name" in sending.record.summary
     await room.broker.resolve(sending.record.id, True, "user", "send it")
     assert await asyncio.wait_for(sending.answer, WAIT_S) == "send it"
-    assert {record.decided_by for record in await _decided(room)} == {"user"}
-    assert "approval_auto" not in await _kinds(room)
+    waived: list[ApprovalRecord] = [record for record in await _decided(room) if record.decided_by == YOLO_DECIDER]
+    assert [(record.summary, record.note) for record in waived] == [
+        (SECRET.summary, "every mode but yolo refuses this (secret_access)")
+    ]
+    assert "approval_auto" in await _kinds(room)
 
 
-async def test_in_yolo_the_hand_off_of_money_holds_over_the_question_of_secrets(room: Room) -> None:
+async def test_in_yolo_the_hand_off_of_money_holds_in_a_step_that_reads_a_secret(room: Room) -> None:
     gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
     paying: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "financial")})
     handed: Question = await _ask(room, gate, paying)
@@ -480,6 +483,9 @@ async def test_yolo_still_keeps_a_research_run_read_only(room: Room) -> None:
     gate: RunGate = _gate(room, "research", "aggressive", "yolo", _nobody)
     with pytest.raises(PolicyDenied):
         await asyncio.wait_for(gate.authorize(WRITE), WAIT_S)
+    # Waiving the always-on review (item 433) does not lift the research run's own limit.
+    with pytest.raises(PolicyDenied):
+        await asyncio.wait_for(gate.authorize(WRITE.model_copy(update={"flags": ("secret_access",)})), WAIT_S)
     assert await room.store.list_approvals(None, 10) == []
 
 
