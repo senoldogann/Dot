@@ -16024,7 +16024,8 @@ still refuses it, so a run whose tab lands there has the tab reset and reads not
 `[server] reach` stay refused: a sign-in starts from a page on this Mac and comes back to its loopback address. A run
 gains nothing by the page: the daemon takes only a state it handed out itself, once, for ten minutes, and the page
 carries no token. Tests: `tests/unit/test_own_interface.py` (the way back, and the spellings that are not it: a slash
-more, another case, a dot segment, the path in the query, the tailnet's name, a request that is not a page) and
+more, another case, a dot segment, the path in the query, the tailnet's name, a backslash a browser reads as `/`, a
+request that is not a page) and
 `tests/smoke/test_browser_boundary.py` (a link whose redirect ends there reaches the daemon as one navigation and the
 tab is reset; on the code before this change it is refused). Docs: `docs/browser-and-computer-use.md`.
 

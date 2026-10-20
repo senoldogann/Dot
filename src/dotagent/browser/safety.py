@@ -119,13 +119,19 @@ def browser_host(host: str) -> str | None:
         return name
 
 
+def _backslashed(url: str) -> bool:
+    """Whether ``url`` has a backslash before its query, which a browser takes for ``/`` where Python's parser does
+    not."""
+    return "\\" in url.partition("#")[0].partition("?")[0]
+
+
 def check_url(url: str, allowed_hosts: Sequence[str], blocked_hosts: Sequence[str]) -> UrlVerdict:
     """Whether the browser may open ``url``: web pages only, never a blocked host, only allowed hosts when set. The host
     is judged as a browser reads it (:func:`browser_host`), and an address a browser reads otherwise than this check is
-    refused: one with a backslash before its query, which a browser takes for ``/`` where Python's parser does not."""
+    refused: one with a backslash before its query (:func:`_backslashed`)."""
     if url == "about:blank":
         return UrlVerdict(allowed=True, reason="blank page")
-    if "\\" in url.partition("#")[0].partition("?")[0]:
+    if _backslashed(url):
         return UrlVerdict(allowed=False, reason="the URL holds a backslash, which a browser reads as /")
     try:
         parts = urlsplit(url)
@@ -207,7 +213,9 @@ def sign_in_return(url: str, server: ServerConfig) -> bool:
     Chrome that runs), whose guard refuses Dot's interface; the way back is let through as a page, and nothing else of
     the interface. :func:`check_browser_url` still refuses it, so a run whose tab lands there has the tab reset. A run
     gains nothing by it: the daemon takes only a state it handed out itself, once, for ten minutes, and the page
-    carries no token."""
+    carries no token. An address a browser reads otherwise than Python (:func:`_backslashed`) is not it."""
+    if _backslashed(url):
+        return False
     try:
         parts = urlsplit(url)
         port: int | None = parts.port

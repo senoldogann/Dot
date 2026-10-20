@@ -138,6 +138,8 @@ def test_the_way_back_of_a_sign_in_opens_as_a_page_and_as_nothing_else(url: str)
         "http://127.0.0.1:8765/oauth/callback/../../api/approvals",
         "http://127.0.0.1:8765/api/approvals?next=/oauth/callback",
         "https://mac.tail1234.ts.net/oauth/callback?state=abc",
+        # A browser reads the backslash as /: this is evil.example, which Python's parser takes for the loopback host.
+        "http://evil.example\\@127.0.0.1:8765/oauth/callback?state=abc",
     ],
 )
 def test_nothing_else_of_dots_interface_opens_with_the_way_back(url: str) -> None:
