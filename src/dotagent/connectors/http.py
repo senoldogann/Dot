@@ -117,10 +117,14 @@ class AccountApi:
     async def _get(
         self, service: str, url: str, params: Sequence[tuple[str, str]], headers: Mapping[str, str], token: str
     ) -> httpx.Response:
+        # httpx puts ``params`` in place of the query of ``url`` even when there are none: a next page's address, which
+        # carries its own query, is sent as it is.
+        query: tuple[tuple[str, str], ...] | None = tuple(params) if params else None
+
         async def once() -> httpx.Response:
             async with self.accounts.client() as client:
                 response: httpx.Response = await client.get(
-                    url, params=list(params), headers={**headers, "Authorization": f"Bearer {token}"}
+                    url, params=query, headers={**headers, "Authorization": f"Bearer {token}"}
                 )
             if response.status_code in _BUSY:
                 raise _Busy(response)

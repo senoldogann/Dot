@@ -16,7 +16,7 @@ from pydantic import Field, model_validator
 
 from dotagent.connectors import google, graph
 from dotagent.connectors.http import AccountApi
-from dotagent.connectors.types import CalendarEvent, MailMessage, MailSummary
+from dotagent.connectors.types import CalendarEvent, EventList, MailList, MailMessage, MailSummary
 from dotagent.core.errors import ToolInputError
 from dotagent.core.text import truncate_middle, unclosing
 from dotagent.oauth.providers import ProviderId
@@ -38,6 +38,9 @@ _TEXT_CHARS: int = 30_000
 _LINE_CHARS: int = 300
 _NOTES_CHARS: int = 500
 _LISTED_ATTENDEES: int = 8
+# The most messages a search lists, and events a call lists.
+_MOST_MESSAGES: int = 25
+_MOST_EVENTS: int = 100
 _MAIL_NAMES: dict[ProviderId, str] = {"google": google.GMAIL_NAME, "microsoft": graph.MAIL_NAME}
 _CALENDAR_NAMES: dict[ProviderId, str] = {"google": google.CALENDAR_NAME, "microsoft": graph.CALENDAR_NAME}
 _ACCOUNT_FIELD: str = "The address of an account the owner signed in, as your instructions list them."
@@ -176,7 +179,7 @@ class MailSearchArgs(ToolArgs):
             "of the inbox."
         ),
     )
-    limit: int = Field(default=10, ge=1, le=25, description="How many messages at most.")
+    limit: int = Field(default=10, ge=1, le=_MOST_MESSAGES, description="How many messages at most.")
 
 
 class MailReadArgs(ToolArgs):
@@ -187,14 +190,18 @@ class MailReadArgs(ToolArgs):
 class CalendarEventsArgs(ToolArgs):
     account: str = Field(min_length=3, max_length=320, description=_ACCOUNT_FIELD)
     start: str = Field(
+        max_length=40,
         description="Where the time starts: a day (2026-10-21) or a moment (2026-10-21T09:00), in the Mac's time "
-        "zone unless it gives an offset."
+        "zone unless it gives an offset.",
     )
-    end: str = Field(description="Where it ends, not included: a day (2026-10-22 ends it with 21 October) or a moment.")
+    end: str = Field(
+        max_length=40,
+        description="Where it ends, not included: a day (2026-10-22 ends it with 21 October) or a moment.",
+    )
     query: str = Field(
         default="", max_length=200, description="Words the events must have, in their title, place or notes."
     )
-    limit: int = Field(default=50, ge=1, le=100, description="How many events at most.")
+    limit: int = Field(default=50, ge=1, le=_MOST_EVENTS, description="How many events at most.")
 
     @model_validator(mode="after")
     def _times(self) -> Self:
@@ -225,7 +232,7 @@ async def _api(ctx: ToolContext, address: str) -> AccountApi:
     return AccountApi(ctx.runtime.accounts, account.provider, account.address)
 
 
-async def _search(api: AccountApi, query: str, limit: int) -> tuple[MailSummary, ...]:
+async def _search(api: AccountApi, query: str, limit: int) -> MailList:
     if api.provider == "google":
         return await google.search_gmail(api, query, limit)
     return await graph.search_outlook(api, query, limit)
@@ -237,9 +244,7 @@ async def _read(api: AccountApi, message_id: str) -> MailMessage:
     return await graph.read_outlook(api, message_id)
 
 
-async def _events(
-    api: AccountApi, start: dt.datetime, end: dt.datetime, query: str, limit: int
-) -> tuple[CalendarEvent, ...]:
+async def _events(api: AccountApi, start: dt.datetime, end: dt.datetime, query: str, limit: int) -> EventList:
     if api.provider == "google":
         return await google.google_events(api, start, end, query, limit)
     return await graph.outlook_events(api, start, end, query, limit)
@@ -256,16 +261,21 @@ def build_mail_calendar_tools() -> tuple[RegisteredTool, ...]:
 
     async def run_search(args: MailSearchArgs, ctx: ToolContext) -> ToolResult:
         api: AccountApi = await _api(ctx, args.account)
-        found: tuple[MailSummary, ...] = await _search(api, args.query, args.limit)
+        found: MailList = await _search(api, args.query, args.limit)
         zone: ZoneInfo = await asyncio.to_thread(resolve_zone, "")
         source: str = f"{_MAIL_NAMES[api.provider]} of {api.address}"
         what: str = f"for {args.query.strip()!r}" if args.query.strip() else "in the inbox"
-        if not found:
+        if not found.messages:
             return ok(f"{source}: no message {what}.")
-        body: str = "\n".join(line for at, summary in enumerate(found, 1) for line in summary_lines(at, summary, zone))
+        body: str = "\n".join(
+            line for at, summary in enumerate(found.messages, 1) for line in summary_lines(at, summary, zone)
+        )
+        cut: str = (
+            f" More match than these: narrow the search, or raise limit (up to {_MOST_MESSAGES})." if found.more else ""
+        )
         return _fenced(
-            f"{source}: {_counted(len(found), 'message')} {what}, times in {zone.key}. Read one whole with "
-            f"{MAIL_READ_TOOL} and its id.",
+            f"{source}: {_counted(len(found.messages), 'message')} {what}, times in {zone.key}.{cut} Read one whole "
+            f"with {MAIL_READ_TOOL} and its id.",
             source,
             body,
         )
@@ -299,14 +309,20 @@ def build_mail_calendar_tools() -> tuple[RegisteredTool, ...]:
                 f"{CALENDAR_EVENTS_TOOL}: end ({args.end}) must come after start ({args.start})",
                 {"start": args.start, "end": args.end},
             )
-        found: tuple[CalendarEvent, ...] = await _events(api, start, end, args.query, args.limit)
+        found: EventList = await _events(api, start, end, args.query, args.limit)
         source: str = f"{_CALENDAR_NAMES[api.provider]} of {api.address}"
         span: str = f"from {_moment_text(start, zone)} to {_moment_text(end, zone)} ({zone.key})"
         words: str = f" with {args.query.strip()!r}" if args.query.strip() else ""
-        if not found:
+        if not found.events:
+            if found.more:
+                return ok(
+                    f"{source}: no event{words} among the events read {span}, but the time holds more than are read "
+                    "at once: narrow it."
+                )
             return ok(f"{source}: no event{words} {span}.")
-        body: str = "\n".join(line for at, event in enumerate(found, 1) for line in event_lines(at, event, zone))
-        return _fenced(f"{source}: {_counted(len(found), 'event')}{words} {span}.", source, body)
+        body: str = "\n".join(line for at, event in enumerate(found.events, 1) for line in event_lines(at, event, zone))
+        cut: str = f" The time may hold more: narrow it, or raise limit (up to {_MOST_EVENTS})." if found.more else ""
+        return _fenced(f"{source}: {_counted(len(found.events), 'event')}{words} {span}.{cut}", source, body)
 
     return (
         make_tool(

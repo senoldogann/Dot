@@ -11,7 +11,7 @@ import pytest
 from pydantic import ValidationError
 
 from dotagent.connectors.google import gmail_message, google_events_of
-from dotagent.connectors.graph import has_words, outlook_events_of, outlook_message, search_value
+from dotagent.connectors.graph import has_words, next_page, outlook_events_of, outlook_message, search_value
 from dotagent.connectors.http import refused, wait_asked
 from dotagent.connectors.types import Attachment, CalendarEvent, MailMessage
 from dotagent.core.errors import AccountApiError
@@ -136,7 +136,7 @@ def test_google_events_keep_their_times_the_owners_answer_and_their_notes_as_tex
             },
         ]
     }
-    standup, holiday = google_events_of(answer, "test")
+    standup, holiday = google_events_of(answer, "test").events
     assert standup.start == dt.datetime(2026, 10, 21, 6, 0, tzinfo=dt.UTC)
     assert (standup.your_answer, standup.organizer) == ("accepted", "Bob <bob@example.com>")
     assert "Agenda" in standup.notes and "<" not in standup.notes
@@ -175,7 +175,7 @@ def test_outlook_events_are_read_in_utc_and_one_all_day_keeps_its_days() -> None
             },
         ]
     }
-    review, away = outlook_events_of(answer, "test")
+    review, away = outlook_events_of(answer, "test").events
     assert (review.start, review.end) == (
         dt.datetime(2026, 10, 21, 6, 0, tzinfo=dt.UTC),
         dt.datetime(2026, 10, 21, 7, 0, tzinfo=dt.UTC),
@@ -251,5 +251,17 @@ def test_a_cancelled_event_says_so() -> None:
     event: CalendarEvent = google_events_of(
         {"items": [{"id": "c", "status": "cancelled", "start": {"date": "2026-10-21"}, "end": {"date": "2026-10-22"}}]},
         "test",
-    )[0]
+    ).events[0]
     assert event.cancelled and event.title == "(no title)"
+
+
+def test_a_list_the_provider_cut_says_so_and_a_next_page_is_only_ever_graphs() -> None:
+    timed: dict[str, object] = {"start": {"date": "2026-10-21"}, "end": {"date": "2026-10-22"}}
+    assert google_events_of({"items": [{"id": "a", **timed}], "nextPageToken": "p2"}, "test").more
+    assert not google_events_of({"items": [{"id": "a", **timed}]}, "test").more
+    page: str = "https://graph.microsoft.com/v1.0/me/calendarView?$skiptoken=x"
+    assert outlook_events_of({"value": [], "@odata.nextLink": page}, "test").more
+    assert next_page(page) == page and next_page(None) is None
+    for elsewhere in ("https://evil.example/v1.0/me/calendarView", "http://graph.microsoft.com/v1.0/me/events"):
+        with pytest.raises(AccountApiError, match="not Graph's"):
+            next_page(elsewhere)

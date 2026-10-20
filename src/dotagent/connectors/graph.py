@@ -3,12 +3,21 @@ and the events of a time, as :mod:`dotagent.connectors.types`. Graph's answers a
 models below. Graph is asked for the times of events in UTC and for the text of a message rather than its HTML."""
 
 import datetime as dt
-from urllib.parse import quote
+from urllib.parse import quote, urlsplit
 
 from pydantic import Field
 
 from dotagent.connectors.http import AccountApi, read_answer
-from dotagent.connectors.types import Attachment, Attendee, CalendarEvent, MailMessage, MailSummary, ProviderAnswer
+from dotagent.connectors.types import (
+    Attachment,
+    Attendee,
+    CalendarEvent,
+    EventList,
+    MailList,
+    MailMessage,
+    MailSummary,
+    ProviderAnswer,
+)
 from dotagent.core.errors import AccountApiError
 from dotagent.web.text import html_to_text
 
@@ -21,6 +30,12 @@ _EVENT_FIELDS: str = (
     "id,subject,start,end,isAllDay,isCancelled,location,organizer,attendees,bodyPreview,webLink,responseStatus"
 )
 _UTC_TIMES: dict[str, str] = {"Prefer": 'outlook.timezone="UTC"'}
+# Graph searches no events: with words to look for, the time is read a page of this many events at a time, up to this
+# many pages, and the words looked for in each.
+_PAGE_EVENTS: int = 100
+_MOST_PAGES: int = 10
+# Where a next page of Graph may be: the token goes with the request, so it goes nowhere else.
+_GRAPH_HOST: str = "graph.microsoft.com"
 _TEXT_BODY: dict[str, str] = {"Prefer": 'outlook.body-content-type="text"'}
 
 
@@ -59,6 +74,8 @@ class _Message(ProviderAnswer):
 
 class _Messages(ProviderAnswer):
     value: tuple[_Message, ...] = ()
+    # Graph's mark of a next page.
+    next_link: str | None = Field(default=None, alias="@odata.nextLink")
 
 
 class _When(ProviderAnswer):
@@ -97,6 +114,7 @@ class _Event(ProviderAnswer):
 
 class _Events(ProviderAnswer):
     value: tuple[_Event, ...] = ()
+    next_link: str | None = Field(default=None, alias="@odata.nextLink")
 
 
 def _person(recipient: _Recipient) -> str:
@@ -121,9 +139,10 @@ def _summary(message: _Message) -> MailSummary:
     )
 
 
-def outlook_summaries_of(answer: object, url: str) -> tuple[MailSummary, ...]:
-    """The messages of Graph's answer to ``url``."""
-    return tuple(_summary(message) for message in read_answer(_Messages, answer, MAIL_NAME, url).value)
+def outlook_summaries_of(answer: object, url: str) -> MailList:
+    """The messages of Graph's answer to ``url``, cut when it names a next page."""
+    found: _Messages = read_answer(_Messages, answer, MAIL_NAME, url)
+    return MailList(messages=tuple(_summary(message) for message in found.value), more=found.next_link is not None)
 
 
 def outlook_message(answer: object, url: str) -> MailMessage:
@@ -186,9 +205,25 @@ def _event(event: _Event) -> CalendarEvent:
     )
 
 
-def outlook_events_of(answer: object, url: str) -> tuple[CalendarEvent, ...]:
-    """The events of Graph's answer to ``url``."""
-    return tuple(_event(event) for event in read_answer(_Events, answer, CALENDAR_NAME, url).value)
+def next_page(link: str | None) -> str | None:
+    """The address of Graph's next page, which carries its own query; an error for one that is not Graph's."""
+    if link is None:
+        return None
+    parts = urlsplit(link)
+    if parts.scheme != "https" or parts.netloc != _GRAPH_HOST:
+        raise AccountApiError("Outlook gave a next page that is not Graph's", {"host": parts.netloc})
+    return link
+
+
+def _event_page(answer: object, url: str) -> tuple[tuple[CalendarEvent, ...], str | None]:
+    found: _Events = read_answer(_Events, answer, CALENDAR_NAME, url)
+    return tuple(_event(event) for event in found.value), next_page(found.next_link)
+
+
+def outlook_events_of(answer: object, url: str) -> EventList:
+    """The events of one page of Graph's answer to ``url``, cut when it names a next page."""
+    events, link = _event_page(answer, url)
+    return EventList(events=events, more=link is not None)
 
 
 def _utc_text(moment: dt.datetime) -> str:
@@ -201,7 +236,7 @@ def has_words(event: CalendarEvent, query: str) -> bool:
     return all(word in said for word in query.casefold().split())
 
 
-async def search_outlook(api: AccountApi, query: str, limit: int) -> tuple[MailSummary, ...]:
+async def search_outlook(api: AccountApi, query: str, limit: int) -> MailList:
     """The messages ``query`` finds in every folder (Outlook's search words); the inbox, the newest first, when it is
     empty."""
     url: str
@@ -224,18 +259,26 @@ async def read_outlook(api: AccountApi, message_id: str) -> MailMessage:
     return outlook_message(await api.get(MAIL_NAME, url, params, _TEXT_BODY), url)
 
 
-async def outlook_events(
-    api: AccountApi, start: dt.datetime, end: dt.datetime, query: str, limit: int
-) -> tuple[CalendarEvent, ...]:
-    """The events of the calendar between ``start`` and ``end``, each repeat on its own, in their order; ``query``
-    keeps the ones whose title, place or notes have its words (Graph searches no events)."""
-    url: str = f"{GRAPH}/calendarView"
+async def outlook_events(api: AccountApi, start: dt.datetime, end: dt.datetime, query: str, limit: int) -> EventList:
+    """The events of the calendar between ``start`` and ``end``, each repeat on its own, in their order. Graph
+    searches no events: with ``query``, the time is read a page at a time and the events whose title, place or notes
+    have its words are kept, until ``limit`` are found or :data:`_MOST_PAGES` pages are read; the list is cut when
+    the time may hold more."""
+    words: bool = query.strip() != ""
+    address: str | None = f"{GRAPH}/calendarView"
     params: list[tuple[str, str]] = [
         ("startDateTime", _utc_text(start)),
         ("endDateTime", _utc_text(end)),
-        ("$top", str(limit)),
+        ("$top", str(_PAGE_EVENTS if words else limit)),
         ("$orderby", "start/dateTime"),
         ("$select", _EVENT_FIELDS),
     ]
-    found: tuple[CalendarEvent, ...] = outlook_events_of(await api.get(CALENDAR_NAME, url, params, _UTC_TIMES), url)
-    return tuple(event for event in found if has_words(event, query))
+    kept: list[CalendarEvent] = []
+    pages: int = 0
+    while address is not None and pages < (_MOST_PAGES if words else 1) and len(kept) <= limit:
+        events: tuple[CalendarEvent, ...]
+        events, link = _event_page(await api.get(CALENDAR_NAME, address, params, _UTC_TIMES), address)
+        kept.extend(event for event in events if has_words(event, query))
+        # A next page's address carries the query of the first.
+        address, params, pages = link, [], pages + 1
+    return EventList(events=tuple(kept[:limit]), more=len(kept) > limit or address is not None)

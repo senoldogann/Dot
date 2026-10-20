@@ -25,6 +25,13 @@ class MailSummary(FrozenModel):
     unread: bool
 
 
+class MailList(FrozenModel):
+    """The messages a search found, and whether more matched than are listed."""
+
+    messages: tuple[MailSummary, ...]
+    more: bool
+
+
 class Attachment(FrozenModel):
     name: str
     media_type: str
@@ -63,3 +70,10 @@ class CalendarEvent(FrozenModel):
     notes: str
     link: str
     cancelled: bool
+
+
+class EventList(FrozenModel):
+    """The events of a time, and whether the time may hold more than are listed."""
+
+    events: tuple[CalendarEvent, ...]
+    more: bool

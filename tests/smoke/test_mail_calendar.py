@@ -83,6 +83,19 @@ _GRAPH_MESSAGE: JsonObject = {
     "bodyPreview": "Due soon",
     "isRead": True,
 }
+# Graph searches no events: a search of the calendar reads it a page at a time, the second page here.
+_GRAPH_PAGE_TWO: str = "https://graph.microsoft.com/v1.0/me/calendarView?$skiptoken=page-2"
+_GRAPH_FIRST_PAGE: JsonObject = {
+    "value": [
+        {
+            "id": "o-0",
+            "subject": "Standup",
+            "start": {"dateTime": "2026-10-21T06:00:00.0000000", "timeZone": "UTC"},
+            "end": {"dateTime": "2026-10-21T06:15:00.0000000", "timeZone": "UTC"},
+        }
+    ],
+    "@odata.nextLink": _GRAPH_PAGE_TWO,
+}
 _GRAPH_EVENTS: JsonObject = {
     "value": [
         {
@@ -122,7 +135,7 @@ class _Providers:
         path: str = request.url.path
         if path == "/gmail/v1/users/me/messages":
             assert request.url.params["q"] == "from:bob" and request.url.params["maxResults"] == "5"
-            return httpx.Response(200, json={"messages": [{"id": "m-1", "threadId": "t-1"}]})
+            return httpx.Response(200, json={"messages": [{"id": "m-1", "threadId": "t-1"}], "nextPageToken": "p2"})
         if path == "/gmail/v1/users/me/messages/m-1":
             return httpx.Response(200, json=_GMAIL_MESSAGE)
         return httpx.Response(404, json={"error": {"code": 404, "message": "Not Found", "status": "NOT_FOUND"}})
@@ -140,12 +153,17 @@ class _Providers:
                 200, json={**_GRAPH_MESSAGE, "body": {"contentType": "text", "content": "Pay by Monday."}}
             )
         assert path == "/v1.0/me/calendarView", path
+        assert request.headers["prefer"] == 'outlook.timezone="UTC"'
         self.graph_busy += 1
         if self.graph_busy == 1:
             return httpx.Response(429, headers={"Retry-After": "0"}, json={"error": {"code": "TooManyRequests"}})
-        assert request.headers["prefer"] == 'outlook.timezone="UTC"'
+        if request.url.params.get("$skiptoken") == "page-2":
+            # A next page's address carries the whole query: nothing of the first request is added to it.
+            assert list(request.url.params.keys()) == ["$skiptoken"], request.url
+            return httpx.Response(200, json=_GRAPH_EVENTS)
         assert request.url.params["startDateTime"] == "2026-10-20T21:00:00Z"
-        return httpx.Response(200, json=_GRAPH_EVENTS)
+        assert request.url.params["$top"] == "100"
+        return httpx.Response(200, json=_GRAPH_FIRST_PAGE)
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         url: str = str(request.url)
@@ -248,7 +266,10 @@ async def test_gmail_and_google_calendar_read_through_the_account_a_token_turned
     action, found = await _call(ran, "mail_search", {"account": "ADA@gmail.com", "query": "from:bob", "limit": 5})
     assert (action.kind, action.risk, action.flags) == ("network", "low", ())
     assert found.untrusted and not found.is_error
-    assert found.text.startswith("Gmail of ada@gmail.com: 1 message for 'from:bob', times in Europe/Istanbul.")
+    assert found.text.startswith(
+        "Gmail of ada@gmail.com: 1 message for 'from:bob', times in Europe/Istanbul. More match than these: narrow "
+        "the search, or raise limit (up to 25)."
+    )
     listed: str = _fenced_part(found.text)
     assert "1. id m-1 · Mon 26 Oct 2026 10:14 · unread" in listed and "Subject: Invoice 42" in listed
     assert providers.refreshes == ["g"]
@@ -284,8 +305,9 @@ async def test_outlook_mail_and_calendar_read_through_the_account_a_not_now_wait
         "calendar_events",
         {"account": "ada@outlook.com", "start": "2026-10-21", "end": "2026-10-22", "query": "budget"},
     )
-    assert providers.graph_busy == 2
-    assert "1. Wed 21 Oct 2026 13:00–14:00 · Budget review" in events.text
+    # A "not now", then the first page and the second, where the words are.
+    assert providers.graph_busy == 3
+    assert "1. Wed 21 Oct 2026 13:00–14:00 · Budget review" in events.text and "Standup" not in events.text
     assert "place: Room 4" in events.text and "you: tentativelyAccepted" in events.text
     _, none = await _call(
         ran,

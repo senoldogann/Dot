@@ -97,7 +97,8 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - `tool_surface` in `[agent]` decides which tools a run's model sees. `full`, the default, offers all of them at every
   step. `grouped` starts with the core tools (files, the shell, the web, searching and saving notes, delegation, skills,
   the plan and `finish`) and the groups the thread already used. The other groups (`browser`, `desktop`, `schedule`,
-  `memory_admin`, and `mcp__<server>` for each MCP server) are listed in the system prompt with what they are for and
+  `terminal`, `memory_admin`, `drafts`, `accounts`, `team`, `pages`, and `mcp__<server>` for each MCP server) are
+  listed in the system prompt with what they are for and
   their tools, at most 16 of a group: in a bigger group, those that share the most words with the run's goal first. The
   model turns a group on with `use_tools`. A call to a tool whose group is off does not run: it turns the group on, and
   its result asks the model to call the tool again. A group stays on for the rest of the run. `auto` is `grouped` for a
@@ -413,16 +414,19 @@ it was handed.
 
 `mail_search`, `mail_read` and `calendar_events` (item 424) read your mail and calendars in the Google and Microsoft
 accounts you signed in on Customize › Plugins ([Accounts](extending.md#accounts-googles-and-microsofts-own-sign-in)),
-through Gmail's, Google Calendar's and Microsoft Graph's own APIs, so that neither Mail, Outlook nor a browser has to
-be open. They are a run's only once an account is signed in: until then neither they nor their part of the prompt
-are in it. `account` is the address of one of the accounts: the run's prompt names them, and an address no account
-has is refused with their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`)
-or Outlook's (`from:ada`, `subject:invoice`) and, without any, lists the newest messages of the inbox; `mail_read`
-reads one whole: its people, its date, its text (the HTML of a message with no text made text) and the names of its
-files; `calendar_events` lists the events between two days or moments, in the Mac's time zone, each repeat on its own,
-with your answer to each. They only read: nothing is sent, moved or marked read, so research runs have them too, and
-the policy sees a read through the network (`network`, `low`). An email for you to send is still a draft
-(`draft_message`).
+through Gmail's, Google Calendar's and Microsoft Graph's own APIs, so that neither Mail, Outlook nor a browser has to be
+open. They are a run's only once an account is signed in: until then neither they nor their part of the prompt are in
+it. `account` is the address of one of the accounts: the run's prompt names them, and an address no account has is
+refused with their list. `mail_search` takes Gmail's search words (`from:ada is:unread newer_than:7d`) or Outlook's
+(`from:ada`, `subject:invoice`) and, without any, lists the newest messages of the inbox; `mail_read` reads one whole:
+its people, its date, its text (the HTML of a message with no text made text) and the names of its files;
+`calendar_events` lists the events between two days or moments, in the Mac's time zone, each repeat on its own, with
+your answer to each. A list the provider cut says so (more messages match, or the time may hold more events), so that a
+run narrows its search rather than taking the first page for all there is. Graph searches no events: with words to look
+for, an Outlook calendar is read a page of 100 events at a time, up to ten pages, and its next pages are followed only
+on Graph's own address, as they carry the account's token. They only read: nothing is sent, moved or marked read, so
+research runs have them too, and the policy sees a read through the network (`network`, `low`). An email for you to send
+is still a draft (`draft_message`).
 
 What they return is written by others, since anyone can send you a mail or an invitation: it comes inside an
 `<account_content …>` fence and marks the run untrusted, as a web page does ([Safety](safety.md)). A token the

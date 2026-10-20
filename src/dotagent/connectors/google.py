@@ -13,7 +13,16 @@ from urllib.parse import quote
 from pydantic import Field
 
 from dotagent.connectors.http import AccountApi, read_answer
-from dotagent.connectors.types import Attachment, Attendee, CalendarEvent, MailMessage, MailSummary, ProviderAnswer
+from dotagent.connectors.types import (
+    Attachment,
+    Attendee,
+    CalendarEvent,
+    EventList,
+    MailList,
+    MailMessage,
+    MailSummary,
+    ProviderAnswer,
+)
 from dotagent.core.errors import AccountApiError
 from dotagent.web.text import html_to_text
 
@@ -60,6 +69,8 @@ class _Reference(ProviderAnswer):
 
 class _MessageList(ProviderAnswer):
     messages: tuple[_Reference, ...] = ()
+    # Gmail's mark of a next page: more messages match.
+    nextPageToken: str | None = None
 
 
 class _When(ProviderAnswer):
@@ -89,6 +100,7 @@ class _Event(ProviderAnswer):
 
 class _Events(ProviderAnswer):
     items: tuple[_Event, ...] = ()
+    nextPageToken: str | None = None
 
 
 def _header(part: _Part, name: str) -> str:
@@ -212,12 +224,13 @@ def _event(event: _Event) -> CalendarEvent:
     )
 
 
-def google_events_of(answer: object, url: str) -> tuple[CalendarEvent, ...]:
-    """The events of Google Calendar's answer to ``url``."""
-    return tuple(_event(event) for event in read_answer(_Events, answer, CALENDAR_NAME, url).items)
+def google_events_of(answer: object, url: str) -> EventList:
+    """The events of Google Calendar's answer to ``url``, cut when it names a next page."""
+    found: _Events = read_answer(_Events, answer, CALENDAR_NAME, url)
+    return EventList(events=tuple(_event(event) for event in found.items), more=found.nextPageToken is not None)
 
 
-async def search_gmail(api: AccountApi, query: str, limit: int) -> tuple[MailSummary, ...]:
+async def search_gmail(api: AccountApi, query: str, limit: int) -> MailList:
     """The messages ``query`` finds (Gmail's search words; the inbox when empty), the newest first."""
     url: str = f"{GMAIL}/messages"
     listed: _MessageList = read_answer(
@@ -237,7 +250,7 @@ async def search_gmail(api: AccountApi, query: str, limit: int) -> tuple[MailSum
         if isinstance(answer, BaseException):
             raise answer
         summaries.append(gmail_summary(answer, address))
-    return tuple(summaries)
+    return MailList(messages=tuple(summaries), more=listed.nextPageToken is not None)
 
 
 async def read_gmail(api: AccountApi, message_id: str) -> MailMessage:
@@ -245,9 +258,7 @@ async def read_gmail(api: AccountApi, message_id: str) -> MailMessage:
     return gmail_message(await api.get(GMAIL_NAME, url, [("format", "full")], {}), url)
 
 
-async def google_events(
-    api: AccountApi, start: dt.datetime, end: dt.datetime, query: str, limit: int
-) -> tuple[CalendarEvent, ...]:
+async def google_events(api: AccountApi, start: dt.datetime, end: dt.datetime, query: str, limit: int) -> EventList:
     """The events of the primary calendar between ``start`` and ``end``, each repeat on its own, in their order;
     ``query`` narrows them by Google's own search of their words when it is not empty."""
     params: list[tuple[str, str]] = [

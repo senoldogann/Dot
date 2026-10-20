@@ -15613,7 +15613,9 @@ Graph's own APIs (`dotagent.connectors`): the providers' answers are read into m
 text before its HTML made text, the times of events in the Mac's zone, an all-day event's days kept. They only read,
 so research runs have them too (`network`, `low`); what they return comes in an `<account_content>` fence and taints
 the run, and the prompt has a section for them and names the accounts signed in. A run has them only once an account
-is signed in (a run's fixed tokens grew past a small window's budget with them there for nothing). A token the provider turns away is
+is signed in (a run's fixed tokens grew past a small window's budget with them there for nothing). A list the provider
+cut says so, and an Outlook calendar searched for words is read page by page (Graph searches no events), its next pages
+followed only on Graph's own address. A token the provider turns away is
 refreshed once (`Accounts.refreshed_token`); a 429, a 5xx or a call that did not reach the provider is made again after
 the wait it asks for; any other refusal is an `AccountApiError` with the provider's words, the path without its query.
 From the review of #412: the sign-in's network failures are `SignInError`s, and a keychain path the prompt would split
