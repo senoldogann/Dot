@@ -253,6 +253,7 @@ from dotagent.tools.groups import (
     groups_of,
     hidden_tools,
     offered_specs,
+    tools_in,
     used_groups,
 )
 from dotagent.tools.mail_calendar import account_lines
@@ -1728,7 +1729,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                     *(called_lines(names.name) if agent_record is None else ()),
                     # The accounts are named only to a run that has one of the tools that take them (an agent's may
                     # have none, or only some).
-                    *(account_lines(signed_in) if any(group_of(spec.name) == ACCOUNTS_GROUP for spec in specs) else ()),
+                    *(account_lines(signed_in) if tools_in([spec.name for spec in specs], ACCOUNTS_GROUP) else ()),
                     *owner_prompt_lines(await owner_section(runtime.store)),
                 ),
                 devtools_address(browser.config),
