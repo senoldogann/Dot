@@ -2,8 +2,10 @@
 
 ## What leaves this Mac
 
-Dot sends nothing to the people who make it: there is no telemetry, no crash report and no check for updates. What
-leaves the Mac is what a run needs, sent where the configuration points:
+Dot sends nothing to the people who make it: there is no telemetry and no crash report. The desktop app looks for a
+newer version of itself as it starts and from its menu, a request for `latest.json` of the latest GitHub release that
+carries nothing of yours, and on your yes downloads that version from there ([the desktop
+shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, sent where the configuration points:
 
 - **To the models: the run's conversation.** Each call sends the goal, the messages, what the tools returned (the text
   of the files and pages the run read, what commands printed) and the screenshots the run takes or is given. By default
@@ -171,7 +173,8 @@ and `dotx memory list` say of such a note that it was saved while reading outsid
   `~/.config/gcloud`, the data of your browsers (Chrome, Safari, Firefox, Brave, Edge and Arc) and their cookies, the
   tokens and passwords that command lines keep (`~/.netrc`, `~/.git-credentials`, `~/.config/gh`, `~/.npmrc`,
   `~/.pypirc`, the credentials of Cargo and RubyGems, `~/.docker/config.json`, `~/.kube`, `~/.azure`, `~/.config/op`,
-  `~/.password-store`), the shell's history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
+  `~/.password-store`), the keys that sign a Tauri app's updates (`~/.tauri`, the desktop app's among them), the shell's
+  history, Messages and Mail (`[policy] protected_paths`; a list of your own replaces
   this one), nor Dot's own key file, token, what signing in to an MCP server gave it, browser profiles, configuration,
   database and journals of file changes. The
   configuration holds the policy and the MCP servers, the database the rules, the journals what `dotx undo` writes back.

@@ -1,9 +1,9 @@
 # Changelog
 
-Dot has had no release yet: it is built on `main`, and each change is described in its pull request. From the first
-release on, this file lists what each one changes, the newest first.
+Each release of Dot lists here what it changes, the newest first. A change not released yet goes under **Unreleased**,
+at the top, until a release names it; how a release is made is in [Releasing](docs/development.md#releasing).
 
-## Unreleased
+## 0.1.0 (2026-10-20)
 
 The first public version of Dot, an always-on autonomous agent for macOS.
 
@@ -36,3 +36,7 @@ The first public version of Dot, an always-on autonomous agent for macOS.
   with a flash, and bring Dot forward. See [The daemon, the web UI and the desktop shell](docs/daemon.md).
 - **`dotx setup`** checks the Mac, stores a provider's key and chooses the model. The home of the web UI says when the
   default model cannot answer. See the [README](README.md#install).
+- **The desktop app**, `Dot_0.1.0_universal.dmg` of the release, for Apple silicon and Intel, signed with a Developer ID
+  and notarized by Apple: Dot in a window of its own, with a menu bar item and ⌘⇧Space. It looks for a newer Dot as it
+  starts and from **Check for Updates…**, and installs one on your yes, once its signature is checked. See
+  [The daemon, the web UI and the desktop shell](docs/daemon.md#the-desktop-shell).

@@ -15659,6 +15659,31 @@ names, the prompt), smoke (`test_approval_modes.py`: yolo hands money off, asks 
 spend asks, no allow rule lets a message go, a hand-off rule holds; the pace race answered). Docs: `docs/safety.md`,
 `docs/autonomy.md`, `README.md`, `CHANGELOG.md`.
 
+### 432. The first release, 0.1.0: the signed and notarized Mac app, its disk image, and updates by itself
+
+**Status: done (2026-10-20), on `release-0.1.0`; a path a human merges (`desktop/src-tauri/tauri.conf.json`, REVIEW.md),
+merged on the owner's word of 2026-10-20 to merge every open branch once all was done; publishing is the owner's.** The
+owner's word of 2026-10-19: "Sürüm hazırla. İmzalı bir Mac uygulaması, kurulum paketi ve otomatik güncelleme ekle.
+CHANGELOG.md'yi de ilk sürüme göre güncelle." **As built.** The shell carries `tauri-plugin-updater`, used from Rust
+only (no page gets its commands): it reads `latest.json` of the latest GitHub release as it starts and from the menu bar
+item's new **Check for Updates…**, offers a newer version in a native dialog (rfd's, shown from Rust:
+`tauri-plugin-dialog` would put its own `alert` and `confirm` in every page), and on **Install and Restart** downloads
+it, checks its minisign signature against the public key in `tauri.conf.json`, which must also name the version offered
+(`requireSignedVersion`, so that a tampered `latest.json` cannot pair a new number with an older signed archive),
+installs it and starts again. One look at a time (`Looking`): the menu's during another says so. The look at start
+speaks only when it finds an update; the one from the menu also says that Dot is the newest, or why it could not look.
+`desktop/release.sh` builds a release on the owner's Mac from a clean checkout: the universal app signed with the one
+Developer ID Application identity of the keychain (hardened runtime, secure timestamp), notarized with notarytool's
+profile `dot-notary` and stapled; the updater's archive of the stapled app (no extended attributes), signed with
+`~/.tauri/dot.key`, its password read from the Keychain (`dot-release`), bound to the version; the disk image (the app
+and a link to Applications) signed, notarized and stapled; `latest.json` for both kinds of Mac; the changelog's section
+as the notes. It checks first that the checkout is a commit of GitHub's `main` with nothing uncommitted, that the five
+files of the version agree, that the tag is not on GitHub and that the public key is the key's, and it publishes
+nothing: it prints the `gh release create` command, whose tag also publishes the package on PyPI.
+`tests/unit/test_version.py` keeps the desktop app's version the package's; `~/.tauri` joins `[policy] protected_paths`.
+The docs no longer say there is no check for updates. Docs: `docs/development.md` (Releasing), `docs/daemon.md` (the
+desktop shell's updates), `README.md` (install the app), `CHANGELOG.md` (0.1.0, dated).
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16567,3 +16592,6 @@ spend asks, no allow rule lets a message go, a hand-off rule holds; the pace rac
   message carried stand over it as small squares side by side (the picture itself, its name a tooltip), the other files
   stay chips under it; and a command or script longer than 400 characters shows as itself in a call's row, cut in the
   middle past 4000, instead of `<N chars>`, which only a blob without words (a picture's base64) still gets.
+- 2026-10-20 (Opus 5.5): item 432 on the owner's word of 2026-10-19, on `release-0.1.0` from `main`: the first release,
+  0.1.0: the desktop app signed with the Developer ID, notarized and stapled, its disk image, its updater's signed
+  archive and `latest.json`, all from `desktop/release.sh`; the shell looks for updates as it starts and from its menu.

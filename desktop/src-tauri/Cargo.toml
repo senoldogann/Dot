@@ -26,3 +26,6 @@ hmac = "0.13"
 sha2 = "0.11"
 ureq = { version = "3", features = ["json"] }
 url = "2"
+tauri-plugin-updater = "2"
+# The updater's questions as the system's dialogs, shown from Rust (tauri-plugin-dialog gives each page a script).
+rfd = { version = "0.16", default-features = false }

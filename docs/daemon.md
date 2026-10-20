@@ -692,8 +692,8 @@ the agent itself.
   open page, which says that it reconnects and reads again what changed once the daemon is back.
 - **The menu bar item** is Dot's mark in the state of the whole of Dot (looking at you at rest, glancing up while a
 run works, a blue pastille while something waits for you) with the count of what waits for you beside it, read from
-`GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat and Quit. Closing the
-window keeps the shell in the menu bar.
+`GET /api/activity/count` every second. A click opens the window; the menu has Open Dot, New chat, Check for Updates…
+and Quit. Closing the window keeps the shell in the menu bar.
 - **⌘⇧Space** anywhere brings the window up on New chat, with the cursor in the box. When another app holds the
   shortcut, the shell starts without it and its menu says so; New chat stays in the menu. While the window shows the
   page of a daemon that is down, New chat brings it up as it is, and what the page says stays.
@@ -705,6 +705,14 @@ window keeps the shell in the menu bar.
   to send a notification or drag the window: the address it reads from `config.toml`, and any it read there before
   since it started. A page of any other address, another port of the Mac among them, gets nothing from it.
 - **Files** drop into the composer as in the browser.
+- **Updates** (item 432). As it starts, and from **Check for Updates…**, the shell reads `latest.json` of the latest
+  release on GitHub (`plugins.updater` in `desktop/src-tauri/tauri.conf.json`). A newer version is offered in a dialog:
+  **Install and Restart** downloads it, checks that it is signed with the updater's key and that the signature names the
+  version offered, puts it in place of the app and starts the shell again; **Later** leaves it for the next look. The
+  look at start says something only when it finds a newer Dot; the one from the menu also says when this Dot is the
+  newest, or why it could not look, and that Dot is looking already while a look is under way, so that an update is
+  never installed twice. The dialogs are the system's, shown by the shell itself: no page can show one. Only the shell
+  updates itself: the daemon stays as it was installed, from its checkout or from PyPI.
 
 Build it on your Mac with the Rust toolchain and Node installed:
 
@@ -715,7 +723,8 @@ npm run build      # desktop/src-tauri/target/release/bundle/macos/Dot.app (and 
 npm run dev        # a debug window with live reload of the shell
 ```
 
-The build is signed ad hoc; a build other Macs open without a warning needs an Apple developer account
-(`bundle.macOS.signingIdentity` in `desktop/src-tauri/tauri.conf.json`). The icons come from Dot's mark:
-`uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark lit as a ball on a dark tile), the
-three menu bar icons and the web app's icons, and `npm run icons` makes the bundle's set from the app icon.
+That build is signed ad hoc, for this Mac. The app other Macs install, signed with a Developer ID, notarized and
+updating itself, is a release's, which `desktop/release.sh` builds (see [Releasing](development.md#releasing)). The
+icons come from Dot's mark: `uv run python desktop/icons/render.py` draws the favicon, the app icon (the mark lit as a
+ball on a dark tile), the three menu bar icons and the web app's icons, and `npm run icons` makes the bundle's set from
+the app icon.

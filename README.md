@@ -52,6 +52,10 @@ The pictures show a run of Dot's scripted test model, under the name of a real o
 3. Install its packages: `uv sync`.
 4. Set it up: `uv run dotx setup`.
 5. Open it: `uv run dotx open` opens the web UI in your browser, signed in.
+6. If you want Dot in a window of its own, with a menu bar item and ⌘⇧Space: download `Dot_<version>_universal.dmg`
+   from the [latest release](https://github.com/senoldogann/Dot/releases/latest), open it and drag Dot to
+   Applications. The app is signed and notarized, and keeps itself up to date (see
+   [the desktop shell](docs/daemon.md#the-desktop-shell)).
 
 `dotx setup` does the following, then installs the service and gives the address of the web UI:
 
@@ -93,8 +97,9 @@ on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the s
   money and credentials are handed to you and a message or a post in your name needs a yes (the review model's in
   `auto`), whatever your rules say; a `yolo` run also asks you before it reads your secrets. See
   [Autonomy](docs/autonomy.md).
-- **What leaves this Mac.** There is no telemetry. The models get the run's conversation, and the sites, search engines
-  and services a run uses get what it sends them. See [What leaves this Mac](docs/safety.md#what-leaves-this-mac).
+- **What leaves this Mac.** There is no telemetry; the desktop app asks GitHub for its latest version and, on your
+  yes, downloads it from there. The models get the run's conversation, and the sites, search engines and services a run
+  uses get what it sends them. See [What leaves this Mac](docs/safety.md#what-leaves-this-mac).
 - **The daemon** listens on this Mac's loopback address alone. Its API needs its token, except for a health check,
   the daemon's proof that it holds the token, and the pairing of a phone. A phone comes in through your own tailnet.
 - **A vulnerability** is reported privately, as [SECURITY.md](SECURITY.md) says.

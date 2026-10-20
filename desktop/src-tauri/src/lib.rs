@@ -13,11 +13,13 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
 use hmac::{Hmac, KeyInit, Mac};
+use rfd::{AsyncMessageDialog, MessageButtons, MessageDialogResult, MessageLevel};
 use serde::Deserialize;
 use sha2::Sha256;
 use tauri::image::Image;
@@ -30,6 +32,7 @@ use tauri::{
     WebviewWindowBuilder, WindowEvent,
 };
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+use tauri_plugin_updater::{Update, UpdaterExt};
 
 const WINDOW: &str = "main";
 const TRAY: &str = "main";
@@ -545,6 +548,129 @@ fn watch(app: AppHandle, shown: Shown) {
     });
 }
 
+/// Who asked for a look at the releases (item 432): the owner, from the menu, is told also that Dot is the newest or
+/// why it could not look; the look Dot takes as it starts speaks only when it found a newer Dot.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum UpdateCheck {
+    Asked,
+    AtStart,
+}
+
+/// The button of the offer that installs the update.
+const INSTALL: &str = "Install and Restart";
+
+/// Whether a look at the releases is under way, its offer and the install included: one at a time, so that the look at
+/// start and the menu's, or two clicks of the menu, never install twice. A message that only tells what a look found
+/// is not part of it.
+static LOOKING: AtomicBool = AtomicBool::new(false);
+
+/// The look at the releases under way: it ends when this is dropped, on every way out.
+struct Looking;
+
+impl Looking {
+    /// The look, unless another is under way.
+    fn start() -> Option<Looking> {
+        LOOKING
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .ok()
+            .map(|_| Looking)
+    }
+}
+
+impl Drop for Looking {
+    fn drop(&mut self) {
+        LOOKING.store(false, Ordering::SeqCst);
+    }
+}
+
+/// A native message with only an OK button, for what a look at the releases found. The dialogs are the system's, shown
+/// by the shell itself (rfd): no page gets a way to show one.
+async fn tell(level: MessageLevel, message: String) {
+    AsyncMessageDialog::new()
+        .set_title("Dot")
+        .set_level(level)
+        .set_description(message)
+        .set_buttons(MessageButtons::Ok)
+        .show()
+        .await;
+}
+
+/// Look for a newer Dot among the releases (`plugins.updater` of tauri.conf.json, item 432). One found is offered;
+/// on yes it is downloaded, its signature checked against the public key the shell carries, installed, and the shell
+/// started again.
+fn check_for_update(app: AppHandle, how: UpdateCheck) {
+    tauri::async_runtime::spawn(async move {
+        let Some(looking) = Looking::start() else {
+            if how == UpdateCheck::Asked {
+                tell(
+                    MessageLevel::Info,
+                    "Dot is looking for an update already.".to_string(),
+                )
+                .await;
+            }
+            return;
+        };
+        let found = match app.updater() {
+            Ok(updater) => updater.check().await,
+            Err(error) => Err(error),
+        };
+        match found {
+            Ok(Some(update)) => offer_update(&app, update, looking).await,
+            Ok(None) => {
+                drop(looking);
+                if how == UpdateCheck::Asked {
+                    let current = app.package_info().version.to_string();
+                    tell(MessageLevel::Info, format!("Dot {current} is the newest.")).await;
+                }
+            }
+            Err(error) => {
+                drop(looking);
+                eprintln!("dot-shell: the releases could not be read for an update: {error}");
+                if how == UpdateCheck::Asked {
+                    tell(
+                        MessageLevel::Warning,
+                        format!("Dot could not look for an update: {error}"),
+                    )
+                    .await;
+                }
+            }
+        }
+    });
+}
+
+/// Ask whether to install `update`; on yes, install it and start the shell again. The look (`looking`) ends with the
+/// answer Later, or once the install failed, before that is told.
+async fn offer_update(app: &AppHandle, update: Update, looking: Looking) {
+    let answer = AsyncMessageDialog::new()
+        .set_title("A newer Dot")
+        .set_level(MessageLevel::Info)
+        .set_description(format!(
+            "Dot {} is out (this one is {}). Install it now? Dot starts again with it.",
+            update.version, update.current_version
+        ))
+        .set_buttons(MessageButtons::OkCancelCustom(
+            INSTALL.to_string(),
+            "Later".to_string(),
+        ))
+        .show()
+        .await;
+    if !matches!(answer, MessageDialogResult::Custom(ref button) if button == INSTALL) {
+        return;
+    }
+    match update.download_and_install(|_, _| {}, || {}).await {
+        Ok(()) => app.restart(),
+        Err(error) => {
+            drop(looking);
+            eprintln!("dot-shell: the update could not be installed: {error}");
+            tell(
+                MessageLevel::Warning,
+                format!("The update could not be installed: {error}"),
+            )
+            .await;
+        }
+    }
+}
+
 /// The menu bar item. `shortcut_taken` says that ⇧⌘Space could not be had: the menu then says so, and New chat is
 /// only in the menu.
 fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
@@ -563,12 +689,28 @@ fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
         false,
         None::<&str>,
     )?;
+    let update = MenuItem::with_id(app, "update", "Check for Updates…", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
+    let before_quit = PredefinedMenuItem::separator(app)?;
     let quit = PredefinedMenuItem::quit(app, Some("Quit Dot"))?;
     let menu = if shortcut_taken {
-        Menu::with_items(app, &[&open, &chat, &taken, &separator, &quit])?
+        Menu::with_items(
+            app,
+            &[
+                &open,
+                &chat,
+                &taken,
+                &separator,
+                &update,
+                &before_quit,
+                &quit,
+            ],
+        )?
     } else {
-        Menu::with_items(app, &[&open, &chat, &separator, &quit])?
+        Menu::with_items(
+            app,
+            &[&open, &chat, &separator, &update, &before_quit, &quit],
+        )?
     };
     TrayIconBuilder::with_id(TRAY)
         .icon(tray_icon("idle"))
@@ -578,6 +720,7 @@ fn tray(app: &AppHandle, shortcut_taken: bool) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id.as_ref() {
             "open" => show(app),
             "chat" => new_chat(app),
+            "update" => check_for_update(app.clone(), UpdateCheck::Asked),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| {
@@ -614,6 +757,7 @@ fn shortcut(app: &AppHandle) -> tauri::Result<()> {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Granted::default())
         .setup(|app| {
             let handle = app.handle().clone();
@@ -642,6 +786,7 @@ pub fn run() {
                 }
             };
             tray(&handle, shortcut_taken)?;
+            check_for_update(handle.clone(), UpdateCheck::AtStart);
             watch(handle, shown);
             Ok(())
         })
