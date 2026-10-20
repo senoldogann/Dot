@@ -15924,6 +15924,59 @@ the wait, the program end to end, the restart as unload and load, a waiting rest
 it, the refusal in a run, the mark on a run's commands), against a stand-in `launchctl` and a local health check. Docs:
 `docs/daemon.md` and the docs that told the restart.
 
+### 442. Open points left by items 433 to 441, kept for later
+
+**Status: planned (2026-10-20), on the owner's word: "Açık başlık varsa tut bir yerde sonra bakarız".** What items 433
+to 441 left open, gathered in one place to come back to; each point names where it stands. None is started.
+
+**For a human (paths REVIEW.md keeps).**
+
+- `Cache-Control: no-store` for `/oauth/callback`, which can name the owner's account address (`server/guard.py`,
+  `response_headers`; a unit case beside `tests/unit/test_server_guard.py`).
+- A job of browser tests in CI: `.github/workflows/gate.yml` runs none, which is how two browser failures reached `main`
+  (items 425 and 437); a small one on each pull request (`test_face`, `test_phone_type`, `test_phone_back`) or a weekly
+  whole one.
+- The review model's retry does not say what was wrong, so an over-long field throws away a lesson or a playbook, and
+  `review_answer_unusable` logs no context (`agent/review.py`, the sweep of item 437).
+- The shell guard rates `dotx service restart` low and `launchctl submit` high, but a submitted job is a job that
+  launchd keeps starting; whether it should be refused outright or named as such (`policy/shell.py`).
+
+**The owner's.**
+
+- Name the app Dot on Google's consent screen (Google Auth Platform › Branding › App name); the docs say so (item 437).
+- The usage limits, SSL errors and "credit balance too low" of the model providers that fill the daemon's log.
+- A memory note keeps how to read the passwords Chrome saved; read it on the Memory page and keep or remove it.
+- Chrome's own "Save password?" bubble, which Dot's tools do not see: Chrome's Settings › Autofill and passwords ›
+  Google Password Manager › "Offer to save passwords" off, in the Chrome Dot works in (no code change was made).
+
+**Follow-ups in the code.**
+
+- A test of a routed step model whose content filter stops a reply (it leaves the run's routing and standby models);
+  `left`'s wording in `_to_standby`'s docstring and `docs/models.md` now also covers such a model (item 437's review).
+- `test_answer_streams` counts animation frames and failed once under six parallel browsers in the 21-minute whole run;
+  it passes alone and under lighter load.
+- The one-shot restart (item 441) runs `sys.executable`, not Dot.app's launcher as the daemon's job does: with Dot's
+  home under Desktop, Documents or Downloads macOS may ask that Python for folder access.
+- A run cannot reinstall the service now (`dotx service install` refuses in a run, item 441): a change of the job itself
+  waits for the owner.
+- The idle reaper (`terminal_idle_s`, 30 min) still closes an ended background session nobody was told of, with its
+  output; and `history.js`'s background note shows the first line of a goal when two ends are told at once (item 437).
+- What stopped the daemon is not logged (the signal, a system restart), which left the 121 restarts of 2026-10-20 to be
+  told from launchd's own state (item 437's sweep).
+- Quartz's lazily bound functions raced once in the QR code (fixed there); the desktop modules (`desktop/capture.py`,
+  `screen.py`, `input.py`) bind theirs the same way.
+- The letters on the plugin tiles that have no logo, and the Close button of a schedule or rule form, which a phone
+  shows under a long form (item 437's UI sweep).
+- Logos: DeepWiki, Context7 and Canva have no mark in either set, Jina only a wordmark, Instagram its one-colour glyph,
+  Outlook its letter until it is installed; the LICENSE lists brand guidelines only for the brands it named before.
+- Microsoft's sign-in comes back to `localhost` while the UI is at `127.0.0.1`, so a tab in the default browser may ask
+  for the access token; whether Microsoft accepts `127.0.0.1` for a `localhost` registration is not verified. A Google
+  project left in Testing gives refresh tokens that expire after seven days; the docs do not say so yet.
+- Chrome's own bubbles (save a password, an address or a card; translate; a permission) are not part of the page, and a
+  run neither sees nor answers them; the profile of Dot's own Chrome could keep them off.
+- The plugin page loads slowly under load (`test_phone_lists` waited past 5 s before item 437 made it wait for its
+  state).
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16870,3 +16923,5 @@ it, the refusal in a run, the mark on a run's commands), against a stand-in `lau
   of a group and 4 px between rows on a phone, so a long run reads as a list; a wide window keeps what it had.
 - 2026-10-20 (Opus 5.5): item 441 on `item-441-restart-when-idle` from `main`: `dotx service restart`, now or once no
   run works, after a run's `launchctl submit` restarted the daemon every 30 s while it was idle; the job was removed.
+- 2026-10-20 (Opus 5.5): item 442 planned on the owner's word, on `item-442-open-points` from `main`: the open points of
+  items 433 to 441 in one list, for later.
