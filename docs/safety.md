@@ -84,7 +84,9 @@ currency, so list sites that bill in one currency. Empty by default.
 5. *The guard* (item 427): a message sent for you (`message_send`: an email, a chat or text message, a reply or a
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode, whatever your
-   rules say; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you.
+   rules say; only a rule that hands the step to you is stricter. A rule that allows it does not answer for you. What
+   the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
+   (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
 6. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what

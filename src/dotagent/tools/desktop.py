@@ -16,7 +16,7 @@ from pydantic import Field
 
 from dotagent.config import AppConfig
 from dotagent.core.errors import DesktopError, ToolInputError
-from dotagent.desktop.actions import SecureFieldCheck, enter_secure_field, refuse_secure_field
+from dotagent.desktop.actions import SecureFieldCheck, refuse_secure_field
 from dotagent.desktop.apps import bundle_path
 from dotagent.desktop.render import (
     describe_step,
@@ -410,7 +410,9 @@ def _act_tool() -> RegisteredTool:
                 )
             )
 
-        secure_field: SecureFieldCheck = enter_secure_field if ctx.approvals == "yolo" else refuse_secure_field
+        # A secure field is the user's in every mode (item 427): the step's review hands a credential to them, and a
+        # field found secure only as the step runs is refused.
+        secure_field: SecureFieldCheck = refuse_secure_field
         limit: int = ctx.runtime.config.desktop.max_batch_steps
         outcome: ActOutcome = await ctx.runtime.desktop.act(
             ctx.thread_id,

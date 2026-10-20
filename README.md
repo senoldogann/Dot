@@ -89,8 +89,9 @@ on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the s
 ## Safety in short
 
 - **Who answers the policy's questions.** Most actions need no answer. For those that do, `ask` (the default) puts the
-  question to you, `auto` lets a review model answer, and `yolo` lets the run go on alone, but for the guard no rule
-  turns off: money, credentials, your secrets, messages and posts in your name wait for you in every mode. See
+  question to you, `auto` lets a review model answer, and `yolo` lets the run go on alone. In every mode, `yolo` too,
+  money and credentials are handed to you and a message or a post in your name needs a yes (the review model's in
+  `auto`), whatever your rules say; a `yolo` run also asks you before it reads your secrets. See
   [Autonomy](docs/autonomy.md).
 - **What leaves this Mac.** There is no telemetry. The models get the run's conversation, and the sites, search engines
   and services a run uses get what it sends them. See [What leaves this Mac](docs/safety.md#what-leaves-this-mac).

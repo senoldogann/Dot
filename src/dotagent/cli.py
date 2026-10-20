@@ -24,9 +24,9 @@ from dotagent.store.models import BrowserMode
 _EFFORT_HELP: str = "reasoning level; the levels a model offers are listed by 'dotx models'"
 _APPROVALS_HELP: str = (
     "who answers what the policy would ask: supervised (you, and before every change too), ask (you; edits and "
-    "routine work run), auto (a review model) or yolo (nobody, but money, credentials, your secrets, messages and "
-    "posts in your name wait for you in every mode, whatever your rules say). A change of Dot's own files asks you in "
-    "every mode but yolo"
+    "routine work run), auto (a review model) or yolo (nobody, but money and credentials are handed to you, and a "
+    "message or a post in your name, or a read of your secrets, waits for your yes, whatever your rules say). A change "
+    "of Dot's own files asks you in every mode but yolo"
 )
 _GOAL_MODE_HELP: str = (
     "a checker sends the run back to work until the goal is really reached (default: [agent] goal_mode)"

@@ -355,6 +355,38 @@ async def test_a_payment_under_its_pre_approved_caps_is_a_question_and_counts_ag
     assert await room.store.spent_since("shop.example", 0.0) == 17.0
 
 
+async def test_a_capped_payment_that_also_posts_asks_and_still_counts_against_the_day(room: Room) -> None:
+    """A payment under its caps whose step also posts is asked by the guard (item 427), and once it goes ahead its spend
+    counts against the day as any other's: a page cannot keep the day's cap from filling by adding a post."""
+    gate: RunGate = RunGate(
+        room.store,
+        room.bus,
+        room.broker,
+        room.run.id,
+        "task",
+        "aggressive",
+        NO_PACE,
+        CAPS,
+        "ask",
+        _nobody,
+        (INSTRUCTION,),
+        SiteLocks(),
+    )
+    sharing: ActionInfo = PAID.model_copy(update={"flags": ("financial", "public_post")})
+    question: Question = await _ask(room, gate, sharing)
+    assert "Dot asks you before a message or a post in your name" in question.record.summary
+    await room.broker.resolve(question.record.id, True, "user", "fine")
+    assert await asyncio.wait_for(question.answer, WAIT_S) == "fine"
+    assert await room.store.spent_since("shop.example", 0.0) == 12.0
+    # 12 of the day's 30 are spent: 19 more would go over, so the money hand-off holds.
+    over: Question = await _ask(room, gate, sharing.model_copy(update={"amount": Amount(value=19.0, currency="EUR")}))
+    assert over.record.severity == "handoff"
+    await room.broker.resolve(over.record.id, False, "user", "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(over.answer, WAIT_S)
+    assert await room.store.spent_since("shop.example", 0.0) == 12.0
+
+
 async def test_a_second_payment_on_the_site_waits_for_the_first_and_counts_what_it_spent(room: Room) -> None:
     """Two runs pay on one site at once (item 136): the second is decided once the first is, from what it spent, so the
     two cannot both take what is left of the day."""
