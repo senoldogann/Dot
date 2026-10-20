@@ -311,6 +311,37 @@ async def test_the_owners_messages_read_as_markdown_and_a_copy_of_the_conversati
                     await page.keyboard.press("ControlOrMeta+c")
                     assert await page.evaluate("() => navigator.clipboard.readText()") == _ANSWER
 
+                # What stands under a block of code keeps clear of it (item 439): the code is inside its own box now,
+                # and the line under an answer that ends in a block of code had stuck to it.
+                gap: float = await page.evaluate(
+                    "() => { const foot = document.querySelector('.answer-foot');"
+                    " const box = document.querySelector('.answer .prose .prose-code');"
+                    " return foot === null ? 99"
+                    " : foot.getBoundingClientRect().top - box.getBoundingClientRect().bottom; }"
+                )
+                assert gap >= 0, gap
+                # A block of code has a copy of its own, over its right edge, as a table has (item 439): it is in sight,
+                # as large as a thumb needs on a phone, and it copies the code as it was written.
+                snippet: Locator = page.locator(".answer .prose .prose-code").first
+                press: Locator = snippet.get_by_role("button", name="Copy the code")
+                await expect(press).to_be_visible()
+                await snippet.evaluate("node => node.scrollIntoView({ block: 'center' })")
+                where = await press.bounding_box()
+                frame = await snippet.locator("pre").bounding_box()
+                assert where is not None and frame is not None
+                assert where["x"] + where["width"] <= frame["x"] + frame["width"] + 1, (where, frame)
+                assert where["y"] <= frame["y"] + 1, (where, frame)
+                if width < 500:
+                    assert where["width"] >= 28 and where["height"] >= 28, where
+                await snippet.scroll_into_view_if_needed()
+                await page.screenshot(
+                    path=str(tmp_path / f"code-{width}-{scheme}.png"),
+                    clip={"x": 0, "y": max(0, where["y"] - 70), "width": min(width, 700), "height": 190},
+                )
+                if browser.browser_type.name == "chromium":
+                    await press.click()
+                    assert await page.evaluate("() => navigator.clipboard.readText()") == "ls ~/garden"
+
                 await page.evaluate("() => getSelection().removeAllRanges()")
                 await first.scroll_into_view_if_needed()
                 await page.screenshot(path=str(tmp_path / f"markdown-{width}-{scheme}.png"))

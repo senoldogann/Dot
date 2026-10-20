@@ -16652,3 +16652,7 @@ stay gone after a reload; denied, they stay; wide and on a phone; the test fails
 - 2026-10-20 (Opus 5.5): item 438 on `risk-badge` from `main`, on the owner's word: the low, medium or high label on
   the row of a command in the chat, which the owner had taken off, was back (`tools.js` drew the call's risk as a badge
   after the call reported); it is gone, with its unused `.r-*` colours. The approval card's own severity stays.
+- 2026-10-20 (Opus 5.5): item 439 on `code-copy` from `main`, on the owner's phone screen of a table and a block of code
+  in an answer: the table had a copy over its right edge and the block of code, which stood under it, had none. It
+  has one now, the same bar (`prose.js`, `app.css`), taking the code as it was written. `test_markdown_copy.py` presses
+  it in Chrome and checks it is in sight over the block's right edge at 1280 and 390 px, light and dark.

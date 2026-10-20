@@ -250,3 +250,12 @@ def test_a_call_in_the_chat_wears_no_low_medium_high_badge() -> None:
     assert "badge r-" not in tools
     assert "outcome.risk" not in tools
     assert ".r-low" not in (_CSS / "app.css").read_text(encoding="utf-8")
+
+
+def test_what_keeps_clear_of_a_block_above_it_names_the_boxes_code_and_tables_are_drawn_in() -> None:
+    """A block of code and a table are drawn in a box of their own with a copy bar (items 403 and 439), so a rule that
+    names what ends an answer must name the box and not only the ``pre`` and the ``table`` in it."""
+    css: str = (_CSS / "app.css").read_text(encoding="utf-8")
+    rule: str = css[css.index(".answer > .prose:has(> :is(") :]
+    rule = rule[: rule.index("{")]
+    assert ".prose-code" in rule and ".prose-table" in rule, rule
