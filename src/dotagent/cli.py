@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from dotagent.cli_commands import COMMAND_ADAPTER, Command
 from dotagent.core.errors import DotError
-from dotagent.core.logs import configure_logging
+from dotagent.core.logs import configure_logging, get_logger
 from dotagent.core.paths import ensure_layout, log_dir
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort
 from dotagent.policy.types import ApprovalMode
@@ -101,6 +101,8 @@ _FAMILIES: dict[str, str] = {
     "service-status": "dotagent.cli_daemon",
     "service-permissions": "dotagent.cli_daemon",
 }
+
+log = get_logger(__name__)
 
 
 class _Family(Protocol):
@@ -535,6 +537,9 @@ def main() -> None:
     try:
         code: int = asyncio.run(dispatch(command))
     except DotError as exc:
+        # On record in dotx.log too, so that a daemon that keeps failing to start (a configuration it refuses, an
+        # address taken) says why where the log is read, not only in the stderr of its launchd job.
+        log.error("command_failed", command=command.name, error=exc.message, context=exc.context)
         sys.stderr.write(f"error: {exc}\n")
         code = 2
     except (KeyboardInterrupt, asyncio.CancelledError):

@@ -10,7 +10,7 @@
 // come from Dot's config, a plugin or another agent of the Mac.
 
 import { accountsCard } from "../accounts.js";
-import { api } from "../api.js";
+import { api, blobUrl } from "../api.js";
 import { clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
@@ -51,9 +51,9 @@ const WAY_NAMES = { mcp: "MCP server", mac: "AppleScript", web: "Dot's browser",
 const MCP_POLL_MS = 2000;
 // A server's tile names this many of its tools.
 const SHOWN_TOOLS = 6;
-// A colour darker or lighter than these (its relative luminance) does not read on both grounds: its mark takes the ink.
-const DARKEST_MARK = 0.06;
-const LIGHTEST_MARK = 0.55;
+// A colour lighter than this (its relative luminance, a contrast of 3 to 1 with the tile's white) does not read on the
+// tile: the icon or letters drawn in it take the ink.
+const LIGHTEST_INK = 0.3;
 
 /** The relative luminance of the colour `hex` (six digits, no "#"), as WCAG reckons it. */
 function luminance(hex) {
@@ -64,25 +64,38 @@ function luminance(hex) {
   return 0.2126 * r + 0.7152 * g + 0.0722 * b;
 }
 
-/** A service's mark: its logo, the interface's icon or its letters, on a tile tinted with its colour. The logo and the
- * letters take the colour where it reads on both grounds, else the ink. */
-export function pluginMark(plugin) {
+/** A logo of `static/icons/plugins` as a picture, in its own colours. */
+function logoPicture(file) {
+  return el("img", { class: "plugin-logo", src: `/icons/plugins/${file}`, alt: "" });
+}
+
+/**
+ * A service's mark on its tile, which is light in both colour schemes: its logo in its own colours, else the interface's
+ * icon or its letters, drawn in the listing's colour where it reads on the tile, else in the ink. `appIcon` is the pending
+ * `blob:` URL of the icon of the application of this Mac the service stands for, as the owner has it installed
+ * (`GET /connections/{id}/icon`), or null; the icon takes the tile's place once it is read, and the mark is as drawn
+ * meanwhile, and as it stays when the icon cannot be read (the one that asked says why).
+ */
+export function pluginMark(plugin, appIcon) {
   const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" });
-  if (plugin.colour !== null) {
-    const shade = luminance(plugin.colour);
-    mark.style.setProperty("--plugin-tint", `#${plugin.colour}`);
-    if (shade >= DARKEST_MARK && shade <= LIGHTEST_MARK) {
-      mark.style.setProperty("--plugin-ink", `#${plugin.colour}`);
-    }
+  if (plugin.colour !== null && luminance(plugin.colour) <= LIGHTEST_INK) {
+    mark.style.setProperty("--plugin-ink", `#${plugin.colour}`);
   }
   if (plugin.logo !== null) {
-    const logo = el("span", { class: "plugin-logo" });
-    logo.style.setProperty("--plugin-logo", `url("/icons/plugins/${plugin.logo}")`);
-    mark.append(logo);
+    mark.append(logoPicture(plugin.logo));
   } else if (plugin.glyph !== null) {
     mark.append(icon(plugin.glyph));
   } else {
     mark.append(el("span", { class: "plugin-letters" }, plugin.monogram));
+  }
+  if (appIcon !== null) {
+    appIcon.then(
+      (url) => {
+        mark.dataset.icon = "app";
+        mark.replaceChildren(el("img", { class: "plugin-logo", src: url, alt: "" }));
+      },
+      () => undefined,
+    );
   }
   return mark;
 }
@@ -206,6 +219,27 @@ export function mount(root, ctx) {
   // off while the page paints again, and an application's says that macOS asks.
   const busy = new Set();
   const holder = el("div", { class: "stack" }, loadingPanel());
+  // The icons of the applications of this Mac the page showed, by application: the `blob:` URL of each, pending or made.
+  const appIcons = new Map();
+
+  /** The pending `blob:` URL of the icon of the application `plugin` stands for, read once for the page, when that
+   * application is installed and has one; else null. */
+  function appIcon(plugin) {
+    const app = plugin.app === null ? undefined : listing.apps.find((one) => one.id === plugin.app);
+    if (app === undefined || !app.icon) {
+      return null;
+    }
+    let pending = appIcons.get(app.id);
+    if (pending === undefined) {
+      pending = blobUrl(`/connections/${encodeURIComponent(app.id)}/icon`);
+      appIcons.set(app.id, pending);
+      pending.catch((error) => {
+        appIcons.delete(app.id);
+        console.error(`the icon of ${app.name} could not be read`, error);
+      });
+    }
+    return pending;
+  }
 
   /** Where `way` stands now: its application of `GET /connections`, or its server and service of `GET /mcp/servers`. */
   function wayNow(way) {
@@ -416,7 +450,7 @@ export function mount(root, ctx) {
     return el(
       "div",
       { class: "plugin-tile", dataset: { plugin: plugin.id, connected: String(isConnected), tried: String(plugin.tried) } },
-      pluginMark(plugin),
+      pluginMark(plugin, appIcon(plugin)),
       el(
         "div",
         { class: "plugin-main" },
@@ -433,13 +467,7 @@ export function mount(root, ctx) {
    * 408), else the plug. */
   function serverMark(server) {
     const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" });
-    if (server.logo !== null) {
-      const logo = el("span", { class: "plugin-logo" });
-      logo.style.setProperty("--plugin-logo", `url("/icons/plugins/${server.logo}")`);
-      mark.append(logo);
-    } else {
-      mark.append(icon("plug"));
-    }
+    mark.append(server.logo === null ? icon("plug") : logoPicture(server.logo));
     return mark;
   }
 
@@ -773,7 +801,7 @@ export function mount(root, ctx) {
       el(
         "header",
         { class: "plugin-hero", dataset: { plugin: plugin.id } },
-        pluginMark(plugin),
+        pluginMark(plugin, appIcon(plugin)),
         el("div", { class: "plugin-main" }, el("h2", { class: "plugin-title" }, plugin.name), el("div", { class: "plugin-does" }, plugin.does), el("div", { class: "plugin-meta" }, howChip(plugin), standing(plugin))),
       ),
       does.length < 2 ? null : card("does", "What Dot does with it", "sparkle", el("ul", { class: "plugin-list" }, does.map((line) => el("li", null, line)))),
@@ -819,13 +847,18 @@ export function mount(root, ctx) {
     }
   }
 
-  // The official sign-ins of Google and Microsoft (item 422) head the page.
-  const accounts = accountsCard();
-  root.append(bar, accounts.element, holder);
+  // The official sign-ins of Google and Microsoft (item 422) head the list of the plugins, not a service's own page.
+  const accounts = pluginId === undefined ? accountsCard() : null;
+  root.append(bar, ...(accounts === null ? [] : [accounts.element]), holder);
   attempt(load);
   return () => {
     disposed = true;
     clearTimeout(polling);
-    accounts.dispose();
+    accounts?.dispose();
+    for (const pending of appIcons.values()) {
+      // An icon that could not be read was reported where it was asked for; there is no URL to let go of.
+      pending.then((url) => URL.revokeObjectURL(url), () => undefined);
+    }
+    appIcons.clear();
   };
 }

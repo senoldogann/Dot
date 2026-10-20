@@ -520,8 +520,15 @@ export function mount(root, _ctx) {
   // failures in a row with the last error, and why learning has stopped, if it has.
   const learningLines = el("ul", { class: "owner-lines" });
   const learningHint = el("span", { class: "hint" });
+  // A work that was skipped, for there was nothing to learn from, leaves no mark: with neither a success nor a failure
+  // recorded, it has not failed, so the line says only that there is nothing yet.
   function learningLine(name, work) {
-    const went = work.last_success === null ? "has not gone well yet" : `last went well ${ago(work.last_success)}`;
+    const went =
+      work.last_success !== null
+        ? `last went well ${ago(work.last_success)}`
+        : work.last_failure === null
+          ? "nothing recorded yet"
+          : "has not gone well yet";
     const failing = work.failures_in_row > 0 ? `; failed ${plural(work.failures_in_row, "time", "times")} in a row since: ${work.last_error}` : "";
     return el("li", null, `${name}: ${went}${failing}`);
   }
@@ -572,7 +579,6 @@ export function mount(root, _ctx) {
           { class: "card-head" },
           el("span", { class: "grow" }, "Notes"),
           count,
-          el("span", { class: "spacer" }),
           search,
         ),
         holder,
@@ -581,7 +587,7 @@ export function mount(root, _ctx) {
       el(
         "section",
         { class: "card" },
-        el("div", { class: "card-head" }, el("span", { class: "grow" }, "What Dot knows about you"), el("span", { class: "spacer" }), ownerHint),
+        el("div", { class: "card-head" }, el("span", { class: "grow" }, "What Dot knows about you"), ownerHint),
         el(
           "div",
           { class: "card-pad stack" },
@@ -594,7 +600,7 @@ export function mount(root, _ctx) {
       el(
         "section",
         { class: "card learning-panel", dataset: { learning: "" } },
-        el("div", { class: "card-head" }, el("span", { class: "grow" }, "How learning fares"), el("span", { class: "spacer" }), learningHint),
+        el("div", { class: "card-head" }, el("span", { class: "grow" }, "How learning fares"), learningHint),
         el("div", { class: "card-pad" }, learningLines),
       ),
     ),

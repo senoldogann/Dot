@@ -7,6 +7,7 @@ from collections.abc import Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
+from structlog.testing import capture_logs
 
 from dotagent.config import load_default_config
 from dotagent.core.errors import WebError, WebThrottledError
@@ -135,6 +136,31 @@ async def test_when_every_rung_fails_the_error_names_each_engine_and_its_reason(
         "brave: Brave Search is limiting the searches of this machine"
     )
     assert failure.value.context["engines"] == ["duckduckgo", "brave"]
+
+
+async def test_a_failed_engine_says_its_status_and_body_in_its_reason_and_in_the_log() -> None:
+    """The message alone ("did not answer the search") does not tell an engine that is down from one out of credit."""
+    credit: WebError = WebError(
+        "the Anthropic API did not answer the search",
+        {
+            "query": "q",
+            "status": 400,
+            "body": "credit balance is too low  sk-ant-api03-" + "a" * 40,
+        },
+    )
+    engines: WebError = WebError(
+        "the SearXNG instance's engines did not answer the search", {"unresponsive": "google: timeout, brave: captcha"}
+    )
+    attempts: dict[SearchEngine, Attempt] = {"anthropic": _failing(credit), "searxng": _failing(engines)}
+    with capture_logs() as logs, pytest.raises(WebError) as failure:
+        await climb(("anthropic", "searxng"), attempts, EngineBench(), "q", 5, lambda: 0.0)
+    assert failure.value.message == (
+        "anthropic: the Anthropic API did not answer the search (HTTP 400: credit balance is too low ***); "
+        "searxng: the SearXNG instance's engines did not answer the search (google: timeout, brave: captcha)"
+    )
+    failed = [entry for entry in logs if entry["event"] == "search_engine_failed"]
+    assert [entry["engine"] for entry in failed] == ["anthropic", "searxng"]
+    assert failed[0]["context"] == credit.context and failed[1]["context"] == engines.context
 
 
 def test_the_memory_answers_the_same_query_with_its_age_and_forgets_old_ones() -> None:

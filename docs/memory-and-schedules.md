@@ -25,6 +25,10 @@ was handed is not repeated while its text stands, comes again when it changed (a
 update), and is named as forgotten when it was, since the old text stays in the chat; a note folded into a summary, in
 the run or since, is handed again after the summary, as it stands then.
 
+How learning fares, the last card, says for the reflection, the lessons and the skills when each last went well and,
+for one that failed, how many times in a row and why. A work with neither a success nor a failure recorded (one that
+had nothing to learn from leaves no mark) says "nothing recorded yet", not that it has not gone well.
+
 ```bash
 dotx memory add --tag core "I prefer answers in Turkish, with code and commands in English"
 dotx memory search --limit 5 how do I like my answers
@@ -161,7 +165,8 @@ whole: its name, goal, repetition (cron or one moment), time zone, kind of run (
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat and whether it is on
 (`history_runs`, `same_chat` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the
 standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
-creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it.
+creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
+the form is open, **New schedule** reads **Close**, with a cross.
 
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)

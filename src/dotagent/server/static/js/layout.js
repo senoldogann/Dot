@@ -113,6 +113,12 @@ const TOUCH_FIRST = window.matchMedia("(hover: none) and (pointer: coarse)");
 // width.
 export const PHONE = window.matchMedia("(max-width: 720px)");
 
+/** `narrow` on a phone's width, `wide` elsewhere: for words that a box cannot shorten with an ellipsis, as a
+ * textarea's placeholder, which a phone's one line cuts off in the middle of a word. */
+export function narrowOr(narrow, wide) {
+  return PHONE.matches ? narrow : wide;
+}
+
 /** Whether the page is used by touch first, on a phone or a tablet: a box that takes the focus there opens the screen's
  * keyboard over half the page, so a page leaves the caret for a tap as it opens (item 293). */
 export function touchFirst() {

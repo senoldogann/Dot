@@ -38,6 +38,8 @@ _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _PHONES: tuple[str, ...] = ("iPhone 17 Pro Max", "iPhone SE")
 # Long enough for the checks: the runs work while the pages are looked at, and the daemon stops them at the end.
 _WORK: ScriptedTurn = ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "sleep 60"}),))
+# How long a page may take to draw on a busy Mac: its lists are read from the daemon, one of them from macOS.
+_PAGE_WAIT_MS: int = 15_000
 # One line of facts, whatever its size: under one and a half of its own sizes high.
 _ONE_LINE: float = 1.5
 _CARD: str = """(card) => {
@@ -119,13 +121,15 @@ async def _phone(browser: Browser, playwright: Playwright, device: str) -> Brows
 
 
 async def _ground(card: Locator) -> dict[str, str]:
-    await expect(card).to_be_visible()
+    await expect(card).to_be_visible(timeout=_PAGE_WAIT_MS)
     found: object = await card.evaluate(_CARD)
     assert isinstance(found, dict)
     return {str(key): str(value) for key, value in found.items()}
 
 
-async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_lines(own_home: Path) -> None:
+async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_lines(
+    own_home: Path, mac_at_rest: None
+) -> None:
     async with _served(own_home) as (manager, address), async_playwright() as playwright:
         await _working(manager)
         browser: Browser = await playwright.webkit.launch(headless=True)
@@ -138,7 +142,7 @@ async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_l
                 # The run at work on the home's Today strip (item 364: the Activity page is gone).
                 await page.goto(f"{address}/#/runs")
                 row: Locator = page.locator(".home-today [data-section=working] .activity-row").first
-                await expect(row).to_be_visible(timeout=15_000)
+                await expect(row).to_be_visible(timeout=_PAGE_WAIT_MS)
                 facts: Locator = row.locator(".meta-facts")
                 await expect(facts).to_contain_text("step")
                 lines: object = await facts.evaluate(_LINES)
@@ -150,11 +154,13 @@ async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_l
 
                 await page.goto(f"{address}/#/team")
                 empty: Locator = page.locator("main .empty-line")
-                await expect(empty).to_contain_text("Ask Dot")
+                await expect(empty).to_contain_text("Ask Dot", timeout=_PAGE_WAIT_MS)
                 await expect(empty).not_to_contain_text("message_agent")
                 # The empty page stands its mark, its title and the line in the middle (item 407).
                 await expect(page.locator("main .empty-state .empty-mark svg")).to_have_count(1)
-                await expect(page.locator("main .empty-state .empty-title")).to_have_text("No messages today")
+                await expect(page.locator("main .empty-state .empty-title")).to_have_text(
+                    "No messages today", timeout=_PAGE_WAIT_MS
+                )
                 await context.close()
 
             page = await browser.new_page(viewport={"width": 1280, "height": 800}, reduced_motion="reduce")

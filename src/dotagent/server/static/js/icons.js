@@ -1,5 +1,6 @@
-// Inline SVG icons, built as DOM nodes (the CSP does not allow data: images). 24x24 grid, stroke only. The shapes are
-// Lucide's, under its ISC licence (Feather's MIT licence for those Lucide took from Feather): LICENSE-Lucide.txt.
+// Inline SVG icons, built as DOM nodes, so that their stroke takes the text's colour (.icon in app.css). 24x24 grid,
+// stroke only. The shapes are Lucide's, under its ISC licence (Feather's MIT licence for those Lucide took from
+// Feather): LICENSE-Lucide.txt.
 
 import { svg } from "./dom.js";
 

@@ -8,8 +8,9 @@ outside 1 to 100, a context budget of 0 or less, a tool output under 2,000 chara
 `max_timeout_s`. So is a value no run could use: an address of a provider or of the judge that is not `http://` or
 `https://` with a host, a model that is not `<provider>:<model>` with a provider Dot knows (`[models] search` an
 Anthropic one), a site under `[policy.spend]` that is not a bare host in lower case without `www.`, such as
-`example.com`. Two environment variables of the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR`
-(the logs).
+`example.com`. The error names each setting; for a key this version of Dot does not have it says that a newer Dot may
+add it (a daemon that runs an older checkout than the one that wrote the file refuses it). Two environment variables of
+the process move things: `DOT_HOME` (the home directory) and `DOT_LOG_DIR` (the logs).
 
 | Path (under `~/Library/Application Support/Dot`) | Content                                                              |
 | ------------------------------------------------ | -------------------------------------------------------------------- |
@@ -48,3 +49,6 @@ Logs are structured and go to `~/Library/Logs/Dot/dotx.log` (another folder with
 names the one in use, and the sign-in screen of a daemon that could not answer points to it); at 10 MB it is moved to
 `dotx.log.1` (the one before is dropped) and a new one is started. The output of the launchd job goes to
 `daemon.out.log` and `daemon.err.log` in the same directory, and the stderr of each MCP server to `mcp-<name>.log`.
+A `dotx` command that ends with an error, the daemon's start included (a configuration it refuses, a daemon already
+running, an address taken), writes a `command_failed` event to `dotx.log` too, with the command and the error;
+`dotx service status` and `dotx service install` read it back (see [Daemon](daemon.md)).

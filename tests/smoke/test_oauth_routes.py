@@ -87,10 +87,28 @@ async def test_a_sign_in_starts_from_this_mac_and_a_state_nobody_waits_for_is_sa
         # A page reached through a tailnet name cannot start one: the sign-in comes back to this Mac.
         phone = await client.post("/api/accounts/google/start", headers={"Host": "mac.tail1234.ts.net"})
         assert phone.status_code in (421, 422), phone.text
-        # The way back needs no token, and a state nobody waits for is said so.
-        unknown = await client.get("/oauth/callback", params={"state": "nobody", "code": "c"})
-        assert unknown.status_code == 400 and "does not wait for this sign-in" in unknown.text
+        # The way back needs no token, and a state nobody waits for is said so, in a page of Dot's own look that shows
+        # nothing the address carried.
+        unknown = await client.get(
+            "/oauth/callback",
+            params={
+                "state": "nobody",
+                "code": "c",
+                "error": "server_error",
+                "error_description": "WORDS-OF-A-STRANGER",
+            },
+        )
+        assert unknown.status_code == 400 and "This sign-in has ended" in unknown.text
+        assert "WORDS-OF-A-STRANGER" not in unknown.text and 'href="/css/app.css"' in unknown.text
         # The browser that comes back for the sign-in started is given a page; its code is not traded here (no
-        # provider is reached), so only that the page is the sign-in's own is checked.
+        # provider is reached), so only that the page is the sign-in's own is checked. The plain No is not an error to
+        # show; another error is, as the provider words it and escaped.
         declined = await client.get("/oauth/callback", params={"state": query["state"][0], "error": "access_denied"})
-        assert declined.status_code == 200 and "Not signed in to Microsoft" in declined.text
+        assert declined.status_code == 200 and "Not signed in to Microsoft</h1>" in declined.text
+        assert "callback-reason" not in declined.text
+        again = parse_qs(urlsplit((await client.post("/api/accounts/microsoft/start")).json()["link"]).query)
+        refused = await client.get(
+            "/oauth/callback",
+            params={"state": again["state"][0], "error": "server_error", "error_description": "<b>It broke</b>"},
+        )
+        assert refused.status_code == 200 and "server_error: &lt;b&gt;It broke&lt;/b&gt;" in refused.text

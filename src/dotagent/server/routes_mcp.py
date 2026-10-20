@@ -1,7 +1,7 @@
 """Routes of the MCP servers on Customize › Plugins (items 279 and 316): every server Dot has with where it stands, the
 catalogue's services, adding one, connecting one again (signing in again) and removing one, and the page an
 authorization server sends the browser back to after a sign-in (``/oauth/callback``, outside ``/api``, so that it needs
-no token).
+no token; its page is :mod:`dotagent.server.callback_page`).
 
 Adding a server tries it first: Dot connects to it once with a sign-in the owner can give (only a server that answers
 401 asks for one), keeps it once it answered with its tools, and connects it again as runs do, its tools offered to
@@ -9,7 +9,6 @@ the runs that start after. The sign-in happens in the owner's own browser, on th
 back to the address of the page the owner added it from (the Mac's, or the one their phone reaches it at)."""
 
 import asyncio
-import html
 import shlex
 import time
 from collections.abc import Mapping
@@ -31,8 +30,9 @@ from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
 from dotagent.mcp.types import McpFailure
-from dotagent.oauth.accounts import CameBack
+from dotagent.oauth.accounts import CameBack, denial_reason
 from dotagent.secrets import remove_env_value, write_env_value
+from dotagent.server.callback_page import Callback, Subject, account_callback, render, status_of
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import origin_is_local
 from dotagent.server.views import (
@@ -61,12 +61,6 @@ _SSE_SUFFIX: str = "/sse"
 _URL_SCHEMES: tuple[str, ...] = ("http://", "https://")
 _NAME_RULE: str = "a server's name is lowercase letters, digits and dashes, at most 24, starting with a letter"
 _TAKEN_NAME: str = "another MCP server has its name"
-_PAGE: str = (
-    '<!doctype html>\n<html lang="en">\n<head><meta charset="utf-8">'
-    '<meta name="viewport" content="width=device-width, initial-scale=1"><title>Dot</title></head>\n'
-    '<body>\n<h1>{title}</h1>\n<p>{text}</p>\n<p><a href="/#/customize/plugins">Back to '
-    "Plugins</a></p>\n</body>\n</html>\n"
-)
 
 
 @dataclass
@@ -87,8 +81,9 @@ class _Try:
         return self.task is not None and not self.task.done()
 
 
-def _page(title: str, text: str) -> str:
-    return _PAGE.format(title=html.escape(title), text=html.escape(text))
+def _answer(callback: Callback) -> HTMLResponse:
+    """The page for how a sign-in came out, with the status that says it."""
+    return HTMLResponse(render(callback), status_code=status_of(callback.outcome))
 
 
 def _address(config: McpServerConfig) -> str:
@@ -108,6 +103,25 @@ def _service_of(config: McpServerConfig) -> str | None:
             if package and package == tuple(arg for arg in config.args if not arg.startswith("-"))[: len(package)]:
                 return service.id
     return None
+
+
+def _host_of(url: str) -> str:
+    """The host of ``url`` with its port: the page names the server by it, and never shows the rest of the address,
+    where a key may be."""
+    parts = urlsplit(url)
+    return parts.netloc.rpartition("@")[2]
+
+
+def mcp_subject(name: str, config: McpServerConfig | None) -> Subject:
+    """The server a sign-in is for, as the callback page names it: the service of the catalogue it is a server of, with
+    its mark and the host it is at, else the server's own name (and its host)."""
+    service_id: str | None = None if config is None else _service_of(config)
+    service: McpService | None = next((one for one in MCP_SERVICES if one.id == service_id), None)
+    return Subject(
+        name=name if service is None else service.name,
+        detail=None if config is None or config.url is None else _host_of(config.url),
+        mark=None if service_id is None else logo_of_service(service_id),
+    )
 
 
 def kept_secret_names(service: McpService) -> dict[str, str]:
@@ -465,34 +479,29 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     @router.get(CALLBACK_PATH)
     async def come_back(
-        state: str = "", code: str | None = None, error: str | None = None, iss: str | None = None
+        state: str = "",
+        code: str | None = None,
+        error: str | None = None,
+        error_description: str | None = None,
+        iss: str | None = None,
     ) -> HTMLResponse:
         """Where the authorization server sends the browser back: the code goes to the sign-in that waits for it, an
-        account's of Google or Microsoft (item 422) first, else an MCP server's."""
-        came: CameBack | None = await ctx.runtime.accounts.come_back(state, code, error, time.time())
+        account's of Google or Microsoft (item 422) first, else an MCP server's. The page says how it came out (item
+        437); the words the server sent with a no are shown only for a state that waits."""
+        came: CameBack | None = await ctx.runtime.accounts.come_back(state, code, error, error_description, time.time())
         if came is not None:
-            return HTMLResponse(_page(came.title, came.text), status_code=came.status)
+            return _answer(account_callback(came))
+        # Read before the code is handed over: a record that cannot be read leaves the sign-in waiting, not answered.
+        servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         server: str | None = sign_ins.answer(state, code, iss, error)
         if server is None:
-            return HTMLResponse(
-                _page(
-                    "Dot does not wait for this sign-in",
-                    "It ended, or Dot started again since. Start it again on Customize › Plugins.",
-                ),
-                status_code=400,
-            )
+            return _answer(Callback(outcome="unknown", subject=None, reason=None))
+        found: tuple[McpServerConfig, McpOrigin] | None = servers.get(server)
+        subject: Subject = mcp_subject(server, None if found is None else found[0])
         if error is not None or code is None:
-            return HTMLResponse(
-                _page(
-                    f"Not signed in to {server}",
-                    f"The sign-in ended without a yes ({error or 'no code'}). Start it again on Customize › Plugins.",
-                )
+            return _answer(
+                Callback(outcome="declined", subject=subject, reason=denial_reason(error, error_description))
             )
-        return HTMLResponse(
-            _page(
-                f"Signed in to {server}",
-                "Dot connects to it now and offers its tools to the runs that start next. You can close this tab.",
-            )
-        )
+        return _answer(Callback(outcome="back", subject=subject, reason=None))
 
     return router

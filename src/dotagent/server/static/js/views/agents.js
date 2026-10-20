@@ -707,8 +707,10 @@ function mountPage(root, ctx, agentId) {
   const sections = el("section", { class: "home-today agent-sections", "aria-label": "The agent's work" });
   const page = el("div", { class: "home agent-home" }, loadingPanel());
 
+  // The bar names the agent, as a heading of the page, and so does the tab (`Researcher · Agents · Dot`).
   function stageOf(record) {
-    setStageTitle(actorFace(record.id, "idle", record.look), el("span", { class: "stage-name" }, record.name));
+    ctx.setTitle(`${record.name} · Agents`);
+    setStageTitle(actorFace(record.id, "idle", record.look), el("h1", { class: "stage-h1 stage-name" }, record.name));
     setStageTools(
       el("button", { class: "btn ghost sm", type: "button", title: "Edit the agent", onclick: () => edit(record) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
       el("button", { class: "btn ghost sm", type: "button", title: "Save the agent as a file, to import in another home", onclick: () => attempt(() => exportAgent(record)) }, icon("download"), el("span", { class: "label" }, "Export")),
@@ -717,6 +719,7 @@ function mountPage(root, ctx, agentId) {
   }
 
   function closeForm() {
+    delete page.dataset.editing;
     if (form !== null) {
       form.dispose();
       form = null;
@@ -743,6 +746,8 @@ function mountPage(root, ctx, agentId) {
       onCancel: () => greet(record),
     });
     top.replaceChildren(form.element);
+    // The editor opens at the top of the page, not in the middle where the greeting stood (agent-home, app.css).
+    page.dataset.editing = "";
     form.focus();
   }
 

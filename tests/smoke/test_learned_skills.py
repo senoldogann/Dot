@@ -15,6 +15,7 @@ from dataclasses import dataclass
 
 import httpx
 import pytest_asyncio
+from structlog.testing import capture_logs
 
 from dotagent.agent.learning_health import LearningHealth, read_learning_health
 from dotagent.agent.manager import RunManager
@@ -310,7 +311,8 @@ async def test_skill_work_that_fails_is_counted_and_work_that_goes_well_clears_i
 ) -> None:
     """Review O25: the task that runs the skill work of a run records how it ended. A failure (forced here: a kind with
     no letters to name a skill by) is counted with its error and says so on the run; the next run whose skill is
-    written clears it; the Memory page's API shows the record each time."""
+    written clears it; the Memory page's API shows the record each time. The warning in the log carries the error's
+    context."""
     turns: list[ScriptedTurn] = [
         _turn(_write()),
         _turn(_read()),
@@ -324,9 +326,12 @@ async def test_skill_work_that_fails_is_counted_and_work_that_goes_well_clears_i
         SKILL,
     ]
     async with _home(login_env, turns) as home:
-        first: RunRecord = await _run(home)
+        with capture_logs() as logs:
+            first: RunRecord = await _run(home)
         assert first.status == "done"
         assert await home.runtime.store.last_event(first.id, PLAYBOOK_FAILED) is not None
+        warned = [entry for entry in logs if entry["event"] == "playbook_failed"]
+        assert [entry["context"] for entry in warned] == [{"kind": "!!!"}]
         failed: LearningHealth | None = await read_learning_health(home.runtime.store)
         assert failed is not None
         assert (failed.playbooks.failures_in_row, failed.playbooks.last_success) == (1, None)

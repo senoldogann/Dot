@@ -100,6 +100,16 @@ def installed_app(bundle_id: str) -> Path | None:
     return None if url is None else Path(str(AppKit.NSURL.path(url)))
 
 
+def installed_one_of(bundle_ids: tuple[str, ...]) -> tuple[str, Path] | None:
+    """The first of ``bundle_ids`` that Launch Services finds an application for, with where it is; ``None`` when none
+    of them is installed."""
+    for bundle_id in bundle_ids:
+        found: Path | None = installed_app(bundle_id)
+        if found is not None:
+            return bundle_id, found
+    return None
+
+
 def _open(bundle_id: str, flags: tuple[str, ...]) -> None:
     outcome: subprocess.CompletedProcess[str] = subprocess.run(
         [_OPEN, *flags, "-b", bundle_id], capture_output=True, text=True, timeout=_OPEN_TIMEOUT_S, check=False

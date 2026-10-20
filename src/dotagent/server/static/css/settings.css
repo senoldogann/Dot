@@ -1,5 +1,6 @@
 /* The settings page: the tabs down the left side and the pane of the chosen tab next to them. When the two would not fit
-   side by side, the tabs become a strip above the pane. */
+   side by side (the page under 1100 px: the tabs' 196 px, the gap of 36 px and the pane's 860 px; a window of 1412 px
+   with the sidebar open, of 1140 px with it closed), the tabs become a strip above the pane. */
 
 /* The settings may run wider than the other pages: the pane next to the tabs has to hold the model table whole. */
 .page:has(> .settings-frame) {
@@ -731,17 +732,26 @@
   margin-top: var(--space-2);
 }
 
-/* The controls page (#/controls): the colour swatches and the rows of controls. */
+/* The controls page (#/controls): the colour swatches and the rows of controls. A token's swatch and name are a
+   .token-swatch, not a .swatch, which is the theme editor's colour input (32 px square, below). A track holds the
+   swatch, the gap and the longest token's name (--border-strong) on one line; a name is never broken at its hyphens. */
 .swatches {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(132px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
   gap: var(--space-2);
 }
 
-.swatch {
+.token-swatch {
   display: flex;
   align-items: center;
   gap: var(--space-2);
+}
+
+.token-swatch > code {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .swatch-colour {
@@ -1541,6 +1551,15 @@
 
 .learning-panel .owner-lines {
   margin: 0;
+}
+
+/* A head's name keeps the room its words need, and the line beside it (a count, the time of an update, why learning has
+   stopped) takes the rest, to its right, wrapping when it is long: a name with no room of its own, as .grow gives it,
+   is written across that line. A phone's head wraps instead (app.css). */
+@media (min-width: 721px) {
+  .memory-layout .card-head > .grow {
+    flex: 1 0 auto;
+  }
 }
 
 @media (max-width: 900px) {

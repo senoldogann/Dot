@@ -1,7 +1,9 @@
 """Settings › System's facts of the daemon in their groups (item 378), Diagnostics (item 370) and Open source licences
 (item 371), on a served daemon in Chrome, wide and light, on a phone and dark. Diagnostics lists the daemon's own
-process and those it started, the room what Dot keeps takes, and a log's last lines with its secrets masked and a
-filter; a name that is not a log is refused. The licences list the notices that come with the pages, the Python packages
+process and those it started, the room its files take, and a log's last lines with its secrets masked and a
+filter; a name that is not a log is refused. The rows that lead to the two pages end in a chevron that points right, the
+processes are counted in the singular for one, and on a phone the table of processes wears a cue that more lies to its
+right (item 437). The licences list the notices that come with the pages, the Python packages
 beside the daemon with a search, and the tools Dot uses. Nothing outside this Mac is reached: the logs are a folder of
 the test's own."""
 
@@ -157,8 +159,30 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                     await _fold(page, "Daemon").locator(".fold-toggle").click()
                     await expect(_fold(page, "Daemon")).to_have_attribute("data-open", "true")
                     await page.screenshot(path=tmp_path / f"system-{width}-{scheme}.png", full_page=True)
+                    # The rows that open the two pages end in a chevron that points right, as drawn: turned a quarter
+                    # round it pointed up, as a fold does.
+                    rows: Locator = page.locator(".about-row")
+                    await expect(rows).to_have_count(2)
+                    for row in await rows.all():
+                        assert await row.locator(".icon").evaluate("(mark) => getComputedStyle(mark).rotate") == "none"
+                    await expect(rows.first).to_contain_text("the room its files take, and its logs")
                     await page.get_by_role("link", name=re.compile(r"^Diagnostics")).click()
                     await expect(page).to_have_url(f"{address}/#/diagnostics")
+                    await expect(page.locator(".page-sub")).to_have_text(
+                        "Dot's processes and what they take, the room its files take, and its logs, read on this Mac."
+                    )
+                    # The processes are counted in the singular for one; the table scrolls sideways in its box on a
+                    # phone, whose edge fades while more lies to the right.
+                    await expect(page.locator(".card-head .small.muted").first).to_have_text(
+                        re.compile(r"^\d+ process")
+                    )
+                    totals: str = await page.locator(".card-head .small.muted").first.inner_text()
+                    counted = re.match(r"(\d+) (process|processes) · ", totals)
+                    assert counted is not None, totals
+                    assert (counted.group(2) == "process") == (counted.group(1) == "1"), totals
+                    await expect(page.locator(".table-scroll").first).to_have_attribute(
+                        "data-scroll", "more" if width < 720 else "end"
+                    )
                     await expect(page.locator("tr[data-pid]").first).to_contain_text("(Dot's daemon)")
                     await expect(page.locator(".folder-row .row-title", has_text="Dot's home in all")).to_be_visible()
                     lines = page.locator(".log-lines")

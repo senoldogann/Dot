@@ -1,13 +1,14 @@
 // Settings › System › Diagnostics (item 370): the daemon's process and those it started, with what each takes of the
-// CPU and of memory, read again every few seconds while the page is seen; the room what Dot keeps takes on disk; and the
-// logs, the last lines of one, with a filter. A process is named by its executable alone, and a log's lines come with
-// their secrets masked (dotagent/server/diagnostics.py).
+// CPU and of memory, read again every few seconds while the page is seen; the room the files Dot keeps take on disk; and
+// the logs, the last lines of one, with a filter. A process is named by its executable alone, and a log's lines come
+// with their secrets masked (dotagent/server/diagnostics.py).
 
 import { api } from "../api.js";
 import { sizeLabel } from "../attachments.js";
-import { ago, duration, el } from "../dom.js";
+import { ago, duration, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { inlineError, inlineLoading, pageHead } from "../panels.js";
+import { scrollCue } from "../scrollcue.js";
 import { attempt } from "../ui.js";
 
 // How often the processes are read again while the page is seen.
@@ -19,7 +20,8 @@ function card(title, side, body) {
   return el("section", { class: "card" }, el("div", { class: "card-head" }, el("span", { class: "grow" }, title), side), body);
 }
 
-/** A table whose cells never break: on a narrow window it scrolls sideways in its own box (item 360). */
+/** A table whose cells never break: on a narrow window it scrolls sideways in its own box (item 360), and the box's
+ * edge fades while more lies to the right (scrollcue.js, which the caller starts). */
 function wideTable(heads, rows) {
   return el(
     "div",
@@ -45,7 +47,7 @@ function processRow(process, daemonPid) {
   );
 }
 
-/** What one kind of what Dot keeps takes: its name over where it is, its size at the side. */
+/** The room one kind of file Dot keeps takes: its name over where it is, its size at the side. */
 function folderRow(folder) {
   return el(
     "div",
@@ -63,16 +65,24 @@ export function mount(root) {
   const diskBody = el("div", null, inlineLoading());
   const logsBody = el("div", null, inlineLoading());
 
+  // The cue on the table now shown; the table is drawn again at every reading.
+  let stopCue = () => {};
+
   async function loadProcesses() {
     try {
       const view = await api.get("/diagnostics/processes");
       if (disposed) {
         return;
       }
-      totals.textContent = `${view.processes.length} processes · ${view.cpu_percent.toFixed(1)} % CPU · ${sizeLabel(view.memory_bytes)}`;
-      processesBody.replaceChildren(wideTable(["Process", "PID", "CPU", "Memory", "Running for"], view.processes.map((process) => processRow(process, view.daemon_pid))));
+      totals.textContent = `${plural(view.processes.length, "process", "processes")} · ${view.cpu_percent.toFixed(1)} % CPU · ${sizeLabel(view.memory_bytes)}`;
+      const table = wideTable(["Process", "PID", "CPU", "Memory", "Running for"], view.processes.map((process) => processRow(process, view.daemon_pid)));
+      stopCue();
+      processesBody.replaceChildren(table);
+      stopCue = scrollCue(table);
     } catch (error) {
       if (!disposed) {
+        stopCue();
+        stopCue = () => {};
         processesBody.replaceChildren(inlineError(error, () => attempt(loadProcesses)));
       }
     }
@@ -150,7 +160,7 @@ export function mount(root) {
 
   root.append(
     el("a", { class: "back", href: "#/settings/system" }, icon("arrowLeft"), "System"),
-    pageHead("Diagnostics", "Dot's processes and what they take, the room what it keeps takes, and its logs, read on this Mac.", null),
+    pageHead("Diagnostics", "Dot's processes and what they take, the room its files take, and its logs, read on this Mac.", null),
     card("Processes", totals, processesBody),
     card("Disk", refreshButton("Measure the folders again", () => attempt(loadDisk)), diskBody),
     card("Logs", refreshButton("Read the log again", () => attempt(loadLogs)), logsBody),
@@ -166,5 +176,6 @@ export function mount(root) {
   return () => {
     disposed = true;
     clearTimeout(timer);
+    stopCue();
   };
 }

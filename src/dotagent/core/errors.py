@@ -37,6 +37,11 @@ class ProviderError(DotError):
     """A model provider call failed."""
 
 
+class ProviderFilterError(ProviderError):
+    """The model service's content filter stopped the reply. The model is not unavailable to other runs, but asked again
+    with the same conversation it is stopped again."""
+
+
 class ProviderHttpError(ProviderError):
     """The provider answered with a non-success HTTP status."""
 
@@ -72,6 +77,23 @@ class ProviderQuotaError(ProviderHttpError):
     ) -> None:
         super().__init__(message, status, context)
         self.retry_after_s: float | None = retry_after_s
+
+
+class ProviderCreditError(ProviderQuotaError):
+    """OpenRouter's 402 for an account whose credits do not pay for the request. The price of a request counts the
+    longest answer it allows, which is the model's own limit when it names none, so the account may pay for a shorter
+    one: ``affordable_tokens`` is the longest answer its credits do pay for, ``None`` when the message names none."""
+
+    def __init__(
+        self,
+        message: str,
+        status: int,
+        retry_after_s: float | None,
+        context: Mapping[str, JsonValue],
+        affordable_tokens: int | None,
+    ) -> None:
+        super().__init__(message, status, retry_after_s, context)
+        self.affordable_tokens: int | None = affordable_tokens
 
 
 class ProviderRunnerError(ProviderHttpError):

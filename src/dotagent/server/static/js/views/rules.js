@@ -8,7 +8,7 @@
 import { api } from "../api.js";
 import { clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, paneHead, segmented, switchSetting } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, paintOpener, paneHead, segmented, switchSetting } from "../panels.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -434,12 +434,13 @@ export function mount(root, _ctx) {
   });
   const words = buildWords((drafted) => form.fill(drafted), () => disposed);
   const sandbox = buildSandbox(() => disposed);
-  const addButton = el("button", { class: "btn primary sm", type: "button" }, icon("plus"), "New rule");
+  const addButton = el("button", { class: "btn primary sm", type: "button" });
+  paintOpener(addButton, "New rule", false);
   // The two ways to write a rule stay away until Add rule asks for them: the list is what this page is for (item 373).
   const forms = el("div", { class: "rule-forms", hidden: true }, words.element, form.element);
   const closeForms = () => {
     forms.hidden = true;
-    addButton.lastChild.textContent = "New rule";
+    paintOpener(addButton, "New rule", false);
   };
   forms.append(
     el(
@@ -451,7 +452,7 @@ export function mount(root, _ctx) {
   );
   addButton.addEventListener("click", () => {
     forms.hidden = !forms.hidden;
-    addButton.lastChild.textContent = forms.hidden ? "New rule" : "Close";
+    paintOpener(addButton, "New rule", !forms.hidden);
     if (!forms.hidden) {
       forms.scrollIntoView({ block: "nearest" });
       // What was written before Close is still there.
@@ -492,7 +493,7 @@ export function mount(root, _ctx) {
   if (asked !== null && asked.trim() !== "") {
     // A card's "Make a rule of this" opens the ways to write one with its sentence already in the box (item 373).
     forms.hidden = false;
-    addButton.lastChild.textContent = "Close";
+    paintOpener(addButton, "New rule", true);
     words.start(asked.trim());
   }
   // A rule added, switched or deleted on another page is read again here, as are the rules once the stream is back.

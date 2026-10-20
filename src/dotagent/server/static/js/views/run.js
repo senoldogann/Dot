@@ -37,7 +37,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFaile
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
-import { PHONE, trackHeight } from "../layout.js";
+import { narrowOr, PHONE, trackHeight } from "../layout.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -135,7 +135,9 @@ function planStep(step) {
  */
 // The runs opened last, kept while the page lives (`{ detail, history, messages }`, the stream's messages so far), so
 // that coming back to one (from a delegated run's page, say) draws it at once as it stood and follows its stream on
-// from there, instead of an empty page that fills again as the whole stream is read once more.
+// from there, instead of an empty page that fills again as the whole stream is read once more. The kept `detail` is the
+// run as it was loaded, brought up to its end when the run ends on the page (`onRunStatus`), so that a run that is over
+// comes back at rest.
 const KEPT_RUNS = 6;
 const keptRuns = new Map();
 
@@ -907,9 +909,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     // The word in the box arms a choice for one message only where the send can carry it (item 259).
     choices.setWords(!editing && !(active && steers(false)));
     footStop.hidden = !active;
-    // Short enough for one line of a phone's composer (item 111).
-    const working = steers(false) ? "Steer this run, or /btw to ask on the side" : "Queue a message, or /btw to ask on the side";
-    input.placeholder = active ? working : "Follow up (@ for skills, / for commands, or /btw to ask on the side)";
+    // Short enough for one line of a phone's composer, which holds about thirty characters (items 111 and 437).
+    const working = steers(false)
+      ? narrowOr("Steer this run (or /btw)", "Steer this run, or /btw to ask on the side")
+      : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
+    input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for skills, / for commands, or /btw to ask on the side)");
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);
@@ -1123,6 +1127,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
         setActorState(face, faceStateAtEnd(update.status));
       }
       active = false;
+      // The snapshot kept for a return to this page is of a run that is over: it draws at rest, and its replayed end
+      // gives no tick.
+      kept.detail = { ...kept.detail, active: false, elsewhere: false, run: { ...kept.detail.run, status: update.status, finished_at: update.endedAt } };
       computer.setActive(false);
       messagesMissed();
       finishedAt = update.endedAt;
@@ -1407,6 +1414,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   paintCost();
   paintFiles(thread);
   syncControls();
+  // The words in the box are read again when the window crosses the phone's width.
+  PHONE.addEventListener("change", syncControls);
   // A chat opens at its end, where its next words come (item 403) or where its newest message stands (item 440); before,
   // the page stood at its top until its first event moved it, which read as a jump up after every message sent.
   toEnd("auto");
@@ -1512,6 +1521,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     settling.disconnect();
     clearTimeout(settled);
     stopDockHeight();
+    PHONE.removeEventListener("change", syncControls);
     outline.dispose();
     stopLifecycle();
     stopBack();

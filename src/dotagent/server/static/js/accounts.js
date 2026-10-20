@@ -9,7 +9,8 @@ import { attempt, toast } from "./ui.js";
 // How often the card reads the accounts again after a sign-in starts, and for how long.
 const FOLLOW_MS = 3000;
 const FOLLOW_FOR_MS = 10 * 60 * 1000;
-const MARKS = { google: "/icons/plugins/google.svg" };
+// The providers' own marks, in full colour: the files the list of the plugins shows Google and Microsoft with.
+const MARKS = { google: "/icons/plugins/google-icon.svg", microsoft: "/icons/plugins/microsoft-icon.svg" };
 
 /** The card: returns `element` and `dispose()`. */
 export function accountsCard() {

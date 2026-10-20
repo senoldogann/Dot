@@ -275,12 +275,13 @@ box (items 352 and 360) says in a few quiet words how long the run has worked, o
 stand and how many messages are queued; each part opens what it tells of, and the line comes while one of its parts has
 something to say and goes when none has. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. When the run ends done, the next message starts and the
-page follows it; every open page shows the queue as it changes. In a campaign's chat the message steers the session. The
-box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal mode) of the
-chat, and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat
-keeps them (item 199): those its first run started with, then each one chosen in the box, at once and for every browser,
-so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a chat from before has
-the open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a
+page follows it; every open page shows the queue as it changes, and only your messages wait in it: the end of a command
+in the background is never queued (see [Runs and tools](runs.md#tools)). In a campaign's chat the message steers the
+session. The box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal
+mode) of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same
+agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
+for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
+chat from before has the open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a
 new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
 next follow-up. Beside the send, a ring shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
@@ -309,7 +310,8 @@ its end, where its next words come or its newest message stands, and stays there
 403 and 440). The six runs opened
 last are kept while the page lives, so that coming back to one (from a delegated run's page, say) draws it at once as it
 stood and follows its stream on from the last message read, not from the first; what the lessons, the questions and the
-cost show is read again (item 426).
+cost show is read again (item 426). A run that ended while its page was open is kept as ended: coming back to it shows
+its face at rest, not the tick again.
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
@@ -379,9 +381,10 @@ reaches Dot at and a pairing code for its home-screen app; see [Dot on the phone
 **System** (the daemon, its facts in four groups each named over its rows of a label and a value, item 378: this Dot,
 how it acts, what it works with and its models; the emergency stop and the health checks in a fold, closed, with the
 number of failures on its line, and the ways to **Diagnostics** and **Open source licences**, pages of their own). Which
-folds are open is kept in the browser. The tabs sit beside their content when the window has the room and above it
-otherwise, in one row that scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item
-272); on a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
+folds are open is kept in the browser. The tabs sit beside their content when the page has the room for both (1100
+px: a window of 1412 px with the sidebar open, of 1140 px with it closed) and above it otherwise, in one row that
+scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they
+are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
@@ -399,7 +402,7 @@ the introduction and the first message you send end it, and the daemon keeps tha
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
-memory and how long it has run, read again every five seconds while the page is seen; the room each kind of what Dot
+memory and how long it has run, read again every five seconds while the page is seen; the room each kind of file Dot
 keeps takes on disk (the store, the workspace, the profiles of Dot's own Chrome, screenshots, downloads, the undo
 journals, the eval reports, skills and plugins, the logs and the home in all); and the logs, the last 300 lines of the
 one written last, or of another, with a filter. A process is named by its executable alone, as its arguments may carry a
@@ -411,7 +414,8 @@ and a search, and the tools Dot uses (Google Chrome, Ollama, Node.js, Tailscale,
 this Mac or that it is not, looked for on the PATH of the owner's shell (`GET /api/licences`).
 Both pages, like the other pages under another (an agent's or a campaign's page, Team, a service's page), have their
 link back at their top in a wide window, with the sidebar beside them too (item 380): the sidebar names the list they
-are under, not the page itself.
+are under, not the page itself. On a phone the table of processes scrolls sideways in its box, its edge fading while
+more lies to the right.
 
 Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards, each a miniature of Dot's
 window drawn in the scheme it names: System (the default, split down the middle), Light and Dark; ⇧⌥⌘A steps through
@@ -459,7 +463,8 @@ modules; its notice is `static/js/appearance/LICENSE`, and Dot is not affiliated
 visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit test
-(4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type: Inter
+(4.5:1 for text and its second tier, 3:1 for the muted and faint ones; the neutral and the paper look hold the muted
+one to 4.5:1 too, the sidebar's group labels being set in it); the yellow is the owner's bubbles. Type: Inter
 for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
 (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta and
 hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the greeting),
@@ -550,7 +555,11 @@ dotx service uninstall   # stop the daemon and remove the job
 
 - Run `service install` again to restart the daemon after you changed the configuration. It stops the running job before
   it writes the new job's file; when launchd does not load the new job, the file of before is put back and its job
-  started again, and the install fails with launchd's words.
+  started again, and the install fails with launchd's words. When the job loads and the daemon does not answer within a
+  minute, the error says why when the daemon's own start failed since the install began (`dotx.log`'s `command_failed`
+  of `daemon`: a setting this version of Dot does not know, a daemon already running, an address taken), and
+  `service status`, when the daemon does not answer, shows the failure that ended the latest `dotx daemon` unless a
+  start that went well came after it. Without such a failure, read `daemon.err.log`.
 - The job runs **Dot.app** (item 288), a small app in Dot's home (`~/Library/Application Support/Dot/Dot.app`) whose
   program starts the daemon's Python and waits for it. macOS holds the program launchd starts responsible for all it
   starts, so its questions and System Settings name **Dot**, and Accessibility (it covers posting input events),
@@ -627,11 +636,11 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |
-| `GET /connections`, `POST /connections/{id}`                                    | the applications of Customize › Plugins, where each stands (`state`) and its step (`step`); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
+| `GET /connections`, `GET /connections/{id}/icon`, `POST /connections/{id}`      | the applications of Customize › Plugins, where each stands (`state`), its step (`step`) and whether the installed application has an icon (`icon`); the icon of an application of the Mac or of OneDrive as a PNG read from its bundle (404 for one of the web, one not installed and one whose bundle holds no icon file); take the step: ask macOS (a minute for your answer), show the Automation pane, open OneDrive, or open the sign-in page in Dot's browser (404 for no such application, 409 for a sign-in in My Chrome or in a browser without a window) |
 | `GET\|POST /mcp/servers` (`secrets` by name for a service that takes a key, item 408), `POST /mcp/servers/{name}/connect`, `DELETE /mcp/servers/{name}` | the MCP servers Dot has (`origin`, `state`, `tools`, `error`, `link`, `logo`, `picks_tools`) and the services to add (`kind`, `secrets`, `logo`); add one (`{"service": "notion"}`, or `{"name", "address"}`, with the page's `origin`), tried first and answered once its sign-in page is known or within 20 s; connect one again (signing in again); remove one added there (409 for one set up elsewhere) |
 | `GET /mcp/servers/{name}/offered`, `PUT /mcp/servers/{name}/allow` (`{"tools": [...]}`) (item 426) | for a server added on the page (409 for one set up elsewhere, 404 for one that is not there): every tool it lists with what it says it does, and the limit of 30; then the tools to offer, 1 to 30 of the names it lists (422 otherwise, nothing changed), connected first and kept with the server after, so a server that does not answer leaves the choice unwritten and a restart offers the same ones. The page offers the choice when `picks_tools` is true: the server was left out for offering more tools than the model gets at once, also after its first try failed; the endpoint itself also changes the allow list of a server that is ready |
 | `GET /accounts`, `POST /accounts/{provider}/start`, `DELETE /accounts/{provider}/{address}` | the accounts of Google and Microsoft signed in through their own sign-ins and whether the client you registered with each is saved (item 422); start a sign-in, only from this Mac's own address (the provider's page to open; 422 when the client is not saved); sign an account out |
-| `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state`, an account's of Google or Microsoft first, else an MCP server's (400 for none, and for an account's that waited more than 10 minutes) |
+| `GET /oauth/callback` (public, outside `/api`)                                  | where a service's sign-in page sends the browser back; hands the code to the sign-in that waits with its `state`, an account's of Google or Microsoft first, else an MCP server's, and answers a page of Dot's own look that names the account or service and says how it came out (item 437; 400 for a state nobody waits for, for an account's that failed, and for one that waited more than 10 minutes; what the address carries is shown only for a state that waits) |
 | `GET /assistant`, `PUT /assistant` (`{"name": "Miro", "owner": "Ada", "introduced": true}`, each optional) | the name the owner calls Dot by, the owner's name (the first name of their account on this Mac until they give one) and whether Dot has had its first conversation (item 420); a change, live and in the config file (422 for a blank name, a control character or a name too long) |
 | `GET /phone`, `POST /phone/pairing`                                             | the addresses a phone reaches Dot at (`[server] reach`), what Tailscale says of the Mac and whether the daemon keeps it awake (item 271); a new pairing code (item 267) |
 | `POST /phone/tailnet`, `POST /phone/awake` (`{"on": true}`)                     | Tailscale set up for this daemon and its name written into `[server] reach` (422 with why when Tailscale is missing or not signed in); the Mac kept awake while it charges, or not (`[server] keep_awake`) (item 271) |

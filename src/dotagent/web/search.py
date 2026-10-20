@@ -25,6 +25,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from dotagent.core.errors import WebError, WebThrottledError
 from dotagent.core.logs import get_logger
+from dotagent.core.text import redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.web.client import WebClient
 from dotagent.web.ladder import BENCH_S, EngineBench, SearchEngine, SearchOutcome, Skipped
@@ -72,6 +73,9 @@ _API_BYTES: int = 1_000_000
 _MAX_SNIPPET_CHARS: int = 600
 _MAX_TITLE_CHARS: int = 200
 _ERROR_BODY_CHARS: int = 500
+# How much of an engine's answer (its status line and the start of its body) goes after its message in the reason a rung
+# is skipped with.
+_REASON_DETAIL_CHARS: int = 160
 # DuckDuckGo answers 202 with a bot check instead of results; 429 is the plain rate limit of both scraped engines (Brave
 # reaches it after a handful of searches in quick succession), and 403 a machine turned away.
 _DUCKDUCKGO_THROTTLED_STATUS: frozenset[int] = frozenset({202, 429})
@@ -337,6 +341,20 @@ def search_ladder(
             return (choice,)
 
 
+def skip_reason(error: WebError) -> str:
+    """Why a rung was skipped: the message of ``error``, then, when its context has them, the HTTP status and the start
+    of the body the engine answered with (or the engines SearXNG says did not answer), secrets masked. The message
+    alone does not tell an engine that is down from one that is out of credit."""
+    status: object = error.context.get("status")
+    body: object = error.context.get("body")
+    unresponsive: object = error.context.get("unresponsive")
+    parts: list[str] = [f"HTTP {status}"] if isinstance(status, int) else []
+    for detail in (body, unresponsive):
+        if isinstance(detail, str) and detail.strip():
+            parts.append(_flat(redact_secrets(detail), _REASON_DETAIL_CHARS))
+    return f"{error.message} ({': '.join(parts)})" if parts else error.message
+
+
 def bench_note(remaining_s: float) -> str:
     return f"benched for {max(1, round(remaining_s / 60))} more min after it limited this machine"
 
@@ -351,7 +369,8 @@ async def climb(
 ) -> SearchOutcome:
     """Ask the engines of ``rungs`` in turn until one answers. A benched engine is skipped with the time it has left;
     one that limits this machine is benched for its ``BENCH_S`` and skipped; one that fails otherwise is skipped with
-    its error. When every rung is skipped the error names each engine and its reason."""
+    its error (:func:`skip_reason`) and the error's context goes to the log. When every rung is skipped the error names
+    each engine and its reason."""
     skipped: list[Skipped] = []
     for engine in rungs:
         remaining: float | None = bench.remaining(engine, now())
@@ -362,11 +381,17 @@ async def climb(
             hits: tuple[SearchHit, ...] = await attempts[engine](query, max_results)
         except WebThrottledError as error:
             bench.bench(engine, BENCH_S[engine], now())
-            log.warning("search_engine_benched", engine=engine, seconds=BENCH_S[engine], error=error.message)
-            skipped.append(Skipped(engine=engine, reason=error.message))
+            log.warning(
+                "search_engine_benched",
+                engine=engine,
+                seconds=BENCH_S[engine],
+                error=error.message,
+                context=error.context,
+            )
+            skipped.append(Skipped(engine=engine, reason=skip_reason(error)))
         except WebError as error:
-            log.warning("search_engine_failed", engine=engine, error=error.message)
-            skipped.append(Skipped(engine=engine, reason=error.message))
+            log.warning("search_engine_failed", engine=engine, error=error.message, context=error.context)
+            skipped.append(Skipped(engine=engine, reason=skip_reason(error)))
         else:
             return SearchOutcome(hits=hits, engine=engine, skipped=tuple(skipped), age_s=0.0)
     raise WebError(

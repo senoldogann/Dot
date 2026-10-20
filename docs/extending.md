@@ -11,9 +11,20 @@ Communication, Development, Business, Productivity and This Mac. Each tile has t
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
 service's own page: each way it connects, with where it stands and its step, the tools of its MCP server once it is
-ready, and where its data goes. **Check again** reads them all anew. The marks of the services Simple Icons draws
-(version 16.35.0, CC0) are files of `static/icons/plugins`, with the brands' guidelines in its LICENSE; a mark
-identifies its service and nothing more. `GET /api/plugins` returns the listings (`connections/directory.py`).
+ready, and where its data goes. **Check again** reads them all anew. `GET /api/plugins` returns the listings
+(`connections/directory.py`).
+
+Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
+logo such as GitHub's or X's reads in the dark scheme too). The logos are files of `static/icons/plugins`: from
+[gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the five brands it draws as a wordmark alone
+(Stripe, Box, Wix, Zapier and Webflow), Simple Icons' symbol in the brand's colour (version 16.35.0, CC0); the
+folder's LICENSE names the files, the source and the commit they came from, and the brands' guidelines. A mark
+identifies its service and nothing more. The applications of this Mac (Mail, Calendar, Notes, Reminders, Messages,
+Contacts, Excel, Word, PowerPoint, Outlook and OneDrive) show the icon of the application you have installed, read from
+its bundle when the page is drawn (`GET /api/connections/{id}/icon`, a PNG; `connections/app_icons.py`), since Apple's
+and Microsoft's artwork is not Dot's to ship; one that is not installed keeps its own mark, a logo, an icon of the
+interface or letters (DeepWiki, Context7, Jina, Canva and Outlook have no logo to show). A server added by hand wears
+the logo of the service it is one of.
 
 A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel and Canva (their MCP servers
 let in approved clients only; Canva refused Dot's on 2026-10-19), and Asana and Box (clients registered by hand). Figma
@@ -63,7 +74,8 @@ The ways a service connects:
   the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using:
   its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own page, which
   sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through
-  `[server] reach`); then it turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself
+  `[server] reach`), to a page that names the service and its mark and says Dot is finishing the sign-in, because the
+  service's code is traded for its tokens after that page; then the tile turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself
   with the service as a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and
   renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left
   out with words that bring you back here (**Sign in again**). **Remove** takes a server added here out, with its tools
@@ -81,18 +93,30 @@ has from its config, a plugin or another agent (Customize › Skills › Found o
 
 ## Accounts: Google's and Microsoft's own sign-in
 
-Customize › Plugins opens on **Accounts** (item 422): Google (Gmail, Google Calendar) and Microsoft (Outlook, Microsoft
-365) through their official sign-ins, with the client you register with each, as each asks of an app that runs on a
-computer. **Sign in** opens the provider's page in a new tab; you say yes there, the provider sends the browser back to
+Customize › Plugins opens on **Accounts** (item 422), above the list and not on a service's own page: Google (Gmail,
+Google Calendar) and Microsoft (Outlook, Microsoft 365), each with its own mark, through their official sign-ins, with
+the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page in a new tab; you say yes there, the provider sends the browser back to
 the daemon's `/oauth/callback` on this Mac's own address with a code, which Dot trades for tokens with PKCE, and the
 card follows until the account is there, named by its address; **Sign out** takes it away. A sign-in starts only from a
 page on this Mac (the provider comes back to the Mac's loopback address, which a phone does not reach). An account's
 access token is refreshed with its refresh token once it is about to run out.
 
+The tab the provider sends you back to is a page of Dot's own look (item 437), light or dark as the Mac is: it names the
+account with its address and says how the sign-in came out, signed in, or not signed in because you said no, the
+provider refused (with the provider's own words, such as `invalid_client`), or the browser came back after more than 10
+minutes, and **Back to Plugins** opens Plugins in that tab. The tab opens where the link opens: in the browser you use,
+or, from the desktop app, in your default browser, which may never have opened Dot and then asks for the access token
+before it shows Plugins; Dot's own window on this Mac already shows the account either way. A page that is loaded again
+after its sign-in was used says that the sign-in has ended, and shows nothing the address carried.
+
 The clients, once: at Google, enable the [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
-and the [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), create a **Desktop
-app** client at [Google Auth Platform › Clients](https://console.cloud.google.com/auth/clients), and add your address as
-a test user under [Audience](https://console.cloud.google.com/auth/audience); at Microsoft, register an app at [Entra ›
+and the [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), name the app **Dot**
+under [Google Auth Platform › Branding](https://console.cloud.google.com/auth/branding) (App name, and a logo if you
+like: Google's page shows the name of the project's app when you say yes, so a project made for something else asks in
+that name), create a **Desktop app** client at [Google Auth Platform ›
+Clients](https://console.cloud.google.com/auth/clients), and add your address as a test user under
+[Audience](https://console.cloud.google.com/auth/audience); at Microsoft, register an app named **Dot** (the
+registration's name is what Microsoft's page shows) at [Entra ›
 App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) for any
 organisation's and personal accounts, with `http://localhost/oauth/callback` as a redirect URI of **Mobile and desktop
 applications** (Microsoft compares the path, not the port) and public client flows allowed. Then save the three values

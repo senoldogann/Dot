@@ -48,7 +48,8 @@ is the answer (a small model that is offered both writes the call out as text).
   paths touched the newest that fit in another tenth of the budget (it says how many earlier ones it leaves out), and a
   check lists names, paths and links in the summary that the conversation never had (an address cut short, with the
   ellipsis of a cut value, or one lengthened by a fragment, a query or a closing slash counts as known, not a page under
-  it). The `compacted` event names the model,
+  it; a name the summary abbreviates itself, with an ellipsis inside it or a `<placeholder>`, is not looked up). The
+  `compacted` event names the model,
   how the summary came about, the attempts it took, what the check found and the estimated size of the prompt before
   and after it (`tokens_before`, `tokens_after`).
 - The plan has steps that are `pending`, `in_progress`, `done`, `failed` or `skipped`; `update_plan` writes it and
@@ -131,10 +132,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A reply without a tool call ends the turn in `chat` mode and when the run has not used a tool yet. Otherwise it is
   nudged towards `finish`; after `finish_nudges` nudges in a row the reply itself becomes the result. A step with tool
   calls starts the count again, so a status line written between tool steps does not end the run.
-- A reply the model service cut short (at its output limit, or for an abnormal reason such as a content filter) is
-  never taken as the answer, in any mode: the model is told how the reply ended and asked to go on with its tools or
-  give the complete answer again in fewer words. Each such reply counts as a nudge; after `finish_nudges` of them in
-  a row the run fails with "The model's replies were cut short" and the reason the last one ended with.
+- A reply the model service cut short (at its output limit, or for another abnormal reason it gave) is never taken
+  as the answer, in any mode: the model is told how the reply ended and asked to go on with its tools or give the
+  complete answer again in fewer words. Each such reply counts as a nudge; after `finish_nudges` of them in a row the
+  run fails with "The model's replies were cut short" and the reason the last one ended with.
+- A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
+  conversation the model is stopped again (item 437). The run moves to a standby model at once (see
+  [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
+  model left, the run fails saying that the filter stopped it and that another model would answer.
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`
@@ -295,9 +300,11 @@ HTML pages of DuckDuckGo and Brave Search (no key), then DuckDuckGo opened in Do
 Dot's own with a visible window (its bot check runs there and passes; a headless Chrome is shown a CAPTCHA, measured
 2026-10-11). An engine that limits this machine is benched (DuckDuckGo 10 minutes, Brave 90 seconds, SearXNG and the
 Anthropic rung 2 minutes) and the searches of that time skip it at once; the same query within 10 minutes is answered
-from memory. The first line of a result names the engine that answered, every rung skipped with its reason, and the age
-of a remembered answer. Bing is not a rung: without a session its page answers some queries with the results of another
-query. `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web]
+from memory. The first line of a result names the engine that answered, every rung skipped with its reason (for an
+engine that answered with an error: the HTTP status and the start of what it said, secrets masked, so an engine that is
+down reads differently from one out of credit; the log's `search_engine_failed` and `search_engine_benched` carry the
+whole context), and the age of a remembered answer. Bing is not a rung: without a session its page answers some queries
+with the results of another query. `web_fetch` reads HTML and PDF and refuses localhost, LAN and cloud-metadata addresses unless `[web]
 allow_private_hosts` is set. A page that turns the plain request away (HTTP 401, 403, 429, 503 or 999, LinkedIn's
 refusal) or shows little text without JavaScript is read in the run's Chrome, in a tab the owner does not work in that
 closes after the read: a scratch tab of Dot's own Chrome, or a tab opened behind the owner's in the owner's attached
@@ -375,15 +382,19 @@ when the daemon stops; the end of a run closes none, so a server it started stay
 A command that runs long and ends by itself, as an eval or a long build, past the 30 minutes that `shell` may wait
 (`[shell] max_timeout_s`), goes to a terminal session in the background (`terminal_open` with `background`, item 229):
 it is not closed while it runs for being left unread, and the run that started it can
-end. When it ends by itself, its chat is told in a message of its queue, which starts the chat's next run with the
-chat's choices once no run works there (a held queue keeps it). The message says which command ended, with its exit
-status and how long it ran, and nothing it printed, which the run reads with `terminal_read`, as untrusted; Dot wrote
-it, so it opens that run as a note and is no instruction of the owner. Right above the composer, the chat's page shows
-each of its commands at work, with the time it has run and a Stop; the dot of a command in the background pulses, as its
-end will wake Dot. A command stopped there, closed by the run or ended by the daemon's stop tells nothing, and neither
-does one whose end a run has read itself with `terminal_read` (item 427): the message queued the moment it ended is
-taken back out of the queue, so a run that waited for its command and saw it end is not followed by a run that tells it
-the same again; a message that has already started its run is left as it is. A delegated
+end. When it ends by itself, its chat is told once (item 437), and never in a message of its queue: the Queued list of
+the composer does not show it, and a stopped chat is not left paused with it. A run at work on the chat is told at its
+next step, in a system note that says which command ended, with its exit status and how long it ran, and nothing it
+printed, which the run reads with `terminal_read`, as untrusted; it is Dot's note, so it clears no untrusted mark and is
+no instruction of the owner. When no run works on the chat, a run is started to tell it, with the chat's choices, as
+the end of a run starts its queue's next message; its goal says the same words, Dot wrote them, so it opens as a note
+and starts as untrusted as the chat's last run ended. That run starts only when nothing waits in the chat's queue and
+the queue is not held; otherwise the run that starts next, a queued message's, or yours after a stop or a failed run,
+is told at its first step, so your queued messages and their order stay as they were. Right above the composer, the
+chat's page shows each of its commands at work, with the time it has run and a Stop; the dot of a command in the
+background pulses, as its end will wake Dot. A command stopped there, closed by the run or ended by the daemon's stop
+tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item 427):
+a run that waited for its command and saw it end is not told the same again. A delegated
 run or a campaign's session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends
 with its run: a command in the background lives as long as the daemon.
 

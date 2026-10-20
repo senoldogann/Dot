@@ -13,7 +13,7 @@ import { dotName } from "../face.js";
 import { buildFirstChat } from "../firstchat.js";
 import { forgetLevel, KEPT_SPEED, ONE_MESSAGE, savedLevel, saveLevel } from "../efforts.js";
 import { icon } from "../icons.js";
-import { touchFirst, trackHeight } from "../layout.js";
+import { narrowOr, PHONE, touchFirst, trackHeight } from "../layout.js";
 import { LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { anchoredPopover } from "../popover.js";
 import { readPref, removePref, writePref } from "../prefs.js";
@@ -84,9 +84,10 @@ const HOME_KEPT = {
   goalMode: KEPT_GOAL_MODE,
 };
 
-/** The words in the home's empty box, with the name the owner calls Dot by (item 420). */
+/** The words in the home's empty box, with the name the owner calls Dot by (item 420); a phone's line holds about thirty
+ * characters, so it only says that the at sign and the slash open something. */
 function placeholderFor(name) {
-  return `Message ${name} (@ for skills, / for commands)`;
+  return narrowOr(`Message ${name} (@ or /)`, `Message ${name} (@ for skills, / for commands)`);
 }
 
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
@@ -112,6 +113,12 @@ function buildComposer(ctx, listener) {
     listener,
   });
   const { textarea: goal, attachments } = frame;
+  // The name the box invites a message to, and the words again when the window crosses the phone's width.
+  let called = dotName();
+  const rephrase = () => {
+    goal.placeholder = placeholderFor(called);
+  };
+  PHONE.addEventListener("change", rephrase);
   // The mode, the model with its reasoning and the Options (choices.js).
   const choices = runChoices({
     frame,
@@ -152,7 +159,8 @@ function buildComposer(ctx, listener) {
   function paintAgent() {
     const chosen = chosenAgent();
     const name = chosen === null ? "Dot" : chosen.name;
-    goal.placeholder = `Message ${name} (@ for skills, / for commands)`;
+    called = name;
+    rephrase();
     agentPill.setValue(chosen === null ? "Dot" : chosen.name, "");
     agentPill.setIcon(chosen === null ? actorFace(DOT_ID, "idle", null) : actorFace(chosen.id, "idle", chosen.look));
     standing.setAvailable(chosen === null && choices.value().mode === "task");
@@ -293,9 +301,11 @@ function buildComposer(ctx, listener) {
       }
     },
     rename: (name) => {
-      goal.placeholder = placeholderFor(name);
+      called = name;
+      rephrase();
     },
     dispose: () => {
+      PHONE.removeEventListener("change", rephrase);
       stopStatus();
       choices.dispose();
       agentMenu.dispose();

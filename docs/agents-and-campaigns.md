@@ -21,14 +21,16 @@ its tools are the ones the agent names plus finishing, asking you and turning to
 server you pick for its message, or picked for an earlier message of its chat (item 415): your pick widens the agent's
 bounds for that chat; a server the model only called does not. The run's page wears the agent's face and name in the bar
 with a chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. Deleting an agent
-leaves its chats, its lessons and its learned skills to Dot.
+leaves its chats, its lessons and its learned skills to Dot. The bar of an agent's page names the agent as the page's
+heading, as the tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not where the
+greeting stood.
 
 An agent can start from a template (item 315). Under the list, **Start from a template** shows fourteen: Sales
 Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of
 Staff, Reviewer, Research Desk, Competitor Watch, Release QA, Copy Editor and Design Critic, each with its face, its
 role, what it needs of the Mac and the schedule it suggests. **Use template** makes the agent in one click and opens
 its page; it is then an agent like any other, to change in the
-editor. Every template names the tools its agent may use (item 425), and its card counts them under **Tools** and lists
+editor. Every template names the tools its agent may use (item 425), and its card counts them under **Tools** (a 40 px row to tap on a phone) and lists
 the names a click below it: no template starts an agent with every tool, and a tool this home does not have (its group
 off in the configuration, or its app not here) is struck through with the reason, since such a template is refused on use. Every
 template's instructions also say that what leaves the Mac for a person is a draft for you to send (`draft_message`, see [Drafts](runs.md#drafts)). Sales

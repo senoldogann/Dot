@@ -12,6 +12,31 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - An approval's card stays in its own chat: the home lists a run that waits under Waits for you without its card,
   and once you allow it the card leaves the chat with the line that asked for it. A refused card stays, saying so
   (item 434).
+- Every service of Customize › Plugins wears its own logo in full colour on a tile that reads in both colour schemes,
+  and the Mac's applications (Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint, Outlook,
+  OneDrive) show the icon of the application you have installed; OneDrive is found by either of its two bundle ids, the
+  Accounts card shows Google's and Microsoft's colours and only heads the list, and the "+" of a tile keeps its width on
+  a phone (item 437).
+- The page you come back to after signing in to Google, Microsoft or an MCP service now looks like Dot, light or dark as
+  your Mac is, names the account or service, says in the provider's own words why a sign-in failed, and has a button
+  back to Plugins; the docs say to name the app Dot on Google's consent screen (item 437).
+- The end of a command Dot left running in the background no longer shows in the composer's Queued list, with Steer,
+  edit and remove: a run at work is told at its next step, Dot starts a run to tell a chat where none works, and a
+  stopped chat is not left paused with it (item 437).
+- The daemon's own log errors are fixed: the Settings › Phone QR codes no longer crash, an OpenRouter account with few
+  credits is asked again with an answer it can pay for (and a 402 says "out of credits"), a daemon that refuses its
+  configuration names the setting in `dotx service status` and `dotx service install`, and failed searches, banner
+  clicks and request answers keep their context or stop warning for ordinary traffic (item 437).
+- Small fixes across the web UI: Settings › System's rows end in a right-pointing chevron, Diagnostics counts "1
+  process" and fades its table's edge on a phone, Memory's heads and learning lines read right, Schedules and Rules
+  close with a cross, an agent's page has its name as tab title and heading and opens its editor at the top, a phone's
+  composer words fit its line, Controls' colour names stay on one line, and the sidebar's section labels read at 4.5:1
+  (item 437).
+- A run that finished while its page was open comes back at rest, not with the done tick again, and a template card's
+  Tools row is a 40 px target on a phone; the phone browser tests no longer flake on a busy Mac (item 437).
+- A reply the model service's content filter stops (`content_filter`) no longer fails the run as "cut short" after
+  asking twice more: the run moves to its standby model at once, or, with none, ends saying that the filter stopped it
+  and that another model would answer (item 437).
 
 ## 0.1.0 (2026-10-20)
 

@@ -15722,6 +15722,164 @@ Waits for you under the composer, and the sidebar, lead to the chat where the ca
 stay gone after a reload; denied, they stay; wide and on a phone; the test fails on the code before). Docs:
 `docs/daemon.md`, `CHANGELOG.md` (Unreleased).
 
+### 437. Logos, sign-in pages, background commands, and what a sweep of the app found
+
+**Status: done (2026-10-20), on `item-437-logos-and-polish`, built in six worktrees (`polish-logos`, `polish-signin`,
+`polish-background`, `polish-daemonlog`, `polish-ui`, `polish-tests`) and merged into it.** The owner's words of
+2026-10-20, with four screenshots (the Plugins page, Google's consent screen naming "Expiry Obligation Tracker", the
+bare "Signed in to Microsoft" page, a background command's end in the Queued list): "Her plugin ve connector kendi ikonu
+ya da logosu olsun, bunlar sanki senin yarattığın şeyler. Ayrıca neden farklı uygulama çıktı Gmail girişte ve bu başarı
+ekranları daha iyi olabilir aslında. Ve artık arka planda çalışan terminal çıktıları queue mesaj olarak gelmesin
+bittikten sonra çünkü ajan görüyor zaten onları. Onun harici uygulamamızda başka problem, eksik ya da sorun var ise
+araştır ve bunları da çöz. Tüm bu her şeyi tek bir PR'da gönder temizce." A sweep first ran the whole offline suite with
+the browser tests, read three days of the daemon's log and opened every page of the UI at 1280 and 390 px, light and
+dark; each group then checked its findings on the current `main` (items 436 and 438 had landed) before fixing them.
+Google's consent screen shows the name of the Google Cloud project the client ID belongs to; the owner renames it there
+(the docs now say so).
+
+**Logos.** **As built (2026-10-20).** Every service of Customize › Plugins wears its own logo, in its own colours (item
+437). The marks were Simple Icons paths used as a CSS mask, one flat colour on a tinted tile, with letters (S, M, in, X,
+W) where Simple Icons has no mark; a logo is now a picture (`<img>`, `object-fit: contain`) of a file of
+`static/icons/plugins`: 42 full-colour files of gilbarbara/logos (CC0 1.0, commit `dafdf2df`, each checked to hold
+nothing that runs or loads), and, for the five brands gilbarbara draws as a wordmark alone (Stripe, Box, Wix, Zapier,
+Webflow), Simple Icons' symbol with the brand's colour as the file's fill; the AWS wordmark is legible at the tile's
+size and is used, Jina's is not and keeps its letter, and DeepWiki, Context7 and Canva, which have no mark anywhere,
+keep their glyph or letters. The LICENSE names both sources, the commit and the files, with the trademark notice and the
+guideline links. The tile is white in both colour schemes (`--mark-ground`, `--mark-ink`, `--mark-ring` in
+`themes.css`), so GitHub, X and Vercel read in the dark one; a glyph or letters sit on the same tile in the listing's
+colour where it reads on white, else the ink; a server added by hand wears its service's logo the same way. The
+applications of the Mac (Mail, Calendar, Notes, Reminders, Messages, Contacts, Excel, Word, PowerPoint, Outlook,
+OneDrive) wear the icon of the application the owner has installed, read from its bundle when the page is drawn and
+never committed: `GET /api/connections/{id}/icon` draws the `.icns` that its `Info.plist` names as a PNG (Pillow, once
+for each version of the file), `GET /api/connections` tells which applications have one (`icon`) so the page asks for
+those alone, and the page loads the PNG with the token, the guard unchanged; an application that is not installed keeps
+its mark (Outlook here, its letter). OneDrive was reported not installed whenever no folder synced, because its bundle
+id is `com.microsoft.OneDrive-mac` and the catalogue said `com.microsoft.OneDrive`; a folder application now holds
+`bundle_ids` and the first Launch Services finds is the one. The Accounts card shows Google's and Microsoft's colours on
+the same tile (the first chat's Google card too, which drew a black G), stands over the list and no longer over each
+service's own page, and the tile's "+" keeps its width beside long words (a flex row squeezed it to 18 to 28 px). "(item
+408)" is out of the copy of the key-based and local plugins. The title of the Accounts card over its hint on a phone,
+also reported, had been fixed by item 436; the browser test holds it. The directory test reads each logo file (a
+well-formed SVG with a `viewBox`, nothing that runs or loads, named in the LICENSE under its source, no file unused,
+every name the scripts use there), `test_app_icons` the bundle reading and the bundle ids, a smoke test Calendar's icon
+through the API, and the browser test of the page the marks, the Accounts card and the "+" in both schemes.
+
+**Sign-in pages.** **As built (2026-10-20).** The page the browser comes back to at `/oauth/callback` after a sign-in is
+Dot's own sign-in card in place of the bare template (`server/callback_page.py`): the wordmark of `offline.html`, the
+title with a disc that says how it went (a tick, a cross for a refusal, a plain mark for what is neither done nor a
+fault), the account with its address and its provider's full-colour mark (as the Accounts card has)
+or the MCP service with the name and mark the catalogue gives it and its host, the provider's own words when it gave
+any, a primary **Back to Plugins**, and a line that the tab may have opened in the default browser, where Plugins asks
+for the access token first. It links `/css/app.css` and `/css/themes.css` by absolute address and has no inline style or
+script, so the content security policy and `guard.py` are as they were; light and dark follow the system by
+`light-dark()` alone, and a mark sits on the plugins' tile, light in both schemes (`--mark-ground`).
+`CameBack` is a typed outcome (signed in, declined, expired, failed) and the renderer owns the words and the status: a
+plain No is a neutral "Not signed in to Google, nothing was saved", any other error shows as `error: description` (cut,
+escaped), a refusal shows its message with the provider's error code and description (`_Refusal`; an answer that is no
+OAuth error stays in the log's `body`), and a state nobody waits for says "This sign-in has ended" and shows nothing the
+address carried. An MCP server's page says "Back from Notion" and that Dot is finishing the sign-in, because its code is
+traded for tokens after the page, and names the server by its host alone, never the address, where a key may be. The
+docs name the app **Dot** on Google's consent screen (Branding › App name) and the Microsoft registration Dot, and say
+the tab may open in the default browser. `tests/unit/test_callback_page.py` renders every outcome;
+`tests/smoke/test_sign_in_page.py` draws three of them in Chrome, wide and on a phone, light and dark, without a console
+error under the policy. Not done: `Cache-Control: no-store` for the callback (it is in `guard.py`, a human's), and the
+7-day lapse of a Google project left in Testing, not yet confirmed in Google's console.
+
+**Background commands.** `RunManager.command_ended` no longer calls `queue`; nothing of Dot's is ever stored in a chat's
+queue. A run at work on the chat is told at its next step: `loop.py` takes the ended, untold commands of the chat
+(`Terminals.take_ended`, once per session end) next to the peers note and stores a `[system note]` with the same words
+the queued message had (`ended_notices`: which command, its exit status, how long it ran, nothing it printed); it is a
+note from Dot, not the inbox, so it clears no taint and is no instruction. When no run of any process works on the chat,
+nothing waits in its queue and the queue is not held, `RunManager._tell_ended_commands` starts the telling run directly
+(source `background`, the chat's choices and agent, started as untrusted as the chat's last run ended) and tells the
+pages with `queue_changed` and `started_run_id`, so the page follows it and nothing flashes in the Queued sheet;
+`_follow_queue` calls it after `_drain` on a done end, for a command that ended in the run's last step. After a stop or
+a failed run nothing is queued and nothing is held (the chat is no longer left "Paused until you resume it" with Dot's
+row), and the next run of the chat, a queued message's or the owner's, is told at its first step; a start that another
+start beat leaves the news to that run. The item 427 take-back of a queued notice is deleted with `command_read`,
+`close_read` and `end_read`: a run that reads the end itself closes the session, which is never told. The owner's queued
+messages and their order are untouched. The tool texts of `terminal_open` say: you are told at your next step, or in a
+new run when none works on the chat. Tests: smoke (`test_background_commands.py`: idle case, working run told once at
+its next step with nothing queued, end in the last step, stop then the owner's next run, close in the window, a beaten
+start; `test_terminal.py`: an end is handed out once; `test_taint_goes_on.py`: the note clears no taint), the browser
+test of the chat page unchanged, `dotx eval check`. Docs: `docs/runs.md`, `docs/safety.md`, `docs/daemon.md`,
+`CHANGELOG.md` (Unreleased).
+
+**The daemon log's bugs.** Item 437, part daemonlog, as built: nine recurring errors and warnings of the owner's own
+daemon were read in dotx.log and daemon.err.log, checked against the code, and seven of them fixed. The two QR codes of
+Settings › Phone, asked for together, no longer crash: PyObjC binds a Core Graphics function the first time its name is
+read and two worker threads reading it unbound at once made the second fail with a KeyError, so `qr.py` makes its
+transform once at import. A search rung that fails says why: `search_engine_failed`, `search_engine_benched` and
+`playbook_failed` log the context of their error, and the reason a rung is skipped with carries the HTTP status and the
+start of what the engine answered, secrets masked. OpenRouter's 402 for credits is its own error, `ProviderCreditError`,
+and pauses a model as "out of credits" instead of "not in the plan"; because Dot sends no `max_tokens`, OpenRouter
+priced each call at the model's longest answer and refused it on an account with few credits, so the connector now asks
+once more with the answer length the 402 names (at least 1,024 tokens) and logs `openrouter_max_tokens_lowered`. A
+daemon that refuses its configuration says why where the owner looks: the error names each setting and says that a newer
+Dot may add a key this version does not know, `dotx` writes a `command_failed` event to `dotx.log` for every command
+that ends with an error (a failed daemon start included), `dotx service status` shows the failure that ended the latest
+daemon when it does not answer, and `dotx service install` names it when the job loads but the daemon ended with an
+error since the install began. The compaction check leaves a name the summary abbreviates (an ellipsis inside it, a
+`<placeholder>`) alone. The cookie-banner handler no longer lets Playwright's click timeout out to stderr: a banner that
+went away under the click says nothing, any other failure is `consent_decline_failed` with the page's address. Chrome's
+"Invalid InterceptionId" on a request the page cancelled first is a debug line, not the `browser_hop_unanswered`
+warning. Left to a human because they sit in `review.py`: the retry note of a reviewer answer that was not usable still
+does not say which field was too long. The restart loop of 2026-10-20 (finding 5) is not attributed by any new log yet.
+
+**The UI sweep.** **As built (2026-10-20).** The small things a pass over every page of the web UI, at 1280 and 390 px
+in both schemes, found, each checked against `main` after item 436 and fixed only where it still showed. The rows of
+Settings › System that open Diagnostics and the licences end in a chevron that points right, not one turned up.
+Diagnostics says "1 process", fades the right edge of its table of processes on a phone while more lies that way
+(`scrollCue`, started again with each reading), and says "the room its files take". On Memory a card head keeps its
+name's room and sets the count, the time of an update or why learning stopped at its right, and a learning work with
+neither a success nor a failure recorded (one with nothing to learn from leaves no mark) says "nothing recorded yet",
+not "has not gone well yet". The button that opens a form on Schedules and Rules is a cross and "Close" while the form
+is open, with `aria-expanded` (`paintOpener`). An agent's page names the agent in the tab ("Researcher · Agents · Dot")
+and in the bar as the page's one `h1`, and Edit opens the editor at the top of the page, not under the half window that
+centres the greeting (`.agent-home[data-editing]`). A phone's composer says "Message Dot (@ or /)", "Follow up (@ or
+/)", "Steer this run (or /btw)" and "Queue a message (or /btw)" (`narrowOr`), where the long words were cut mid-word and
+a measure of 182 px held 305 px of them; they are read again when the window crosses 720 px. On Controls a colour's name
+stood in a 32 px box because the page's `.swatch` was also the theme editor's colour input; it is a `.token-swatch` now.
+The sidebar's group labels are set in the muted ink, not the faint one (4.13:1), and the neutral look's light muted ink
+is `#696864` (4.48:1 on the third surface, now 4.55:1), with the copies of the look in a shown page's variables and the
+desktop's down page; `tests/unit/test_css_tokens.py` holds the muted ink and those labels to 4.5:1 in the two looks of
+`themes.css`, the faint tier staying at 3:1. The Settings tabs are a column only where the page has 1100 px for them
+beside the pane (a window of 1412 px with the sidebar open, 1140 px with it closed), as item 272 built and tested them;
+the page that said "in a Mac's window" now says so. Tests: `test_about_pages.py`, `test_agents.py`,
+`test_side_scroll.py`, `test_rules.py`, `test_schedule_memory.py`, `test_controls.py`, `test_phone_fit.py` (the
+placeholder measured in the box's font on an iPhone SE, an iPhone 17 Pro Max and a Pixel 7) and `test_queue.py`.
+
+**The browser tests.** Item 437 (As built): the five browser tests the sweep found failing or flaky on main before item
+436 pass again, in a run alone, at -n 8 and -n 12, and under twenty CPU burners. Two were real. A run that ended while
+its page was open was kept (item 425) as it was loaded, still active, so coming back to it replayed its end into a page
+that took it for live and the face showed the done tick again; the page now brings the kept snapshot up to the run's end
+when the run ends (views/run.js, onRunStatus), and a run that is over comes back at rest. The Tools count on a template
+card was a 20 px row on a phone; it is a 40 px row there with its marker kept (app.css), as the other rows a finger
+opens. Three were flaky. test_phone_back put its links on the home after a goto to the address it was at, which WebKit
+turns into a reload, before the page's main existed, and opened the list of chats before the chat's route, which closes
+a drawer, had run; it now waits for the home and for the route's own mark (main[data-layout]). test_setup_card looked
+for the answer as the first text on the page, which on a phone is the closed sidebar's last line; it asks the answer's
+own card. The Plugins page waits for GET /api/connections, which asks macOS's permission service one application at a
+time (0.8 s for ten apps on an idle Mac, 5.6 s for one under load); the tests that open the page for its layout alone
+(test_phone_lists, test_phone_back, test_phone_type, test_phone_all_pages) take a new fixture, mac_at_rest, that has
+macOS answer at once, as test_customize_plugins already does. The CI gate still runs no browser test (gate.yml), which a
+human decides; that is why both real failures reached main.
+
+**A content filter's stop.** The owner's word of 2026-10-20 18:0x, with a screenshot of two chat runs on
+`opencode_go:deepseek-v4.1-flash` that failed in 10 and 14 s with "The model's replies were cut short ...
+'content_filter'" ("Ekteki problem nedir, ilk defa karşılaştım. Bu problemi de çöz"): each step of a 339k-token chat
+came back with no words and the service's end `content_filter`, which the loop took for a cut reply and nudged twice
+with the same conversation. `agent/loop.py` now reads that end (`_FILTERED`, `filtered_stop`) as a model that cannot
+answer this run: a `ProviderFilterError` (`core/errors.py`) raised at the step, so a routed step goes back to the run's
+own model and the run's own model hands over to a standby one at once (`_cannot_answer`, reason "its content filter
+stopped the reply"), without pausing the model in the router for other runs; with no standby model left the run fails at
+the first stop, saying the filter stopped it and that another model, or a standby model, would answer.
+Tests: smoke (`test_helpers.py`: the move to the standby model, and the end without one after one request;
+`test_cut_short_replies.py` takes another abnormal end). Docs: `docs/runs.md`, `docs/models.md`.
+
+**Left for a human** (paths REVIEW.md keeps): `Cache-Control: no-store` for `/oauth/callback` (`server/guard.py`), and a
+job of browser tests in CI (`.github/workflows/gate.yml` runs none, which is how two browser failures reached `main`).
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16661,3 +16819,6 @@ stay gone after a reload; denied, they stay; wide and on a phone; the test fails
   phone the keyboard's Return sent the message, where the round send button sends. A run opens at its foot now, live or
   over, and keeps it while what is above settles (`run.js`); on a touch screen Return breaks the line whatever the
   setting says (`composer.js`). `test_chat_scroll.py` measures both, wide in Chrome and on a phone.
+- 2026-10-20 (Opus 5.5): item 437 on the owner's words of 2026-10-20, on `item-437-logos-and-polish` from `main`: every
+  plugin's own logo and the Mac apps' own icons, sign-in pages that look like Dot, a background command's end no queued
+  message, and the daemon-log, UI and browser-test fixes of a sweep of the app; one pull request.

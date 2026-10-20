@@ -7,7 +7,7 @@ import { api } from "../api.js";
 import { clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
-import { emptyPanel, errorPanel, field, loadingPanel, pageHead, segmented } from "../panels.js";
+import { emptyPanel, errorPanel, field, loadingPanel, pageHead, paintOpener, segmented } from "../panels.js";
 import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
 import { getSnapshot, loadModels, onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
@@ -462,10 +462,11 @@ export function mount(root, ctx) {
   const count = el("span", { class: "hint" });
   // The form that adds a schedule stays away until New schedule asks for it; the list is what this page is for.
   const formSlot = el("div", { class: "schedule-form-slot", hidden: true });
-  const addButton = el("button", { class: "btn primary sm", type: "button" }, icon("plus"), "New schedule");
+  const addButton = el("button", { class: "btn primary sm", type: "button" });
+  paintOpener(addButton, "New schedule", false);
   addButton.addEventListener("click", () => {
     formSlot.hidden = !formSlot.hidden;
-    addButton.lastChild.textContent = formSlot.hidden ? "New schedule" : "Close";
+    paintOpener(addButton, "New schedule", !formSlot.hidden);
     if (!formSlot.hidden) {
       formSlot.scrollIntoView({ block: "nearest" });
       formSlot.querySelector("input")?.focus();
@@ -569,7 +570,7 @@ export function mount(root, ctx) {
   schedulerNote.hidden = status === null || status.scheduler_running;
   const closeForm = () => {
     formSlot.hidden = true;
-    addButton.lastChild.textContent = "New schedule";
+    paintOpener(addButton, "New schedule", false);
   };
   const form = scheduleForm({
     view: null,

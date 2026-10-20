@@ -1,5 +1,7 @@
-// The settings. In a Mac's window, one page with the tabs down its left side; on a phone, a list of the tabs in groups
-// whose rows open each tab as a page of its own (item 330). Each tab is drawn by the module that owns it.
+// The settings. In a Mac's window, one page with the tabs down its left side where the page has the room for them beside
+// the pane, and in one row above the pane where it has not (settings.css: from 1100 px of page, a window of 1412 px with
+// the sidebar open); on a phone, a list of the tabs in groups whose rows open each tab as a page of its own (item 330).
+// Each tab is drawn by the module that owns it.
 
 import { api, query } from "../api.js";
 import { el, modelName } from "../dom.js";

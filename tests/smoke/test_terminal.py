@@ -24,7 +24,7 @@ from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import RunRecord, ThreadRecord
-from dotagent.terminal.session import Terminals, TerminalSession
+from dotagent.terminal.session import Terminals, TerminalSession, ended_notices
 from dotagent.tools.base import PreparedCall
 from dotagent.tools.context import ToolContext
 
@@ -196,16 +196,12 @@ class _Watcher:
     def __init__(self) -> None:
         self.changed: list[str] = []
         self.ended: asyncio.Queue[tuple[str, str, int | None]] = asyncio.Queue()
-        self.read: list[tuple[str, str]] = []
 
     async def sessions_changed(self, thread_id: str) -> None:
         self.changed.append(thread_id)
 
     async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
         self.ended.put_nowait((thread_id, session.id, session.exit_status))
-
-    async def command_read(self, thread_id: str, session: TerminalSession) -> None:
-        self.read.append((thread_id, session.id))
 
 
 async def test_a_command_in_the_background_runs_unread_and_its_end_alone_is_told(runtime: Runtime) -> None:
@@ -231,6 +227,36 @@ async def test_a_command_in_the_background_runs_unread_and_its_end_alone_is_told
         # Opened three times, closed by hand, closed idle twice, and one end: each was heard.
         assert watcher.changed.count("chat") >= 6, watcher.changed
         assert watcher.ended.empty()
+    finally:
+        await terminals.aclose()
+
+
+async def test_the_end_of_a_command_in_the_background_is_taken_once(runtime: Runtime) -> None:
+    """Item 437: the end of a command in the background is handed out once, to the run at work that is told in a note or
+    to the run started to tell it, with how long the command ran; a command still running, a session that is no command
+    in the background and one that was closed are never handed out; one put back is handed out again."""
+    terminals: Terminals = Terminals(4, 60.0, runtime.shell_env)
+    watcher: _Watcher = _Watcher()
+    terminals.watch(watcher)
+    try:
+        ended: TerminalSession = await terminals.open("chat", "exit 3", (), workspace_dir(), True)
+        plain: TerminalSession = await terminals.open("chat", "exit 4", (), workspace_dir(), False)
+        running: TerminalSession = await terminals.open("chat", "sleep 30", (), workspace_dir(), True)
+        assert await asyncio.wait_for(watcher.ended.get(), 10.0) == ("chat", ended.id, 3)
+        # The plain session's program ended too, and it is no command in the background.
+        await asyncio.sleep(1.0)
+        assert (plain.exit_status, running.exit_status) == (4, None)
+        assert terminals.take_ended("other") == []
+        assert terminals.has_untold_ends("chat") and not terminals.has_untold_ends("other")
+        assert terminals.take_ended("chat") == [ended]
+        assert terminals.take_ended("chat") == [] and not terminals.has_untold_ends("chat")
+        assert ended.ended_at is not None and 0 <= ended.ended_at - ended.started_at < 10
+        assert ended_notices([ended]).startswith(f"The command in the background {ended.id} ended with exit 3 after ")
+        terminals.put_back_ended([ended])
+        assert terminals.take_ended("chat") == [ended]
+        terminals.put_back_ended([ended])
+        await terminals.close("chat", ended.id)
+        assert terminals.take_ended("chat") == []
     finally:
         await terminals.aclose()
 

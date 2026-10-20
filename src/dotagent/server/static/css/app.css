@@ -1564,16 +1564,21 @@ a.pill:hover {
   margin: 0;
 }
 
+/* A provider's mark, as a service's on the Plugins list: its colours on a tile that is light in both colour schemes. */
 .account-mark {
   display: inline-grid;
   flex: none;
   place-items: center;
-  width: 24px;
-  height: 24px;
+  box-sizing: border-box;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
   border-radius: var(--radius-sm);
-  background: var(--surface-2);
-  color: var(--text);
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
+  color: var(--mark-ink);
   font-weight: var(--weight-title);
+  object-fit: contain;
 }
 
 .account-name {
@@ -1776,6 +1781,11 @@ a.pill:hover {
   z-index: 1;
 }
 
+/* The tile's "+" keeps the width of its button beside long words: a flex row shrank it to 18 to 28 px of its 32. */
+.plugin-tile .plugin-add {
+  flex: none;
+}
+
 .plugin-does,
 .skill-does {
   display: -webkit-box;
@@ -1837,18 +1847,26 @@ a.pill:hover {
   margin-top: var(--space-2);
 }
 
+/* The mark of a service (item 437): a tile that is light in both colour schemes, so that a dark logo (GitHub, X,
+   Vercel) reads in the dark scheme too. A logo is a picture in its own colours; the interface's icon and letters are
+   drawn in --plugin-ink, the listing's colour where it reads on the tile, else the ink. An application of this Mac
+   wears its own icon, which is its own tile: it takes none. */
 .plugin-mark {
-  --plugin-tint: var(--text);
-  --plugin-ink: var(--text);
+  --plugin-ink: var(--mark-ink);
   display: grid;
   flex: none;
   place-items: center;
   width: 40px;
   height: 40px;
   border-radius: var(--radius-sm);
-  background: color-mix(in srgb, var(--plugin-tint) 12%, var(--surface));
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--plugin-tint) 20%, transparent);
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
   color: var(--plugin-ink);
+}
+
+.plugin-mark[data-icon="app"] {
+  background: none;
+  box-shadow: none;
 }
 
 .plugin-mark .icon {
@@ -1858,10 +1876,17 @@ a.pill:hover {
 }
 
 .plugin-logo {
-  width: 22px;
-  height: 22px;
-  background-color: var(--plugin-ink);
-  mask: var(--plugin-logo) center / contain no-repeat;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+/* An icon of the Mac holds its squircle inside a margin of its own, about a twelfth of its width on each side: drawn a
+   fifth larger than the tile, its squircle is as large as the tiles of the logos. */
+.plugin-mark[data-icon="app"] .plugin-logo {
+  width: 120%;
+  height: 120%;
+  max-width: none;
 }
 
 .plugin-letters {
@@ -1885,8 +1910,8 @@ a.pill:hover {
 
 .plugin-hero .plugin-logo,
 .plugin-hero .plugin-mark .icon {
-  width: 30px;
-  height: 30px;
+  width: 38px;
+  height: 38px;
 }
 
 .plugin-hero .plugin-letters {
@@ -2384,8 +2409,15 @@ a.pill:hover {
   gap: var(--space-3);
 }
 
+/* The same tile as the provider's mark of Customize › Plugins. */
 .first-connect-mark {
   flex: none;
+  box-sizing: border-box;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
+  object-fit: contain;
 }
 
 .first-connect-name {
@@ -6024,6 +6056,108 @@ dialog.lightbox img {
   width: 88px;
 }
 
+/* The page the browser comes back to after a sign-in (item 437, server/callback_page.py): the sign-in card, a disc by the
+   title that says how it went, the account or service it was for, and what the provider said. The page has no script and
+   no inline style, so each of these is a class, and it follows the system's light or dark alone. */
+.callback-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.callback-status {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-pill);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  color: var(--muted);
+}
+
+.callback-status svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.callback-status.ok {
+  border-color: transparent;
+  background: var(--ok-weak);
+  color: var(--ok);
+}
+
+.callback-status.bad {
+  border-color: var(--bad-border);
+  background: var(--bad-weak);
+  color: var(--bad);
+}
+
+.callback-subject {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.callback-mark {
+  display: grid;
+  flex: none;
+  place-items: center;
+  box-sizing: border-box;
+  width: 40px;
+  height: 40px;
+  padding: var(--space-2);
+  border-radius: var(--radius-sm);
+  /* The plugins' tile (.plugin-mark): a full-colour logo on a ground that stays light in both schemes. */
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
+  color: var(--mark-ink);
+  font-size: var(--text-lg);
+  font-weight: var(--weight-title);
+  line-height: var(--leading-lg);
+}
+
+.callback-mark img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.callback-subject-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.callback-name {
+  font-weight: var(--weight-title);
+}
+
+.callback-detail {
+  color: var(--muted);
+}
+
+.callback-reason {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  font: var(--text-sm) / var(--leading-sm) var(--mono);
+  overflow-wrap: anywhere;
+}
+
 .code-line {
   display: block;
   padding: 8px 8px;
@@ -7004,6 +7138,12 @@ button.attach-chip:hover {
   padding-top: 24px;
 }
 
+/* While the agent's editor is open the page starts under the bar: the form is long, and the room that keeps the
+   greeting in the middle of the window would push it down past the fold. */
+.agent-home[data-editing] {
+  grid-template-rows: auto auto auto;
+}
+
 .agent-who .home-greeting {
   font-size: var(--text-md);
 }
@@ -7165,6 +7305,12 @@ button.attach-chip:hover {
 
   .template-card > .template-tools {
     grid-area: tools;
+  }
+
+  /* The count that opens the tools is tapped: a 40 px row, like the other rows a finger opens, its marker kept. */
+  .template-tools > summary {
+    min-height: 40px;
+    padding-block: var(--space-2);
   }
 
   .template-card > .btn.template-use {
@@ -7550,7 +7696,8 @@ button.attach-chip:hover {
 
 /* ---------- Settings › System's Diagnostics (item 370) and Open source licences (item 371) ---------- */
 
-/* A row of System that opens one of the two pages: its title and line, the chevron at its right. */
+/* A row of System that opens one of the two pages: its title and line, the chevron at its right, pointing right as the
+   icon is drawn (an arrow that points up would read as a fold). */
 .about-row {
   color: inherit;
 }
@@ -7558,7 +7705,6 @@ button.attach-chip:hover {
 .about-row > .icon {
   flex: none;
   color: var(--muted);
-  rotate: -90deg;
 }
 
 /* A process sits in under the one that started it, by how deep it is under the daemon. */

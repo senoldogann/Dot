@@ -8,9 +8,11 @@ terminal_sessions`` at a time, each closed once it was not used for ``terminal_i
 stops. The end of a run closes none: a server outlives the run that started it.
 
 A command in the background (item 229) is a session the run left to run on its own, as an eval or a long build: it is
-not closed for being left unread while it runs, and when it ends by itself its chat is told (:class:`TerminalWatcher`,
-the run manager), with no word of what it printed: that is read with ``terminal_read``, as untrusted. A session closed
-by the run, by the owner or by the daemon's stop tells nothing.
+not closed for being left unread while it runs, and when it ends by itself its chat is told, once, with no word of what
+it printed: that is read with ``terminal_read``, as untrusted. A run at work on the chat is told at its next step, in a
+system note (:meth:`Terminals.take_ended`); when no run works there, the run manager (:class:`TerminalWatcher`) starts
+one to tell it. A session closed by the run, by the owner or by the daemon's stop tells nothing, and neither does one
+whose end a run has read and closed before it was told.
 """
 
 import asyncio
@@ -24,6 +26,7 @@ import re
 import signal
 import termios
 import time
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Protocol
 
@@ -69,7 +72,7 @@ def asks_for_secret(recent: str) -> bool:
 def ended_notice(session_id: str, command: str, exit_status: int, seconds: float) -> str:
     """What the chat of a command in the background that ended is told (item 229): the session, its exit status, how
     long it ran and the command, as Dot saw them, on the first line, and none of what it printed, which is untrusted and
-    read with ``terminal_read``."""
+    read with ``terminal_read``. A run at work is told it in a system note, a run started for it as its goal."""
     shown: str = truncate_middle(" ".join(command.split()), _NOTICE_COMMAND_CHARS)
     return (
         f"The command in the background {session_id} ended with exit {exit_status} after {duration_text(seconds)}: "
@@ -133,12 +136,11 @@ class TerminalSession:
         self.closing: bool = False
         # The program's exit status, once it ended by itself.
         self.exit_status: int | None = None
-        # The message of the chat's queue that told the end of this command (item 427), until a run has read the end
-        # itself: that run has the news, and the message is taken back out.
-        self.told: str | None = None
-        # A run read the program's end and closed the session (:meth:`Terminals.close_read`), as opposed to a close by
-        # the owner, the run's own ``terminal_close``, the idle reaper or the daemon's stop, which read nothing.
-        self.end_read: bool = False
+        # When the program ended by itself (seconds since the epoch): the notice of its end says how long it ran.
+        self.ended_at: float | None = None
+        # Whether the chat was told that this command ended, in the note of a run at work or the goal of the run started
+        # for it (:meth:`Terminals.take_ended`): a command's end is told once.
+        self.told: bool = False
         self._arrived: asyncio.Event = asyncio.Event()
         # Neither a read nor a write of the terminal waits in the event loop: what is not there yet comes with the
         # loop's next word on the descriptor.
@@ -317,9 +319,22 @@ class TerminalSession:
                 self._follower = None
 
 
+def ended_notices(sessions: Sequence[TerminalSession]) -> str:
+    """The notice (:func:`ended_notice`) of each of ``sessions``, commands in the background that ended by
+    themselves, one after the other."""
+    notices: list[str] = []
+    for session in sessions:
+        if session.exit_status is None or session.ended_at is None:
+            raise ValueError(f"the command of session {session.id} has not ended")
+        notices.append(
+            ended_notice(session.id, session.command, session.exit_status, session.ended_at - session.started_at)
+        )
+    return "\n\n".join(notices)
+
+
 class TerminalWatcher(Protocol):
     """Who hears of the daemon's terminal sessions (item 229), the run manager: the pages follow a chat's sessions as
-    they change, and the end of a command in the background is told to its chat."""
+    they change, and a chat whose command in the background ended is told when no run works there."""
 
     async def sessions_changed(self, thread_id: str) -> None:
         """A session of the chat ``thread_id`` opened, ended or was closed."""
@@ -327,10 +342,6 @@ class TerminalWatcher(Protocol):
 
     async def command_ended(self, thread_id: str, session: TerminalSession) -> None:
         """The program of ``session``, a command in the background of the chat ``thread_id``, ended by itself."""
-        ...
-
-    async def command_read(self, thread_id: str, session: TerminalSession) -> None:
-        """A run read the end of ``session``, a command in the background of the chat ``thread_id``, and closed it."""
         ...
 
 
@@ -434,15 +445,32 @@ class Terminals:
         log.info("terminal_closed", thread_id=thread_id, session=session_id)
         await self._changed(thread_id)
 
-    async def close_read(self, thread_id: str, session_id: str) -> None:
-        """Close a session whose program's end a run has read (item 427): a command in the background that ended is not
-        told to the chat again, or is taken back from it if it was told already
-        (:meth:`TerminalWatcher.command_read`)."""
-        session: TerminalSession = self.get(thread_id, session_id)
-        session.end_read = True
-        await self.close(thread_id, session_id)
-        if session.background and self._watcher is not None:
-            await self._watcher.command_read(thread_id, session)
+    def _untold_ends(self, thread_id: str) -> list[TerminalSession]:
+        return [
+            session
+            for session in self.sessions(thread_id)
+            if session.background and session.exit_status is not None and not session.told
+        ]
+
+    def has_untold_ends(self, thread_id: str) -> bool:
+        """Whether a command in the background of the chat ``thread_id`` ended by itself and its chat was not told."""
+        return bool(self._untold_ends(thread_id))
+
+    def take_ended(self, thread_id: str) -> list[TerminalSession]:
+        """The commands in the background of the chat ``thread_id`` that ended by themselves and that its chat was not
+        told of, in the order they opened, each marked told: a command's end is told once, in the note of a run at work
+        or the goal of the run started for it. A session a run read to its end is closed, and no longer here. Nothing
+        awaits in it, so two runs do not take the same one."""
+        ended: list[TerminalSession] = self._untold_ends(thread_id)
+        for session in ended:
+            session.told = True
+        return ended
+
+    def put_back_ended(self, sessions: Sequence[TerminalSession]) -> None:
+        """Mark ``sessions`` not told again, as :meth:`take_ended` took them, when the run that was to tell them did not
+        start: the next run of the chat tells them."""
+        for session in sessions:
+            session.told = False
 
     async def _changed(self, thread_id: str) -> None:
         if self._watcher is not None:
@@ -460,6 +488,7 @@ class Terminals:
             if session.closing:
                 return
             session.exit_status = await session.exit_code()
+            session.ended_at = time.time()
             session.used_at = time.monotonic()
             log.info(
                 "terminal_ended",

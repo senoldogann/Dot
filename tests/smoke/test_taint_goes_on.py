@@ -1,8 +1,8 @@
 """A run that goes on from another keeps its taint (item 243), in the real loop and store. What a terminal prints is
 content third parties can author, so the run that read it is tainted, and a note it would save asks the owner first.
-When the command it left in the background ends, the run that tells the chat starts tainted as that run ended; a run
-that a shutdown cut off after such a read is resumed tainted. A message of the owner starts a run untainted, as before:
-its note is saved without asking.
+When the command it left in the background ends, the run that tells the chat starts tainted as that run ended, and the
+note that tells a run at work clears no taint; a run that a shutdown cut off after such a read is resumed tainted. A
+message of the owner starts a run untainted, as before: its note is saved without asking.
 
 No network and no model service is used: the scripted model plays the runs.
 """
@@ -147,6 +147,31 @@ async def test_the_run_that_tells_of_a_command_that_ended_starts_as_tainted_as_t
             assert await _asked_or_ended(runtime, owners.id) is None
             assert (await runtime.store.get_run(owners.id)).status == "done"
             assert ("memory_save", False) in await _results(runtime, owners.id)
+
+
+async def test_the_note_that_tells_a_run_of_the_end_of_its_command_clears_no_taint(login_env: dict[str, str]) -> None:
+    """The run that opened the command is tainted by what the terminal printed. The end of the command reaches it at its
+    next step as a system note from Dot, not as a message of the owner (item 437): it clears no taint, so the note the
+    run saves after it still asks."""
+    opening: ScriptedTurn = _turn("terminal_open", {"command": _SHORT, "background": True})
+    waiting: ScriptedTurn = _turn("shell", {"command": "sleep 6", "timeout_s": 16})
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _session(login_env, [opening, waiting, _SAVE, _FINISH]) as (runtime, manager):
+            run: RunRecord = await _start(manager, None)
+            asked: ApprovalRecord | None = await _asked_or_ended(runtime, run.id)
+            assert asked is not None, "the note was saved without asking after the note of the end of the command"
+            assert (asked.tool, TAINT_REASON in asked.summary) == ("memory_save", True)
+            await manager.decide(asked.id, False, UI_SOURCE, "")
+            assert (await _ended(manager, run.id)).status == "done"
+            told: list[str] = [
+                message.content
+                for message in await runtime.store.load_messages(run.thread_id, 0)
+                if message.content.startswith("[system note] The command in the background")
+            ]
+            assert len(told) == 1, told
+            # It came before the run's save, as a system note: no steer, and no run of its own.
+            assert await runtime.store.events_of_kind(run.id, "steer", 10) == []
+            assert [record.id for record in await runtime.store.list_runs(10, run.thread_id)] == [run.id]
 
 
 async def test_a_run_cut_off_after_it_read_a_terminal_is_resumed_tainted(login_env: dict[str, str]) -> None:
