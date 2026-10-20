@@ -16639,3 +16639,7 @@ stay gone after a reload; denied, they stay; wide and on a phone; the test fails
 - 2026-10-20 (Opus 5.5): item 434 on the owner's words of 2026-10-20, on `item-433-434-yolo-and-cards` from `main`: an
   approval's card stays in its own chat, the home lists the run without it, and an allowed card leaves the chat with
   its line.
+- 2026-10-20 (Opus 5.5): item 435 on `sunshine-text` from `main`, on the owner's word: the light that slides through
+  the words of a running call and a live thought was an amber again (`--warn`), where the owner had made it the text's
+  own colour, dark on a light theme and light on a dark one. The owner's edit stood in the uncommitted tree that item 426 took
+  over (kept at `refs/backup/main-dirty-2026-10-20`) and was not carried into it; it is back, with a test that holds it.
