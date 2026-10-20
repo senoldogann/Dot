@@ -97,8 +97,9 @@ on the tailnet in Dot's config file. [Dot on the phone](docs/phone.md) has the s
   money and credentials are handed to you and a message or a post in your name needs a yes (the review model's in
   `auto`), whatever your rules say; a `yolo` run also asks you before it reads your secrets. See
   [Autonomy](docs/autonomy.md).
-- **What leaves this Mac.** There is no telemetry. The models get the run's conversation, and the sites, search engines
-  and services a run uses get what it sends them. See [What leaves this Mac](docs/safety.md#what-leaves-this-mac).
+- **What leaves this Mac.** There is no telemetry; the desktop app only asks GitHub for its latest version. The models
+  get the run's conversation, and the sites, search engines and services a run uses get what it sends them. See [What
+  leaves this Mac](docs/safety.md#what-leaves-this-mac).
 - **The daemon** listens on this Mac's loopback address alone. Its API needs its token, except for a health check,
   the daemon's proof that it holds the token, and the pairing of a phone. A phone comes in through your own tailnet.
 - **A vulnerability** is reported privately, as [SECURITY.md](SECURITY.md) says.

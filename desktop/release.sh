@@ -45,8 +45,10 @@ version_in() {
 
 [ "$(uname -s)" = Darwin ] || fail "a release is built on a Mac"
 cd "$root"
-[ -z "$(git status --porcelain --untracked-files=no)" ] ||
-  fail "the checkout has changes not committed; a release is built from a commit"
+[ -z "$(git status --porcelain)" ] || fail "the checkout has files not committed; a release is built from a commit"
+git fetch -q origin main
+git merge-base --is-ancestor HEAD origin/main ||
+  fail "$(git rev-parse --short HEAD) is not a commit of origin's main; a release is made from main"
 
 version=$(plutil -extract version raw -o - "$conf")
 [[ $version =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "the version of tauri.conf.json is not x.y.z: $version"

@@ -13,11 +13,13 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::thread;
 use std::time::Duration;
 
 use hmac::{Hmac, KeyInit, Mac};
+use rfd::{AsyncMessageDialog, MessageButtons, MessageDialogResult, MessageLevel};
 use serde::Deserialize;
 use sha2::Sha256;
 use tauri::image::Image;
@@ -29,7 +31,6 @@ use tauri::{
     AppHandle, LogicalPosition, Manager, RunEvent, TitleBarStyle, WebviewUrl, WebviewWindow,
     WebviewWindowBuilder, WindowEvent,
 };
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
 use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
@@ -555,14 +556,42 @@ enum UpdateCheck {
     AtStart,
 }
 
-/// A native message with only an OK button, for what a look at the releases found.
-fn tell(app: &AppHandle, kind: MessageDialogKind, message: String) {
-    app.dialog()
-        .message(message)
-        .title("Dot")
-        .kind(kind)
-        .buttons(MessageDialogButtons::Ok)
-        .show(|_| {});
+/// The button of the offer that installs the update.
+const INSTALL: &str = "Install and Restart";
+
+/// Whether a look at the releases is under way, its offer included: one at a time, so that the look at start and the
+/// menu's, or two clicks of the menu, never install twice.
+static LOOKING: AtomicBool = AtomicBool::new(false);
+
+/// The look at the releases under way: it ends when this is dropped, on every way out.
+struct Looking;
+
+impl Looking {
+    /// The look, unless another is under way.
+    fn start() -> Option<Looking> {
+        LOOKING
+            .compare_exchange(false, true, Ordering::SeqCst, Ordering::SeqCst)
+            .ok()
+            .map(|_| Looking)
+    }
+}
+
+impl Drop for Looking {
+    fn drop(&mut self) {
+        LOOKING.store(false, Ordering::SeqCst);
+    }
+}
+
+/// A native message with only an OK button, for what a look at the releases found. The dialogs are the system's, shown
+/// by the shell itself (rfd): no page gets a way to show one.
+async fn tell(level: MessageLevel, message: String) {
+    AsyncMessageDialog::new()
+        .set_title("Dot")
+        .set_level(level)
+        .set_description(message)
+        .set_buttons(MessageButtons::Ok)
+        .show()
+        .await;
 }
 
 /// Look for a newer Dot among the releases (`plugins.updater` of tauri.conf.json, item 432). One found is offered;
@@ -570,30 +599,36 @@ fn tell(app: &AppHandle, kind: MessageDialogKind, message: String) {
 /// started again.
 fn check_for_update(app: AppHandle, how: UpdateCheck) {
     tauri::async_runtime::spawn(async move {
+        let Some(_looking) = Looking::start() else {
+            if how == UpdateCheck::Asked {
+                tell(
+                    MessageLevel::Info,
+                    "Dot is looking for an update already.".to_string(),
+                )
+                .await;
+            }
+            return;
+        };
         let found = match app.updater() {
             Ok(updater) => updater.check().await,
             Err(error) => Err(error),
         };
         match found {
-            Ok(Some(update)) => offer_update(app, update),
+            Ok(Some(update)) => offer_update(&app, update).await,
             Ok(None) => {
                 if how == UpdateCheck::Asked {
                     let current = app.package_info().version.to_string();
-                    tell(
-                        &app,
-                        MessageDialogKind::Info,
-                        format!("Dot {current} is the newest."),
-                    );
+                    tell(MessageLevel::Info, format!("Dot {current} is the newest.")).await;
                 }
             }
             Err(error) => {
                 eprintln!("dot-shell: the releases could not be read for an update: {error}");
                 if how == UpdateCheck::Asked {
                     tell(
-                        &app,
-                        MessageDialogKind::Warning,
+                        MessageLevel::Warning,
                         format!("Dot could not look for an update: {error}"),
-                    );
+                    )
+                    .await;
                 }
             }
         }
@@ -601,37 +636,34 @@ fn check_for_update(app: AppHandle, how: UpdateCheck) {
 }
 
 /// Ask whether to install `update`; on yes, install it and start the shell again.
-fn offer_update(app: AppHandle, update: Update) {
-    let message = format!(
-        "Dot {} is out (this one is {}). Install it now? Dot starts again with it.",
-        update.version, update.current_version
-    );
-    let asking = app.clone();
-    asking
-        .dialog()
-        .message(message)
-        .title("A newer Dot")
-        .buttons(MessageDialogButtons::OkCancelCustom(
-            "Install and Restart".to_string(),
+async fn offer_update(app: &AppHandle, update: Update) {
+    let answer = AsyncMessageDialog::new()
+        .set_title("A newer Dot")
+        .set_level(MessageLevel::Info)
+        .set_description(format!(
+            "Dot {} is out (this one is {}). Install it now? Dot starts again with it.",
+            update.version, update.current_version
+        ))
+        .set_buttons(MessageButtons::OkCancelCustom(
+            INSTALL.to_string(),
             "Later".to_string(),
         ))
-        .show(move |yes| {
-            if yes {
-                tauri::async_runtime::spawn(async move {
-                    match update.download_and_install(|_, _| {}, || {}).await {
-                        Ok(()) => app.restart(),
-                        Err(error) => {
-                            eprintln!("dot-shell: the update could not be installed: {error}");
-                            tell(
-                                &app,
-                                MessageDialogKind::Warning,
-                                format!("The update could not be installed: {error}"),
-                            );
-                        }
-                    }
-                });
-            }
-        });
+        .show()
+        .await;
+    if !matches!(answer, MessageDialogResult::Custom(ref button) if button == INSTALL) {
+        return;
+    }
+    match update.download_and_install(|_, _| {}, || {}).await {
+        Ok(()) => app.restart(),
+        Err(error) => {
+            eprintln!("dot-shell: the update could not be installed: {error}");
+            tell(
+                MessageLevel::Warning,
+                format!("The update could not be installed: {error}"),
+            )
+            .await;
+        }
+    }
 }
 
 /// The menu bar item. `shortcut_taken` says that ⇧⌘Space could not be had: the menu then says so, and New chat is
@@ -720,7 +752,6 @@ fn shortcut(app: &AppHandle) -> tauri::Result<()> {
 pub fn run() {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(Granted::default())
         .setup(|app| {

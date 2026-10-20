@@ -106,10 +106,10 @@ once: the next release raises it in the five files first.
   for both kinds of Mac;
 - `notes.md`, the version's section of the changelog, the release's notes.
 
-It stops at the first check that fails, and says which: changes not committed, versions that differ, a tag that is
-on GitHub already, a changelog with no section for the version, the app's signature (the Developer ID, the hardened
-runtime, a secure timestamp, both architectures), and a verdict of Apple's notary service other than Accepted, with
-the log of what it found.
+It stops at the first check that fails, and says which: files not committed, a commit that is not on GitHub's `main`,
+versions that differ, a tag that is on GitHub already, a changelog with no section for the version, the app's signature
+(the Developer ID, the hardened runtime, a secure timestamp, both architectures), and a verdict of Apple's notary
+service other than Accepted, with the log of what it found.
 
 Once, on the Mac that builds releases:
 

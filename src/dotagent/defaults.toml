@@ -379,6 +379,8 @@ protected_paths = [
   "~/.pypirc",
   "~/.cargo/credentials",
   "~/.cargo/credentials.toml",
+  # The keys that sign the updates of an app built with Tauri, Dot's desktop app among them (docs/development.md).
+  "~/.tauri",
   "~/.gem/credentials",
   "~/.docker/config.json",
   "~/.kube",

@@ -710,8 +710,9 @@ and Quit. Closing the window keeps the shell in the menu bar.
   **Install and Restart** downloads it, checks that it is signed with the updater's key and that the signature names the
   version offered, puts it in place of the app and starts the shell again; **Later** leaves it for the next look. The
   look at start says something only when it finds a newer Dot; the one from the menu also says when this Dot is the
-  newest, or why it could not look. Only the shell updates itself: the daemon stays as it was installed, from its
-  checkout or from PyPI.
+  newest, or why it could not look, and that Dot is looking already while a look is under way, so that an update is
+  never installed twice. The dialogs are the system's, shown by the shell itself: no page can show one. Only the shell
+  updates itself: the daemon stays as it was installed, from its checkout or from PyPI.
 
 Build it on your Mac with the Rust toolchain and Node installed:
 
