@@ -16026,6 +16026,34 @@ Tests: `tests/smoke/test_paste_as_file.py` — a long paste goes as a file and t
 attached file."; a picture pasted from the clipboard goes as one chip and the same, on a wide window and on a phone; and
 a text and a file together send as they did.
 
+### 446. A chat reached from the side menu opens at its foot; there is always a way
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21, with a screenshot of the phone: going from one chat to
+another in the side menu threw the conversation up, where it should stand at its foot, a chat whose run is at work too;
+and the agent of that chat gave up on its own ("Word'de açıp bakmayı henüz yapamadım, sıradaki işim o"), and only once
+pushed said it had never tried AppleScript: its soul should never give up and always look for a way, like a wolf ("bir
+yolu illaki vardır"). **As built.** Two causes of the jump, both measured in a browser before the fix. The page keeps
+the runs opened last (item 426) and drew one that was at work when it was left from that snapshot: when the run had
+ended meanwhile, the end the stream brought again read as one under the reader's eyes, so the page landed on the top of
+the answer (1487 of 2266 px wide) and wrote it in again. A run kept at work now has its state read again before it is
+drawn from what was kept (`run.js`), and opens at rest at its foot. And the dock was measured before it stood in the
+page (0 px), its real height coming a frame later: a finished run's settle hold found the foot again, a live run's page
+stood a dock's height (144 px on a phone) above it. The dock is watched now and a reader at the end stays there as it
+changes (its first height, the bar over the composer, a queued message, a draft of several lines), and the settle hold
+of item 440 holds a live run's foot as a finished one's, the earlier turns' work read in included. Every run's system
+prompt, a chat's too, in both styles, has a section "There is always a way" (`prompt.py`): no giving up on a step while
+a way is left untried (the error read, another tool, channel or method, never the failing call again), nothing called
+impossible or left for later before it was tried, with each way tried named; no way goes around a refusal, a denial or a
+decision that is the owner's, and the section stands before the rules of trust and safety that bound it. The line of
+each style about a failed step is folded into it, and a chat's ending says not to end the turn announcing a next step it
+can take now (a task's or research run's keep acting already says so). The fixed part of a task's prompt grows by about
+140 tokens (a chat's by 30 more): `tests/smoke/test_scaffold.py`'s runs on a 24 000-token window, which held it with a
+few tokens to spare, get 26 000, still far under the 48 000 that Settings › Models offers at the least. Tests:
+`tests/smoke/test_chat_switch_scroll.py` (Chrome wide, WebKit on a phone: a chat over, one with earlier turns, one at
+work with a draft of six lines that grows the dock, two drawn again from what was kept, one whose run ended while
+another chat was open; it fails on main), `tests/unit/test_run_modes.py`, `test_lean_prompt.py`. Docs: `docs/daemon.md`,
+`docs/autonomy.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16981,3 +17009,6 @@ a text and a file together send as they did.
   its buttons there — and to the home only when nothing waits.
 - 2026-10-21 (Opus 5.5): item 445: a message of files alone goes — a pasted text, a picture — with the line the files are
   worth as its goal, and no word typed; the composer of every page takes it.
+- 2026-10-21 (Opus 5.5): item 446 on `item-446-chat-foot-always-a-way` from `main`: a chat reached from
+  the side menu opens at its foot, a run that ended while another chat was open and a live one included;
+  every run is told that there is always a way, within the rules of trust and safety.

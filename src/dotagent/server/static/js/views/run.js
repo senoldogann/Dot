@@ -37,7 +37,7 @@ import { getSnapshot, onChange, onLifecycle, onStreamBack, quietBreak, readFaile
 import { createTimeline } from "../timeline.js";
 import { attempt, choiceDialog, toast } from "../ui.js";
 import { keepChatLook, PAGE_READY_EVENT } from "../waiting.js";
-import { narrowOr, PHONE, trackHeight } from "../layout.js";
+import { narrowOr, PHONE } from "../layout.js";
 
 const TERMINAL = new Set(["done", "failed", "cancelled"]);
 // A delegated run's goal in the bar and the words of its pill (item 82).
@@ -137,7 +137,7 @@ function planStep(step) {
 // that coming back to one (from a delegated run's page, say) draws it at once as it stood and follows its stream on
 // from there, instead of an empty page that fills again as the whole stream is read once more. The kept `detail` is the
 // run as it was loaded, brought up to its end when the run ends on the page (`onRunStatus`), so that a run that is over
-// comes back at rest.
+// comes back at rest; one that was still at work has its state read again before it is drawn (item 446).
 const KEPT_RUNS = 6;
 const keptRuns = new Map();
 
@@ -1379,13 +1379,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
 
   // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from the
   // first message (item 129).
+  const earlier = earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null), signal);
   const thread = el(
     "div",
     { class: "run-thread" },
     el("h1", { class: "visually-hidden" }, run.goal),
     connectionSlot,
     problem,
-    earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null), signal),
+    earlier,
     goalMessage,
     timeline.element,
     waitingList,
@@ -1397,9 +1398,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   filesWatch.observe(thread, { childList: true, subtree: true });
   const main = el("div", { class: "run-main" }, thread, dock);
   // On a phone the dock floats over the conversation's foot (item 374), a pane of glass with the messages going by
-  // under it: its height is kept on the column that holds them both, where the conversation's padding reads it.
+  // under it: its height is kept on the column that holds them both, where the conversation's padding reads it. The
+  // dock is measured once it stands in the page and whenever it changes (its first height, the bar over the composer, a
+  // queued message, a draft of several lines), and a reader at the end stays there as the foot moves with it (item 446).
   threadBox = thread;
-  const stopDockHeight = trackHeight(dock, main, "--dock-h");
+  const dockWatch = new ResizeObserver(() => {
+    main.style.setProperty("--dock-h", `${dock.offsetHeight}px`);
+    if (following) {
+      toEnd("auto");
+    }
+  });
+  dockWatch.observe(dock);
   // The marks of the conversation's messages stand at the layout's left edge (item 201).
   const outline = messageOutline({ layout, main, thread, dock });
   layout.append(outline.element, main, stage.handle, inspector.element, inspector.scrim);
@@ -1419,14 +1428,18 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // A chat opens at its end, where its next words come (item 403) or where its newest message stands (item 440); before,
   // the page stood at its top until its first event moved it, which read as a jump up after every message sent.
   toEnd("auto");
-  // What is above the foot settles after the page opens (pictures, a table's width, a folded group's height): the
-  // foot is held for a moment, until the reader's own scroll moves it (item 440).
+  // What is above the foot settles after the page opens (pictures, a table's width, a folded group's height, the work
+  // of the earlier turns read in): the foot is held for a moment, a live run's as a finished one's, until the reader's
+  // own scroll moves it (items 440 and 446).
   const settling = new ResizeObserver(() => {
-    if (following && openedFinished) {
+    if (following) {
       toEnd("auto");
     }
   });
   settling.observe(timeline.element);
+  if (earlier !== null) {
+    settling.observe(earlier);
+  }
   const settled = setTimeout(() => settling.disconnect(), SETTLE_OPEN_MS);
   paintLessons(detail.lessons);
   attempt(changes.refresh);
@@ -1520,7 +1533,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     lessonCuts.disconnect();
     settling.disconnect();
     clearTimeout(settled);
-    stopDockHeight();
+    dockWatch.disconnect();
     PHONE.removeEventListener("change", syncControls);
     outline.dispose();
     stopLifecycle();
@@ -1580,13 +1593,15 @@ export function mount(root, ctx) {
     stopRun();
     stopRun = () => undefined;
     const kept = again ? undefined : keptRuns.get(runId);
-    if (kept !== undefined) {
-      // Drawn at once as it stood; what changed meanwhile comes on the stream, and the rest is read again below.
+    if (kept !== undefined && !kept.detail.active && !kept.detail.elsewhere) {
+      // A run that was over when it was kept is drawn at once as it stood; its lessons and questions are read again below.
       stopRun = showRun({ root, ctx, signal: controller.signal, detail: kept.detail, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept });
       shown();
       return;
     }
-    keptRuns.delete(runId);
+    if (kept === undefined) {
+      keptRuns.delete(runId);
+    }
     root.replaceChildren(loadingPanel());
     let detail;
     try {
@@ -1597,6 +1612,17 @@ export function mount(root, ctx) {
       }
       const problem = error.status === 404 ? emptyPanel("circleDashed", "Run not found", `No run has the id ${runId}.`) : errorPanel(error, () => attempt(open));
       root.replaceChildren(backLink(), problem);
+      shown();
+      return;
+    }
+    if (kept !== undefined) {
+      if (controller.signal.aborted) {
+        return;
+      }
+      // A run that was at work when it was kept may have ended since: drawn from what was read of its stream, with its
+      // state read again, an end the stream brings now came while the reader was on another page, and the chat opens at
+      // its foot with its answer drawn at once (item 446), as it does for a run that was over when its page opened.
+      stopRun = showRun({ root, ctx, signal: controller.signal, detail, history: kept.history, historyProblem: null, reload: () => attempt(() => open(true)), kept: { ...kept, detail } });
       shown();
       return;
     }

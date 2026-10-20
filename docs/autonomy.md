@@ -105,7 +105,12 @@ the goal asks for, and to take an ask to keep going at its word. This is not **K
 which makes the goal a campaign worked on in sessions (see [Campaigns](agents-and-campaigns.md#campaigns)). Every run, a chat's too, is told
 that when it hesitates to do what it was asked, or a part of it, it says so at once, with what holds it back and what
 it can do instead, and asks you or goes on with the part it can do, instead of looking into the matter on its own
-first (item 327).
+first (item 327). Every run, a chat's too, in both prompt styles, is also told that there is always a way (item 446): it
+does not give up on a step while a way to do it is left untried, but reads the error and takes another tool, channel
+or method instead of repeating the call that failed; and it says that something cannot be done, or leaves it for
+later, only after trying it, naming each way it tried and what it returned. A chat, whose reply ends its turn, is told
+not to end it announcing a next step it could take now, as a task or research run is told to keep acting. No way goes
+around a refusal, a denial or a decision that is yours.
 
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
