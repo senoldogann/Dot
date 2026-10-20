@@ -561,7 +561,7 @@ const INSTALL: &str = "Install and Restart";
 
 /// Whether a look at the releases is under way, its offer and the install included: one at a time, so that the look at
 /// start and the menu's, or two clicks of the menu, never install twice. A message that only tells what a look found
-/// is no longer part of it.
+/// is not part of it.
 static LOOKING: AtomicBool = AtomicBool::new(false);
 
 /// The look at the releases under way: it ends when this is dropped, on every way out.
