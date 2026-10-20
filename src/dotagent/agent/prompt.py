@@ -118,10 +118,9 @@ _APPROVALS_TEXT: dict[Literal["supervised", "auto", "yolo"], str] = {
         "not retry it and do not look for a way around it."
     ),
     "yolo": (
-        "yolo: nothing waits for the user — not money, not a password or a one-time code, not a message or a post in "
-        "their name; each step the policy would flag is recorded as what it did. Do what was asked yourself, and ask "
-        "the user only what you truly cannot do; a refusal that stands is not a question, so do not look for a way "
-        "around it."
+        "yolo: nothing waits for the user — money, a password, a message or a post in their name; each flagged step is "
+        "recorded as what it did. Do what was asked yourself, ask only what you truly cannot, and take no way around a "
+        "refusal."
     ),
 }
 
@@ -384,9 +383,8 @@ _SECRETS_REFUSED: str = (
     "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
 )
 _SECRETS_TYPED: str = (
-    "A password, a one-time code or a card's details that the user gave you, or that a mail or a page you were "
-    "told to read carries, you type in yourself: in yolo the user is asked nothing you can do. Ask only for what "
-    "you cannot get."
+    "A password, a one-time code or a card's details you were given, or that a mail or a page you read carries, you "
+    "type in yourself: in yolo nothing is asked of the user that you can do."
 )
 
 _CLOSING: str = """- Prefer reversible actions. Before deleting, overwriting or sending something, make sure the \
