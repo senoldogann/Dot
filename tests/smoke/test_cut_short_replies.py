@@ -106,11 +106,13 @@ async def test_a_run_whose_replies_keep_being_cut_short_fails_saying_so(login_en
     turns: list[ScriptedTurn] = [
         ScriptedTurn(text=f"Part {index} of the answer", calls=()) for index in range(nudges + 1)
     ]
-    model: _CutShort = _CutShort(turns, {index: ("other", "content_filter") for index in range(nudges + 1)})
+    # An end the service gave that is no content filter's (OpenRouter's "error"): a filter's stop moves the run to a
+    # standby model at once instead (test_helpers.py).
+    model: _CutShort = _CutShort(turns, {index: ("other", "error") for index in range(nudges + 1)})
     async with _manager(login_env, model) as (runtime, manager):
         ended: RunRecord = await _ended(manager, "task")
         assert ended.status == "failed"
         assert ended.result.startswith(PREFIX_CUT_SHORT)
-        assert "'content_filter'" in ended.result
+        assert "'error'" in ended.result
         assert classify_ending(ended.status, ended.result) == "cut_short"
         assert len(await _notes(runtime, ended)) == nudges

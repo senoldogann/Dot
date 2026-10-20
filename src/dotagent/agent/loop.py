@@ -175,6 +175,7 @@ from dotagent.core.errors import (
     InvalidValueError,
     MissingSecretError,
     ProviderError,
+    ProviderFilterError,
     ProviderTransportError,
     RunCancelled,
     StoreError,
@@ -333,8 +334,13 @@ _NO_TOOL_NOTE: str = (
 )
 _EMPTY_NOTE: str = "[system note] Your last reply was empty. Continue with the task using tools, or call finish."
 # How a reply ends that the model service stopped before it was complete: at its output limit, or for an abnormal
-# reason it gave (a content filter, a refusal, a reason the codecs do not know).
+# reason it gave (a refusal, a reason the codecs do not know).
 _CUT_SHORT: frozenset[FinishReason] = frozenset({"length", "other"})
+# The ends, in the service's own words, of a reply its content filter stopped (OpenCode Go's DeepSeek gave
+# 'content_filter' with no output on a 340k-token chat, 2026-10-20): asked again with the same conversation, the model
+# is stopped again, so the run moves to a standby model at once (:func:`_cannot_answer`) instead of being nudged.
+_FILTERED: frozenset[str] = frozenset({"content_filter"})
+_FILTERED_REASON: str = "its content filter stopped the reply"
 _CUT_SHORT_NOTE: str = (
     "[system note] Your last reply was cut short before its end (it ended with '{reason}'). Continue with the tools "
     "you need, or give your complete answer again in fewer words."
@@ -1434,6 +1440,26 @@ async def _wait_unless_stopped(cancel: asyncio.Event, seconds: float) -> None:
         return
 
 
+def _cannot_answer(error: Exception) -> str | None:
+    """Why the run's model cannot answer this run: what pauses it for every run (:func:`unavailable_reason`), or its
+    service's content filter, which stops this conversation alone. ``None`` for any other error."""
+    if isinstance(error, ProviderFilterError):
+        return _FILTERED_REASON
+    return unavailable_reason(error)
+
+
+def filtered_stop(reply: ModelReply, model: str) -> ProviderFilterError | None:
+    """The error of a reply that the model service's content filter stopped (:data:`_FILTERED`), else ``None``."""
+    if reply.raw_finish not in _FILTERED:
+        return None
+    return ProviderFilterError(
+        f"the model's service stopped its reply with its content filter ('{reply.raw_finish}'), and asked again with "
+        "this conversation it stops it again: choose another model for this chat, or name a standby model "
+        "([models] standby) that the run moves to",
+        {"model": model, "input_tokens": reply.usage.input_tokens, "output_tokens": reply.usage.output_tokens},
+    )
+
+
 async def _to_standby(
     agent: AgentRun,
     ref: ModelRef,
@@ -1444,16 +1470,16 @@ async def _to_standby(
     step: int,
 ) -> _Standby | None:
     """Move the run to the first standby model that can take it over, now that ``ref`` could not answer (``error``,
-    which paused it in the router). The models the run has worked on (``left``) are not taken again, so a run goes
-    through its standby models once at most. The run's reasoning level follows the move: the level of the new model
-    that is nearest to it.
+    which paused it in the router, or its content filter's stop, which paused nothing: :func:`_cannot_answer`). The
+    models the run has worked on (``left``) are not taken again, so a run goes through its standby models once at most.
+    The run's reasoning level follows the move: the level of the new model that is nearest to it.
 
     ``None`` when ``error`` says nothing about the model being unable to answer, or when no standby model is left that
     is available (each one the run has not worked on lacks its key or is paused): the run then ends with ``error``. A
     standby model that cannot take the run over (:func:`_fitted`) is passed over; when every available one is, the
     run fails with a :class:`ConfigError` whose message, the run's result, says why for each."""
     runtime: Runtime = agent.runtime
-    reason: str | None = unavailable_reason(error)
+    reason: str | None = _cannot_answer(error)
     if reason is None:
         return None
     standby: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.standby)
@@ -1975,6 +2001,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             reply: ModelReply = await _complete_in_time(
                 runtime, step_ref, request, sink, step_origin, config.model_call_timeout_s
             )
+            # A reply the service's content filter stopped is handled as a model that cannot answer this run: a
+            # routed step goes back to the run's own model, the run's own model hands over to a standby one.
+            filtered: ProviderFilterError | None = filtered_stop(reply, step_ref.label)
+            if filtered is not None:
+                log.warning("reply_filtered", run_id=run.id, step=steps, model=step_ref.label, finish=reply.raw_finish)
+                raise filtered
         except (ProviderError, MissingSecretError) as error:
             if routed is not None:
                 # The routed model could not answer: the step is asked again on the run's own model.

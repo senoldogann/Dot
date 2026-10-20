@@ -132,10 +132,14 @@ reminder, a resumed run) and, in goal mode, to the goal check.
 - A reply without a tool call ends the turn in `chat` mode and when the run has not used a tool yet. Otherwise it is
   nudged towards `finish`; after `finish_nudges` nudges in a row the reply itself becomes the result. A step with tool
   calls starts the count again, so a status line written between tool steps does not end the run.
-- A reply the model service cut short (at its output limit, or for an abnormal reason such as a content filter) is
-  never taken as the answer, in any mode: the model is told how the reply ended and asked to go on with its tools or
-  give the complete answer again in fewer words. Each such reply counts as a nudge; after `finish_nudges` of them in
-  a row the run fails with "The model's replies were cut short" and the reason the last one ended with.
+- A reply the model service cut short (at its output limit, or for another abnormal reason it gave) is never taken
+  as the answer, in any mode: the model is told how the reply ended and asked to go on with its tools or give the
+  complete answer again in fewer words. Each such reply counts as a nudge; after `finish_nudges` of them in a row the
+  run fails with "The model's replies were cut short" and the reason the last one ended with.
+- A reply the service's content filter stopped (it ends with `content_filter`) is no nudge: asked again with the same
+  conversation the model is stopped again (item 437). The run moves to a standby model at once (see
+  [Helpers and standby](models.md#models-and-providers)), and the model is not paused for other runs; with no standby
+  model left, the run fails saying that the filter stopped it and that another model for the chat would answer.
 - `finish` can say what the run could not do without you (`needs_from_user`): the run's page shows it under the answer
   as "What Dot needs from you", and `dotx run` prints it after the answer.
 - A small model with the full tool list sometimes writes the `finish` call out as a plain message (`gpt-oss:20b-cloud`

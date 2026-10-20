@@ -24,7 +24,7 @@ from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment,
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import FileSeed, ScriptedCall, ScriptedTurn
 from dotagent.llm.calls import CALL_EVENT
-from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply
+from dotagent.llm.types import ChatProvider, ChatRequest, DeltaSink, Effort, ModelInfo, ModelReply, Usage
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.store.models import EventRecord, RunRecord
 from dotagent.tools.consult import CONSULT_TOOL
@@ -110,6 +110,24 @@ class SpendingProvider:
 
     async def aclose(self) -> None:
         return None
+
+
+class FilteringProvider(SpendingProvider):
+    """A provider whose content filter stops every reply at once, as OpenCode Go's DeepSeek did on a long chat
+    (2026-10-20): no words, no calls, and the end 'content_filter' in the service's own words."""
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.requests.append(request)
+        return ModelReply(
+            model=request.model,
+            text="",
+            thinking="",
+            tool_calls=(),
+            usage=Usage(input_tokens=339_358, output_tokens=0, cached_tokens=0),
+            finish="other",
+            raw_finish="content_filter",
+            raw=(),
+        )
 
 
 class Played(FrozenModel):
@@ -423,3 +441,35 @@ async def test_without_a_standby_model_the_run_fails_with_the_error_of_its_model
     assert played.record.result.startswith("credit balance is too low")
     assert played.data(MODEL_SWITCHED_EVENT) == ()
     assert played.record.model == SPENT_MAIN
+
+
+async def test_a_reply_its_content_filter_stops_moves_the_run_to_its_standby_model(login_env: dict[str, str]) -> None:
+    """Asked again with the same conversation the filter stops the model again, so the run is not nudged: it moves to
+    its standby model at the first stop."""
+    filtering: FilteringProvider = FilteringProvider(ScriptedProvider("anthropic", []), 0)
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
+    async with _session(_config([], [SCRIPTED_MODEL], 5), login_env, {"anthropic": filtering, "ollama": standby}) as (
+        runtime,
+        runs,
+    ):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert (played.record.status, played.record.result) == ("done", "Done on the standby model."), played.record
+    assert played.data(MODEL_SWITCHED_EVENT) == (
+        {"from": SPENT_MAIN, "to": SCRIPTED_MODEL, "reason": "its content filter stopped the reply", "step": 1},
+    )
+    assert len(filtering.requests) == 1
+
+
+async def test_a_reply_its_content_filter_stops_ends_the_run_saying_so_when_no_standby_model_is_left(
+    login_env: dict[str, str],
+) -> None:
+    filtering: FilteringProvider = FilteringProvider(ScriptedProvider("anthropic", []), 0)
+    async with _session(_config([], [], 5), login_env, {"anthropic": filtering}) as (runtime, runs):
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert played.record.status == "failed"
+    assert played.record.result.startswith(
+        "the model's service stopped its reply with its content filter ('content_filter')"
+    ), played.record.result
+    assert "choose another model for this chat" in played.record.result
+    # One stop is enough to know: the same conversation is not sent again.
+    assert len(filtering.requests) == 1

@@ -37,6 +37,11 @@ class ProviderError(DotError):
     """A model provider call failed."""
 
 
+class ProviderFilterError(ProviderError):
+    """The model service's content filter stopped the reply. The model is not unavailable to other runs, but asked again
+    with the same conversation it is stopped again."""
+
+
 class ProviderHttpError(ProviderError):
     """The provider answered with a non-success HTTP status."""
 

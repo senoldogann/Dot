@@ -147,8 +147,8 @@ def _refused(provider: Provider, response: httpx.Response, what: str) -> _Refusa
     if isinstance(body, dict):
         error = body.get("error")
         description = body.get("error_description")
-    code: str | None = None if error is None else truncate_middle(str(error), 100)
-    words: str | None = None if description is None else truncate_middle(str(description), 300)
+    code: str | None = None if error is None else truncate_middle(str(error), _CODE_CHARS)
+    words: str | None = None if description is None else truncate_middle(str(description), _DESCRIPTION_CHARS)
     return _Refusal(
         f"{provider.name} refused {what}",
         {

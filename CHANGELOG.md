@@ -34,6 +34,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
   (item 437).
 - A run that finished while its page was open comes back at rest, not with the done tick again, and a template card's
   Tools row is a 40 px target on a phone; the phone browser tests no longer flake on a busy Mac (item 437).
+- A reply the model service's content filter stops (`content_filter`) no longer fails the run as "cut short" after
+  asking twice more: the run moves to its standby model at once, or, with none, ends saying that the filter stopped it
+  and that another model would answer (item 437).
 
 ## 0.1.0 (2026-10-20)
 

@@ -15767,12 +15767,12 @@ through the API, and the browser test of the page the marks, the Accounts card a
 **Sign-in pages.** **As built (2026-10-20).** The page the browser comes back to at `/oauth/callback` after a sign-in is
 Dot's own sign-in card in place of the bare template (`server/callback_page.py`): the wordmark of `offline.html`, the
 title with a disc that says how it went (a tick, a cross for a refusal, a plain mark for what is neither done nor a
-fault), the account with its address and Google's mark (Microsoft's tile shows its initial, as the Accounts card does)
+fault), the account with its address and its provider's full-colour mark (as the Accounts card has)
 or the MCP service with the name and mark the catalogue gives it and its host, the provider's own words when it gave
 any, a primary **Back to Plugins**, and a line that the tab may have opened in the default browser, where Plugins asks
 for the access token first. It links `/css/app.css` and `/css/themes.css` by absolute address and has no inline style or
 script, so the content security policy and `guard.py` are as they were; light and dark follow the system by
-`light-dark()` alone, and the marks, drawn for a light page, are inverted in the dark by a `prefers-color-scheme` rule.
+`light-dark()` alone, and a mark sits on the plugins' tile, light in both schemes (`--mark-ground`).
 `CameBack` is a typed outcome (signed in, declined, expired, failed) and the renderer owns the words and the status: a
 plain No is a neutral "Not signed in to Google, nothing was saved", any other error shows as `error: description` (cut,
 escaped), a refusal shows its message with the provider's error code and description (`_Refusal`; an answer that is no
@@ -15864,6 +15864,18 @@ time (0.8 s for ten apps on an idle Mac, 5.6 s for one under load); the tests th
 (test_phone_lists, test_phone_back, test_phone_type, test_phone_all_pages) take a new fixture, mac_at_rest, that has
 macOS answer at once, as test_customize_plugins already does. The CI gate still runs no browser test (gate.yml), which a
 human decides; that is why both real failures reached main.
+
+**A content filter's stop.** The owner's word of 2026-10-20 18:0x, with a screenshot of two chat runs on
+`opencode_go:deepseek-v4.1-flash` that failed in 10 and 14 s with "The model's replies were cut short ...
+'content_filter'" ("Ekteki problem nedir, ilk defa karşılaştım. Bu problemi de çöz"): each step of a 339k-token chat
+came back with no words and the service's end `content_filter`, which the loop took for a cut reply and nudged twice
+with the same conversation. `agent/loop.py` now reads that end (`_FILTERED`, `filtered_stop`) as a model that cannot
+answer this run: a `ProviderFilterError` (`core/errors.py`) raised at the step, so a routed step goes back to the run's
+own model and the run's own model hands over to a standby one at once (`_cannot_answer`, reason "its content filter
+stopped the reply"), without pausing the model in the router for other runs; with no standby model left the run fails at
+the first stop, saying the filter stopped it and that another model for the chat, or a standby model, would answer.
+Tests: smoke (`test_helpers.py`: the move to the standby model, and the end without one after one request;
+`test_cut_short_replies.py` takes another abnormal end). Docs: `docs/runs.md`, `docs/models.md`.
 
 **Left for a human** (paths REVIEW.md keeps): `Cache-Control: no-store` for `/oauth/callback` (`server/guard.py`), and a
 job of browser tests in CI (`.github/workflows/gate.yml` runs none, which is how two browser failures reached `main`).

@@ -55,7 +55,8 @@ the run's own model is never its helper.
 
 `standby` lists the models a run moves to when its own model answers with a quota, rate-limit or key error (HTTP 401),
 refuses access to it (HTTP 403: a model, a region or a plan the key may not use; or OpenRouter's 404 for a model the
-account's privacy settings leave no provider of, item 361), or its provider has no key: the run
+account's privacy settings leave no provider of, item 361), its provider has no key, or its service's content filter
+stops the reply (item 437; that pauses the model for no other run): the run
 goes on from the same step, with the tools that step had, on the first standby model that can take it over, the model is
 told, and the timeline shows the switch, which the model chip follows. The run's reasoning level becomes the nearest one
 the new model offers. A run takes each model once at most, in the order of the list, and never goes back to one it left.
