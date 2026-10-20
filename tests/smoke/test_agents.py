@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, Route, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, FloatRect, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.playbooks import Playbook, playbook_name, read_meta, write_playbook
@@ -40,6 +40,9 @@ pytestmark = pytest.mark.asyncio(loop_scope="module")
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _RUN_WAIT_S: float = 60.0
 _SETTLE_MS: int = 700
+# How far down the page the agent's editor may start, in a window 860 px tall: at the top, under the bar and the way
+# back, and not where the greeting stands in the middle (item 437).
+_EDITOR_TOP_MAX_PX: int = 300
 TOKEN: str = f"MARKER-{secrets.token_hex(8)}"
 LESSON: str = "Primary sources on the matter are listed in the ministry's own register first."
 SKILL_KIND: str = "Check a claim against the ministry register"
@@ -358,6 +361,10 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.wait_for_timeout(_SETTLE_MS)
             rows_text: list[str] = await page_ui.locator(".agent-row").all_inner_texts()
             assert len(rows_text) == 2 and "Scout" in rows_text[1] and "Find two sources" in rows_text[1], rows_text
+            # The templates under them say nothing of a tool list that loaded, and no empty part is written as "null".
+            templates = page_ui.locator("section[aria-label='Templates']")
+            await expect(templates).to_contain_text("Start from a template")
+            await expect(templates).not_to_contain_text("null")
             await page_ui.screenshot(path=str(out / "agents.png"))
             await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
             await page_ui.wait_for_timeout(_SETTLE_MS)
@@ -365,6 +372,10 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             assert (
                 await page_ui.locator("textarea[aria-label='Message']").get_attribute("placeholder") == "Message Scout"
             )
+            # The tab names the agent and the bar's name is the page's one heading (item 437).
+            await expect(page_ui).to_have_title("Scout · Agents · Dot")
+            await expect(page_ui.get_by_role("heading", level=1)).to_have_text("Scout")
+            await expect(page_ui.locator(".stage-title h1.stage-name")).to_have_count(1)
             assert await page_ui.locator(".list-row[data-run]").count() == 2
             # What it learned: the lesson with its score, the skill with Share.
             assert await page_ui.locator(".agent-learned [data-lesson]").count() == 1
@@ -398,12 +409,18 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
             await page_ui.wait_for_timeout(_SETTLE_MS)
             await page_ui.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            # The editor opens at the top of the page, not down where the greeting stood (item 437); Cancel puts the
+            # greeting back in the middle.
+            editor_box: FloatRect | None = await page_ui.locator(".agent-editor").bounding_box()
+            assert editor_box is not None and editor_box["y"] < _EDITOR_TOP_MAX_PX, editor_box
             await expect(page_ui.locator(".look-picker .look-option")).to_have_count(8 + 16 + 12)
             await expect(
                 page_ui.locator(".look-preview .character[data-still='false'][data-shape='droplet']")
             ).to_have_count(1)
             assert await page_ui.locator(".look-picker input[value='violet']").is_checked()
             await page_ui.screenshot(path=str(out / "editor.png"), full_page=True)
+            await page_ui.get_by_role("button", name="Cancel").click()
+            await expect(page_ui.locator(".agent-home")).not_to_have_attribute("data-editing", "")
             # Dot's own look is a card of Settings › General.
             await page_ui.goto(f"http://{host}:{port}/#/settings/general")
             await page_ui.wait_for_timeout(_SETTLE_MS)

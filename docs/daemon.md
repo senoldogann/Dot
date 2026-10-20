@@ -376,9 +376,10 @@ reaches Dot at and a pairing code for its home-screen app; see [Dot on the phone
 **System** (the daemon, its facts in four groups each named over its rows of a label and a value, item 378: this Dot,
 how it acts, what it works with and its models; the emergency stop and the health checks in a fold, closed, with the
 number of failures on its line, and the ways to **Diagnostics** and **Open source licences**, pages of their own). Which
-folds are open is kept in the browser. The tabs sit beside their content when the window has the room and above it
-otherwise, in one row that scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item
-272); on a phone they are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
+folds are open is kept in the browser. The tabs sit beside their content when the page has the room for both (1100
+px: a window of 1412 px with the sidebar open, of 1140 px with it closed) and above it otherwise, in one row that
+scrolls sideways with the open tab in sight and stays under the bar as the page scrolls (item 272); on a phone they
+are a list in groups whose rows open each tab as a page of its own (item 330, under [Dot on the
 phone](phone.md#dot-on-the-phone)). The earlier addresses of the memory, rules and system pages lead to their tabs, and
 the schedules' tab (`#/settings/schedules`) to the Schedules page. **SnapShots** (item 405) is the window captured into
 the box by both Command keys pressed together: see below.
@@ -396,7 +397,7 @@ the introduction and the first message you send end it, and the daemon keeps tha
 
 **Diagnostics** (`#/diagnostics`, item 370) reads this Mac as it is: the daemon's process and the ones it started (MCP
 servers, Dot's Chrome and its helpers, commands), each under the one that started it, with its share of the CPU, its
-memory and how long it has run, read again every five seconds while the page is seen; the room each kind of what Dot
+memory and how long it has run, read again every five seconds while the page is seen; the room each kind of file Dot
 keeps takes on disk (the store, the workspace, the profiles of Dot's own Chrome, screenshots, downloads, the undo
 journals, the eval reports, skills and plugins, the logs and the home in all); and the logs, the last 300 lines of the
 one written last, or of another, with a filter. A process is named by its executable alone, as its arguments may carry a
@@ -408,7 +409,8 @@ and a search, and the tools Dot uses (Google Chrome, Ollama, Node.js, Tailscale,
 this Mac or that it is not, looked for on the PATH of the owner's shell (`GET /api/licences`).
 Both pages, like the other pages under another (an agent's or a campaign's page, Team, a service's page), have their
 link back at their top in a wide window, with the sidebar beside them too (item 380): the sidebar names the list they
-are under, not the page itself.
+are under, not the page itself. On a phone the table of processes scrolls sideways in its box, its edge fading while
+more lies to the right.
 
 Settings › Appearance (⌥⌘A) holds the look of this browser. **Colour scheme** is three cards, each a miniature of Dot's
 window drawn in the scheme it names: System (the default, split down the middle), Light and Dark; ⇧⌥⌘A steps through
@@ -456,7 +458,8 @@ modules; its notice is `static/js/appearance/LICENSE`, and Dot is not affiliated
 visual system. Colour: every colour is a token of `themes.css` naming its light and its dark value in one place;
 surfaces step up by lightness (page, sunken sidebar, raised cards) rather than by shadow in dark; borders are the text
 colour at a small alpha so they sit on every surface; the text tiers are measured against every surface by a unit test
-(4.5:1 for text and its second tier, 3:1 for the muted and faint ones); the yellow is the owner's bubbles. Type: Inter
+(4.5:1 for text and its second tier, 3:1 for the muted and faint ones; the neutral and the paper look hold the muted
+one to 4.5:1 too, the sidebar's group labels being set in it); the yellow is the owner's bubbles. Type: Inter
 for the interface and the answers, Geist Mono for code and identifiers, both served from Dot's own origin
 (`static/fonts`, SIL Open Font License); seven sizes each with its line-height (12/16 badges and chips, 13/18 meta and
 hints, 14/20 the interface, 15/24 prose and the composer, 17/24 section titles, 20/28 page titles, 24/32 the greeting),

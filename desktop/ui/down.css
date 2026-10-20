@@ -7,7 +7,7 @@ h1 { margin: 12px 0 0; font-size: 22px; font-weight: 650; letter-spacing: -0.015
 p { max-width: 420px; margin: 0; }
 pre { margin: 4px 0; padding: 10px 14px; border-radius: 10px; background: #f3f2ee; font: 13px ui-monospace, "SF Mono", Menlo, monospace; }
 .why { font: 13px/1.5 ui-monospace, "SF Mono", Menlo, monospace; overflow-wrap: anywhere; }
-.muted { color: #6a6965; font-size: 13px; }
+.muted { color: #696864; font-size: 13px; }
 .wordmark { display: block; overflow: visible; }
 .letter { fill: none; stroke: currentColor; stroke-width: 34; stroke-linecap: round; stroke-linejoin: round; }
 .disc { fill: #ffcd3c; }

@@ -25,6 +25,15 @@ export function paneHead(subtitle, actions) {
   return el("div", { class: "page-head" }, el("div", { class: "grow page-sub" }, subtitle), actions);
 }
 
+/**
+ * The words and mark of a button that opens a form and shuts it again (New schedule, New rule): `openLabel` with a plus
+ * while the form is shut, Close with a cross while it is open; `aria-expanded` says which.
+ */
+export function paintOpener(button, openLabel, isOpen) {
+  button.replaceChildren(icon(isOpen ? "x" : "plus"), isOpen ? "Close" : openLabel);
+  button.setAttribute("aria-expanded", String(isOpen));
+}
+
 /** A spinner for a place that is still loading, to sit inside a card. */
 export function inlineLoading() {
   return el("div", { class: "empty", role: "status", "aria-label": "Loading" }, el("div", { class: "spinner" }));

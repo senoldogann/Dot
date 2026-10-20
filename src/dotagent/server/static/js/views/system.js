@@ -217,7 +217,7 @@ function buildAbout() {
     body: el(
       "div",
       { class: "list" },
-      row("#/diagnostics", "Diagnostics", "Dot's processes and what they take, the room what it keeps takes, and its logs."),
+      row("#/diagnostics", "Diagnostics", "Dot's processes and what they take, the room its files take, and its logs."),
       row("#/licences", "Open source licences", "The notices of the packages, the assets and the tools Dot uses."),
     ),
     openByDefault: true,

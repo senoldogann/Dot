@@ -6992,6 +6992,12 @@ button.attach-chip:hover {
   padding-top: 24px;
 }
 
+/* While the agent's editor is open the page starts under the bar: the form is long, and the room that keeps the
+   greeting in the middle of the window would push it down past the fold. */
+.agent-home[data-editing] {
+  grid-template-rows: auto auto auto;
+}
+
 .agent-who .home-greeting {
   font-size: var(--text-md);
 }
@@ -7538,7 +7544,8 @@ button.attach-chip:hover {
 
 /* ---------- Settings › System's Diagnostics (item 370) and Open source licences (item 371) ---------- */
 
-/* A row of System that opens one of the two pages: its title and line, the chevron at its right. */
+/* A row of System that opens one of the two pages: its title and line, the chevron at its right, pointing right as the
+   icon is drawn (an arrow that points up would read as a fold). */
 .about-row {
   color: inherit;
 }
@@ -7546,7 +7553,6 @@ button.attach-chip:hover {
 .about-row > .icon {
   flex: none;
   color: var(--muted);
-  rotate: -90deg;
 }
 
 /* A process sits in under the one that started it, by how deep it is under the daemon. */

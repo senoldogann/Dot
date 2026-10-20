@@ -7,8 +7,9 @@
    The scale (item 63): warm greys with little saturation; surfaces step up by lightness (bg, surface, surface-2,
    surface-3) in both schemes, so depth comes from the step and not from a shadow in dark; borders are the text colour
    at a small alpha, so they sit on every surface; the text tiers (text, text-2, muted, faint) are measured against
-   every surface by tests/unit/test_css_tokens.py (4.5:1 for the first two, 3:1 for the last two); shadows are
-   nearly gone in dark. The accent is an ink, not the amber of the bubble: an amber reads at under 2:1 on a light
+   every surface by tests/unit/test_css_tokens.py (4.5:1 for the first two, 3:1 for the last two; the neutral and the
+   paper look hold their muted ink to 4.5:1 too, as small labels are set in it, and the sidebar's group labels with
+   it); shadows are nearly gone in dark. The accent is an ink, not the amber of the bubble: an amber reads at under 2:1 on a light
    surface, and the accent paints text, focus rings and the send button. */
 
 :root {
@@ -36,7 +37,7 @@
   --control: light-dark(#85837d, #8a8882);
   --text: light-dark(#1c1b19, #ecebe6);
   --text-2: light-dark(#4b4a46, #c6c4bd);
-  --muted: light-dark(#6a6965, #a19f98);
+  --muted: light-dark(#696864, #a19f98);
   --faint: light-dark(#767470, #94928b);
   --accent: light-dark(#2b2a27, #e6e4de);
   --accent-strong: light-dark(#1c1b19, #f5f4f0);

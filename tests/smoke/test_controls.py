@@ -12,7 +12,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -32,6 +32,8 @@ _LUMINANCE: str = """(() => {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
 })()"""
 _SECTIONS: int = 13
+# Whether every name of the nodes is whole and on a single line (a mono small line is 20 px tall).
+_ON_ONE_LINE: str = "(names) => names.every((name) => name.scrollWidth <= name.clientWidth && name.offsetHeight < 30)"
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -112,6 +114,11 @@ async def test_every_control_draws_in_both_looks_wide_and_on_a_phone_at_both_den
                 await expect(page.locator("html")).to_have_attribute("data-theme", theme)
                 await expect(page.locator(".control-section")).to_have_count(_SECTIONS)
                 await expect(page.locator("[data-control=faces] .avatar")).to_have_count(5)
+                # Each colour's token stands on one line beside its swatch, whole (item 437): the swatch's box was
+                # that of the theme editor's colour input, 32 px square, so the name broke at its hyphens.
+                names: Locator = page.locator(".token-swatch > code")
+                assert await names.count() > 0
+                assert await names.evaluate_all(_ON_ONE_LINE)
                 await page.screenshot(path=str(tmp_path / f"controls-{theme}-{width}-{scheme}.png"), full_page=True)
                 await page.close()
 

@@ -12,7 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.review import RULE_TOOL
@@ -176,6 +176,10 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             await page.goto(ui_url(host, port, TOKEN))
             await page.goto(f"http://{host}:{port}/#/settings/rules")
             await page.get_by_role("button", name="New rule").click()
+            # The button that opened the forms shuts them: a cross and Close, not the plus of New rule (item 437).
+            opener: Locator = page.locator(".rule-panel > .panel-head").get_by_role("button", name="Close")
+            await expect(opener.locator(".icon")).to_have_attribute("data-icon", "x")
+            await expect(opener).to_have_attribute("aria-expanded", "true")
             words = page.get_by_role("textbox", name="The rule in your words", exact=True)
             draft = page.get_by_role("button", name="Draft the rule", exact=True)
             await page.get_by_role("button", name="Ask me before Dot deletes anything with rm").click()
@@ -183,6 +187,9 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             # Closed and opened again, the forms keep what was written (item 373).
             await page.locator(".rule-panel > .panel-head").get_by_role("button", name="Close").click()
             await expect(words).to_be_hidden()
+            await expect(page.get_by_role("button", name="New rule").locator(".icon")).to_have_attribute(
+                "data-icon", "plus"
+            )
             await page.get_by_role("button", name="New rule").click()
             await expect(words).to_have_value("Ask me before Dot deletes anything with rm")
             await expect(words).to_be_focused()
