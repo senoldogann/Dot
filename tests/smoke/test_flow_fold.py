@@ -164,13 +164,22 @@ async def test_the_step_group_folds_and_unfolds_while_the_run_still_works(tmp_pa
                 await expect(group.locator(".steps-latest")).to_have_text(_FIRST)
                 assert await group.evaluate("(node) => node.open") is False
                 await expect(group.locator(".steps-latest")).to_be_visible()
+                # Folded and at work, the head names the command that runs, in place of how much it did so far, and
+                # before the chevron, not after it.
+                await expect(group.locator(".steps-count")).to_be_hidden()
+                before_chevron: bool = await group.evaluate(
+                    "(node) => node.querySelector('.steps-latest').getBoundingClientRect().right"
+                    " <= node.querySelector('.steps-head .chev').getBoundingClientRect().left"
+                )
+                assert before_chevron
                 await group.screenshot(path=str(tmp_path / "steps-folded-at-work.png"))
-                # (1) A click opens it: the call it holds is visible.
+                # (1) A click opens it: the call it holds is visible, and the count of what it did so far is back.
                 first_tool: Locator = group.locator(".steps-body details.tool").first
                 await expect(first_tool).to_have_count(1)
                 await summary.click()
                 assert await group.evaluate("(node) => node.open") is True
                 await expect(first_tool).to_be_visible()
+                await expect(group.locator(".steps-count")).to_have_text("ran 1 command so far")
                 # (2) A click folds it while the command still runs; the call's result streams, the head is painted
                 # anew, and the group stays folded with the latest line in sight.
                 await summary.click()

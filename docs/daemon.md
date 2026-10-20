@@ -210,7 +210,8 @@ box would be, which stays at the window's foot as the conversation scrolls (item
 ("Completed in 1m 46s", "Working for 2m"), whether its parent still works ("Runs on its own" once not), "Open parent"
 and, while it works, **Stop**. The tool calls of one stretch of work fold into a single line that says what they did,
 "Ran 2 commands and read 1 file", with the time it took beside it ("Working…" and what is behind it while it runs,
-"Worked for 12 s" for a stretch with no call; item 374). Open, it shows every call, result and screenshot, each call one
+"Worked for 12 s" for a stretch with no call; item 374). A folded group at work names the command that runs right
+after "Working…", in place of how much it did so far, which the open group keeps (item 430). Open, it shows every call, result and screenshot, each call one
 line in line with the group's head (item 402): its mark (a spinner while it runs, then the mark of its kind, in the
 failure's colour when it failed; item 403), what it did (a command is the command itself, the policy's words its
 tooltip; another call, whose mark several tools share, keeps its tool's name and the policy's words, "Read notes.txt")
