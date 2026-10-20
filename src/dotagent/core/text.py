@@ -239,18 +239,29 @@ def _is_blob(text: str) -> bool:
     return sum(char.isspace() for char in text) * 50 < len(text)
 
 
-def strip_blobs(value: JsonValue, text_chars: int = 0) -> JsonValue:
-    """Replace long strings (base64 images, huge prompts) so payloads stay readable in logs. With ``text_chars`` only a
-    blob is replaced, by its size; a long text (a command, a script) stays, cut in the middle where it passes
-    ``text_chars``, since a reader of the call wants to see what it ran."""
+def strip_blobs(value: JsonValue) -> JsonValue:
+    """Replace long strings (base64 images, huge prompts) by their size, so payloads stay readable in logs."""
     if isinstance(value, str):
-        if len(value) > _BLOB_THRESHOLD and (text_chars == 0 or _is_blob(value)):
-            return f"<{len(value)} chars>"
-        return truncate_middle(value, text_chars) if text_chars > 0 else value
+        return f"<{len(value)} chars>" if len(value) > _BLOB_THRESHOLD else value
     if isinstance(value, list):
-        return [strip_blobs(item, text_chars) for item in value]
+        return [strip_blobs(item) for item in value]
     if isinstance(value, dict):
-        return {key: strip_blobs(item, text_chars) for key, item in value.items()}
+        return {key: strip_blobs(item) for key, item in value.items()}
+    return value
+
+
+def strip_blobs_keep_text(value: JsonValue, text_chars: int) -> JsonValue:
+    """Replace only a blob (a picture's base64) by its size; a long text (a command, a script) stays, cut in the middle
+    where it passes ``text_chars``, since a reader of the call wants to see what it ran. Mask secrets before this: a cut
+    in the middle of a key leaves halves no pattern knows (item 431)."""
+    if isinstance(value, str):
+        if len(value) > _BLOB_THRESHOLD and _is_blob(value):
+            return f"<{len(value)} chars>"
+        return truncate_middle(value, text_chars)
+    if isinstance(value, list):
+        return [strip_blobs_keep_text(item, text_chars) for item in value]
+    if isinstance(value, dict):
+        return {key: strip_blobs_keep_text(item, text_chars) for key, item in value.items()}
     return value
 
 
