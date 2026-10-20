@@ -8,6 +8,7 @@ No network and no model service is used: the scripted model plays the runs of a 
 """
 
 import asyncio
+import re
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -191,6 +192,50 @@ async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
                         # The chat opened again reads the same.
                         await page.reload()
                         await _decided_shows(page, approved)
+                    await page.close()
+            finally:
+                await browser.close()
+
+
+@pytest.mark.browser
+async def test_the_bell_leads_to_the_chat_that_asks_and_not_to_the_list_of_chats(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """The owner's word of 2026-10-20: the bell of the header leads to the chat whose approval waits, its card there,
+    and not to the home's list — wide and on a phone."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width in (1280, 390):
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, reduced_motion="reduce"
+                    )
+                    await page.goto(ui_url(host, port, TOKEN))
+                    older, _first = await _asking(runtime, manager, f"Write the shelves (bell, {width})")
+                    # A newer approval waits too: the store lists them newest first, and the bell must lead to the one
+                    # that has waited longest all the same.
+                    newer = await runtime.store.create_approval(
+                        "run_older_test_bell", "shell", "A newer thing that waits", "high", {}
+                    )
+                    await page.goto(f"{address}/#/")
+                    bell: Locator = page.locator(".pill.warn").first
+                    await expect(bell).to_be_visible()
+                    await bell.click()
+                    await expect(page).to_have_url(re.compile(rf"#/runs/{older.id}$"))
+                    card: Locator = page.locator(".timeline .approval")
+                    await expect(card).to_have_count(1)
+                    await card.get_by_role("button", name="Deny").click()
+                    async with asyncio.timeout(WAIT_S):
+                        assert (await manager.wait(older.id)).status == "done"
+                    # The newer one waits still, and the bell leads there now.
+                    await expect(bell).to_be_visible()
+                    await expect(bell).to_have_attribute("href", f"#/runs/{newer.run_id}")
+                    await runtime.store.decide_approval(newer.id, "denied", "test", "")
+                    # Nothing waits now, and the bell hides with the card — the page reads the approvals again on its
+                    # own clock (every fifteen seconds) when nothing told it they changed.
+                    await expect(page.locator(".pill.warn").first).to_be_hidden(timeout=20_000)
                     await page.close()
             finally:
                 await browser.close()

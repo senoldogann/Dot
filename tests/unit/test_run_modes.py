@@ -164,7 +164,7 @@ def test_the_prompt_tells_the_model_how_its_questions_are_answered() -> None:
     assert "nothing waits for the user" in _prompt("yolo", False)
     # A yolo run asks nothing at all (item 443): money, a password and a message in the owner's name included; a
     # code it can read or a password it was given it types itself.
-    assert "not a password or a one-time code" in _prompt("yolo", False)
+    assert "money, a password, a message or a post in their name" in _prompt("yolo", False)
     assert "you type in yourself" in _prompt("yolo", False)
     assert "other secrets" not in _prompt("yolo", False)
     assert "answered by a review model" not in _prompt("yolo", False)

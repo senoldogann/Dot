@@ -226,8 +226,8 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
             name="terminal_send",
             description=(
                 "Type into a terminal session and return what the program printed back. End a line with \\n to "
-                "press Enter. When the program asks for a password, every mode but yolo leaves that step to the user; "
-                "a yolo run types the one line it was given (item 443)."
+                "press Enter. At a password prompt every mode but yolo leaves the step to the user; yolo types one "
+                "line (item 443)."
             ),
             args_model=SendArgs,
             modes=ACTING_MODES,

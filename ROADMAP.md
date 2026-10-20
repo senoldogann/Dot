@@ -16000,6 +16000,17 @@ says what it would have asked), `test_site_locks.py` (the two runs race for the 
 asking), `test_terminal.py` (the password is typed in yolo and refused where the modes ask). Docs: `docs/autonomy.md`,
 `docs/safety.md`, `defaults.toml`, the `--help` of the CLI and the approvals card.
 
+### 444. The bell leads to the chat that asks
+
+**Status: done (2026-10-20/21).** The owner's word of 2026-10-20, with two screenshots of the phone: the bell of the
+header, its count of what waits, led to the home's list of chats — an empty chat, in their words — where the question
+they went to answer was one line among the day's. **As built.** The bell's link is painted with the snapshot of the
+approvals: the oldest approval's own chat (`#/runs/<run_id>`), where its card stands and its buttons are, and the home
+when nothing waits (`shell.js`). Answered, the bell hides with the card. A question a run *left* (severity `question`,
+status `left`) is still not counted by the bell: it is in the home's list, and the count of the bell comes from the
+pending approvals. Measured in `tests/smoke/test_approval_target.py`, which clicks the bell on a wide window and a phone
+and finds the card in the chat it opens; on the CSS before this change the page it opens is the home.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16951,3 +16962,5 @@ asking), `test_terminal.py` (the password is typed in yolo and refused where the
 - 2026-10-20 (Opus 5.5): item 443: in yolo the agent asks nothing — money, a password or a one-time code, a message or
   a post in the owner's name, a capped payment, Dot's own files and the always-on review are waived with the reason
   recorded, and only a refusal (a research run's) stands; the secret fields it can fill it fills itself.
+- 2026-10-20 (Opus 5.5): item 444: the header's bell leads to the chat of the approval that waits longest — its card and
+  its buttons there — and to the home only when nothing waits.

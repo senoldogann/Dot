@@ -31,9 +31,11 @@ too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧�
 ([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Settings** and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
-shows only what needs you: the approvals waiting, and the connection to the daemon while it is being made or lost; what
-works stands under Working. The sections (Waiting for you, Working, Chats) fold on a click of their label, and the folds
-are kept between visits. The sidebar's head holds only the button that folds it away. **Select** turns the list into
+shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited
+longest, its card and its buttons there, and the home when nothing waits (item 444) — and the connection to the daemon
+while it is being made or lost; what works stands under Working. The sections (Waiting for you, Working, Chats) fold on
+a click of their label, and the folds are kept between visits. The sidebar's head holds only the button that folds it
+away. **Select** turns the list into
 checkboxes: tick chats (or Select all) and **Delete** asks once, then removes them with every run, step, event and
 approval of theirs. A chat with a run under way is refused, the run of a `dotx` command too: wait for the run to end, or
 cancel it (a `dotx` command's with Ctrl-C). Escape leaves the selection. Under 860 px the sidebar becomes a drawer. The

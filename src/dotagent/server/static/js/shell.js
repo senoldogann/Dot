@@ -49,6 +49,13 @@ function buildIndicators() {
     paint(snapshot) {
       setText(waitingCount, String(snapshot.approvals.length));
       waiting.hidden = snapshot.approvals.length === 0;
+      // The bell leads to what waits, not to the list of chats: the chat of the approval that has waited longest, where
+      // its card stands. With nothing waiting, the home is where the rest of the day is.
+      const first = snapshot.approvals.reduce(
+        (oldest, approval) => (oldest === null || approval.created_at < oldest.created_at ? approval : oldest),
+        null,
+      );
+      waiting.href = first === null ? "#/runs" : `#/runs/${encodeURIComponent(first.run_id)}`;
       dot.className = `live-dot ${snapshot.stream}`;
       setText(connectionLabel, STREAM_LABEL[snapshot.stream]);
       // The connection shows while it is being made or lost; a live one says nothing (item 120), nor does a break that
