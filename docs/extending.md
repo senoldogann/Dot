@@ -63,7 +63,8 @@ The ways a service connects:
   the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using:
   its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own page, which
   sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through
-  `[server] reach`); then it turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself
+  `[server] reach`), to a page that names the service and its mark and says Dot is finishing the sign-in, because the
+  service's code is traded for its tokens after that page; then the tile turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself
   with the service as a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and
   renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left
   out with words that bring you back here (**Sign in again**). **Remove** takes a server added here out, with its tools
@@ -89,10 +90,22 @@ card follows until the account is there, named by its address; **Sign out** take
 page on this Mac (the provider comes back to the Mac's loopback address, which a phone does not reach). An account's
 access token is refreshed with its refresh token once it is about to run out.
 
+The tab the provider sends you back to is a page of Dot's own look (item 437), light or dark as the Mac is: it names the
+account with its address and says how the sign-in came out, signed in, or not signed in because you said no, the
+provider refused (with the provider's own words, such as `invalid_client`), or the browser came back after more than 10
+minutes, and **Back to Plugins** opens Plugins in that tab. The tab opens where the link opens: in the browser you use,
+or, from the desktop app, in your default browser, which may never have opened Dot and then asks for the access token
+before it shows Plugins; Dot's own window on this Mac already shows the account either way. A page that is loaded again
+after its sign-in was used says that the sign-in has ended, and shows nothing the address carried.
+
 The clients, once: at Google, enable the [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
-and the [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), create a **Desktop
-app** client at [Google Auth Platform › Clients](https://console.cloud.google.com/auth/clients), and add your address as
-a test user under [Audience](https://console.cloud.google.com/auth/audience); at Microsoft, register an app at [Entra ›
+and the [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), name the app **Dot**
+under [Google Auth Platform › Branding](https://console.cloud.google.com/auth/branding) (App name, and a logo if you
+like: Google's page shows the name of the project's app when you say yes, so a project made for something else asks in
+that name), create a **Desktop app** client at [Google Auth Platform ›
+Clients](https://console.cloud.google.com/auth/clients), and add your address as a test user under
+[Audience](https://console.cloud.google.com/auth/audience); at Microsoft, register an app named **Dot** (the
+registration's name is what Microsoft's page shows) at [Entra ›
 App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps/ApplicationsListBlade) for any
 organisation's and personal accounts, with `http://localhost/oauth/callback` as a redirect URI of **Mobile and desktop
 applications** (Microsoft compares the path, not the port) and public client flows allowed. Then save the three values

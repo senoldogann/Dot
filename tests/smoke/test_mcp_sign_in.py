@@ -24,6 +24,7 @@ import time
 from collections.abc import AsyncIterator
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 import httpx
 import pytest
@@ -332,7 +333,7 @@ async def test_a_server_that_asks_signs_in_in_the_browser_and_stays_signed_in(wo
             back: httpx.Response = await browser.get(link)
         assert back.status_code == 200, back.text
         assert str(back.url).startswith(f"{world.dot}/oauth/callback?")
-        assert "Signed in to signed" in back.text
+        assert "Back from signed</h1>" in back.text and "Dot is finishing the sign-in" in back.text
         ready: dict[str, object] = await _ready(client, "signed")
         assert (ready["state"], ready["tools"], ready["signs_in"], ready["error"]) == (
             "ready",
@@ -405,6 +406,35 @@ async def test_a_server_open_to_all_is_added_without_a_sign_in(world: _World) ->
         assert services["notion"] is False and "deepwiki" in services
 
 
+async def test_a_sign_in_the_owner_says_no_to_says_nothing_was_saved_and_the_server_is_left_out(
+    world: _World,
+) -> None:
+    async with _client(world) as client:
+        added: httpx.Response = await client.post(
+            "/api/mcp/servers",
+            json={"service": None, "name": "refused", "address": f"{world.signed}/mcp", "origin": world.dot},
+        )
+        assert added.status_code == 200, added.text
+        link: object = added.json()["link"]
+        assert isinstance(link, str)
+        # The owner's browser comes back with the authorization server's no in place of its code.
+        state: str = parse_qs(urlsplit(link).query)["state"][0]
+        async with httpx.AsyncClient(base_url=world.dot, timeout=30.0) as browser:
+            came: httpx.Response = await browser.get(
+                "/oauth/callback",
+                params={"state": state, "error": "server_error", "error_description": "It could not ask you."},
+            )
+        assert came.status_code == 200, came.text
+        assert "Not signed in to refused</h1>" in came.text and "nothing was saved" in came.text
+        assert "server_error: It could not ask you." in came.text
+        # The server is named by its host, not by the whole address.
+        assert urlsplit(world.signed).netloc in came.text and f"{world.signed}/mcp" not in came.text
+        left: dict[str, object] = await _ready(client, "refused")
+        assert left["state"] == "left_out" and left["tools"] == []
+        removed: httpx.Response = await client.delete("/api/mcp/servers/refused")
+        assert removed.status_code == 200, removed.text
+
+
 async def test_a_bad_name_an_unknown_page_and_a_stray_callback_are_refused(world: _World) -> None:
     async with _client(world) as client:
         bad: httpx.Response = await client.post(
@@ -421,7 +451,7 @@ async def test_a_bad_name_an_unknown_page_and_a_stray_callback_are_refused(world
     async with httpx.AsyncClient(base_url=world.dot, timeout=30.0) as browser:
         stray: httpx.Response = await browser.get("/oauth/callback", params={"state": "made-up", "code": "x"})
     assert stray.status_code == 400
-    assert "Dot does not wait for this sign-in" in stray.text
+    assert "This sign-in has ended" in stray.text
 
 
 async def test_a_service_s_secrets_go_into_dot_s_env_file_and_its_server_refers_to_them(
@@ -505,7 +535,7 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
                 await signed.get_by_role("link", name="Open the sign-in page").click()
             sign_in: Page = await opened.value
             await sign_in.wait_for_load_state()
-            await expect(sign_in.locator("h1")).to_have_text("Signed in to signed")
+            await expect(sign_in.locator("h1")).to_have_text("Back from signed")
             await sign_in.close()
             await expect(signed.locator(".badge")).to_have_text("Ready", timeout=READY_WITHIN_S * 1000)
             await expect(signed).to_contain_text("1 tool: whoami")

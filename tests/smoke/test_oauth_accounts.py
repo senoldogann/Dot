@@ -84,7 +84,7 @@ async def _signed_in(accounts: Accounts, google: _Google) -> CameBack | None:
     query: dict[str, list[str]] = parse_qs(urlsplit(link).query)
     assert query["redirect_uri"] == ["http://127.0.0.1:8765/oauth/callback"]
     google.challenge = query["code_challenge"][0]
-    return await accounts.come_back(query["state"][0], "the-code", None, time.time())
+    return await accounts.come_back(query["state"][0], "the-code", None, None, time.time())
 
 
 async def test_a_sign_in_keeps_the_account_its_tokens_refresh_and_signing_out_takes_them(
@@ -94,7 +94,7 @@ async def test_a_sign_in_keeps_the_account_its_tokens_refresh_and_signing_out_ta
     keychain: Keychain = Keychain(keychain_file)
     accounts: Accounts = Accounts(store, keychain, httpx.MockTransport(google))
     came: CameBack | None = await _signed_in(accounts, google)
-    assert came is not None and came.status == 200 and came.title == "Signed in to Google", came
+    assert came == CameBack(kind="signed_in", provider="google", address="ada@example.com", reason=None)
     providers: tuple[ProviderView, ...] = await accounts.providers()
     assert [(view.id, view.configured, [a.address for a in view.accounts]) for view in providers] == [
         ("google", True, ["ada@example.com"]),
@@ -122,17 +122,41 @@ async def test_a_code_the_provider_refuses_a_no_and_a_state_nobody_waits_for(
     link: str = await accounts.start("google", 8765, time.time())
     query: dict[str, list[str]] = parse_qs(urlsplit(link).query)
     google.challenge = "not the sign-in's"
-    refused: CameBack | None = await accounts.come_back(query["state"][0], "the-code", None, time.time())
-    assert refused is not None and refused.status == 400 and "Google refused the sign-in's code" in refused.text
+    refused: CameBack | None = await accounts.come_back(query["state"][0], "the-code", None, None, time.time())
+    # The page says what the provider said: its error code and its description, no more.
+    assert refused == CameBack(
+        kind="failed",
+        provider="google",
+        address=None,
+        reason="Google refused the sign-in's code: invalid_grant - Bad code.",
+    )
     # A state is good once.
-    assert await accounts.come_back(query["state"][0], "the-code", None, time.time()) is None
+    assert await accounts.come_back(query["state"][0], "the-code", None, None, time.time()) is None
     declined_link: str = await accounts.start("google", 8765, time.time())
     declined: CameBack | None = await accounts.come_back(
-        parse_qs(urlsplit(declined_link).query)["state"][0], None, "access_denied", time.time()
+        parse_qs(urlsplit(declined_link).query)["state"][0], None, "access_denied", None, time.time()
     )
-    assert declined is not None and "without a yes (access_denied)" in declined.text
-    assert await accounts.come_back("nobody-waits", "code", None, time.time()) is None
+    assert declined == CameBack(kind="declined", provider="google", address=None, reason=None)
+    other_link: str = await accounts.start("google", 8765, time.time())
+    other: CameBack | None = await accounts.come_back(
+        parse_qs(urlsplit(other_link).query)["state"][0], None, "server_error", "Try later.", time.time()
+    )
+    assert other == CameBack(kind="declined", provider="google", address=None, reason="server_error: Try later.")
+    assert await accounts.come_back("nobody-waits", "code", None, None, time.time()) is None
     assert await asyncio.wait_for(accounts.providers(), 30) is not None
+
+
+async def test_an_answer_that_is_no_oauth_error_is_kept_for_the_log_and_not_shown(
+    keychain_file: str, clients: None, store: Store
+) -> None:
+    transport: httpx.MockTransport = httpx.MockTransport(
+        lambda request: httpx.Response(502, text="<html>Bad gateway BODY-FOR-THE-LOG</html>")
+    )
+    accounts: Accounts = Accounts(store, Keychain(keychain_file), transport)
+    link: str = await accounts.start("google", 8765, time.time())
+    state: str = parse_qs(urlsplit(link).query)["state"][0]
+    came: CameBack | None = await accounts.come_back(state, "the-code", None, None, time.time())
+    assert came == CameBack(kind="failed", provider="google", address=None, reason="Google refused the sign-in's code")
 
 
 async def test_a_sign_in_without_the_owners_client_says_what_to_save(
@@ -153,8 +177,8 @@ async def test_a_browser_that_comes_back_too_late_is_turned_away(clients: None, 
     link: str = await accounts.start("google", 8765, started)
     query: dict[str, list[str]] = parse_qs(urlsplit(link).query)
     google.challenge = query["code_challenge"][0]
-    late: CameBack | None = await accounts.come_back(query["state"][0], "the-code", None, started + 601)
-    assert late is not None and late.status == 400 and "more than 10 minutes" in late.text, late
+    late: CameBack | None = await accounts.come_back(query["state"][0], "the-code", None, None, started + 601)
+    assert late == CameBack(kind="expired", provider="google", address=None, reason=None), late
     assert google.forms == []
 
 
