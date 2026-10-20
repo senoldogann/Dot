@@ -622,7 +622,7 @@ export function mount(root, _ctx) {
           "span",
           null,
           "A new key is used from the next request on, without a restart. The memory search and MCP servers read their keys when the daemon starts: after changing a key they use, restart it with ",
-          el("code", { class: "mono" }, "dotx service install"),
+          el("code", { class: "mono" }, "dotx service restart"),
           ".",
         ),
       ),

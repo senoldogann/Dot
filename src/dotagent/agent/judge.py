@@ -551,7 +551,7 @@ class SwitchedJudge:
     def _require_service(self) -> None:
         if self._typed is None:
             raise ConfigError(
-                "the typed judge needs the TypeSafe service: save TYPESAFE_API_KEY, then dotx service install",
+                "the typed judge needs the TypeSafe service: save TYPESAFE_API_KEY, then dotx service restart",
                 {"provider": "typesafe"},
             )
 

@@ -15892,6 +15892,38 @@ and so do the approval and question cards, which stand in a stack of their own a
 sideways takes the head, the empty stack and the 4 px between rows too. Measured in `tests/smoke/test_phone_rows.py`, which reads the rows at
 390 on a touch screen and fails on the CSS before this change.
 
+### 441. `dotx service restart`: restart the daemon now, or once no run works
+
+**Status: done (2026-10-20), on `item-441-restart-when-idle`, on the owner's word to find and fix the app's problems.**
+Seen twice on the owner's Mac: a run that merged a change of Dot's own code wanted the daemon restarted once it had
+ended, and improvised it with a shell script submitted as a launchd job (`launchctl submit -l
+dev.dotagent.restart-after-run ... /tmp/dot-restart-after-run.sh`). `launchctl submit` keeps a job alive, so launchd
+started the script again each time it exited and the daemon was restarted every 30 s while no run worked (312
+`daemon_started` events in its log); the job was removed by hand. Dot had no command for "restart the daemon when no run
+works". **As built.** `dotx service restart` restarts the installed daemon now: its job is unloaded (`bootout`: SIGTERM,
+and launchctl waits until it has exited) and loaded again from its property list (`launchd.restart_job`), and the
+command waits up to 60 s until a new process answers `/api/health`, then prints its version (a clear error naming `dotx
+service install` when launchd has no job of it). `dotx service restart --when-idle` returns at once after it loads a
+one-shot launchd job, `dev.dotagent.restart-when-idle`, from a property list in Dot's home (`RunAtLoad`,
+`AbandonProcessGroup`, no `KeepAlive`, the running Python with `-P -m dotagent.restart_when_idle`, `DOT_HOME` and
+`DOT_LOG_DIR` handed on when set). The program reads the database through a read-only SQLite connection every 5 s,
+counting the runs in `WORKING_STATUSES` (the run that asked counts until it ends); once none works it restarts the
+daemon as the command does, logs `restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` (after 2 hours, without
+a restart), `_failed` or `_crashed` (an error that is not Dot's, with its traceback) to `dotx.log`, deletes its property
+list and unloads its own label. A missing or unreadable database is an error, never an idle daemon. Asking while one is
+on its way changes nothing, since replacing it could stop it between unloading the daemon's job and loading it again;
+`dotx service status` has a `restart` line, and `dotx service uninstall` cancels a waiting one. The shell and terminal
+tools mark the commands of a run (`DOT_RUN_SHELL`, `core/runenv.py`), and `dotx service restart` and `dotx service
+install` refuse under it: the daemon would stop under the run and the run's end would kill the command between the
+unload and the load (the pre-push review's finds, over two rounds). The shell tool's description tells the model to ask
+for `--when-idle` and never to load a launchd job of its own, and where that cannot run (the sandbox outside yolo keeps
+a run from launchctl) to say that the daemon needs `dotx service restart`. The hints that told `dotx service install` as
+the way to restart (browser attach and detach, service permissions, the typed judge, Settings › Keys) say `dotx service
+restart`. Tests: `tests/unit/test_restart_when_idle.py` (the plist, the idle check per status against a scratch store,
+the wait, the program end to end, the restart as unload and load, a waiting restart left as it is, uninstall cancelling
+it, the refusal in a run, the mark on a run's commands), against a stand-in `launchctl` and a local health check. Docs:
+`docs/daemon.md` and the docs that told the restart.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16836,3 +16868,5 @@ sideways takes the head, the empty stack and the 4 px between rows too. Measured
   message, and the daemon-log, UI and browser-test fixes of a sweep of the app; one pull request.
 - 2026-10-20 (Opus 5.5): item 438 on `phone-rows` from `main`: a run's rows stand 32 px tall with 2 px between the calls
   of a group and 4 px between rows on a phone, so a long run reads as a list; a wide window keeps what it had.
+- 2026-10-20 (Opus 5.5): item 441 on `item-441-restart-when-idle` from `main`: `dotx service restart`, now or once no
+  run works, after a run's `launchctl submit` restarted the daemon every 30 s while it was idle; the job was removed.

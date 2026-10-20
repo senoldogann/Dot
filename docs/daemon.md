@@ -548,18 +548,46 @@ that address: it reads what the browser keeps for the address, the token among i
 
 ```bash
 dotx service install     # a launchd agent: starts the daemon at every login and after a crash, never after a clean stop
-dotx service status      # whether the job is loaded and the daemon answers
+dotx service status      # whether the job is loaded and the daemon answers, and whether a restart waits for the runs
+dotx service restart     # restart the daemon now, cutting off the runs at work
+dotx service restart --when-idle   # return at once; restart the daemon once no run works (what a run asks for)
 dotx service permissions # make macOS ask, in the name of the service, for the desktop permissions it lacks
 dotx service uninstall   # stop the daemon and remove the job
 ```
 
-- Run `service install` again to restart the daemon after you changed the configuration. It stops the running job before
-  it writes the new job's file; when launchd does not load the new job, the file of before is put back and its job
+- Run `service install` again after you changed the job itself (`service restart` takes up a change of the
+  configuration). It stops the running job before it writes the new job's file; when launchd does not load the new job,
+  the file of before is put back and its job
   started again, and the install fails with launchd's words. When the job loads and the daemon does not answer within a
   minute, the error says why when the daemon's own start failed since the install began (`dotx.log`'s `command_failed`
   of `daemon`: a setting this version of Dot does not know, a daemon already running, an address taken), and
   `service status`, when the daemon does not answer, shows the failure that ended the latest `dotx daemon` unless a
   start that went well came after it. Without such a failure, read `daemon.err.log`.
+- `dotx service restart` restarts the daemon without changing the job (item 441): the job is unloaded (`bootout` sends
+  the daemon SIGTERM, so it stops as it does at the end of a session, and launchctl waits until it has exited) and
+  loaded again from its property list, and the command waits up to 60 seconds for a new process to answer `GET
+  /api/health`, then prints its version. It is the way to take up a change of Dot's code, of `config.toml` or of a key;
+  `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at work are cut
+  off, and the daemon's next start resumes them as `[agent] resume` says. When launchd has no job of the service, the
+  command says so and names `service install`. In a command a run's tool started (the shell and terminal tools mark
+  them, `DOT_RUN_SHELL`), `service restart` and `service install` refuse: the daemon would stop under the run, and the
+  run's end would kill the command before it loads the daemon again.
+- **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item 441;
+  the shell tool's description tells the model so). A run that merged a change of Dot's own code wants the daemon
+  restarted once it has ended, and restarting at once would cut the run itself off. A run reaches launchctl only in
+  `yolo` or with `[shell] sandbox` off: the sandbox of the other modes keeps a run's commands from launchctl (see
+  [Safety](safety.md#safety)), and the run then says in its answer that the daemon needs `dotx service restart`. The
+  option loads a one-shot launchd job, `dev.dotagent.restart-when-idle` (its property list is in Dot's home:
+  `RunAtLoad`, no `KeepAlive`, `AbandonProcessGroup`), and returns at once. The job runs `python -P -m
+  dotagent.restart_when_idle`, which reads the database read-only every 5 seconds until no run is queued, running or
+  blocked (the run that asked included, so it has to end first, and a run that waits for an answer works too), then
+  restarts the daemon as `service restart` does, waits for the health check, writes what it did to `dotx.log`
+  (`restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` after 2 hours without a restart, `_failed`, `_crashed`
+  with a traceback), unloads itself and deletes its property list. Asking while one is on its way changes nothing
+  (replacing it could stop it between unloading the daemon's job and loading it again), so there is never more than one;
+  `service status` shows a `restart` line that says whether one waits, and `service uninstall` cancels it. A job that a
+  run made with `launchctl submit` is started again by launchd each time its script exits, which restarted the daemon
+  every 30 seconds for as long as no run worked (312 starts in one log).
 - The job runs **Dot.app** (item 288), a small app in Dot's home (`~/Library/Application Support/Dot/Dot.app`) whose
   program starts the daemon's Python and waits for it. macOS holds the program launchd starts responsible for all it
   starts, so its questions and System Settings name **Dot**, and Accessibility (it covers posting input events),
@@ -582,8 +610,8 @@ dotx service uninstall   # stop the daemon and remove the job
     no dialog for this to a program that is not an app), press `+`, then Cmd+Shift+G, paste the path with Cmd+V, press
     Return, choose **Open** and switch it on.
 
-  A running process keeps what it had when it started, so after you switched a permission on run `dotx service install`
-  (it restarts the daemon) and then `dotx service permissions` again for the next one. The command ends with "The
+  A running process keeps what it had when it started, so after you switched a permission on run `dotx service restart`
+  (or `dotx service install`) and then `dotx service permissions` again for the next one. The command ends with "The
   service has everything the desktop needs." and exit code 0 once the daemon has accessibility, input events and screen
   recording. Settings › System › **Permissions** in the web UI does the same from the page (item 409): the three
   permissions as macOS reports them for the daemon (`GET /api/desktop/permissions`, no dialog), **Ask macOS** (`POST`,

@@ -100,6 +100,7 @@ _FAMILIES: dict[str, str] = {
     "service-uninstall": "dotagent.cli_daemon",
     "service-status": "dotagent.cli_daemon",
     "service-permissions": "dotagent.cli_daemon",
+    "service-restart": "dotagent.cli_daemon",
 }
 
 log = get_logger(__name__)
@@ -469,6 +470,15 @@ def build_parser() -> argparse.ArgumentParser:
     service_commands.add_parser("status", help="show whether the job is loaded and the daemon answers")
     service_commands.add_parser(
         "permissions", help="make macOS ask, in the name of the service, for the desktop permissions it lacks"
+    )
+    restart = service_commands.add_parser("restart", help="restart the daemon now, or once no run works")
+    restart.add_argument(
+        "--when-idle",
+        action="store_true",
+        help=(
+            "return at once and restart the daemon when no run works (the run that asks included); a run that "
+            "changed Dot's code asks for this, never for a launchd job of its own"
+        ),
     )
     return parser
 

@@ -282,6 +282,11 @@ class ServicePermissionsCommand(FrozenModel):
     name: Literal["service-permissions"]
 
 
+class ServiceRestartCommand(FrozenModel):
+    name: Literal["service-restart"]
+    when_idle: bool
+
+
 class EvalListCommand(FrozenModel):
     name: Literal["eval-list"]
 
@@ -448,7 +453,8 @@ type Command = Annotated[
     | ServiceInstallCommand
     | ServiceUninstallCommand
     | ServiceStatusCommand
-    | ServicePermissionsCommand,
+    | ServicePermissionsCommand
+    | ServiceRestartCommand,
     Field(discriminator="name"),
 ]
 COMMAND_ADAPTER: TypeAdapter[Command] = TypeAdapter(Command)

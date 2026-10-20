@@ -101,7 +101,7 @@ async def cmd_browser_attach(command: BrowserAttachCommand) -> int:
         f"Worked in a test tab of Chrome {attachment.browser_version} ({attachment.open_tabs} tabs open) and closed "
         "it.\n"
         f'Saved mode = "attach" under [browser] in {config_path()}.\n'
-        "Restart the Dot service so it uses your Chrome: dotx service install\n"
+        "Restart the Dot service so it uses your Chrome: dotx service restart\n"
         "Chrome asks you to click Allow once when the service first opens a page. "
         "To go back to Dot's own Chrome: dotx browser detach\n"
     )
@@ -113,7 +113,7 @@ async def cmd_browser_detach(command: BrowserDetachCommand) -> int:
     await asyncio.to_thread(set_browser_mode, config_path(), "own")
     sys.stdout.write(
         f'Saved mode = "own" under [browser] in {config_path()}.\n'
-        "Restart the Dot service so it uses Dot's own Chrome again: dotx service install\n"
+        "Restart the Dot service so it uses Dot's own Chrome again: dotx service restart\n"
     )
     return 0
 
