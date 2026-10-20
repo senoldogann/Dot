@@ -559,8 +559,9 @@ enum UpdateCheck {
 /// The button of the offer that installs the update.
 const INSTALL: &str = "Install and Restart";
 
-/// Whether a look at the releases is under way, its offer included: one at a time, so that the look at start and the
-/// menu's, or two clicks of the menu, never install twice.
+/// Whether a look at the releases is under way, its offer and the install included: one at a time, so that the look at
+/// start and the menu's, or two clicks of the menu, never install twice. A message that only tells what a look found
+/// is no longer part of it.
 static LOOKING: AtomicBool = AtomicBool::new(false);
 
 /// The look at the releases under way: it ends when this is dropped, on every way out.
@@ -599,7 +600,7 @@ async fn tell(level: MessageLevel, message: String) {
 /// started again.
 fn check_for_update(app: AppHandle, how: UpdateCheck) {
     tauri::async_runtime::spawn(async move {
-        let Some(_looking) = Looking::start() else {
+        let Some(looking) = Looking::start() else {
             if how == UpdateCheck::Asked {
                 tell(
                     MessageLevel::Info,
@@ -614,14 +615,16 @@ fn check_for_update(app: AppHandle, how: UpdateCheck) {
             Err(error) => Err(error),
         };
         match found {
-            Ok(Some(update)) => offer_update(&app, update).await,
+            Ok(Some(update)) => offer_update(&app, update, looking).await,
             Ok(None) => {
+                drop(looking);
                 if how == UpdateCheck::Asked {
                     let current = app.package_info().version.to_string();
                     tell(MessageLevel::Info, format!("Dot {current} is the newest.")).await;
                 }
             }
             Err(error) => {
+                drop(looking);
                 eprintln!("dot-shell: the releases could not be read for an update: {error}");
                 if how == UpdateCheck::Asked {
                     tell(
@@ -635,8 +638,9 @@ fn check_for_update(app: AppHandle, how: UpdateCheck) {
     });
 }
 
-/// Ask whether to install `update`; on yes, install it and start the shell again.
-async fn offer_update(app: &AppHandle, update: Update) {
+/// Ask whether to install `update`; on yes, install it and start the shell again. The look (`looking`) ends with the
+/// answer Later, or once the install failed, before that is told.
+async fn offer_update(app: &AppHandle, update: Update, looking: Looking) {
     let answer = AsyncMessageDialog::new()
         .set_title("A newer Dot")
         .set_level(MessageLevel::Info)
@@ -656,6 +660,7 @@ async fn offer_update(app: &AppHandle, update: Update) {
     match update.download_and_install(|_, _| {}, || {}).await {
         Ok(()) => app.restart(),
         Err(error) => {
+            drop(looking);
             eprintln!("dot-shell: the update could not be installed: {error}");
             tell(
                 MessageLevel::Warning,

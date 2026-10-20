@@ -4,8 +4,8 @@
 
 Dot sends nothing to the people who make it: there is no telemetry and no crash report. The desktop app looks for a
 newer version of itself as it starts and from its menu, a request for `latest.json` of the latest GitHub release that
-carries nothing of yours ([the desktop shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs,
-sent where the configuration points:
+carries nothing of yours, and on your yes downloads that version from there ([the desktop
+shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, sent where the configuration points:
 
 - **To the models: the run's conversation.** Each call sends the goal, the messages, what the tools returned (the text
   of the files and pages the run read, what commands printed) and the screenshots the run takes or is given. By default
