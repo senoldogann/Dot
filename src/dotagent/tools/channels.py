@@ -1,9 +1,10 @@
 """The channel a tool works through, for the order the prompt sets (a command or an API before the browser, the
 browser before the desktop) and for counting how much of a run went through a GUI.
 
-``command`` is the shell, the terminal and the file tools; ``api`` an MCP tool, AppleScript or a reader of the Mac's
-own applications; ``web`` a page read without a browser; ``browser`` the browser tools; ``desktop`` the desktop tools;
-``agent`` the tools that act on the run itself (the plan, memory, notes, delegation, schedules, campaigns, finishing).
+``command`` is the shell, the terminal and the file tools; ``api`` an MCP tool, AppleScript, a reader of the Mac's
+own applications or of the mail and calendars of an account signed in; ``web`` a page read without a browser;
+``browser`` the browser tools; ``desktop`` the desktop tools; ``agent`` the tools that act on the run itself (the
+plan, memory, notes, delegation, schedules, campaigns, finishing).
 """
 
 from typing import Literal
@@ -24,6 +25,8 @@ _PREFIXES: tuple[tuple[str, Channel], ...] = (
     ("web_", "web"),
     ("browser_", "browser"),
     ("desktop_", "desktop"),
+    ("mail_", "api"),
+    ("calendar_", "api"),
 )
 
 

@@ -110,6 +110,10 @@ on a command line, and the list of accounts, with no secret in it, is in the sto
 after more than 10 minutes is turned away. Nothing logs a token, a code or an address (`GET /api/accounts`,
 `POST /api/accounts/<provider>/start`, `DELETE /api/accounts/<provider>/<address>`).
 
+Runs read the mail and the calendar of each account with `mail_search`, `mail_read` and `calendar_events` (item 424,
+[Runs and tools](runs.md#mail-and-calendars)); the prompt of every run names the accounts signed in. They only read:
+an email a run writes for you is a draft you send from the conversation.
+
 ## MCP servers
 
 Dot can use the tools of [MCP](https://modelcontextprotocol.io) servers that it starts itself over stdio, or reaches

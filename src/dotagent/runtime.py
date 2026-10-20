@@ -82,6 +82,7 @@ from dotagent.tools.drafts import build_draft_tool
 from dotagent.tools.files import build_file_tools
 from dotagent.tools.help import build_find_help_tool
 from dotagent.tools.judge_items import build_judge_items_tool
+from dotagent.tools.mail_calendar import build_mail_calendar_tools
 from dotagent.tools.mcp import build_mcp_tools
 from dotagent.tools.memory import build_memory_tools
 from dotagent.tools.meta import build_meta_tools
@@ -170,6 +171,7 @@ def _tool_groups(config: AppConfig, judge_items: bool) -> tuple[tuple[Registered
         build_notes_tools(),
         build_memory_tools(),
         (build_draft_tool(),),
+        build_mail_calendar_tools(),
         build_schedule_tools(),
         build_campaign_tools(),
         build_delegate_tools(),

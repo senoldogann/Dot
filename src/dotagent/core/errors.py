@@ -233,6 +233,11 @@ class SignInError(DotError):
     provider refused, its tokens cannot be read or refreshed, or the Keychain did not answer."""
 
 
+class AccountApiError(DotError):
+    """A call to the mail or the calendar of an account signed in failed (item 424): Gmail's, Google Calendar's or
+    Microsoft Graph's API refused it, could not be reached, or answered with what Dot does not read."""
+
+
 class PhoneSetupError(DotError):
     """What a phone needs to reach Dot away from home could not be set up (item 271): Tailscale is missing, not running
     or refused to serve, or the Mac cannot be kept awake."""

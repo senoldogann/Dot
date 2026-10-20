@@ -221,6 +221,7 @@ from dotagent.memory.service import (
     prompt_memories,
     words_only,
 )
+from dotagent.oauth.tokens import Account
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
@@ -244,6 +245,7 @@ from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL, closing_step, delegated_evidence
 from dotagent.tools.groups import (
+    ACCOUNTS_GROUP,
     BROWSER_GROUP,
     CORE_GROUP,
     group_of,
@@ -253,6 +255,7 @@ from dotagent.tools.groups import (
     offered_specs,
     used_groups,
 )
+from dotagent.tools.mail_calendar import account_lines
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
@@ -1604,6 +1607,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     # Settings › Browser may keep every run off the browser (item 354).
     if not runtime.browser.config.enabled:
         specs = tuple(spec for spec in specs if group_of(spec.name) != BROWSER_GROUP)
+    # The mail and calendar tools (item 424) are a run's only when the owner signed an account in.
+    signed_in: list[Account] = await runtime.accounts.accounts()
+    if not signed_in:
+        specs = tuple(spec for spec in specs if group_of(spec.name) != ACCOUNTS_GROUP)
     # Without a teammate the message tool goes, unless the run may make one (item 99): then it stays, so a teammate
     # made mid-run can be messaged at once.
     if not team and all(spec.name != CREATE_AGENT_TOOL for spec in specs):
@@ -1719,6 +1726,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 (
                     *owner_name_lines(names.owner, names.mac_name),
                     *(called_lines(names.name) if agent_record is None else ()),
+                    *account_lines(signed_in),
                     *owner_prompt_lines(await owner_section(runtime.store)),
                 ),
                 devtools_address(browser.config),

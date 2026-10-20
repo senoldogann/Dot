@@ -15603,6 +15603,27 @@ the secret rule, the taught skill's folder and its record), `tests/smoke/test_te
 served here: the steps across a navigation, a password field's value out of them, the scripted writer and the save).
 Docs: `docs/browser-and-computer-use.md`.
 
+### 424. The owner's mail and calendars read through the accounts signed in
+
+**Status: done (2026-10-20), on `mail-and-calendar`.** The owner's word of 2026-10-19 (DOT_PLAN.md, phases 2 and 3):
+Gmail and Calendar through the official sign-ins rather than AppleScript and Chrome's cookies, Outlook's mail and
+calendar through Microsoft Graph. **As built (2026-10-20).** `mail_search`, `mail_read` and `calendar_events` read the
+mail and calendars of the accounts of item 422, by the account's address, through Gmail's, Google Calendar's and
+Graph's own APIs (`dotagent.connectors`): the providers' answers are read into models at the edge, a message's plain
+text before its HTML made text, the times of events in the Mac's zone, an all-day event's days kept. They only read,
+so research runs have them too (`network`, `low`); what they return comes in an `<account_content>` fence and taints
+the run, and the prompt has a section for them and names the accounts signed in. A run has them only once an account
+is signed in (a run's fixed tokens grew past a small window's budget with them there for nothing). A list the provider
+cut says so, and an Outlook calendar searched for words is read page by page (Graph searches no events), its next pages
+followed only on Graph's own address. A token the provider turns away is
+refreshed once (`Accounts.refreshed_token`); a 429, a 5xx or a call that did not reach the provider is made again after
+the wait it asks for; any other refusal is an `AccountApiError` with the provider's words, the path without its query.
+From the review of #412: the sign-in's network failures are `SignInError`s, and a keychain path the prompt would split
+is refused. The tools are the `accounts` group, through the `api` channel. Writing (a draft sent from an account,
+events changed) is not in it. Tests: `tests/unit/test_mail_calendar.py`, `tests/smoke/test_mail_calendar.py` (both
+providers stood in for, after a real sign-in into a keychain of the test's own: a token turned away and refreshed, a
+"not now" waited out, an address no account has). Docs: `docs/runs.md`, `docs/extending.md`, `docs/safety.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16474,3 +16495,6 @@ Docs: `docs/browser-and-computer-use.md`.
 - 2026-10-20 (Opus 5.5): item 423 on `teach-a-task` from `main`: the composer's + menu, a recording of the owner's
   steps in the chat's tab with every secret field left out, the review model's skill of what they showed, its saving as
   a taught skill that no failure retires, and Run it now.
+- 2026-10-20 (Opus 5.5): item 424 on `mail-and-calendar` from `main`: `mail_search`, `mail_read` and
+  `calendar_events` read the mail and calendars of the accounts signed in, through Gmail's, Google Calendar's and
+  Microsoft Graph's own APIs.

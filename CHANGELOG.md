@@ -27,6 +27,9 @@ The first public version of Dot, an always-on autonomous agent for macOS.
 - **MCP servers, skills and plugins** add tools, and apps connect with your own accounts. **Customize** lists the 65
   services Dot works with, how each connects and the skills it reads, and adds the 45 MCP servers of its catalogue with
   a sign-in, a key or a server run on this Mac. See [Apps, MCP servers, skills and plugins](docs/extending.md).
+- **Accounts** of Google and Microsoft sign in through their own pages, their tokens in the Keychain, and runs read
+  their mail and calendars (Gmail, Google Calendar, Outlook) through the providers' APIs. See
+  [Apps, MCP servers, skills and plugins](docs/extending.md#accounts-googles-and-microsofts-own-sign-in).
 - **SnapShots**: both Command keys pressed together in any app capture the window in front into the open chat's box,
   with a flash, and bring Dot forward. See [The daemon, the web UI and the desktop shell](docs/daemon.md).
 - **`dotx setup`** checks the Mac, stores a provider's key and chooses the model. The home of the web UI says when the

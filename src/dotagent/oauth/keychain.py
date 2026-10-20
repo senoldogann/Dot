@@ -31,6 +31,8 @@ _NOT_FOUND: int = 44
 # An address that ``security``'s prompt takes as one word (no space, no quote, no backslash), short enough for a line
 # of the prompt to hold it with a piece.
 _PLAIN: re.Pattern[str] = re.compile(r"[^\s\"'\\]{1,320}")
+# A keychain file's path that ``security``'s prompt takes as one word.
+_PLAIN_PATH: re.Pattern[str] = re.compile(r"[^\s\"'\\]+")
 # The characters of a piece, and the bytes of a line of ``security``'s prompt, its end of line included.
 _PIECE_CHARS: int = 3000
 _LINE_BYTES: int = 4095
@@ -82,6 +84,11 @@ class Keychain:
     written one at a time: two saves at once would mix their pieces in one slot."""
 
     def __init__(self, file: str | None) -> None:
+        if file is not None and _PLAIN_PATH.fullmatch(file) is None:
+            raise SignInError(
+                "the keychain file's path has a space, a quote or a backslash, which security's prompt would split",
+                {"file": file},
+            )
         self._file: tuple[str, ...] = () if file is None else (file,)
         self._locks: dict[str, asyncio.Lock] = {}
 
