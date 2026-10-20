@@ -240,6 +240,7 @@ from dotagent.store.models import (
     ThreadRecord,
 )
 from dotagent.store.stats import ACT_TOOLS
+from dotagent.terminal.session import TerminalSession, ended_notices
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.context import Spawner, ToolContext
@@ -1906,6 +1907,11 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             if newcomers:
                 known_agents.update(member.id for member in newcomers)
                 history.append(await _stored_note(agent, _new_teammates_note(newcomers)))
+        # The commands in the background of this chat that ended since the last step, told once (item 437). A system
+        # note, not a message of the owner: it clears no taint and is no instruction.
+        commands_ended: list[TerminalSession] = runtime.terminals.take_ended(run.thread_id)
+        if commands_ended:
+            history.append(await _stored_note(agent, f"[system note] {ended_notices(commands_ended)}"))
         # The other runs at work and what they hold, said again whenever that changes (item 301).
         others: str = peers_note(runtime.peers.others(run.id), runtime.workspace)
         if others and others != peers_said:

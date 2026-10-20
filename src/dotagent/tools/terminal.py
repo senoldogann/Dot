@@ -12,7 +12,9 @@ every mode, yolo too (item 429): credentials are the user's, and nobody else can
 theirs to run in a terminal of their own.
 
 A command opened with ``background`` (item 229) runs on its own, past the shell's time limit and unread, and its end is
-told to its chat; a delegated run and a campaign's session have no chat of their own to tell, and open none.
+told to its chat once: to the run at work there, at its next step, else in a run started for it (item 437). A run that
+read the end itself has been told; a delegated run and a campaign's session have no chat of their own to tell, and open
+none.
 """
 
 from pathlib import Path
@@ -46,8 +48,9 @@ class OpenArgs(ToolArgs):
         default=False,
         description=(
             "True for a command that runs long and ends by itself (an eval, a long build or download): it runs past "
-            "shell's time limit and is not closed for being left unread, and when it ends this chat is told, in a new "
-            "run once the run at work there has ended. Not for a program you type into, nor a server."
+            "shell's time limit and is not closed for being left unread, and when it ends this chat is told: you at "
+            "your next step, or, when no run works on the chat, in a new run. You need not poll it. Not for a "
+            "program you type into, nor a server."
         ),
     )
 
@@ -109,7 +112,7 @@ async def _read(session: TerminalSession, wait_s: float, ctx: ToolContext) -> st
     if not session.ended:
         return text
     code: int = await session.exit_code()
-    await ctx.runtime.terminals.close_read(ctx.thread_id, session.id)
+    await ctx.runtime.terminals.close(ctx.thread_id, session.id)
     return f"{text}\n[the program ended with exit {code}; session {session.id} is closed]"
 
 
@@ -135,7 +138,8 @@ def build_terminal_tools() -> tuple[RegisteredTool, ...]:
             ctx.thread_id, args.command, run_sandbox(ctx).commands, cwd, args.background
         )
         head: str = (
-            f"[session {session.id}, in the background: {args.command}; this chat is told when it ends]"
+            f"[session {session.id}, in the background: {args.command}; you are told when it ends, at your next step, "
+            "or in a new run when none works on this chat]"
             if args.background
             else f"[session {session.id}: {args.command}]"
         )

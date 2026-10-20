@@ -273,12 +273,13 @@ box (items 352 and 360) says in a few quiet words how long the run has worked, o
 stand and how many messages are queued; each part opens what it tells of, and the line comes while one of its parts has
 something to say and goes when none has. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. When the run ends done, the next message starts and the
-page follows it; every open page shows the queue as it changes. In a campaign's chat the message steers the session. The
-box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal mode) of the
-chat, and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat
-keeps them (item 199): those its first run started with, then each one chosen in the box, at once and for every browser,
-so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a chat from before has
-the open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a
+page follows it; every open page shows the queue as it changes, and only your messages wait in it: the end of a command
+in the background is never queued (see [Runs and tools](runs.md#tools)). In a campaign's chat the message steers the
+session. The box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal
+mode) of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same
+agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
+for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
+chat from before has the open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a
 new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
 next follow-up. Beside the send, a ring shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
