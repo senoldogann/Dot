@@ -16028,6 +16028,21 @@ more, another case, a dot segment, the path in the query, the tailnet's name, a 
 `tests/smoke/test_browser_boundary.py` (a link whose redirect ends there reaches the daemon as one navigation and the
 tab is reset; on the code before this change it is refused). Docs: `docs/browser-and-computer-use.md`.
 
+The pre-push review's pass found the page that opens there half drawn: it linked `/css/app.css`, `/css/themes.css`,
+`/favicon.svg` and the provider's mark, files of the interface which that Chrome refuses, and its **Back to Plugins**
+(item 437) led into the interface, to the very error page of the owner's screenshots. The page carries its look now
+(`server/callback_page.py`): the two sheets one after the other in its one `<style>`, which the policy of
+`guard.callback_headers` lets apply by its SHA-256 hash and nothing else inline (`style-src 'sha256-…'`, no script,
+`img-src data:`, `font-src 'self'`, `no-store`), and the favicon and the mark as `data:` addresses; it asks the daemon
+for nothing but its faces, which Dot's own Chrome refuses and the system's stand in for. A mark is the name of an SVG
+file of `icons/plugins` and nothing else. The button and its line about the access token are gone: the page says that
+Dot on this Mac already shows the account, and that the tab can be closed. Tests: `tests/unit/test_callback_page.py`
+(the one style is the two sheets and its hash is the policy's, every address of the page is a `data:` one, no link, no
+script), `tests/smoke/test_sign_in_page.py` (in a plain Chrome against the real daemon the page asks for its faces and
+nothing else) and `tests/smoke/test_browser_boundary.py` (a tab of Dot's own Chrome that no run drives, as macOS opens
+one, draws the real page with its mark, and nothing but the way back reaches the stand-in daemon). Docs:
+`docs/extending.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.

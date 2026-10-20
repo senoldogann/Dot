@@ -6058,7 +6058,8 @@ dialog.lightbox img {
 
 /* The page the browser comes back to after a sign-in (item 437, server/callback_page.py): the sign-in card, a disc by the
    title that says how it went, the account or service it was for, and what the provider said. The page has no script and
-   no inline style, so each of these is a class, and it follows the system's light or dark alone. */
+   carries this file and themes.css in its one style (item 445), so each of these is a class, and it follows the system's
+   light or dark alone. */
 .callback-head {
   display: flex;
   align-items: center;

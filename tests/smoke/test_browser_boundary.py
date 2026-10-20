@@ -29,6 +29,7 @@ from playwright.async_api import (
     Playwright,
     Response,
     async_playwright,
+    expect,
 )
 from starlette.types import Message, Receive, Scope, Send
 from test_browser import act, ref_of
@@ -38,7 +39,8 @@ from dotagent.browser.types import PageView, ScriptRun, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import ForbiddenUrlError
 from dotagent.mcp.signin import CALLBACK_PATH
-from dotagent.server.guard import LocalGuard
+from dotagent.server.callback_page import Callback, Subject, render
+from dotagent.server.guard import LocalGuard, response_headers
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -65,8 +67,14 @@ class Arrivals:
         return [arrival for arrival in self.items if arrival.path == path]
 
 
+_SIGNED_IN: Callback = Callback(
+    outcome="signed_in", subject=Subject(name="Google", detail="ada@example.com", mark="google-icon.svg"), reason=None
+)
+
+
 class _InsideHandler(BaseHTTPRequestHandler):
-    """The stand-in for Dot's interface: every request that reaches it is recorded, and answered."""
+    """The stand-in for Dot's interface: every request that reaches it is recorded, and answered; the way back of a
+    sign-in with the daemon's own page and headers."""
 
     arrivals: Arrivals = Arrivals()
 
@@ -78,8 +86,13 @@ class _InsideHandler(BaseHTTPRequestHandler):
                 fetch_mode=self.headers.get("Sec-Fetch-Mode"),
             )
         )
-        body: bytes = b"<!doctype html><title>Inside</title><h1>Inside Dot</h1>"
+        way_back: bool = self.path.split("?", 1)[0] == CALLBACK_PATH
+        body: bytes = (
+            render(_SIGNED_IN).encode() if way_back else b"<!doctype html><title>Inside</title><h1>Inside Dot</h1>"
+        )
         self.send_response(200)
+        for name, value in response_headers(CALLBACK_PATH) if way_back else ():
+            self.send_header(name, value)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -366,6 +379,30 @@ async def test_the_way_back_of_a_sign_in_reaches_the_daemon_and_the_run_reads_no
     callbacks: list[Arrival] = _InsideHandler.arrivals.of(f"{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
     assert [arrival.fetch_mode for arrival in callbacks] == ["navigate"], _InsideHandler.arrivals.items
     assert [arrival.path for arrival in _InsideHandler.arrivals.items] == [callbacks[0].path]
+
+
+async def test_the_page_a_sign_in_comes_back_to_is_drawn_in_a_tab_no_run_drives(
+    browser: BrowserSession, site: str
+) -> None:
+    """macOS hands the provider's page to the Chrome that runs, which may be Dot's own (item 445): in a tab of the
+    owner's there, which no run drives, the way back opens and is drawn in Dot's look from what the page carries
+    itself, the mark too; nothing else of the interface reaches the daemon (its faces are refused, and the system's
+    are drawn)."""
+    context: BrowserContext = await browser._ensure_context()
+    page: Page = await context.new_page()
+    try:
+        await page.goto(f"{site}/")
+        async with page.expect_navigation():
+            await page.click('text="Back to Dot"')
+        await expect(page.locator("h1")).to_have_text("Signed in to Google")
+        assert await page.evaluate("document.querySelector('.callback-mark img').naturalWidth > 0")
+        card: str = await page.evaluate("getComputedStyle(document.querySelector('.signin .card')).backgroundColor")
+        assert card not in ("rgba(0, 0, 0, 0)", "transparent"), card
+        assert [arrival.path for arrival in _InsideHandler.arrivals.items] == [
+            f"{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state"
+        ]
+    finally:
+        await page.close()
 
 
 async def test_a_link_that_redirects_to_the_interface_is_stopped(

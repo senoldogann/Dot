@@ -99,13 +99,15 @@ async def test_a_sign_in_starts_from_this_mac_and_a_state_nobody_waits_for_is_sa
             },
         )
         assert unknown.status_code == 400 and "This sign-in has ended" in unknown.text
-        assert "WORDS-OF-A-STRANGER" not in unknown.text and 'href="/css/app.css"' in unknown.text
+        assert "WORDS-OF-A-STRANGER" not in unknown.text and "<style>" in unknown.text
+        # The page carries its look, under a policy of its own that lets that one style apply (item 445).
+        assert "style-src 'sha256-" in unknown.headers["content-security-policy"]
         # The browser that comes back for the sign-in started is given a page; its code is not traded here (no
         # provider is reached), so only that the page is the sign-in's own is checked. The plain No is not an error to
         # show; another error is, as the provider words it and escaped.
         declined = await client.get("/oauth/callback", params={"state": query["state"][0], "error": "access_denied"})
         assert declined.status_code == 200 and "Not signed in to Microsoft</h1>" in declined.text
-        assert "callback-reason" not in declined.text
+        assert 'class="callback-reason"' not in declined.text
         again = parse_qs(urlsplit((await client.post("/api/accounts/microsoft/start")).json()["link"]).query)
         refused = await client.get(
             "/oauth/callback",

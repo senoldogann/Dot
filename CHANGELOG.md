@@ -6,7 +6,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 ## Unreleased
 
 - Signing in to Google or Microsoft from Customize no longer ends on a page Chrome blocked when the sign-in opened in
-  Dot's own Chrome: the page you come back to opens there, and nothing else of Dot's interface does (item 445).
+  Dot's own Chrome: the page you come back to opens there, drawn in Dot's look from what it carries itself, and
+  nothing else of Dot's interface does. The page no longer has a button back to Plugins, which led there into Dot's
+  interface; Dot's window already shows the account (item 445).
 - In `yolo`, Dot no longer asks you about what every other mode refuses (a read of where your secrets are kept, data
   sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own files outside the undo
   journal): the step runs and is recorded. Money and credentials are still handed to you, and a message or a post in
@@ -20,8 +22,8 @@ at the top, until a release names it; how a release is made is in [Releasing](do
   Accounts card shows Google's and Microsoft's colours and only heads the list, and the "+" of a tile keeps its width on
   a phone (item 437).
 - The page you come back to after signing in to Google, Microsoft or an MCP service now looks like Dot, light or dark as
-  your Mac is, names the account or service, says in the provider's own words why a sign-in failed, and has a button
-  back to Plugins; the docs say to name the app Dot on Google's consent screen (item 437).
+  your Mac is, names the account or service and says in the provider's own words why a sign-in failed; the docs say to
+  name the app Dot on Google's consent screen (item 437).
 - The end of a command Dot left running in the background no longer shows in the composer's Queued list, with Steer,
   edit and remove: a run at work is told at its next step, Dot starts a run to tell a chat where none works, and a
   stopped chat is not left paused with it (item 437).

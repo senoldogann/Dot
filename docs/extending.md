@@ -104,10 +104,12 @@ access token is refreshed with its refresh token once it is about to run out.
 The tab the provider sends you back to is a page of Dot's own look (item 437), light or dark as the Mac is: it names the
 account with its address and says how the sign-in came out, signed in, or not signed in because you said no, the
 provider refused (with the provider's own words, such as `invalid_client`), or the browser came back after more than 10
-minutes, and **Back to Plugins** opens Plugins in that tab. The tab opens where the link opens: in the browser you use,
-or, from the desktop app, in your default browser, which may never have opened Dot and then asks for the access token
-before it shows Plugins; Dot's own window on this Mac already shows the account either way. A page that is loaded again
-after its sign-in was used says that the sign-in has ended, and shows nothing the address carried.
+minutes. The tab opens where the link opens: in the browser you use, or, from the desktop app, in the browser macOS
+hands it to, which may be Dot's own Chrome when that is the one running; the page carries its look (the interface's
+sheets in its one style, under a policy that names their hash, and its pictures as `data:` addresses) and asks the
+daemon for nothing but its faces, so it is drawn there as anywhere (item 445). It has no link into the interface, which
+Dot's own Chrome never opens; Dot's own window on this Mac already shows the account. A page that is loaded again after
+its sign-in was used says that the sign-in has ended, and shows nothing the address carried.
 
 The clients, once: at Google, enable the [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
 and the [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com), name the app **Dot**
