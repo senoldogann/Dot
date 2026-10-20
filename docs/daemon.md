@@ -131,7 +131,8 @@ the mode, the model, the agent, Keep going and a choice for one message picked f
 a new chat after that starts on Task, the default model, Dot and Keep going off. Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
 ⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
-browser (item 230). The markdown in the box shows as it reads (item 207):
+browser (item 230); on a touch screen Return always adds a line and the round send button sends (item 440). The markdown
+in the box shows as it reads (item 207):
 its marks (a heading's hashes, a list's mark, the stars of bold, the backticks of code, a link's brackets, a
 table's pipes) quieter than its words, bold words, headings and a table's head heavier, code tinted, quotes softer and
 links in the colour of links; the box is still a text field, with its caret, selection, spelling and undo, and what is
@@ -304,8 +305,9 @@ in the head of the run opens it (the choice is kept in the browser); open, it si
 is a drawer below that, and on a phone a sheet that rises from the foot (item 296). The run's head is the top bar
 itself: Dot's face and name on the left, the panel button on the right; the bar is solid with a hairline under it, so
 nothing scrolls under a blur, the panel stays in place under it, and the box stays at the bottom. Every other page names
-itself in the same bar (Agents, Campaigns, Settings) and opens with one line of description. A live run's page opens at
-its end, where its next words come, and stays there as the earlier turns fill in above (item 403). The six runs opened
+itself in the same bar (Agents, Campaigns, Settings) and opens with one line of description. A run's page, live or over, opens at
+its end, where its next words come or its newest message stands, and stays there as the earlier turns fill in above (items
+403 and 440). The six runs opened
 last are kept while the page lives, so that coming back to one (from a delegated run's page, say) draws it at once as it
 stood and follows its stream on from the last message read, not from the first; what the lessons, the questions and the
 cost show is read again (item 426). A run that ended while its page was open is kept as ended: coming back to it shows

@@ -16814,6 +16814,11 @@ job of browser tests in CI (`.github/workflows/gate.yml` runs none, which is how
   in an answer: the table had a copy over its right edge and the block of code, which stood under it, had none. It
   has one now, the same bar (`prose.js`, `app.css`), taking the code as it was written. `test_markdown_copy.py` presses
   it in Chrome and checks it is in sight over the block's right edge at 1280 and 390 px, light and dark.
+- 2026-10-20 (Opus 5.5): item 440 on `chat-scroll-enter` from `main`, on the owner's two words about the chat: a chat
+  that was over opened at the top of its last answer, wide and on a phone, where a live one opened at its end; and on a
+  phone the keyboard's Return sent the message, where the round send button sends. A run opens at its foot now, live or
+  over, and keeps it while what is above settles (`run.js`); on a touch screen Return breaks the line whatever the
+  setting says (`composer.js`). `test_chat_scroll.py` measures both, wide in Chrome and on a phone.
 - 2026-10-20 (Opus 5.5): item 437 on the owner's words of 2026-10-20, on `item-437-logos-and-polish` from `main`: every
   plugin's own logo and the Mac apps' own icons, sign-in pages that look like Dot, a background command's end no queued
   message, and the daemon-log, UI and browser-test fixes of a sweep of the app; one pull request.

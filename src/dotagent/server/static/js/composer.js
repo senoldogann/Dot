@@ -1,6 +1,7 @@
 // What the three composers share (the new chat's, the run's dock and the agent's page): one frame with the box that
 // grows with its text, the attached files and the picks under it and a bar of pills; Enter sends and Shift+Enter breaks
-// a line, or ⌘Enter sends and Enter breaks it, as Settings › General chooses (item 230); `/`
+// a line, or ⌘Enter sends and Enter breaks it, as Settings › General chooses (item 230; on a touch screen Return always
+// breaks the line, item 440); `/`
 // at the start of a word opens the slash menu of commands, skills and MCP tools (slash.js says what it offers; this
 // file draws it and listens to the keys, after the APG combobox pattern: the arrows move, Enter and Tab pick, Escape
 // closes, letters filter); the "+" opens the menu that adds files and picks plugins and skills for the message (item
@@ -12,6 +13,7 @@ import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
 import { icon, toolIconName } from "./icons.js";
+import { touchFirst } from "./layout.js";
 import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
 import { arePicks, createPicks, pickColour } from "./picks.js";
@@ -64,7 +66,7 @@ function loadPalette() {
   return paletteLoad;
 }
 
-/** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`), autosize up to `maxPx`, the slash
+/** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`; never plain Return on a touch screen), autosize up to `maxPx`, the slash
  * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer), the at menu
  * of the MCP servers, their tools and the skills (item 367) and the markdown it holds shown under it; `edited()` runs
  * after a pick of the menu changed the text, as the input event does after typing, and `picked(pick)` after a skill or
@@ -243,8 +245,11 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
         return;
       }
     }
-    // Enter sends, with ⌘ or Ctrl or without; where ⌘Enter is the key that sends, Enter alone breaks the line.
-    if (event.key === "Enter" && !event.shiftKey && (settingValue(SEND_KEY) === "enter" || event.metaKey || event.ctrlKey)) {
+    // Enter sends, with ⌘ or Ctrl or without; where ⌘Enter is the key that sends, Enter alone breaks the line. On a
+    // touch screen Return is the line's break whatever the setting says (item 440): the round send button next to the
+    // box is what sends there, and a keyboard with no ⌘ cannot send the other way.
+    const sendsByEnter = settingValue(SEND_KEY) === "enter" && !touchFirst();
+    if (event.key === "Enter" && !event.shiftKey && (sendsByEnter || event.metaKey || event.ctrlKey)) {
       event.preventDefault();
       send();
     }

@@ -172,7 +172,7 @@ function buildNotifications() {
 function buildComposerCard() {
   const sendKey = choiceSetting({
     label: "Send with",
-    hint: "Enter sends and Shift+Enter breaks a line, or ⌘Enter (Ctrl+Enter) sends and Enter breaks a line.",
+    hint: "Enter sends and Shift+Enter breaks a line, or ⌘Enter (Ctrl+Enter) sends and Enter breaks a line. On a touch screen Return always breaks a line, and the send button sends.",
     options: [
       { id: "enter", label: "Enter", hint: "Enter sends; Shift+Enter breaks a line." },
       { id: "mod-enter", label: "⌘Enter", hint: "⌘Enter or Ctrl+Enter sends; Enter breaks a line." },
