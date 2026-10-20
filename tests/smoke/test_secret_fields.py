@@ -19,13 +19,16 @@ import pytest_asyncio
 from dotagent.agent.gate import RunGate, SiteLocks
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
+from dotagent.browser.types import SecretField, SecretFieldCheck
 from dotagent.config import load_config
+from dotagent.core.errors import HandedOff
 from dotagent.core.paths import workspace_dir
 from dotagent.core.types import JsonObject
 from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.base import PreparedCall, ToolResult
+from dotagent.tools.browser import _secret_field_check
 from dotagent.tools.context import ToolContext
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
@@ -288,3 +291,23 @@ async def test_a_yolo_run_hands_the_code_field_to_the_user(runtime: Runtime, sit
         ("approved", "user", "handoff")
     ]
     assert records[0].summary.startswith(f"Type into a one-time-code field ({field})")
+
+
+async def test_a_yolo_run_hands_every_card_field_to_the_user_whatever_its_batch_was_allowed(runtime: Runtime) -> None:
+    """A yes to a batch, a payment under its caps among them, never covers typing a card number (item 427): the field
+    is asked of the gate on its own, which hands it to the user."""
+    ctx, _ = await _context(runtime, "yolo")
+    check: SecretFieldCheck = _secret_field_check(ctx)
+    field: SecretField = SecretField(ref="e7", kind="cc-number", url="https://shop.example/checkout")
+    async with runtime.bus.subscribe(ctx.run_id) as events, asyncio.timeout(_ANSWER_WITHIN_S):
+        typing: asyncio.Task[None] = asyncio.create_task(check(field))
+        event: EventRecord = await events.queue.get()
+        while event.kind != "approval_requested":
+            event = await events.queue.get()
+        approval_id: object = event.data["approval_id"]
+        assert isinstance(approval_id, str)
+        await runtime.approvals.resolve(approval_id, True, "user", "typed it myself")
+        with pytest.raises(HandedOff):
+            await typing
+    records: list[ApprovalRecord] = await _records(ctx)
+    assert [(record.severity, record.args["flags"]) for record in records] == [("handoff", ["financial"])]

@@ -76,12 +76,14 @@ def auto_review(info: ActionInfo) -> Decision | None:
 
 def asked_in_yolo(info: ActionInfo) -> Decision:
     """What a yolo run makes of an action the always-on review refuses (:func:`auto_review`, item 427): a question for
-    the user, who may let a secret store be read or data be sent out, where every other mode refuses it."""
+    the user, who may let a secret store be read or data be sent out, where every other mode refuses it. The question
+    names every guarded flag of the step, a message or a post it also sends among them, as the one yes answers for
+    all; the hand-off of money or credentials, which is stricter, the gate puts first (:func:`hard_stop`)."""
     return Decision(
         verdict="ask",
         source="auto_review",
-        reason="in yolo Dot asks you before it reads where secrets are kept or sends secrets out "
-        f"({', '.join(_intersect(info, _DENY_FLAGS))})",
+        reason="in yolo Dot asks you before it reads where secrets are kept, sends secrets out, or sends a message or "
+        f"a post in your name ({', '.join(_intersect(info, _DENY_FLAGS | _GUARD_FLAGS))})",
         rule_id=None,
     )
 

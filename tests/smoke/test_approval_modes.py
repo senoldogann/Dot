@@ -268,6 +268,16 @@ async def test_yolo_leaves_money_secrets_and_messages_to_the_user(room: Room) ->
     assert "approval_auto" not in await _kinds(room)
 
 
+async def test_in_yolo_the_hand_off_of_money_holds_over_the_question_of_secrets(room: Room) -> None:
+    gate: RunGate = _gate(room, "task", "aggressive", "yolo", _nobody)
+    paying: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "financial")})
+    handed: Question = await _ask(room, gate, paying)
+    assert handed.record.severity == "handoff"
+    await room.broker.resolve(handed.record.id, False, "user", "")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(handed.answer, WAIT_S)
+
+
 async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Room) -> None:
     await room.store.add_rule("allow", "apple_script", "", "Mail is fine")
     allowing: RunGate = _gate(room, "task", "aggressive", "ask", _nobody)

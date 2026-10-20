@@ -17,6 +17,7 @@ from dotagent.policy.engine import (
     approval_severity,
     asked_in_yolo,
     decide,
+    hard_stop,
     owner_handoff,
     route_for,
     supervised,
@@ -279,8 +280,10 @@ class RunGate:
             return await self._waive(info, decision)
         if self._approval_mode == "yolo" and decision.source == "auto_review":
             # What the always-on review refuses in every other mode, a yolo run asks the user about (item 427); a
-            # hand-off rule of theirs is stricter.
+            # hand-off rule of theirs, or of money and credentials, is stricter.
             stricter: Decision | None = owner_handoff(info, rules)
+            if stricter is None:
+                stricter = hard_stop(info, None)
             return await self._ask_user(info, stricter if stricter is not None else asked_in_yolo(info), "")
         if decision.verdict == "deny":
             await self._emit_policy(info, decision)

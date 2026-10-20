@@ -327,17 +327,15 @@ def _act_kind(steps: list[Step]) -> ActionKind:
     return "browser_read"
 
 
-def _secret_field_check(ctx: ToolContext, authorized: ActionInfo) -> SecretFieldCheck:
+def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
     """What a batch does at a field that takes a secret: every mode but yolo refuses it. Yolo asks the gate, which hands
-    the field to the user (item 427: money and credentials are theirs in every mode), unless the batch was authorized
-    for that kind of secret already."""
+    every such field to the user (item 427: money and credentials are theirs in every mode); a yes to the batch, a
+    payment under its caps among them, never covers typing a card number or a password."""
     if ctx.approvals != "yolo":
         return refuse_secret_field
 
     async def enter(field: SecretField) -> None:
         flag: Flag = secret_field_flag(field.kind)
-        if flag in authorized.flags:
-            return
         summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
         await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, field.url, (flag,)))
 
@@ -419,7 +417,7 @@ def _act_tool() -> RegisteredTool:
     async def run(args: ActArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         limit: int = ctx.runtime.config.browser.max_batch_steps
         outcome: ActOutcome = await ctx.browser.act(
-            ctx.thread_id, first_steps(args.steps, limit), args.accept_dialogs, _secret_field_check(ctx, authorized)
+            ctx.thread_id, first_steps(args.steps, limit), args.accept_dialogs, _secret_field_check(ctx)
         )
         rendered: str = render_act_outcome(outcome, _nonce(), _body_budget(ctx))
         note: str = batch_cut_note(len(args.steps), limit)

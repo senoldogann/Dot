@@ -104,10 +104,10 @@ def test_what_the_always_on_review_refuses_elsewhere_a_yolo_run_asks() -> None:
     assert refusal is not None and refusal.verdict == "deny"
     asked: Decision = asked_in_yolo(SECRET)
     assert (asked.verdict, asked.source) == ("ask", "auto_review")
-    assert (
-        asked.reason
-        == "in yolo Dot asks you before it reads where secrets are kept or sends secrets out (secret_access)"
-    )
+    assert asked.reason.endswith("sends secrets out, or sends a message or a post in your name (secret_access)")
+    # One yes answers for the whole step: the question names a message it also sends.
+    mailing: ActionInfo = SECRET.model_copy(update={"flags": ("secret_access", "external_send", "message_send")})
+    assert asked_in_yolo(mailing).reason.endswith("(secret_access, message_send)")
 
 
 def test_every_classifier_that_knows_a_message_goes_out_says_so() -> None:
