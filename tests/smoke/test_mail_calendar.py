@@ -117,6 +117,8 @@ class _Providers:
     def __init__(self) -> None:
         self.graph_busy: int = 0
         self.refreshes: list[str] = []
+        # The next page Graph's calendar names after its first.
+        self.next_page: str = _GRAPH_PAGE_TWO
 
     def _token(self, request: httpx.Request, mark: str) -> httpx.Response:
         form: dict[str, list[str]] = parse_qs(request.content.decode())
@@ -163,7 +165,7 @@ class _Providers:
             return httpx.Response(200, json=_GRAPH_EVENTS)
         assert request.url.params["startDateTime"] == "2026-10-20T21:00:00Z"
         assert request.url.params["$top"] == "100"
-        return httpx.Response(200, json=_GRAPH_FIRST_PAGE)
+        return httpx.Response(200, json={**_GRAPH_FIRST_PAGE, "@odata.nextLink": self.next_page})
 
     def __call__(self, request: httpx.Request) -> httpx.Response:
         url: str = str(request.url)
@@ -404,3 +406,18 @@ async def test_a_run_has_the_tools_and_names_the_accounts_only_once_one_is_signe
     assert {"mail_search", "mail_read", "calendar_events"} <= tools_after
     assert "# Mail and calendars" in after.messages[0].content
     assert "take as account: ada@gmail.com (Gmail and Google Calendar)." in after.messages[0].content
+
+
+async def test_a_next_page_that_is_not_graphs_is_never_asked_for_with_the_token(
+    runtime: Runtime, keychain_file: str, signed_in_clients: None
+) -> None:
+    providers: _Providers = _Providers()
+    providers.next_page = "https://evil.example/v1.0/me/calendarView?$skiptoken=page-2"
+    ran: Runtime = await _signed_in(runtime, Keychain(keychain_file), providers)
+    # The stand-in takes no request for another host: the call fails before it would be made.
+    with pytest.raises(AccountApiError, match="not Graph's"):
+        await _call(
+            ran,
+            "calendar_events",
+            {"account": "ada@outlook.com", "start": "2026-10-21", "end": "2026-10-22", "query": "budget"},
+        )
