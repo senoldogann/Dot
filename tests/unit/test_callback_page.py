@@ -1,6 +1,6 @@
 """The page the browser is sent back to after a sign-in (item 437): every outcome of an account's sign-in and of an MCP
 server's has a title, an h1 and the sheets of the interface, which it carries in its one style under the hash its
-policy names, and asks the server for nothing but its faces (item 445): no link, no script, its pictures ``data:``
+policy names, and asks the server for nothing but its faces (item 448): no link, no script, its pictures ``data:``
 addresses. What a provider said is escaped."""
 
 import base64

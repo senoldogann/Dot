@@ -207,7 +207,7 @@ def check_browser_url(
 
 
 def sign_in_return(url: str, server: ServerConfig) -> bool:
-    """Whether ``url`` is the way back of a sign-in to Dot (item 445): the daemon's ``/oauth/callback`` (exactly, as
+    """Whether ``url`` is the way back of a sign-in to Dot (item 448): the daemon's ``/oauth/callback`` (exactly, as
     Chrome read it) on this Mac at the daemon's port, where Google, Microsoft and the MCP services send the browser with
     the code of a sign-in the owner started. The sign-in may open in Dot's own Chrome (macOS hands an address to the
     Chrome that runs), whose guard refuses Dot's interface; the way back is let through as a page, and nothing else of

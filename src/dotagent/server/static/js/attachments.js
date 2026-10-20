@@ -485,14 +485,17 @@ export function createAttachments({ dropTarget, input, onChange }) {
   };
 }
 
-/**
- * A message is the owner's words, and the files that come with it are material to work with: with files listed and no
- * words, a send says so rather than nothing (item 269), since a long paste leaves the box empty.
- */
-export function askForWords(attachments) {
-  if (attachments.count() > 0) {
-    toast("error", "Say in a few words what to do with the files, or put a pasted text back into the box with its pencil");
-  }
+/** What a message of files alone says, as the goal its run is given (item 445): a pasted text or a picture goes without a
+ * word typed, and this line is what the run reads — the files themselves are what the owner meant. */
+function wordsForFiles(attachments) {
+  return attachments.count() === 1 ? "See the attached file." : "See the attached files.";
+}
+
+/** The words a message goes with (item 445): what is in the box, else the line its files are worth, else nothing — an
+ * empty send with nothing in it is no message at all. */
+export function messageText(text, attachments) {
+  const words = text.trim();
+  return words === "" && attachments.count() > 0 ? wordsForFiles(attachments) : words;
 }
 
 /** Whether a message may go now; says why not when files are still uploading or failed. */

@@ -5,7 +5,7 @@
 import { actorFace, DOT_ID } from "../actors.js";
 import { api } from "../api.js";
 import { assistant, loadAssistant, onAssistant } from "../assistant.js";
-import { askForWords, readyToSend } from "../attachments.js";
+import { messageText, readyToSend } from "../attachments.js";
 import { MODES, optionRow, runChoices } from "../choices.js";
 import { composerFrame, composerPill, NEW_CHAT_DRAFT } from "../composer.js";
 import { el, modelName } from "../dom.js";
@@ -227,9 +227,9 @@ function buildComposer(ctx, listener) {
     if (starting) {
       return;
     }
-    const text = goal.value.trim();
+    // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
+    const text = messageText(goal.value, attachments);
     if (text === "") {
-      askForWords(attachments);
       goal.focus();
       return;
     }

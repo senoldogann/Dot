@@ -100,7 +100,7 @@ async def test_a_sign_in_starts_from_this_mac_and_a_state_nobody_waits_for_is_sa
         )
         assert unknown.status_code == 400 and "This sign-in has ended" in unknown.text
         assert "WORDS-OF-A-STRANGER" not in unknown.text and "<style>" in unknown.text
-        # The page carries its look, under a policy of its own that lets that one style apply (item 445).
+        # The page carries its look, under a policy of its own that lets that one style apply (item 448).
         assert "style-src 'sha256-" in unknown.headers["content-security-policy"]
         # The browser that comes back for the sign-in started is given a page; its code is not traded here (no
         # provider is reached), so only that the page is the sign-in's own is checked. The plain No is not an error to

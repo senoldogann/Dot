@@ -121,7 +121,7 @@ def test_an_address_a_browser_reads_otherwise_is_refused_or_read_as_the_browser_
     ],
 )
 def test_the_way_back_of_a_sign_in_opens_as_a_page_and_as_nothing_else(url: str) -> None:
-    """Item 445: a sign-in that opened in Dot's own Chrome comes back to the daemon; the guard lets that page through,
+    """Item 448: a sign-in that opened in Dot's own Chrome comes back to the daemon; the guard lets that page through,
     and the same address loaded by a page (a fetch, an image) stays refused."""
     assert request_verdict(url, True, (), (), SERVER).allowed
     assert not request_verdict(url, False, (), (), SERVER).allowed

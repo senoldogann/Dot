@@ -183,7 +183,7 @@ Both modes share what follows.
   (`localhost`, `127.0.0.1`, `[::1]` and the like), and the names of `[server] reach`; your Chrome may be signed in
   there. One page of it passes: the one a sign-in comes back to (`/oauth/callback` on this Mac at `[server] port`),
   which macOS may open in Dot's own Chrome when you sign in from Customize; Chrome opens it as a page and nothing else
-  of the interface, and a run whose tab lands there still has the tab reset (item 445). A server of this Mac on another
+  of the interface, and a run whose tab lands there still has the tab reset (item 448). A server of this Mac on another
   port opens as any site. In Dot's own Chrome every request is checked as Chrome sends it, not only the address a tool
   opens: a page (in a tab or a popup, and each hop of a redirect) must pass both lists, and anything a page loads (a
   script, a picture, a fetch, a worker) must be neither a blocked host nor Dot's interface, so a page of an allowed site

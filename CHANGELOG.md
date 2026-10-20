@@ -8,7 +8,7 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - Signing in to Google or Microsoft from Customize no longer ends on a page Chrome blocked when the sign-in opened in
   Dot's own Chrome: the page you come back to opens there, drawn in Dot's look from what it carries itself, and
   nothing else of Dot's interface does. The page no longer has a button back to Plugins, which led there into Dot's
-  interface; Dot's window already shows the account (item 445).
+  interface; Dot's window already shows the account (item 448).
 - In `yolo`, Dot no longer asks you about what every other mode refuses (a read of where your secrets are kept, data
   sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own files outside the undo
   journal): the step runs and is recorded. Money and credentials are still handed to you, and a message or a post in

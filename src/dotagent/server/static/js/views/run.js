@@ -6,7 +6,7 @@ import { agentList } from "../agentlist.js";
 import { api, follow } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
-import { askForWords, readyToSend } from "../attachments.js";
+import { messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
 import { runChoices } from "../choices.js";
@@ -704,9 +704,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     if (sending) {
       return;
     }
-    const text = input.value.trim();
+    // A message of files alone goes too (item 445): a pasted text or a picture sent without a word typed.
+    const text = messageText(input.value, attachments);
     if (text === "") {
-      askForWords(attachments);
       input.focus();
       return;
     }

@@ -1,6 +1,6 @@
 """The page the browser is sent back to after a sign-in (item 437), in a real Chrome on a real server: drawn with
 the interface's own sheets, which it carries, under the policy of its own (no console error, which a refused style or
-script would be), asking the server for nothing but its faces (item 445), in the system's light or dark, wide and on a
+script would be), asking the server for nothing but its faces (item 448), in the system's light or dark, wide and on a
 phone, with the account's mark. The outcomes are the real ones of the accounts: a no with a provider's words, a return
 that waited too long, and a state nobody waits for. No provider is reached."""
 

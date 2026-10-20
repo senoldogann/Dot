@@ -135,7 +135,7 @@ def _site_handler(inside: str, guarded: str) -> type[BaseHTTPRequestHandler]:
                 self._redirect(f"{guarded}/")
                 return
             if path == "/back":
-                # The page of a sign-in that opened in Dot's own Chrome sends the browser back to the daemon (item 445).
+                # The page of a sign-in that opened in Dot's own Chrome sends the browser back to the daemon (item 448).
                 self._redirect(f"{inside}{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
                 return
             if path == "/allow":
@@ -368,7 +368,7 @@ async def test_a_redirect_to_the_interface_is_stopped_before_it_is_fetched(brows
 async def test_the_way_back_of_a_sign_in_reaches_the_daemon_and_the_run_reads_nothing_of_it(
     browser: BrowserSession, site: str
 ) -> None:
-    """A sign-in that opened in Dot's own Chrome ends in a redirect to the daemon's ``/oauth/callback`` (item 445): the
+    """A sign-in that opened in Dot's own Chrome ends in a redirect to the daemon's ``/oauth/callback`` (item 448): the
     hop is sent, so the code reaches the sign-in that waits for it, and the landing check still resets the tab of a run
     that came there, as on every other page of the interface."""
     view: PageView = await browser.open_url("back", f"{site}/")
@@ -384,7 +384,7 @@ async def test_the_way_back_of_a_sign_in_reaches_the_daemon_and_the_run_reads_no
 async def test_the_page_a_sign_in_comes_back_to_is_drawn_in_a_tab_no_run_drives(
     browser: BrowserSession, site: str
 ) -> None:
-    """macOS hands the provider's page to the Chrome that runs, which may be Dot's own (item 445): in a tab of the
+    """macOS hands the provider's page to the Chrome that runs, which may be Dot's own (item 448): in a tab of the
     owner's there, which no run drives, the way back opens and is drawn in Dot's look from what the page carries
     itself, the mark too; nothing else of the interface reaches the daemon (its faces are refused, and the system's
     are drawn)."""

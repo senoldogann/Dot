@@ -107,7 +107,7 @@ provider refused (with the provider's own words, such as `invalid_client`), or t
 minutes. The tab opens where the link opens: in the browser you use, or, from the desktop app, in the browser macOS
 hands it to, which may be Dot's own Chrome when that is the one running; the page carries its look (the interface's
 sheets in its one style, under a policy that names their hash, and its pictures as `data:` addresses) and asks the
-daemon for nothing but its faces, so it is drawn there as anywhere (item 445). It has no link into the interface, which
+daemon for nothing but its faces, so it is drawn there as anywhere (item 448). It has no link into the interface, which
 Dot's own Chrome never opens; Dot's own window on this Mac already shows the account. A page that is loaded again after
 its sign-in was used says that the sign-in has ended, and shows nothing the address carried.
 

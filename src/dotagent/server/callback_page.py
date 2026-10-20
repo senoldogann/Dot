@@ -3,7 +3,7 @@
 for with its mark, and what the provider said), in light or dark as the system is. The page asks the server for nothing
 but its faces: it carries the sheets of the interface in its one style, which the policy of
 :func:`~dotagent.server.guard.callback_headers` lets apply by its hash, and its pictures as ``data:`` addresses. A
-sign-in may open in Dot's own Chrome, whose guard refuses every other file of the interface (item 445), and the page is
+sign-in may open in Dot's own Chrome, whose guard refuses every other file of the interface (item 448), and the page is
 drawn there as anywhere, in the system's faces. It has no script and no link into the interface, which that Chrome
 never opens. Every outcome of an account's sign-in (:class:`~dotagent.oauth.accounts.CameBack`) and of an MCP server's
 has its own words here, and nothing the address of the way back carried is shown for a state nobody waits for."""
