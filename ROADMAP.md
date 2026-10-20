@@ -16560,3 +16560,6 @@ spend asks, no allow rule lets a message go, a hand-off rule holds; the pace rac
   home follows a new name at once, and Settings › Phone and Harness fit an iPhone SE.
 - 2026-10-20 (Opus 5.5): item 429 on `yolo-guard` from `main`: the guard no rule turns off, money, credentials,
   secrets, messages and posts in the owner's name theirs in every mode, yolo too.
+- 2026-10-20 (Opus 5.5): item 430 on the owner's word of the same day, on `steps-live-line` from `main`: a folded group of
+  tool steps at work shows the command that runs now right after "Working…", in place of "ran 11 commands, wrote 11 files
+  and used 1 tool so far"; the count stays for the open group, and the line is gone once the group is open or over.
