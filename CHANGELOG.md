@@ -8,6 +8,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - In `yolo`, Dot no longer asks you before it reads where your secrets are kept or sends data out, which every other
   mode refuses: the step runs and is recorded. Money and credentials are still handed to you, and a message or a post
   in your name still waits for your yes (item 433).
+- An approval's card stays in its own chat: the home lists a run that waits under Waits for you without its card,
+  and once you allow it the card leaves the chat with the line that asked for it. A refused card stays, saying so
+  (item 434).
 
 ## 0.1.0 (2026-10-20)
 

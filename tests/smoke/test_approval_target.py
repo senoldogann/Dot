@@ -1,6 +1,8 @@
 """What an action acts on, whole, on its approval card (item 242), on the pages of a daemon in Chrome: a long command is
 shown whole, wrapped within the card, in a box that scrolls past a dozen lines. Wide and on a phone, light and dark.
-Before, the card showed its first 300 characters on one line, cut at the card's edge.
+Before, the card showed its first 300 characters on one line, cut at the card's edge. The card is in its own chat alone:
+the home lists the run that waits without it, and once allowed it leaves the chat with the line that asked for it (item
+434); refused, it stays and says so.
 
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server.
 """
@@ -14,7 +16,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
@@ -138,6 +140,57 @@ async def test_an_approval_card_shows_a_long_command_whole_wrapped_in_a_box_that
                     async with asyncio.timeout(WAIT_S):
                         assert (await manager.wait(run.id)).status == "done"
                     assert (await runtime.store.get_approval(approval.id)).status == "denied"
+                    await page.close()
+            finally:
+                await browser.close()
+
+
+async def _decided_shows(page: Page, approved: bool) -> None:
+    """What the chat of a run that ended shows of its approval: nothing when it was allowed (item 434), else the refused
+    card with the line that asked for it."""
+    chat: Locator = page.locator(".timeline")
+    # The run's answer is there: every event before it has been read.
+    await expect(chat).to_contain_text("Left.")
+    cards: Locator = chat.locator(".approval")
+    lines: Locator = chat.locator(".note", has_text="Needs approval")
+    await expect(cards).to_have_count(0 if approved else 1)
+    await expect(lines).to_have_count(0 if approved else 1)
+    if not approved:
+        await expect(cards).to_contain_text("Denied")
+
+
+@pytest.mark.browser
+async def test_an_approval_card_is_only_in_its_chat_and_leaves_it_once_allowed(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
+            host, port = "127.0.0.1", int(address.rpartition(":")[2])
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width in (1280, 390):
+                    page: Page = await browser.new_page(
+                        viewport={"width": width, "height": 900}, reduced_motion="reduce"
+                    )
+                    await page.goto(ui_url(host, port, TOKEN))
+                    for approved in (True, False):
+                        run, _ = await _asking(runtime, manager, f"Write the shelves ({width}, {approved})")
+                        # The home lists the run under Waits for you, without its card.
+                        await page.goto(f"{address}/#/")
+                        await expect(page.locator(".home")).to_contain_text("Waits for you")
+                        await expect(page.locator(".home .approval")).to_have_count(0)
+                        await page.goto(f"{address}/#/runs/{run.id}")
+                        card: Locator = page.locator(".timeline .approval")
+                        await expect(card).to_have_count(1)
+                        await expect(page.locator(".timeline .note", has_text="Needs approval")).to_have_count(1)
+                        await card.get_by_role("button", name="Approve" if approved else "Deny").click()
+                        async with asyncio.timeout(WAIT_S):
+                            assert (await manager.wait(run.id)).status == "done"
+                        await _decided_shows(page, approved)
+                        await page.screenshot(path=str(tmp_path / f"decided-{width}-{approved}.png"))
+                        # The chat opened again reads the same.
+                        await page.reload()
+                        await _decided_shows(page, approved)
                     await page.close()
             finally:
                 await browser.close()

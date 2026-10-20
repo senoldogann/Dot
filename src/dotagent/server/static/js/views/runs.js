@@ -1,9 +1,8 @@
 // The home page: Dot's presence (presence.js: the face in its state, a greeting, one line of now) and one composer in
 // the middle of the window, the Today strip under them. The recent runs live in the sidebar; a run that waits for an
-// answer shows above, as a card.
+// answer is listed under Waits for you, and its card stays in its own chat (item 434).
 
 import { actorFace, DOT_ID } from "../actors.js";
-import { approvalCard, fromRecord, LEFT_IN_RUN } from "../approvals.js";
 import { api } from "../api.js";
 import { assistant, loadAssistant, onAssistant } from "../assistant.js";
 import { askForWords, readyToSend } from "../attachments.js";
@@ -23,7 +22,7 @@ import { providerLabel, providerOf } from "../providers.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { onCompose } from "../shortcuts.js";
-import { getSnapshot, loadModels, onChange, refresh } from "../state.js";
+import { getSnapshot, loadModels, onChange } from "../state.js";
 import { attempt, toast } from "../ui.js";
 
 const MAX_GOAL_PX = 320;
@@ -305,43 +304,6 @@ function buildComposer(ctx, listener) {
   };
 }
 
-function buildApprovals() {
-  const list = el("div", { class: "stack" });
-  const section = el("section", { class: "home-approvals", hidden: true }, el("div", { class: "section-label" }, "Waiting for you"), list);
-  const cards = new Map();
-
-  function sync(snapshot) {
-    const wanted = new Set(snapshot.approvals.map((record) => record.id));
-    for (const [id, card] of cards) {
-      if (!wanted.has(id)) {
-        card.node.remove();
-        cards.delete(id);
-      }
-    }
-    for (const record of snapshot.approvals) {
-      if (!cards.has(record.id)) {
-        const card = approvalCard({
-          approval: fromRecord(record),
-          heading: el("a", { class: "small", href: `#/runs/${record.run_id}` }, "Open run"),
-          onSettled: (decided) => {
-            // The card shows the decision at once; the refresh then takes it away.
-            if (decided !== null) {
-              card.settle(decided.status, decided.note);
-            }
-            refresh().catch((error) => toast("error", `The approvals could not be refreshed: ${error.message}`));
-          },
-          leftNote: LEFT_IN_RUN,
-        });
-        cards.set(record.id, card);
-        list.append(card.node);
-      }
-    }
-    section.hidden = cards.size === 0;
-  }
-
-  return { element: section, sync };
-}
-
 /** Why the default model `main` cannot answer, as the providers' lists say (`loadModels`), or null when its provider
  * lists it. */
 function mainProblem(providers, main) {
@@ -435,17 +397,15 @@ export function mount(root, ctx) {
     },
   };
   const composer = buildComposer(ctx, listen);
-  const approvals = buildApprovals();
   const setup = buildSetup();
-  // The setup card stands over the greeting, in the block the page keeps in the middle.
+  // The setup card stands over the greeting, in the block the page keeps in the middle. What a run waits for is
+  // answered in its own chat (item 434): the home lists it under Waits for you, which leads there.
   const start = el("div", { class: "home-start" }, setup.element, presence.element, composer.element);
-  const home = el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), approvals.element, start, presence.strip);
+  const home = el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), start, presence.strip);
   root.append(home);
   // The greeting and the composer stand in the middle of the space under the top bar (item 124): the row above them
   // takes half of what their height leaves of it (app.css), so the page keeps that height as it changes.
   const stopCentring = trackHeight(start, home, "--home-start-h");
-  approvals.sync(getSnapshot());
-  const stopApprovals = onChange(approvals.sync);
   const stopSetup = onChange(setup.sync);
   // On a touch screen the caret waits for a tap: a box that takes the focus opens the keyboard over the page (item 293).
   function offerCaret() {
@@ -482,7 +442,6 @@ export function mount(root, ctx) {
     first?.dispose();
     stopNames();
     stopCentring();
-    stopApprovals();
     stopSetup();
     stopCompose();
     composer.dispose();
