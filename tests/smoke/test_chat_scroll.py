@@ -56,7 +56,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script()))
+    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script() * 2))
     try:
         yield built
     finally:
@@ -212,5 +212,63 @@ async def test_the_composer_stands_at_the_foot_of_what_is_seen_while_the_convers
             await phone.screenshot(path=str(tmp_path / "phone-draft.png"))
             assert phone_errors == []
             await phone.context.close()
+        finally:
+            await browser.close()
+
+
+_AT_THE_FOOT: str = """() => {
+  const thread = document.querySelector('.run-thread');
+  const box = thread !== null && thread.scrollHeight > thread.clientHeight + 4 ? thread : document.scrollingElement;
+  return { top: Math.round(box.scrollTop), max: Math.round(box.scrollHeight - box.clientHeight) };
+}"""
+
+
+async def test_a_chat_that_is_over_opens_at_its_foot_and_return_breaks_the_line_on_a_phone(
+    runtime: Runtime, served: tuple[RunManager, str]
+) -> None:
+    """A finished chat opens on its newest message, wide and on a phone, not at the top of its last answer (item 440);
+    and on a touch screen Return breaks the line, where the round send button sends, while a wide window keeps Enter
+    for sending."""
+    manager, address = served
+    run: RunRecord = await manager.start(
+        _GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(run.id)).status == "done"
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            shots: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "dark"), (390, "light"))
+            for width, scheme in shots:
+                page, errors = await _page(browser, address, run.id, width, scheme)
+                await page.wait_for_timeout(900)
+                where = await page.evaluate(_AT_THE_FOOT)
+                assert where["max"] > 0, where
+                assert where["max"] - where["top"] <= 2, (width, where)
+                assert errors == []
+                await page.context.close()
+            # On a phone Return breaks the line and sends nothing; on a wide window Enter sends (item 440).
+            for width, sends in ((390, False), (1280, True)):
+                context: BrowserContext = await browser.new_context(
+                    viewport={"width": width, "height": 900},
+                    is_mobile=width < 500,
+                    has_touch=width < 500,
+                    reduced_motion="reduce",
+                )
+                page = await context.new_page()
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                await page.wait_for_selector(".dock textarea", timeout=15000)
+                box = page.locator(".dock textarea")
+                await box.fill("first line")
+                await box.press("Enter")
+                await page.wait_for_timeout(500)
+                value: str = await box.input_value()
+                if sends:
+                    assert value == "", (width, value)
+                else:
+                    assert value == "first line\n", (width, value)
+                await context.close()
         finally:
             await browser.close()
