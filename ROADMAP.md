@@ -15624,6 +15624,20 @@ events changed) is not in it. Tests: `tests/unit/test_mail_calendar.py`, `tests/
 providers stood in for, after a real sign-in into a keychain of the test's own: a token turned away and refreshed, a
 "not now" waited out, an address no account has). Docs: `docs/runs.md`, `docs/extending.md`, `docs/safety.md`.
 
+### 428. The browser tests of `main` pass again: the home follows a new name, Settings › Phone and Harness fit a phone
+
+**Status: done (2026-10-20), on `browser-test-fixes`.** Seven browser tests (the `browser` mark, which the pull
+request's gate leaves out) failed on `main`, three of them for items of this session. **As built.** The open home
+repainted its greeting and Dot's name only at a change of what runs, so a name saved in Settings › General a moment
+before (the daemon keeps it since item 420) showed the old one: the home's name listener repaints them now. Settings ›
+Phone's QR rows let the words beside a code go under it on an iPhone SE, and an address in them break, where the
+row reached 60 px past the screen's edge (item 421); the panel foot of Settings › Harness wraps its three buttons (2 px).
+The tests that read the regular home on a fresh daemon mark Dot introduced, as the first conversation (item 420) stands
+in the greeting's place otherwise; the pairing test names the code's hint among the guide's; the diagnostics test
+expects the guard's 400 for a dot segment (item 419). Tests: `test_home.py`, `test_page_guards.py`,
+`test_character_cost.py`, `test_phone_pairing.py`, `test_about_pages.py`, `test_phone_settings.py`,
+`test_phone_fit.py`. Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16521,3 +16535,5 @@ providers stood in for, after a real sign-in into a keychain of the test's own: 
   was told to the chat again in a message of its queue, which started a run for what the first knew. The bar is as wide
   as what it holds (`run.css`); a read of the end (`terminal_read`) takes the queued message back out unless it has
   already started its run (`RunManager.command_read`). Measured in WebKit at 320, 360, 390 and 430 px, light and dark.
+- 2026-10-20 (Opus 5.5): item 428 on `browser-test-fixes` from `main`: the browser tests of `main` pass again; the
+  home follows a new name at once, and Settings › Phone and Harness fit an iPhone SE.

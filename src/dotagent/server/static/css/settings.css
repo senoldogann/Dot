@@ -1451,6 +1451,13 @@
   image-rendering: pixelated;
 }
 
+/* The words beside a QR code go under it when the row is narrow (an iPhone SE's), and an address in them breaks
+   rather than reach past the screen's edge. */
+.phone-qr-row > .hint {
+  flex: 1 1 12rem;
+  overflow-wrap: anywhere;
+}
+
 /* ---------- Memory (item 373): the lines Dot knows and the notes in two columns, as Providers keeps its list and its
    pane: what is yours and what to add at the left, the notes themselves at the right, each a hairline row. ---------- */
 
@@ -1488,6 +1495,7 @@
 .panel-foot {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: var(--space-2);
 }
 

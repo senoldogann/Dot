@@ -107,7 +107,8 @@ async def test_diagnostics_and_the_licences_show_what_is_there(
                 assert tail["lines"][0] == "first line" and tail["lines"][-1] == "the daemon started"
                 assert _SECRET not in "\n".join(tail["lines"])
                 refused = await client.get("/api/diagnostics/logs/..%2Fdotx.log", params={"lines": 10})
-                assert refused.status_code == 404, refused.text
+                # The guard refuses a path with a dot segment before any route sees it (item 419).
+                assert refused.status_code == 400 and "segment is refused" in refused.text, refused.text
                 assert (await client.get("/api/diagnostics/logs/dotx.log", params={"lines": 0})).status_code == 422
                 disk = (await client.get("/api/diagnostics/disk")).json()
                 assert [folder["name"] for folder in disk["folders"]][-1] == "Dot's home in all"
