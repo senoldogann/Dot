@@ -84,6 +84,11 @@
   --knob: light-dark(#ffffff, #f5f4f0);
   /* The page of a document as Quick Look draws it (item 268): white in both schemes, as the Mac draws it. */
   --paper: #ffffff;
+  /* The tile a service's mark sits on (item 437): light in both schemes, so that a dark logo (GitHub, X, Vercel)
+     reads in the dark scheme too; an icon of the interface and letters on it are drawn in the tile's ink. */
+  --mark-ground: #ffffff;
+  --mark-ink: #2b2a27;
+  --mark-ring: rgb(0 0 0 / 10%);
   --scrim: light-dark(rgb(28 27 25 / 40%), rgb(0 0 0 / 55%));
   --scrim-strong: light-dark(rgb(28 27 25 / 78%), rgb(0 0 0 / 80%));
   /* Shadows: a trace of ink in light, none in dark but under what floats over a scrim. */

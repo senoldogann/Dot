@@ -21,7 +21,7 @@ _GITHUB: WebApp = next(app for app in WEB_APPS if app.id == "github")
 def test_the_catalogue_names_each_application_once_and_signs_in_over_https() -> None:
     ids: list[str] = [app.id for app in MAC_APPS] + [app.id for app in FOLDER_APPS] + [app.id for app in WEB_APPS]
     assert len(ids) == len(set(ids))
-    bundles: list[str] = [app.bundle_id for app in MAC_APPS] + [app.bundle_id for app in FOLDER_APPS]
+    bundles: list[str] = [app.bundle_id for app in MAC_APPS] + [id for app in FOLDER_APPS for id in app.bundle_ids]
     assert all(bundle.count(".") >= 2 for bundle in bundles)
     assert all(app.sign_in.startswith("https://") and app.domains and app.cookies for app in WEB_APPS)
 

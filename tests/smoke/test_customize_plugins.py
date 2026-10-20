@@ -7,7 +7,10 @@ with no Sign in in a browser without a window; a service not tried yet says so a
 says how it connects, where it stands and where its data goes: Notes' Open System Settings shows the Automation pane
 under a line that names Dot, the program to open there, and goes under that line on a phone. The "+" of Calendar asks
 macOS and its tile says Allowed, and still does once the application is closed and macOS tells nothing about it (item
-288). The old address of Connect apps leads to the page.
+288). The old address of Connect apps leads to the page. Every mark is a picture or an icon on a tile that is white in
+both colour schemes: a logo in its own colours, Calendar's the icon of the application itself, read from its bundle (the
+Mac's own here), Mail's and Outlook's their glyph and letters (no bundle to read, not installed); the Accounts card
+heads the list and no service's own page, and the "+" of a tile keeps its width.
 
 macOS is never asked here and System Settings never opens: the test answers for them (``_Mac``). The sign-ins are read
 for real, from a cookie file in the profile of Dot's browser.
@@ -50,6 +53,8 @@ _OUTLOOK: str = "com.microsoft.Outlook"
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
 _PHONE_PX: int = 860
 _DAY_S: float = 86_400.0
+# Calendar's bundle, the Mac's own: the icon the page shows for it is read from there for real.
+_CALENDAR_APP: Path = Path("/System/Applications/Calendar.app")
 # The program macOS holds responsible for Dot here: the service's app.
 _DOT_APP: Path = Path("/Users/someone/Library/Application Support/Dot/Dot.app")
 # How long macOS's question waits for the owner here.
@@ -80,7 +85,9 @@ class _Mac:
         return "allowed"
 
     def installed(self, bundle_id: str) -> Path | None:
-        return None if bundle_id == _OUTLOOK else Path(f"/Applications/{bundle_id}.app")
+        if bundle_id == _OUTLOOK:
+            return None
+        return _CALENDAR_APP if bundle_id == _CALENDAR else Path(f"/Applications/{bundle_id}.app")
 
     def show(self, pane: Pane) -> None:
         self.panes.append(pane)
@@ -168,6 +175,45 @@ async def _box(locator: Locator) -> FloatRect:
     return box
 
 
+_LOADED: str = "(image) => image.complete && image.naturalWidth > 0"
+
+
+async def _check_marks(page: Page) -> None:
+    """The marks of the list as the page draws them, and the Accounts card above it."""
+    await page.wait_for_function("[...document.querySelectorAll('.plugin-mark img')].every((image) => image.complete)")
+    broken: list[str] = await page.evaluate(
+        "[...document.querySelectorAll('img')].filter((image) => image.naturalWidth === 0).map((image) => image.src)"
+    )
+    assert broken == []
+    # A logo is a picture in its own colours on a tile that is white in both colour schemes.
+    github: Locator = _tile(page, "github").locator(".plugin-mark")
+    await expect(github.locator("img.plugin-logo")).to_have_attribute("src", "/icons/plugins/github-icon.svg")
+    assert await github.locator("img").evaluate(_LOADED)
+    assert await github.evaluate("(mark) => getComputedStyle(mark).backgroundColor") == "rgb(255, 255, 255)"
+    # Calendar wears its application's icon, read from its bundle; Mail and Outlook keep their glyph and letters.
+    calendar: Locator = _tile(page, "calendar").locator(".plugin-mark")
+    await expect(calendar).to_have_attribute("data-icon", "app")
+    await expect(calendar.locator("img")).to_have_attribute("src", re.compile(r"^blob:"))
+    assert await calendar.locator("img").evaluate(_LOADED)
+    await expect(_tile(page, "mail").locator(".plugin-mark .icon")).to_have_count(1)
+    await expect(_tile(page, "mail").locator(".plugin-mark[data-icon]")).to_have_count(0)
+    await expect(_tile(page, "outlook").locator(".plugin-letters")).to_have_text("O")
+    # The tile's "+" keeps its width beside long words, on a phone too.
+    widths: list[float] = await page.locator("button.plugin-add").evaluate_all(
+        "(buttons) => buttons.map((button) => button.getBoundingClientRect().width)"
+    )
+    assert len(widths) > 10 and min(widths) >= 31.5, widths
+    # The Accounts card: both providers in their colours, and its title clear of its line.
+    accounts: Locator = page.locator("section[aria-label='Accounts']")
+    await expect(accounts.locator("img.account-mark")).to_have_count(2)
+    apart: bool = await accounts.locator(".card-head").evaluate(
+        "(head) => { const title = document.createRange(); title.selectNodeContents(head.querySelector('.grow'));"
+        " const a = title.getBoundingClientRect(); const b = head.querySelector('.hint').getBoundingClientRect();"
+        " return a.right <= b.left || a.bottom <= b.top; }"
+    )
+    assert apart
+
+
 async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
     runtime: Runtime, address: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
@@ -215,6 +261,7 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                     await expect(tile.locator(".plugin-mark")).to_have_count(1)
                     await expect(tile.locator(".plugin-does")).not_to_be_empty()
                     await expect(tile.locator(".chip")).to_have_count(1)
+                await _check_marks(page)
                 mail: Locator = _tile(page, "mail")
                 await expect(mail.locator(".badge")).to_have_text("Allowed")
                 await expect(mail.get_by_role("button")).to_have_count(0)
@@ -260,6 +307,9 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 # Notes' own page: how it connects, where it stands, where its data goes, and its step.
                 await _tile(page, "notes").locator(".plugin-name").click()
                 await expect(page).to_have_url(f"{address}/#/customize/plugins/notes")
+                # A service's own page has no Accounts card over it, and its mark is the same tile, larger.
+                await expect(page.locator("section[aria-label='Accounts']")).to_have_count(0)
+                await expect(page.locator(".plugin-hero .plugin-mark")).to_have_count(1)
                 way: Locator = page.locator(".plugin-way[data-way='mac']")
                 await expect(way.locator(".badge")).to_have_text("Refused")
                 await expect(way.locator(".plugin-guide")).to_contain_text("Privacy & Security › Automation")

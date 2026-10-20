@@ -1084,7 +1084,8 @@ class ConnectionView(FrozenModel):
     """One application of Customize › Plugins (items 278 and 316). ``kind`` says how Dot reaches it: ``mac``, it
     drives it with AppleScript; ``web``, it uses it in its own browser; ``folder``, it reads and writes the folder it
     keeps in sync. ``state`` is where it stands and ``step`` what sets it up (``connections/states.py``), ``None``
-    when there is none to take; ``waiting`` is true while macOS asks the owner about it on the Mac."""
+    when there is none to take; ``waiting`` is true while macOS asks the owner about it on the Mac; ``icon`` is true
+    when the installed application has an icon of its own to show (``GET /connections/{id}/icon``)."""
 
     id: str
     kind: ConnectionKind
@@ -1093,6 +1094,7 @@ class ConnectionView(FrozenModel):
     state: ConnectionState
     step: ConnectionStep | None
     waiting: bool
+    icon: bool
 
 
 class ConnectionsView(FrozenModel):
