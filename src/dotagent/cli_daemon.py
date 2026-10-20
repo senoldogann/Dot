@@ -26,6 +26,7 @@ from dotagent.cli_commands import (
 from dotagent.config import AppConfig, load_user_config
 from dotagent.core.errors import ConfigError, InvalidValueError, ServiceError
 from dotagent.core.paths import dot_home, log_dir, token_path
+from dotagent.core.runenv import started_by_a_run
 from dotagent.daemon_failure import DaemonFailure, daemon_failure_in, failure_text
 from dotagent.desktop.perms import Pane, open_settings, settings_url
 from dotagent.dot_app import app_path, ensure_app
@@ -38,7 +39,6 @@ from dotagent.launchd import (
     LaunchAgent,
     Removal,
     RestartJob,
-    RestartWhen,
     ServiceStatus,
     build_launch_agent,
     build_restart_job,
@@ -298,7 +298,19 @@ async def _unanswered(url: str, uid: int, began: datetime) -> ServiceError:
     )
 
 
+def _refused_in_a_run(what: str) -> None:
+    """Refuse ``what``, which restarts the daemon at once, in a command a run's tool started
+    (:mod:`dotagent.core.runenv`): the restart would cut that run off, and the end of the run would kill the command
+    before it loads the daemon again. Such a run asks for ``dotx service restart --when-idle``."""
+    if started_by_a_run(os.environ):
+        raise ServiceError(
+            f"a run cannot {what}: the daemon would stop under it, cutting the run off",
+            {"fix": "'dotx service restart --when-idle' restarts the daemon once the run has ended"},
+        )
+
+
 async def cmd_service_install(command: ServiceInstallCommand) -> int:
+    _refused_in_a_run("install the service, which restarts the daemon at once")
     config: AppConfig = load_user_config()
     url: str = health_url(config.server.host, config.server.port)
     uid: int = os.getuid()
@@ -337,8 +349,8 @@ def _not_installed(uid: int) -> ServiceError:
 
 async def restart_service(plist: Path, uid: int, url: str) -> HealthView:
     """Restart the daemon now (its job unloaded and loaded again from ``plist``, :func:`restart_job`, so the daemon ends
-    as at a stop) and wait until a new process answers the health check at ``url``. The one-shot restart's program
-    calls this (:mod:`dotagent.restart_when_idle`), in a launchd job of its own.
+    as at a stop) and wait until a new process answers the health check at ``url``: the answer of the process that ran
+    before does not count.
 
     Raises :class:`ServiceError` when launchd has no job of the service (it is not installed), when launchctl refuses
     the restart, and when no new process answers within :data:`_START_WAIT_S`.
@@ -348,13 +360,6 @@ async def restart_service(plist: Path, uid: int, url: str) -> HealthView:
         raise _not_installed(uid)
     began: datetime = datetime.now()
     await restart_job(plist, uid)
-    return await _answer_of_a_new_daemon(uid, before, url, began)
-
-
-async def _answer_of_a_new_daemon(uid: int, before: JobState, url: str, began: datetime) -> HealthView:
-    """The health of the daemon once a process other than the one of ``before`` answers at ``url``: the answer of the
-    process that ran before does not count. Raises :class:`ServiceError` when none answers within
-    :data:`_START_WAIT_S`."""
     deadline: float = time.monotonic() + _START_WAIT_S
     while True:
         job: JobState | None = await inspect_job(uid)
@@ -367,26 +372,11 @@ async def _answer_of_a_new_daemon(uid: int, before: JobState, url: str, began: d
         await asyncio.sleep(_POLL_S)
 
 
-async def _load_restart(when: RestartWhen, uid: int) -> bool:
-    """Load the one-shot restart (:mod:`dotagent.restart_when_idle`) that restarts the daemon ``when``. Launchd runs it
-    in a job of its own, so a ``dotx`` that a run started and that the run's end kills cannot leave the daemon
-    unloaded halfway. One that waits already is replaced. Returns whether one was replaced."""
-    if await inspect_job(uid) is None:
-        raise _not_installed(uid)
-    job: RestartJob = build_restart_job(sys.executable, when, dot_home(), log_dir(), os.environ)
-    return await install_restart_job(restart_job_path(dot_home()), render_restart_job(job), uid)
-
-
 async def cmd_service_restart(command: ServiceRestartCommand) -> int:
+    _refused_in_a_run("restart the daemon at once")
     config: AppConfig = load_user_config()
     url: str = health_url(config.server.host, config.server.port)
-    uid: int = os.getuid()
-    before: JobState | None = await inspect_job(uid)
-    if before is None:
-        raise _not_installed(uid)
-    began: datetime = datetime.now()
-    await _load_restart("now", uid)
-    health: HealthView = await _answer_of_a_new_daemon(uid, before, url, began)
+    health: HealthView = await restart_service(_plist_path(), os.getuid(), url)
     sys.stdout.write(
         f"Restarted the daemon of the launchd job {LABEL}: it answers at "
         f"{base_url(config.server.host, config.server.port)} (version {health.version}). "
@@ -397,13 +387,22 @@ async def cmd_service_restart(command: ServiceRestartCommand) -> int:
 
 async def cmd_service_restart_when_idle(command: ServiceRestartCommand) -> int:
     """Load the one-shot job that restarts the daemon once no run works (:mod:`dotagent.restart_when_idle`) and return
-    at once. A restart that waits already is replaced."""
+    at once. A restart that is on its way already is left as it is: replacing it could stop it between unloading the
+    daemon's job and loading it again, and it restarts the daemon once no run works anyway."""
     uid: int = os.getuid()
+    if await inspect_job(uid) is None:
+        raise _not_installed(uid)
     plist: Path = restart_job_path(dot_home())
-    replaced: bool = await _load_restart("idle", uid)
+    if await inspect_restart_job(uid) is not None:
+        sys.stdout.write(
+            f"A restart is on its way already (the launchd job {RESTART_LABEL}: {plist}): it restarts the daemon once "
+            "no run works. Nothing changed.\n"
+        )
+        return 0
+    job: RestartJob = build_restart_job(sys.executable, dot_home(), log_dir(), os.environ)
+    await install_restart_job(plist, render_restart_job(job), uid)
     sys.stdout.write(
-        f"{'Replaced the restart that waited with a new one' if replaced else 'Loaded a restart that waits'} "
-        f"(the launchd job {RESTART_LABEL}: {plist}).\n"
+        f"Loaded a restart that waits (the launchd job {RESTART_LABEL}: {plist}).\n"
         f"The daemon is restarted once no run works, the run that asked included; the job looks every "
         f"{RESTART_POLL_S:g} seconds, gives up after {_duration(RESTART_WAIT_LIMIT_S)} without restarting, and "
         "unloads itself either way. 'dotx service status' says whether one waits.\n"

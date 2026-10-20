@@ -39,8 +39,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
   and that another model would answer (item 437).
 - `dotx service restart` restarts the daemon now (it stops as at a stop, then the command waits for the health check),
   and `dotx service restart --when-idle` returns at once and restarts it once no run works, the run that asked included:
-  a one-shot launchd job that unloads itself, gives up after 2 hours and is replaced when you ask again. A run that
-  changed Dot's code asks for this, never for a launchd job of its own, which launchd started again every 30 seconds.
+  a one-shot launchd job that unloads itself and gives up after 2 hours; asking again while one is on its way changes
+  nothing. A run's command may ask only for the latter (the restart now and `service install` refuse in a run), and the
+  shell tool tells the model to, never to load a launchd job of its own, which launchd started again every 30 seconds.
   `dotx service status` says whether a restart waits and `dotx service uninstall` cancels it (item 441).
 
 ## 0.1.0 (2026-10-20)

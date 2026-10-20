@@ -17,7 +17,7 @@ import re
 import time
 from collections.abc import Mapping
 from pathlib import Path
-from typing import Literal, TypedDict
+from typing import TypedDict
 
 from dotagent.core.errors import ServiceError
 from dotagent.core.logs import get_logger
@@ -100,16 +100,11 @@ class RestartPlist(TypedDict):
     EnvironmentVariables: dict[str, str]
 
 
-# When the one-shot restart restarts the daemon: at once, or once no run works.
-type RestartWhen = Literal["now", "idle"]
-
-
 class RestartJob(FrozenModel):
-    """What the one-shot restart runs, when it restarts (``when``) and where it keeps its files; ``render_restart_job``
-    turns it into the property list."""
+    """What the restart that waits runs and where it keeps its files; ``render_restart_job`` turns it into the property
+    list."""
 
     python: str
-    when: RestartWhen
     working_directory: str
     stdout_path: str
     stderr_path: str
@@ -225,12 +220,11 @@ def render_launch_agent(agent: LaunchAgent) -> bytes:
     return plistlib.dumps(agent_plist(agent), fmt=plistlib.FMT_XML, sort_keys=True)
 
 
-def build_restart_job(python: str, when: RestartWhen, home: Path, logs: Path, environ: Mapping[str, str]) -> RestartJob:
-    """The job that runs :data:`RESTART_MODULE` with ``python`` to restart the daemon ``when``, from Dot's home
-    ``home``. ``DOT_HOME`` and ``DOT_LOG_DIR`` are handed on when set here."""
+def build_restart_job(python: str, home: Path, logs: Path, environ: Mapping[str, str]) -> RestartJob:
+    """The job that runs :data:`RESTART_MODULE` with ``python``, from Dot's home ``home``. ``DOT_HOME`` and
+    ``DOT_LOG_DIR`` are handed on when set here."""
     return RestartJob(
         python=python,
-        when=when,
         working_directory=str(home),
         stdout_path=str(logs / "restart-when-idle.out.log"),
         stderr_path=str(logs / "restart-when-idle.err.log"),
@@ -239,9 +233,7 @@ def build_restart_job(python: str, when: RestartWhen, home: Path, logs: Path, en
 
 
 def restart_plist(job: RestartJob) -> RestartPlist:
-    """The property list of the one-shot restart, at once or once no run works (``job.when``, its program's argument).
-    Launchd carries it out in a job of its own, so a ``dotx`` that asked for it from a run's shell may be killed with
-    the run without leaving the daemon unloaded.
+    """The property list of the restart that waits.
 
     The job runs once, when it is loaded (``RunAtLoad``), and has no ``KeepAlive``: launchd does not start it again
     when it exits. ``AbandonProcessGroup`` keeps launchd from killing the ``launchctl`` calls the program still has
@@ -250,7 +242,7 @@ def restart_plist(job: RestartJob) -> RestartPlist:
     """
     return RestartPlist(
         Label=RESTART_LABEL,
-        ProgramArguments=[job.python, "-P", "-m", RESTART_MODULE, job.when],
+        ProgramArguments=[job.python, "-P", "-m", RESTART_MODULE],
         RunAtLoad=True,
         AbandonProcessGroup=True,
         ProcessType="Background",

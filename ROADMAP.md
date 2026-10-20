@@ -15899,33 +15899,30 @@ Seen twice on the owner's Mac: a run that merged a change of Dot's own code want
 ended, and improvised it with a shell script submitted as a launchd job (`launchctl submit -l
 dev.dotagent.restart-after-run ... /tmp/dot-restart-after-run.sh`). `launchctl submit` keeps a job alive, so launchd
 started the script again each time it exited and the daemon was restarted every 30 s while no run worked (312
-`daemon_started` events in its log). Dot had no command for "restart the daemon when no run works". **As built.** `dotx
-service restart` restarts the installed daemon now: it loads the one-shot job below with `now`, which unloads the
-daemon's job (SIGTERM, waiting until it has exited) and loads it again from its property list, so a `dotx` a run started
-and the run's end killed cannot leave the daemon unloaded halfway (the pre-push review's find: done by the `dotx`
-itself, the restart died with it after the unload); the command waits up to 60 s until a new process (a pid other than
-the one before) answers `/api/health`, then prints its version; the error of a daemon that does not answer is the one
-`service install` gives (`_unanswered`). `dotx service restart --when-idle` returns at once after it loads a one-shot
-launchd job, `dev.dotagent.restart-when-idle`, from a property list in Dot's home (`RunAtLoad`, `AbandonProcessGroup`,
-no `KeepAlive`, `ProgramArguments` the running Python with `-P -m dotagent.restart_when_idle` and `now` or `idle`,
-`DOT_HOME` and `DOT_LOG_DIR` handed on when set). `dotagent.restart_when_idle` reads the database through a read-only
-SQLite connection (`mode=ro`) every 5 s, counting the runs in `WORKING_STATUSES` (queued, running, blocked: the run that
-asked counts until it ends, and a run that waits for an answer works too); once none works it restarts the daemon as the
-command does, waits for the health check, logs `restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` or
-`_failed` to `dotx.log` with structured fields, deletes its property list and unloads its own label (`bootout`, which
-ends it), whatever happened: an error that is not Dot's is logged with its traceback (`restart_when_idle_crashed`)
-before. It gives up after `RESTART_WAIT_LIMIT_S` (2 hours) without restarting. A missing or unreadable database is an
-error, never an idle daemon. Asking again replaces the one that waits (`install_restart_job`: bootout, wait until
-unloaded, bootstrap; the plist of before is put back when the new one does not load), so there is never more than one,
-and `dotx service status` has a `restart` line that says whether one waits; `dotx service uninstall` cancels it.
-`launchd.py`'s install, inspect and unload helpers take the job's label now, so the daemon's job and the restart's share
-them. `docs/daemon.md` says what the commands do and that a run restarts the daemon with `--when-idle`, never with a
-launchd job of its own; the other docs, and the hints of `dotx browser attach` and `detach`, `service permissions`, the
-typed judge and Settings › Keys, that told `dotx service install` as the way to restart say `dotx service restart`.
-Measured in `tests/unit/test_restart_when_idle.py` against a stand-in `launchctl` and a local health check, so no test
-touches the owner's launchd, daemon or home. A run reaches launchctl only in `yolo` or with `[shell] sandbox` off (the
-sandbox of the other modes keeps a run's commands from it); the docs say so, and that such a run tells the owner the
-daemon needs `dotx service restart`.
+`daemon_started` events in its log); the job was removed by hand. Dot had no command for "restart the daemon when no run
+works". **As built.** `dotx service restart` restarts the installed daemon now: its job is unloaded (`bootout`: SIGTERM,
+and launchctl waits until it has exited) and loaded again from its property list (`launchd.restart_job`), and the
+command waits up to 60 s until a new process answers `/api/health`, then prints its version (a clear error naming `dotx
+service install` when launchd has no job of it). `dotx service restart --when-idle` returns at once after it loads a
+one-shot launchd job, `dev.dotagent.restart-when-idle`, from a property list in Dot's home (`RunAtLoad`,
+`AbandonProcessGroup`, no `KeepAlive`, the running Python with `-P -m dotagent.restart_when_idle`, `DOT_HOME` and
+`DOT_LOG_DIR` handed on when set). The program reads the database through a read-only SQLite connection every 5 s,
+counting the runs in `WORKING_STATUSES` (the run that asked counts until it ends); once none works it restarts the
+daemon as the command does, logs `restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` (after 2 hours, without
+a restart), `_failed` or `_crashed` (an error that is not Dot's, with its traceback) to `dotx.log`, deletes its property
+list and unloads its own label. A missing or unreadable database is an error, never an idle daemon. Asking while one is
+on its way changes nothing, since replacing it could stop it between unloading the daemon's job and loading it again;
+`dotx service status` has a `restart` line, and `dotx service uninstall` cancels a waiting one. The shell and terminal
+tools mark the commands of a run (`DOT_RUN_SHELL`, `core/runenv.py`), and `dotx service restart` and `dotx service
+install` refuse under it: the daemon would stop under the run and the run's end would kill the command between the
+unload and the load (the pre-push review's finds, over two rounds). The shell tool's description tells the model to ask
+for `--when-idle` and never to load a launchd job of its own, and where that cannot run (the sandbox outside yolo keeps
+a run from launchctl) to say that the daemon needs `dotx service restart`. The hints that told `dotx service install` as
+the way to restart (browser attach and detach, service permissions, the typed judge, Settings › Keys) say `dotx service
+restart`. Tests: `tests/unit/test_restart_when_idle.py` (the plist, the idle check per status against a scratch store,
+the wait, the program end to end, the restart as unload and load, a waiting restart left as it is, uninstall cancelling
+it, the refusal in a run, the mark on a run's commands), against a stand-in `launchctl` and a local health check. Docs:
+`docs/daemon.md` and the docs that told the restart.
 
 ## Log
 

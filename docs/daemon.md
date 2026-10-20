@@ -562,30 +562,31 @@ dotx service uninstall   # stop the daemon and remove the job
   of `daemon`: a setting this version of Dot does not know, a daemon already running, an address taken), and
   `service status`, when the daemon does not answer, shows the failure that ended the latest `dotx daemon` unless a
   start that went well came after it. Without such a failure, read `daemon.err.log`.
-- `dotx service restart` restarts the daemon without changing the job (item 441): it loads the one-shot job below
-  with `now`, which unloads the daemon's job (`bootout` sends the daemon SIGTERM, so it stops as it does at the end of a
-  session, and launchctl waits until it has exited) and loads it again from its property list; launchd carries this
-  out in that job, so a `dotx` that a run started and the run's end killed cannot leave the daemon unloaded halfway.
-  The command waits up to 60 seconds for a new process to answer `GET /api/health`, then prints its version. It is the
-  way to take up a change of Dot's code, of `config.toml`
-  or of a key; `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at
-  work are cut off, and the daemon's next start resumes them as `[agent] resume` says. When launchd has no job of the
-  service, the command says so and names `service install`.
-- **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item
-  441). A run that merged a change of Dot's own code wants the daemon restarted once it has ended, and restarting at
-  once would cut the run itself off. A run reaches launchctl only in `yolo` or with `[shell] sandbox` off: the sandbox
-  of the other modes keeps a run's commands from launchctl (see [Safety](safety.md#safety)), and the run then says in
-  its answer that the daemon needs `dotx service restart`. The option loads a one-shot launchd job,
-  `dev.dotagent.restart-when-idle` (its
-  property list is in Dot's home: `RunAtLoad`, no `KeepAlive`, `AbandonProcessGroup`), and returns at once. The job runs
-  `python -P -m dotagent.restart_when_idle`, which reads the database read-only every 5 seconds until no run is
-  queued, running or blocked (the run that asked included, so it has to end first, and a run that waits for an answer
-  works too), then restarts the daemon as `service restart` does, waits for the health check, writes what it did to
-  `dotx.log` (`restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` after 2 hours without a restart, `_failed`),
-  unloads itself and deletes its property list. Asking again replaces the one that waits, so there is never more than
-  one; `service status` shows a `restart` line that says whether one waits, and `service uninstall` cancels it. A job
-  that a run made with `launchctl submit` is started again by launchd each time its script exits, which restarted the
-  daemon every 30 seconds for as long as no run worked (312 starts in one log).
+- `dotx service restart` restarts the daemon without changing the job (item 441): the job is unloaded (`bootout` sends
+  the daemon SIGTERM, so it stops as it does at the end of a session, and launchctl waits until it has exited) and
+  loaded again from its property list, and the command waits up to 60 seconds for a new process to answer `GET
+  /api/health`, then prints its version. It is the way to take up a change of Dot's code, of `config.toml` or of a key;
+  `service install` is for a change of the job itself (another Python, another `DOT_HOME`). The runs at work are cut
+  off, and the daemon's next start resumes them as `[agent] resume` says. When launchd has no job of the service, the
+  command says so and names `service install`. In a command a run's tool started (the shell and terminal tools mark
+  them, `DOT_RUN_SHELL`), `service restart` and `service install` refuse: the daemon would stop under the run, and the
+  run's end would kill the command before it loads the daemon again.
+- **A run restarts the daemon with `dotx service restart --when-idle`, never with a launchd job of its own** (item 441;
+  the shell tool's description tells the model so). A run that merged a change of Dot's own code wants the daemon
+  restarted once it has ended, and restarting at once would cut the run itself off. A run reaches launchctl only in
+  `yolo` or with `[shell] sandbox` off: the sandbox of the other modes keeps a run's commands from launchctl (see
+  [Safety](safety.md#safety)), and the run then says in its answer that the daemon needs `dotx service restart`. The
+  option loads a one-shot launchd job, `dev.dotagent.restart-when-idle` (its property list is in Dot's home:
+  `RunAtLoad`, no `KeepAlive`, `AbandonProcessGroup`), and returns at once. The job runs `python -P -m
+  dotagent.restart_when_idle`, which reads the database read-only every 5 seconds until no run is queued, running or
+  blocked (the run that asked included, so it has to end first, and a run that waits for an answer works too), then
+  restarts the daemon as `service restart` does, waits for the health check, writes what it did to `dotx.log`
+  (`restart_when_idle_waiting`, `_idle`, `_restarted`, `_gave_up` after 2 hours without a restart, `_failed`, `_crashed`
+  with a traceback), unloads itself and deletes its property list. Asking while one is on its way changes nothing
+  (replacing it could stop it between unloading the daemon's job and loading it again), so there is never more than one;
+  `service status` shows a `restart` line that says whether one waits, and `service uninstall` cancels it. A job that a
+  run made with `launchctl submit` is started again by launchd each time its script exits, which restarted the daemon
+  every 30 seconds for as long as no run worked (312 starts in one log).
 - The job runs **Dot.app** (item 288), a small app in Dot's home (`~/Library/Application Support/Dot/Dot.app`) whose
   program starts the daemon's Python and waits for it. macOS holds the program launchd starts responsible for all it
   starts, so its questions and System Settings name **Dot**, and Accessibility (it covers posting input events),

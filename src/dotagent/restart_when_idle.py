@@ -1,4 +1,4 @@
-"""The program of ``dotx service restart`` (item 441): restart the daemon at once, or once no run works.
+"""The program of ``dotx service restart --when-idle`` (item 441): wait until no run works, then restart the daemon.
 
 A run that merged a change of Dot's own code wants the daemon restarted once it has ended; restarting at once would cut
 the run itself off. ``dotx service restart --when-idle`` loads this program as a one-shot launchd job
@@ -9,9 +9,7 @@ no run works it restarts the daemon (:func:`dotagent.cli_daemon.restart_service`
 unloads its own job and deletes its property list whatever happened. After
 :data:`~dotagent.launchd.RESTART_WAIT_LIMIT_S` seconds it gives up without restarting. It writes what it did to
 ``dotx.log``: ``restart_when_idle_waiting``, ``restart_when_idle_idle``, ``restart_when_idle_restarted``,
-``restart_when_idle_gave_up``, ``restart_when_idle_failed`` and ``restart_when_idle_crashed``. ``dotx service restart``
-without the option loads the same job with ``now``: the restart is made at once, by launchd's job rather than by the
-``dotx`` that asked, so a ``dotx`` a run started and the run's end killed cannot leave the daemon unloaded halfway.
+``restart_when_idle_gave_up``, ``restart_when_idle_failed`` and ``restart_when_idle_crashed``.
 
 ``count_working_runs`` reads the database and ``wait_until_idle`` polls it; ``main`` is the job's entry point.
 """
@@ -32,7 +30,6 @@ from dotagent.core.paths import db_path, dot_home, ensure_layout, log_dir
 from dotagent.launchd import (
     RESTART_POLL_S,
     RESTART_WAIT_LIMIT_S,
-    RestartWhen,
     launch_agent_path,
     release_restart_job,
     restart_job_path,
@@ -100,30 +97,24 @@ async def wait_and_restart(database: Path, uid: int) -> int:
         log.warning("restart_when_idle_gave_up", waited_s=waited_s, runs_at_work=working)
         return 1
     log.info("restart_when_idle_idle", waited_s=waited_s)
-    await restart_now(uid)
-    return 0
-
-
-async def restart_now(uid: int) -> int:
-    """Restart the daemon at once and wait for it to answer (``dotx service restart``). Returns 0."""
     # The address is read now, not when the job was loaded: the configuration may have changed while it waited.
     config: AppConfig = load_user_config()
     health: HealthView = await restart_service(
         launch_agent_path(Path.home()), uid, health_url(config.server.host, config.server.port)
     )
-    log.info("restart_when_idle_restarted", version=health.version)
+    log.info("restart_when_idle_restarted", waited_s=waited_s, version=health.version)
     return 0
 
 
-async def run(uid: int, when: RestartWhen) -> int:
-    """Carry out the restart ``when`` asked, then unload this job: it ends here whatever happened, so that no job is
-    left that ``dotx service status`` would call a restart that waits. Returns the exit code, which is 0 when the
-    daemon was restarted, 1 when the time was up, 2 on an error of Dot's and 3 on any other (each logged, with its
-    traceback for the last: once the job unloads itself nothing else would show it)."""
+async def run(uid: int) -> int:
+    """Carry out the restart, then unload this job: it ends here whatever happened, so that no job is left that
+    ``dotx service status`` would call a restart that waits. Returns the exit code, which is 0 when the daemon was
+    restarted, 1 when the time was up, 2 on an error of Dot's and 3 on any other (each logged, with its traceback for
+    the last: once the job unloads itself nothing else would show it)."""
     plist: Path = restart_job_path(dot_home())
     code: int
     try:
-        code = await (restart_now(uid) if when == "now" else wait_and_restart(db_path(), uid))
+        code = await wait_and_restart(db_path(), uid)
     except DotError as exc:
         log.error("restart_when_idle_failed", error=exc.message, context=exc.context)
         code = 2
@@ -134,20 +125,11 @@ async def run(uid: int, when: RestartWhen) -> int:
     return code
 
 
-def _when_of(arguments: list[str]) -> RestartWhen:
-    """When the job restarts, as its property list says: ``now`` or ``idle`` (``launchd.restart_plist``)."""
-    if arguments == ["now"]:
-        return "now"
-    if arguments == ["idle"]:
-        return "idle"
-    raise ServiceError("the restart job names no time to restart: 'now' or 'idle'", {"arguments": " ".join(arguments)})
-
-
 def main() -> None:
     ensure_layout()
     configure_logging("info", False, log_dir() / "dotx.log")
     try:
-        code: int = asyncio.run(run(os.getuid(), _when_of(sys.argv[1:])))
+        code: int = asyncio.run(run(os.getuid()))
     except DotError as exc:
         log.error("restart_when_idle_failed", error=exc.message, context=exc.context)
         code = 2
