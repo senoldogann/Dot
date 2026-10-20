@@ -244,6 +244,12 @@ export function buildPresence() {
     element,
     strip,
     listen,
+    /** Paint the names again: the owner changed what Dot is called or what it calls them (item 420), maybe on
+     * another page a moment ago, whose save lands after this one was drawn. */
+    renamed: () => {
+      name.textContent = dotName();
+      paintGreeting(getSnapshot());
+    },
     dispose: () => {
       disposed = true;
       clearTimeout(moodTimer);
