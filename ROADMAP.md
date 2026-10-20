@@ -16011,6 +16011,21 @@ status `left`) is still not counted by the bell: it is in the home's list, and t
 pending approvals. Measured in `tests/smoke/test_approval_target.py`, which clicks the bell on a wide window and a phone
 and finds the card in the chat it opens; on the CSS before this change the page it opens is the home.
 
+### 445. A pasted text or a picture goes with no word typed
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-20: a message of files alone — a long text pasted, a
+screenshot pasted in — asked for words before it could go, and there was nothing to say. **As built.** The send of every
+composer (a run's, the home's, an agent's) takes what is in it: with words, those; with none and a file or a picture,
+`wordsForFiles` gives the run the line its files are worth — "See the attached file." for one, "See the attached files." for
+more — and the files go with it as any message's do (`messageText` in `attachments.js`, one rule for the three
+composers). An empty box with nothing in it still sends nothing, and `askForWords` and its toast are gone with the rule
+that raised them. A message of pictures alone still shows them, the line standing as the words of the message in the
+conversation.
+
+Tests: `tests/smoke/test_paste_as_file.py` — a long paste goes as a file and the home's Start opens the run with "See the
+attached file."; a picture pasted from the clipboard goes as one chip and the same, on a wide window and on a phone; and
+a text and a file together send as they did.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -16964,3 +16979,5 @@ and finds the card in the chat it opens; on the CSS before this change the page 
   recorded, and only a refusal (a research run's) stands; the secret fields it can fill it fills itself.
 - 2026-10-20 (Opus 5.5): item 444: the header's bell leads to the chat of the approval that waits longest — its card and
   its buttons there — and to the home only when nothing waits.
+- 2026-10-21 (Opus 5.5): item 445: a message of files alone goes — a pasted text, a picture — with the line the files are
+  worth as its goal, and no word typed; the composer of every page takes it.

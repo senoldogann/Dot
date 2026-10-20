@@ -1,8 +1,9 @@
 """A long text pasted into a message box goes as a file (item 269), on the pages of a served daemon in Chrome: a long
 Markdown text becomes `pasted-text-<time>.md` and a long plain one `pasted-text-<time>.txt`, each uploaded at once and
 nothing typed into the box, while a short paste is the box's own; a pasted file goes back into the box as text from its
-chip. A message is the owner's words: with only files, the send asks for them and starts nothing, and on a run at work
-it stays a send, never the Stop that an empty box makes it. The chip of the new chat's box opens the file in a dialog,
+chip. A message of files alone goes with no word typed (item 445): a long paste or a picture pasted in is the message,
+and the run it starts reads "See the attached file."; on a run at work a send with a file listed stays a send, never the
+Stop that an empty box makes it. The chip of the new chat's box opens the file in a dialog,
 the page having no panel beside a conversation: a Markdown file formatted, its HTML never drawn, and as it is written a
 click away. Wide and on a phone, light and dark. Before, a paste of any length went into the box as text.
 
@@ -55,6 +56,9 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (390, "light"),
     (390, "dark"),
 )
+
+# Enough replies for every run the tests start: the one at work, then one Start per shape.
+_REPLIES: int = 1 + 2 * len(_SHOTS)
 
 
 @pytest.fixture
@@ -162,12 +166,6 @@ async def _one_size(
     assert await box.input_value() == ""
     await page.screenshot(path=str(shots / f"chips-{width}-{scheme}.png"))
 
-    # A message is the owner's words: with only files, the send asks for them and starts nothing.
-    await page.get_by_role("button", name="Start").click()
-    await expect(page.locator(".toast", has_text="Say in a few words what to do with the files")).to_be_visible()
-    await expect(box).to_be_focused()
-    assert page.url.endswith("#/runs")
-
     # The plain one goes back into the box as text.
     await plain.get_by_role("button", name=re.compile(r"in the message as text$")).click()
     await expect(chips).to_have_count(1)
@@ -198,6 +196,14 @@ async def _one_size(
     await expect(dialog).to_have_count(0)
     await expect(opener).to_be_focused()
 
+    # Files alone are a message too (item 445): the send starts the run with no word typed, and what the run reads is
+    # the line the file is worth. The box goes back to empty first, the pasted text having been tried in it.
+    await box.fill("")
+    await expect(chips).to_have_count(1)
+    await page.get_by_role("button", name="Start").click()
+    await expect(page).to_have_url(re.compile(r"#/runs/run_"))
+    await expect(page.locator(".bubble.user")).to_contain_text("See the attached file.")
+
     # On a run at work an empty box makes the send its Stop; a long paste leaves the box empty and the send a send.
     await page.goto(f"{address}/#/runs/{working.id}")
     dock: Locator = page.locator(".dock .composer")
@@ -207,9 +213,9 @@ async def _one_size(
     await expect(dock.locator(".attach-chip")).to_have_class(re.compile(r"\bready\b"))
     await expect(send).not_to_have_attribute("aria-label", "Stop")
     await page.screenshot(path=str(shots / f"working-{width}-{scheme}.png"))
+    # Sent with no word typed, the pasted text goes: the dock clears and its file with it (item 445).
     await send.click()
-    await expect(page.locator(".toast", has_text="Say in a few words what to do with the files")).to_be_visible()
-    await expect(dock.locator(".attach-chip")).to_have_count(1)
+    await expect(dock.locator(".attach-chip")).to_have_count(0)
     await page.close()
 
 
@@ -217,7 +223,7 @@ async def test_a_long_paste_goes_as_a_file_that_opens_formatted(own_home: Path, 
     finish: ScriptedTurn = ScriptedTurn(
         text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
     )
-    model: HeldModel = HeldModel(ScriptedProvider(_PROVIDER, [finish]))
+    model: HeldModel = HeldModel(ScriptedProvider(_PROVIDER, [finish] * _REPLIES))
     async with _served(own_home, model) as (manager, address), async_playwright() as playwright:
         working: RunRecord = await manager.start(
             "Work while the page is read", "task", HELD, None, "test", None, None, "standard", None, "ask", False, ()
@@ -231,3 +237,47 @@ async def test_a_long_paste_goes_as_a_file_that_opens_formatted(own_home: Path, 
             model.release.set()
             async with asyncio.timeout(_RUN_WAIT_S):
                 await manager.wait(working.id)
+
+
+_PASTE_PICTURE: str = """async (box) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 8;
+  canvas.height = 8;
+  const blob = await new Promise((resolved) => canvas.toBlob(resolved, "image/png"));
+  const data = new DataTransfer();
+  data.items.add(new File([blob], "dot.png", { type: "image/png" }));
+  return !box.dispatchEvent(new ClipboardEvent("paste", { clipboardData: data, bubbles: true, cancelable: true }));
+}"""
+
+
+@pytest.mark.browser
+async def test_a_pasted_picture_goes_with_no_word_typed(own_home: Path) -> None:
+    """Item 445, the owner's word of 2026-10-20: a picture pasted into the box goes as the message, with no word typed —
+    on a phone and on a wide window — and the run reads the line the file is worth."""
+    finish: ScriptedTurn = ScriptedTurn(
+        text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
+    )
+    model: HeldModel = HeldModel(ScriptedProvider(_PROVIDER, [finish] * _REPLIES))
+    async with _served(own_home, model) as (_manager, address), async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel="chrome", headless=True)
+        try:
+            for width in (1280, 390):
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": 900}, color_scheme="dark", reduced_motion="reduce"
+                )
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs")
+                box: Locator = page.get_by_role("textbox", name="Goal")
+                assert await box.evaluate(_PASTE_PICTURE)
+                chips: Locator = page.locator(".composer .attach-chip")
+                await expect(chips).to_have_count(1)
+                await expect(chips.first).to_have_attribute("title", "dot.png")
+                # The picture is uploaded before the message may go: the chip says so while it is on its way.
+                await expect(chips.first).not_to_have_class(re.compile(r"\buploading\b"))
+                await page.get_by_role("button", name="Start").click()
+                await expect(page).to_have_url(re.compile(r"#/runs/run_"))
+                await expect(page.locator(".bubble.user")).to_contain_text("See the attached file.")
+                await page.close()
+        finally:
+            await browser.close()
+            model.release.set()
