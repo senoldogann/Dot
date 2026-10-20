@@ -273,7 +273,8 @@ does not follow the agent's later changes (remove it and add it again to take th
 it but never change it. Remove deletes that copy and nothing else. A server is added as a line of
 `<home>/added-servers.json` that names its agent and its name, with a fingerprint of its entry (a SHA-256 hash) and
 nothing it is started with; a run outside `yolo` may read that record but never change it. From Dot's next start
-(`dotx service restart` restarts the daemon; a run asks for `dotx service restart --when-idle`), Dot reads the entry from
+(`dotx service restart` restarts the daemon; a run in `yolo` asks for `dotx service restart --when-idle`), Dot reads the
+entry from
 that agent's file each time it starts and starts the server as the agent does, with its command, arguments and
 environment, or its URL and headers, under the name Dot gives it (lower case, `-` for `_` and spaces); its tools are offered and approved as those of an `[[mcp]]` server. An
 entry that changed after you added it is not started, and the page says so until you remove the server and add it again:

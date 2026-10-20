@@ -258,4 +258,4 @@ key saved there (a key from the environment or the Keychain is left alone). The 
 with the variable in its environment, which comes before a key saved in Dot. A saved or removed key is used from the
 next request of a run on, even in a run under way. The memory search (an OpenAI or ollama.com key) and the MCP servers
 read their keys when the daemon starts: after changing a key they use, restart the daemon (`dotx service restart`; a
-run asks for `dotx service restart --when-idle`, see [Daemon](daemon.md)).
+run in `yolo` asks for `dotx service restart --when-idle`, see [Daemon](daemon.md)).

@@ -48,14 +48,14 @@ LOGS: Path = Path("/h/Logs")
 
 
 def _job(environ: dict[str, str]) -> RestartJob:
-    return build_restart_job("/opt/dot/bin/python", HOME, LOGS, environ)
+    return build_restart_job("/opt/dot/bin/python", "idle", HOME, LOGS, environ)
 
 
 def test_the_job_runs_once_from_dots_home_and_launchd_never_starts_it_again() -> None:
     parsed: dict[str, object] = plistlib.loads(render_restart_job(_job({})))
     assert parsed["Label"] == RESTART_LABEL
     assert RESTART_LABEL != LABEL
-    assert parsed["ProgramArguments"] == ["/opt/dot/bin/python", "-P", "-m", RESTART_MODULE]
+    assert parsed["ProgramArguments"] == ["/opt/dot/bin/python", "-P", "-m", RESTART_MODULE, "idle"]
     assert parsed["RunAtLoad"] is True
     assert parsed["AbandonProcessGroup"] is True
     # A job with a KeepAlive is started again each time it exits: the improvised restart ran every 30 s.
@@ -79,7 +79,7 @@ def test_the_property_list_is_in_dots_home_and_names_a_module_that_exists() -> N
 
 def test_macos_accepts_the_property_list(tmp_path: Path) -> None:
     plist: Path = tmp_path / f"{RESTART_LABEL}.plist"
-    plist.write_bytes(render_restart_job(build_restart_job("/usr/bin/python3", tmp_path, tmp_path / "logs", {})))
+    plist.write_bytes(render_restart_job(build_restart_job("/usr/bin/python3", "now", tmp_path, tmp_path / "logs", {})))
     linted: subprocess.CompletedProcess[str] = subprocess.run(
         [PLUTIL, "-lint", str(plist)], capture_output=True, text=True, check=False
     )
@@ -303,7 +303,7 @@ async def test_the_program_waits_for_the_runs_restarts_the_daemon_once_and_unloa
         plist: Path = restart_job_path(dot_home())
         await install_restart_job(plist, b"<plist/>\n", UID)
         with capture_logs() as logs:
-            program: asyncio.Task[int] = asyncio.create_task(restart_when_idle.run(UID))
+            program: asyncio.Task[int] = asyncio.create_task(restart_when_idle.run(UID, "idle"))
             await asyncio.sleep(0.2)
             # The run that asked still works: the daemon is left alone.
             assert not program.done()
@@ -338,7 +338,7 @@ async def test_the_program_gives_up_without_restarting_when_a_run_still_works_at
         plist: Path = restart_job_path(dot_home())
         await install_restart_job(plist, b"<plist/>\n", UID)
         with capture_logs() as logs:
-            assert await asyncio.wait_for(restart_when_idle.run(UID), 30.0) == 1
+            assert await asyncio.wait_for(restart_when_idle.run(UID, "idle"), 30.0) == 1
         assert _events(logs) == [
             "restart_when_idle_waiting",
             "restart_when_idle_gave_up",
@@ -359,7 +359,7 @@ async def test_the_program_that_cannot_restart_the_daemon_says_so_and_still_unlo
         plist: Path = restart_job_path(dot_home())
         await install_restart_job(plist, b"<plist/>\n", UID)
         with capture_logs() as logs:
-            assert await asyncio.wait_for(restart_when_idle.run(UID), 30.0) == 2
+            assert await asyncio.wait_for(restart_when_idle.run(UID, "idle"), 30.0) == 2
         failed: list[MutableMapping[str, object]] = [
             entry for entry in logs if entry["event"] == "restart_when_idle_failed"
         ]
@@ -379,3 +379,32 @@ async def test_uninstall_cancels_the_restart_that_waits(tmp_path: Path, launchct
     assert await inspect_restart_job(UID) is None
     assert _read(plist) is None
     assert await cancel_restart_job(plist, UID) is False
+
+
+def test_the_program_reads_when_to_restart_from_its_arguments() -> None:
+    assert restart_when_idle._when_of(["now"]) == "now"
+    assert restart_when_idle._when_of(["idle"]) == "idle"
+    with pytest.raises(ServiceError):
+        restart_when_idle._when_of([])
+
+
+async def test_the_program_restarts_at_once_when_asked_now_and_unloads_itself(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, launchctl: Path
+) -> None:
+    """``dotx service restart`` hands the restart to launchd's job: the daemon is restarted even when runs work, and
+    the job unloads itself after it."""
+    server: asyncio.Server = await asyncio.start_server(_health, "127.0.0.1", 0)
+    store: Store = await _scratch_home(tmp_path, monkeypatch, server.sockets[0].getsockname()[1])
+    try:
+        await _run_in(store, "running", 1)
+        _load_the_daemons_job(launchctl)
+        plist: Path = restart_job_path(dot_home())
+        await install_restart_job(plist, b"<plist/>\n", UID)
+        assert await asyncio.wait_for(restart_when_idle.run(UID, "now"), 30.0) == 0
+        calls: list[str] = _calls(launchctl)
+        assert calls.count(f"bootout gui/{UID}/{LABEL}") == 1
+        assert calls[-1] == f"bootout gui/{UID}/{RESTART_LABEL}"
+        assert _read(plist) is None
+    finally:
+        server.close()
+        await store.close()
