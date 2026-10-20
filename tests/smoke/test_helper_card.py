@@ -35,6 +35,9 @@ TOKEN: str = "helper-card-token"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 # Long enough for every look below; the runs are cancelled long before.
 _WAIT_COMMAND: str = "sleep 300"
+# The card of the conversation's rows. The side panel's Agents tab has a card of its own (item 426), so the class alone
+# names two on a page that shows both.
+_CARD: str = ".timeline > .helper-card"
 _GOAL: str = "Scan the catalogue for the books that came back this week and list the ones still missing a shelf"
 _STEP_WAIT_S: float = 20.0
 _RUN_WAIT_S: float = 30.0
@@ -167,7 +170,7 @@ async def test_a_helpers_row_shows_its_card_on_a_rest_or_the_focus_wide_and_none
             for index, scheme in enumerate(_WIDE):
                 page: Page = await _open(browser, address, parent, 1280, scheme, False)
                 summary: Locator = page.locator("details.child > summary.child-row")
-                card: Locator = page.locator(".helper-card")
+                card: Locator = page.locator(_CARD)
                 await expect(card).to_be_hidden()
                 await summary.hover()
                 await expect(card).to_be_visible()
@@ -178,7 +181,7 @@ async def test_a_helpers_row_shows_its_card_on_a_rest_or_the_focus_wide_and_none
                 await expect(state).to_contain_text("Running · ")
                 await expect(state.locator(".status-ring")).to_have_class("status-ring s-running")
                 await expect(card.locator(".helper-card-label")).to_have_text("Now")
-                await expect(card.locator(".helper-card-action")).to_have_text(f"shell · {_WAIT_COMMAND}")
+                await expect(card.locator(".helper-card-action")).to_have_text(_WAIT_COMMAND)
                 card_id: str | None = await card.get_attribute("id")
                 assert card_id is not None
                 await expect(summary).to_have_attribute("aria-describedby", card_id)
@@ -217,7 +220,7 @@ async def test_a_helpers_row_shows_its_card_on_a_rest_or_the_focus_wide_and_none
                 summary = page.locator("details.child > summary.child-row")
                 await summary.hover()
                 await page.wait_for_timeout(1000)
-                await expect(page.locator(".helper-card")).to_be_hidden()
+                await expect(page.locator(_CARD)).to_be_hidden()
                 await summary.tap()
                 await expect(page.locator("details.child")).to_have_js_property("open", True)
                 await page.screenshot(path=str(tmp_path / f"card-390-{scheme}.png"))
@@ -229,11 +232,11 @@ async def test_a_helpers_row_shows_its_card_on_a_rest_or_the_focus_wide_and_none
             page = await _open(browser, address, parent, 1280, "light", False)
             summary = page.locator("details.child > summary.child-row")
             await summary.hover()
-            card = page.locator(".helper-card")
+            card = page.locator(_CARD)
             await expect(card).to_be_visible()
             await expect(card.locator(".helper-card-meta").nth(1)).to_contain_text("Stopped · ")
             await expect(card.locator(".helper-card-label")).to_have_text("Last")
-            await expect(card.locator(".helper-card-action")).to_have_text(f"shell · {_WAIT_COMMAND}")
+            await expect(card.locator(".helper-card-action")).to_have_text(_WAIT_COMMAND)
             await page.screenshot(path=str(tmp_path / "card-ended.png"))
             await page.close()
         finally:

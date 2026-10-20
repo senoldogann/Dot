@@ -162,6 +162,12 @@ def _system_prompt(request: ChatRequest) -> str:
     return next(message.content for message in request.messages if message.role == "system")
 
 
+def _handed(request: ChatRequest) -> str:
+    """Everything the model was handed: the instructions and the messages. A lesson recalled for a goal stands under
+    the goal, not in the instructions (item 404), so a test of what a run was told reads both."""
+    return "\n".join(message.content for message in request.messages)
+
+
 async def _finished(client: httpx.AsyncClient, manager: RunManager, body: dict[str, object]) -> str:
     """Start a run through the API with ``body`` and wait for its end; its id."""
     started = await client.post("/api/runs", json=body)
@@ -298,11 +304,13 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
     await asyncio.to_thread(write_playbook, playbooks_dir(), _skill(agent_id))
     MODEL.script = ScriptedProvider(_PROVIDER, [FINISH, FINISH])
     second_id: str = await _finished(client, manager, {"goal": "Find two sources on the matter", "agent_id": agent_id})
-    own_prompt: str = _system_prompt(MODEL.requests[-1])
-    assert LESSON in own_prompt and SKILL_NAME in own_prompt, own_prompt[-1500:]
+    own_handed: str = _handed(MODEL.requests[-1])
+    assert LESSON in own_handed and SKILL_NAME in own_handed, own_handed[-1500:]
+    # The lesson comes under the goal and the skill is listed in the instructions (item 404).
+    assert LESSON not in _system_prompt(MODEL.requests[-1]) and SKILL_NAME in _system_prompt(MODEL.requests[-1])
     dots_id: str = await _finished(client, manager, {"goal": "Find two sources on the matter"})
-    dots_prompt: str = _system_prompt(MODEL.requests[-1])
-    assert LESSON not in dots_prompt and SKILL_NAME not in dots_prompt, dots_prompt[-1500:]
+    dots_handed: str = _handed(MODEL.requests[-1])
+    assert LESSON not in dots_handed and SKILL_NAME not in dots_handed, dots_handed[-1500:]
     page = await client.get(f"/api/agents/{agent_id}")
     learned = page.json()["learned"]
     assert [lesson["content"] for lesson in learned["lessons"]] == [LESSON]
@@ -321,7 +329,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
     assert shared.status_code == 200 and shared.json()["items"][0]["shared"] is True, shared.text
     MODEL.script = ScriptedProvider(_PROVIDER, [FINISH])
     await _finished(client, manager, {"goal": "Find two sources on the matter"})
-    assert SKILL_NAME in _system_prompt(MODEL.requests[-1]) and LESSON not in _system_prompt(MODEL.requests[-1])
+    assert SKILL_NAME in _system_prompt(MODEL.requests[-1]) and LESSON not in _handed(MODEL.requests[-1])
 
     host: str = client.base_url.host
     port: int | None = client.base_url.port

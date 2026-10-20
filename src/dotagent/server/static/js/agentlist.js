@@ -7,7 +7,7 @@ import { actorFace } from "./actors.js";
 import { api } from "./api.js";
 import { clip, duration, el, modelName, setText } from "./dom.js";
 import { faceState } from "./face.js";
-import { actionLine, stateWord } from "./helpercard.js";
+import { actionLine, helperCard, stateWord } from "./helpercard.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
 import { providerMark, providerOf } from "./providers.js";
@@ -40,6 +40,8 @@ export function agentList({ threadId, helper }) {
   const more = el("button", { class: "btn ghost sm agent-more", type: "button", hidden: true, onclick: () => expand() });
   const empty = el("p", { class: "hint", hidden: true }, "When Dot hands part of the work to a helper, the helper shows here.");
   const section = panelSection({ id: "run-agents", title: "Previous agents", actions: null, body: el("div", { class: "stack tight" }, empty, rows, more) });
+  // The card a row shows when the pointer rests on it or the focus comes to it, as in the conversation (item 226).
+  const card = helperCard(section.element);
   let runs = [];
   let expanded = false;
   // The time and the last line of each row whose agent works, to count on.
@@ -53,9 +55,9 @@ export function agentList({ threadId, helper }) {
     if (run.finished_at === null) {
       working.push({ run, time, doing });
     }
-    return el(
+    const link = el(
       "a",
-      { class: "agent-row", href: `#/runs/${run.id}`, title: run.goal },
+      { class: "agent-row", href: `#/runs/${run.id}` },
       el("span", { class: "child-face" }, actorFace(run.agent_id ?? run.id, faceState(run.status), null), ring),
       el(
         "span",
@@ -73,9 +75,30 @@ export function agentList({ threadId, helper }) {
       time,
       el("span", { class: "chev" }, icon("chevron")),
     );
+    const known = cardHelper(run);
+    card.attach(link, known, () => actorFace(run.agent_id ?? run.id, faceState(known.status), null));
+    return link;
+  }
+
+  /** What the card tells of `run`: what the conversation keeps of it when it shows it, else what the list read. */
+  function cardHelper(run) {
+    return (
+      helper(run.id) ?? {
+        goal: run.goal ?? "",
+        model: run.model ?? null,
+        effort: run.effort ?? null,
+        speed: run.speed ?? "standard",
+        status: run.status,
+        began: run.created_at,
+        ended: run.finished_at ?? null,
+        action: null,
+        calls: 0,
+      }
+    );
   }
 
   function paint() {
+    card.hide();
     const now = Date.now() / 1000;
     working = [];
     const shown = expanded ? runs : runs.slice(0, FIRST_ROWS);
@@ -114,6 +137,7 @@ export function agentList({ threadId, helper }) {
       setText(time, took(run, now));
       setText(doing, doingWords(helper(run.id)));
     }
+    card.refresh(now);
   }
 
   return { element: section.element, refresh, fail, tick };

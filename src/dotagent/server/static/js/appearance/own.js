@@ -12,6 +12,7 @@ import { THEMES, findTheme, forgetTheme, setOwnThemes } from "../theme.js";
 import { mix, parseColour, toHex } from "./colour.js";
 import { THEME_ROLES, vividPalette } from "./generator.js";
 import { PALETTES } from "./palettes.js";
+import { MORE_PALETTES } from "./palettes-more.js";
 import { lookTokens, paletteTokens } from "./tokens.js";
 import { isVsCodeTheme, vsCodeThemeFile } from "./vscode.js";
 
@@ -204,7 +205,7 @@ export function copiedRoles(theme, scheme) {
   if (theme.own) {
     return rolesOf(theme.file, scheme);
   }
-  return theme.look ? lookRoles(lookTokens(theme.id, scheme)) : opaque(PALETTES[theme.id][scheme]);
+  return theme.look ? lookRoles(lookTokens(theme.id, scheme)) : opaque((PALETTES[theme.id] ?? MORE_PALETTES[theme.id])[scheme]);
 }
 
 // A theme of one's own as the gallery and the page take a theme (theme.js).

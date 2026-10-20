@@ -11,6 +11,7 @@
 // (previewTokens) and the picks come back after (endPreview).
 
 import { PALETTES } from "./appearance/palettes.js";
+import { MORE_PALETTES, MORE_THEMES } from "./appearance/palettes-more.js";
 import { THEME_TOKENS, lookTokens, paletteTokens, pairedTokens } from "./appearance/tokens.js";
 import { readPref, removePref, writePref } from "./prefs.js";
 
@@ -18,6 +19,8 @@ import { readPref, removePref, writePref } from "./prefs.js";
 // for, the layout it starts with, its tokens for a scheme, and the three colours its orb is drawn with
 // (appearance/orbs.js): the page, the accent and the action.
 const BOTH = ["light", "dark"];
+// The palettes of palettes.js and Dot's more of palettes-more.js, by id.
+const ALL_PALETTES = { ...PALETTES, ...MORE_PALETTES };
 
 function look(id, label, hint, foldSteps) {
   const orb = (scheme) => {
@@ -30,10 +33,10 @@ function look(id, label, hint, foldSteps) {
 
 function palette(id, label, hint) {
   const orb = (scheme) => {
-    const roles = PALETTES[id][scheme];
+    const roles = ALL_PALETTES[id][scheme];
     return { canvas: roles.canvas, accent: roles.accent, action: roles.messageAction };
   };
-  const tokens = (scheme) => paletteTokens(PALETTES[id][scheme]);
+  const tokens = (scheme) => paletteTokens(ALL_PALETTES[id][scheme]);
   return { id, label, hint, look: false, own: false, schemes: BOTH, foldSteps: true, inspector: false, tokens, orb };
 }
 
@@ -47,6 +50,7 @@ export const THEMES = [
   palette("ocean", "Ocean", "Cool greys and a teal accent."),
   palette("ember", "Ember", "Warm stone and a rust accent."),
   palette("iris", "Iris", "Lavender greys and a magenta accent."),
+  ...MORE_THEMES.map(([id, label, hint]) => palette(id, label, hint)),
 ];
 
 export const SCHEMES = [

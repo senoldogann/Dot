@@ -1123,7 +1123,8 @@ class McpServerView(FrozenModel):
     the only place that removes one. ``address`` is its URL or its command. ``state``: its tools are offered to runs
     (``ready``, with ``tools``, their names on the server), it was left out (``error`` says why), it is switched off
     in the config, or Dot tries it now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``:
-    Dot signs in to it with the owner's account, and Sign in again renews that."""
+    Dot signs in to it with the owner's account, and Sign in again renews that. ``picks_tools``: it was left out for
+    offering too many tools, and the owner chooses those to offer on the page (``allow``)."""
 
     name: str
     origin: McpOrigin
@@ -1135,6 +1136,30 @@ class McpServerView(FrozenModel):
     link: str | None
     signs_in: bool
     logo: str | None
+    picks_tools: bool
+
+
+class McpOfferedTool(FrozenModel):
+    """A tool an MCP server lists: its name on the server and what it says it does."""
+
+    name: str
+    description: str
+
+
+class McpOfferedView(FrozenModel):
+    """``GET /mcp/servers/{name}/offered``: every tool the server lists, those its allow list names, and how many the
+    model may get from it."""
+
+    server: str
+    tools: tuple[McpOfferedTool, ...]
+    allow: tuple[str, ...]
+    limit: int
+
+
+class McpAllow(FrozenModel):
+    """``PUT /mcp/servers/{name}/allow``: the tools of the server to offer to the model, by their names on it."""
+
+    tools: tuple[str, ...]
 
 
 class ServiceSecretView(FrozenModel):

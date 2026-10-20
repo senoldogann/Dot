@@ -1031,12 +1031,6 @@
 }
 
 /* The themes: a card each, a button over the whole card for both schemes and an orb for each scheme above it. */
-.theme-gallery {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
-  gap: var(--space-3);
-}
-
 .theme-card {
   position: relative;
   display: flex;
@@ -1266,10 +1260,6 @@
     gap: var(--space-2);
   }
 
-  .theme-gallery {
-    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  }
-
   .theme-editor {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -1378,10 +1368,6 @@
   .wire-composer {
     inset: auto 10% 6%;
     height: 10%;
-  }
-
-  .theme-gallery {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .theme-orbs {
@@ -1811,4 +1797,39 @@
 
 .harness-facts dd {
   margin: 0;
+}
+
+/* The themes on one line (item 126): a strip that scrolls sideways, each card snapping into place. */
+.theme-gallery {
+  position: relative;
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-snap-type: x mandatory;
+  scroll-padding-inline: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-3);
+  scrollbar-width: thin;
+}
+
+.theme-gallery[data-dragging] {
+  cursor: grabbing;
+  scroll-snap-type: none;
+  user-select: none;
+}
+
+.theme-gallery > .theme-card {
+  flex: 0 0 156px;
+  scroll-snap-align: center;
+}
+
+.theme-card:has(.theme-card-pick[aria-pressed="true"]) {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+@media (max-width: 640px) {
+  .theme-gallery > .theme-card {
+    flex-basis: 132px;
+  }
 }

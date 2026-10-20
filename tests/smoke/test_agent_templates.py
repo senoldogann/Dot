@@ -1,4 +1,4 @@
-"""Templates and agent files (item 315, after Grok's): each of the nine templates becomes an agent in one click, with
+"""Templates and agent files (item 315, after Grok's): each of the templates becomes an agent in one click, with
 the template's role, instructions, tools and face; an agent's page saves it as a file that holds its profile and
 nothing else, and refuses to while its words hold what looks like a key; Import in another home makes the same agent,
 and refuses a file that names tools that home lacks, saying which. Two real daemons, one home after the other, in
@@ -60,9 +60,13 @@ async def login_env() -> dict[str, str]:
 
 
 @asynccontextmanager
-async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, str]]:
-    """The daemon in the home of the environment, served at the address it yields."""
-    runtime: Runtime = await open_runtime(eval_config(load_default_config()), login_env)
+async def _daemon(login_env: dict[str, str], *, desktop: bool = True) -> AsyncIterator[tuple[Runtime, str]]:
+    """The daemon in the home of the environment, served at the address it yields. ``desktop`` says whether the Mac's
+    own tools are registered, which ``[desktop] enabled`` in the configuration turns off; the eval configuration leaves
+    them off (425)."""
+    config = eval_config(load_default_config())
+    config = config.model_copy(update={"desktop": config.desktop.model_copy(update={"enabled": desktop})})
+    runtime: Runtime = await open_runtime(config, login_env)
     try:
         await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, []))
         manager: RunManager = RunManager(runtime)
@@ -134,6 +138,31 @@ async def _overflow(page: Page) -> int:
 
 
 @pytest.mark.browser
+async def test_a_home_that_cannot_list_its_tools_says_so_on_the_cards_and_marks_nothing_it_does_not_know(
+    login_env: dict[str, str],
+) -> None:
+    """When ``GET /api/tools`` fails the cards cannot tell which tools this home lacks. They say that, above the
+    templates, instead of listing every name as if it were available (item 425)."""
+    with scratch_home() as home, eval_environment(home, {}):
+        async with _daemon(login_env, desktop=False) as (runtime, address), async_playwright() as playwright:
+            browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.route("**/api/tools", lambda route: route.fulfill(status=500, body="no"))
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/agents")
+                await expect(page.locator(".template-card")).to_have_count(len(TEMPLATES))
+                notice = page.locator("[data-templates-tools-unknown]")
+                await expect(notice).to_contain_text("could not be listed")
+                # No card claims a tool is missing, and the notice is the one place that says why.
+                chief = page.locator('.template-card[data-template="chief-of-staff"]')
+                await chief.locator(".template-tools > summary").click()
+                await expect(chief.locator(".template-tool-chips .chip.missing")).to_have_count(0)
+                await page.close()
+            finally:
+                await browser.close()
+
+
 async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_the_same_agent_in_another_home(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
@@ -149,6 +178,16 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await expect(cards.locator(".template-name")).to_have_text([template.name for template in TEMPLATES])
                 await expect(cards.locator(".template-role")).to_have_text([template.role for template in TEMPLATES])
                 await expect(cards.locator(".avatar")).to_have_count(len(TEMPLATES))
+                # Every card names the tools its agent may use (item 425): the count on the card, the names a click
+                # below it, so that no click makes an agent with every tool by surprise.
+                await expect(cards.locator(".template-tools > summary")).to_have_text(
+                    [f"Tools ({len(template.tools)})" for template in TEMPLATES]
+                )
+                first: Locator = cards.first
+                await first.locator(".template-tools > summary").click()
+                await expect(first.locator(".template-tool-chips code")).to_have_text(list(TEMPLATES[0].tools))
+                # Every tool the fourteen name is a tool this home has, so no chip is marked missing.
+                await expect(cards.locator(".template-tool-chips .chip.missing")).to_have_count(0)
                 await page.screenshot(path=tmp_path / "templates-1280-light.png", full_page=True)
                 phone: Page = await _open(browser, address, "/agents", 390, "dark")
                 await expect(phone.locator(".template-card")).to_have_count(len(TEMPLATES))
@@ -186,15 +225,19 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                         "tools": list(template.tools),
                         "look": template.look.model_dump(mode="json"),
                     }
-                # Every template drafts what it writes to a person (item 314); one that works on the web and in files
-                # has no tool that drives Mail, Messages or a terminal.
+                # Every template names the tools its agent may use (item 425), and drafts what it writes to a person
+                # (item 314): none starts with every tool, and one that works on the web and in files alone names no
+                # tool that drives Mail, Messages or a terminal.
+                assert all(template.tools for template in TEMPLATES), "a template names its tools"
                 assert all("draft_message" in template.instructions for template in TEMPLATES)
-                bounded: list[str] = [template.id for template in TEMPLATES if template.tools]
-                assert bounded == ["sales-outbound", "talent-scout", "paid-media", "product-performance"]
-                for template in TEMPLATES:
-                    if template.tools:
-                        assert "draft_message" in template.tools, template.id
-                        assert not DRIVERS & set(template.tools), template.id
+                assert all("draft_message" in template.tools for template in TEMPLATES)
+                assert [template.id for template in TEMPLATES if DRIVERS & set(template.tools)] == [
+                    "expense-manager",
+                    "bug-reproduction",
+                    "account-health",
+                    "chief-of-staff",
+                    "reviewer",
+                ]
                 outbound: AgentRecord = await runtime.store.get_agent(made["sales-outbound"])
 
                 # The owner sets its bounds, then saves it as a file from its page.
@@ -275,11 +318,17 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
     await asyncio.to_thread(broken.write_text, "not an agent", encoding="utf-8")
 
     with scratch_home() as home, eval_environment(home, {}):
-        async with _daemon(login_env) as (runtime, address), async_playwright() as playwright:
+        async with _daemon(login_env, desktop=False) as (runtime, address), async_playwright() as playwright:
             browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
                 phone = await _open(browser, address, "/agents", 390, "dark")
                 await expect(phone.locator(".template-card")).to_have_count(len(TEMPLATES))
+                # A tool this home does not have is marked on the card before the click that would be refused (item
+                # 425): here the Mac's own tools are off, so the AppleScript three templates name is struck through.
+                chief: Locator = phone.locator('.template-card[data-template="chief-of-staff"]')
+                await chief.locator(".template-tools > summary").click()
+                await expect(chief.locator(".template-tool-chips .chip.missing")).to_have_text(["apple_script"])
+                await expect(phone.locator(".template-card").first.locator(".chip.missing")).to_have_count(0)
                 await _import(phone, broken)
                 await expect(_toast(phone, "error", "broken.json is not an agent file")).to_be_visible()
                 await _import(phone, stranger)

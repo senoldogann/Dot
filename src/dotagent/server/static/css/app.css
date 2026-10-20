@@ -7033,6 +7033,40 @@ button.attach-chip:hover {
   align-self: flex-start;
 }
 
+/* A template's tools (item 425): the count under the facts, and the names themselves, wrapped, a click below it, so
+   that a card keeps its height while the list stays in reach. */
+.template-tools {
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.template-tools > summary {
+  width: max-content;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.template-tools[open] > summary {
+  margin-bottom: var(--space-1);
+}
+
+.template-tool-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  /* A card stays as tall as its row while the names, when the list is open, scroll inside it. */
+  max-height: 11rem;
+  overflow: auto;
+}
+
+/* A tool this home does not have (item 425): struck through and in the warning colour, since a template that names it
+   is refused on use, and the owner should see that before the click. */
+.template-tool-chips .chip.missing {
+  border-color: var(--warn);
+  color: var(--warn);
+  text-decoration: line-through;
+}
+
 /* A template's card on a phone (item 373): the way to use it stands at the card's top right, "Use" in a thumb's box,
    and the facts read under it — the card is half as tall as it was and the list is a list again. */
 .template-use .use-short {
@@ -7049,7 +7083,8 @@ button.attach-chip:hover {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "head use"
-      "facts facts";
+      "facts facts"
+      "tools tools";
     align-items: start;
     gap: var(--space-2);
     padding: var(--space-3);
@@ -7061,6 +7096,10 @@ button.attach-chip:hover {
 
   .template-card > .template-facts {
     grid-area: facts;
+  }
+
+  .template-card > .template-tools {
+    grid-area: tools;
   }
 
   .template-card > .btn.template-use {

@@ -214,7 +214,7 @@ async def test_a_phones_run_page_and_list_of_chats_are_laid_out_for_a_phone(own_
                     await expect(rows).to_have_count(len(_HELPERS))
                     await expect(rows.locator(".agent-state")).to_have_text(["Running"] * len(_HELPERS))
                     await expect(rows.locator(".agent-model")).to_have_text(["scripted"] * len(_HELPERS))
-                    await expect(rows.locator(".agent-doing")).to_have_text(["Now: shell · sleep 600"] * len(_HELPERS))
+                    await expect(rows.locator(".agent-doing")).to_have_text(["Now: sleep 600"] * len(_HELPERS))
                     await page.screenshot(path=str(tmp_path / f"sheet-{scheme}.png"))
                     # A drag of its head down closes it.
                     head: FloatRect = await _box(sheet.locator(".inspector-head"))

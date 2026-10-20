@@ -16498,3 +16498,20 @@ providers stood in for, after a real sign-in into a keychain of the test's own: 
 - 2026-10-20 (Opus 5.5): item 424 on `mail-and-calendar` from `main`: `mail_search`, `mail_read` and
   `calendar_events` read the mail and calendars of the accounts signed in, through Gmail's, Google Calendar's and
   Microsoft Graph's own APIs.
+- 2026-10-20 (Opus 5.5): item 425 on `integrate-agent-work` from `main`, on the owner's word of 2026-10-19: five
+  templates from Grok Bot's marketplace (Research Desk, Competitor Watch, Release QA, Copy Editor, Design Critic)
+  beside Dot's nine, and every template names the tools its agent may use, never every tool. The card counts them
+  under Tools and lists the names a click below it, and a tool this home lacks (its group off in the configuration, an
+  app not here) is struck through before the click that would be refused.
+- 2026-10-20 (Opus 5.5): item 426 on `integrate-agent-work` from `main`: what another agent left uncommitted in the
+  owner's checkout, taken over on the current `main` and checked. Agents list rows show the helper card; the agent's
+  page is laid out as the home with the new chat's mode, model and reasoning pickers; a server of too many tools gets a
+  list to choose from on the Plugins page; six more palettes with the themes on one strip; a run opened again draws at
+  once from what the page kept; the Screenshots section of the right panel folds; a page a run showed stands in its turn
+  of the conversation's history. Left out because `main`'s item 414 has SnapShots in another form or because they risked
+  the owner's files: a second SnapShots, the prune of attachments, the removal of a call's risk badge, the Tauri window
+  rights. Found and fixed on the way: the six new palettes were not reserved ids, so a theme file of one's own could
+  hide behind a built-in; an agent's box started from the choices this browser had made for the home, so an agent bound
+  to ask could be sent with yolo; a server left out for too many tools could not be chosen from until the daemon
+  restarted, and a choice that could not connect was kept anyway; the template cards hid a failing tool list. The
+  agent's box shares fast mode and goal mode with the home's, as the pickers always did.

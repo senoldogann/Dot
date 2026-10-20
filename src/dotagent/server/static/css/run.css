@@ -1881,3 +1881,17 @@ dialog.computer-full::backdrop {
     font-size: var(--text-sm);
   }
 }
+
+/* The screenshots section folds away from its title. */
+.panel-section-title > .panel-fold-toggle {
+  flex: none;
+  margin: -4px 0 -4px -8px;
+  padding: 4px 8px;
+  color: inherit;
+  font: inherit;
+  font-weight: var(--weight-label);
+}
+
+.panel-fold[data-open="false"] .panel-section-head {
+  padding-bottom: 12px;
+}

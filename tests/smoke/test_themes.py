@@ -28,7 +28,22 @@ pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
 TOKEN: str = "themes-test-token"
 Scheme = Literal["light", "dark"]
-_THEMES: tuple[str, ...] = ("neutral", "paper", "clean", "rose", "grove", "ocean", "ember", "iris")
+_THEMES: tuple[str, ...] = (
+    "neutral",
+    "paper",
+    "clean",
+    "rose",
+    "grove",
+    "ocean",
+    "ember",
+    "iris",
+    "midnight",
+    "nord",
+    "solarized",
+    "sepia",
+    "forest",
+    "contrast",
+)
 _SCHEMES: tuple[Scheme, ...] = ("light", "dark")
 # Dot's contrast rule, as tests/unit/test_css_tokens.py holds the looks of themes.css to it.
 _SURFACES: tuple[str, ...] = ("--bg", "--sidebar", "--surface", "--surface-2", "--surface-3")

@@ -27,14 +27,18 @@ from dotagent.core.logs import get_logger
 from dotagent.core.paths import connected_servers_path, env_file_path
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_connected, read_connected
-from dotagent.mcp.hub import McpHub
+from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, McpHub
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
+from dotagent.mcp.types import McpFailure
 from dotagent.oauth.accounts import CameBack
 from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import origin_is_local
 from dotagent.server.views import (
+    McpAllow,
+    McpOfferedTool,
+    McpOfferedView,
     McpOrigin,
     McpReconnect,
     McpServerAdd,
@@ -76,6 +80,8 @@ class _Try:
     task: asyncio.Task[None] | None
     link: str | None
     error: str | None
+    # The try failed because the server offers more tools than Dot hands a model at once: the owner can choose some.
+    too_many: bool = False
 
     def running(self) -> bool:
         return self.task is not None and not self.task.done()
@@ -182,6 +188,20 @@ def requested_server(body: McpServerAdd) -> McpServerConfig:
         raise ConfigError("the command line cannot be read", {"address": address, "error": str(error)}) from error
 
 
+def chosen_tools(wanted: tuple[str, ...], offered: tuple[str, ...]) -> list[str]:
+    """The allow list for the tools ``wanted`` of a server that lists ``offered``: each once, in the server's order.
+    Raises ConfigError for none, more than ``MAX_UNFILTERED_TOOLS``, or a name the server does not list."""
+    picked: set[str] = set(wanted)
+    missing: list[JsonValue] = [name for name in sorted(picked - set(offered))]
+    if missing:
+        raise ConfigError("the MCP server does not offer these tools", {"missing": missing})
+    if not picked or len(picked) > MAX_UNFILTERED_TOOLS:
+        raise ConfigError(
+            f"choose between 1 and {MAX_UNFILTERED_TOOLS} tools", {"chosen": len(picked), "limit": MAX_UNFILTERED_TOOLS}
+        )
+    return [name for name in offered if name in picked]
+
+
 def mcp_router(ctx: ServerContext) -> APIRouter:
     router: APIRouter = APIRouter()
     hub: McpHub = ctx.runtime.mcp
@@ -217,7 +237,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
 
     def view(config: McpServerConfig, origin: McpOrigin) -> McpServerView:
         attempt: _Try | None = tries.get(config.name)
-        failure: str | None = next((one.error for one in hub.failures if one.server == config.name), None)
+        left: McpFailure | None = next((one for one in hub.failures if one.server == config.name), None)
+        failure: str | None = None if left is None else left.error
         state: McpServerState
         error: str | None = None
         if attempt is not None and attempt.running():
@@ -244,6 +265,9 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             error=error,
             link=attempt.link if attempt is not None and attempt.running() else None,
             signs_in=config.oauth,
+            picks_tools=state == "left_out"
+            and not config.allow
+            and ((attempt is not None and attempt.too_many) or (left is not None and "limit" in left.detail)),
         )
 
     async def listing() -> McpServersView:
@@ -307,6 +331,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             log.info("mcp_server_added", server=config.name, origin=attempt.origin, signs_in=signs)
         except DotError as error:
             attempt.error = error.message
+            attempt.too_many = "limit" in error.context and not config.allow
             log.warning("mcp_server_not_added", server=config.name, error=error.message, context=error.context)
         except Exception as error:
             # Not one of Dot's own errors: a fault in Dot or in the MCP library, as the hub reports it.
@@ -371,6 +396,48 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
                 "this MCP server is set up elsewhere; connect it again there", {"server": name, "set_up": origin}
             )
         return await start(config, origin, page)
+
+    async def chosen_server(name: str) -> McpServerConfig:
+        """The server ``name`` whose tools the owner chooses on the page: one added there (Dot's config keeps its own
+        ``allow``)."""
+        found: tuple[McpServerConfig, McpOrigin] | None = (await everything()).get(name)
+        if found is None:
+            raise NotFoundError("Dot has no MCP server of this name", {"server": name})
+        if found[1] != "connected":
+            raise RunConflict(
+                "this MCP server is set up elsewhere; choose its tools with `allow` there",
+                {"server": name, "set_up": found[1]},
+            )
+        return found[0]
+
+    @router.get("/api/mcp/servers/{name}/offered")
+    async def offered_tools(name: str) -> McpOfferedView:
+        """Every tool the server ``name`` lists, to choose those the model gets from it."""
+        config: McpServerConfig = await chosen_server(name)
+        tools = await hub.offered(config)
+        return McpOfferedView(
+            server=name,
+            tools=tuple(McpOfferedTool(name=tool.remote_name, description=tool.description) for tool in tools),
+            allow=tuple(config.allow),
+            limit=MAX_UNFILTERED_TOOLS,
+        )
+
+    @router.put("/api/mcp/servers/{name}/allow")
+    async def choose_tools(name: str, body: McpAllow) -> McpServerView:
+        """Keep the tools chosen as the server's allow list and connect it again with them: they are offered to the
+        runs that start after."""
+        config: McpServerConfig = await chosen_server(name)
+        offered: tuple[str, ...] = tuple(tool.remote_name for tool in await hub.offered(config))
+        kept: McpServerConfig = config.model_copy(update={"allow": chosen_tools(body.tools, offered)})
+        # Connected first, kept after: a server that does not answer now leaves the choice unwritten, so the owner may
+        # choose again, where a kept allow list would take the choice away from the page.
+        await hub.connect(kept)
+        await asyncio.to_thread(keep_connected, connected_servers_path(), kept)
+        refresh_mcp_tools(ctx.runtime.registry, hub)
+        # The try that failed for too many tools is over: the server is kept now, with its choice.
+        tries.pop(name, None)
+        log.info("mcp_tools_chosen", server=name, tools=len(kept.allow))
+        return view(kept, "connected")
 
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:

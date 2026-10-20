@@ -69,6 +69,11 @@ The ways a service connects:
   out with words that bring you back here (**Sign in again**). **Remove** takes a server added here out, with its tools
   and its sign-in; one set up elsewhere is removed there.
 
+**Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
+its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
+tick 1 to 30. **Save** connects the server with those and keeps the choice with it, so a restart offers the same ones; a
+server that does not answer leaves the choice unwritten and the button stays.
+
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
 command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
 has from its config, a plugin or another agent (Customize › Skills › Found on this Mac), with **Ready** and its tools,
@@ -142,8 +147,8 @@ and shows the tools each offers, or why one does not start. Only tools are used 
 A server at a URL may
 sign in as MCP's authorization asks (OAuth): `oauth = true` has
 Dot send the token it keeps for it, which **Sign in again** on [Customize › Plugins](#customize--plugins) gets, and the servers added
-there sign in by themselves. The tool list is read when Dot starts and when a server is added or removed on the Plugins
-page, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
+there sign in by themselves. The tool list is read when Dot starts and when a server is added, removed or has its tools
+chosen on the Plugins page, for the runs that start after; a server that dies is started again by the next call. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,
 or the input schema of one of its tools cannot be handed to a model: a reference that leads nowhere, or a tree whose
 nodes hold nodes, which `allow` can leave out) is left out, and Dot starts without its tools: Settings › System names it

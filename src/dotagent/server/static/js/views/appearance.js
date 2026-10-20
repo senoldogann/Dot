@@ -193,6 +193,85 @@ function themeCard(theme, handlers) {
   return { element, paint };
 }
 
+// How far a mouse drags the strip before a press counts as a drag and not a click on a card.
+const DRAG_SLOP = 5;
+
+/**
+ * The themes on one line (item 126): a strip that scrolls sideways by swipe, trackpad, a mouse's wheel or drag and the
+ * arrow keys, each card snapping into place; the card in use is scrolled into view when the strip is drawn.
+ */
+function themeStrip(cards) {
+  const strip = el("div", { class: "theme-gallery", role: "group", "aria-label": "Themes" }, ...cards.map((card) => card.element));
+  // A mouse drags the strip; a touch and a trackpad scroll it natively.
+  let drag = null;
+  strip.addEventListener("pointerdown", (event) => {
+    if (event.pointerType === "mouse" && event.button === 0) {
+      drag = { x: event.clientX, left: strip.scrollLeft, moved: false };
+    }
+  });
+  strip.addEventListener("pointermove", (event) => {
+    if (drag === null) {
+      return;
+    }
+    const delta = event.clientX - drag.x;
+    if (!drag.moved && Math.abs(delta) > DRAG_SLOP) {
+      drag.moved = true;
+      strip.setPointerCapture(event.pointerId);
+      strip.toggleAttribute("data-dragging", true);
+    }
+    if (drag.moved) {
+      strip.scrollLeft = drag.left - delta;
+    }
+  });
+  const release = () => {
+    if (drag?.moved) {
+      // The click that ends a drag picks nothing.
+      strip.addEventListener("click", (event) => event.stopPropagation(), { capture: true, once: true });
+      setTimeout(() => strip.removeAttribute("data-dragging"), 0);
+    }
+    drag = null;
+  };
+  strip.addEventListener("pointerup", release);
+  strip.addEventListener("pointercancel", release);
+  // A mouse's wheel scrolls the strip sideways with Shift held; without it the page scrolls on, and a trackpad's
+  // sideways swipe scrolls the strip natively.
+  strip.addEventListener(
+    "wheel",
+    (event) => {
+      if (event.shiftKey && event.deltaX === 0 && event.deltaY !== 0 && strip.scrollWidth > strip.clientWidth) {
+        strip.scrollLeft += event.deltaY;
+        event.preventDefault();
+      }
+    },
+    { passive: false },
+  );
+  // The arrow keys move from card to card.
+  strip.addEventListener("keydown", (event) => {
+    const step = { ArrowLeft: -1, ArrowRight: 1, Home: -Infinity, End: Infinity }[event.key];
+    const picks = [...strip.querySelectorAll(".theme-card-pick")];
+    const at = picks.indexOf(document.activeElement);
+    if (step === undefined || at === -1) {
+      return;
+    }
+    event.preventDefault();
+    const next = picks[Math.min(picks.length - 1, Math.max(0, at + step))];
+    next.focus({ preventScroll: true });
+    centre(strip, next.closest(".theme-card"));
+  });
+  requestAnimationFrame(() => {
+    const inUse = strip.querySelector(".theme-card[data-in-use]");
+    if (inUse !== null) {
+      centre(strip, inUse, "instant");
+    }
+  });
+  return strip;
+}
+
+// Scroll `strip` sideways so that `card` sits in its middle, without moving the page.
+function centre(strip, card, behavior = "smooth") {
+  strip.scrollTo({ left: card.offsetLeft - (strip.clientWidth - card.offsetWidth) / 2, behavior });
+}
+
 // Hand a theme's file to the browser to download as `<id>.json`.
 function download(theme) {
   const url = URL.createObjectURL(new Blob([exportedText(theme)], { type: "application/json" }));
@@ -273,7 +352,7 @@ function themesCard(onEditing) {
         { class: "hint" },
         "A card takes its theme for light and dark; an orb, for its own scheme only. A sun or a moon on an orb marks the theme in use for light or for dark.",
       ),
-      el("div", { class: "theme-gallery" }, ...cards.map((card) => card.element)),
+      themeStrip(cards),
       el(
         "div",
         { class: "hint", "data-theme-folder": "" },
