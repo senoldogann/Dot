@@ -422,7 +422,7 @@ function mountList(root, ctx) {
   // The page in two parts (item 509): the agents the owner has, then the ready-made ones to add, a team or one agent
   // at a time, one of the two shown.
   const mineCount = el("span", { class: "agents-count" });
-  const mine = el(
+  const yours = el(
     "section",
     { class: "agents-part", "aria-label": "Your agents" },
     el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your agents", mineCount)),
@@ -616,7 +616,7 @@ function mountList(root, ctx) {
   root.append(
     pageHead("Agents", "Dot, and the agents you or Dot made, each with a role and its own chats.", el("div", { class: "cluster" }, teamLink, importButton, chooser, newButton)),
     editorSlot,
-    mine,
+    yours,
     templates,
   );
   const stopLifecycle = onLifecycle((event) => {

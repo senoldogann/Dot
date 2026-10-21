@@ -55,7 +55,7 @@ name the shell and the terminal's tools, and the Reviewer names no web at all. T
 (item 464): Sales Outbound and Account Health on weekdays at 9:00 and 8:30, Chief of Staff on weekdays at 7:30, Paid
 Media every day at 8:00, Talent Scout on Mondays at 10:00, Product Performance and Competitor Watch on Mondays at 9:00
 and 8:00, and Expense Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a
-switch, **Also add this schedule, switched off until you read its goal**: on, **Use template** makes the agent and a
+switch, **Add its schedule too, switched off** (its full name for a screen reader says until you read its goal): on, **Use template** makes the agent and a
 schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the agent's
 instructions then guide; the schedule is added switched off, so nothing runs before you have read what it will do, and
 a schedule that could not be added leaves the agent made and says why. An agent's page lists the schedules its runs
@@ -79,8 +79,8 @@ Growth team (Competitor Watch, Paid Media, Product Performance, Sales Outbound) 
 Expense Manager). Each card says what the team does and shows the faces and names of its agents. **Use team** makes,
 in one click, each agent of the team you do not have yet, as its template's **Use template** makes it. An agent of
 yours with the name of one of them, in any case, is that agent, kept as it is; a team one of whose agents this home
-cannot make (a tool it lacks) makes none of them and says why. A team whose agents suggest schedules offers **Also add
-their schedules, switched off until you read their goals**, for the agents it makes. A team is its agents and nothing
+cannot make (a tool it lacks) makes none of them and says why. A team whose agents suggest schedules offers **Add
+their schedules too, switched off**, for the agents it makes. A team is its agents and nothing
 besides: you ask Dot for the work, and Dot hands each agent its part through messages (below) and puts their answers
 together. The API: `GET /api/agent-teams` and `POST /api/agent-teams/{id}/use` (201 with the agents it `made` and the
 ones of yours it `kept`; 404 for a team that is not there, 422 for one that cannot be made).
