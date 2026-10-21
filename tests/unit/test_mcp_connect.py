@@ -91,6 +91,10 @@ def test_a_service_s_secrets_are_asked_for_by_name_and_kept_under_dot_s_own_name
     assert (
         service_of(McpServerConfig(name="mine", command="npx", args=["-y", "@playwright/mcp@latest"])) == "playwright"
     )
+    # Item 514: Dot's own Playwright server keeps a page's WebMCP tools out of a run, and is still the service's.
+    playwright: McpService = next(service for service in MCP_SERVICES if service.id == "playwright")
+    assert playwright.args == ("-y", "@playwright/mcp@latest", "--no-webmcp")
+    assert service_of(McpServerConfig(name="mine", command="npx", args=list(playwright.args))) == "playwright"
     assert service_of(McpServerConfig(name="mine", command="npx", args=["-y", "something-else"])) is None
 
 
