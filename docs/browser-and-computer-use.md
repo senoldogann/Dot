@@ -185,7 +185,8 @@ Both modes share what follows.
   have asked (items 429 and 443, see [Safety](safety.md#safety)). Outside `yolo` the run never reads such a field's
   value either: the page's lines show `[hidden]` and a screenshot covers the field (item 467). Cookie banners
   are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails
-  with the banner still there is logged as `consent_decline_failed` with the page's address).
+  with the banner still there is logged as `consent_decline_failed` with the page's address, and why the banner could
+  not be counted when it could not).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
 - With `idle_close_s` set (seconds; 0, the default, keeps it open until the daemon stops; item 454), Dot's own Chrome
   (`own`) closes, the Playwright driver with it, once nothing used it for that long: no chat's step is under way in it,

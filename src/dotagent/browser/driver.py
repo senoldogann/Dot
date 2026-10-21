@@ -829,21 +829,15 @@ async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) 
         raise _failure("uploading the files failed", page, {"ref": ref}, error) from error
 
 
-async def _banner_gone(banner: Locator, url: str) -> bool:
-    """Whether the banner left the page; one that cannot be counted, or not in time, is taken as still there, with why
-    in the log."""
+async def _banner_uncounted(banner: Locator) -> str | None:
+    """``None`` when the banner left the page; else why it is taken as still there: it is there, or it could not be
+    counted, or not in time."""
     try:
-        return await _count(banner) == 0
+        return None if await _count(banner) == 0 else ""
     except TimeoutError:
-        _log.warning("consent_banner_uncounted", url=truncate_middle(url, _ERROR_CHARS), error="no answer in time")
-        return False
+        return "the page did not answer the count in time"
     except PlaywrightError as error:
-        _log.warning(
-            "consent_banner_uncounted",
-            url=truncate_middle(url, _ERROR_CHARS),
-            error=truncate_middle(str(error), _ERROR_CHARS),
-        )
-        return False
+        return truncate_middle(str(error), _ERROR_CHARS)
 
 
 async def install_consent_handler(page: Page) -> None:
@@ -857,12 +851,16 @@ async def install_consent_handler(page: Page) -> None:
         try:
             await banner.get_by_role("button", name=_DECLINE_BUTTON).first.click(timeout=_CONSENT_CLICK_TIMEOUT_MS)
         except PlaywrightError as error:
-            if page.is_closed() or await _banner_gone(banner, page.url):
+            if page.is_closed():
+                return
+            uncounted: str | None = await _banner_uncounted(banner)
+            if uncounted is None:
                 return
             _log.warning(
                 "consent_decline_failed",
                 url=truncate_middle(page.url, _ERROR_CHARS),
                 error=truncate_middle(str(error), _ERROR_CHARS),
+                count_error=uncounted or None,
             )
 
     await page.add_locator_handler(banner, decline, no_wait_after=True, times=_CONSENT_HANDLER_TIMES)

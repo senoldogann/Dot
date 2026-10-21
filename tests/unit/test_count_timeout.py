@@ -6,6 +6,7 @@ import asyncio
 from dataclasses import dataclass
 
 import pytest
+from structlog.testing import capture_logs
 
 from dotagent.browser import driver
 from dotagent.core.errors import BrowserError
@@ -38,4 +39,12 @@ async def test_a_page_that_never_answers_a_count_holds_nothing(monkeypatch: pyte
         assert await driver._is_secret(_Page(), "e5") is True  # type: ignore[arg-type]
         with pytest.raises(BrowserError, match="did not answer in time"):
             await driver.live_locator(_Page(), "e5", "click")  # type: ignore[arg-type]
-        assert await driver._banner_gone(_Stuck(), "https://example.com/stuck") is False  # type: ignore[arg-type]
+        assert await driver._banner_uncounted(_Stuck()) == "the page did not answer the count in time"  # type: ignore[arg-type]
+    # The field the probe could not ask about says so in the log, with why.
+    with capture_logs() as logs:
+        await driver._is_secret(_Page(), "e7")  # type: ignore[arg-type]
+    assert {
+        "event": "browser_field_unreadable",
+        "ref": "e7",
+        "error": "the page did not answer in time",
+    }.items() <= logs[0].items(), logs
