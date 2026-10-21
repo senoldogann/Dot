@@ -65,14 +65,16 @@ export function paletteGroups(commands, palette) {
 }
 
 /** The groups of the at menu (item 367): the MCP servers and the plugins, by their names, each with its service's
- * mark — and nothing else: the skills and the commands are the slash menu's (the owner's word of 2026-10-21, item 447).
+ * mark, then the Google and Microsoft accounts signed in, by their addresses, each with its provider's mark (item 496)
+ * — and nothing else: the skills and the commands are the slash menu's (the owner's word of 2026-10-21, item 447).
  * A pick is a chip for the message. */
 export function pickGroups(palette) {
-  if (palette === null || palette.servers.length === 0) {
+  if (palette === null) {
     return [];
   }
-  return [
-    {
+  const groups = [];
+  if (palette.servers.length > 0) {
+    groups.push({
       title: "MCP servers",
       kind: "plugin",
       items: palette.servers.map((server) => ({
@@ -83,8 +85,23 @@ export function pickGroups(palette) {
         mark: server.mark ?? null,
         pick: { kind: "plugin", name: server.name },
       })),
-    },
-  ];
+    });
+  }
+  if (palette.accounts.length > 0) {
+    groups.push({
+      title: "Accounts",
+      kind: "account",
+      items: palette.accounts.map((account) => ({
+        id: `account-${account.address}`,
+        label: account.address,
+        hint: account.reads,
+        kind: "account",
+        mark: account.mark,
+        pick: { kind: "account", name: account.address },
+      })),
+    });
+  }
+  return groups;
 }
 
 /** The groups with only the items whose label holds `word` (case folded), and no empty group. */

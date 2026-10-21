@@ -29,8 +29,8 @@ export const SECTIONS = [
   { id: "mac", title: "This Mac" },
 ];
 const MCP_ORIGIN_WORDS = {
-  config: "Set up in Dot's config.",
-  plugin: "Comes with one of Dot's plugins.",
+  config: "Set up in Dot's config: take its [[mcp]] block out of config.toml to remove it.",
+  plugin: "Comes with one of Dot's plugins; Remove plugin takes the plugin out.",
   elsewhere: "Added from another agent of this Mac (Customize › Skills › Found on this Mac).",
 };
 // A server's tile names this many of its tools.
@@ -87,7 +87,8 @@ function serverGuide(server) {
 }
 
 /** The buttons of an MCP server of `catalogue`: its sign-in page while Dot waits for one, Sign in again or Try again,
- * and Remove for one added here; null when it has none. */
+ * Remove for one added here or from another agent, and Remove plugin for one of a plugin (item 497); null when it has
+ * none. */
 function serverActions(catalogue, server, service) {
   const working = server.state === "trying" || server.state === "signing_in";
   const actions = [];
@@ -104,8 +105,13 @@ function serverActions(catalogue, server, service) {
   if (server.picks_tools && server.origin === "connected" && !working) {
     actions.push(el("button", { class: "btn sm primary", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.chooseTools(server)) }, "Choose tools"));
   }
-  if (server.origin === "connected") {
+  if (server.origin === "connected" || server.origin === "elsewhere") {
     actions.push(el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.remove(server, service)) }, "Remove"));
+  }
+  if (server.origin === "plugin" && server.plugin !== null) {
+    actions.push(
+      el("button", { class: "btn sm", type: "button", disabled: acting, title: `Take the plugin ${server.plugin} out of Dot`, onclick: () => attempt(() => catalogue.removePlugin(server)) }, "Remove plugin"),
+    );
   }
   return actions.length === 0 ? null : el("div", { class: "plugin-actions" }, ...actions);
 }

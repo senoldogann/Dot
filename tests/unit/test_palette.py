@@ -6,6 +6,7 @@ from pathlib import Path
 from dotagent.connections.directory import ServiceMark, mark_of_service
 from dotagent.help.elsewhere import ADDED_MARKER, SkillCopy, copied_skill_names
 from dotagent.mcp.types import McpTool, ToolHints
+from dotagent.oauth.tokens import Account
 from dotagent.server.palette import palette_view
 from dotagent.server.views import PaletteView
 from dotagent.skills.types import Skill
@@ -42,6 +43,7 @@ def test_the_palette_lists_skills_by_name_and_tools_under_their_servers_with_one
             _tool("notes", "create", "Create a note."),
         ],
         {},
+        [],
     )
     assert [skill.name for skill in view.skills] == ["deploy-site", "release-notes"]
     assert view.skills[0].source == "home"
@@ -50,7 +52,7 @@ def test_the_palette_lists_skills_by_name_and_tools_under_their_servers_with_one
         ("notes_create", "Create a note."),
         ("notes_search", "Search the notes."),
     ]
-    assert palette_view([], frozenset(), [], {}) == PaletteView(skills=(), servers=())
+    assert palette_view([], frozenset(), [], {}, []) == PaletteView(skills=(), servers=(), accounts=())
 
 
 def test_a_server_of_the_palette_wears_the_mark_its_customize_tile_wears() -> None:
@@ -64,6 +66,7 @@ def test_a_server_of_the_palette_wears_the_mark_its_customize_tile_wears() -> No
         frozenset(),
         [_tool(name, "lookup", "Look something up.") for name in ("notes", "deepwiki", "context7", "microsoft-learn")],
         marks,
+        [],
     )
     assert [(server.name, server.mark) for server in view.servers] == [
         ("context7", ServiceMark(logo=None, glyph=None, monogram="C7", colour=None)),
@@ -90,9 +93,23 @@ def test_a_skill_dot_copied_from_another_agent_is_marked_imported_and_no_other(t
     ]
     imported: frozenset[str] = copied_skill_names(skills)
     assert imported == frozenset({"copied"})
-    view: PaletteView = palette_view(skills, imported, [], {})
+    view: PaletteView = palette_view(skills, imported, [], {}, [])
     assert [(skill.name, skill.imported) for skill in view.skills] == [
         ("copied", True),
         ("elsewhere", False),
         ("own", False),
     ]
+
+
+def test_the_palette_names_the_accounts_signed_in_with_their_providers_marks() -> None:
+    """Item 496: the at menu offers each account signed in, with what of it a run reads and its provider's logo."""
+    accounts = [
+        Account(provider="google", address="me@gmail.com", connected_at=1.0),
+        Account(provider="microsoft", address="me@outlook.com", connected_at=2.0),
+    ]
+    view: PaletteView = palette_view([], frozenset(), [], {}, accounts)
+    assert [(account.address, account.mark.logo) for account in view.accounts] == [
+        ("me@gmail.com", "google-icon.svg"),
+        ("me@outlook.com", "microsoft-icon.svg"),
+    ]
+    assert view.accounts[0].reads.startswith("Gmail")

@@ -8,7 +8,7 @@
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook } from "../actors.js";
 import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
-import { runChoices } from "../choices.js";
+import { MODES, runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
 import { ago, clip, el, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
@@ -571,6 +571,7 @@ function agentComposer(record, ctx) {
   const { textarea: goal, attachments } = frame;
   const choices = runChoices({
     frame,
+    modes: MODES,
     kept: agentKept(record),
     optionsTitle: "Approvals",
     more: () => [],

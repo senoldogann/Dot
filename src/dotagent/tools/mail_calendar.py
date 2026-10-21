@@ -65,14 +65,16 @@ def moment_of(text: str, zone: dt.tzinfo) -> dt.datetime:
     return moment if moment.tzinfo is not None else moment.replace(tzinfo=zone)
 
 
+def account_reads(provider: ProviderId) -> str:
+    """What a run reads of an account of ``provider``, by the provider's names: its mail and its calendar."""
+    return f"{_MAIL_NAMES[provider]} and {_CALENDAR_NAMES[provider]}"
+
+
 def account_lines(accounts: Sequence[Account]) -> tuple[str, ...]:
     """The line that tells a run which accounts the owner signed in, for the tools here; none without one."""
     if not accounts:
         return ()
-    named: str = "; ".join(
-        f"{account.address} ({_MAIL_NAMES[account.provider]} and {_CALENDAR_NAMES[account.provider]})"
-        for account in accounts
-    )
+    named: str = "; ".join(f"{account.address} ({account_reads(account.provider)})" for account in accounts)
     return (
         f"The user's accounts signed in, which {MAIL_SEARCH_TOOL}, {MAIL_READ_TOOL} and {CALENDAR_EVENTS_TOOL} "
         f"take as account: {named}.",

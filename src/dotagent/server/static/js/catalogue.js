@@ -402,9 +402,13 @@ export function createCatalogue(onChange) {
   }
 
   async function remove(server, service) {
+    // One added from another agent of this Mac is taken back from Dot alone (item 497): the agent keeps it.
     const sure = await confirmDialog({
       title: `Remove ${service ? service.name : server.name} from Dot?`,
-      message: "Its tools leave the runs that start after, and Dot forgets its address and its sign-in.",
+      message:
+        server.origin === "elsewhere"
+          ? "Dot stops it now and its tools leave the runs that start after; the agent it came from keeps it."
+          : "Its tools leave the runs that start after, and Dot forgets its address and its sign-in.",
       confirmLabel: "Remove",
       focusCancel: true,
     });
@@ -413,6 +417,26 @@ export function createCatalogue(onChange) {
     }
     await busyWith(`server:${server.name}`, async () => {
       const now = await api.del(`/mcp/servers/${encodeURIComponent(server.name)}`);
+      if (!disposed) {
+        servers = now;
+      }
+    });
+  }
+
+  /** Take the plugin `server` comes with out of Dot (item 497): its servers stop now, its skills leave the runs that
+   * start after, and its folder goes to the Trash. */
+  async function removePlugin(server) {
+    const sure = await confirmDialog({
+      title: `Remove the plugin ${server.plugin} from Dot?`,
+      message: "Its MCP servers stop now and its skills leave the runs that start after. Its folder goes to the Trash, where you can put it back.",
+      confirmLabel: "Remove",
+      focusCancel: true,
+    });
+    if (!sure) {
+      return;
+    }
+    await busyWith(`server:${server.name}`, async () => {
+      const now = await api.del(`/installed-plugins/${encodeURIComponent(server.plugin)}`);
       if (!disposed) {
         servers = now;
       }
@@ -480,6 +504,7 @@ export function createCatalogue(onChange) {
     connectAgain,
     chooseTools,
     remove,
+    removePlugin,
     load,
     dispose() {
       disposed = true;

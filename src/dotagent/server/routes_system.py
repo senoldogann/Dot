@@ -545,7 +545,9 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             name: mark_of_service(service) if (service := service_of(server)) is not None else None
             for name, server in ctx.runtime.mcp.configs().items()
         }
-        return palette_view(catalog.skills, imported, ctx.runtime.mcp.tools, marks)
+        return palette_view(
+            catalog.skills, imported, ctx.runtime.mcp.tools, marks, await ctx.runtime.accounts.accounts()
+        )
 
     @router.get("/doctor")
     async def doctor() -> list[CheckResult]:
