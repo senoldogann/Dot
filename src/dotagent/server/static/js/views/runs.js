@@ -17,6 +17,7 @@ import { narrowOr, PHONE, touchFirst, trackHeight } from "../layout.js";
 import { LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.js";
 import { anchoredPopover } from "../popover.js";
 import { readPref, removePref, writePref } from "../prefs.js";
+import { buildAway } from "../away.js";
 import { buildPresence } from "../presence.js";
 import { providerLabel, providerOf } from "../providers.js";
 import { KEPT_APPROVALS, KEPT_GOAL_MODE, standingPicker } from "../runmodes.js";
@@ -411,7 +412,9 @@ export function mount(root, ctx) {
   // The setup card stands over the greeting, in the block the page keeps in the middle. What a run waits for is
   // answered in its own chat (item 434): the home lists it under Waits for you, which leads there.
   const start = el("div", { class: "home-start" }, setup.element, presence.element, composer.element);
-  const home = el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), start, presence.strip);
+  // What schedules and campaigns did while the owner was away (item 466) stands over the Today strip.
+  const away = buildAway();
+  const home = el("div", { class: "home" }, el("h1", { class: "visually-hidden" }, "New chat"), start, away.element, presence.strip);
   root.append(home);
   // The greeting and the composer stand in the middle of the space under the top bar (item 124): the row above them
   // takes half of what their height leaves of it (app.css), so the page keeps that height as it changes.
@@ -456,5 +459,6 @@ export function mount(root, ctx) {
     stopCompose();
     composer.dispose();
     presence.dispose();
+    away.dispose();
   };
 }

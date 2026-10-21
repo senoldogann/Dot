@@ -190,6 +190,13 @@ class RunsQuery(FrozenModel):
     thread_id: str | None = None
 
 
+class AwayQuery(FrozenModel):
+    """The moment "while you were away" reads from (item 466), in seconds since the epoch; the server keeps it within
+    the last :data:`~dotagent.server.away.AWAY_WINDOW_S`."""
+
+    since: float = Field(ge=0)
+
+
 class ThreadsQuery(FrozenModel):
     limit: int = Field(default=100, ge=1, le=500)
 
@@ -1401,3 +1408,59 @@ class ActivityCount(FrozenModel):
     waiting: int
     working: int
     state: Literal["idle", "working", "waiting"]
+
+
+class AwayRun(FrozenModel):
+    """A run a schedule or a campaign started (item 466), as "while you were away" lists it: what names it (the
+    schedule, the campaign, else the first line of its goal), its agent, how it ended or that it works, its steps, and
+    the first line of its answer with its secrets masked."""
+
+    run_id: str
+    title: str
+    campaign: bool
+    agent_id: str | None
+    status: RunStatus
+    steps: int
+    created_at: float
+    finished_at: float | None
+    answer: str
+
+
+class AwayDecisions(FrozenModel):
+    """The approvals answered for the owner in those runs (item 466): by the review model and by yolo, approved and
+    denied."""
+
+    reviewer_approved: int
+    reviewer_denied: int
+    yolo_approved: int
+    yolo_denied: int
+
+
+class AwayDecisionRun(FrozenModel):
+    """One of the runs with the most approvals answered for the owner (item 466), with how many each answered and how
+    many of them were denied."""
+
+    run_id: str
+    title: str
+    reviewer: int
+    yolo: int
+    denied: int
+
+
+class AwayView(FrozenModel):
+    """What schedules and campaigns did between ``since`` and ``until`` (item 466): how many of their runs ended done,
+    failed or stopped, how many work and how many were sessions of campaigns; the newest of those runs; the approvals
+    answered for the owner in them and the runs with the most; and the drafts they wrote that wait for the owner. It
+    carries no summary nor the arguments of an approval."""
+
+    since: float
+    until: float
+    done: int
+    failed: int
+    cancelled: int
+    working: int
+    campaign_sessions: int
+    runs: list[AwayRun]
+    decisions: AwayDecisions
+    decision_runs: list[AwayDecisionRun]
+    drafts: int

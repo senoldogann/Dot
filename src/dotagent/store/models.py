@@ -414,6 +414,37 @@ class ScheduleFiring(FrozenModel):
     chat_title: str
 
 
+# Who decided an approval for the owner without asking them (item 443's records): the review model, or yolo.
+type AutoDecider = Literal["reviewer", "yolo"]
+
+
+class UnattendedRun(FrozenModel):
+    """A run that a schedule or a campaign started (item 466), with the name of the schedule whose chat it went in and
+    the title of the campaign it was a session of; a firing from before item 257 names no schedule."""
+
+    run: RunRecord
+    schedule_name: str | None
+    campaign_title: str | None
+
+
+class UnattendedCount(FrozenModel):
+    """How many of the runs that schedules and campaigns started ended with ``status``, or work (item 466)."""
+
+    status: RunStatus
+    campaign: bool
+    count: int
+
+
+class AutoDecisionCount(FrozenModel):
+    """How many approvals ``decided_by`` answered ``status`` for the owner (item 466) in the run ``run``, which a
+    schedule or a campaign started, and in its helpers; with what names the run, as :class:`UnattendedRun` has it."""
+
+    run: UnattendedRun
+    decided_by: AutoDecider
+    status: Literal["approved", "denied"]
+    count: int
+
+
 class CampaignRecord(FrozenModel):
     """A goal that Dot works on in sessions, through restarts and days, until its outcome is verified or the owner
     stops it. ``thread_id`` is the owner's conversation it was started in. ``targets`` and ``verification`` are what
