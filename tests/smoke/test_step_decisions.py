@@ -146,3 +146,37 @@ async def test_who_answered_a_question_is_kept_with_the_step(room: Room) -> None
     assert (supervised.decision.source, supervised.decision.answered_by) == ("supervised", "user")
     # authorize gives the owner's note as it did.
     assert await _gate(room, "balanced", "ask", _nobody).authorize(READ) == ""
+
+
+async def test_the_taint_the_gate_weighed_is_kept_with_the_decision_and_the_question(room: Room) -> None:
+    """Item 474: a step's decision, and the policy event of a question, say whether the run was tainted when the gate
+    decided, so that what a rule would have done there can be told later (item 469)."""
+    clean: StepDecision = (await _gate(room, "balanced", "ask", _nobody).authorize_recorded(READ)).decision
+    assert clean.tainted is False
+    tainted: RunGate = _gate(room, "cautious", "ask", _nobody)
+    tainted.taint()
+    read: StepDecision = (await tainted.authorize_recorded(READ)).decision
+    assert read.tainted is True
+    asked: Authorization = await _answered_by_the_owner(room, tainted, WRITE)
+    assert asked.decision.tainted is True
+    events: list[EventRecord] = await room.store.list_events(room.run.id, 0, 500)
+    policy: EventRecord = [event for event in events if event.kind == "policy"][-1]
+    assert (policy.data["summary"], policy.data["tainted"]) == ("Write notes.md", True)
+
+
+async def test_a_question_the_review_model_passed_on_keeps_the_taint_the_gate_weighed(room: Room) -> None:
+    """Item 474: the review model takes its time, and a read beside the step may taint the run meanwhile; the review
+    model, the policy event of the question it passed on and the step's decision all keep the taint the gate weighed."""
+    gates: list[RunGate] = []
+    seen: list[bool] = []
+
+    async def passing_on(request: ReviewRequest) -> ReviewVerdict:
+        seen.append(request.tainted)
+        gates[0].taint()
+        return ReviewVerdict(decision="escalate", reason="the owner should say")
+
+    gates.append(_gate(room, "cautious", "auto", passing_on))
+    asked: Authorization = await _answered_by_the_owner(room, gates[0], WRITE)
+    events: list[EventRecord] = await room.store.list_events(room.run.id, 0, 500)
+    policy: EventRecord = [event for event in events if event.kind == "policy"][-1]
+    assert (seen, policy.data["tainted"], asked.decision.tainted, gates[0].tainted) == ([False], False, False, True)

@@ -223,7 +223,8 @@ class RunGate:
         if refusal is None:
             return
         decision: Decision = Decision(verdict="deny", source="pace", reason=refusal, rule_id=None)
-        await self._emit_policy(info, decision)
+        # A refusal before the policy weighs the step: the run's taint as it stands.
+        await self._emit_policy(info, decision, self.tainted)
         raise PolicyDenied(refusal, {"action": _describe(info), "source": decision.source})
 
     async def _space(self, paced: PacedAction) -> None:
@@ -248,11 +249,13 @@ class RunGate:
         rules: list[RuleRecord] = await self._store.list_rules()
         state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
-        decided: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
+        # The taint the policy weighs, kept with the step's record (item 474).
+        tainted: bool = self.tainted
+        decided: Decision = decide(info, self._mode, tainted, self._preset, rules, allowance)
         if self._approval_mode == "yolo" and decided.source == "auto_review":
             # What the always-on review refuses in every other mode, a yolo run does without asking: the layers
             # after the review still judge the step, and a refusal among them stands (item 443).
-            rest: Decision = decide_past_review(info, self._mode, self.tainted, self._preset, rules, allowance)
+            rest: Decision = decide_past_review(info, self._mode, tainted, self._preset, rules, allowance)
             review: Decision = waived_in_yolo(info)
             if rest.verdict == "allow":
                 decided = review
@@ -263,7 +266,7 @@ class RunGate:
                 # would have asked (item 443).
                 decided = rest.model_copy(update={"reason": f"{rest.reason}; also {review.reason}"})
         decision: Decision = supervised(decided, info) if self._approval_mode == "supervised" else decided
-        note, answered_by = await self._authorize_decision(info, decision, rules)
+        note, answered_by = await self._authorize_decision(info, decision, rules, tainted)
         if allowance is not None and state is not None:
             # The payment goes ahead under its caps, whichever question let it through (the guard asks first when the
             # step also sends or posts, item 429): it counts against the site's day. A refusal or a hand-off raised.
@@ -278,7 +281,7 @@ class RunGate:
                 state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
             )
             log.info("spend_recorded", run_id=self._run_id, host=state.host, amount=state.amount.value)
-        return Authorization(note=note, decision=step_decision(decision, answered_by, self._preset))
+        return Authorization(note=note, decision=step_decision(decision, answered_by, self._preset, tainted))
 
     def _capped_site(self, info: ActionInfo) -> str | None:
         """The site of a payment step with an amount on a site with pre-approved caps; ``None`` for any other action."""
@@ -293,10 +296,11 @@ class RunGate:
         return spend_state(self._spend, info.target, info.amount, spent)
 
     async def _authorize_decision(
-        self, info: ActionInfo, decision: Decision, rules: list[RuleRecord]
+        self, info: ActionInfo, decision: Decision, rules: list[RuleRecord], tainted: bool
     ) -> tuple[str, Answerer]:
         """What the decision means in this approval mode: a waiver, a refusal, the review model or the user; with the
-        owner's note and who answered (item 468)."""
+        owner's note and who answered (item 468). ``tainted`` is the taint the policy weighed: the review model reads
+        it, and the policy event keeps it (item 474), however long an answer takes."""
         if decision.verdict == "allow":
             return "", "policy"
         if self._approval_mode == "yolo" and decision.verdict != "deny":
@@ -305,16 +309,19 @@ class RunGate:
             # what it would have asked. A refusal is not a question and stands below.
             return await self._waive(info, decision), "yolo"
         if decision.verdict == "deny":
-            await self._emit_policy(info, decision)
+            await self._emit_policy(info, decision, tainted)
             raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})
         route: Route = route_for(decision, self._approval_mode)
         if route == "waived":
             return await self._waive(info, decision), "yolo"
         if route == "reviewer":
-            return await self._review(info, decision)
-        return await self._ask_user(info, decision, ""), "user"
+            return await self._review(info, decision, tainted)
+        return await self._ask_user(info, decision, "", tainted), "user"
 
-    async def _emit_policy(self, info: ActionInfo, decision: Decision) -> None:
+    async def _emit_policy(self, info: ActionInfo, decision: Decision, tainted: bool) -> None:
+        """The event of a step the policy asks about, hands off or refuses, with whether the run was tainted when it
+        was weighed (item 474): a step that does not go through keeps no decision in its result, so this is its
+        record."""
         await self._bus.emit(
             self._run_id,
             "policy",
@@ -324,6 +331,7 @@ class RunGate:
                 "source": decision.source,
                 "reason": decision.reason,
                 "rule_id": decision.rule_id,
+                "tainted": tainted,
             },
             True,
         )
@@ -343,15 +351,16 @@ class RunGate:
         )
         return ""
 
-    async def _review(self, info: ActionInfo, decision: Decision) -> tuple[str, Answerer]:
+    async def _review(self, info: ActionInfo, decision: Decision, tainted: bool) -> tuple[str, Answerer]:
         """Auto: the review model answers from the user's instructions; what it cannot tell goes to the user, who then
         answered."""
         verdict: ReviewVerdict = await self._reviewer(
-            ReviewRequest(instructions=self._instructions, action=info, reason=decision.reason, tainted=self.tainted)
+            ReviewRequest(instructions=self._instructions, action=info, reason=decision.reason, tainted=tainted)
         )
         reason: str = shorten_reason(verdict.reason)
         if verdict.decision == "escalate":
-            return await self._ask_user(info, decision, f"The review model passed this on to you: {reason}"), "user"
+            passed_on: str = f"The review model passed this on to you: {reason}"
+            return await self._ask_user(info, decision, passed_on, tainted), "user"
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
@@ -368,8 +377,8 @@ class RunGate:
             )
         return "", "reviewer"
 
-    async def _ask_user(self, info: ActionInfo, decision: Decision, passed_on: str) -> str:
-        await self._emit_policy(info, decision)
+    async def _ask_user(self, info: ActionInfo, decision: Decision, passed_on: str, tainted: bool) -> str:
+        await self._emit_policy(info, decision, tainted)
         severity: str = "handoff" if decision.verdict == "handoff" else approval_severity(info)
         summary: str = f"{info.summary} — {decision.reason}" + (f". {passed_on}" if passed_on else "")
         outcome: ApprovalOutcome = await self._approvals.request(

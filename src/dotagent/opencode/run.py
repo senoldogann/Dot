@@ -31,6 +31,7 @@ from dotagent.agent.attachments import (
     attachment_summary,
     message_with_attachments,
 )
+from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.executor import ToolOutcome, execute_calls
 from dotagent.agent.gate import RunGate
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOutcome, browser_of
@@ -298,11 +299,46 @@ def _channel(tool: str) -> Channel:
 
 @dataclass
 class _Call:
-    """A tool call of the agent as the run follows it: its policy action once it asked, the time it waited there."""
+    """A tool call of the agent as the run follows it: its policy action once it asked, the time it waited there, and
+    what decided it when the gate let it through (item 474)."""
 
     announced: bool = False
     action: ActionInfo | None = None
     waited_s: float = 0.0
+    decision: StepDecision | None = None
+
+    def asked(self, action: ActionInfo) -> None:
+        """The agent asks to act for this call. OpenCode may ask twice for one call (a folder outside the workspace,
+        then the edit itself): the call's action and decision are those of its last ask, the decision only once the
+        gate lets it through."""
+        self.action = action
+        self.decision = None
+
+
+def step_result(event: ToolSeen, name: str, call: _Call, text: str, seconds: float, tainted: bool) -> JsonObject:
+    """The ``tool_result`` event of one of OpenCode's calls, as the executor writes one of Dot's own: a call that asked
+    the gate keeps its action, its flags and what decided it (item 474: ``None`` for one the gate did not let through);
+    one that never asked keeps OpenCode's title as its summary, and no action."""
+    action: ActionInfo | None = call.action
+    return {
+        "call_id": event.call_id,
+        "tool": name,
+        "ok": event.status == "completed",
+        "text": truncate_middle(redact_secrets(text), _EVENT_TEXT_CHARS),
+        "images": [],
+        "seconds": round(seconds, 2),
+        "waited_s": round(call.waited_s, 2),
+        "summary": action.summary if action is not None else event.title,
+        "kind": action.kind if action is not None else "",
+        "risk": action.risk if action is not None else "",
+        "target": action.target if action is not None else "",
+        "site": "",
+        "steps": [],
+        "channel": _channel(event.tool),
+        "tainted": tainted,
+        "decision": None if call.decision is None else call.decision.model_dump(mode="json"),
+        "flags": [] if action is None else list(action.flags),
+    }
 
 
 @dataclass
@@ -483,28 +519,7 @@ class _Follow:
             if event.ended_ms is not None and event.started_ms is not None
             else 0.0
         )
-        action: ActionInfo | None = call.action
-        await self.emit(
-            "tool_result",
-            {
-                "call_id": event.call_id,
-                "tool": name,
-                "ok": ok,
-                "text": truncate_middle(redact_secrets(text), _EVENT_TEXT_CHARS),
-                "images": [],
-                "seconds": round(seconds, 2),
-                "waited_s": round(call.waited_s, 2),
-                "summary": action.summary if action is not None else event.title,
-                "kind": action.kind if action is not None else "",
-                "risk": action.risk if action is not None else "",
-                "target": action.target if action is not None else "",
-                "site": "",
-                "steps": [],
-                "channel": _channel(event.tool),
-                "tainted": self.agent.gate.tainted,
-            },
-            True,
-        )
+        await self.emit("tool_result", step_result(event, name, call, text, seconds, self.agent.gate.tainted), True)
 
     async def step_ended(self, event: StepEnded) -> None:
         step: _Step | None = self.step_of(event.message_id)
@@ -563,7 +578,7 @@ class _Follow:
             await self.server.reply(event.request_id, self.directory, "reject", NO_SUBAGENT_NOTE)
             return
         action: ActionInfo = permission_action(event, self.directory, runtime.protected, runtime.dot_paths)
-        call.action = action
+        call.asked(action)
         # An edit that would step on another run at work is refused, as a call of Dot's own tools is (item 301).
         held: str | None = runtime.peers.conflict(self.agent.run.id, action.tool, action)
         if held is not None:
@@ -581,7 +596,9 @@ class _Follow:
                 return
         asked_at: float = time.monotonic()
         try:
-            note: str = await self.agent.gate.authorize(action)
+            authorized: Authorization = await self.agent.gate.authorize_recorded(action)
+            call.decision = authorized.decision
+            note: str = authorized.note
             await self.agent.gate.wait_free()
         except (ApprovalRejected, PolicyDenied) as refused:
             await self.server.reply(event.request_id, self.directory, "reject", refused.message)

@@ -57,7 +57,7 @@ def _step(event_id: int, summary: str, decision: JsonObject | None, recorded: bo
 def _stopped(event_id: int, source: DecisionSource, verdict: str) -> StepRow:
     """A push the gate did not let through, with the policy event of its call."""
     return _step(event_id, _PUSH, None, True, False).model_copy(
-        update={"ok": False, "stopped_by": {"source": source, "verdict": verdict}}
+        update={"ok": False, "stopped_by": {"source": source, "verdict": verdict, "tainted": None}}
     )
 
 
@@ -149,6 +149,25 @@ def test_an_allow_rule_still_asks_where_the_taint_of_the_moment_would() -> None:
     assert (allowed.same, allowed.looser) == (1, 1)
     # A pre-approval is not made a question by the taint.
     assert _tried("preapproved", [], [sent, clean]).looser == 2
+
+
+def test_the_taint_the_gate_kept_comes_before_the_runs_taint_before_the_result() -> None:
+    """Since item 474 a step's decision, and the policy event of a step the gate stopped, keep the taint the gate
+    weighed: it is read before the run's taint before the result, which a read that ran beside the step may have brought
+    after the gate decided."""
+    asked: JsonObject = _decision("ask", "preset", "user")
+    kept_clean: StepRow = _step(3, _PUSH, {**asked, "tainted": False}, True, False).model_copy(
+        update={"flags": ("external_send",), "tainted_before": True}
+    )
+    kept_tainted: StepRow = _step(2, _PUSH, {**asked, "tainted": True}, True, False).model_copy(
+        update={"flags": ("external_send",), "tainted_before": False}
+    )
+    stopped_tainted: StepRow = _stopped(1, "preset", "ask").model_copy(
+        update={"stopped_by": {"source": "preset", "verdict": "ask", "tainted": True}, "flags": ("external_send",)}
+    )
+    allowed: RulePreview = _tried("allow", [], [kept_clean, kept_tainted, stopped_tainted])
+    # The clean one would now go ahead; the two the taint made questions would still ask.
+    assert (allowed.looser, allowed.same, allowed.stricter) == (1, 2, 0)
 
 
 def test_the_rule_that_decides_and_its_answer_are_what_the_policy_gives() -> None:

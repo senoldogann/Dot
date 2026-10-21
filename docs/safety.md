@@ -116,14 +116,15 @@ currency, so list sites that bill in one currency. Empty by default.
    caps; a rule that hands the step to you does take the place of the question about a message, a post or a spend).
    The steps it would decide it compares with what was decided then: the decision a step's record keeps since item
    468, or for a step the gate did not let through (refused, declined, handed to you), what the policy said of it
-   before, in the `policy` event of its call. It says how many would ask more, how many less and how many the same,
-   with the taint of that moment: an allow rule still asks about a step that reaches outside while the run is
-   tainted. A step with no decision on record (held by another run, refused by the review model, from before item
-   468, or an OpenCode agent's) is counted as such. Then come the newest steps it fits, each leading to its run. A
+   before, in the `policy` event of its call. It says how many would ask more, how many less and how many the same, with
+   the taint the gate weighed then (kept since item 474; for an older step, the run's taint before its result): an allow
+   rule still asks about a step that reaches outside while the run is tainted. A step with no decision on record (held
+   by another run, refused by the review model, from before item 468, or an OpenCode agent's that ran before item 474 or
+   that the gate did not let through) is counted as such. Then come the newest steps it fits, each leading to its run. A
    drafted rule is tried at once. A try-out reads at most 20,000 steps and two seconds, the newest first, and says so
-   when it read only those; a pattern that takes too long on a past step stops it, with that said, as the daemon
-   would refuse the step. Only steps still in the database count, and a batch of browser or desktop steps is one
-   step, as its record keeps it. It can
+   when it read only those; a pattern that takes too long on a past step stops it, with that said, as the daemon would
+   refuse the step. Only steps still in the database count, and a batch of browser or desktop steps is one step, as its
+   record keeps it. It can
    also be said in your own words ("let Dot run git status and git
    diff without asking me"): the review model drafts its parts, the tool, the answer and the commands or words the
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
@@ -360,10 +361,12 @@ commas) or your own words. The run reads which option you chose, and whether it 
 
 **The record of each step.** Every step that the policy let through keeps, with its result, what decided it (item 468):
 the verdict, where it came from (one of your rules, named, the preset, the guard, the taint, supervised...), the reason,
-the preset of the run, and who answered when there was a question: nobody (the policy let it through), you, the review
-model, or yolo, which asks nothing; and the flags its action raised (money, a credential, a message in your name...).
-A step refused or handed to you has its `policy` event instead, which names the rule too. The steps a browser batch
-takes inside one call are the batch's one record; one of them that asked has its own `policy` event and approval.
+the preset of the run, who answered when there was a question: nobody (the policy let it through), you, the review
+model, or yolo, which asks nothing; whether the run was tainted when the gate decided (item 474); and the flags its
+action raised (money, a credential, a message in your name...). Since item 474, a step of an OpenCode agent keeps the
+same. A step refused or handed to you has its `policy` event instead, which names the rule and keeps the taint too. The
+steps a browser batch takes inside one call are the batch's one record; one of them that asked has its own `policy`
+event and approval.
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 

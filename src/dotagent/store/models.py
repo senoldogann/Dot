@@ -410,10 +410,10 @@ class StepRow(FrozenModel):
     """A step of a past run as a rule's try-out reads it (item 469): the ``tool_result`` event's tool, the kind and risk
     the policy gave its action, its summary and target, whether it succeeded, and what the policy decided of it (raw, as
     the event keeps it). ``recorded`` says whether the event has that field at all: written since item 468, it is
-    ``None`` for a step the gate did not let through or that never reached it; ``stopped_by`` is then the source and
-    verdict of the ``policy`` event of its call, when the gate emitted one. ``flags`` are those of its action (kept
-    since item 468), ``tainted_before`` whether its run was tainted when the gate decided it, and ``yolo`` whether its
-    run asked nothing (item 443)."""
+    ``None`` for a step the gate did not let through or that never reached it; ``stopped_by`` is then the source,
+    verdict and taint (item 474) of the ``policy`` event of its call, when the gate emitted one. ``flags`` are those of
+    its action (kept since item 468), ``tainted_before`` whether its run was tainted before the step's result, and
+    ``yolo`` whether its run asked nothing (item 443)."""
 
     event_id: int
     run_id: str
