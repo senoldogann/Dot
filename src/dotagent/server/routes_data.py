@@ -42,7 +42,7 @@ from dotagent.scheduler.plans import (
 )
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
-from dotagent.server.rule_replay import candidate_rule, preview_rule
+from dotagent.server.rule_replay import candidate_rule, preview_rule, rules_usage
 from dotagent.server.rule_shadow import rule_views
 from dotagent.server.views import (
     FiringsQuery,
@@ -57,6 +57,8 @@ from dotagent.server.views import (
     RulePreview,
     RulePreviewRequest,
     RuleRequest,
+    RulesUsage,
+    RulesUsageQuery,
     RuleView,
     ScheduleAgent,
     ScheduleCreateRequest,
@@ -139,6 +141,12 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         )
         await tell_rules_changed()
         return rule
+
+    @router.get("/rules/usage")
+    async def usage(query: Annotated[RulesUsageQuery, Query()]) -> RulesUsage:
+        """How each enabled rule was used on the steps of the last days, with today's rules (item 473): nothing is
+        written."""
+        return await rules_usage(store, await store.list_rules(), query.days, time.time())
 
     @router.post("/rules/preview")
     async def preview(request: RulePreviewRequest) -> RulePreview:

@@ -446,6 +446,12 @@ class RulePreviewRequest(FrozenModel):
     days: int = Field(ge=1, le=90)
 
 
+class RulesUsageQuery(FrozenModel):
+    """How far back the rules' use is read (item 473), in days."""
+
+    days: int = Field(ge=1, le=90)
+
+
 class RuleDraftRequest(FrozenModel):
     """A rule in the owner's own words, for the review model to draft (item 110)."""
 
@@ -1528,4 +1534,31 @@ class RulePreview(FrozenModel):
     stopped: int
     unknown: int
     examples: list[RuleExample]
+    problem: str | None
+
+
+class RuleUsage(FrozenModel):
+    """What one enabled rule did on the steps of the last days, with today's rules (item 473): how many steps it fits
+    and when the newest was; of those it is the first rule to fit, how many it decides, how many ran in yolo, which asks
+    nothing whatever the rules say, and how many were settled before any rule; and the earlier rules that decide the
+    others."""
+
+    rule_id: str
+    fits: int
+    last_fit_at: float | None
+    decides: int
+    in_yolo: int
+    before_rules: int
+    shadowed_by: list[RuleShadow]
+
+
+class RulesUsage(FrozenModel):
+    """How the enabled rules were used on the steps of the last days (item 473): how many steps were read
+    (``scanned``, from ``since``; all of the days asked unless ``partial``), each enabled rule's use, and ``problem``,
+    when a rule's pattern took too long on a step, which the daemon refuses."""
+
+    scanned: int
+    since: float | None
+    partial: bool
+    rules: list[RuleUsage]
     problem: str | None

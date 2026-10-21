@@ -1,5 +1,5 @@
-// The words of a rule's try-out on past steps (item 469), pure functions of `POST /rules/preview`'s answer, so they
-// can be read alone (tests/js/rulepreview.test.js).
+// The words of a rule's try-out on past steps (item 469) and of each rule's use (item 473), pure functions of the
+// answers of `POST /rules/preview` and `GET /rules/usage`, so they can be read alone (tests/js/rulepreview.test.js).
 
 import { plural } from "./dom.js";
 
@@ -64,4 +64,20 @@ export function outcomeLabel(was, ok, recorded) {
     default:
       return ok ? "ran" : "failed";
   }
+}
+
+/** The line under one of your rules of how it was used on the steps of the last days, with today's rules (item 473):
+ * how many it fits, how many it decides, and what decides the others. `numberOf(id)` is a rule's place in the list. */
+export function usageLine(usage, view, days, numberOf) {
+  const read = view.partial && view.since !== null ? `of the newest ${view.scanned} steps (since ${dayOf(view.since)})` : `of the last ${plural(days, "day", "days")}`;
+  if (usage.fits === 0) {
+    return `Fits no step ${read}.`;
+  }
+  const parts = [
+    `decides ${usage.decides}`,
+    usage.in_yolo > 0 ? `${usage.in_yolo} ${usage.in_yolo === 1 ? "was" : "were"} in YOLO runs, which ask nothing` : null,
+    usage.before_rules > 0 ? `${usage.before_rules} ${usage.before_rules === 1 ? "was" : "were"} settled before any rule` : null,
+    ...usage.shadowed_by.map((shadow) => `rule #${numberOf(shadow.rule_id)} decides ${shadow.steps} first`),
+  ].filter((part) => part !== null);
+  return `Fits ${plural(usage.fits, "step", "steps")} ${read}: ${parts.join("; ")}.`;
 }

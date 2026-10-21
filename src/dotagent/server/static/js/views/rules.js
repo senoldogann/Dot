@@ -10,7 +10,7 @@ import { api } from "../api.js";
 import { ago, clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paintOpener, paneHead, segmented, switchSetting } from "../panels.js";
-import { outcomeLabel, previewLines } from "../rulepreview.js";
+import { outcomeLabel, previewLines, usageLine } from "../rulepreview.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -100,7 +100,9 @@ function neverDecides(record, numberOf) {
   );
 }
 
-function ruleRow(record, index, total, numberOf, handlers) {
+/** A rule's row; `used` is the line of how it was used on the last days (item 473), or null until that is read and for a
+ * rule switched off. */
+function ruleRow(record, index, total, numberOf, handlers, used) {
   const answer = answerOf(record.behavior);
   const toggle = el("button", {
     class: "switch",
@@ -138,6 +140,7 @@ function ruleRow(record, index, total, numberOf, handlers) {
         neverDecides(record, numberOf),
       ),
       record.description === "" ? null : el("div", { class: "row-text muted" }, record.description),
+      used === null ? null : el("div", { class: "rule-usage faint small" }, used),
     ),
     el(
       "div",
@@ -486,6 +489,10 @@ function buildSandbox(isDisposed) {
 export function mount(root, _ctx) {
   let disposed = false;
   let rules = null;
+  // How the rules were used on the last days (item 473), read after the rules; an answer older than the last read is
+  // left unshown.
+  let usage = null;
+  let usageTicket = 0;
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
 
@@ -503,16 +510,36 @@ export function mount(root, _ctx) {
       onMove: (record, direction) => attempt(() => move(record, direction)),
     };
     const numberOf = (id) => rules.findIndex((record) => record.id === id) + 1;
+    const usedBy = new Map((usage?.rules ?? []).map((used) => [used.rule_id, used]));
+    const lineOf = (record) => {
+      const used = usedBy.get(record.id);
+      return used === undefined ? null : usageLine(used, usage, TRY_OUT_DAYS, numberOf);
+    };
+    const problem = usage === null || usage.problem === null ? null : el("p", { class: "small rule-tryout-problem" }, usage.problem);
     // A rule's arrow keeps the focus through every drawing of the list, whichever of the reads after a move comes last.
     const active = document.activeElement;
     const focused = active instanceof HTMLElement && holder.contains(active) ? active.dataset : null;
+    // replaceChildren writes a null as the word: what is not there is left out first.
     holder.replaceChildren(
-      el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, handlers))),
+      ...[problem, el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, handlers, lineOf(record))))].filter(
+        (part) => part !== null,
+      ),
     );
     if (focused?.rule !== undefined) {
       focusArrow(focused.rule, focused.move);
     }
     count.textContent = plural(rules.length, "rule", "rules");
+  }
+
+  async function loadUsage() {
+    usageTicket += 1;
+    const ticket = usageTicket;
+    const read = await api.get(`/rules/usage?days=${TRY_OUT_DAYS}`);
+    if (disposed || ticket !== usageTicket) {
+      return;
+    }
+    usage = read;
+    paint();
   }
 
   async function reload() {
@@ -522,7 +549,10 @@ export function mount(root, _ctx) {
         return;
       }
       rules = fresh;
+      // What the rules did was counted with the rules as they were: it is read again for these.
+      usage = null;
       paint();
+      attempt(loadUsage);
     } catch (error) {
       if (disposed) {
         return;

@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { outcomeLabel, previewLines } from "../../src/dotagent/server/static/js/rulepreview.js";
+import { outcomeLabel, previewLines, usageLine } from "../../src/dotagent/server/static/js/rulepreview.js";
 
 const VIEW = {
   scanned: 3200,
@@ -63,3 +63,18 @@ test("what happened to a past step", () => {
   assert.equal(outcomeLabel({ answered_by: "reviewer" }, true, true), "the review model approved it");
   assert.equal(outcomeLabel({ answered_by: "yolo" }, true, true), "ran, YOLO");
 });
+
+test("how a rule was used, said in a line", () => {
+  const view = { scanned: 3200, since: null, partial: false };
+  const numberOf = (id) => ({ rul_1: 1, rul_2: 2 })[id];
+  const usage = { rule_id: "rul_2", fits: 12, last_fit_at: 1, decides: 7, in_yolo: 3, before_rules: 1, shadowed_by: [{ rule_id: "rul_1", description: "Do it", steps: 1 }] };
+  assert.equal(
+    usageLine(usage, view, 30, numberOf),
+    "Fits 12 steps of the last 30 days: decides 7; 3 were in YOLO runs, which ask nothing; 1 was settled before any rule; rule #1 decides 1 first.",
+  );
+  assert.equal(usageLine({ ...usage, fits: 1, decides: 1, in_yolo: 0, before_rules: 0, shadowed_by: [] }, view, 30, numberOf), "Fits 1 step of the last 30 days: decides 1.");
+  assert.equal(usageLine({ ...usage, fits: 0 }, view, 1, numberOf), "Fits no step of the last 1 day.");
+  const since = new Date(2026, 9, 2, 12).getTime() / 1000;
+  assert.match(usageLine({ ...usage, fits: 0 }, { scanned: 20000, since, partial: true }, 30, numberOf), /^Fits no step of the newest 20000 steps \(since .+\)\.$/);
+});
+

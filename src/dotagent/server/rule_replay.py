@@ -1,15 +1,15 @@
 """Trying a rule on past steps before it is added (item 469): which of the steps of the last days it fits, which of
 those an earlier rule decides first, which no rule decides (a yolo run's, or what the policy settles before it reads
 any rule), and how what it would decide compares with what was decided then: the decision a step's record keeps since
-item 468, or for a step the gate did not let through, what the policy event of its call said. The steps are the
-``tool_result`` events, read newest first by pages, at most so many and for so long, and the rule is matched as the
-policy matches rules (:func:`dotagent.policy.engine.match_rule`), the policy itself untouched: nothing is written and
-nothing decided."""
+item 468, or for a step the gate did not let through, what the policy event of its call said. And how each of the
+owner's rules was used on the same steps, with today's rules (item 473). The steps are the ``tool_result`` events, read
+newest first by pages, at most so many and for so long, and the rules are matched as the policy matches them
+(:func:`dotagent.policy.engine.match_rule`), the policy itself untouched: nothing is written and nothing decided."""
 
 import asyncio
 import time
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from typing import get_args
 
 from dotagent.agent.authorization import StepDecision
@@ -19,7 +19,7 @@ from dotagent.core.text import plain_line, redact_secrets
 from dotagent.core.types import FrozenModel
 from dotagent.policy.engine import match_rule
 from dotagent.policy.types import TAINT_ESCALATION_FLAGS, ActionInfo, ActionKind, DecisionSource, Risk, Verdict
-from dotagent.server.views import RuleExample, RulePreview, RuleShadow
+from dotagent.server.views import RuleExample, RulePreview, RuleShadow, RulesUsage, RuleUsage
 from dotagent.store.db import Store
 from dotagent.store.models import Behavior, RuleRecord, StepRow
 
@@ -247,26 +247,170 @@ def preview_of(tally: Tally, existing: Sequence[RuleRecord], partial: bool) -> R
     )
 
 
+async def _read_steps(
+    store: Store, days: int, now: float, count: Callable[[list[StepRow], float], int], stopped: Callable[[], bool]
+) -> bool:
+    """Read the steps of the last ``days`` before ``now``, newest first, by pages, and hand each page to ``count``,
+    which counts it in a worker thread until the monotonic deadline it is given and says how many it counted; reading
+    ends at the end of the steps, once ``stopped`` says a problem stopped the count, or at the cap of steps or of time.
+    Whether steps were left unread."""
+    floor: int = await store.first_event_id_since(now - days * DAY_S)
+    before: int = 2**62
+    scanned: int = 0
+    ends: float = time.monotonic() + _BUDGET_S
+    while True:
+        wanted: int = min(_PAGE, _MAX_STEPS - scanned)
+        page: list[StepRow] = await store.tool_steps(floor, before, wanted, TAINT_EVENTS)
+        done: int = await asyncio.to_thread(count, page, ends)
+        scanned += done
+        if stopped():
+            return False
+        if done < len(page):
+            return True
+        if len(page) < wanted:
+            return False
+        before = page[-1].event_id
+        if scanned >= _MAX_STEPS or time.monotonic() > ends:
+            left: list[StepRow] = await store.tool_steps(floor, before, 1, TAINT_EVENTS)
+            return left != []
+
+
 async def preview_rule(
     store: Store, candidate: RuleRecord, existing: Sequence[RuleRecord], days: int, now: float
 ) -> RulePreview:
     """Try ``candidate`` on the steps of the last ``days`` before ``now``, newest first, by pages counted in a worker
     thread; a try-out that reaches its cap of steps or of time with steps left says it read the newest only."""
-    floor: int = await store.first_event_id_since(now - days * DAY_S)
-    before: int = 2**62
     tally: Tally = Tally()
-    ends: float = time.monotonic() + _BUDGET_S
-    while True:
-        wanted: int = min(_PAGE, _MAX_STEPS - tally.scanned)
-        page: list[StepRow] = await store.tool_steps(floor, before, wanted, TAINT_EVENTS)
-        done: int = await asyncio.to_thread(tally_steps, tally, existing, candidate, page, ends)
-        if tally.problem is not None:
-            return preview_of(tally, existing, False)
-        if done < len(page):
-            return preview_of(tally, existing, True)
-        if len(page) < wanted:
-            return preview_of(tally, existing, False)
-        before = page[-1].event_id
-        if tally.scanned >= _MAX_STEPS or time.monotonic() > ends:
-            left: list[StepRow] = await store.tool_steps(floor, before, 1, TAINT_EVENTS)
-            return preview_of(tally, existing, left != [])
+
+    def count(page: list[StepRow], deadline: float) -> int:
+        return tally_steps(tally, existing, candidate, page, deadline)
+
+    partial: bool = await _read_steps(store, days, now, count, lambda: tally.problem is not None)
+    return preview_of(tally, existing, partial)
+
+
+class RuleTally:
+    """What one enabled rule did on the steps read so far, with today's rules (item 473)."""
+
+    def __init__(self) -> None:
+        self.fits: int = 0
+        self.last_fit_at: float | None = None
+        self.decides: int = 0
+        self.in_yolo: int = 0
+        self.before_rules: int = 0
+        self.shadowed_by: Counter[str] = Counter()
+
+
+class UsageTally:
+    """How the enabled rules were used on the steps read so far; one is filled page by page and read once at the end."""
+
+    def __init__(self, rules: Sequence[RuleRecord]) -> None:
+        self.scanned: int = 0
+        self.oldest: float | None = None
+        self.rules: dict[str, RuleTally] = {rule.id: RuleTally() for rule in rules if rule.enabled}
+        self.problem: str | None = None
+
+
+def _count_ruled(kept: RuleTally, step: StepRow, behavior: Behavior) -> None:
+    """Count a step that a rule decides as the first to fit it: a yolo run's, which asks nothing whatever the rules say;
+    one settled before any rule; or one it decides."""
+    if step.yolo:
+        kept.in_yolo += 1
+        return
+    said: _Said | None = _said(step)
+    if said is not None and _settled_before_rules(said, behavior):
+        kept.before_rules += 1
+        return
+    kept.decides += 1
+
+
+def _slow_rule(number: int, step: StepRow, error: ConfigError, reached: bool) -> str:
+    """What stops a count of the rules' use: rule ``number``'s pattern took too long on ``step``, or could not be read.
+    The daemon refuses a step that reaches that rule; ``reached`` says whether this one would, no earlier rule fitting
+    it (a check before every rule may still have settled it)."""
+    said: str = (
+        f"The pattern of rule #{number} takes longer than the daemon allows on a past step ({step.tool}: "
+        f"{plain_line(redact_secrets(step.summary), _EXAMPLE_CHARS)}), or cannot be read: {error.message}."
+    )
+    if reached:
+        return f"{said} The daemon refuses a step that reaches rule #{number}."
+    return f"{said} An earlier rule fits this step first, but the daemon refuses a step that reaches rule #{number}."
+
+
+def tally_usage(tally: UsageTally, rules: Sequence[RuleRecord], steps: Sequence[StepRow], deadline: float) -> int:
+    """Count ``steps`` (newest first) for each enabled rule of ``rules`` until the monotonic ``deadline`` passes, and
+    say how many were counted (one at least): which rules a step fits, the first of them in their order deciding it, as
+    the policy picks it. A pattern that takes too long on one stops the count there, with the problem said, as the
+    daemon refuses such a step."""
+    ordered: list[RuleRecord] = sorted(rules, key=lambda rule: rule.position)
+    # A rule's number as the page shows it: its place among all the rules, those switched off too.
+    numbers: dict[str, int] = {rule.id: index + 1 for index, rule in enumerate(ordered)}
+    enabled: list[RuleRecord] = [rule for rule in ordered if rule.enabled]
+    counted: int = 0
+    for step in steps:
+        if counted > 0 and time.monotonic() > deadline:
+            return counted
+        counted += 1
+        tally.scanned += 1
+        tally.oldest = step.at
+        action: ActionInfo | None = _action(step)
+        if action is None:
+            continue
+        fitting: list[RuleRecord] = []
+        for rule in enabled:
+            try:
+                fits: bool = match_rule(action, [rule]) is not None
+            except ConfigError as error:
+                tally.problem = _slow_rule(numbers[rule.id], step, error, fitting == [])
+                return counted
+            if fits:
+                fitting.append(rule)
+        if not fitting:
+            continue
+        first: RuleRecord = fitting[0]
+        for rule in fitting:
+            kept: RuleTally = tally.rules[rule.id]
+            kept.fits += 1
+            if kept.last_fit_at is None:
+                kept.last_fit_at = step.at
+            if rule.id != first.id:
+                kept.shadowed_by[first.id] += 1
+        _count_ruled(tally.rules[first.id], step, first.behavior)
+    return counted
+
+
+def usage_of(tally: UsageTally, rules: Sequence[RuleRecord], partial: bool) -> RulesUsage:
+    names: dict[str, str] = {rule.id: rule.description or f"rule {rule.position}" for rule in rules}
+    return RulesUsage(
+        scanned=tally.scanned,
+        since=tally.oldest,
+        partial=partial,
+        rules=[
+            RuleUsage(
+                rule_id=rule_id,
+                fits=kept.fits,
+                last_fit_at=kept.last_fit_at,
+                decides=kept.decides,
+                in_yolo=kept.in_yolo,
+                before_rules=kept.before_rules,
+                shadowed_by=[
+                    RuleShadow(rule_id=first, description=names.get(first, first), steps=steps)
+                    for first, steps in kept.shadowed_by.most_common()
+                ],
+            )
+            for rule_id, kept in tally.rules.items()
+        ],
+        problem=tally.problem,
+    )
+
+
+async def rules_usage(store: Store, rules: Sequence[RuleRecord], days: int, now: float) -> RulesUsage:
+    """How each enabled rule of ``rules`` was used on the steps of the last ``days`` before ``now``, with today's rules
+    (item 473), read as a try-out reads them."""
+    tally: UsageTally = UsageTally(rules)
+
+    def count(page: list[StepRow], deadline: float) -> int:
+        return tally_usage(tally, rules, page, deadline)
+
+    partial: bool = await _read_steps(store, days, now, count, lambda: tally.problem is not None)
+    return usage_of(tally, rules, partial)
