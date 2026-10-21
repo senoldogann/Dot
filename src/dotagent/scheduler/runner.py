@@ -396,6 +396,7 @@ class Scheduler:
             if one_time:
                 waiting: str = f"waiting: {paused.name} is paused"
                 if record.last_status != waiting:
+                    log.info("schedule_waiting_agent_paused", schedule_id=record.id, agent_id=paused.id)
                     await store.set_schedule_status(record.id, waiting)
                 return
             log.info("schedule_skipped_agent_paused", schedule_id=record.id, agent_id=paused.id)
