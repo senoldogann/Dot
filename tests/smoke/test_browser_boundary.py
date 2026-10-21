@@ -380,7 +380,7 @@ async def test_the_way_back_of_a_sign_in_reaches_the_daemon_and_the_run_reads_no
     """A sign-in that opened in Dot's own Chrome ends in a redirect to the daemon's ``/oauth/callback`` (item 448): the
     hop is sent, so the code reaches the sign-in that waits for it, and the landing check still resets the tab of a run
     that came there, as on every other page of the interface."""
-    view: PageView = await browser.open_url("back", f"{site}/")
+    view: PageView = await browser.open_url("back", f"{site}/", True)
     with pytest.raises(ForbiddenUrlError) as refused:
         await act(browser, "back", [Step(action="click", ref=ref_of(view.body, 'link "Back to Dot"'))], False)
     assert "Dot's own interface" in refused.value.reason, refused.value

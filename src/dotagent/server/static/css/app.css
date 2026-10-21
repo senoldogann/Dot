@@ -7297,11 +7297,11 @@ button.attach-chip:hover {
   align-self: flex-start;
 }
 
-/* A template that suggests a schedule offers it with the agent (item 464): ticked, the schedule is added switched off,
-   for its goal to be read first. */
+/* A template that suggests a schedule offers it with the agent (item 464): switched on, the schedule is added switched
+   off, for its goal to be read first. The row is the switch's (item 488). */
 .template-also {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   color: var(--text-2);
   font-size: var(--text-sm);
@@ -7309,9 +7309,8 @@ button.attach-chip:hover {
   cursor: pointer;
 }
 
-.template-also input {
+.template-also .switch {
   flex: none;
-  margin: 4px 0 0;
 }
 
 /* A schedule on its agent's page (item 464): the goal in full, to be read before it is switched on. */
