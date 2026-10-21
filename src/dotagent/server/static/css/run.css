@@ -286,9 +286,12 @@
 }
 
 /* Reduced motion (item 73): the mark and the blocks stand still, and the band of light is not drawn at all, so the shape
-   of the chat is still seen and the line still read. */
+   of the chat is still seen and the line still read; the composition still fades in, as a page's fade stays. */
 @media (prefers-reduced-motion: reduce) {
-  .chat-loading,
+  .chat-loading {
+    animation: fade-in var(--motion-base) var(--ease);
+  }
+
   .chat-loading-ring,
   .chat-loading-core,
   .chat-loading-mark::before,
