@@ -525,7 +525,7 @@ def _search_files_tool() -> RegisteredTool:
         else:
             found = ok(_capped(lines, "matches"))
         # A match in a page a crawl kept or an MCP answer kept whole was written by third parties (item 494).
-        return mark_untrusted(found) if matches_third_party(lines, ctx.workspace) else found
+        return mark_untrusted(found) if matches_third_party(lines, target_of(args, ctx), ctx.workspace) else found
 
     return make_path_tool(
         name="search_files",

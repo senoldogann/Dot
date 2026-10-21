@@ -23,10 +23,13 @@ def holds_third_party(path: Path, workspace: Path) -> bool:
     return any(path.is_relative_to(root) for root in third_party_roots(workspace))
 
 
-def matches_third_party(lines: list[str], workspace: Path) -> bool:
-    """Whether a line of ripgrep's ``path:line:text`` answer, searched by a resolved path, comes from a third-party
-    file."""
-    roots: tuple[Path, ...] = third_party_roots(workspace)
+def matches_third_party(lines: list[str], target: Path, workspace: Path) -> bool:
+    """Whether ripgrep's answer for a search of ``target`` comes from a third-party file: ``target`` lies in a folder
+    of them (one file searched alone has lines with no path), or a ``path:line:text`` line's path does. Its path begins
+    as ``target`` was written, resolved or the workspace as given, so both spellings of the folders are tried."""
+    if holds_third_party(target, workspace):
+        return True
+    roots: tuple[Path, ...] = (*third_party_roots(workspace), *(workspace / folder for folder in THIRD_PARTY_FOLDERS))
     return any(Path(line.split(":", 1)[0]).is_relative_to(root) for line in lines for root in roots)
 
 

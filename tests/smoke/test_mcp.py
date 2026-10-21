@@ -344,6 +344,8 @@ async def test_a_long_answer_is_kept_whole_in_a_file_whose_reading_is_untrusted(
     assert read.untrusted and "row 005000" in read.text
     searched, _ = await _call(runtime, "search_files", {"pattern": "row 004321"})
     assert searched.untrusted and "row 004321" in searched.text
+    searched_one, _ = await _call(runtime, "search_files", {"pattern": "row 004321", "path": str(kept)})
+    assert searched_one.untrusted and "row 004321" in searched_one.text
     tailed, _ = await _call(runtime, "shell", {"command": "tail -n 1 mcp-results/*.txt"})
     assert tailed.untrusted and "row 005000" in tailed.text
     plain, _ = await _call(runtime, "shell", {"command": "echo hello"})
