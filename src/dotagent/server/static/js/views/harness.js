@@ -194,7 +194,7 @@ function loopFacts(view) {
   return [
     ...fact("When", when),
     ...fact("Test tasks", `${view.scoring_tasks.join(", ")} (${plural(view.step_repeats, "time", "times")} each), on which each new version is tried`),
-    ...fact("Final check", `${view.final_tasks.join(", ")}, played once after a version is put in use, never to choose one`),
+    ...fact("Final check", `${view.final_tasks.join(", ")}, played once by dotx harness final after a version is in use, never to choose one`),
     ...fact("Who chooses", adopts),
     ...fact("Limits", `habits ${view.habits_chars} characters, tool guidance ${view.tool_guidance_chars}, ${view.component_lines} lines each`),
   ];

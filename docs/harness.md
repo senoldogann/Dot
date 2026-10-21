@@ -53,11 +53,11 @@ adopted version, `--adopt` to take it at once) or `POST /api/harness`, and manag
 
 ## The scoring set is the owner's
 
-What a candidate is judged on is never shown to the model that writes it. The proposer reads one run; the probe runs
-the candidate on a *scoring set* it has not seen: the eval tasks that are safe to repeat, and the runs of yours you
-mark as tests. A second, smaller *final set* is never used to choose between candidates: it is run once, after a
-version is adopted, and reported as it comes out, so that the score you read was not optimized against. The owner
-writes the questions, never the program; that, and adopting, is the human's part (Wei et al., "The End of Harness
+What a candidate is judged on is never shown to the model that writes it. The proposer reads one run; the probe runs the
+candidate on a *scoring set* it has not seen: the eval tasks that are safe to repeat, and the runs of yours you mark as
+tests. A second, smaller *final set* is never used to choose between candidates: `dotx harness final` runs it once,
+after a version is adopted, and reports it as it comes out, so that the score you read was not optimized against. The
+owner writes the questions, never the program; that, and adopting, is the human's part (Wei et al., "The End of Harness
 Engineering", 2026, make the same cut: an execution report the run writes, candidates a small model writes, a scoring
 set the operator writes and the proposer never sees, and a final set used once).
 
@@ -84,9 +84,10 @@ The improvement loop (the items after 387 build it in layers) works one *step* a
    each decision tied to an observation; or it keeps the current harness. The composed version is played on the scoring
    set in its turn and survives, as `probed`, when it did better than the base, with the decisions and the evidence in
    its notes; else the best candidate does.
-4. **Adopt.** You adopt it, or not, on the Self-improvement page or with `dotx harness adopt`. `[harness] adopt = "auto"` (off by
-   default) adopts on its own only a version its own probe showed better on a task and worse on none, with two repeats,
-   and never one written from a run that had read content third parties can author: that decision is yours.
+4. **Adopt.** You adopt it, or not, on the Self-improvement page or with `dotx harness adopt`. `[harness] adopt =
+   "auto"` (off by default) adopts on its own only a version its own probe showed better on a task and worse on none,
+   with two repeats, and never one written from a run that had read content third parties can author: that decision is
+   yours.
 
 5. **Reflect.** After the step, a reflector writes what each edit did (helped, hurt, no observed effect, confounded)
    and, when the evidence supports one, an *experience*: the cue (the shape of situation), the lesson, the evidence
