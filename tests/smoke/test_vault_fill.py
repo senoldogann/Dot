@@ -1,9 +1,9 @@
 """A login of the owner's 1Password filled into a page (item 493), through the browser tools and the gate, with a
 stand-in for ``op`` and a real headless Chrome; no model is called. A yolo run fills it and no result shows a value:
-not the fill's, not the page the form lands on, whose address holds them. Scripts stay off in the chat's tabs while
-the filled tab is open, and run again once it is closed. A login of another site is refused before anything is asked,
-a password goes into a password field alone, a frame of another site gets nothing, and a page a script ran in gets no
-login. In auto the owner answers the fill, not the review model.
+not the fill's, not the view of the filled form. Scripts stay off in the chat's tabs while the filled tab is open, and
+run again once it is closed. A login of another site is refused before anything is asked, a password goes into a
+password field alone, a frame of another site gets nothing, nor does a form that sends what is typed in its address,
+and a page a script ran in gets no login. In auto the owner answers the fill, not the review model.
 """
 
 import asyncio
@@ -49,6 +49,7 @@ USERNAME: str = "ada@example.com"
 PASSWORD: str = "S3cret-Passw0rd!"
 CODE: str = "482913"
 _ANSWER_WITHIN_S: float = 30.0
+_HOME: str = "<!doctype html><title>Home</title><h1>Welcome</h1>"
 _POLL_S: float = 0.05
 
 
@@ -75,7 +76,7 @@ class _Handler(BaseHTTPRequestHandler):
         pages: dict[str, str] = {
             "/login": f"""<!doctype html><title>Sign in</title><h1>Sign in</h1>
 <style>[name=user] {{ position: fixed; left: 400px; top: 300px; width: 200px; height: 60px }}</style>
-<form action="/home" method="get">
+<form action="/home" method="post">
 <label>Email <input name="user" autocomplete="username"></label>
 <label>Password <input name="pass" type="password" autocomplete="current-password"></label>
 <label>Code <input name="code" autocomplete="one-time-code"></label>
@@ -88,12 +89,22 @@ class _Handler(BaseHTTPRequestHandler):
 const login = {{ location: {{ href: "http://127.0.0.1:{port}/login" }} }};
 Object.defineProperty(document.querySelector("input"), "ownerDocument", {{ get: () => login }});
 </script>""",
-            "/home": "<!doctype html><title>Home</title><h1>Welcome</h1>",
+            "/get-login": """<!doctype html><title>Search sign in</title>
+<form action="/home" method="get"><label>Password <input name="pass" type="password"></label></form>""",
+            "/home": _HOME,
         }
-        if path == "/home":
-            self.server.submissions.append(self.path)
         body: bytes = pages.get(path, "not found").encode()
         self.send_response(200 if path in pages else 404)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self) -> None:
+        """The form of ``/login``: its fields as sent, kept, and the home page."""
+        self.server.submissions.append(self.rfile.read(int(self.headers.get("Content-Length", "0"))).decode())
+        body: bytes = _HOME.encode()
+        self.send_response(200)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -269,15 +280,18 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     with Image.open(io.BytesIO(shot.data)) as picture:
         pixel: object = picture.convert("RGB").getpixel((500, 330))
     assert isinstance(pixel, tuple) and all(abs(channel - 0x33) < 24 for channel in pixel), pixel
+    # The view of the form shows what its fields hold, masked.
+    seen: ToolResult = await _call(ctx, gate, "browser_snapshot", {})
+    _unseen(seen.text)
+    assert MASK in seen.text, seen.text
     # No script runs in the chat's tabs while the filled tab is open.
     with pytest.raises(BrowserError, match="scripts stay off"):
         await _call(ctx, gate, "browser_eval", {"script": "document.querySelector('input[type=password]').value"})
-    # The form goes with the values; the page it lands on and its address, which holds them, show none of them.
+    # The form goes with the values, and the page it lands on shows none of them.
     sent: ToolResult = await _call(
         ctx, gate, "browser_act", {"steps": [{"action": "press", "ref": refs["code"], "key": "Enter"}]}
     )
     _unseen(sent.text)
-    assert MASK in sent.text, sent.text
     assert site.submissions and quote_plus(PASSWORD) in site.submissions[-1], site.submissions
     # Another page of the same tab: still no script, since going back could bring the filled page back whole.
     with pytest.raises(BrowserError, match="scripts stay off"):
@@ -324,6 +338,12 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
     again: dict[str, str] = await _form(ctx, gate, site)
     filled: ToolResult = await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": again["pass"]})
     _unseen(filled.text)
+    # A form that sends what is typed in the page's address gets no password: the address would hold it.
+    shown: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/get-login"})
+    field: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', shown.text)
+    assert field is not None, shown.text
+    with pytest.raises(BrowserError, match="its method is GET"):
+        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": field.group(1)})
 
 
 async def test_in_auto_the_owner_answers_the_fill_and_not_the_review_model(runtime: Runtime, site: _Site) -> None:

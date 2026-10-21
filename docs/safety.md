@@ -230,7 +230,11 @@ a note that it was saved while reading outside content.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
     (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
     document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
-    so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text.
+    so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text,
+    and a password or a code only into a form that does not send what is typed in the page's address (its method is
+    not GET): an address is written into the views of the page, Chrome's history and Dot's log, and shortened where
+    it is long, so no address holds them. A page can still write them into its own words, which Dot masks where it
+    shows them whole; only the login's own site, which has them anyway, can do that.
   - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
     stricter), and in `auto` you answer it, not the review model.
   - The token is kept in Dot's `.env`, which no tool of a run may read, under a name `op` does not read. The shell

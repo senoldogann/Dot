@@ -15,15 +15,23 @@ _MASKED_FROM_CHARS: int = 4
 
 
 def _forms(value: str) -> set[str]:
-    """``value`` as a page or a script may write it back: as it is, in an address (a form sent by GET puts it there,
-    ``%21`` for ``!``, ``+`` for a space) and inside a JSON string."""
-    return {value, quote(value, safe=""), quote(value), quote_plus(value), json.dumps(value)[1:-1]}
+    """``value`` as a page or a script may write it back: as it is, in an address (``%21`` for ``!``, ``+`` for a
+    space) and inside a JSON string; and each of those with its runs of blanks made one space, as a line of a view is
+    written."""
+    written: set[str] = {value, quote(value, safe=""), quote(value), quote_plus(value), json.dumps(value)[1:-1]}
+    return written | {" ".join(form.split()) for form in written}
 
 
 def masked(text: str, values: Iterable[str]) -> str:
     """``text`` with each of ``values`` of a few characters or more replaced by :data:`MASK`, in each of the forms a
     page may write it in, the longest first, so that a value inside another is masked with it."""
-    forms: set[str] = {form for value in values if len(value) >= _MASKED_FROM_CHARS for form in _forms(value)}
+    forms: set[str] = {
+        form
+        for value in values
+        if len(value) >= _MASKED_FROM_CHARS
+        for form in _forms(value)
+        if len(form) >= _MASKED_FROM_CHARS
+    }
     for form in sorted(forms, key=len, reverse=True):
         text = text.replace(form, MASK)
     return text

@@ -161,6 +161,15 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
 # The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
 # no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
 _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
+# Whether the form a field is in sends what is typed in the page's address (item 493): its method, or one its submit
+# buttons name, is GET. A field in no form goes with the page's own script, which keeps it out of the address as a rule.
+_SENDS_BY_GET_SCRIPT: str = """(field) => {
+  const form = field.form;
+  if (!form) return false;
+  const get = (method) => (method || '').trim().toLowerCase() === 'get';
+  return get(form.getAttribute('method')) || [...form.querySelectorAll('button, input[type=submit], input[type=image]')]
+    .some((button) => get(button.getAttribute('formmethod')));
+}"""
 # The mark of a field a login was filled into (item 493), which every screenshot covers, in every mode: the field shows
 # the username, and a password once the page shows it.
 _FILLED_SELECTOR: str = "[data-dot-vault]"
@@ -628,6 +637,7 @@ async def fill_login_field(
         try:
             frame: Frame | None = await element.owner_frame()
             marking: object = await element.evaluate(_FIELD_MARKING_SCRIPT)
+            by_get: object = await element.evaluate(_SENDS_BY_GET_SCRIPT)
         except PlaywrightError as error:
             raise BrowserError(
                 "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
@@ -647,6 +657,13 @@ async def fill_login_field(
                 f"the field {ref} does not take the login's {kind}: a password goes only into a password field, so "
                 "that it shows in no text",
                 {"ref": ref, "url": page.url, "part": kind, "field": field},
+            )
+        if kind != "username" and by_get is True:
+            # An address is written into the page's views, its history and logs, and shortened where it is long.
+            raise BrowserError(
+                f"the form of the field {ref} sends what is typed in the page's address (its method is GET): Dot fills "
+                f"a login's {kind} only into a form that keeps it out of the address",
+                {"ref": ref, "url": page.url, "part": kind},
             )
         typing()
         try:

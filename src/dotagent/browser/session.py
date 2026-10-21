@@ -126,6 +126,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
+from dotagent.vault.masking import masked
 
 _log = get_logger("dotagent.browser.session")
 
@@ -1744,7 +1745,9 @@ class BrowserSession:
     async def read_text(self, thread_id: str, ref: str | None, offset: int, max_chars: int) -> TextView:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            text: str = squeeze_text(await visible_text(tab.page, ref, _ms(self._config.action_timeout_s)))
+            # Masked before it is cut into slices, so that no slice holds a part of a value (item 493).
+            page_text: str = await visible_text(tab.page, ref, _ms(self._config.action_timeout_s))
+            text: str = squeeze_text(masked(page_text, self.vault_values(thread_id)))
             return TextView(
                 url=tab.page.url, text=text[offset : offset + max_chars], offset=offset, total_chars=len(text)
             )
