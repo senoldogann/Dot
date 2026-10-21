@@ -151,9 +151,10 @@ MODEL: _Recorder = _Recorder()
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
+    # The note the tour saves is saved with no embedding: no Ollama server is asked (item 486).
     (home / "config.toml").write_text(
         '[browser]\nheadless = true\n\n[agent]\nplaybooks = true\nlessons = "off"\n\n[models]\nmain = '
-        f'"{SCRIPTED_MODEL}"\n',
+        f'"{SCRIPTED_MODEL}"\n\n[memory]\nembed_enabled = false\n',
         encoding="utf-8",
     )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
