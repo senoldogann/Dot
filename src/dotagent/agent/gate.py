@@ -217,6 +217,12 @@ class RunGate:
         to them again before it is kept (item 482)."""
         self._owner_away = False
 
+    @property
+    def parking(self) -> Parking | None:
+        """Where the run keeps the steps nobody answers (item 482), None where it refuses them; a run it delegates keeps
+        them there too (item 485)."""
+        return self._parking
+
     def keep_for(self, parking: Parking | None) -> None:
         """Keep the steps the run hands to the owner that nobody answers in time, as ``parking`` says (item 482); None
         refuses them as before."""

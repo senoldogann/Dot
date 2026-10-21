@@ -1230,9 +1230,10 @@ class RunManager:
             asked: RunRecord = await self._runtime.store.get_run(record.run_id)
             if record.kept_until is not None:
                 decided: ApprovalRecord = await self._decide_kept(record, approve, source, note)
-                # A step a session kept, answered while no session of the campaign works (item 484): the campaign's
-                # next session comes forward, once the session that kept it planned it, and its brief says what the
-                # owner answered; a session at work was told, and plans its next one itself.
+                # A step a session kept, or a run it delegated (item 485), answered while no session of the campaign
+                # works (item 484): the campaign's next session comes forward, once the session recording its end
+                # planned it, and its brief says what the owner answered; a session at work was told (found by
+                # :meth:`_carry_kept`), and plans its next one itself.
                 ended: bool = record.scope_campaign_id is not None and not await self._campaign_works(
                     record.scope_campaign_id
                 )
@@ -1606,7 +1607,8 @@ class RunManager:
         ended is followed by the campaign's next session instead, whose brief carries the answer (item 484). The words
         are Dot's: they clear no taint, and only the ``note`` the owner wrote is their instruction, which is all the new
         run's goal adds to the goal it goes on from."""
-        asked: RunRecord = await self._runtime.store.get_run(record.run_id)
+        # A step a delegated run kept is answered to the run at the top, which delegated it (item 485).
+        asked: RunRecord = await self._root_of(record.run_id)
         said: str = note.strip()
         # A session of a campaign hears it itself, never another run of the campaign's conversation; any other kept
         # step goes to the run at work in its chat.
@@ -1655,13 +1657,20 @@ class RunManager:
                 files=(),
                 resumed=None,
                 once=asked.once,
-                carried=tuple(dict.fromkeys((asked.id, newest.id))),
+                carried=tuple(dict.fromkeys((asked.id, record.run_id, newest.id))),
                 picks=NO_PICKS,
             ),
             None,
             asked.agent_id,
         )
         log.info("kept_step_handed_back", approval_id=record.id, run_id=run.id, delivered="run")
+
+    async def _root_of(self, run_id: str) -> RunRecord:
+        """The run at the top of the delegations of ``run_id``: the run itself when nobody delegated it (item 485)."""
+        run: RunRecord = await self._runtime.store.get_run(run_id)
+        while run.parent_run_id is not None:
+            run = await self._runtime.store.get_run(run.parent_run_id)
+        return run
 
     def _ending_sessions(self, sessions: Sequence[RunRecord]) -> list[RunHandle]:
         """The handles this process holds of the ``sessions`` whose end is stored: those recording their end now."""
@@ -2195,21 +2204,24 @@ class RunManager:
                 gate.taint()
             # A step it hands to the owner, or a question for their yes, that nobody answers in time is kept for them
             # where [policy] unanswered says so (items 482, 483): in its chat, or for a session of a campaign in the
-            # campaign's conversation, shared by its sessions (item 484); never in yolo, a delegated run or an eval.
-            conversation_id: str = (
-                thread_id if campaign_id is None else (await runtime.store.get_campaign(campaign_id)).thread_id
-            )
-            gate.keep_for(
-                parking_for(
-                    runtime.config.policy,
-                    approval_mode,
-                    parent_run_id is not None,
-                    source == EVAL_SOURCE,
-                    conversation_id,
-                    campaign_id,
-                    await runtime.store.schedule_of_thread(thread_id),
+            # campaign's conversation, shared by its sessions (item 484); a delegated run keeps them where the run that
+            # delegated it does, so that the answer reaches the run at the top (item 485); never in yolo or an eval.
+            if parent_run_id is not None:
+                gate.keep_for(None if parent is None or approval_mode == "yolo" else parent.gate.parking)
+            else:
+                conversation_id: str = (
+                    thread_id if campaign_id is None else (await runtime.store.get_campaign(campaign_id)).thread_id
                 )
-            )
+                gate.keep_for(
+                    parking_for(
+                        runtime.config.policy,
+                        approval_mode,
+                        source == EVAL_SOURCE,
+                        conversation_id,
+                        campaign_id,
+                        await runtime.store.schedule_of_thread(thread_id),
+                    )
+                )
             cancel: asyncio.Event = asyncio.Event()
             inbox: asyncio.Queue[UserInput] = asyncio.Queue()
             finished: asyncio.Event = asyncio.Event()

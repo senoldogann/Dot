@@ -281,9 +281,15 @@ function sessionRow(session, number) {
   );
 }
 
+// What became of a step a session kept for you (item 484): a hand-off, or a question for your yes.
+const KEPT_ANSWERS = { denied: "Skipped", expired: "Not answered in time, and lapsed" };
+
 function decidedRow(question) {
   const answers = { approved: `Answered: ${question.note}`, denied: "Skipped", expired: "Not answered while the session waited" };
-  const answer = answers[question.status] ?? question.status;
+  const kept = question.kept_until !== null && question.kept_until !== undefined;
+  const done = question.severity === "handoff" ? "You did it" : "Allowed once";
+  const said = question.note === "" ? "" : `: ${question.note}`;
+  const answer = kept ? (question.status === "approved" ? `${done}${said}` : (KEPT_ANSWERS[question.status] ?? question.status)) : (answers[question.status] ?? question.status);
   return el(
     "div",
     { class: "list-row" },

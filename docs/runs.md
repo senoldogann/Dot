@@ -458,13 +458,15 @@ Their tests run against a stand-in of both providers after a real sign-in into a
 
 ## Delegation
 
-`delegate(goal, model?, step?)` hands a sub-goal to a separate run with a conversation of its own and returns
-its result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
-helper model that `model` names when that one can answer (see [Helpers and standby](models.md#models-and-providers)). Several
-calls in one turn run side by side (up to `parallel_tools`), which is how a plan's independent steps run at the same
-time; `step` names the plan step the part is, and the report closes it (see the plan above). A
-delegated run cannot delegate again (the depth is one), ask you a question (its approvals still come to you) or
-consult a helper, does not take one of the
-`max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled. The parent's
-result names the model the delegated run ended on. The delegated run takes its parent's mode, which the model
-cannot choose: a task run's helper can do what the task run can, a research run's helper only reads.
+`delegate(goal, model?, step?)` hands a sub-goal to a separate run with a conversation of its own and returns its
+result, so a long investigation does not fill the parent's context. The run works on the parent's model, or on the
+helper model that `model` names when that one can answer (see [Helpers and standby](models.md#models-and-providers)).
+Several calls in one turn run side by side (up to `parallel_tools`), which is how a plan's independent steps run at the
+same time; `step` names the plan step the part is, and the report closes it (see the plan above). A delegated run cannot
+delegate again (the depth is one), ask you a question (its approvals still come to you) or consult a helper, does not
+take one of the `max_concurrent_runs` slots, starts as untrusted as its parent, and ends when the parent is cancelled.
+The parent's result names the model the delegated run ended on. The delegated run takes its parent's mode, which the
+model cannot choose: a task run's helper can do what the task run can, a research run's helper only reads. A step it
+hands to you, or a question for your yes, that nobody answers in time is kept where its parent keeps them, with
+`[policy] unanswered = "park"` (item 485, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)):
+your answer goes to the parent, or to a run that goes on from it.

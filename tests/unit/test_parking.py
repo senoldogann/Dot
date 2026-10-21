@@ -37,23 +37,20 @@ def _policy(unanswered: Literal["refuse", "park"]) -> PolicyConfig:
 
 @pytest.mark.parametrize("approvals", ["supervised", "ask", "auto"])
 def test_a_run_that_asks_keeps_its_hand_offs_where_park_is_set(approvals: ApprovalMode) -> None:
-    assert parking_for(_policy("park"), approvals, False, False, "thr-1", None, "sch-1") == Parking(
+    assert parking_for(_policy("park"), approvals, False, "thr-1", None, "sch-1") == Parking(
         thread_id="thr-1", campaign_id=None, schedule_id="sch-1", keep_s=7200.0
     )
     # A session of a campaign keeps them in the campaign's conversation, shared by its sessions (item 484).
-    assert parking_for(_policy("park"), approvals, False, False, "thr-c", "cmp-1", None) == Parking(
+    assert parking_for(_policy("park"), approvals, False, "thr-c", "cmp-1", None) == Parking(
         thread_id="thr-c", campaign_id="cmp-1", schedule_id=None, keep_s=7200.0
     )
-    assert parking_for(_policy("refuse"), approvals, False, False, "thr-1", None, "sch-1") is None
+    assert parking_for(_policy("refuse"), approvals, False, "thr-1", None, "sch-1") is None
 
 
-@pytest.mark.parametrize(
-    ("approvals", "delegated", "evaluated"), [("yolo", False, False), ("ask", True, False), ("ask", False, True)]
-)
-def test_yolo_a_delegated_run_and_an_eval_keep_nothing(
-    approvals: ApprovalMode, delegated: bool, evaluated: bool
-) -> None:
-    assert parking_for(_policy("park"), approvals, delegated, evaluated, "thr-1", None, None) is None
+@pytest.mark.parametrize(("approvals", "evaluated"), [("yolo", False), ("ask", True)])
+def test_yolo_and_an_eval_keep_nothing(approvals: ApprovalMode, evaluated: bool) -> None:
+    """A delegated run keeps where the run that delegated it does (item 485), which the manager passes down."""
+    assert parking_for(_policy("park"), approvals, evaluated, "thr-1", None, None) is None
 
 
 def test_the_fingerprint_is_the_step_as_its_card_showed_it() -> None:

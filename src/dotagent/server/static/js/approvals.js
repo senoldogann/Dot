@@ -33,6 +33,8 @@ export function fromRecord(record) {
     status: record.status,
     note: record.note,
     keptUntil: record.kept_until ?? null,
+    // The campaign a kept step belongs to (item 484), a session's helper's too (item 485).
+    scopeCampaignId: record.scope_campaign_id ?? null,
   };
 }
 
@@ -48,6 +50,7 @@ export function fromEvent(runId, data) {
     status: "pending",
     note: "",
     keptUntil: null,
+    scopeCampaignId: null,
   };
 }
 
@@ -310,7 +313,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         ),
         el("div", { class: "approval-text" }, text),
         several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
-        isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil, leftNote === LEFT_IN_CAMPAIGN) : leftNote) : null,
+        isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil, approval.scopeCampaignId !== null || leftNote === LEFT_IN_CAMPAIGN) : leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
         isQuestion || isHandoff
           ? null
