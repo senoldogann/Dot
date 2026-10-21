@@ -64,7 +64,7 @@ known vulnerability (item 217). When something under `.github/` changes, every w
 repository does not have, a known vulnerable action, a cache read by a release, Dependabot taking a release the day it
 is out (it waits a week, `cooldown` in `dependabot.yml`). Any finding fails the job; one accepted is in
 `.github/zizmor.yml` with its reason. zizmor is pinned by its version in the workflow, as pip-audit is; raise it by hand
-when a release brings an audit worth having (`uvx zizmor@<version> .` first, on your Mac).
+when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .` first, on your Mac).
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](../ROADMAP.md) and, from item 459 on, in [roadmap/](../roadmap/); read them before

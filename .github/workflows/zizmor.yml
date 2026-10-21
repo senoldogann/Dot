@@ -3,7 +3,7 @@
 # release that reads a cache, Dependabot taking a release the day it is out, and more (docs.zizmor.sh/audits). It runs
 # when something under .github/ changes, every week, since an advisory or an impostor commit appears without any change
 # here, and on demand. Any finding fails the job; one that is accepted is in .github/zizmor.yml with its reason. The
-# same check on a Mac: `uvx zizmor@1.31.1 .` (CONTRIBUTING.md).
+# same check on a Mac: `uvx zizmor@1.31.1 --min-severity low .` (CONTRIBUTING.md).
 name: zizmor
 
 on:

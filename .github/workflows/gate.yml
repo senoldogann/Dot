@@ -21,7 +21,7 @@ on:
 permissions:
   contents: read
 
-# Each action is pinned by the commit its tag (or branch) named when it was pinned, given in the comment: a tag moved
+# Each action is pinned by the commit its tag named when it was pinned, given in the comment: a tag moved
 # later cannot change what runs here.
 
 concurrency:

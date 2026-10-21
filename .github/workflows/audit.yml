@@ -12,7 +12,7 @@ on:
 permissions:
   contents: read
 
-# Each action is pinned by the commit its tag (or branch) named when it was pinned, given in the comment, as in
+# Each action is pinned by the commit its tag named when it was pinned, given in the comment, as in
 # gate.yml; each tool by its version.
 
 jobs:

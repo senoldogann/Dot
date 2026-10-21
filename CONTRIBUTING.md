@@ -53,7 +53,7 @@ A change under `.github/` is audited by zizmor too (item 487); the same check on
 audits that ask GitHub (`--offline` without it):
 
 ```bash
-uvx zizmor@1.31.1 .
+uvx zizmor@1.31.1 --min-severity low .
 ```
 
 ## Tests
