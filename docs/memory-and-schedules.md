@@ -201,9 +201,9 @@ earlier runs.
   by hand counts as one at its time, and a firing that started no run counts not at all. A one-time schedule is never
   switched off by it. Switching a schedule on again, or changing it, starts its row afresh.
 - How the end of a schedule's run is told on your phone and desktop (item 461): **Notifications** in its form, else
-  `[scheduler] notify` (`always`, every end, by default). **Only when it fails or needs me** (`problems`) tells the
-  failed run that starts a row of failures, not the ones after it, and a run that ends with something it needs from
-  you; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **Firings** and the run's
-  page still show. A run started with **Run now** is told at every level, as are a question, an approval, a draft and
+  `[scheduler] notify` (`always`, every end, by default). **Only when it fails or needs me** (`problems`) tells a run
+  that ends with something it needs from you, failed or not, and of the other failed runs the first of a row, not the
+  ones after it; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **Firings** and
+  the run's page still show. A run started with **Run now** is told at every level, as are a question, an approval, a draft and
   the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

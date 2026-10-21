@@ -16207,9 +16207,9 @@ schedule's as any other's, so a schedule that runs every hour told every hour. *
 `[scheduler] notify`, `always`, which is how Dot worked). The level is read when its run starts and given to the run's
 watch (`Scheduler._track`, `_watch`), so a schedule changed or deleted while its run works tells that run's end at the
 level it had: never no notice, never two (the critique). At the end the watch writes the outcome and the row of failed
-runs (item 458) and, when the level tells it (`scheduler/notices.py` `tells`: `always` every end; `problems` the failed
-run that starts a row of failures, and a run not cancelled that ends with something it needs from the owner; `never`
-none), sends the live event `schedule_run_ended` (the run, how it ended, its answer), which the phone
+runs (item 458) and, when the level tells it (`scheduler/notices.py` `tells`: `always` every end; `problems` a run not
+cancelled that ends with something it needs from the owner, failed or not, and of the other failed runs the first of a
+row; `never` none), sends the live event `schedule_run_ended` (the run, how it ended, its answer), which the phone
 (`notify/push.py` `finished_message`) and the desktop (attention.js) word as every run's end; they no longer tell the
 plain end (`run_finished`) of a run a schedule started, while a campaign's session, also started by the scheduler, is
 told as before. A run started by hand (**Run now**) is told at every level (`BY_HAND_LEVEL`): the owner asked for it. At

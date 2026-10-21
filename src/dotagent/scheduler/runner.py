@@ -628,9 +628,9 @@ class Scheduler:
             log.error("campaign_session_start_failed", campaign_id=campaign_id, error=exc.message, context=exc.context)
 
     async def _watch(self, schedule_id: str, run_id: str, level: NotifyLevel) -> None:
-        """Write the outcome of a run to its schedule once the run is over, with its row of failed runs (item 458), and
-        tell its end at ``level`` (item 461), even when that write failed; a repeating schedule whose runs failed so
-        many times in a row is switched off, and the owner told once."""
+        """Write the outcome of a run to its schedule once the run is over, with its row of failed runs (item 458); a
+        repeating schedule whose runs failed so many times in a row is switched off, and the owner told once. The end
+        is told at ``level`` (item 461) even when the write or the switch-off failed."""
         try:
             finished: RunRecord = await self._manager.wait(run_id)
             failed_in_row: int | None = None
@@ -644,9 +644,11 @@ class Scheduler:
                     error=exc.message,
                     context=exc.context,
                 )
-            await self._tell_end(schedule_id, finished, level, failed_in_row)
-            if finished.status == "failed" and failed_in_row is not None:
-                await self._stop_if_failing(schedule_id, failed_in_row)
+            try:
+                if finished.status == "failed" and failed_in_row is not None:
+                    await self._stop_if_failing(schedule_id, failed_in_row)
+            finally:
+                await self._tell_end(schedule_id, finished, level, failed_in_row)
         finally:
             self._in_flight.pop(schedule_id, None)
 

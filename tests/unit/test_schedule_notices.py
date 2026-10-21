@@ -1,5 +1,5 @@
-"""How the end of a schedule's run is told (item 461): always every end, never none, and problems a failure that
-follows a run that went well (or one whose row is unknown) and an end that needs the owner, unless it was stopped."""
+"""How the end of a schedule's run is told (item 461): always every end, never none, and problems an end that needs
+the owner, unless it was stopped, and a failure that follows a run that went well (or one whose row is unknown)."""
 
 import pytest
 
@@ -21,6 +21,8 @@ def test_the_level_is_the_schedules_own_else_the_configured_one_and_a_run_by_han
         ("never", "failed", "Sign in.", 1, False),
         ("problems", "failed", "", 1, True),
         ("problems", "failed", "", 2, False),
+        # A run that needs the owner is told even as the second failure of a row.
+        ("problems", "failed", "Sign in to the bank.", 2, True),
         ("problems", "failed", "", None, True),
         ("problems", "done", "", 0, False),
         ("problems", "done", "Sign in to the bank.", 0, True),

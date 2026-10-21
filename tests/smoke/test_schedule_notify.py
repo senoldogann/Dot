@@ -16,6 +16,7 @@ from playwright.async_api import Browser, Locator, Page, async_playwright, expec
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
+from dotagent.core.errors import StoreError
 from dotagent.core.types import JsonObject
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
@@ -246,6 +247,31 @@ async def test_a_schedule_deleted_while_its_run_works_still_tells_its_end(
         await scheduler.drain()
     await asyncio.sleep(0.1)
     assert told.runs.count(run_id) == 1, told.runs
+
+
+async def _store_gone(*args: object) -> None:
+    raise StoreError("the store is gone", {})
+
+
+async def test_the_switch_off_and_the_notice_of_a_failed_run_are_each_done_when_the_other_fails(
+    runtime: Runtime,
+    manager: RunManager,
+    scheduler: Scheduler,
+    client: httpx.AsyncClient,
+    told: Told,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    limited: JsonObject = {"goal": "Look.", "cron": "*/5 * * * *", "stop_after_failures": 1}
+    untold: ScheduleRecord = await _schedule(client, {"name": "untold", **limited})
+    with monkeypatch.context() as patch:
+        patch.setattr(scheduler, "_tell_end", _store_gone)
+        await _fired(runtime, manager, scheduler, untold.id, False, "")
+    assert not (await runtime.store.get_schedule(untold.id)).enabled
+    kept_on: ScheduleRecord = await _schedule(client, {"name": "kept on", **limited})
+    with monkeypatch.context() as patch:
+        patch.setattr(scheduler, "_stop_if_failing", _store_gone)
+        failed: str = await _fired(runtime, manager, scheduler, kept_on.id, False, "")
+    assert told.runs.count(failed) == 1, told.runs
 
 
 @pytest.mark.browser
