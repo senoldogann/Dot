@@ -188,10 +188,10 @@ Both modes share what follows.
   (`own`) closes, the Playwright driver with it, once nothing used it for that long: no chat's step is under way in it,
   no run at work holds tabs in it, no page is being read in it for the web tools or watched under "Dot's computer", no
   task is being taught in it, and its window is not the one in front. The next call that needs it starts it again on the
-  same profile, signed in as before (a profile keeps its session cookies, item 453); the chats' tabs go with it. Dot's
-  Chrome is the Google Chrome application, so while it runs macOS takes it for yours: a click on Chrome in the Dock
-  brings Dot's forward instead of opening yours. Once Dot's has closed, the Dock opens yours again; while a run works in
-  its browser, the mode `attach` lets Dot work in your own Chrome instead.
+  same profile, signed in as before (a profile keeps its session cookies, item 453; Incognito keeps nothing); the chats'
+  tabs go with it. Dot's Chrome is the Google Chrome application, so while it runs macOS takes it for yours: a click on
+  Chrome in the Dock brings Dot's forward instead of opening yours. Once Dot's has closed, the Dock opens yours again;
+  while a run works in its browser, the mode `attach` lets Dot work in your own Chrome instead.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the
   cloud-metadata hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any
