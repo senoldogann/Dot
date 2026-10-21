@@ -14,7 +14,10 @@ and the reader's choice stays; folded, it still says what call runs now, except 
 Appearance › *Fold tool steps* says whether
 those lines start folded (Neutral and the palettes fold them, Paper does not). The short marks at the left of the
 conversation stand for its messages, and a click on one goes to it — the last of them to the newest question and the
-work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out.
+work under it. A very long conversation keeps its last forty turns on the page and says how many it leaves out. While a
+chat is read, its page shows the shape of the conversation to come — a message of yours and the answer under it, under
+Dot's mark and the line that say the chat is opening — so an empty page never stands in its place (item 501); with
+reduced motion it stands still.
 
 `finish` takes the `answer` and a `success` flag. The `answer` is the complete message the user reads (the findings, the
 figures or the text that was asked for, with the links to the sources), and it is the result of the run: the web UI

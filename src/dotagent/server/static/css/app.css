@@ -129,6 +129,10 @@
   --motion-spin: 0.8s;
   --motion-moment: 3s;
   --motion-shimmer: 1.8s;
+  /* The chat's opening (item 501): the turn of the ring around Dot's mark while a run is read, and the band of light that
+     crosses the blocks of the conversation to come. */
+  --motion-turn: 6s;
+  --motion-shine: 3.4s;
   /* The opening (item 114): one timeline that every part of it shares, and the fall of a dot, quicker as it drops. */
   --motion-opening: 1.3s;
   --ease-fall: cubic-bezier(0.55, 0, 1, 0.45);
