@@ -1717,9 +1717,14 @@ class RunManager:
         text: str = _answer_text(question, answer)
         active: RunHandle | None = self._active_on(asked.thread_id)
         if active is not None:
+            # The answer to a question a run the owner watches left without waiting (item 506) does what the answer to
+            # one it waits for does: it is their instruction, and it clears no mark of untrusted content, so the run's
+            # choice to wait never decides what the answer does to its trust. The answer to one a run nobody answers
+            # left is the owner's message to the run, which restores it.
+            vouches: bool = not can_ask_user(asked.source, asked.parent_run_id, asked.approvals)
             try:
                 active.inbox.put_nowait(
-                    UserInput(text=text, files=(), question_id=question.id, vouches=True, said=text)
+                    UserInput(text=text, files=(), question_id=question.id, vouches=vouches, said=text)
                 )
             except asyncio.QueueShutDown:
                 await active.finished.wait()

@@ -1721,7 +1721,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             True,
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
-    questions: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
+    asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
+    # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
+    # wait for the answer whatever it says (item 506).
+    questions: AskMode = "wait" if asks == "choose" and agent.opening.picks.plan_first else asks
     # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
     # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
     # the provider's cache of the instructions and the history holds from message to message (item 404). More skills

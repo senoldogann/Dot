@@ -27,7 +27,7 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
-from dotagent.store.models import NO_PICKS, AgentRecord, ApprovalRecord, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, AgentRecord, ApprovalRecord, EventRecord, RunPicks, RunRecord, ThreadRecord
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -319,8 +319,27 @@ async def test_a_question_asked_without_wait_in_a_run_the_user_watches_goes_on_a
     assert (ended.status, ended.result) == ("done", "port.txt holds 8431.")
     assert "approval_requested" not in [event.kind for event in events]
     assert "on the chat for the user, and you go on" in _result_of(events, ASK_USER_TOOL)
-    assert [event.data["text"] for event in events if event.kind == "steer"] == [CARRIED]
+    # The answer is the owner's instruction, as a waited one is, and vouches for nothing: it clears no mark.
+    steers: list[EventRecord] = [event for event in events if event.kind == "steer"]
+    assert [(event.data["text"], event.data["vouches"]) for event in steers] == [(CARRIED, False)]
     assert [record.id for record in on_thread] == [run.id]
+
+
+async def test_a_question_of_a_run_sent_with_plan_first_waits_though_it_is_asked_without_wait(
+    login_env: dict[str, str],
+) -> None:
+    """Item 506: a message sent with Plan first acts only once the owner agrees, so its run's questions wait."""
+    model: ScriptedProvider = ScriptedProvider(_PROVIDER, [ASK, _finish("port.txt holds 8431.", True, "")])
+    picks: RunPicks = RunPicks(plugins=(), skills=(), plan_first=True)
+    async with _session(login_env, model) as (runtime, manager):
+        async with runtime.bus.subscribe(None) as subscription:
+            run: RunRecord = await manager.start_picked(
+                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "ask", False, (), picks
+            )
+            asked: EventRecord = await _next(subscription, "approval_requested")
+        assert (await runtime.store.get_run(run.id)).status == "blocked"
+        await manager.decide(str(asked.data["approval_id"]), True, UI_SOURCE, ANSWER)
+        assert (await _ended(manager, run)).status == "done"
 
 
 async def test_text_between_tool_steps_does_not_end_a_task_run(login_env: dict[str, str]) -> None:

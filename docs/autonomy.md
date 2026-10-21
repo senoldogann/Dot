@@ -140,12 +140,13 @@ conversation as your message, for the next run there. An empty answer is refused
 left question never expires. With `wait` such a question waits as in a run you watch, for `approval_timeout_s` at most.
 
 **Questions in a run you watch.** A run you started in any mode but `yolo`, in the daemon (from the web page, the phone
-or the menu bar), chooses for each question whether it waits for your answer (item 506). One asked with `wait`, which
-it uses only when nothing useful can be done until you answer, waits as before, for `approval_timeout_s` at most. Any
-other is left on the chat as above and the run goes on with what does not depend on the answer: its status stays
-`running`, the card waits under "Dot asked you", and your answer comes to the run as your message at its next step, or,
-once it has ended, carries the work on as above. A run of a `dotx` command waits for every answer, as no other process
-can reach it while it works.
+or the menu bar), chooses for each question whether it waits for your answer (item 506). One asked with `wait`, which it
+uses only when nothing useful can be done until you answer, waits as before, for `approval_timeout_s` at most. Any other
+is left on the chat as above and the run goes on with what does not depend on the answer: its status stays `running`,
+the card waits under "Dot asked you", and your answer comes to the run as your instruction at its next step, clearing no
+mark of untrusted content, as a waited answer does not ([Safety](safety.md#safety)), or, once it has ended, carries the
+work on as above. A run of a message sent with Plan first, and a run of a `dotx` command, which no other process can
+reach while it works, wait for every answer.
 
 **Steps kept for you.** A step the policy hands to you (money, a credential, a rule of yours that hands it off) waits
 `approval_timeout_s` for **I did it**, as every question of the policy does. With `[policy] unanswered = "park"` (item

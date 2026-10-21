@@ -183,18 +183,19 @@ other agents of the Mac set up count the same way, unfenced, and so does reading
 when it is too long for one result, under `<workspace>/crawl/` and `<workspace>/mcp-results/` (item 494): `read_file` of
 one, a `search_files` match in one or a search of one, a shell line that names one or runs in one (the words of the
 line are read, so a line that reaches them otherwise, by a variable or a search of the workspace, is not seen); a
-failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and
-from then on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a
-schedule or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a
-change on a code host, inline code that reaches the network or runs a command of it) ask even when the preset or an
-`allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to the run clears
-the mark. A delegated run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off,
-and the run that tells a chat that its command in the background ended as the chat's last run ended: that message is
-Dot's, not yours, and so is the note that tells a run at work of such an end, which clears nothing. A message you send
-starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`): it is never among the
-notes a run starts with, is handed while it works or as a site's lessons (item 384), a `memory_search` that returns
-one marks the run that read it, so its next save asks again, and Settings › Memory and `dotx memory list` say of such
-a note that it was saved while reading outside content.
+failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and from then
+on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
+or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a change on a
+code host, inline code that reaches the network or runs a command of it) ask even when the preset or an `allow` rule
+would let them through; only a `preapproved` rule skips the question. A message you send to the run clears the mark;
+your answer to a question of a run you watch does not, whether the run waited for it or went on (item 506), as it
+answers what the run asked rather than sending it on its way. A delegated run starts as untrusted as its parent, a
+resumed run as the run it resumes was when it was cut off, and the run that tells a chat that its command in the
+background ended as the chat's last run ended: that message is Dot's, not yours, and so is the note that tells a run at
+work of such an end, which clears nothing. A message you send starts a run unmarked. A note a run saved while it was
+marked keeps that origin (`tainted`): it is never among the notes a run starts with, is handed while it works or as a
+site's lessons (item 384), a `memory_search` that returns one marks the run that read it, so its next save asks again,
+and Settings › Memory and `dotx memory list` say of such a note that it was saved while reading outside content.
 
 **Secrets.**
 
