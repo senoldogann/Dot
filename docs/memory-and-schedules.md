@@ -168,6 +168,19 @@ standard speed). Options left on "default" take the configured value when the sc
 creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
 the form is open, **New schedule** reads **Close**, with a cross.
 
+**Run now** (the play button of a schedule's row, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
+once, switched on or off, due or not; the button says that it does real work, as at its time, with the approvals its
+run takes, and the run's page opens, where Stop is. The run goes as a firing goes: unattended, with the schedule's own
+choices (a yolo schedule's run asks nothing), the digest of its earlier runs, in a chat of its own titled
+`<name> · <time> · by hand` (or in the schedule's chat, with "the same chat"), and its first message says it was
+started by hand. Nothing of when the schedule fires next nor of whether it is switched on changes: a one-time schedule
+is still due at its moment. It does not start while the emergency stop is engaged, nor while a run of the schedule is
+at work or being started (409), and a firing whose time comes meanwhile is skipped as for a run still going. A start
+the daemon refuses leaves no chat behind and is no missed firing. **Firings** under a schedule lists its last runs,
+at its time and by hand, newest first, one at work among them, each with how it went, when, its chat and the first
+line of its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand
+among its earlier runs.
+
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
   is skipped and waits for the next; you are told, as you are when a firing's run cannot start (see the notifications

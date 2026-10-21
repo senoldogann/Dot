@@ -67,6 +67,7 @@ from dotagent.store.models import (
     RunPicks,
     RunRecord,
     RunStatus,
+    ScheduleFiring,
     ScheduleOptions,
     ScheduleRecord,
     SentMessage,
@@ -3456,6 +3457,29 @@ class Store:
         """Mark the chat ``thread_id`` as one of the schedule ``schedule_id`` (item 257), whose next firings read the
         runs it started there."""
         await self._db.execute("UPDATE threads SET schedule_id = ? WHERE id = ?", (schedule_id, thread_id))
+        await self._db.commit()
+
+    async def schedule_firings(self, schedule_id: str, source: str, limit: int) -> list[ScheduleFiring]:
+        """The last ``limit`` runs of ``source`` (the scheduler's) in the chats of the schedule ``schedule_id``, newest
+        first, one at work among them, each with the title of its chat (item 455): its firings, at its time and by
+        hand, without the runs they delegated or the owner's follow-ups."""
+        rows = await self._all(
+            "SELECT r.*, t.title AS chat_title FROM runs r JOIN threads t ON t.id = r.thread_id"
+            " WHERE t.schedule_id = ? AND r.source = ? AND r.parent_run_id IS NULL"
+            " ORDER BY r.created_at DESC LIMIT ?",
+            (schedule_id, source, limit),
+        )
+        return [ScheduleFiring(run=_run(row), chat_title=str(row["chat_title"])) for row in rows]
+
+    @_writing
+    async def record_schedule_hand_run(self, schedule_id: str, started_at: float, thread_id: str) -> None:
+        """A run of the schedule ``schedule_id`` the owner started by hand at ``started_at`` in the chat ``thread_id``
+        (item 455): its last run and its chat, and nothing of when it fires next nor of whether it is switched on,
+        which :meth:`record_schedule_fire` would change."""
+        await self._db.execute(
+            "UPDATE schedules SET last_run_at = ?, thread_id = ?, last_status = 'running' WHERE id = ?",
+            (started_at, thread_id, schedule_id),
+        )
         await self._db.commit()
 
     async def schedule_runs(self, schedule_id: str, source: str, limit: int) -> list[RunRecord]:

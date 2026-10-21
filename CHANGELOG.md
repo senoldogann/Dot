@@ -5,14 +5,16 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- Schedules: **Run now** starts a schedule's run at once, switched on or off, as its firing would run, without
+  changing when it fires next; **Firings** lists its last runs, at its time and by hand (item 455).
 - Settings › Rules: a rule's arrows move it up or down the order the rules are checked in, and a rule that an earlier
   rule fits wherever it fits says it never decides, with the number of the rule that decides in its place. The note
   above the rules now says what a yolo run keeps of the protections that are always on: only a research run's limit
   (item 449).
-- In `yolo`, Dot no longer asks you about what every other mode refuses (a read of where your secrets are kept, data
-  sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own files outside the undo
-  journal): the step runs and is recorded. Money and credentials are still handed to you, and a message or a post in
-  your name still waits for your yes (item 433).
+- In `yolo`, Dot asks you nothing (items 433 and 443): not about what every other mode refuses (a read of where your
+  secrets are kept, data sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own
+  files outside the undo journal), nor about money, a credential, a message or a post in your name: the step runs and
+  its record keeps the reason it would have asked for. Only a research run's limit stands.
 - An approval's card stays in its own chat: the home lists a run that waits under Waits for you without its card,
   and once you allow it the card leaves the chat with the line that asked for it. A refused card stays, saying so
   (item 434).

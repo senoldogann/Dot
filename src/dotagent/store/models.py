@@ -390,6 +390,14 @@ class ScheduleRecord(FrozenModel):
     options: ScheduleOptions
 
 
+class ScheduleFiring(FrozenModel):
+    """A run a schedule started, at its time or by hand (item 455), with the title of the chat it went in, which says
+    which of the two it was."""
+
+    run: RunRecord
+    chat_title: str
+
+
 class CampaignRecord(FrozenModel):
     """A goal that Dot works on in sessions, through restarts and days, until its outcome is verified or the owner
     stops it. ``thread_id`` is the owner's conversation it was started in. ``targets`` and ``verification`` are what

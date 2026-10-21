@@ -229,6 +229,12 @@ class MemoriesQuery(FrozenModel):
     offset: int = Field(default=0, ge=0)
 
 
+class FiringsQuery(FrozenModel):
+    """How many of a schedule's last firings to list (item 455)."""
+
+    limit: int = Field(default=20, ge=1, le=50)
+
+
 class SearchQuery(FrozenModel):
     q: str = Field(min_length=1, max_length=500)
     limit: int = Field(default=10, ge=1, le=50)
