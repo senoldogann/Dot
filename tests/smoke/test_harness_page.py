@@ -1,4 +1,4 @@
-"""Settings › Self-improvement (the harness) in a real browser (item 393, its words item 502): with no version the page
+"""Settings › Self-improvement (the harness) in a real browser (item 393, its words item 503): with no version the page
 says Dot's built-in instructions alone are in use; a version written on the page and put in use shows in use and in
 the list; setting it aside leaves the built-in instructions again; on a phone the settings list has the row."""
 
@@ -106,7 +106,7 @@ async def test_a_version_written_on_the_page_is_in_use_until_it_is_set_aside(
 ) -> None:
     page: Page = await _open(browser, client, 1280)
     try:
-        # The page says what it is in plain words (item 502).
+        # The page says what it is in plain words (item 503).
         await expect(
             page.get_by_text("Dot learns from its own runs how to work better on this Mac.", exact=False)
         ).to_be_visible()

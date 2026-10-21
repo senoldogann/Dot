@@ -1,5 +1,5 @@
 // Settings › Self-improvement (item 393, docs/harness.md: the harness): what Dot improves around its model, in plain
-// words (item 502). The version in use and its texts, a form for a version of the owner's, every version with Use and
+// words (item 503). The version in use and its texts, a form for a version of the owner's, every version with Use and
 // Set aside, the nights of learning and the lessons they kept, and how the nightly learning is set.
 
 import { api } from "../api.js";

@@ -163,7 +163,7 @@ the lesson writer: its words cannot pass into a clean run's candidate unmarked.
 
 ## The page
 
-Settings › *Self-improvement* is the harness's page, in plain words (item 502): it opens by saying that Dot learns
+Settings › *Self-improvement* is the harness's page, in plain words (item 503): it opens by saying that Dot learns
 from its own runs how to work better on this Mac, that every run follows two short texts besides Dot's built-in
 instructions, that each night Dot can propose a new version and try it on test tasks first, and that you choose the
 version it follows and never have to write one. Its words for the states are *new* (`candidate`), *tried* (`probed`),
