@@ -1,7 +1,7 @@
-"""The side menu shows every agent of a run (item 198): under a run at work, every run it delegated, those at work with
-their time and those that ended with how they ended, behind a button that says how many work and folds them; the fold
-is kept. The side menu counts the chats at work (item 202). Scripted runs, served by a real server, wide and on a phone,
-light and dark."""
+"""The side menu shows every agent of a run (item 198): a chat at work wears the faces of every run it delegated, those
+at work and those that ended, three at most with the rest counted (item 507), and its name for a screen reader says how
+many there are. The side menu counts the chats at work (item 202). Scripted runs, served by a real server, wide and on a
+phone, light and dark."""
 
 import asyncio
 import time
@@ -140,7 +140,7 @@ async def _open_sidebar(browser: Browser, address: str, width: int, scheme: Lite
     return page
 
 
-async def test_the_side_menu_shows_every_agent_of_a_run_and_folds_them(
+async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
     manager, address = served
@@ -151,32 +151,19 @@ async def test_the_side_menu_shows_every_agent_of_a_run_and_folds_them(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for index, (width, scheme) in enumerate(_SHOTS):
+            for width, scheme in _SHOTS:
                 page: Page = await _open_sidebar(browser, address, width, scheme)
                 section: Locator = page.locator("#sidebar [data-section=working]")
-                # Working holds the run's chat (item 202), every run it delegated under it.
+                # Working holds the run's chat (item 202), wearing the faces of every run it delegated (item 507):
+                # three, the one at work among them, and nothing under the row.
                 await expect(section.locator(".side-label")).to_have_text("Working 1")
-                fold: Locator = section.locator("button.side-children-fold")
-                await expect(fold).to_have_text("3 delegated runs · 1 working")
-                await expect(fold).to_have_attribute("aria-expanded", "true")
-                kids: Locator = section.locator(".side-children a.side-child")
-                await expect(kids).to_have_count(len(_SHELVES))
-                await expect(kids.locator(".side-working")).to_have_count(1)
-                await expect(kids.filter(has_text="done")).to_have_count(2)
+                row: Locator = section.locator(".side-chat > .side-run")
+                faces = row.locator(".side-chat-helpers .side-helper")
+                await expect(faces).to_have_count(len(_SHELVES))
+                await expect(faces.locator(".avatar[data-state='working']")).to_have_count(1)
+                await expect(section.locator(".side-children")).to_have_count(0)
+                assert "3 helpers" in (await row.get_attribute("aria-label") or "")
                 await page.screenshot(path=str(tmp_path / f"agents-{width}-{scheme}.png"))
-                if index == 0:
-                    # Folded, they stay folded on the next visit, and come back unfolded.
-                    await fold.click()
-                    await expect(fold).to_have_attribute("aria-expanded", "false")
-                    await expect(kids.first).to_be_hidden()
-                    await page.reload()
-                    fold = page.locator("#sidebar [data-section=working] button.side-children-fold")
-                    await expect(fold).to_have_attribute("aria-expanded", "false")
-                    await expect(page.locator("#sidebar .side-children a.side-child").first).to_be_hidden()
-                    await page.screenshot(path=str(tmp_path / f"agents-folded-{width}-{scheme}.png"))
-                    await fold.click()
-                    await expect(fold).to_have_attribute("aria-expanded", "true")
-                    await expect(page.locator("#sidebar .side-children a.side-child")).to_have_count(len(_SHELVES))
                 await page.close()
         finally:
             await browser.close()

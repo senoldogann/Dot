@@ -780,13 +780,23 @@
   font-weight: var(--weight-label);
 }
 
+/* The chat's last line: its words, ellipsized, and the faces of what it delegated at their end (item 507). */
 .side-chat-last {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-width: 0;
   color: var(--muted);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
+}
+
+.side-chat-words {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .side-chat-meta {
@@ -805,37 +815,50 @@
   background: var(--accent);
 }
 
-/* Delegated runs under the run that delegated them (item 68), behind the button that folds them (item 198): it says
-   how many there are, and how many of them work while some have ended. */
-.side-family {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-half);
+/* The runs a row delegated, laid over one another (item 507), as the marks of the connected apps stand in the foot: three
+   faces at most, the rest counted, each ringed in the sidebar's own ground so that a hovered row does not show through.
+   A chat wears them in the line its last words would take; the row itself opens the chat they work in. */
+.side-helpers {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
 }
 
-.side-children-fold {
-  align-self: flex-start;
-  width: auto;
-  margin-left: 12px;
-  padding: var(--space-half) 8px;
-  border-radius: var(--radius-sm);
+.side-helpers > * + * {
+  margin-left: calc(-1 * var(--space-1));
+}
+
+.side-helper {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  box-shadow: 0 0 0 2px var(--sidebar);
+}
+
+.side-helper .avatar {
+  width: 20px;
+  height: 20px;
+}
+
+.side-helper .status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.side-helper-more {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  box-shadow: 0 0 0 2px var(--sidebar);
+  color: var(--muted);
   font-size: var(--text-xs);
   line-height: var(--leading-xs);
-  color: var(--muted);
-}
-
-.side-children-fold:hover {
-  background: color-mix(in srgb, var(--text) 6%, transparent);
-}
-
-.side-children {
-  margin-left: 12px;
-  padding-left: 8px;
-  border-left: 1px solid var(--border);
-}
-
-.side-child .side-run-goal {
-  font-size: var(--text-sm);
 }
 
 /* Inside the desktop shell (item 88) the system draws the traffic lights over the top left of the page, where the
@@ -1020,9 +1043,8 @@
     padding-right: 36px;
   }
 
-  /* What a run does now and how many runs it delegated read at a hint's size; the ages and times stay the smallest. */
-  .side-activity-detail,
-  .side-children-fold {
+  /* What a run does now reads at a hint's size; the ages and times stay the smallest. */
+  .side-activity-detail {
     font-size: var(--text-sm);
     line-height: var(--leading-sm);
   }

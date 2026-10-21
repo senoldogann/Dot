@@ -20,11 +20,12 @@ works. The creatures rest; only those at work move. Each chat stands once (item 
 while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
 ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
 **Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second).
-Under it hang all the runs it delegated (item 198), each saying the same while it works and how it ended
-once it has, behind a line that says how many there are and, while some have ended, how many work; a click on it folds
-them, and the fold is kept. Working lists too what is no chat's: a schedule about to fire, the session of a campaign
-(which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
-days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
+Under its name, in the line its last words would take, stand the faces of the runs it delegated (item 507), those at
+work and those that ended: three at most, laid over one another as the marks of the connected apps stand in the foot, the
+rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
+whose conversation and Agents tab hold those runs. Working lists too what is no chat's: a schedule about to fire, the
+session of a campaign (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
+its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
 chat in sight, and the search finds the chats at work
 too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
 and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
@@ -93,9 +94,10 @@ banner floats under the bar, so nothing on the page moves, and a page left out o
 out of sight. The daemon serves the pages as it read them when it started, hidden files
 left out (item 309): files changed on disk while it runs (a merge, a batch of work ported in) wait for its next start,
 so that a page never asks the daemon's API for a field or a route only a newer daemon has. A run delegated by another
-run sits under the run that delegated it, in the sidebar, with its steps so far and its
-channel; the parent's row says how many runs it delegated. In the chat, the delegated run's card carries a chip with its
-progress ("step 3 · web_fetch", then "done · 12 steps") and an **open** link to the run's own page.
+run stands in the sidebar as a small face in the row of the run that delegated it, three at most with the rest counted
+(item 507), and the row's name says how many there are. In the chat, the delegated run's card carries a chip with its
+progress ("step 3 · web_fetch", then "done · 12 steps"), its steps so far, the time it has worked and an **open** link to
+the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
