@@ -669,12 +669,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const statusBar = el("div", { class: "status-bar", hidden: true }, capsule.element);
   const dock = el("div", { class: "dock" }, statusBar, resumeLine, queue.element, loops.element, background.element, frame.element, foot);
 
-  // Steer messages that are sent but not read yet; each one leaves when the run reports reading it.
+  // Steer messages that are sent but not read yet; each one leaves when the run reports reading it, at once while its
+  // model is at a step, after the tool at work otherwise (item 509).
   const waitingMessages = [];
   const waitingList = el("div", { class: "stack tight", hidden: true });
 
   function holdMessage(text) {
-    const label = el("span", null, `Waiting for the next step: “${clip(text, QUOTE_CHARS)}”`);
+    const label = el("span", null, `Sending to the run: “${clip(text, QUOTE_CHARS)}”`);
     const node = el("div", { class: "note" }, icon("clock"), label);
     const entry = { text, node, label };
     waitingMessages.push(entry);

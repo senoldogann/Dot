@@ -624,7 +624,8 @@
   padding: 0 var(--space-2) 0 var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-pill);
-  background: var(--surface);
+  /* The sidebar's own ground, as the cog beside it (item 509). */
+  background: transparent;
   color: var(--text);
   font: inherit;
   font-size: var(--text-sm);
@@ -633,6 +634,7 @@
 
 .side-connect:hover {
   border-color: var(--border-strong);
+  background: color-mix(in srgb, var(--text) 4%, transparent);
 }
 
 .side-connect[data-current] {

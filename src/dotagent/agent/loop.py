@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Awaitable, Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -1421,6 +1421,42 @@ async def _complete_in_time(
         ) from exc
 
 
+@dataclass(frozen=True)
+class _Heard:
+    """What came of a step's model call raced against the run's inbox (:func:`_complete_unless_steered`): the model's
+    reply, or ``None`` when a message arrived first and the call was given up; and that message, when one did."""
+
+    reply: ModelReply | None
+    sent: UserInput | None
+
+
+async def _complete_unless_steered(inbox: asyncio.Queue[UserInput], call: Awaitable[ModelReply]) -> _Heard:
+    """Await the model's reply to a step, unless a message to the run (a steer, the answer to a question) arrives
+    first: the call is then cancelled, and the loop reads the message before it asks again (item 509). A message that
+    arrives as the reply does is handed back with it; one that arrives as the call fails goes back to the inbox, and the
+    error is raised as it was."""
+    reply_task: asyncio.Future[ModelReply] = asyncio.ensure_future(call)
+    heard: asyncio.Task[UserInput] = asyncio.ensure_future(inbox.get())
+    try:
+        racing: set[asyncio.Future[ModelReply] | asyncio.Future[UserInput]] = {reply_task, heard}
+        await asyncio.wait(racing, return_when=asyncio.FIRST_COMPLETED)
+        if heard.done() and heard.exception() is not None:
+            # The inbox was shut: there is nothing to hear, and the reply is awaited alone.
+            await asyncio.wait({reply_task})
+    finally:
+        heard.cancel()
+        await asyncio.wait({heard})
+        if not reply_task.done():
+            reply_task.cancel()
+            await asyncio.wait({reply_task})
+    sent: UserInput | None = None if heard.cancelled() or heard.exception() is not None else heard.result()
+    if reply_task.cancelled():
+        return _Heard(reply=None, sent=sent)
+    if reply_task.exception() is not None and sent is not None:
+        inbox.put_nowait(sent)
+    return _Heard(reply=reply_task.result(), sent=sent)
+
+
 def _connection_broke(error: Exception) -> bool:
     """Whether ``error`` says that the model could not be reached, rather than that it cannot answer for a while or
     refused the request: the connection broke or timed out, or its server failed with a status that retrying can get
@@ -1920,10 +1956,14 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     async def sink(delta: StreamDelta) -> None:
         await runtime.bus.emit(run.id, "delta", {"kind": delta.kind, "text": delta.text, "step": steps}, False)
 
+    # A message that cut a step's model call short (item 509), read first at the top of the loop.
+    early: list[UserInput] = []
+
     while True:
         if agent.cancel.is_set():
             raise RunCancelled("the run was stopped", {"run_id": run.id})
-        steered: list[UserInput] = _drain(agent.inbox)
+        steered: list[UserInput] = [*early, *_drain(agent.inbox)]
+        early = []
         for sent in steered:
             text: str = sent.text
             note: Message = await message_with_attachments(
@@ -2022,9 +2062,26 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         steps += 1
         asked_at: float = time.monotonic()
         try:
-            reply: ModelReply = await _complete_in_time(
+            call: Awaitable[ModelReply] = _complete_in_time(
                 runtime, step_ref, request, sink, step_origin, config.model_call_timeout_s
             )
+            # A step past the run's limit is its last: a message does not hold back the finish it ends with.
+            heard: _Heard = (
+                _Heard(reply=await call, sent=None)
+                if past_limit is not None
+                else await _complete_unless_steered(agent.inbox, call)
+            )
+            if heard.reply is None:
+                # A message arrived while the model was at the step: the step is given up and asked again with it.
+                log.info("step_steered", run_id=run.id, step=steps, model=step_ref.label)
+                early = [] if heard.sent is None else [heard.sent]
+                await sink(_RESET)
+                steps -= 1
+                continue
+            if heard.sent is not None:
+                # It arrived as the reply did: it waits in the inbox for the next step, or for the end to read it.
+                agent.inbox.put_nowait(heard.sent)
+            reply: ModelReply = heard.reply
             # A reply the service's content filter stopped is handled as a model that cannot answer this run: a
             # routed step goes back to the run's own model, the run's own model hands over to a standby one.
             filtered: ProviderFilterError | None = filtered_stop(reply, step_ref.label)
