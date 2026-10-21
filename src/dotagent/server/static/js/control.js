@@ -5,7 +5,7 @@
 
 import { api } from "./api.js";
 import { el } from "./dom.js";
-import { LONG_PRESS_MS, clampedFractionOf, drawnOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor } from "./pointer.js";
+import { LONG_PRESS_MS, clampedFractionOf, drawnOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor, textPieces } from "./pointer.js";
 
 // How long input waits to go with the next (moves and scrolls; a press, a release and a key go at once), how many
 // events a batch carries at most (the daemon takes 64), and how much text one event carries (it takes 500).
@@ -81,7 +81,9 @@ export function createControl({ runId, screen, image, onRefused }) {
       page = { width: taken.width, height: taken.height };
     } catch (error) {
       queue.length = 0;
-      if (!stopped) {
+      // Refused once the run was given back: the daemon let go of a button left down as it was (item 470), so a
+      // release sent after it says nothing new. Anything else is told, a stopped layer's too.
+      if (!(stopped && error.status === 409 && error.message.includes("not taken over"))) {
         onRefused(error);
       }
     } finally {
@@ -343,11 +345,10 @@ export function createControl({ runId, screen, image, onRefused }) {
   };
 
   function sendText(text) {
-    const events = [];
-    for (let start = 0; start < text.length; start += TEXT_CHARS) {
-      events.push({ kind: "text", text: text.slice(start, start + TEXT_CHARS) });
-    }
-    send(events, true);
+    send(
+      textPieces(text, TEXT_CHARS).map((piece) => ({ kind: "text", text: piece })),
+      true,
+    );
   }
 
   image.addEventListener("pointerdown", onDown);

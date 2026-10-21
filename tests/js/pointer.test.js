@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DOUBLE_TAP_MS, LONG_PRESS_MS, MAX_ZOOM, TAP_SLOP_PX, clampedFractionOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor } from "../../src/dotagent/server/static/js/pointer.js";
+import { DOUBLE_TAP_MS, LONG_PRESS_MS, MAX_ZOOM, TAP_SLOP_PX, clampedFractionOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor, textPieces } from "../../src/dotagent/server/static/js/pointer.js";
 
 const NATURAL = { width: 1280, height: 860 };
 
@@ -74,8 +74,15 @@ test("a key is named as Playwright names it, a character typed as it is is not",
   assert.equal(keyName({ ...plain, key: "@", ctrlKey: true, altKey: true }), null);
   assert.equal(keyName({ ...plain, key: "ArrowLeft", altKey: true }), "Alt+ArrowLeft");
   assert.equal(keyName({ ...plain, key: "c", ctrlKey: true }), "Control+c");
-  // A chord the daemon could not take is not sent: a letter outside ASCII.
+  // A chord the daemon could not take is not sent: a letter outside ASCII. A space is text, or the Mac's own.
   assert.equal(keyName({ ...plain, key: "ö", metaKey: true }), null);
+  assert.equal(keyName({ ...plain, key: " ", metaKey: true }), null);
+});
+
+test("long text goes in pieces cut between characters, an emoji's two halves together", () => {
+  assert.deepEqual(textPieces("abcde", 2), ["ab", "cd", "e"]);
+  assert.deepEqual(textPieces("a😀b", 2), ["a😀", "b"]);
+  assert.deepEqual(textPieces("", 500), []);
 });
 
 test("a button let go off the picture is let go at the page's edge", () => {

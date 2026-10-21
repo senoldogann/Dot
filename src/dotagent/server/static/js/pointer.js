@@ -120,14 +120,26 @@ export function keyName(event) {
   if (event.key === "Unidentified" || event.key === "Dead" || event.key === "Process" || ["Shift", "Control", "Alt", "Meta"].includes(event.key)) {
     return null;
   }
+  // A space is text; with a modifier it is the Mac's own (Command-Space searches it), not the page's.
+  if (event.key === " ") {
+    return null;
+  }
   const printable = [...event.key].length === 1;
   if (printable && !event.metaKey && (!event.ctrlKey || event.altKey)) {
     return null;
   }
   const modifiers = [event.ctrlKey ? "Control" : null, event.altKey ? "Alt" : null, event.metaKey ? "Meta" : null, event.shiftKey && !printable ? "Shift" : null].filter((part) => part !== null);
-  if (event.key === " ") {
-    return null;
-  }
   const name = [...modifiers, event.key].join("+");
   return KEY.test(name) ? name : null;
+}
+
+/** `text` in pieces of at most `size` characters as the daemon counts them, so that no piece ends in the middle of one
+ * (the two halves of an emoji). */
+export function textPieces(text, size) {
+  const characters = [...text];
+  const pieces = [];
+  for (let start = 0; start < characters.length; start += size) {
+    pieces.push(characters.slice(start, start + size).join(""));
+  }
+  return pieces;
 }
