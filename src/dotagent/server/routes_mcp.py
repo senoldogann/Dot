@@ -240,10 +240,12 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = {}
         for config in ctx.runtime.config.mcp:
             servers.setdefault(config.name, (config, "config"))
-        # A plugin taken out (item 497) is gone from its folder: its servers are not Dot's any more.
+        # A plugin taken out (item 497) is gone from its folder: its servers are not Dot's any more, but for one the
+        # hub still runs, as when the folder went without Dot, which Remove plugin then stops.
+        running: dict[str, McpServerConfig] = hub.configs()
         for plugin in ctx.runtime.plugins.plugins:
-            if plugin.root.is_dir():
-                for config in plugin.servers:
+            for config in plugin.servers:
+                if plugin.root.is_dir() or config.name in running:
                     servers.setdefault(config.name, (config, "plugin"))
         recorded: frozenset[str] = frozenset(config.name for config in record.servers)
         for name, config in hub.configs().items():
@@ -523,8 +525,16 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         start after, and its folder goes to the Trash, from which it can be put back. A plugin read from a folder of
         ``[plugins] dirs`` is refused: the owner takes that folder out of the config."""
         plugin: Plugin | None = next((one for one in ctx.runtime.plugins.plugins if one.name == name), None)
-        if plugin is None or not plugin.root.is_dir():
+        running: frozenset[str] = frozenset(hub.configs())
+        if plugin is None or (not plugin.root.is_dir() and not any(one.name in running for one in plugin.servers)):
             raise NotFoundError("Dot has no plugin of this name", {"plugin": name})
+        if not plugin.root.is_dir():
+            # Its folder went without Dot: only its servers are left to stop.
+            for server in plugin.servers:
+                await hub.disconnect(server.name)
+            refresh_mcp_tools(ctx.runtime.registry, hub)
+            log.info("plugin_servers_stopped", plugin=name)
+            return await listing()
         if not is_dots_own(plugin, plugins_dir()):
             raise RunConflict(
                 f"the plugin {name} is read from {plugin.root.parent}, a folder of [plugins] dirs: take that folder "
