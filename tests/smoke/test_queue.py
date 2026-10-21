@@ -654,7 +654,9 @@ async def test_the_chats_page_queues_moves_edits_steers_and_resumes_messages_abo
                     )
                     await page.goto(ui_url(host, port, TOKEN))
                     await page.goto(f"{address}/#/runs/{first.id}")
-                    box: Locator = page.locator(".dock textarea")
+                    # The box of the page in front: the page the chat went on from stands, inert, until it is drawn
+                    # over (item 454).
+                    box: Locator = page.locator(".dock textarea:not([inert] *)")
                     send: Locator = page.locator(".dock .btn.send")
                     queue: Locator = page.locator(".dock .queue")
                     rows: Locator = queue.locator(".queue-row")
@@ -818,7 +820,9 @@ async def test_the_settings_choose_the_key_that_sends_and_whether_a_message_stee
                     # The run waits at its first step from here on: what is steered reaches it at its second.
                     waiting: _Reply = await model.asked()
                     await page.goto(f"{address}/#/runs/{first.id}")
-                    box: Locator = page.locator(".dock textarea")
+                    # The box of the page in front: the page the chat went on from stands, inert, until it is drawn
+                    # over (item 454).
+                    box: Locator = page.locator(".dock textarea:not([inert] *)")
                     send: Locator = page.locator(".dock .btn.send")
                     queue: Locator = page.locator(".dock .queue")
                     await expect(send).to_have_attribute("aria-label", "Stop")

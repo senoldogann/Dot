@@ -8,6 +8,13 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - Schedules: **Notifications** in a schedule's form says how the end of its runs is told on your phone and desktop:
   always (as before, else `[scheduler] notify`), only when it fails or needs you, or never; a run you start with
   **Run now** is always told (item 461).
+- A message sent from a chat that is over no longer jumps the chat up and back down: it stays at its foot until the
+  next run's page takes its place. A chat whose run is over opens with every message already there, instead of
+  filling in as its stream is read (item 454).
+- `[browser] idle_close_s` closes Dot's own Chrome, with its Playwright driver, once nobody used it for that long, so it
+  does not keep its memory all day; while it runs macOS takes it for your Google Chrome, and a click on Chrome in the
+  Dock brings Dot's forward instead of opening yours. It is off (0) unless you set it; Dot's Chrome starts again signed
+  in as before (Incognito keeps nothing), since it keeps its session cookies (item 454).
 - Schedules: a repeating schedule whose runs fail so many times in a row (its **Switch off after**, or `[scheduler]
   stop_after_failures`; never by default) is switched off and you are told once; its row says how many failed in a
   row (item 458).
@@ -64,6 +71,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - Every run, a chat's too, is told that there is always a way: it does not give up on a step while a way is left
   untried and says that something cannot be done only after trying it, naming each way it tried; a chat does not end
   its turn announcing a step it could take now. No way goes around a refusal, a denial or your decision (item 446).
+- A message sent to a chat on the phone shows at once on the desktop, and one sent on the desktop on the phone: every
+  page that shows the chat's newest run goes on at the run it started, also once a phone put away is back or loads the
+  page again, and what was typed there and not sent goes with it; a page of an earlier run stays (item 451).
 
 ## 0.1.0 (2026-10-20)
 
