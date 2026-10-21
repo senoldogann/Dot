@@ -1,9 +1,10 @@
-# The gate every change passes before it is merged: the same commands as CONTRIBUTING.md, on macOS because the
-# package depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted
-# model or a stand-in plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding
-# model skips itself here. Beside it, the `browser` job runs the core of the browser tests (item 486): the URL rules of
-# Dot's Chrome, the sign-in, the secret fields, the attach mode and every phone page; browser.yml runs them all every
-# night and before a release. The tests marked live, internet, desktop or hosted stay on the developer's Mac.
+# The gate every change passes before it is merged: the same commands as CONTRIBUTING.md, on macOS because the package
+# depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted model
+# or a stand-in plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding model
+# skips itself here. Beside it, the `browser` job runs the core of the browser tests (item 486): the URL rules of Dot's
+# Chrome, the sign-in, the secret fields, the attach mode and every phone page, on every change and in the release,
+# which calls this gate; browser.yml runs them all every night and when asked. The tests marked live, internet, desktop
+# or hosted stay on the developer's Mac.
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing, as no
