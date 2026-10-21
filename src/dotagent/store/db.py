@@ -40,6 +40,7 @@ from dotagent.store.models import (
     AgentRecord,
     ApprovalRecord,
     ApprovalStatus,
+    AutoDecisionCount,
     Behavior,
     BrowserMode,
     CampaignEntry,
@@ -67,12 +68,15 @@ from dotagent.store.models import (
     RunPicks,
     RunRecord,
     RunStatus,
+    ScheduleFiring,
     ScheduleOptions,
     ScheduleRecord,
     SentMessage,
     ShownPage,
     ThreadRecord,
     ThreadSummary,
+    UnattendedCount,
+    UnattendedRun,
     WorkingRun,
 )
 from dotagent.store.stats import (
@@ -421,6 +425,24 @@ def _summary(row: aiosqlite.Row) -> ThreadSummary:
     )
 
 
+# The runs "while you were away" reads (item 466): of the scheduler's source, no helper's, still in their chat, ended at
+# or after the moment or still working; bound to (source, since). Their names come from the schedule of their chat and
+# from their campaign.
+_UNATTENDED: str = (
+    "runs.source = ? AND runs.parent_run_id IS NULL AND runs.rewound_at IS NULL"
+    " AND (runs.finished_at >= ? OR runs.finished_at IS NULL)"
+)
+_UNATTENDED_JOINS: str = (
+    "LEFT JOIN threads ON threads.id = runs.thread_id LEFT JOIN schedules ON schedules.id = threads.schedule_id"
+    " LEFT JOIN campaigns ON campaigns.id = runs.campaign_id"
+)
+_UNATTENDED_NAMES: str = "schedules.name AS schedule_name, campaigns.title AS campaign_title"
+
+
+def _unattended(row: aiosqlite.Row) -> UnattendedRun:
+    return UnattendedRun(run=_run(row), schedule_name=row["schedule_name"], campaign_title=row["campaign_title"])
+
+
 def _run(row: aiosqlite.Row) -> RunRecord:
     return RunRecord(
         id=row["id"],
@@ -532,6 +554,7 @@ def _agent(row: aiosqlite.Row) -> AgentRecord:
         updated_at=row["updated_at"],
         made_by=row["made_by"],
         look=_look_of(row),
+        paused_at=row["paused_at"],
     )
 
 
@@ -715,18 +738,32 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             timezone=row["timezone"],
             history_runs=row["history_runs"],
             same_chat=None if row["same_chat"] is None else bool(row["same_chat"]),
+            stop_after_failures=row["stop_after_failures"],
+            notify=row["notify"],
+            agent_id=row["agent_id"],
         ),
+        runs_failed_in_row=row["runs_failed_in_row"],
     )
 
 
 type _OptionValues = tuple[
-    str | None, str | None, str | None, int | None, str | None, int | None, int | None, str | None
+    str | None,
+    str | None,
+    str | None,
+    int | None,
+    str | None,
+    int | None,
+    int | None,
+    str | None,
+    int | None,
+    str | None,
+    str | None,
 ]
 
 
 def _option_values(options: ScheduleOptions) -> _OptionValues:
     """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone,
-    history_runs, same_chat, speed."""
+    history_runs, same_chat, speed, stop_after_failures, notify, agent_id."""
     goal_mode: int | None = None if options.goal_mode is None else int(options.goal_mode)
     same_chat: int | None = None if options.same_chat is None else int(options.same_chat)
     return (
@@ -738,6 +775,9 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
         options.history_runs,
         same_chat,
         options.speed,
+        options.stop_after_failures,
+        options.notify,
+        options.agent_id,
     )
 
 
@@ -777,6 +817,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     # The note was saved while its run had read content third parties can author; an older note was not.
     ("tainted", "INTEGER NOT NULL DEFAULT 0"),
 )
+# The status of a schedule switched off because the agent its runs ran as was deleted (item 462); switching it on
+# again, as Dot or as another agent, clears it as it clears item 458's.
+AGENT_DELETED_STATUS: str = "switched off: its agent was deleted"
 # Columns of ``schedules`` added later: NULL means "what the configuration says when the schedule fires", which is how
 # the schedules of an older database ran.
 _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -788,6 +831,10 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("history_runs", "INTEGER"),
     ("same_chat", "INTEGER"),
     ("speed", "TEXT"),
+    ("stop_after_failures", "INTEGER"),
+    ("runs_failed_in_row", "INTEGER NOT NULL DEFAULT 0"),
+    ("notify", "TEXT"),
+    ("agent_id", "TEXT"),
 )
 
 
@@ -827,6 +874,8 @@ _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("shape", "TEXT"),
     ("expression", "TEXT"),
     ("colour", "TEXT"),
+    # When the owner paused the agent (item 465); NULL while it works, as every agent did before.
+    ("paused_at", "REAL"),
 )
 # The kv key of Dot's own look (item 102), an ``AgentLook`` as JSON.
 DOT_LOOK_KEY: str = "look:dot"
@@ -1961,6 +2010,65 @@ class Store:
             )
         return [_run(row) for row in rows]
 
+    # ----- while you were away (item 466) ----------------------------------------------------------------------------
+
+    async def unattended_runs(self, source: str, since: float, limit: int) -> list[UnattendedRun]:
+        """The newest ``limit`` runs of ``source`` (the scheduler's: a schedule's firings and runs by hand, and the
+        sessions of campaigns) that are no helper's and ended at or after ``since``, or work; with the schedule's name
+        and the campaign's title."""
+        rows = await self._all(
+            f"SELECT runs.*, {_UNATTENDED_NAMES} FROM runs {_UNATTENDED_JOINS}"
+            f" WHERE {_UNATTENDED} ORDER BY runs.created_at DESC LIMIT ?",
+            (source, since, limit),
+        )
+        return [_unattended(row) for row in rows]
+
+    async def unattended_counts(self, source: str, since: float) -> list[UnattendedCount]:
+        """How many of those runs (:meth:`unattended_runs`, all of them) ended so or work, by status, the sessions of
+        campaigns apart."""
+        rows = await self._all(
+            "SELECT runs.status AS status, runs.campaign_id IS NOT NULL AS campaign, COUNT(*) AS count FROM runs"
+            f" WHERE {_UNATTENDED} GROUP BY runs.status, campaign",
+            (source, since),
+        )
+        return [
+            UnattendedCount(status=row["status"], campaign=bool(row["campaign"]), count=row["count"]) for row in rows
+        ]
+
+    async def auto_decision_counts(self, source: str, since: float) -> list[AutoDecisionCount]:
+        """The approvals the review model and yolo decided at or after ``since`` in those runs (:meth:`unattended_runs`)
+        and in their helpers, counted for each run by who decided and how; neither a summary nor the arguments of one
+        are read."""
+        rows = await self._all(
+            f"WITH unattended AS (SELECT runs.id FROM runs WHERE {_UNATTENDED}),"
+            " decided AS (SELECT COALESCE(ran.parent_run_id, ran.id) AS top_id, approvals.decided_by AS decided_by,"
+            " approvals.status AS decision FROM approvals JOIN runs AS ran ON ran.id = approvals.run_id"
+            " WHERE (ran.id IN unattended OR ran.parent_run_id IN unattended) AND approvals.decided_by IN (?, ?)"
+            " AND approvals.status IN ('approved', 'denied') AND approvals.decided_at >= ?)"
+            f" SELECT runs.*, {_UNATTENDED_NAMES}, decided.decided_by AS decided_by, decided.decision AS decision,"
+            f" COUNT(*) AS count FROM decided JOIN runs ON runs.id = decided.top_id {_UNATTENDED_JOINS}"
+            " GROUP BY decided.top_id, decided.decided_by, decided.decision",
+            (source, since, "reviewer", "yolo", since),
+        )
+        return [
+            AutoDecisionCount(
+                run=_unattended(row), decided_by=row["decided_by"], status=row["decision"], count=row["count"]
+            )
+            for row in rows
+        ]
+
+    async def unattended_drafts(self, source: str, since: float) -> int:
+        """How many drafts those runs (:meth:`unattended_runs`) and their helpers wrote at or after ``since`` that still
+        wait for the owner."""
+        row = await self._one(
+            f"WITH unattended AS (SELECT runs.id FROM runs WHERE {_UNATTENDED})"
+            " SELECT COUNT(*) AS count FROM drafts JOIN runs AS ran ON ran.id = drafts.run_id"
+            " WHERE (ran.id IN unattended OR ran.parent_run_id IN unattended) AND drafts.status = 'waiting'"
+            " AND drafts.created_at >= ?",
+            (source, since, since),
+        )
+        return 0 if row is None else int(row["count"])
+
     async def chat_turns_until(self, thread_id: str, until: float, limit: int) -> list[RunRecord]:
         """The latest ``limit`` turns of the chat ``thread_id`` (its runs that no other run delegated) that started by
         ``until``, newest first; the runs a rewind took out of the chat (item 282) are left out."""
@@ -2585,6 +2693,28 @@ class Store:
         )
         await self._db.commit()
         return record
+
+    @_writing
+    async def move_rule(self, rule_id: str, places: int) -> None:
+        """Move the rule ``rule_id`` ``places`` places along the order the policy reads the rules in (a negative number
+        toward the first), read here under the write lock, and number every rule 1 to n in that order, which also
+        closes the gaps that deleted rules left."""
+        rows = await self._all("SELECT id FROM rules ORDER BY position, created_at", ())
+        order: list[str] = [str(row["id"]) for row in rows]
+        if rule_id not in order:
+            raise NotFoundError("rule not found", {"rule_id": rule_id})
+        index: int = order.index(rule_id) + places
+        if not 0 <= index < len(order):
+            raise InvalidValueError(
+                "a rule cannot move past either end of the order",
+                {"rule_id": rule_id, "places": places, "rules": len(order)},
+            )
+        order.remove(rule_id)
+        order.insert(index, rule_id)
+        await self._db.executemany(
+            "UPDATE rules SET position = ? WHERE id = ?", [(position, moved) for position, moved in enumerate(order, 1)]
+        )
+        await self._db.commit()
 
     @_writing
     async def set_rule_enabled(self, rule_id: str, enabled: bool) -> None:
@@ -3353,11 +3483,13 @@ class Store:
             thread_id=thread_id,
             last_status="",
             options=options,
+            runs_failed_in_row=0,
         )
         await self._db.execute(
             "INSERT INTO schedules(id, name, cron, run_at, goal, mode, enabled, created_at, last_run_at, next_run_at,"
-            " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed,"
+            " stop_after_failures, notify, agent_id)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 name,
@@ -3390,12 +3522,17 @@ class Store:
         enabled: bool,
         next_run_at: float | None,
     ) -> ScheduleRecord:
-        """Replace what a schedule does and when; its history (last run, thread, status) stays."""
+        """Replace what a schedule does and when; its history (last run, thread, status) stays, its row of failed runs
+        starts afresh, and one switched on no longer says it was switched off for them (item 458), as the form's switch
+        is this way and not ``enable``'s."""
+        on: int = 1 if enabled else 0
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
-            " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?, enabled = ?,"
-            " next_run_at = ? WHERE id = ?",
-            (name, cron, run_at, goal, mode, *_option_values(options), 1 if enabled else 0, next_run_at, schedule_id),
+            " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
+            " stop_after_failures = ?, notify = ?, agent_id = ?, enabled = ?, next_run_at = ?, runs_failed_in_row = 0,"
+            " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
+            " WHERE id = ?",
+            (name, cron, run_at, goal, mode, *_option_values(options), on, next_run_at, on, schedule_id),
         )
         await self._db.commit()
         return await self.get_schedule(schedule_id)
@@ -3434,6 +3571,29 @@ class Store:
         """Mark the chat ``thread_id`` as one of the schedule ``schedule_id`` (item 257), whose next firings read the
         runs it started there."""
         await self._db.execute("UPDATE threads SET schedule_id = ? WHERE id = ?", (schedule_id, thread_id))
+        await self._db.commit()
+
+    async def schedule_firings(self, schedule_id: str, source: str, limit: int) -> list[ScheduleFiring]:
+        """The last ``limit`` runs of ``source`` (the scheduler's) in the chats of the schedule ``schedule_id``, newest
+        first, one at work among them, each with the title of its chat (item 455): its firings, at its time and by
+        hand, without the runs they delegated or the owner's follow-ups."""
+        rows = await self._all(
+            "SELECT r.*, t.title AS chat_title FROM runs r JOIN threads t ON t.id = r.thread_id"
+            " WHERE t.schedule_id = ? AND r.source = ? AND r.parent_run_id IS NULL"
+            " ORDER BY r.created_at DESC LIMIT ?",
+            (schedule_id, source, limit),
+        )
+        return [ScheduleFiring(run=_run(row), chat_title=str(row["chat_title"])) for row in rows]
+
+    @_writing
+    async def record_schedule_hand_run(self, schedule_id: str, started_at: float, thread_id: str) -> None:
+        """A run of the schedule ``schedule_id`` the owner started by hand at ``started_at`` in the chat ``thread_id``
+        (item 455): its last run and its chat, and nothing of when it fires next nor of whether it is switched on,
+        which :meth:`record_schedule_fire` would change."""
+        await self._db.execute(
+            "UPDATE schedules SET last_run_at = ?, thread_id = ?, last_status = 'running' WHERE id = ?",
+            (started_at, thread_id, schedule_id),
+        )
         await self._db.commit()
 
     async def schedule_runs(self, schedule_id: str, source: str, limit: int) -> list[RunRecord]:
@@ -3477,11 +3637,41 @@ class Store:
 
     @_writing
     async def set_schedule_enabled(self, schedule_id: str, enabled: bool, next_run_at: float | None) -> None:
+        """Switch a schedule on or off; one switched on starts its row of failed runs afresh, and no longer says it was
+        switched off for them (item 458)."""
+        on: int = 1 if enabled else 0
         await self._db.execute(
-            "UPDATE schedules SET enabled = ?, next_run_at = ? WHERE id = ?",
-            (1 if enabled else 0, next_run_at, schedule_id),
+            "UPDATE schedules SET enabled = ?, next_run_at = ?,"
+            " runs_failed_in_row = CASE WHEN ? = 1 THEN 0 ELSE runs_failed_in_row END,"
+            " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
+            " WHERE id = ?",
+            (on, next_run_at, on, on, schedule_id),
         )
         await self._db.commit()
+
+    @_writing
+    async def record_schedule_outcome(self, schedule_id: str, status: str) -> int | None:
+        """How a run of the schedule ``schedule_id`` ended, as its last status, and its row of failed runs with it
+        (item 458): ``done`` sets it to 0, ``failed`` adds one, anything else (``cancelled``) leaves it. The row after
+        the write; ``None`` when the schedule was deleted meanwhile."""
+        row = await self._one(
+            "UPDATE schedules SET last_status = ?, runs_failed_in_row = CASE ? WHEN 'done' THEN 0"
+            " WHEN 'failed' THEN runs_failed_in_row + 1 ELSE runs_failed_in_row END WHERE id = ?"
+            " RETURNING runs_failed_in_row",
+            (status, status, schedule_id),
+        )
+        await self._db.commit()
+        return None if row is None else int(row["runs_failed_in_row"])
+
+    @_writing
+    async def switch_off_schedule(self, schedule_id: str, status: str) -> bool:
+        """Switch a schedule that is on off for good, with ``status`` saying why (item 458); whether it was on."""
+        cursor = await self._db.execute(
+            "UPDATE schedules SET enabled = 0, next_run_at = NULL, last_status = ? WHERE id = ? AND enabled = 1",
+            (status, schedule_id),
+        )
+        await self._db.commit()
+        return cursor.rowcount == 1
 
     @_writing
     async def delete_schedule(self, schedule_id: str) -> None:
@@ -3644,6 +3834,7 @@ class Store:
             updated_at=now,
             made_by=made_by,
             look=look,
+            paused_at=None,
         )
         await self._db.execute(
             "INSERT INTO agents(id, name, role, instructions, model, effort, approvals, tools, created_at, updated_at,"
@@ -3681,7 +3872,7 @@ class Store:
         tools: Sequence[str],
         look: AgentLook | None,
     ) -> AgentRecord:
-        """Replace what the agent is; its id and its runs stay."""
+        """Replace what the agent is; its id, its runs and its pause (item 465) stay."""
         await self.get_agent(agent_id)
         await self._db.execute(
             "UPDATE agents SET name = ?, role = ?, instructions = ?, model = ?, effort = ?, approvals = ?, tools = ?,"
@@ -3701,6 +3892,14 @@ class Store:
                 agent_id,
             ),
         )
+        await self._db.commit()
+        return await self.get_agent(agent_id)
+
+    @_writing
+    async def set_agent_paused(self, agent_id: str, paused_at: float | None) -> AgentRecord:
+        """Pause the agent at ``paused_at`` (item 465), or resume it with ``None``; nothing else of it changes."""
+        await self.get_agent(agent_id)
+        await self._db.execute("UPDATE agents SET paused_at = ? WHERE id = ?", (paused_at, agent_id))
         await self._db.commit()
         return await self.get_agent(agent_id)
 
@@ -3736,10 +3935,16 @@ class Store:
 
     @_writing
     async def delete_agent(self, agent_id: str) -> None:
-        """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared)."""
+        """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared). Its schedules
+        (item 462) are switched off with :data:`AGENT_DELETED_STATUS` and named for no agent, in the same write: one
+        never goes on firing as Dot, with every tool, nor fails at every tick for an agent that is gone."""
         await self.get_agent(agent_id)
         await self._db.execute("UPDATE runs SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
         await self._db.execute("UPDATE memories SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
+        await self._db.execute(
+            "UPDATE schedules SET enabled = 0, next_run_at = NULL, agent_id = NULL, last_status = ? WHERE agent_id = ?",
+            (AGENT_DELETED_STATUS, agent_id),
+        )
         await self._db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
         await self._db.commit()
 

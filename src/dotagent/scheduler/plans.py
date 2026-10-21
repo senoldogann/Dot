@@ -5,7 +5,7 @@ from typing import Literal
 from zoneinfo import ZoneInfo
 
 from dotagent.config import SchedulerConfig
-from dotagent.core.errors import StoreError, ToolExecutionError, ToolInputError
+from dotagent.core.errors import InvalidValueError, StoreError, ToolExecutionError, ToolInputError
 from dotagent.core.types import FrozenModel
 from dotagent.llm.router import parse_model_ref
 from dotagent.scheduler import DAEMON_NOTE
@@ -19,7 +19,7 @@ from dotagent.scheduler.timing import (
     plan_timing,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import ScheduleOptions, ScheduleRecord
+from dotagent.store.models import DOT_AGENT_ID, ScheduleOptions, ScheduleRecord
 
 _GOAL_CHARS: int = 160
 # Options that leave every choice to the configuration at firing time.
@@ -32,6 +32,9 @@ UNSET_OPTIONS: ScheduleOptions = ScheduleOptions(
     timezone=None,
     history_runs=None,
     same_chat=None,
+    stop_after_failures=None,
+    notify=None,
+    agent_id=None,
 )
 
 
@@ -67,6 +70,18 @@ def _check_options(options: ScheduleOptions) -> None:
         raise ToolInputError("a time zone cannot be blank; leave it out to use the configured one", {})
 
 
+async def _check_agent(store: Store, options: ScheduleOptions) -> None:
+    """Refuse an agent that is not one of the owner's (item 462): Dot is named by no agent (``None``), and an agent
+    that does not exist is not found."""
+    if options.agent_id is None:
+        return
+    if options.agent_id == DOT_AGENT_ID:
+        raise InvalidValueError(
+            "Dot is no agent to name: leave agent_id out, or null, for Dot", {"agent_id": options.agent_id}
+        )
+    await store.get_agent(options.agent_id)
+
+
 async def _ensure_room(store: Store, config: SchedulerConfig) -> None:
     switched_on: int = sum(1 for record in await store.list_schedules() if record.enabled)
     if switched_on >= config.max_schedules:
@@ -93,6 +108,7 @@ async def plan_schedule(
     for one more switched on. A new chat's loop asks it before its run starts, so that a refusal starts nothing (item
     400)."""
     _check_options(request.options)
+    await _check_agent(store, request.options)
     zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
     timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
     await _ensure_room(store, config)
@@ -159,6 +175,7 @@ async def edit_schedule(
     timing; a schedule switched on that has no firing left is refused."""
     record: ScheduleRecord = await store.get_schedule(schedule_id)
     _check_options(request.options)
+    await _check_agent(store, request.options)
     zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
     timing: _EditedTiming = _edited_timing(record, request, zone, config, now)
     if enabled and timing.upcoming is None:
@@ -220,9 +237,12 @@ def schedule_timing(record: ScheduleRecord, zone: ZoneInfo) -> str:
 
 
 def options_text(record: ScheduleRecord) -> str:
-    """The mode and the start options a schedule sets, for example ``task, approvals yolo, goal mode``."""
+    """The mode and the start options a schedule sets, for example ``task, approvals yolo, goal mode``, and the agent
+    its runs run as (item 462)."""
     options: ScheduleOptions = record.options
     parts: list[str] = [record.mode]
+    if options.agent_id is not None:
+        parts.append(f"as agent {options.agent_id}")
     if options.approvals is not None:
         parts.append(f"approvals {options.approvals}")
     if options.goal_mode is not None:

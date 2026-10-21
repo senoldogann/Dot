@@ -35,6 +35,7 @@ SCOUT: AgentRecord = AgentRecord(
     updated_at=1.0,
     made_by=None,
     look=None,
+    paused_at=None,
 )
 TEAM: tuple[AgentBrief, ...] = (
     AgentBrief(name="Scout", role="Finds and checks sources", instructions="", made_by_dot=False),

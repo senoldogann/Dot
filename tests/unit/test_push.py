@@ -221,6 +221,26 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             ),
         ),
         (
+            "schedule_run_ended",
+            {
+                "schedule_id": "sch_1",
+                "run_id": "run_1",
+                "status": "failed",
+                "result": "\nThe site moved.\nTried twice.",
+            },
+            PushMessage(title="A run failed", body="The site moved.", route="#/runs/run_1", state="failed"),
+        ),
+        (
+            "schedule_stopped",
+            {"schedule_id": "sch_1", "name": "weekly report", "failures": 3},
+            PushMessage(
+                title="A schedule was switched off",
+                body="weekly report: its last 3 runs failed",
+                route="#/schedules",
+                state="failed",
+            ),
+        ),
+        (
             "learning_stalled",
             {"reason": "Drawing lessons from runs failed 3 times in a row: the embedder is down"},
             PushMessage(
@@ -369,3 +389,15 @@ async def test_a_busy_push_service_is_asked_once_more(tmp_path: Path, monkeypatc
     with pytest.raises(PushError):
         await push.send_push(keys, subscription, message)
     assert answers == []
+
+
+def test_the_end_of_a_schedules_run_is_its_schedules_to_tell_but_a_campaigns_session_is_told_here() -> None:
+    """Item 461: a run a schedule started is told by its schedule, at its level (``schedule_run_ended``); a campaign's
+    session carries the same source and keeps the run's own notice."""
+    ended: EventRecord = _event("run_finished", {"status": "failed", "result": "The site moved.", "needs": ""})
+    scheduled: RunRecord = _run(None).model_copy(update={"source": "schedule"})
+    assert push_message(ended, scheduled) is None
+    session: RunRecord = scheduled.model_copy(update={"campaign_id": "cmp-1"})
+    assert push_message(ended, session) == PushMessage(
+        title="A run failed", body="The site moved.", route="#/runs/run-1", state="failed"
+    )

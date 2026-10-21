@@ -2506,6 +2506,24 @@ a.pill:hover {
   font-size: var(--text-sm);
 }
 
+/* While you were away (item 466): what schedules and campaigns did, a card over the Today strip, which then takes the
+   row under it. */
+.home > .home-away {
+  grid-row: 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+}
+
+.home > .home-away:not([hidden]) ~ .home-today {
+  grid-row: 4;
+}
+
+.away-line {
+  margin: 0;
+}
+
 /* The Today strip under the composer: a section per kind of thing that has rows. */
 .home-today {
   grid-row: 3;
@@ -3322,6 +3340,21 @@ a.pill:hover {
   animation: fade-in var(--motion-quick) var(--ease);
 }
 
+@media (max-width: 720px) {
+  /* A phone's keyboard leaves little above the composer, and the menu opens upward over it: it takes the room there is and
+     scrolls inside it, rather than running off the top of the screen (the owner's word of 2026-10-21, item 447). The
+     visible band is the window less `--seen-top` and `--seen-bottom`, which layout.js keeps from `visualViewport` (a
+     phone's keyboard pans the page without resizing it, so `dvh` would not follow it); the box's own height is
+     `--composer-h` (composer.js keeps it, a draft and its chips growing it), the dock's where the box is not measured,
+     and 16px keep the menu off the bar. */
+  .slash-menu {
+    max-height: min(
+      320px,
+      calc(100dvh - var(--seen-top, 0px) - var(--seen-bottom, 0px) - var(--composer-h, var(--dock-h, 96px)) - 16px)
+    );
+  }
+}
+
 .slash-group {
   padding: 8px 8px 4px;
   color: var(--muted);
@@ -3588,7 +3621,8 @@ a.pill:hover {
   background: color-mix(in oklab, var(--pick-tint, var(--muted)) 14%, transparent);
 }
 
-.slash-mark .icon {
+.slash-mark .icon,
+.slash-mark .plugin-logo {
   width: 14px;
   height: 14px;
 }

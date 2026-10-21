@@ -2,9 +2,13 @@
 
 The owner asked for Dot's autonomy to be smarter, steadier and sturdier **whatever model runs it**. This file is the
 handoff for that work: what is planned, why, in which order, what is done and how it was checked. If you continue the
-work, read it first, and keep the status table, the item sections and the log at the bottom true. It is the only record
-of where the work stands. Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
+work, read it first, and keep the status table, the item sections and the log at the bottom true. With
+[roadmap/](roadmap/), which holds the items from 459 on, it is the only record of where the work stands.
+Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
 questions, faster steps, helper models) was planned on 2026-10-09 and has its own status table below. Part 3 (items 22 to 41: fewer steps, evidence, learned playbooks, the owner's own channels, an own crawler) was planned on 2026-10-10 from the competitive research in `reports/Dot ajanı rekabet yol haritası.md`; its status table and handoff prompt are under "Part 3".
+
+Items from 459 on are files of their own in [roadmap/](roadmap/), one per item, with their lines of the log
+([roadmap/README.md](roadmap/README.md)); this file keeps the items up to 458 and the log up to then.
 
 ## Principle
 
@@ -16053,39 +16057,218 @@ few tokens to spare, get 26 000, still far under the 48 000 that Settings › Mo
 work with a draft of six lines that grows the dock, two drawn again from what was kept, one whose run ended while
 another chat was open; it fails on main), `tests/unit/test_run_modes.py`, `test_lean_prompt.py`. Docs: `docs/daemon.md`,
 `docs/autonomy.md`.
+### 447. The at menu is the servers and the plugins, with their logos, and it fits a phone's keyboard
 
-### 448. A sign-in that opens in Dot's own Chrome comes back
+**Status: done (2026-10-21).** The owner's word of 2026-10-21, with a screenshot of the phone: `@` listed the MCP
+servers *and* every skill, so the servers the owner wanted were lost among them; the servers wore a plug where their
+Customize tile wears their own logo (item 408); and with the keyboard up the menu ran off the top of the screen.
+**As built.** `@` opens the MCP servers and the plugins alone (`pickGroups`, item 447): the skills and the servers' tools
+are the slash menu's, and a skill found by `@` is a skill found by `/` (`@` finds none of it now, and `/` keeps its
+Skills group). Each server carries the logo its Customize tile wears: the palette gained `PaletteServer.logo`, filled
+from `service_of` and `logo_of_service` as the MCP page fills it (a server added by hand has none, and the plug stands for
+it). `itemMark` draws that picture instead of the icon. And on a phone the menu's height is what the keyboard leaves —
+`min(320px, calc(100dvh - var(--seen-top) - var(--seen-bottom) - var(--dock-h) - 16px))`, the band `layout.js` keeps from
+`visualViewport` (a keyboard pans the page without resizing it, so `dvh` alone does not follow it) — scrolling inside it
+rather than running off the top.
 
-**Status: done (2026-10-21).** The owner's word of 2026-10-21, with two screenshots: the Google and the Microsoft
-sign-ins of Customize › Plugins ended on Chrome's `ERR_BLOCKED_BY_CLIENT` at `127.0.0.1:8765/oauth/callback` and
-`localhost:8765/oauth/callback`. The daemon's log had `browser_request_refused` for both, "it is Dot's own interface":
-macOS handed the provider's page to the Chrome that ran, Dot's own, whose guard (item 135) refuses every address of the
-interface. **As built.** `browser.safety.sign_in_return` names the way back: the path `/oauth/callback` exactly, as
-Chrome read it, on a loopback address at `[server] port`; `request_verdict` lets it through as a navigation only, so a
-script, a picture or a fetch to it is still refused, and `check_browser_url` (what a tool opens, the landing check)
-still refuses it, so a run whose tab lands there has the tab reset and reads nothing of it. The names of
-`[server] reach` stay refused: a sign-in starts from a page on this Mac and comes back to its loopback address. A run
-gains nothing by the page: the daemon takes only a state it handed out itself, once, for ten minutes, and the page
-carries no token. Tests: `tests/unit/test_own_interface.py` (the way back, and the spellings that are not it: a slash
-more, another case, a dot segment, the path in the query, the tailnet's name, a backslash a browser reads as `/`, a
-request that is not a page) and
-`tests/smoke/test_browser_boundary.py` (a link whose redirect ends there reaches the daemon as one navigation and the
-tab is reset; on the code before this change it is refused). Docs: `docs/browser-and-computer-use.md`.
+Tests: `tests/smoke/test_composer_picks.py` (`@` lists no Skills and no Commands, a hand-added server draws the plug, the
+menu's box stays inside the window on a phone, and `/` carries the skill and picks it); `tests/unit/test_palette.py`
+(a catalogued server's logo reaches the palette, a hand-added one has none).
+### 451. A message sent on one screen shows at once on the other
 
-The pre-push review's pass found the page that opens there half drawn: it linked `/css/app.css`, `/css/themes.css`,
-`/favicon.svg` and the provider's mark, files of the interface which that Chrome refuses, and its **Back to Plugins**
-(item 437) led into the interface, to the very error page of the owner's screenshots. The page carries its look now
-(`server/callback_page.py`): the two sheets one after the other in its one `<style>`, which the policy of
-`guard.callback_headers` lets apply by its SHA-256 hash and nothing else inline (`style-src 'sha256-…'`, no script,
-`img-src data:`, `font-src 'self'`, `no-store`), and the favicon and the mark as `data:` addresses; it asks the daemon
-for nothing but its faces, which Dot's own Chrome refuses and the system's stand in for. A mark is the name of an SVG
-file of `icons/plugins` and nothing else. The button and its line about the access token are gone: the page says that
-Dot on this Mac already shows the account, and that the tab can be closed. Tests: `tests/unit/test_callback_page.py`
-(the one style is the two sheets and its hash is the policy's, every address of the page is a `data:` one, no link, no
-script), `tests/smoke/test_sign_in_page.py` (in a plain Chrome against the real daemon the page asks for its faces and
-nothing else) and `tests/smoke/test_browser_boundary.py` (a tab of Dot's own Chrome that no run drives, as macOS opens
-one, draws the real page with its mark, and nothing but the way back reaches the stand-in daemon). Docs:
-`docs/extending.md`.
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent on the phone did not show on the desktop
+until the chat was left and opened again, and the same the other way round; fix that alone. **Cause.** A message sent to
+a chat at rest starts the chat's next run (`POST /runs` with its thread); the screen it was sent from goes on at that
+run, but a page of the same chat elsewhere follows only its own run's stream and was never told: the lifecycle stream's
+`run_queued` carries no thread, and nothing read the chat again. A message queued while a run works already showed
+everywhere (`queue_changed`), and a steer on the run's own stream. **As built** (`views/run.js`). A page that shows the
+chat's newest run goes on at the newer one, as the screen it was sent from does: when a run of the chat is queued (it
+reads the chat's newest runs once on a root `run_queued`), and once the lifecycle stream is back after a break, which
+replays nothing (a phone put away). What was typed there and not sent goes with it as the newer run's draft (`moveDraft`
+of `composer.js`). A page whose run was not the chat's newest when it first read the chat stays where it is: an earlier
+run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its address, or a
+delegated run; such a page reads the chat once. The tab keeps the run it showed as the chat's newest
+(`dot.chatShown.<thread>` in its session storage) until the page leaves it, so a phone's page that the browser loads
+again goes on from where it stood. Every way the page goes on (a message sent there, the queue's next one, an answer,
+Continue, a rewind) takes one guard, so two of them at once open the run once. The pre-push review's first pass stopped
+a page that took every page not reached by a link (main.js's history state) for the chat: the sidebar's Activity rows
+count as no link, and a question left on an earlier run could no longer be answered there. Its second and third passes
+found the same of questions: a page whose run left questions open stays for them, and once the last one closes, answered
+there or on another screen or skipped, it looks again whether the chat went on (`paintQuestions`). Tests:
+`tests/smoke/test_chat_follows.py` (Chrome wide and WebKit as a phone on one chat: the phone's message shows on the wide
+window and the wide window's on the phone, the wide window's unsent words go with it, a page of the earlier run opened
+by its address stays, and a phone's page loaded again after it showed the chat opens where the chat is; a run that left
+two questions, open on both screens: the first answer keeps both pages there, the last, sent on the phone, opens the
+chat's newest run on both; on main the wide window never moves). Docs: `docs/daemon.md`.
+
+### 452. The Run tab of the side panel, plain
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: the side panel's Run tab is crowded with what is not
+needed; make it plain and show what is really useful. It held Details with up to seventeen rows and Cost with ten, the
+steps, the tokens, the compactions and the time said twice, and Cost no money at all, its rows mostly "None". **As
+built.** Details keep what a glance needs: the status, the agent, the model, the reasoning level, the speed when it is
+fast, the approval mode, goal mode only when it is on, the campaign, the tool calls with the failed ones, the tokens,
+the compactions only once there is one (or a flagged check), the duration and the run that delegated it (`details.js`).
+The conversation's Files follow. The rest folds under **More**, closed the first time and kept as the browser last left
+it (`panelFold` of `panels.js`, which `panelSection`'s fold of item 426 now is): the run's mode, its start and its id
+with its copy button, how the run was Set up and its Cost, whose figures of none have no line (`cost.js`). A line of the
+set-up that warns is counted beside More's title ("1 warning", `setup.js`), so a warning is not hidden by the fold. The
+model turns are said once, as Cost's steps. Tests: `tests/smoke/test_side_panel.py` (the tab's sections are Details and
+More, closed the first time, the run id under it, the bill visible once it is opened), `test_activity.py`,
+`test_chat_calm.py` (the warning counted beside More), `test_context_meter.py`, `test_embedding_failure.py` (Set up
+under More). Docs: `docs/daemon.md`.
+
+### 454. A chat that goes on without a jump, a finished chat drawn whole, and Dot's Chrome closed once unused
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent scrolls the chat up and down before it
+lands at its foot; a chat whose run is over streams its messages in again when opened; with Dot working in Chrome a lot,
+a click on their own Chrome opens nothing after a while; and what Dot opens should close once the work is done. **As
+built.** *The jump:* a message sent from a chat that is over starts a run, and the chat went on at that run's address
+through the router's full page change, which emptied the page, scrolled the window to its top and drew a loading panel
+before the next run's page scrolled to its foot. `goOnAt` now leaves the page standing, inert (`main.js`'s `goOn`), and
+the run's page draws over what it finds; the phone's one-screen frame (`html.chat-shell`) stays across, and the turn
+before the new run, read before the page is drawn (`history.js`'s `READ_FIRST`), stands whole instead of growing in.
+*The finished chat:* a run opened after it ended was drawn from its SSE stream frame by frame; `mount` now reads the
+stored events of a run that is over whole (the stream, which ends after them) before it draws the page. A run kept while
+it worked and ended meanwhile is item 446's, left as it built it. *Chrome:* Dot's own Chrome is the installed Google
+Chrome app on a profile of its own, and it ran until the daemon stopped. Measured with a Chrome started as Dot starts
+it: `open -b com.google.Chrome`, which a Dock click amounts to, starts no Chrome of the owner's but goes to Dot's. It
+can now close with its Playwright driver after `[browser] idle_close_s` unused: no chat's step under way, no run at work
+holding tabs in it, no page read in it for the web tools or watched under "Dot's computer" (`_in_use`), no task taught
+in it, its window not in front (`BrowserSession._close_unused`, run by the tab reaper). It is off (0) by default, the
+owner's to set; since item 453 a close loses no session cookie, and 300 s is the value measured against. Also measured:
+a Chrome whose driver is killed exits with it, so a crashed daemon leaves no Chrome behind. Left as it was: background
+terminal commands still run until closed (`terminal_idle_s` closes idle sessions), by design for a server a run starts
+for the owner; while a run works in Dot's Chrome the Dock still brings it forward (`attach` mode avoids it). Measured in
+`tests/smoke/test_chat_scroll.py` (the window falls from 789 px to 0 on the code before; a finished chat's answer is
+there with its page) and `tests/smoke/test_browser.py`.
+
+### 449. The rules move with arrows, and a rule that never decides says so
+
+**Status: done (2026-10-21).** The first of the nine ideas the owner took from the comparison with OpenBot
+(`reports/openbot-vs-dot-2026-10-20.md`, local; the plan below), and the first step of its second, "the strictest rule
+wins". The design, checked against the code and critiqued, does not make the strictest answer win: the order of the
+rules is today the only way to write an exception (the Rules page's own examples, "let Dot run git status without
+asking" above "ask me before rm", are an allow above a broader ask), and a stored rule carries no sign that an exception
+was meant. It goes in three steps: the owner can move the rules and sees which of them never decide (this item); later,
+once the owner has seen the notes for a release, a rule that hands the step over decides wherever it stands (on the
+human path of `policy/`). **As built.** `Store.move_rule` moves a rule a number of places along the order, which it
+reads under the write lock, and numbers the rules 1 to n, which closes the gaps deleted rules left; `POST
+/api/rules/{id}/move` moves it one place up or down (422 past either end, 404 for no rule) and tells the pages
+(`rules_changed`). `server/rule_shadow.py` names for each rule the earlier enabled rule that fits every action it fits
+(no expression or the same one, on a tool pattern that takes in its own: `*`, the same pattern, or one that matches its
+plain tool name), and `GET /api/rules` gives it as `never_decided_by`, computed once on the server and not again in the
+page (the critique). Whether two different expressions overlap is not told. The policy is untouched: `match_rule` still
+takes the first fit, and the rule the note names is the one that decides (the unit test reads it off `match_rule`). The
+Rules page draws two arrows on a rule's row, off at the ends, that keep the focus as the rule moves (the other arrow
+once it reaches an end), and a "Never decides" badge whose title names the rule that decides in its place. The note
+above the rules said a yolo run keeps all of the protections that are always on but the first; since item 443 it keeps
+only the second, a research run's limit, and the note says so. What a yolo run does is untouched. Tests:
+`tests/unit/test_rule_shadow.py` (the certain cases, the cases not told, the note against the engine),
+`tests/smoke/test_server.py` (a move, the numbering, the ends, 404, a direction that is none),
+`tests/smoke/test_rules.py` (the page at 1280 and at 390 px, the phone a touch screen where a row's buttons always show,
+in light and dark: the badge, the arrows, the focus). Docs: `docs/safety.md` (step 6), `docs/daemon.md`.
+
+**The plan it starts.** The owner's go-ahead of 2026-10-20 and 21: the nine ideas, each in its own pull request, planned
+so that today's Dot keeps working as it does, and yolo's freedom untouched ("YOLO modundaki serbestliğe dokunma"): in
+yolo none of them adds a question, a refusal, a hand-off, a wait or a mask, a no given in another mode does not carry
+into it, and each that touches the gate, the policy, the loop or what a run sees has a test that a yolo run does what it
+did. The designs were written against the code by seven agents and critiqued; an item takes its number when it starts.
+First, small and off the human paths: the money and credential floor of MCP tools (their names say a payment or a
+credential), a no not asked again in the same run, the session cookies of Dot's own Chrome kept across its restarts
+(cookies, sessions and history stay as in a real browser, for the Default profile and those the owner added, not
+Incognito), a repeating schedule switched off after failed runs in a row, Run now with a schedule's past firings, and
+this item. Then the medium ones: the values of password, one-time-code and card fields kept out of what the model reads
+(not in yolo), every decision of the gate recorded on its step and a rule tried on past steps before it is added, a
+notification level per schedule, an agent paused without losing it, a "while you were away" digest, scheduled work held
+without the emergency stop, a schedule run as one of the owner's agents, and the owner driving Dot's browser from the
+phone while the run is held. Last, the ones on the human paths, each waiting for the owner's yes: the release gated on
+the whole gate with browser tests in CI and the workflows checked by zizmor, the rule that hands a step over deciding
+wherever it stands, and approvals a run nobody watches keeps for the owner to answer later (off by default; never in
+yolo, where nothing is asked; not for a message, a post, an MCP call or an upload, whose words a later yes would not
+bind; and never by running the kept call outside its run).
+
+### 453. Dot's own Chrome keeps its session cookies when it starts again
+
+**Status: done (2026-10-21).** Part of the ninth of the nine ideas taken from OpenBot (item 449 has the plan), and the
+owner's word of 2026-10-21, corrected after a first reading the wrong way round: "Hayır sen yanlış anladın silmesin" —
+Dot's Chrome must keep cookies, sessions and history like a real browser, for Default and the profiles the owner added,
+not for Incognito. Cookies with an expiry and the history already stayed; the cookies a site gives no expiry, where many
+sites keep a sign-in, were gone after every restart of Dot's Chrome (the daemon's, the Mac's, an idle close). **Measured
+first.** The design would have kept them in a file of its own (a 0600 copy of the jar, saved every 30 s and put back
+before the first page), and the critique asked to try Chrome's own way before that: Chrome writes session cookies into
+the profile while it runs and deletes them as it starts, unless its last run crashed, when it gives them back. On a
+scratch profile (Chrome 155, Playwright 1.63, Dot's switches): a normal restart dropped the session cookie; with
+`profile.exit_type` set to `Crashed` in the profile's preferences and `--hide-crash-restore-bubble` the cookie came
+back, headless and with a window, after each of five restarts in a row, and no page of the last run was opened. **As
+built.** `browser.profiles.keep_session_cookies` writes that word into the preferences of the profile (`exit_type`
+`Crashed`, `exited_cleanly` false; the other preferences kept, written only when they say otherwise, and not for
+Incognito nor a profile whose preferences hold nothing yet; a new profile whose zoom was just written gets it too, with
+nothing to give back) before Dot's own Chrome starts (after the zoom, item 358) and before Sign in… and `dotx browser
+login` open their window (`browser.login`), so a session cookie set in either survives the other; both start Chrome with
+the switch. No copy of a cookie leaves Chrome's own store, which keeps them under the key it always used, so an imported
+profile keeps them too. **Clear** still deletes them. Item 447 of another session (Dot's Chrome closed once unused)
+ships with that close off; with this item in, the close loses no sign-in and its default can be 300 s, the owner's call.
+Yolo and every approval mode are untouched. Tests: `tests/unit/test_browser_profiles.py` (the word written, the rest
+kept, Incognito and a fresh profile left alone, a state Dot does not know refused),
+`tests/smoke/test_browser_session_cookies.py` (a real Chrome on a throwaway profile: a cookie without an expiry is still
+sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
+`docs/browser-and-computer-use.md`.
+
+### 455. A schedule runs now, by hand, and lists its firings
+
+**Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its first part:
+"a Run now button and the list of a schedule's past runs". **As built.** `Scheduler.fire_by_hand` starts a run of a
+schedule now, switched on or off, due or not, as a firing goes (unattended, the schedule's own choices, the digest of
+its earlier runs), in a chat titled `<name> · <time> · by hand` (or the schedule's chat), its first message saying it
+was started by hand (`by_hand_goal`); `Store.record_schedule_hand_run` writes its last run and its chat and nothing of
+when it fires next nor of its switch, so a one-time schedule is still due at its moment. It refuses (409) while the
+emergency stop is engaged and while a run of the schedule is at work or being started: a set of the schedules being
+started, entered by a tick's firing and by a hand run alike, closes the window between the check and the run in flight,
+so a click and a tick start one run between them, and a repeating schedule's firing whose time comes during a hand run
+is skipped as for a run still going, while a one-time schedule waits, still due, and fires once that run has ended (the
+pre-push review found that it was switched off for good by that skip, as its following time is none). A start the daemon
+refuses drops the chat made for it, is the caller's error and no missed firing (the owner is looking). `_fire` keeps its
+order (the firing written before the run starts); its parts both paths need (`_history`, `_carried`, `_start`, `_track`)
+are methods of their own, and `_firing_chat` takes its title. Routes: `POST /api/schedules/{id}/run` (201, a run), `GET
+/api/schedules/{id}/firings` (its last runs, newest first, one at work among them, each with its chat's title,
+`Store.schedule_firings`). On Schedules a row has a play button whose title says it does real work with the approvals
+its run takes (yolo: "asking nothing"), with no question first, as the owner's word of 2026-10-21 asks of yolo ("YOLO
+modundaki serbestliğe dokunma"): a click opens the run's page, where Stop is, and a toast says it started; **Firings**
+opens the list under the row, kept open and read again as the list is painted again. The critique's corrections: the
+design's "a gone model is a 422" does not hold (the run starts and fails as a failed run, which the list shows), so the
+refused start is tested with a manager that refuses; the watch is started before the hand run's status is written.
+Tests: `tests/smoke/test_run_now.py` (switched off and run by hand with its time kept, a one-time schedule still due, no
+second start by hand nor at its time and a click racing a tick, the emergency stop, a refused start leaving no chat, a
+yolo schedule's run in yolo, and the page at 1280 px and at 390 px as a touch screen: the button's title, the run's
+page, the list). The scheduler's own tests pass unchanged. Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`.
+
+### 458. A repeating schedule whose runs keep failing is switched off, and you are told
+
+**Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its second part:
+"a repeating schedule switched off after N failed runs in a row". Today a schedule whose goal cannot be reached any more
+(a site moved, a key expired) fails at every firing, unseen but for the end of each run. **As built.** A schedule keeps
+how many of its runs in a row ended failed (`runs_failed_in_row`, a column; not derived from the last runs, so that
+after the owner fixes the cause and switches it on again one more failure does not switch it straight off):
+`Store.record_schedule_outcome` writes a run's end and the row together (`done` sets it to 0, `failed` adds one,
+`cancelled` leaves it), in the watch of every run of the schedule, at its time and by hand alike (a run by hand that
+ends done starts the row again, which is how the owner tries a fix). A firing that started no run counts not at all.
+When a repeating schedule that is on reaches its limit (`ScheduleOptions.stop_after_failures`, its form's **Switch off
+after**: 3, 5, 10, 20 or never; else `[scheduler] stop_after_failures`, 0 = never, which is how Dot worked), it is
+switched off for good with the status "switched off: its last N runs failed" and the live event `schedule_stopped`, told
+once by the phone and the desktop (the schedule is off afterwards); a one-time schedule is never switched off by it.
+Switching a schedule on again, or changing it, starts its row afresh and clears that status. The row says "N failed in a
+row", with when it switches itself off in its title; the form's default names the configured value
+(`StatusView.schedule_stop_after_failures`). The critique's points taken: the counter moves for every schedule and only
+the switch-off is the repeating ones'; the event is sent only when the switch-off changed the row; the column is named
+apart from the failures to start of `scheduler/failures.py`. Not done: the critique's one tuple of option columns, left
+for the notification level, which adds the next option. Yolo is untouched: a yolo schedule's runs count as any other's,
+and nothing is asked. Tests: `tests/unit/test_schedule_stop.py` (the limit, the rule, the store's row),
+`tests/unit/test_push.py` (the phone's message), `tests/smoke/test_schedule_stop.py` (through the routes and a real
+scheduler: two failed and one done, a timed firing's failure counting, the third in a row switching off a yolo schedule
+with one event, switching it on again; a one-time schedule and one without a limit kept on; the page at 1280 px and at
+390 px as a touch screen: the row's note and the form's limit). Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`,
+`defaults.toml`.
 
 ## Log
 
@@ -17045,5 +17228,19 @@ one, draws the real page with its mark, and nothing but the way back reaches the
 - 2026-10-21 (Opus 5.5): item 446 on `item-446-chat-foot-always-a-way` from `main`: a chat reached from
   the side menu opens at its foot, a run that ended while another chat was open and a live one included;
   every run is told that there is always a way, within the rules of trust and safety.
-- 2026-10-21 (Opus 5.5): item 448: the way back of a sign-in (`/oauth/callback` on this Mac at the daemon's port) opens in
-  Dot's own Chrome as a page, and nothing else of the interface does.
+- 2026-10-21 (Opus 5.5): item 447: `@` offers the MCP servers and the plugins alone — the skills are `/`'s — each with
+  the logo of its Customize tile, and on a phone the menu takes the room the keyboard leaves and scrolls.
+- 2026-10-21 (Opus 5.5): item 449 on `item-449-rule-order` from `main`: a rule's arrows move it up or down the order, a
+  rule that an earlier rule fits wherever it fits says it never decides, and the plan of the nine ideas taken from
+  OpenBot is written down.
+- 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
+  of its last run when it starts again, as Chrome does after a crash, without a page of that run.
+- 2026-10-21 (Opus 5.5): item 455 on `item-455-run-now` from `main`: a schedule runs now by hand, as its firing would,
+  its time and switch kept, and its Firings list its last runs.
+- 2026-10-21 (Opus 5.5): item 458 on `item-458-stop-after-failures` from `main`: a repeating schedule whose runs failed
+  so many times in a row is switched off and you are told once; its row counts them.
+- 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat's
+  newest run goes on at the run a message from another screen started, at once, after a break of its stream, and as a
+  phone loads it again; a page of an earlier run stays.
+- 2026-10-21 (Opus 5.5): item 452 on `item-452-run-panel-plain` from `main`: the Run tab says what a glance needs; the
+  run's mode, start and id, its set-up and its cost fold under More, closed the first time.

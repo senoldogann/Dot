@@ -34,6 +34,7 @@ from dotagent.secrets import known_secrets
 from dotagent.server import UI_SOURCE
 from dotagent.server.actions import action_steps, file_edits
 from dotagent.server.activity import current_activity
+from dotagent.server.away import read_away
 from dotagent.server.changes import ChangesView, chat_changes, chat_runs
 from dotagent.server.context import ServerContext
 from dotagent.server.sending import send_once
@@ -44,6 +45,8 @@ from dotagent.server.views import (
     ApprovalsQuery,
     AsideRequest,
     AttachmentUpload,
+    AwayQuery,
+    AwayView,
     CampaignChip,
     DecisionRequest,
     EventsQuery,
@@ -99,7 +102,8 @@ def _loop_schedule(text: str, every: str, mode: RunMode, options: ScheduleOption
 
 def _opening_options(request: StartRunRequest) -> ScheduleOptions:
     """The options a schedule of the chat that ``request`` opens takes (``chat_options`` of its first run), read from
-    the request before the run is: what the configuration fills in stays None, as a schedule reads it."""
+    the request before the run is: what the configuration fills in stays None, as a schedule reads it, and the chat's
+    agent is the schedule's (item 463)."""
     return ScheduleOptions(
         model=request.model,
         effort=request.effort,
@@ -109,6 +113,9 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
         timezone=None,
         history_runs=None,
         same_chat=True,
+        stop_after_failures=None,
+        notify=None,
+        agent_id=request.agent_id,
     )
 
 
@@ -418,6 +425,11 @@ def runs_router(ctx: ServerContext) -> APIRouter:
     async def activity() -> ActivityView:
         """Everything in motion in one list: what waits for the user, what works now, what ended today."""
         return await current_activity(store, ctx.manager)
+
+    @router.get("/away")
+    async def away(query: Annotated[AwayQuery, Query()]) -> AwayView:
+        """What schedules and campaigns did since ``since`` (item 466), for the Home's "while you were away"."""
+        return await read_away(store, query.since, time.time())
 
     @router.get("/activity/count")
     async def activity_count() -> ActivityCount:

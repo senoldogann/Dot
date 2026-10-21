@@ -1930,3 +1930,22 @@ dialog.computer-full::backdrop {
 .panel-fold[data-open="false"] .panel-section-head {
   padding-bottom: 12px;
 }
+
+/* The Run tab's More (item 452): the run's other facts, then how it was set up and where its time went, each under a
+   head of its own on a hairline, inside the fold's padding. */
+.run-more > .panel-section:not([hidden]) {
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.run-more > .panel-section > .panel-section-head,
+.run-more > .panel-section > .panel-section-body {
+  padding-inline: 0;
+}
+
+.run-more-warning {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--warn);
+}

@@ -122,6 +122,13 @@ Chrome is let go of when it works on it); **Delete** removes an added profile th
 `dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use. Every profile is
 guarded as Default is: a run neither reads nor changes it. In My Chrome mode the profiles are your Chrome's own.
 
+A profile keeps what a real browser keeps (item 453): its history, its cookies with an expiry, and its session
+cookies too, the ones a site gives no expiry and many keep a sign-in in. Chrome writes those into the profile while it
+runs and deletes them as it starts again, unless its last run crashed; so before Dot's own Chrome, Sign in… or `dotx
+browser login` start on a profile, Dot writes into its preferences that the last run crashed (`profile.exit_type`),
+and Chrome starts with `--hide-crash-restore-bubble`: it gives the session cookies back and opens none of the pages of
+that run. Incognito keeps nothing, as before. **Clear** still deletes them all.
+
 Both modes share what follows.
 
 - The page is observed as an accessibility snapshot in which every element has a ref (`e12`). It covers the viewport
@@ -177,6 +184,14 @@ Both modes share what follows.
   are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails
   with the banner still there is logged as `consent_decline_failed` with the page's address).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.
+- With `idle_close_s` set (seconds; 0, the default, keeps it open until the daemon stops; item 454), Dot's own Chrome
+  (`own`) closes, the Playwright driver with it, once nothing used it for that long: no chat's step is under way in it,
+  no run at work holds tabs in it, no page is being read in it for the web tools or watched under "Dot's computer", no
+  task is being taught in it, and its window is not the one in front. The next call that needs it starts it again on the
+  same profile, signed in as before (a profile keeps its session cookies, item 453; Incognito keeps nothing); the chats'
+  tabs go with it. Dot's Chrome is the Google Chrome application, so while it runs macOS takes it for yours: a click on
+  Chrome in the Dock brings Dot's forward instead of opening yours. Once Dot's has closed, the Dock opens yours again;
+  while a run works in its browser, the mode `attach` lets Dot work in your own Chrome instead.
 - `[browser] allowed_hosts` and `blocked_hosts` limit the sites of the browser tools and of `web_fetch`; a host also
   matches its subdomains, and an empty `allowed_hosts` means every site. The blocked list starts with the cloud-metadata
   hosts. Dot's own interface is never opened, whatever the lists say: this Mac on `[server] port` in any spelling

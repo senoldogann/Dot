@@ -55,8 +55,11 @@ REVIEW.md lists under "Always needs a human".
 
 ## How much process a change needs
 
-- Small: prose only (`docs/`, `ROADMAP.md`, `CHANGELOG.md`, comments), or under about 50 changed lines outside the
+- Small: prose only (`docs/`, `ROADMAP.md`, `roadmap/`, `CHANGELOG.md`, `changes/`, comments), or under about 50 changed
+  lines outside the
   "Always needs a human" paths. No `PLAN.md`, no review but the pre-push hook, the checks of what changed; push it.
-- A roadmap or changelog entry goes in the pull request of the change it records, not in a pull request of its own.
+- A roadmap or changelog entry goes in the pull request of the change it records, not in a pull request of its own,
+  in files of the change's own: `roadmap/<item>.md` and `changes/<item>.md` (their READMEs say how), not in ROADMAP.md
+  or CHANGELOG.md, which changes made side by side would all write at the same lines.
 - Everything else: done criteria (in `PLAN.md` when it takes several steps), the tests of what changed while working,
   the whole gate once at the end, the pre-push review, the pull request.

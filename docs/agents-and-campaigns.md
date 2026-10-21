@@ -20,10 +20,18 @@ section ("You are Scout, an agent the owner made: ..." and your instructions), a
 its tools are the ones the agent names plus finishing, asking you and turning tool groups on, and the tools of an MCP
 server you pick for its message, or picked for an earlier message of its chat (item 415): your pick widens the agent's
 bounds for that chat; a server the model only called does not. The run's page wears the agent's face and name in the bar
-with a chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. Deleting an agent
-leaves its chats, its lessons and its learned skills to Dot. The bar of an agent's page names the agent as the page's
+with a chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. A schedule can run
+as one of your agents (its **Agent** on Schedules, item 462; see [Memory and schedules](memory-and-schedules.md)).
+Deleting an agent leaves its chats, its lessons and its learned skills to Dot, and switches its schedules off ("switched
+off: its agent was deleted"), as Dot's with no agent named, so that none goes on firing with every tool; one you switch
+on again runs as Dot, or as the agent you then pick in its form. The dialog says how many of them it switches off: the
+ones on. The bar of an agent's page names the agent as the page's
 heading, as the tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not where the
-greeting stood.
+greeting stood. **Pause** in the bar (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the agent's
+schedules from starting anything by themselves until **Resume**: the list and the page say "Paused", and its schedules'
+rows "<name> is paused" (see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run now** of
+one of its schedules and the messages of other agents still reach it, and runs already working go on, each with its
+Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
 An agent can start from a template (item 315). Under the list, **Start from a template** shows fourteen: Sales
 Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of

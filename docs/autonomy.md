@@ -52,7 +52,9 @@ Every automatic answer is an ordinary approval record (`decided_by` is `reviewer
 and the note holds the reason), an `approval_auto` event and one line in the timeline of the run ("YOLO, not asked:
 click 'Reply' — untrusted content is in context and this action reaches outside the Mac"), so you can see afterwards
 what went through and why. A chat leaves those lines out unless Settings › General › Chat › "Show what ran without
-asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows.
+asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows. The home's **While you
+were away** counts them for the runs of your schedules and campaigns since you last looked (item 466; see
+[The daemon](daemon.md)).
 
 **What only yolo waives.** Every question and every hand-off (item 443): the untrusted content's, Dot's own files',
 the preset's and your `ask` rules', money and credentials', a message or a post in your name, a pre-approved spend, and
@@ -174,14 +176,15 @@ Details panel).
 **Resuming a run that was cut off.** A run that a crash, a restart or a shutdown of the daemon cut off, or a run of
 `dotx run` whose terminal was closed (or that got SIGTERM) or whose command died, can go on where it stopped: Continue
 on the run's page, `dotx resume RUN_ID` (in this terminal, like `dotx run`), or `POST /api/runs/{id}/resume`. A new run
-starts in the same chat, with the goal, model, reasoning level, approval mode and goal mode of the run it resumes, and
-the conversation so far, where a shutdown or a restart of the daemon, or a closed terminal, keeps the results of the
-calls of the step it was in that had ended (a crash keeps none). Its first message tells the model how that run was cut
-off and how each call of that step without a result ended: finished (with the start of its result), cut off while it
-ran, or not started. A call that was cut off may have changed something unless it only reads, and the model is told to
-check before it runs it again. The plan of that run is the plan of the new one. Only the newest run of a chat can be
-resumed, and never a run that you stopped or that another run started. After a shutdown, the chat's queue goes on once
-the new run ends done; after a crash or a restart, it waits until you resume it.
+starts in the same chat, with the goal, model, reasoning level, approval mode and goal mode of the run it resumes, as
+the same agent when it was one of yours (item 462), and the conversation so far, where a shutdown or a restart of the
+daemon, or a closed terminal, keeps the results of the calls of the step it was in that had ended (a crash keeps none).
+Its first message tells the model how that run was cut off and how each call of that step without a result ended:
+finished (with the start of its result), cut off while it ran, or not started. A call that was cut off may have changed
+something unless it only reads, and the model is told to check before it runs it again. The plan of that run is the plan
+of the new one. Only the newest run of a chat can be resumed, and never a run that you stopped or that another run
+started. After a shutdown, the chat's queue goes on once the new run ends done; after a crash or a restart, it waits
+until you resume it.
 
 By default (`resume = "safe"` in `[agent]`, item 248) the daemon also resumes runs on its own when it starts: runs of
 the web UI, cut off at most `resume_within_s` seconds before (30 minutes), whose calls that were cut off only read (a

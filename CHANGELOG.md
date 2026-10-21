@@ -1,18 +1,41 @@
 # Changelog
 
-Each release of Dot lists here what it changes, the newest first. A change not released yet goes under **Unreleased**,
-at the top, until a release names it; how a release is made is in [Releasing](docs/development.md#releasing).
+Each release of Dot lists here what it changes, the newest first. A change not released yet is a file of its own in
+[changes/](changes/) (those from before item 459 stand under **Unreleased**), and a release gathers them into its
+section; how a release is made is in [Releasing](docs/development.md#releasing).
 
 ## Unreleased
 
-- Signing in to Google or Microsoft from Customize no longer ends on a page Chrome blocked when the sign-in opened in
-  Dot's own Chrome: the page you come back to opens there, drawn in Dot's look from what it carries itself, and
-  nothing else of Dot's interface does. The page no longer has a button back to Plugins, which led there into Dot's
-  interface; Dot's window already shows the account (item 448).
-- In `yolo`, Dot no longer asks you about what every other mode refuses (a read of where your secrets are kept, data
-  sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own files outside the undo
-  journal): the step runs and is recorded. Money and credentials are still handed to you, and a message or a post in
-  your name still waits for your yes (item 433).
+What is not released yet is also in [changes/](changes/), a file for each change (item 459); a release folds those
+files in here.
+
+- The side panel's Run tab is plain: Details show the status, the model and its reasoning, the approvals, the tool calls,
+  the tokens and the duration (goal mode and the compactions only when there are some), then the conversation's files;
+  the run's mode, start and id, how it was set up and its cost fold under **More**, closed the first time, which counts
+  a set-up warning beside its title, and a figure of none has no line (item 452).
+- A message sent from a chat that is over no longer jumps the chat up and back down: it stays at its foot until the
+  next run's page takes its place. A chat whose run is over opens with every message already there, instead of
+  filling in as its stream is read (item 454).
+- `[browser] idle_close_s` closes Dot's own Chrome, with its Playwright driver, once nobody used it for that long, so it
+  does not keep its memory all day; while it runs macOS takes it for your Google Chrome, and a click on Chrome in the
+  Dock brings Dot's forward instead of opening yours. It is off (0) unless you set it; Dot's Chrome starts again signed
+  in as before (Incognito keeps nothing), since it keeps its session cookies (item 454).
+- Schedules: a repeating schedule whose runs fail so many times in a row (its **Switch off after**, or `[scheduler]
+  stop_after_failures`; never by default) is switched off and you are told once; its row says how many failed in a
+  row (item 458).
+- Schedules: **Run now** starts a schedule's run at once, switched on or off, as its firing would run, without
+  changing when it fires next; **Firings** lists its last runs, at its time and by hand (item 455).
+- Settings › Rules: a rule's arrows move it up or down the order the rules are checked in, and a rule that an earlier
+  rule fits wherever it fits says it never decides, with the number of the rule that decides in its place. The note
+  above the rules now says what a yolo run keeps of the protections that are always on: only a research run's limit
+  (item 449).
+- Dot's own Chrome no longer signs you out of sites that keep their sign-in in a session cookie whenever it starts
+  again: Default and the profiles you added keep those cookies across restarts, as a real browser keeps a sign-in;
+  Incognito still keeps nothing (item 453).
+- In `yolo`, Dot asks you nothing (items 433 and 443): not about what every other mode refuses (a read of where your
+  secrets are kept, data sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own
+  files outside the undo journal), nor about money, a credential, a message or a post in your name: the step runs and
+  its record keeps the reason it would have asked for. Only a research run's limit stands.
 - An approval's card stays in its own chat: the home lists a run that waits under Waits for you without its card,
   and once you allow it the card leaves the chat with the line that asked for it. A refused card stays, saying so
   (item 434).
@@ -22,8 +45,8 @@ at the top, until a release names it; how a release is made is in [Releasing](do
   Accounts card shows Google's and Microsoft's colours and only heads the list, and the "+" of a tile keeps its width on
   a phone (item 437).
 - The page you come back to after signing in to Google, Microsoft or an MCP service now looks like Dot, light or dark as
-  your Mac is, names the account or service and says in the provider's own words why a sign-in failed; the docs say to
-  name the app Dot on Google's consent screen (item 437).
+  your Mac is, names the account or service, says in the provider's own words why a sign-in failed, and has a button
+  back to Plugins; the docs say to name the app Dot on Google's consent screen (item 437).
 - The end of a command Dot left running in the background no longer shows in the composer's Queued list, with Steer,
   edit and remove: a run at work is told at its next step, Dot starts a run to tell a chat where none works, and a
   stopped chat is not left paused with it (item 437).
@@ -53,6 +76,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - Every run, a chat's too, is told that there is always a way: it does not give up on a step while a way is left
   untried and says that something cannot be done only after trying it, naming each way it tried; a chat does not end
   its turn announcing a step it could take now. No way goes around a refusal, a denial or your decision (item 446).
+- A message sent to a chat on the phone shows at once on the desktop, and one sent on the desktop on the phone: every
+  page that shows the chat's newest run goes on at the run it started, also once a phone put away is back or loads the
+  page again, and what was typed there and not sent goes with it; a page of an earlier run stays (item 451).
 
 ## 0.1.0 (2026-10-20)
 

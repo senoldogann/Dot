@@ -13,7 +13,7 @@ import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
 import { icon, toolIconName } from "./icons.js";
-import { touchFirst } from "./layout.js";
+import { touchFirst, trackHeight } from "./layout.js";
 import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
 import { arePicks, createPicks, pickColour } from "./picks.js";
@@ -53,6 +53,17 @@ export function keepDraft(draftKey, draft) {
   writePref(`${DRAFT_PREFIX}${draftKey}`, JSON.stringify(draft));
 }
 
+/** Move the draft of the composer of `fromKey` to the composer of `toKey`: what was typed for a run goes with its chat
+ * to the next run (item 451). Nothing when there is none. */
+export function moveDraft(fromKey, toKey) {
+  const draft = readDraft(fromKey);
+  if (draft === null) {
+    return;
+  }
+  keepDraft(toKey, draft);
+  clearPref(`${DRAFT_PREFIX}${fromKey}`);
+}
+
 // The skills and the MCP tools, asked for once per page and kept; a failure is kept too, so the menu says so.
 let paletteLoad = null;
 
@@ -68,8 +79,8 @@ function loadPalette() {
 
 /** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`; never plain Return on a touch screen), autosize up to `maxPx`, the slash
  * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer), the at menu
- * of the MCP servers, their tools and the skills (item 367) and the markdown it holds shown under it; `edited()` runs
- * after a pick of the menu changed the text, as the input event does after typing, and `picked(pick)` after a skill or
+ * of the MCP servers and the plugins, each with its logo (items 367 and 447), and the markdown it holds shown under
+ * it; `edited()` runs after a pick of the menu changed the text, as the input event does after typing, and `picked(pick)` after a skill or
  * a tool was picked for the message (`{ kind, name }`, item 318). Returns the menu element and the box's field (the box
  * with its markdown under it) to place in the composer's frame, `autosize()`, to call after any change of the text, and
  * `dispose()`. */
@@ -119,7 +130,12 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
 
   function itemMark(item) {
     const iconName = itemIconName(item);
-    const span = el("span", { class: "slash-mark", dataset: { kind: item.kind ?? "command" } }, icon(iconName));
+    // An MCP server wears the logo its Customize tile wears (item 447), or the plug where it has none (item 408).
+    const mark =
+      item.logo === undefined || item.logo === null
+        ? icon(iconName)
+        : el("img", { class: "plugin-logo", src: `/icons/plugins/${item.logo}`, alt: "" });
+    const span = el("span", { class: "slash-mark", dataset: { kind: item.kind ?? "command" } }, mark);
     if (item.kind === "plugin" || item.kind === "skill" || item.kind === "tool") {
       const tintName = item.serverName ?? item.label;
       span.style.setProperty("--pick-tint", `var(--character-${pickColour(tintName)})`);
@@ -157,7 +173,7 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
       // The at menu holds nothing but what the palette lists: until it is read, it says so rather than that nothing
       // matches.
       const loading = palette === null && range.trigger === "@";
-      menu.append(el("div", { class: "slash-note" }, loading ? "Reading the MCP servers and skills…" : `Nothing matches ${range.trigger}${range.word}.`));
+      menu.append(el("div", { class: "slash-note" }, loading ? "Reading the MCP servers and the plugins…" : `Nothing matches ${range.trigger}${range.word}.`));
     }
     menu.hidden = false;
     textarea.setAttribute("aria-expanded", "true");
@@ -400,6 +416,10 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     requestAnimationFrame(wired.autosize);
   }
   paintEmpty();
+  // The box's own height, on the box itself, for the menu that opens above it (item 447): a phone's keyboard leaves only
+  // what is above the box, and the box grows with a draft, its chips and its files. It stays on the box rather than the
+  // page, where the curtain's composer and a page's live at once (waiting.js) and would write over each other.
+  const stopHeight = trackHeight(element, element, "--composer-h");
   // SnapShots (item 405): a box with a draft of its own takes the captures the daemon made, the ones that waited
   // and each new one, as files of the draft.
   const stopSnapshots =
@@ -446,6 +466,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
     },
     dispose: () => {
       stopSnapshots();
+      stopHeight();
       wired.dispose();
       textarea.removeEventListener("input", onInput);
       textarea.removeEventListener("focus", onFocus);
