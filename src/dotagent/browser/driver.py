@@ -169,8 +169,8 @@ _SENDS_BY_GET_SCRIPT: str = """(field) => {
   const form = field.form;
   if (!form) return false;
   return (form.hasAttribute('method') && form.method === 'get')
-    || [...form.querySelectorAll('button, input[type=submit], input[type=image]')]
-      .some((button) => button.hasAttribute('formmethod') && button.formMethod === 'get');
+    || [...form.elements].some((control) => ['submit', 'image'].includes(control.type)
+      && control.hasAttribute('formmethod') && control.formMethod === 'get');
 }"""
 # The mark of a field a login was filled into (item 493), which every screenshot covers, in every mode: the field shows
 # the username, and a password once the page shows it.

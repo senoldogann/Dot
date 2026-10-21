@@ -21,7 +21,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urldefrag
+from urllib.parse import urldefrag, urlsplit
 
 from playwright.async_api import (
     Browser,
@@ -128,7 +128,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
-from dotagent.vault.masking import masked
+from dotagent.vault.masking import in_address, masked
 
 _log = get_logger("dotagent.browser.session")
 
@@ -1372,8 +1372,11 @@ class BrowserSession:
         """The rules on one request Chrome is about to send; ``page`` the page whose main frame it navigates, when it
         is one, so that the error page it then shows can be told from a page that failed to load. A rule that fails on
         an address refuses it: the request must be answered either way, or Chrome holds it for good."""
-        shown: str = self._shown(url)
-        if shown != url:
+        secrets: tuple[str, ...] = self._live_secrets()
+        shown: str = masked(url, secrets)
+        if secrets and in_address(url, secrets):
+            # Shown and logged by its site alone: a form of the value masking does not know may be in the rest.
+            shown = f"{urlsplit(url).scheme}://{urlsplit(url).netloc}/[an address that carries a filled value]"
             verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
         else:
             try:
@@ -1394,10 +1397,14 @@ class BrowserSession:
             )
         return verdict
 
+    def _live_secrets(self) -> tuple[str, ...]:
+        """The passwords and one-time codes no request may carry in its address now (item 493)."""
+        now: float = time.monotonic()
+        return tuple(value for value, until in self._vault_secrets.items() if until > now)
+
     def _shown(self, url: str) -> str:
         """``url`` as Dot shows and logs it: with the passwords and codes no request may carry masked (item 493)."""
-        now: float = time.monotonic()
-        return masked(url, [value for value, until in self._vault_secrets.items() if until > now])
+        return masked(url, self._live_secrets())
 
     async def _on_request(self, route: Route, request: Request) -> None:
         """The route of Dot's own Chrome: a request the rules refuse fails in the page as blocked by the client; the

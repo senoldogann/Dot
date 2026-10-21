@@ -6,7 +6,7 @@ import json
 import string
 from collections.abc import Iterable
 from functools import cache
-from urllib.parse import quote, quote_plus
+from urllib.parse import quote, quote_plus, unquote
 
 from pydantic import JsonValue
 
@@ -58,6 +58,24 @@ def masked(text: str, values: Iterable[str]) -> str:
     for form in sorted(forms, key=len, reverse=True):
         text = text.replace(form, MASK)
     return text
+
+
+def _read_back(address: str) -> frozenset[str]:
+    """``address`` as it is and with its escapes read back, as UTF-8 and as a page of Western European text writes
+    them (Windows-1252, which browsers read Latin-1 as), with ``+`` as a space and as itself."""
+    readings: set[str] = {address}
+    for text in (address, address.replace("+", " ")):
+        for encoding in ("utf-8", "cp1252"):
+            readings.add(unquote(text, encoding=encoding, errors="replace"))
+    return frozenset(readings)
+
+
+def in_address(address: str, values: Iterable[str]) -> bool:
+    """Whether ``address`` carries one of ``values`` of a few characters or more: in any of the forms :func:`masked`
+    knows, in the address as it is or once its escapes are read back. Reading the escapes back finds a value however a
+    form or a script wrote it, an escape left as it was, a byte of another charset or a part encoded twice."""
+    kept: tuple[str, ...] = tuple(values)
+    return any(masked(reading, kept) != reading for reading in _read_back(address))
 
 
 def masked_json(value: JsonValue, values: Iterable[str]) -> JsonValue:

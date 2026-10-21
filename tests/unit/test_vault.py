@@ -12,7 +12,7 @@ from dotagent.policy.shell import assess_shell
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import Behavior, RuleRecord
 from dotagent.vault.hosts import fills_on, website_hosts
-from dotagent.vault.masking import MASK, masked
+from dotagent.vault.masking import MASK, in_address, masked
 
 
 @pytest.mark.parametrize(
@@ -105,3 +105,19 @@ def test_a_value_is_masked_as_an_address_and_a_json_string_write_it_too() -> Non
     assert (
         masked("/home?pass=S3cret*Pass%7Ew0rd%21 /s?q=S3cret*Pass~w0rd!", [starred]) == f"/home?pass={MASK} /s?q={MASK}"
     )
+
+
+@pytest.mark.parametrize(
+    ("address", "carries"),
+    [
+        ("https://example.com/login?p=P%E4sswort1", True),
+        ("https://example.com/login?p=P%C3%A4sswort1", True),
+        ("https://example.com/x?p=pa%s%20word", True),
+        ("https://example.com/x?p=pa%25s+word", True),
+        ("https://example.com/x?p=pa%2525s%2520word", True),
+        ("https://example.com/x?p=482913", True),
+        ("https://example.com/x?p=48291", False),
+    ],
+)
+def test_an_address_carries_a_value_however_its_escapes_write_it(address: str, carries: bool) -> None:
+    assert in_address(address, ["Pässwort1", "pa%s word", "482913"]) == carries

@@ -233,8 +233,11 @@ a note that it was saved while reading outside content.
     so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text.
   - No address holds a password or a code: an address is written into the views of the page, Chrome's history and
     Dot's log, and shortened where it is long. A form that names GET as its method, or a word no browser knows, gets
-    neither. Dot's own Chrome refuses every request whose address would carry one, as a form that names no method
-    sends it, or a script: a password for as long as Dot runs, a code for five minutes after it went in. Your own Chrome
+    neither. Dot's own Chrome refuses every request whose address carries one, as it is or once its escapes are read
+    back (as UTF-8, and as a page of Western European text writes them), as a form that names no method sends it, or a
+    script: a password for as long as Dot runs, a code for five minutes after it went in. The refusal and Dot's log
+    name such a request by its site alone. A page in another legacy charset (Shift_JIS, KOI8-R and the like) can write
+    a value Dot does not read back. Your own Chrome
     (Settings › Browser › My Chrome) sends its requests unguarded, so there Dot fills a username alone; your password
     manager fills the rest. A page can still write them into its own words, which Dot masks where it shows them
     whole; only the login's own site, which has them anyway, can do that.
