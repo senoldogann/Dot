@@ -9,6 +9,11 @@ from dotagent.core.errors import ToolExecutionError
 from dotagent.core.types import FrozenModel
 from dotagent.llm.types import ImageData
 
+# What Pillow raises for data it cannot read as a picture (item 515): an OSError (UnidentifiedImageError among them), a
+# ValueError for a chunk that is cut short or a text that inflates past its limit (Pillow 13 raises it where 12 raised
+# an OSError), and DecompressionBombError for a picture that says it is larger than Pillow will draw.
+UNREADABLE_IMAGE: tuple[type[Exception], ...] = (OSError, ValueError, Image.DecompressionBombError)
+
 
 class EncodedImage(FrozenModel):
     """A model-ready image together with the geometry needed to map its pixels back to the source."""
@@ -35,7 +40,7 @@ def encode_image(data: bytes, max_edge: int, quality: int) -> EncodedImage:
         with Image.open(io.BytesIO(data)) as opened:
             source_width, source_height = opened.size
             picture: Image.Image = _flatten(opened)
-    except OSError as exc:
+    except UNREADABLE_IMAGE as exc:
         raise ToolExecutionError("the data is not a readable image", {"bytes": len(data), "error": str(exc)}) from exc
     longest: int = max(source_width, source_height)
     if longest > max_edge:
@@ -63,7 +68,7 @@ def jpeg_of_size(data: bytes, width: int, height: int, quality: int) -> bytes:
             if opened.size == (width, height):
                 return data
             picture: Image.Image = _flatten(opened).resize((width, height), Image.Resampling.LANCZOS)
-    except OSError as exc:
+    except UNREADABLE_IMAGE as exc:
         raise ToolExecutionError("the data is not a readable image", {"bytes": len(data), "error": str(exc)}) from exc
     buffer: io.BytesIO = io.BytesIO()
     picture.save(buffer, format="JPEG", quality=quality, optimize=True)
