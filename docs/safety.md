@@ -177,8 +177,9 @@ What a shell command printed after it reached the network (`curl`, `ssh`, `git c
 the guard cannot read), what a terminal program prints, and a find_help answer that lists skills or MCP servers that
 other agents of the Mac set up count the same way, unfenced, and so does reading back the files Dot keeps of such content
 when it is too long for one result, under `<workspace>/crawl/` and `<workspace>/mcp-results/` (item 494): `read_file` of
-one, a `search_files` match in one or a search of one, a shell line that names one or runs in one (the words of the line are read, so a
-line that reaches them otherwise, by a variable or a search of the workspace, is not seen). A run that has seen such content is marked untrusted, and
+one, a `search_files` match in one or a search of one, a shell line that names one or runs in one (the words of the
+line are read, so a line that reaches them otherwise, by a variable or a search of the workspace, is not seen); a
+failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and
 from then on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a
 schedule or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a
 change on a code host, inline code that reaches the network or runs a command of it) ask even when the preset or an

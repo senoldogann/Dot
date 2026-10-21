@@ -155,8 +155,9 @@ async def render_call_result(
         text = fence_mcp(server, tool, body, nonce)
     else:
         path: Path = await asyncio.to_thread(_write_answer, folder, _file_name(server, tool, nonce), body)
-        # The note is longest when it names the last line; what it leaves of the budget is shown.
-        room: int = text_chars - len(_kept_note(path, body, len(body.splitlines())))
+        # The note is longest when it names the last line or no whole line; what it leaves of the budget is shown.
+        longest: int = max(len(_kept_note(path, body, lines)) for lines in (0, len(body.splitlines())))
+        room: int = text_chars - longest
         shown, shown_lines = _leading_lines(body, max(room, 0))
         text = f"{fence_mcp(server, tool, shown, nonce)}\n{_kept_note(path, body, shown_lines)}"
     return ToolResult(text=text, images=tuple(images), is_error=result.is_error, untrusted=True)
