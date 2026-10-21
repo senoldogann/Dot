@@ -167,10 +167,10 @@ async def test_a_slash_opens_the_menu_letters_filter_it_and_enter_picks_without_
                 await goal.type("/")
                 await expect(menu).to_be_visible()
                 await expect(menu.locator(".slash-group")).to_have_text(["Commands", "Skills"])
-                # Four commands (the three modes and /loop, item 400), the owner's skill and the three that come with
-                # Dot (item 196).
-                await expect(menu.locator("[role=option]")).to_have_count(8)
-                await expect(menu.locator("[role=option][aria-selected=true]")).to_contain_text("/task")
+                # Five commands (Auto and the three modes, item 495, and /loop, item 400), the owner's skill and the
+                # three that come with Dot (item 196).
+                await expect(menu.locator("[role=option]")).to_have_count(9)
+                await expect(menu.locator("[role=option][aria-selected=true]")).to_contain_text("/auto")
                 assert await goal.get_attribute("aria-expanded") == "true"
                 await page.screenshot(path=str(tmp_path / f"slash-open-{width}.png"))
                 # Letters filter; the first match is active; the arrow keys move; Enter picks instead of sending.
@@ -272,12 +272,17 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 await popover.get_by_role("option", name="Default (scripted)").click()
                 await expect(reasoning_pill).to_be_hidden()
                 assert await model_pill.get_attribute("aria-expanded") == "false"
-                # The Mode pill: the mode's icon and name; its menu the three modes with what each does.
+                # The Mode pill is away on Auto (item 495), where the message's words settle the mode; a mode named
+                # with its command brings it, with the mode's icon and name, its menu Auto and the three modes with
+                # what each does.
                 mode_pill = page.locator(".composer-pill[data-pill='mode']")
+                await expect(mode_pill).to_be_hidden()
+                await goal.type("/task")
+                await goal.press("Tab")
                 await expect(mode_pill).to_contain_text("Task")
                 await mode_pill.click()
                 modes = page.locator(".composer .composer-popover[aria-label='Mode']")
-                await expect(modes.locator("[role=option]")).to_have_count(3)
+                await expect(modes.locator("[role=option]")).to_have_count(4)
                 await modes.get_by_role("option", name="Chat").click()
                 await expect(modes).to_be_hidden()
                 await expect(mode_pill).to_contain_text("Chat")
@@ -425,11 +430,12 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                 bar: dict[str, float | list[list[str | float]]] = await page.evaluate(_BAR)
                 right, parts = bar["right"], bar["parts"]
                 assert isinstance(right, float | int)
-                assert isinstance(parts, list) and len(parts) == 8, (width, bar)
+                # On Auto (item 495) the bar has no mode pill.
+                assert isinstance(parts, list) and len(parts) == 7, (width, bar)
                 by_name: dict[str, list[float]] = {str(part[0]): [float(value) for value in part[1:]] for part in parts}
-                assert set(by_name) == {"plus", "send", "field", "mode", "agent", "model", "reasoning", "options"}, bar
+                assert set(by_name) == {"plus", "send", "field", "agent", "model", "reasoning", "options"}, bar
                 # The pills keep one line at every width, and their height is the bar's (item 273).
-                pills = [by_name[name] for name in ("mode", "agent", "model", "reasoning", "options")]
+                pills = [by_name[name] for name in ("agent", "model", "reasoning", "options")]
                 assert max(float(pill[0]) for pill in pills) - min(float(pill[0]) for pill in pills) <= 1, (width, bar)
                 height_px = _BAR_PX if width > _PHONE_PX else _PHONE_BAR_PX
                 assert all(round(float(pill[4])) == height_px for pill in pills), (width, bar)
@@ -445,11 +451,8 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                     assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
                     assert float(pills[0][2]) > float(plus[3]) - 1, (width, bar)
                     assert abs(float(field[3]) - float(plus[3])) <= 2, (width, bar)
-                mode_name = page.locator(".composer-pill[data-pill='mode'] .composer-pill-value")
-                if width <= 560:
-                    await expect(mode_name).to_be_hidden()
-                else:
-                    await expect(mode_name).to_be_visible()
+                # On Auto (item 495) the mode has no pill at any width.
+                await expect(page.locator(".composer-pill[data-pill='mode']")).to_be_hidden()
                 await expect(options_pill).to_have_attribute("data-tone", "warn")
                 # Closed, the pill rests with no fill; its colour fades there, so the check waits for it to settle.
                 await expect(options_pill).to_have_css("background-color", "rgba(0, 0, 0, 0)")

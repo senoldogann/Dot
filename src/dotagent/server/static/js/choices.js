@@ -21,6 +21,11 @@ export const MODES = [
   { id: "chat", label: "Chat", hint: "Converse; use tools whenever they help", icon: "message" },
   { id: "research", label: "Research", hint: "Read-only: gather information and report, change nothing", icon: "search" },
 ];
+// Auto (item 495), a message's mode on the home and in a chat: the message's own words settle it (the daemon's
+// agent/mode_words.py), so the box shows no mode pill until one is named with /task, /chat or /research.
+export const AUTO_MODE = { id: "auto", label: "Auto", hint: "Dot picks: read-only when you only ask it to look, else it carries the goal out", icon: "sparkles" };
+// The modes a message may ask for: Auto first, then each mode by name.
+export const MESSAGE_MODES = [AUTO_MODE, ...MODES];
 // Never a real value of a status, so the first synchronisation always paints.
 const NOTHING_SHOWN = false;
 // What the pills add to their tooltips while a run works on a chat's page: a message waits in the queue and starts
@@ -57,8 +62,9 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
 }
 
 /**
- * The pills of a run's choices for the composer `frame` (composer.js), whose frame bounds their menus. `kept` is where
- * the box starts and keeps them: `mode` (an id of `MODES`), `model` (a reference, or "" for the daemon's default),
+ * The pills of a run's choices for the composer `frame` (composer.js), whose frame bounds their menus. `modes` are the
+ * modes it offers (`MESSAGE_MODES` for a message, Auto among them, item 495; `MODES` for an agent's). `kept` is where
+ * the box starts and keeps them: `mode` (an id of `modes`), `model` (a reference, or "" for the daemon's default),
  * `level` (`read(info)`, the reasoning level chosen for a model, or null for the daemon's; `write(info, level)`, null to
  * go back to the daemon's), `speed` (`read()`, "fast" or "standard"; `write(speed)`: fast mode, which a run asks for
  * only of a model that has it, item 223), `approvals` and `goalMode` (as `approvalsPicker` and `goalModePicker` take
@@ -77,7 +83,7 @@ export function optionRow({ lead, label, hint, selected, onPick }) {
  * run works, the choices wait for the next follow-up and the pills say so), `setWords(on)` (whether the word ultrathink
  * or ultracode in the box arms its choice, item 259) and `dispose()`.
  */
-export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }) {
+export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onChange }) {
   let waiting = false;
 
   // A choice of the Options is kept as `kept` keeps it, and told as the others are.
@@ -140,15 +146,17 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
     },
   });
 
-  // The mode (item 108): a pill with the mode's icon, its menu the three modes with what each does. A chat has no goal
-  // to check, so the goal switch only belongs to the other two kinds of run.
+  // The mode (item 108): a pill with the mode's icon, its menu the modes with what each does. A chat has no goal to
+  // check, so the goal switch only belongs to the other kinds of run. On Auto (item 495) the pill is away: the box
+  // shows a mode only once one is named, and its menu leads back to Auto.
   const modePill = composerPill({ id: "mode", caption: "Mode", value: "", icon: null });
   let modeId = kept.mode;
   function paintMode() {
-    const option = MODES.find((candidate) => candidate.id === modeId);
+    const option = modes.find((candidate) => candidate.id === modeId);
     modePill.setValue(option.label, "");
     modePill.setIcon(icon(option.icon));
     setTitle(modePill.element, option.hint);
+    modePill.element.hidden = modeId === AUTO_MODE.id;
     modeMenu.repaint();
   }
   function showMode(id) {
@@ -177,7 +185,7 @@ export function runChoices({ frame, kept, optionsTitle, more, onMode, onChange }
       el(
         "div",
         { role: "listbox", "aria-label": "Mode" },
-        ...MODES.map((option) =>
+        ...modes.map((option) =>
           optionRow({ lead: icon(option.icon), label: option.label, hint: option.hint, selected: option.id === modeId, onPick: () => pickMode(option.id) }),
         ),
       ),

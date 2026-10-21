@@ -209,15 +209,18 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             await expect(keep_going).to_have_attribute("aria-checked", "true")
             await page.keyboard.press("Escape")
             await _away_and_back(page, served)
-            await expect(_pill(page, "mode")).to_contain_text("Task")
+            # A new chat is on Auto (item 495), whose campaign is a task: no mode pill.
+            await expect(_pill(page, "mode")).to_be_hidden()
             await expect(_pill(page, "model")).to_contain_text("deep")
             await expect(_pill(page, "reasoning")).to_contain_text("High")
             await expect(await _keep_going(page)).to_have_attribute("aria-checked", "true")
             await expect(page.locator(".composer-stack > .composer-note")).to_be_visible()
             await page.keyboard.press("Escape")
 
-            # Research for an agent, Ultrathink for this message, and words typed: there again too.
-            await _pick(page, "mode", "Mode", "Research")
+            # Research for an agent, named with its command, Ultrathink for this message, and words typed: there
+            # again too.
+            await page.locator(GOAL).type("/research")
+            await page.locator(GOAL).press("Tab")
             await _pick(page, "agent", "Agent", "Scout")
             await _pick(page, "reasoning", "Reasoning", "Ultrathink")
             await page.locator(GOAL).fill(WORDS)
@@ -252,7 +255,7 @@ async def test_a_new_chat_keeps_its_choices_until_its_message_goes(
             run_id: str = page.url.rpartition("/")[2]
             await page.locator(".side-btn", has_text="New chat").click()
             await expect(page.locator(GOAL)).to_have_value("")
-            await expect(_pill(page, "mode")).to_contain_text("Task")
+            await expect(_pill(page, "mode")).to_be_hidden()
             await expect(_pill(page, "model")).to_contain_text("scripted")
             await expect(_pill(page, "agent")).to_contain_text("Dot")
             await expect(_pill(page, "reasoning")).to_be_hidden()

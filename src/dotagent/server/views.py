@@ -46,13 +46,13 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     ChatChoices,
+    ChatMode,
     HarnessVersion,
     MemoryRecord,
     MemoryScore,
     NotifyLevel,
     QueuedMessage,
     RuleRecord,
-    RunMode,
     RunPicks,
     RunRecord,
     RunStatus,
@@ -67,6 +67,8 @@ _NAME_CHARS: int = 120
 # What the composer picks for one message (item 318): at most this many servers and skills, each by its name.
 MAX_PICKED_PLUGINS: int = 8
 MAX_PICKED_SKILLS: int = 4
+# The accounts signed in that one message may pick (item 496): Google's and Microsoft's, a few of each at most.
+MAX_PICKED_ACCOUNTS: int = 4
 PickedName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)]
 _KEY_CHARS: int = 1000
 # Base64 takes four characters for every three bytes.
@@ -273,7 +275,8 @@ class StartRunRequest(FrozenModel):
     ``2h``), makes the goal a loop of the run's chat too, as ``/loop`` in a new chat's box does (item 400)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
-    mode: RunMode = "task"
+    # Auto (item 495) lets the goal's words settle the mode (agent/mode_words.py); the API's own default is a task.
+    mode: ChatMode = "task"
     model: str | None = None
     thread_id: str | None = None
     effort: Effort | None = None
@@ -289,6 +292,7 @@ class StartRunRequest(FrozenModel):
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
     skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
+    accounts: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_ACCOUNTS)
     plan_first: bool = False
     # How often the goal is asked again in the run's chat (LoopRequest.every); None for no loop. Not with standing.
     loop: str | None = Field(default=None, min_length=2, max_length=8)
@@ -298,8 +302,10 @@ class StartRunRequest(FrozenModel):
     def _fits_standing(self) -> Self:
         if self.standing and self.agent_id is not None:
             raise ValueError("a campaign (standing) is Dot's own: it cannot be started for an agent")
-        if self.standing and (self.plugins or self.skills or self.plan_first):
-            raise ValueError("plugins, skills and Plan first go with a message, not with a campaign (standing)")
+        if self.standing and (self.plugins or self.skills or self.accounts or self.plan_first):
+            raise ValueError(
+                "plugins, skills, accounts and Plan first go with a message, not with a campaign (standing)"
+            )
         if self.standing and self.loop is not None:
             raise ValueError("a loop asks again in a chat; a campaign (standing) goes on by itself")
         if self.browser is not None and not self.standing:
@@ -340,7 +346,7 @@ class QueueMessageRequest(FrozenModel):
     configured ones then, as for ``StartRunRequest``."""
 
     text: str = Field(min_length=1, max_length=_GOAL_CHARS)
-    mode: RunMode = "task"
+    mode: ChatMode = "task"
     model: str | None = None
     effort: Effort | None = None
     speed: Speed = "standard"
@@ -351,13 +357,19 @@ class QueueMessageRequest(FrozenModel):
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
     skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
+    accounts: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_ACCOUNTS)
     plan_first: bool = False
     key: MessageKey | None = None
 
 
-def picks_of(plugins: Sequence[str], skills: Sequence[str], plan_first: bool) -> RunPicks:
-    """The picks a message names (item 318), each name once, in the order they were picked."""
-    return RunPicks(plugins=tuple(dict.fromkeys(plugins)), skills=tuple(dict.fromkeys(skills)), plan_first=plan_first)
+def picks_of(plugins: Sequence[str], skills: Sequence[str], accounts: Sequence[str], plan_first: bool) -> RunPicks:
+    """The picks a message names (items 318 and 496), each name once, in the order they were picked."""
+    return RunPicks(
+        plugins=tuple(dict.fromkeys(plugins)),
+        skills=tuple(dict.fromkeys(skills)),
+        plan_first=plan_first,
+        accounts=tuple(dict.fromkeys(accounts)),
+    )
 
 
 class SavedSkill(FrozenModel):
@@ -1100,12 +1112,23 @@ class PaletteServer(FrozenModel):
     mark: ServiceMark | None
 
 
+class PaletteAccount(FrozenModel):
+    """An account signed in, as the at menu offers it (item 496): its address, its provider, what of it a run reads
+    (its mail and calendar, by the provider's names), and the mark of the provider as the Accounts card wears it."""
+
+    address: str
+    provider: str
+    reads: str
+    mark: ServiceMark
+
+
 class PaletteView(FrozenModel):
-    """What the composer's slash menu offers besides its own commands: the skills a run can use and the MCP servers
-    with the tools the model calls."""
+    """What the composer's menus offer besides their own commands: the skills a run can use, the MCP servers with the
+    tools the model calls, and the accounts signed in (item 496)."""
 
     skills: tuple[PaletteSkill, ...]
     servers: tuple[PaletteServer, ...]
+    accounts: tuple[PaletteAccount, ...]
 
 
 class PermissionsView(FrozenModel):
@@ -1222,13 +1245,15 @@ type McpServerState = Literal["ready", "left_out", "disabled", "trying", "signin
 
 class McpServerView(FrozenModel):
     """One MCP server Dot has, as Customize › Plugins shows it (item 279). ``origin`` is where it is set up: Dot's
-    config, a plugin, another agent of the Mac (Customize › Skills › Found on this Mac), or the Plugins page itself,
-    the only place that removes one. ``address`` is its URL or its command. ``state``: its tools are offered to runs
-    (``ready``, with ``tools``, their names on the server), it was left out (``error`` says why), it is switched off
-    in the config, or Dot tries it now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``:
-    Dot signs in to it with the owner's account, and Sign in again renews that. ``mark``: its service's, the one the
-    service's tile wears (item 477), ``None`` for a server of no service (the plug). ``picks_tools``: it was left out
-    for offering too many tools, and the owner chooses those to offer on the page (``allow``)."""
+    config, a plugin (``plugin`` names it), another agent of the Mac (Customize › Skills › Found on this Mac), or the
+    Plugins page itself. Remove takes out one added on the page or from another agent (item 497); one of a plugin goes
+    with its plugin, and one of the config is the owner's to take out of it. ``address`` is its URL or its command.
+    ``state``: its tools are offered to runs (``ready``, with ``tools``, their names on the server), it was left out
+    (``error`` says why), it is switched off in the config, or Dot tries it now, waiting for the owner to sign in on
+    ``link`` (``signing_in``). ``signs_in``: Dot signs in to it with the owner's account, and Sign in again renews
+    that. ``mark``: its service's, the one the service's tile wears (item 477), ``None`` for a server of no service
+    (the plug). ``picks_tools``: it was left out for offering too many tools, and the owner chooses those to offer on
+    the page (``allow``)."""
 
     name: str
     origin: McpOrigin
@@ -1241,6 +1266,7 @@ class McpServerView(FrozenModel):
     signs_in: bool
     mark: ServiceMark | None
     picks_tools: bool
+    plugin: str | None
 
 
 class McpOfferedTool(FrozenModel):

@@ -280,7 +280,7 @@ async def test_a_picked_server_is_on_from_the_first_step_and_without_the_pick_it
     )
     assert _opening(plain) == GOAL
     assert picked.record.goal == GOAL
-    assert list(picked.picks) == [{"plugins": [SERVER], "skills": [], "plan_first": False}]
+    assert list(picked.picks) == [{"plugins": [SERVER], "skills": [], "plan_first": False, "accounts": []}]
     assert plain.picks == ()
 
 
@@ -305,7 +305,7 @@ async def test_a_picked_skill_and_plan_first_follow_the_owners_words_in_the_firs
     # The skill as the skill tool gives it: what it is and where, then its instructions inside their fence.
     assert skill.startswith(f"Skill {SKILL_NAME} (home), folder "), skill
     assert f'name="{SKILL_NAME}">' in skill and SKILL_STEPS in skill, skill
-    assert list(played.picks) == [{"plugins": [], "skills": [SKILL_NAME], "plan_first": True}]
+    assert list(played.picks) == [{"plugins": [], "skills": [SKILL_NAME], "plan_first": True, "accounts": []}]
 
 
 async def _following(runtime: Runtime, run: RunRecord) -> RunRecord:
@@ -345,7 +345,7 @@ async def test_a_queued_message_keeps_its_picks(login_env: dict[str, str]) -> No
     assert GROUP in _named(first.groups[0], "off"), first.groups[0]
     assert played.record.status == "done"
     assert GROUP in _named(played.groups[0], "on"), played.groups[0]
-    assert list(played.picks) == [{"plugins": [SERVER], "skills": [], "plan_first": False}]
+    assert list(played.picks) == [{"plugins": [SERVER], "skills": [], "plan_first": False, "accounts": []}]
 
 
 async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(login_env: dict[str, str]) -> None:
@@ -384,7 +384,7 @@ async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(logi
                 ),
                 "picks with Keep going": (
                     {"plugins": [SERVER], "standing": True},
-                    "plugins, skills and Plan first go with a message, not with a campaign (standing)",
+                    "plugins, skills, accounts and Plan first go with a message, not with a campaign (standing)",
                 ),
                 "picks on one of OpenCode's models": (
                     {"plugins": [SERVER], "model": OPENCODE_MODEL},
@@ -434,7 +434,7 @@ async def test_picks_a_run_cannot_start_with_are_refused_and_nothing_starts(logi
             steered: httpx.Response = await client.post(f"/api/queue/{queued.id}/steer")
             left: list[QueuedMessage] = await runtime.store.list_queued(played.record.thread_id)
     assert played.record.status == "done"
-    assert list(played.picks) == [{"plugins": [SERVER], "skills": [], "plan_first": False}]
+    assert list(played.picks) == [{"plugins": [SERVER], "skills": [], "plan_first": False, "accounts": []}]
     assert steered.status_code == 422, steered.text
     assert "starts a run of its own, since the run at work cannot take them" in steered.text, steered.text
     assert [message.id for message in left] == [queued.id]
@@ -572,7 +572,7 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
                     assert (await _ended(runtime, manager, model, run_id, 0)).record.status == "done"
                     events: list[EventRecord] = await runtime.store.list_events(run_id, 0, _MAX_EVENTS)
                     assert list(_kind(events, PICKS_EVENT)) == [
-                        {"plugins": [SERVER], "skills": [*skills[1:], SKILL_NAME], "plan_first": True}
+                        {"plugins": [SERVER], "skills": [*skills[1:], SKILL_NAME], "plan_first": True, "accounts": []}
                     ]
                     # The chips come back with the page, from the run's events.
                     await page.reload()
@@ -693,6 +693,8 @@ async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_ski
 MARKED: tuple[str, ...] = ("deepwiki", "context7", "microsoft-learn")
 # A server of the config at DeepWiki's address, switched off so that nothing is reached: its tile wears DeepWiki's mark.
 WIKI: str = "my-wiki"
+# A Google account signed in, as the palette names it (item 496).
+ACCOUNT: str = "me@example.com"
 COPIED_SKILL: str = "copied-skill"
 LEARNED_SKILL: str = "learned-skill"
 
@@ -771,6 +773,15 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     }
                     for name in (*MARKED, SERVER)
                 ],
+                # A Google account signed in, which the at menu offers under the servers (item 496).
+                "accounts": [
+                    {
+                        "address": ACCOUNT,
+                        "provider": "google",
+                        "reads": "Gmail and Google Calendar",
+                        "mark": {"logo": "google-icon.svg", "glyph": None, "monogram": None, "colour": None},
+                    }
+                ],
             }
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
@@ -803,7 +814,10 @@ async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict
                     menu: Locator = page.locator(".composer .slash-menu")
                     await goal.click()
                     await goal.type("@")
-                    await expect(menu.get_by_role("option")).to_have_count(len(MARKED) + 1)
+                    await expect(menu.get_by_role("option")).to_have_count(len(MARKED) + 2)
+                    # The account stands in a group of its own, with its provider's logo (item 496).
+                    account: Locator = menu.get_by_role("option").filter(has_text=ACCOUNT).locator(".slash-mark")
+                    assert await _mark_of(account) == "logo:/icons/plugins/google-icon.svg"
                     for name in MARKED:
                         mark: Locator = menu.get_by_role("option").filter(has_text=name).locator(".slash-mark")
                         assert await _mark_of(mark) == tiles[name], name

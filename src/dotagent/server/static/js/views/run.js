@@ -9,7 +9,7 @@ import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../appr
 import { messageText, readyToSend } from "../attachments.js";
 import { backgroundWork } from "../background.js";
 import { createCapsule } from "../capsule.js";
-import { runChoices } from "../choices.js";
+import { AUTO_MODE, MESSAGE_MODES, runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
@@ -542,6 +542,13 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     maxPx: CHAT_BOX_PX,
     commands: [
       { label: "/btw", hint: "Ask on the side: the run never sees the question.", insert: "/btw " },
+      // The dock shows no mode on Auto (item 495): a mode is named for the chat's next messages by its command.
+      ...MESSAGE_MODES.map((option) => ({
+        label: `/${option.id}`,
+        hint: `${option.label}: ${option.hint}`,
+        insert: "",
+        run: () => choices.setMode(option.id),
+      })),
       LOOP_COMMAND,
     ],
     send: () => submit(false),
@@ -614,8 +621,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   }
   const choices = runChoices({
     frame,
+    modes: MESSAGE_MODES,
     kept: {
-      mode: start.mode,
+      // Task was every chat's mode before Auto (item 495), which settles a task unless the words ask only to look.
+      mode: start.mode === "task" ? AUTO_MODE.id : start.mode,
       model: start.model ?? "",
       level: {
         // A level the model does not offer is not given: the daemon refuses it (item 116).
@@ -940,7 +949,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     const working = steers(false)
       ? narrowOr("Steer this run (or /btw)", "Steer this run, or /btw to ask on the side")
       : narrowOr("Queue a message (or /btw)", "Queue a message, or /btw to ask on the side");
-    input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for servers, / for skills and commands, or /btw to ask on the side)");
+    input.placeholder = active ? working : narrowOr("Follow up (@ or /)", "Follow up (@ for apps, / for skills and commands, or /btw to ask on the side)");
     keepLook();
     const sendWord = active ? (steers(false) ? "Steer" : "Queue") : "Follow up";
     frame.setSendLabel(editing ? "Save" : sendWord);

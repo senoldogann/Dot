@@ -113,8 +113,12 @@ in place (item 364), and the page scrolls to what does not fit. A section folds 
 its title, which counts its rows, and the folds are kept in that browser. The line and the strip follow the lifecycle
 stream, so an answer or a run's end moves them at once; `GET /api/activity` carries the two new lists as `learned_today`
 and `due`. The composer is one frame on a 24 px corner with a soft shadow under it: the goal in a box of one line that
-grows with it, the files attached and the picks under it, then one bar that never wraps: the **+** and the mode (Task,
-Chat or Research; its menu says what each does) at the left; at the right the agent with its face and name once an agent
+grows with it, the files attached and the picks under it, then one bar that never wraps: the **+** and the mode at the
+left. A message is on **Auto** (item 495), which shows no mode pill: its words settle its mode, research, which only
+reads, when they ask only to look ("read-only", "don't change anything", "just research", "salt okunur", "hiçbir şeyi
+değiştirme", "sadece araştır"), and a task otherwise, which ends at once when it answers without a tool, as a chat does
+(`agent/mode_words.py`). A mode named with `/task`, `/chat` or `/research` brings the pill (Task, Chat or Research; its
+menu says what each does and leads back to Auto); `POST /api/runs` takes `mode: "auto"`; at the right the agent with its face and name once an agent
 exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
 default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
 per model) and **Options** (the approval mode, which the pill always shows by its icon and a short name: a lock for
@@ -141,7 +145,7 @@ Settings › Models; the menu goes back to the chat's model and stays open. A ch
 and one that follows the default moves with it. Escape or Cancel goes back without a change. What you typed and attached
 and did not send is kept in this browser and is there again when you come back (so is the box of each run), and so are
 the mode, the model, the agent, Keep going and a choice for one message picked for it (item 397), until a message goes:
-a new chat after that starts on Task, the default model, Dot and Keep going off. Dot's face
+a new chat after that starts on Auto, the default model, Dot and Keep going off. Dot's face
 looks down at the box while you write and brightens when you send. Enter starts the run, Shift+Enter adds a line, or
 ⌘Enter (Ctrl+Enter) starts it and Enter adds a line, as Settings › General › Composer chooses for every composer of this
 browser (item 230); on a touch screen Return always adds a line and the round send button sends (item 440). The markdown
@@ -152,8 +156,8 @@ links in the colour of links; the box is still a text field, with its caret, sel
 sent is the text as typed. A message whose answer was lost on its way back (the page says the sending failed and keeps
 the message) is done once when it is sent again, here and in the box of a run: the page sends each new message with a
 key of its own, and the daemon answers the same message sent again with what its first sending made. `/` at the start of
-a word opens the slash menu over the box: the commands of the composer (`/task`, `/chat`, `/research` and `/loop` here;
-`/btw` and `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools,
+a word opens the slash menu over the box: the commands of the composer (`/auto`, `/task`, `/chat`, `/research` and
+`/loop` here; `/btw`, the modes and `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools,
 read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
 Escape closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the
 slash word goes; a command does its work. `@` at the start of a word opens the menu of the servers and plugins alone
@@ -172,10 +176,12 @@ refused, it stays and says so, and a question keeps its answer.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
 screenshots alike; a phone opens its own sheet). The slash menu picks **Plugins** (the MCP servers with tools) and
-**Skills**, as `GET /api/palette` lists them; the at menu picks the plugins alone (item 447). A plugin or a skill picked is a chip under the box in a colour of
+**Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
+in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
+model; one that is no longer signed in is refused). A plugin, an account or a skill picked is a chip under the box in a colour of
 its name, which its × takes away; Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all
 three switches stand in the **Options** menu's Execution group, under the approvals (item 353). The picks go with the
-message (`plugins`, `skills` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
+message (`plugins`, `skills`, `accounts` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
 sent they stand under it as chips (the run's `picks` event); a message that steers the run under way leaves them for the
 next one, and the page says so, and a queued message with picks is not steered into the run at work: it stays queued to
 start a run of its own. A run sent with picks starts with each picked server's tool group on from its first step when
@@ -313,12 +319,13 @@ once, as the screen it was sent from does: when the run is queued, once the page
 a phone's page that the browser loads again opens; what was typed there and not sent goes with it. A page of an earlier
 run of the chat (opened from the sidebar's Activity, a link or its address) stays where it is, and so does a page while
 a question its run left is open on it, until none is (item 451). In a campaign's chat the message steers the
-session. The box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal
-mode) of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same
-agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
+session. The box wears the home's pills too: the mode (none on Auto, which a chat keeps for its next messages,
+each settled by its own words), the model with its reasoning and the Options (approvals and goal mode) of the chat,
+and a follow-up or a queued message starts its run with them on the same thread, for the same agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
 for every browser, so a reload, a restart of the daemon or a run moved to a standby model leaves them as they are (a
-chat from before has the open run's until its next run starts). They are not kept in the browser as the home's are, and Keep going stays a
-new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
+chat from before has the open run's until its next run starts; a Task kept before Auto, item 495, reads as Auto, which
+settles a task unless a message's words ask only to look). They are not kept in the browser as the home's are, and
+Keep going stays a new chat's choice. The run under way keeps its own: while it works, the pills step back and say that they wait for the
 next follow-up. Beside the send, a ring shows how much of the run's context budget its last step filled (item 222): the
 tokens that step sent the model against the run's budget (the model's own context size or Dot's default, the most of the
 window, item 396); it turns to the warning colour past 80 % and to the danger colour past the budget, and a click shows

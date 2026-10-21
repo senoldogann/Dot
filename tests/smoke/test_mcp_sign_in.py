@@ -510,7 +510,9 @@ async def test_plugins_lists_adds_signs_in_to_and_removes_mcp_servers(
             await page.goto(f"{world.dot}/#/customize/plugins")
             fixture: Locator = _server_row(page, "fixture")
             await expect(fixture.locator(".badge")).to_have_text("Ready")
-            await expect(fixture).to_contain_text("Set up in Dot's config.")
+            await expect(fixture).to_contain_text(
+                "Set up in Dot's config: take its [[mcp]] block out of config.toml to remove it."
+            )
             await expect(fixture).to_contain_text("10 tools: ")
             await expect(fixture.get_by_role("button")).to_have_count(0)
             # The server added by the API before is the Plugins page's own: it can be removed.

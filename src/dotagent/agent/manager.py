@@ -35,6 +35,7 @@ from dotagent.agent.learning_health import (
 )
 from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
+from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.parking import allowed_text, handed_back_text, parking_for
 from dotagent.agent.picks import picked_groups, picks_problems
@@ -1957,13 +1958,19 @@ class RunManager:
             mode,
             frozenset(groups_of(names)),
             runtime.mcp.connected(),
+            [account.address for account in await runtime.accounts.accounts()],
             [skill.name for skill in offered],
             can_ask_user(source, None, approvals),
         )
         if problems:
             raise InvalidValueError(
                 f"the message cannot start with what was picked for it: {'; '.join(problems)}",
-                {"plugins": list(picks.plugins), "skills": list(picks.skills), "plan_first": picks.plan_first},
+                {
+                    "plugins": list(picks.plugins),
+                    "skills": list(picks.skills),
+                    "accounts": list(picks.accounts),
+                    "plan_first": picks.plan_first,
+                },
             )
 
     def _owner_id(self) -> str:
@@ -2562,7 +2569,7 @@ class RunManager:
                     thread_id,
                     ended_notices(ended),
                     (),
-                    choices.mode,
+                    resolved_mode(choices.mode, ended_notices(ended)),
                     choices.model,
                     effort,
                     choices.speed,

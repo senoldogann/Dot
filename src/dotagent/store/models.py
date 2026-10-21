@@ -15,6 +15,9 @@ RunStatus = Literal["queued", "running", "done", "blocked", "failed", "cancelled
 # A run in one of these has not ended.
 WORKING_STATUSES: frozenset[RunStatus] = frozenset({"queued", "running", "blocked"})
 RunMode = Literal["task", "chat", "research"]
+# What a message, and a chat's next follow-up, asks for (item 495): a run's mode, or ``auto``, which each message
+# settles by its own words (agent/mode_words.py).
+ChatMode = Literal["auto", "task", "chat", "research"]
 # Whose words a chat's last line in the sidebar is: the owner's message, or the answer to it (item 277).
 ChatLineRole = Literal["user", "assistant"]
 # How a run was handed a note: at its start, by a memory_search call, or as a note changed while it ran.
@@ -47,13 +50,13 @@ class ThreadRecord(FrozenModel):
 
 
 class ChatChoices(FrozenModel):
-    """What the next follow-up of a chat starts with, as its composer shows it (item 199): the mode, the model and the
-    reasoning level asked of it, the speed (fast mode, item 223), the approval mode and goal mode. ``None`` takes the
-    daemon's: its default model, the configured level, ``[policy] approvals`` and ``[agent] goal_mode``; a chat (the
-    mode) has no goal mode. A chat's choices are those its first run started with, until the owner picks others in its
-    composer."""
+    """What the next follow-up of a chat starts with, as its composer shows it (item 199): the mode (``auto`` lets each
+    message's words settle it, item 495), the model and the reasoning level asked of it, the speed (fast mode, item
+    223), the approval mode and goal mode. ``None`` takes the daemon's: its default model, the configured level,
+    ``[policy] approvals`` and ``[agent] goal_mode``; a chat (the mode) has no goal mode. A chat's choices are those
+    its first run started with, until the owner picks others in its composer."""
 
-    mode: RunMode
+    mode: ChatMode
     model: str | None
     effort: Effort | None
     speed: Speed
@@ -70,14 +73,17 @@ class ChatChoices(FrozenModel):
 class RunPicks(FrozenModel):
     """What the owner picked in the composer for one message (item 318): ``plugins``, the MCP servers whose tools the
     run starts with (by the server's name, a connected app's among them); ``skills``, the skills whose instructions it
-    starts with (by name); ``plan_first``, that it writes its plan and asks before it changes anything."""
+    starts with (by name); ``plan_first``, that it writes its plan and asks before it changes anything; ``accounts``,
+    the Google and Microsoft accounts signed in whose mail and calendar the run starts with (by address, item 496; the
+    picks kept before it name none)."""
 
     plugins: tuple[str, ...]
     skills: tuple[str, ...]
     plan_first: bool
+    accounts: tuple[str, ...] = ()
 
 
-NO_PICKS: RunPicks = RunPicks(plugins=(), skills=(), plan_first=False)
+NO_PICKS: RunPicks = RunPicks(plugins=(), skills=(), plan_first=False, accounts=())
 
 
 class ThreadSummary(FrozenModel):

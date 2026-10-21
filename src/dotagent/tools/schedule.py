@@ -25,7 +25,7 @@ from dotagent.scheduler.plans import (
 )
 from dotagent.scheduler.timing import Timing, describe_timing, plan_timing
 from dotagent.store.db import Store
-from dotagent.store.models import ChatChoices, RunMode, RunRecord, ScheduleOptions, ScheduleRecord
+from dotagent.store.models import ChatChoices, ChatMode, RunRecord, ScheduleOptions, ScheduleRecord
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -89,9 +89,9 @@ class CreateArgs(ToolArgs):
     )
 
 
-def schedule_mode(asked: Literal["task", "research"] | None, chat: RunMode) -> Literal["task", "research"]:
-    """The mode of a schedule a chat makes: the one asked, else the chat's own; a chat that only talks schedules
-    tasks, which is what a schedule's run can be."""
+def schedule_mode(asked: Literal["task", "research"] | None, chat: ChatMode) -> Literal["task", "research"]:
+    """The mode of a schedule a chat makes: the one asked, else the chat's own; a chat that only talks, and one on Auto
+    (item 495), schedules tasks, which is what a schedule's run can be."""
     if asked is not None:
         return asked
     return "research" if chat == "research" else "task"

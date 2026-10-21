@@ -34,11 +34,13 @@ def skill_roots(config: SkillsConfig, plugins: Sequence[Plugin], playbooks: Path
     """``<home>/skills``, then the ``[skills] dirs`` entries, then the skill folders of each plugin, then the playbook
     folder when playbooks are on (``None`` when they are off: a playbook that exists is not offered then), then the
     skills that come with Dot when ``[skills] builtin`` is on. A playbook folder that does not exist yet is no problem:
-    none was written."""
+    none was written. A plugin taken out since Dot started (item 497) is gone from its folder, and its skills with it:
+    it is no problem either."""
     roots: list[SkillRoot] = [SkillRoot(path=skills_dir(), source=HOME_SOURCE)]
     roots.extend(SkillRoot(path=Path(entry).expanduser(), source="config") for entry in config.dirs)
     for plugin in plugins:
-        roots.extend(SkillRoot(path=folder, source=f"plugin {plugin.name}") for folder in plugin.skill_dirs)
+        if plugin.root.is_dir():
+            roots.extend(SkillRoot(path=folder, source=f"plugin {plugin.name}") for folder in plugin.skill_dirs)
     if playbooks is not None and playbooks.is_dir():
         roots.append(SkillRoot(path=playbooks, source=PLAYBOOK_SOURCE))
     if config.builtin:

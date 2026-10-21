@@ -114,8 +114,9 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
 
   function itemMark(item) {
     // An MCP server, and each of its tools, wear the mark of its service as the service's Customize tile wears it, on
-    // that tile's light ground, or the plug for a server of no service (items 447 and 477).
-    if (item.kind === "plugin" || item.kind === "tool") {
+    // that tile's light ground, or the plug for a server of no service (items 447 and 477); an account its provider's
+    // (item 496).
+    if (item.kind === "plugin" || item.kind === "tool" || item.kind === "account") {
       const mark = item.mark ?? null;
       const span = el("span", { class: "slash-mark", dataset: { kind: item.kind, mark: "service" } }, markContent(mark));
       const ink = mark === null ? null : markInk(mark.colour);
