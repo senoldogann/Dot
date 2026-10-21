@@ -495,7 +495,8 @@ function mountList(root, ctx) {
       try {
         await api.post("/schedules", { name: record.name, goal: template.task, cron: template.cron, agent_id: record.id, enabled: false });
       } catch (error) {
-        missed.push(`${record.name}: ${error.message}`);
+        // The toast ends the list with its own full stop, so a message's own is taken off.
+        missed.push(`${record.name}: ${error.message.replace(/\.$/, "")}`);
       }
     }
     const made = AND_LIST.format(used.made.map((record) => record.name));
