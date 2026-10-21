@@ -30,6 +30,17 @@ export function fractionOf(point, rect, natural) {
   return { x, y };
 }
 
+/** The place of `point` on the picture as `fractionOf` gives it, held to the page's edges: where a button pressed on
+ * the page is let go when the finger or the mouse left the picture. Null only before the picture has a size. */
+export function clampedFractionOf(point, rect, natural) {
+  const page = drawnOf(rect, natural);
+  if (page.width <= 0 || page.height <= 0) {
+    return null;
+  }
+  const clamp = (value) => Math.min(1, Math.max(0, value));
+  return { x: clamp((point.x - page.left) / page.width), y: clamp((point.y - page.top) / page.height) };
+}
+
 /** Where the page itself is drawn in the image's box `rect` (`{ left, top, width, height }`), the picture being
  * `natural` large and drawn whole: the box less the bands around it; nothing before the picture has a size. */
 export function drawnOf(rect, natural) {
@@ -94,23 +105,29 @@ export function pinched(zoom, from, to, origin) {
   return { scale, x: middleAfter.x - origin.x - pictureX * scale, y: middleAfter.y - origin.y - pictureY * scale };
 }
 
+// A key or a chord as the daemon takes it (browser/remote_input.py, KEY_PATTERN): up to four modifiers, then one printable
+// ASCII character or a named key.
+const KEY = /^(?:(?:Shift|Control|Alt|Meta|ControlOrMeta)\+){0,4}(?:[!-~]|[A-Z][A-Za-z0-9]{1,15})$/;
+
 /**
- * The name Playwright gives a key the screen's keyboard pressed, with its modifiers (`Meta+a`, `Shift+Tab`), or null
- * for one that types a character as it is: that comes as text. `event` has `key` and the modifier flags of a
- * KeyboardEvent.
+ * The name Playwright gives a key the screen's keyboard pressed, with its modifiers (`Meta+a`, `Shift+Tab`,
+ * `Alt+ArrowLeft`), or null for one that types a character: that comes as text. A character typed with Option or Alt
+ * alone, or with Control and Alt together (AltGr), is a character of the keyboard's layout (`@` on a Turkish Mac), so
+ * text; a chord the daemon could not take (a letter outside ASCII) is null too. `event` has `key` and the modifier
+ * flags of a KeyboardEvent.
  */
 export function keyName(event) {
-  const modifiers = [event.ctrlKey ? "Control" : null, event.altKey ? "Alt" : null, event.metaKey ? "Meta" : null].filter((part) => part !== null);
-  const printable = event.key.length === 1;
-  if (printable && modifiers.length === 0) {
-    return null;
-  }
   if (event.key === "Unidentified" || event.key === "Dead" || event.key === "Process" || ["Shift", "Control", "Alt", "Meta"].includes(event.key)) {
     return null;
   }
+  const printable = [...event.key].length === 1;
+  if (printable && !event.metaKey && (!event.ctrlKey || event.altKey)) {
+    return null;
+  }
+  const modifiers = [event.ctrlKey ? "Control" : null, event.altKey ? "Alt" : null, event.metaKey ? "Meta" : null, event.shiftKey && !printable ? "Shift" : null].filter((part) => part !== null);
   if (event.key === " ") {
     return null;
   }
-  const shift = event.shiftKey && !printable ? ["Shift"] : [];
-  return [...modifiers, ...shift, event.key].join("+");
+  const name = [...modifiers, event.key].join("+");
+  return KEY.test(name) ? name : null;
 }

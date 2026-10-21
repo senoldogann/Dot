@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 
-import { DOUBLE_TAP_MS, LONG_PRESS_MS, MAX_ZOOM, TAP_SLOP_PX, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor } from "../../src/dotagent/server/static/js/pointer.js";
+import { DOUBLE_TAP_MS, LONG_PRESS_MS, MAX_ZOOM, TAP_SLOP_PX, clampedFractionOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor } from "../../src/dotagent/server/static/js/pointer.js";
 
 const NATURAL = { width: 1280, height: 860 };
 
@@ -69,4 +69,18 @@ test("a key is named as Playwright names it, a character typed as it is is not",
   assert.equal(keyName({ ...plain, key: "Unidentified" }), null);
   assert.equal(keyName({ ...plain, key: "Shift", shiftKey: true }), null);
   assert.equal(keyName({ ...plain, key: " " }), null);
+  // A character of the keyboard's layout typed with Option or AltGr is text: `@` on a Turkish Mac is Option-Q.
+  assert.equal(keyName({ ...plain, key: "@", altKey: true }), null);
+  assert.equal(keyName({ ...plain, key: "@", ctrlKey: true, altKey: true }), null);
+  assert.equal(keyName({ ...plain, key: "ArrowLeft", altKey: true }), "Alt+ArrowLeft");
+  assert.equal(keyName({ ...plain, key: "c", ctrlKey: true }), "Control+c");
+  // A chord the daemon could not take is not sent: a letter outside ASCII.
+  assert.equal(keyName({ ...plain, key: "ö", metaKey: true }), null);
+});
+
+test("a button let go off the picture is let go at the page's edge", () => {
+  const box = { left: 0, top: 0, width: 390, height: 262 };
+  assert.deepEqual(clampedFractionOf({ x: 500, y: -40 }, box, NATURAL), { x: 1, y: 0 });
+  assert.deepEqual(clampedFractionOf({ x: 195, y: 131 }, box, NATURAL), { x: 0.5, y: 0.5 });
+  assert.equal(clampedFractionOf({ x: 1, y: 1 }, box, { width: 0, height: 0 }), null);
 });

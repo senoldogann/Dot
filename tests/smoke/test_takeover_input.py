@@ -65,6 +65,9 @@ document.getElementById("press").addEventListener("click", () => {
   const count = document.getElementById("count");
   count.textContent = String(Number(count.textContent) + 1);
 });
+window.pressed = 0;
+document.addEventListener("mousedown", () => { window.pressed += 1; });
+document.addEventListener("mouseup", () => { window.pressed -= 1; });
 document.getElementById("form").addEventListener("submit", (event) => {
   event.preventDefault();
   const submitted = document.getElementById("submitted");
@@ -620,6 +623,26 @@ async def test_a_phone_uses_the_page_from_its_screen(
                 await _until(runtime, run.thread_id, "document.getElementById('submitted').textContent", "1")
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / "phone-control-390-dark.png"))
+                # A finger held still on an empty corner of the page presses there; dragged off the picture and lifted
+                # there, it is let go at the page's edge.
+                held_at: tuple[float, float] = (box["x"] + box["width"] * 0.9, box["y"] + box["height"] * 0.9)
+                await _touch(cdp, "touchStart", [held_at])
+                await asyncio.sleep(0.7)
+                await _until(runtime, run.thread_id, "window.pressed", 1)
+                await _touch(cdp, "touchMove", [(held_at[0], 830.0)])
+                await _touch(cdp, "touchEnd", [])
+                await _until(runtime, run.thread_id, "window.pressed", 0)
+                # Pressed again and the view closed meanwhile: the press is let go as the control ends.
+                await _touch(cdp, "touchStart", [held_at])
+                await asyncio.sleep(0.7)
+                await _until(runtime, run.thread_id, "window.pressed", 1)
+                await full.get_by_role("button", name="Close Dot's computer").click()
+                await _touch(cdp, "touchEnd", [])
+                await _until(runtime, run.thread_id, "window.pressed", 0)
+                await card.get_by_role("button", name="Use it here").click()
+                await expect(full.locator(".computer-screen[data-controlling]")).to_be_visible()
+                box = await image.bounding_box()
+                assert box is not None
                 # Two fingers parted around the middle zoom the picture there; a tap there still clicks the button.
                 middle: tuple[float, float] = (box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.5)
                 await _touch(cdp, "touchStart", [(middle[0] - 30, middle[1]), (middle[0] + 30, middle[1])])

@@ -5,7 +5,7 @@
 
 import { api } from "./api.js";
 import { el } from "./dom.js";
-import { LONG_PRESS_MS, drawnOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor } from "./pointer.js";
+import { LONG_PRESS_MS, clampedFractionOf, drawnOf, fractionOf, gestureOf, isDoubleTap, keyName, pinched, scrollFor } from "./pointer.js";
 
 // How long input waits to go with the next (moves and scrolls; a press, a release and a key go at once), how many
 // events a batch carries at most (the daemon takes 64), and how much text one event carries (it takes 500).
@@ -20,12 +20,14 @@ const BUTTONS = { 0: "left", 2: "right" };
  * The control of the page shown by `image` inside `screen`, for the run `runId` the reader holds. `onRefused(error)` is
  * told when the daemon refused the input (the run was handed back elsewhere, a step of it is still going): what was
  * waiting to go is dropped then. Returns `keyboard`, the button that brings the screen's keyboard up for the page,
- * and `stop()`, which ends the control and puts the picture back as it was.
+ * and `stop()`, which ends the control and puts the picture back as it was: a button still pressed on the page is let
+ * go first, and what is waiting to go still goes.
  */
 export function createControl({ runId, screen, image, onRefused }) {
   const queue = [];
   let sending = false;
   let timer = null;
+  // Stopped, the layer takes no more input; what is waiting to go still goes, and a refusal of it is not told.
   let stopped = false;
   // The page's own size in CSS pixels, from the daemon's last answer; the picture's own until then.
   let page = null;
@@ -35,15 +37,28 @@ export function createControl({ runId, screen, image, onRefused }) {
   let pinch = null;
   let lastTap = null;
   let lastHover = 0;
+  // The mouse's buttons pressed on the page now, with how many clicks their press counted, and its last press, which a
+  // second soon after and near it makes a double click (a pointer event's own count is not to be relied on).
+  const held = new Map();
+  let lastClick = null;
+  let lastPoint = null;
+  // The last place a pressed button was on the page, as fractions: where it is let go when the picture cannot say
+  // (the view closed with the button down).
+  let lastAt = null;
 
   const natural = () => ({ width: image.naturalWidth, height: image.naturalHeight });
   const pointOf = (event) => ({ x: event.clientX, y: event.clientY });
   const fractionAt = (point) => fractionOf(point, image.getBoundingClientRect(), natural());
+  const edgeAt = (point) => clampedFractionOf(point, image.getBoundingClientRect(), natural());
 
   function send(events, now) {
     if (stopped || events.length === 0) {
       return;
     }
+    enqueue(events, now);
+  }
+
+  function enqueue(events, now) {
     queue.push(...events);
     if (now) {
       flush();
@@ -56,7 +71,7 @@ export function createControl({ runId, screen, image, onRefused }) {
   }
 
   async function flush() {
-    if (sending || stopped || queue.length === 0) {
+    if (sending || queue.length === 0) {
       return;
     }
     sending = true;
@@ -66,7 +81,9 @@ export function createControl({ runId, screen, image, onRefused }) {
       page = { width: taken.width, height: taken.height };
     } catch (error) {
       queue.length = 0;
-      onRefused(error);
+      if (!stopped) {
+        onRefused(error);
+      }
     } finally {
       sending = false;
     }
@@ -85,18 +102,31 @@ export function createControl({ runId, screen, image, onRefused }) {
 
   // A mouse or a trackpad: its buttons and moves go as they are, its moves without a button now and then.
   function mouseDown(event) {
-    const at = fractionAt(pointOf(event));
+    const point = pointOf(event);
+    const at = fractionAt(point);
     const button = BUTTONS[event.button];
     if (at === null || button === undefined) {
       return;
     }
-    send([move(at), press("down", at, button, Math.min(Math.max(event.detail, 1), 3))], true);
+    const click = { x: point.x, y: point.y, at: event.timeStamp };
+    const clicks = lastClick !== null && lastClick.button === button && isDoubleTap(lastClick, click) ? Math.min(lastClick.clicks + 1, 3) : 1;
+    lastClick = { ...click, button, clicks };
+    held.set(button, clicks);
+    lastPoint = point;
+    lastAt = at;
+    send([move(at), press("down", at, button, clicks)], true);
   }
 
   function mouseMove(event) {
-    const at = fractionAt(pointOf(event));
+    const point = pointOf(event);
+    // A button pressed on the page drags on it to the page's edge, past the picture too.
+    const at = held.size > 0 ? edgeAt(point) : fractionAt(point);
     if (at === null) {
       return;
+    }
+    lastPoint = point;
+    if (held.size > 0) {
+      lastAt = at;
     }
     if (event.buttons === 0 && event.timeStamp - lastHover < HOVER_MS) {
       return;
@@ -106,12 +136,17 @@ export function createControl({ runId, screen, image, onRefused }) {
   }
 
   function mouseUp(event) {
-    const at = fractionAt(pointOf(event));
     const button = BUTTONS[event.button];
-    if (at === null || button === undefined) {
+    const clicks = button === undefined ? undefined : held.get(button);
+    if (clicks === undefined) {
       return;
     }
-    send([press("up", at, button, Math.min(Math.max(event.detail, 1), 3))], true);
+    held.delete(button);
+    // Let go off the picture, the button is let go at the page's edge: it is never left down.
+    const at = edgeAt(pointOf(event)) ?? lastAt;
+    if (at !== null) {
+      send([press("up", at, button, clicks)], true);
+    }
   }
 
   // A finger: a tap clicks, a drag scrolls the page, a press held still drags on it; two fingers zoom the picture.
@@ -122,13 +157,13 @@ export function createControl({ runId, screen, image, onRefused }) {
       cancelTouch(other);
       other.gesture = "pinch";
       pinch = { ids: [otherId, event.pointerId], points: new Map([[otherId, other.last], [event.pointerId, point]]) };
-      touches.set(event.pointerId, { start: point, last: point, at: event.timeStamp, gesture: "pinch", timer: null });
+      touches.set(event.pointerId, { start: point, last: point, at: event.timeStamp, gesture: "pinch", timer: null, pressedAt: null });
       return;
     }
     if (touches.size > 1) {
       return;
     }
-    const touch = { start: point, last: point, at: event.timeStamp, gesture: "tap", timer: null };
+    const touch = { start: point, last: point, at: event.timeStamp, gesture: "tap", timer: null, pressedAt: null };
     touch.timer = setTimeout(() => becomePress(touch), LONG_PRESS_MS);
     touches.set(event.pointerId, touch);
   }
@@ -144,6 +179,7 @@ export function createControl({ runId, screen, image, onRefused }) {
       return;
     }
     touch.gesture = "press";
+    touch.pressedAt = at;
     send([move(at), press("down", at, "left", 1)], true);
   }
 
@@ -153,9 +189,10 @@ export function createControl({ runId, screen, image, onRefused }) {
       touch.timer = null;
     }
     if (touch.gesture === "press") {
-      const at = fractionAt(touch.last) ?? fractionAt(touch.start);
+      touch.gesture = "off";
+      const at = edgeAt(touch.last) ?? touch.pressedAt;
       if (at !== null) {
-        send([press("up", at, "left", 1)], true);
+        enqueue([press("up", at, "left", 1)], true);
       }
     }
   }
@@ -192,8 +229,10 @@ export function createControl({ runId, screen, image, onRefused }) {
         send([{ kind: "wheel", x: at.x, y: at.y, dx: clampWheel(scrolled.dx), dy: clampWheel(scrolled.dy) }], false);
       }
     } else if (touch.gesture === "press") {
-      const at = fractionAt(point);
+      // A press drags on the page to its edge, past the picture too.
+      const at = edgeAt(point);
       if (at !== null) {
+        touch.pressedAt = at;
         send([move(at)], false);
       }
     }
@@ -225,9 +264,10 @@ export function createControl({ runId, screen, image, onRefused }) {
       lastTap = clicks === 2 ? null : tap;
       send([move(at), press("down", at, "left", clicks), press("up", at, "left", clicks)], true);
     } else if (touch.gesture === "press") {
-      const at = fractionAt(point) ?? fractionAt(touch.last);
+      // Let go off the picture, the press is let go at the page's edge: it is never left down.
+      const at = edgeAt(point) ?? touch.pressedAt;
       if (at !== null) {
-        send([press("up", at, "left", 1)], true);
+        enqueue([press("up", at, "left", 1)], true);
       }
     } else if (touch.gesture === "scroll") {
       flush();
@@ -325,17 +365,24 @@ export function createControl({ runId, screen, image, onRefused }) {
   return {
     keyboard,
     stop() {
+      // A press still on the page is let go before anything else stops; it goes with what is waiting to go.
+      for (const touch of touches.values()) {
+        cancelTouch(touch);
+      }
+      touches.clear();
+      const at = (lastPoint === null ? null : edgeAt(lastPoint)) ?? lastAt;
+      for (const [button, clicks] of held) {
+        if (at !== null) {
+          enqueue([press("up", at, button, clicks)], false);
+        }
+      }
+      held.clear();
       stopped = true;
       if (timer !== null) {
         clearTimeout(timer);
         timer = null;
       }
-      for (const touch of touches.values()) {
-        if (touch.timer !== null) {
-          clearTimeout(touch.timer);
-        }
-      }
-      touches.clear();
+      flush();
       image.removeEventListener("pointerdown", onDown);
       image.removeEventListener("pointermove", onMove);
       image.removeEventListener("pointerup", onUp);
