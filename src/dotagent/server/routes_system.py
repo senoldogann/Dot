@@ -23,6 +23,7 @@ from dotagent.config_edit import (
     set_resume,
     set_role_model,
     set_shell_sandbox,
+    set_standby_models,
 )
 from dotagent.connections.directory import logo_of_service
 from dotagent.core.errors import (
@@ -117,6 +118,7 @@ from dotagent.server.views import (
     SandboxRequest,
     SandboxView,
     SkillShareRequest,
+    StandbyModelsRequest,
     StatusView,
 )
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -382,6 +384,32 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             raise ConfigError(f"the {request.role} model must be one that can call tools", {"model": request.model})
         await asyncio.to_thread(set_role_model, config_path(), request.role, request.model)
         ctx.runtime.roles.choose(request.role, request.model)
+        return models_now()
+
+    @router.put("/models/standby")
+    async def choose_standby_models(request: StandbyModelsRequest) -> ModelsConfig:
+        """Have a run whose own model cannot answer (a quota, rate-limit, key or access error, or its content filter's
+        stop) move to ``models``, in their order and each once at most, from its next move on (item 478); none ends such
+        a run with its model's error. The config file keeps them as ``[models] standby``. A model named twice, one its
+        provider does not offer, one that cannot call tools and one of Zen's free models, which answer only as
+        OpenCode's own agent, are refused, as is a config file that cannot be changed; nothing changes then. A run that
+        moved already keeps the model it moved to."""
+        refs: list[ModelRef] = [parse_model_ref(model) for model in request.models]
+        labels: list[str] = [ref.label for ref in refs]
+        if len(set(labels)) != len(labels):
+            raise ConfigError("a standby model is named twice", {"models": ", ".join(labels)})
+        for ref in refs:
+            if ref.provider == OPENCODE_PROVIDER:
+                raise ConfigError(
+                    "Zen's free models answer only as OpenCode's own agent, so none can be a standby model;"
+                    " pick another",
+                    {"model": ref.label},
+                )
+            info: ModelInfo = await ctx.runtime.router.model_info(ref)
+            if not info.tools:
+                raise ConfigError("a standby model must be one that can call tools", {"model": ref.label})
+        await asyncio.to_thread(set_standby_models, config_path(), labels)
+        ctx.runtime.roles.choose_standby(labels)
         return models_now()
 
     @router.put("/models/context")
