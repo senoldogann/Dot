@@ -52,9 +52,9 @@ Every automatic answer is an ordinary approval record (`decided_by` is `reviewer
 and the note holds the reason), an `approval_auto` event and one line in the timeline of the run ("YOLO, not asked:
 click 'Reply' — untrusted content is in context and this action reaches outside the Mac"), so you can see afterwards
 what went through and why. A chat leaves those lines out unless Settings › General › Chat › "Show what ran without
-asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows. Every step a run takes
-keeps what decided it, a question answered or not (item 468, see [Safety](safety.md#safety)): its row in the chat says
-why it ran when you open it. The home's **While you
+asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows. Every step the policy let
+through keeps what decided it, a question answered or not (item 468, see [Safety](safety.md#safety)), and its row in the
+chat says why it ran when you open it; a step refused or handed to you has its `policy` event instead. The home's **While you
 were away** counts them for the runs of your schedules and campaigns since you last looked (item 466; see
 [The daemon](daemon.md)).
 
