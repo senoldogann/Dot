@@ -406,8 +406,11 @@ export function toolIconName(tool) {
   if (tool === "find_files" || tool === "search_files") {
     return "search";
   }
-  if (tool === "write_file" || tool === "edit_file" || tool === "list_dir") {
+  if (tool === "write_file" || tool === "edit_file") {
     return "file";
+  }
+  if (tool === "list_dir") {
+    return "list";
   }
   if (tool.startsWith("memory_")) {
     return "database";
