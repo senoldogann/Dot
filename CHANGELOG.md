@@ -5,6 +5,10 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- Settings › Rules: a rule's arrows move it up or down the order the rules are checked in, and a rule that an earlier
+  rule fits wherever it fits says it never decides, with the number of the rule that decides in its place. The note
+  above the rules now says what a yolo run keeps of the protections that are always on: only a research run's limit
+  (item 449).
 - In `yolo`, Dot no longer asks you about what every other mode refuses (a read of where your secrets are kept, data
   sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own files outside the undo
   journal): the step runs and is recorded. Money and credentials are still handed to you, and a message or a post in

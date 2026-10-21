@@ -665,7 +665,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /threads/{id}/terminals`                                                  | the chat's terminal sessions: command, background or not, start, end and exit status (404 for no chat) |
 | `DELETE /threads/{id}/terminals/{session}`                                     | ends a session's program and what it started; the chat is told nothing (404 for no such session) |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
-| `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
+| `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules; each of `GET`'s names in `never_decided_by` the earlier rule that fits every action it fits, or null (item 449) |
+| `POST /rules/{id}/move` (`{"direction": "up"\|"down"}`)                        | moves a rule one place in the order and numbers the rules 1 to n; answers the list (422 past either end, 404 for no rule) |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
 | `GET /memories`, `GET /memories/search`, `POST /memories`, `GET\|PATCH\|DELETE /memories/{id}` | notes                                         |
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
