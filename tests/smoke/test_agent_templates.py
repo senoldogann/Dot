@@ -434,8 +434,9 @@ async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner
     login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """Item 504: Use team makes the agents of the team's templates, each as its template's Use makes one; an agent of
-    the owner's with a member's name, in another case, is kept as it is; used again, the team makes none; a team that
-    is not there is a 404; and a team one of whose agents this home cannot make makes none of them."""
+    the owner's with a member's name, in another case, is kept as it is, but for message_agent, which one that names
+    its tools is given (item 511); used again, the team makes none and gives nothing; a team that is not there is a
+    404; and a team one of whose agents this home cannot make makes none of them."""
     team: AgentTeam = next(each for each in TEAMS if each.id == "engineering")
     with scratch_home() as home, eval_environment(home, {}):
         async with (
@@ -461,12 +462,35 @@ async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner
                 .raise_for_status()
                 .json()
             )
+            bounded: JsonObject = (
+                (
+                    await http.post(
+                        "/api/agents",
+                        json={
+                            "name": "bug reproduction",
+                            "role": "Mine too",
+                            "instructions": "",
+                            "model": "",
+                            "effort": None,
+                            "approvals": None,
+                            "tools": ["shell"],
+                        },
+                    )
+                )
+                .raise_for_status()
+                .json()
+            )
             used = await http.post(f"/api/agent-teams/{team.id}/use")
             assert used.status_code == 201, used.text
             body: JsonObject = used.json()
             made: list[JsonObject] = body["made"]
-            assert [record["name"] for record in made] == [name for name in _names(team) if name != "Reviewer"]
-            assert [record["id"] for record in body["kept"]] == [mine["id"]]
+            assert [record["name"] for record in made] == ["Release QA"]
+            assert [record["id"] for record in body["kept"]] == [bounded["id"], mine["id"]]
+            # The agent that named its tools can hand its teammates their parts now; the one with every tool had it.
+            assert body["joined"] == ["bug reproduction"]
+            assert [record["tools"] for record in body["kept"]] == [["shell", "message_agent"], []]
+            stored: JsonObject = (await http.get(f"/api/agents/{bounded['id']}")).raise_for_status().json()
+            assert (stored["record"]["role"], stored["record"]["tools"]) == ("Mine too", ["shell", "message_agent"])
             for record in made:
                 template = next(each for each in TEMPLATES if each.name == record["name"])
                 assert (record["role"], record["instructions"], tuple(record["tools"])) == (
@@ -476,8 +500,8 @@ async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner
                 )
                 assert record["look"] == template.look.model_dump(mode="json")
             again: JsonObject = (await http.post(f"/api/agent-teams/{team.id}/use")).raise_for_status().json()
-            assert again["made"] == []
-            assert [record["id"] for record in again["kept"]] == [made[0]["id"], mine["id"], made[1]["id"]]
+            assert (again["made"], again["joined"]) == ([], [])
+            assert [record["id"] for record in again["kept"]] == [bounded["id"], mine["id"], made[0]["id"]]
             assert (await http.post("/api/agent-teams/no-such-team/use")).status_code == 404
             # A team whose second agent names a tool this home lacks makes none, not its first.
             strange = TEMPLATES[0].model_copy(

@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from dotagent.agent.prompt import AgentBrief, build_system_prompt, collect_prompt_inputs
+from dotagent.agent.templates import team_of
 from dotagent.config import load_default_config
 from dotagent.core.errors import ToolInputError
 from dotagent.harness.components import NO_HARNESS
@@ -38,11 +39,15 @@ SCOUT: AgentRecord = AgentRecord(
     paused_at=None,
 )
 TEAM: tuple[AgentBrief, ...] = (
-    AgentBrief(name="Scout", role="Finds and checks sources", instructions="", made_by_dot=False),
+    AgentBrief(name="Scout", role="Finds and checks sources", instructions="", made_by_dot=False, team=""),
 )
 
 
 def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
+    return _prompt_for(None, tool_names, team)
+
+
+def _prompt_for(agent: AgentBrief | None, tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
             "task",
@@ -60,7 +65,7 @@ def _prompt(tool_names: list[str], team: tuple[AgentBrief, ...]) -> str:
             0,
             None,
             [],
-            None,
+            agent,
             team,
             (),
             None,
@@ -88,6 +93,41 @@ def test_the_prompt_offers_to_make_a_teammate_when_the_run_may_and_says_so_witho
     assert "The owner made" not in together and "reuse one before you make one" in together
     # Without the message tool there is no team to speak of, create or not.
     assert "# Team" not in _prompt([CREATE_AGENT_TOOL], ())
+
+
+def _brief(name: str, role: str, team: str) -> AgentBrief:
+    return AgentBrief(name=name, role=role, instructions="", made_by_dot=False, team=team)
+
+
+def test_an_agent_of_a_ready_team_lists_its_teammates_first_and_hands_them_their_parts() -> None:
+    """Item 511: Competitor Watch's chat delegated the Growth team's work to helpers. Its run is told its team, names
+    its teammates first, and hands a part an agent's role fits to that agent rather than to delegate."""
+    watch: AgentBrief = _brief("Competitor Watch", "Watches the competitors", "Growth team")
+    team: tuple[AgentBrief, ...] = (
+        _brief("Talent Scout", "Finds people for an open role", ""),
+        _brief("Paid Media", "Reads the ad results", "Growth team"),
+        _brief("Reviewer", "Reviews a change", "Engineering team"),
+    )
+    prompt: str = _prompt_for(watch, [MESSAGE_AGENT_TOOL, "delegate"], team)
+    assert "- You are in the Growth team: your teammates come first" in prompt
+    assert "rather than delegating it: delegate is for a part no agent's role covers" in prompt
+    listed: list[str] = [line for line in prompt.splitlines() if line.startswith("  - ")]
+    assert listed[:3] == [
+        "  - Paid Media (Growth team): Reads the ad results",
+        "  - Talent Scout: Finds people for an open role",
+        "  - Reviewer (Engineering team): Reviews a change",
+    ]
+    # Dot's own run is in no team: the list keeps its order, each agent with its team, and without delegate the line
+    # says nothing of it.
+    dots: str = _prompt([MESSAGE_AGENT_TOOL], team)
+    assert "You are in the" not in dots and "rather than delegating" not in dots
+    assert "  - Talent Scout: Finds people for an open role\n  - Paid Media (Growth team)" in dots
+
+
+def test_an_agent_is_in_the_ready_team_one_of_whose_members_has_its_name() -> None:
+    growth = team_of("competitor watch ")
+    assert growth is not None and growth.name == "Growth team"
+    assert team_of("Talent Scout") is None and team_of("Scout") is None
 
 
 def test_an_agent_is_found_by_its_name_whatever_the_case_or_by_its_id() -> None:

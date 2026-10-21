@@ -4499,14 +4499,18 @@ dialog.modal.connect-apps[open] {
   color: var(--warn);
 }
 
-/* A name too long for the row, as an MCP tool's can be, breaks where it must rather than widen the chat (item 360). */
+/* A name too long for the row, as an MCP tool's can be, gives way with an ellipsis rather than widen the chat (item
+   360) or take a second line (item 511): its row is one line, the name at most half of it, the whole name its title. */
 .tool-name {
   font-family: var(--mono);
   font-weight: var(--weight-title);
   font-size: var(--text-sm);
   flex: 0 1 auto;
   min-width: 0;
-  overflow-wrap: anywhere;
+  max-width: 50%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .tool-sum {
@@ -7510,6 +7514,16 @@ button.attach-chip:hover {
 .tool-pick input {
   margin: 0;
   accent-color: var(--accent);
+}
+
+/* The box that ticks every tool (item 511), over the tools, with how many of them are ticked. */
+.tool-pick-all {
+  align-self: flex-start;
+  font-weight: var(--weight-label);
+}
+
+.tool-picks-count {
+  font-weight: var(--weight-text);
 }
 
 /* The templates (item 315): a card each, as many abreast as fit and one on a phone; the face, name and role on top,

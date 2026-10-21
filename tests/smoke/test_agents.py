@@ -14,7 +14,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, FloatRect, Page, Route, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, FloatRect, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.agent.playbooks import Playbook, playbook_name, read_meta, write_playbook
@@ -499,4 +499,45 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
             await browser.close()
     kept = (await client.get(f"/api/agents/{agent_id}")).json()["record"]
     assert (kept["tools"], kept["model"], kept["effort"]) == (["shell"], "ollama:gone-model", "high")
+    assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204
+
+
+@pytest.mark.browser
+async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_tool(
+    runtime: Runtime, client: httpx.AsyncClient
+) -> None:
+    """Item 511: the editor's tools have All tools, which ticks every box; all ticked saves the agent with every tool,
+    such an agent opens with every box ticked, and a form with none ticked saves nothing."""
+    made = await client.post("/api/agents", json=_agent(["shell"]))
+    assert made.status_code == 201, made.text
+    agent_id: str = made.json()["id"]
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            page: Page = await browser.new_page(viewport={"width": 1280, "height": 860})
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.goto(f"http://{host}:{port}/#/agents/{agent_id}")
+            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            every: Locator = page.get_by_role("checkbox", name="All tools")
+            boxes: Locator = page.locator(".tool-picks input")
+            await expect(every).not_to_be_checked()
+            assert await every.evaluate("(box) => box.indeterminate")
+            await every.check()
+            assert await boxes.evaluate_all("(all) => all.length > 1 && all.every((box) => box.checked)")
+            await page.get_by_role("button", name="Save changes").click()
+            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
+            # Opened again, the agent with every tool has every box ticked; none ticked is refused, and nothing changes.
+            await page.reload()
+            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await expect(every).to_be_checked()
+            await every.uncheck()
+            await page.get_by_role("button", name="Save changes").click()
+            await expect(page.get_by_text("Pick the tools it may use, or All tools for every one.")).to_be_visible()
+            assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
+        finally:
+            await browser.close()
     assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204

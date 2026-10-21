@@ -35,7 +35,7 @@ from dotagent.server.views import (
 )
 from dotagent.store.db import Store
 from dotagent.store.models import DOT_AGENT, DOT_AGENT_ID, AgentLook, AgentRecord, MemoryRecord, RunRecord
-from dotagent.tools.team import find_agent
+from dotagent.tools.team import MESSAGE_AGENT_TOOL, find_agent
 
 # How many of its newest runs an agent's page shows.
 _PAGE_RUNS: int = 50
@@ -71,6 +71,11 @@ def _template_request(chosen: AgentTemplate) -> AgentRequest:
         tools=list(chosen.tools) or None,
         look=chosen.look,
     )
+
+
+def _cannot_message(record: AgentRecord) -> bool:
+    """Whether ``record`` names its tools without ``message_agent``; one with every tool (none named) has it."""
+    return bool(record.tools) and MESSAGE_AGENT_TOOL not in record.tools
 
 
 def new_agent_tools(said: list[str] | None) -> tuple[str, ...]:
@@ -189,21 +194,40 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.post("/agent-teams/{team_id}/use", status_code=201)
     async def use_team(team_id: str) -> TeamUse:
         """A team's agents (item 504), each made as its template's Use makes one. A member with the name of an agent
-        the owner has, read without regard to case as the team tools read it, is that agent, kept as it is; the others
-        are all checked (their model and tools) before any is made, so a team one of whose agents this home cannot make
-        makes none. Past the checks they are made one by one, not in one transaction: a store that fails part way
-        leaves the ones made, and two Uses at once may make an agent twice, as two clicks of a template's Use may."""
+        the owner has, read without regard to case as the team tools read it, is that agent, kept as it is but for one
+        thing (item 511): one that names its tools without ``message_agent`` is given it, so that it can hand its
+        teammates their parts (``joined``). The others are all checked (their model and tools) before any is made or
+        given anything, so a team one of whose agents this home cannot make makes none. Past the checks they are made
+        one by one, not in one transaction: a store that fails part way leaves the ones made, and two Uses at once may
+        make an agent twice, as two clicks of a template's Use may."""
         chosen: AgentTeam = find_team(team_id)
         agents: list[AgentRecord] = await store.list_agents()
-        kept: list[AgentRecord] = []
+        have_them: list[AgentRecord] = []
         to_make: list[AgentRequest] = []
         for template in (find_template(member) for member in chosen.members):
             have: AgentRecord | None = find_agent(agents, template.name)
             if have is None:
                 to_make.append(_checked(_template_request(template), known))
             else:
-                kept.append(have)
-        return TeamUse(made=[await saved(request) for request in to_make], kept=kept)
+                have_them.append(have)
+        made: list[AgentRecord] = [await saved(request) for request in to_make]
+        joined: list[str] = [record.name for record in have_them if _cannot_message(record)]
+        kept: list[AgentRecord] = [await _joined(record) if _cannot_message(record) else record for record in have_them]
+        return TeamUse(made=made, kept=kept, joined=joined)
+
+    async def _joined(record: AgentRecord) -> AgentRecord:
+        """``record`` able to message its teammates: ``message_agent`` added to the tools it names."""
+        return await store.update_agent(
+            record.id,
+            record.name,
+            record.role,
+            record.instructions,
+            record.model,
+            record.effort,
+            record.approvals,
+            (*record.tools, MESSAGE_AGENT_TOOL),
+            record.look,
+        )
 
     @router.post("/agents/import", status_code=201)
     async def import_agent(file: AgentFile) -> AgentRecord:
