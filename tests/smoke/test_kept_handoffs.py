@@ -407,6 +407,42 @@ async def test_what_the_policy_decides_now_beats_a_yes_given_earlier(login_env: 
         assert not (runtime.workspace / "report.txt").exists()
 
 
+async def test_a_step_a_delegated_run_kept_is_answered_to_the_run_that_delegated_it(login_env: dict[str, str]) -> None:
+    """Item 485: a delegated run keeps its step where the run that delegated it does, in that run's chat; Allow once
+    starts the run that goes on from the run at the top, in its chat, which does the step once on that yes."""
+    model: ScriptedProvider = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn(ScriptedCall(tool="delegate", arguments={"goal": "Write report.txt with the report's command."})),
+            # The delegated run: nobody answers its question, and it is kept for the run at the top.
+            _report(),
+            _finish("The report waits for the owner's yes."),
+            # The run that delegated it ends; then the run Allow once starts in its chat does the step.
+            _finish("My helper kept the report for the owner."),
+            _report(),
+            _finish("Reported."),
+        ],
+    )
+    async with _session(login_env, model, "park") as (runtime, manager):
+        root: RunRecord = await _start(manager, SCHEDULE_SOURCE, "ask")
+        assert (await _ended(manager, root.id)).status == "done"
+        children: list[RunRecord] = await runtime.store.list_child_runs(root.id)
+        assert len(children) == 1
+        kept: list[ApprovalRecord] = [
+            record for record in await _approvals(runtime, children[0].id) if record.status == "left"
+        ]
+        assert [(record.scope_thread_id, record.scope_campaign_id) for record in kept] == [(root.thread_id, None)]
+        await manager.decide(kept[0].id, True, UI_SOURCE, "")
+        follow: RunRecord = (await runtime.store.list_runs(1, root.thread_id))[0]
+        assert follow.id != root.id and follow.goal == GOAL
+        assert (await _ended(manager, follow.id)).status == "done"
+        auto: list[EventRecord] = [
+            event for event in await _events(runtime, follow.id) if event.kind == "approval_auto"
+        ]
+        assert [event.data["decided_by"] for event in auto] == ["permit"]
+        assert (runtime.workspace / "report.txt").read_text() == "filed\n"
+
+
 async def test_past_the_caps_a_hand_off_is_asked_as_before_and_refused_when_nobody_answers(
     login_env: dict[str, str],
 ) -> None:

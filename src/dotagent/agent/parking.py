@@ -52,16 +52,16 @@ class Parking(FrozenModel):
 def parking_for(
     policy: PolicyConfig,
     approval_mode: ApprovalMode,
-    delegated: bool,
     evaluated: bool,
     conversation_id: str,
     campaign_id: str | None,
     schedule_id: str | None,
 ) -> Parking | None:
-    """The run's parking in the conversation ``conversation_id`` (of the campaign ``campaign_id`` for a session), or
-    None where a question nobody answers ends as a refusal: ``unanswered`` is ``"refuse"``; the run is a yolo one, which
-    asks nothing; a delegated run, whose parent decides; or an eval's."""
-    if policy.unanswered != "park" or approval_mode == "yolo" or delegated or evaluated:
+    """The parking of a run nobody delegated in the conversation ``conversation_id`` (of the campaign ``campaign_id``
+    for a session), or None where a question nobody answers ends as a refusal: ``unanswered`` is ``"refuse"``; the run
+    is a yolo one, which asks nothing; or an eval's. A delegated run keeps its steps where the run that delegated it
+    does (item 485)."""
+    if policy.unanswered != "park" or approval_mode == "yolo" or evaluated:
         return None
     return Parking(
         thread_id=conversation_id,
