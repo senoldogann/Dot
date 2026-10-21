@@ -154,11 +154,11 @@ def test_dotx_stats_shows_when_each_work_last_went_well_its_failures_and_why_lea
     assert lines[1].startswith("  drawing lessons from runs: never went well; 3 failed in a row, the last ")
     assert lines[1].endswith(": the embedder is down")
     assert lines[2] == "  writing skills from runs: never went well"
-    assert lines[3] == "  the harness's nightly step: never went well"
+    assert lines[3] == "  the nightly self-improvement: never went well"
     # While [harness] step_time keeps the step from running, a record that has none is not a failure.
     assert (
         render_learning_health(health, T0 + 120, QUIET_S, False)[3]
-        == "  the harness's nightly step: off ([harness] step_time)"
+        == "  the nightly self-improvement: off ([harness] step_time)"
     )
     assert lines[4].startswith("  learning has stopped: Drawing lessons from runs failed 3 times in a row")
     assert "(the owner was told " in lines[4]
