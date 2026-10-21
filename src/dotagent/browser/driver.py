@@ -829,11 +829,20 @@ async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) 
         raise _failure("uploading the files failed", page, {"ref": ref}, error) from error
 
 
-async def _banner_gone(banner: Locator) -> bool:
-    """Whether the banner left the page; one that cannot be counted, or not in time, is taken as still there."""
+async def _banner_gone(banner: Locator, url: str) -> bool:
+    """Whether the banner left the page; one that cannot be counted, or not in time, is taken as still there, with why
+    in the log."""
     try:
         return await _count(banner) == 0
-    except (TimeoutError, PlaywrightError):
+    except TimeoutError:
+        _log.warning("consent_banner_uncounted", url=truncate_middle(url, _ERROR_CHARS), error="no answer in time")
+        return False
+    except PlaywrightError as error:
+        _log.warning(
+            "consent_banner_uncounted",
+            url=truncate_middle(url, _ERROR_CHARS),
+            error=truncate_middle(str(error), _ERROR_CHARS),
+        )
         return False
 
 
@@ -848,7 +857,7 @@ async def install_consent_handler(page: Page) -> None:
         try:
             await banner.get_by_role("button", name=_DECLINE_BUTTON).first.click(timeout=_CONSENT_CLICK_TIMEOUT_MS)
         except PlaywrightError as error:
-            if page.is_closed() or await _banner_gone(banner):
+            if page.is_closed() or await _banner_gone(banner, page.url):
                 return
             _log.warning(
                 "consent_decline_failed",

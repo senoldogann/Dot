@@ -38,4 +38,4 @@ async def test_a_page_that_never_answers_a_count_holds_nothing(monkeypatch: pyte
         assert await driver._is_secret(_Page(), "e5") is True  # type: ignore[arg-type]
         with pytest.raises(BrowserError, match="did not answer in time"):
             await driver.live_locator(_Page(), "e5", "click")  # type: ignore[arg-type]
-        assert await driver._banner_gone(_Stuck()) is False  # type: ignore[arg-type]
+        assert await driver._banner_gone(_Stuck(), "https://example.com/stuck") is False  # type: ignore[arg-type]
