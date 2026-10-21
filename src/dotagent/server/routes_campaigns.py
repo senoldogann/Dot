@@ -49,7 +49,15 @@ def campaigns_router(ctx: ServerContext) -> APIRouter:
             working=_working(sessions),
             next_local=next_local(campaign),
             entries=await store.campaign_entries(campaign.id, _PAGE_ENTRIES),
-            questions=await store.campaign_questions(campaign.id, ASK_USER_TOOL, _PAGE_QUESTIONS),
+            # The questions its sessions left, and the steps they kept for the owner, which are the campaign's (item
+            # 484).
+            questions=sorted(
+                [
+                    *await store.campaign_questions(campaign.id, ASK_USER_TOOL, _PAGE_QUESTIONS),
+                    *await store.campaign_kept(campaign.id, _PAGE_QUESTIONS),
+                ],
+                key=lambda record: record.created_at,
+            ),
             tokens=await store.campaign_tokens(campaign.id),
         )
 

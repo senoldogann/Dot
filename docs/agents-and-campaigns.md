@@ -166,12 +166,12 @@ campaign is achieved and you are told (the notifications under the web UI and th
 emergency stop or `campaign_max_sessions` stops it.
 - **Only you stop it.** Campaigns, in the sidebar, lists them, and a row has buttons for what you can do to its campaign
   without opening it: Stop while it is active, Mark achieved until it is achieved, and Delete once it is not active and
-  none of its sessions works; each asks first. A campaign's page shows its targets, the questions waiting for you, its
-  ledger and its sessions, with Stop (which also stops a session working then), Go on, Mark achieved and Delete. The
-  emergency stop (its button, or the pointer in the top-left corner during a desktop step) stops the campaign of the
-  session it ends, and while the stop is engaged no session starts. `dotx campaign` changes the campaign without the
-  daemon, so a session working then goes on until it ends (Stop on its run page ends it). `campaign_max_sessions` (0: no
-  limit) stops a campaign after that many sessions; Go on gives it one more.
+  none of its sessions works; each asks first. A campaign's page shows its targets, the questions and the steps kept for
+  you waiting (item 484), its ledger and its sessions, with Stop (which also stops a session working then), Go on, Mark
+  achieved and Delete. The emergency stop (its button, or the pointer in the top-left corner during a desktop step)
+  stops the campaign of the session it ends, and while the stop is engaged no session starts. `dotx campaign` changes
+  the campaign without the daemon, so a session working then goes on until it ends (Stop on its run page ends it).
+  `campaign_max_sessions` (0: no limit) stops a campaign after that many sessions; Go on gives it one more.
 - **Deleting one** (`DELETE /api/campaigns/{id}`) deletes its ledger and the threads of its sessions after the first,
   with all they hold, as deleting those chats would. The conversation it started in stays a chat, with the first
   session as a run of that chat, and the questions its runs left for you expire, as no session reads the answers any
