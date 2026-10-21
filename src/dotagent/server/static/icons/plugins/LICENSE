@@ -3,17 +3,18 @@ The marks in this folder come from two sources, both released under CC0 1.0 Univ
 
 gilbarbara/logos (https://github.com/gilbarbara/logos), commit dafdf2df1334b2327497bfff40111aff0713c992 of 2026-10-17
 (its LICENSE.txt is CC0 1.0 Universal): each file as the source draws it, in the brand's own colours, unchanged:
-apify-icon.svg, asana-icon.svg, atlassian.svg, aws.svg, brave.svg, chrome.svg, clickup-icon.svg, cloudflare-icon.svg,
+airtable.svg, amplitude-icon.svg, apify-icon.svg, asana-icon.svg, atlassian.svg, aws.svg, brave.svg, chrome.svg, clickup-icon.svg, cloudflare-icon.svg,
 elevenlabs-icon.svg, exa-icon.svg, figma.svg, firecrawl-icon.svg, github-icon.svg, gitlab-icon.svg, google-icon.svg,
 grafana.svg, heroku-icon.svg, hugging-face-icon.svg, instagram-icon.svg, intercom-icon.svg, linear-icon.svg,
 linkedin-icon.svg, mapbox-icon.svg, microsoft-icon.svg, microsoft-onedrive.svg, miro-icon.svg,
-model-context-protocol-icon.svg, monday-icon.svg, neon-icon.svg, netlify-icon.svg, notion-icon.svg, perplexity-icon.svg,
+model-context-protocol-icon.svg, monday-icon.svg, neon-icon.svg, netlify-icon.svg, new-relic-icon.svg, notion-icon.svg, paypal.svg, perplexity-icon.svg,
 playwright.svg, posthog-icon.svg, postman-icon.svg, sentry-icon.svg, slack-icon.svg, supabase-icon.svg, tavily.svg,
 todoist-icon.svg, vercel-icon.svg, x.svg.
 
-Simple Icons (https://simpleicons.org), version 16.35.0: box.svg, stripe.svg, webflow.svg, wix.svg, zapier.svg.
-gilbarbara/logos draws these brands as a wordmark alone, too small to read in a tile, so each keeps Simple Icons'
-symbol: the icon's path alone, with the brand's colour as the file's fill.
+Simple Icons (https://simpleicons.org), version 16.35.0: box.svg, calendly.svg, mixpanel.svg, semrush.svg, stripe.svg,
+webflow.svg, wix.svg, zapier.svg. gilbarbara/logos draws these brands as a wordmark alone, too small to read in a tile,
+or not at all (Calendly, Semrush), so each keeps Simple Icons' symbol: the icon's path alone, with the brand's colour
+as the file's fill.
 
 The marks are trademarks of their owners. Dot shows each to identify the service it stands for, and nothing more; its
 use implies no endorsement. The owners' brand guidelines, where Simple Icons names them:
@@ -21,6 +22,7 @@ use implies no endorsement. The owners' brand guidelines, where Simple Icons nam
 - Asana: https://asana.com/brand
 - Atlassian: https://atlassian.design/foundations/logos
 - Box: https://www.box.com/en-gb/about-us/press
+- Calendly: https://calendly.com/newsroom
 - Brave: https://brave.com/brave-branding-assets
 - Cloudflare: https://www.cloudflare.com/trademark/
 - ElevenLabs: https://elevenlabs.io/brand
@@ -33,8 +35,11 @@ use implies no endorsement. The owners' brand guidelines, where Simple Icons nam
 - Instagram: https://about.meta.com/brand/resources/instagram
 - Intercom: https://www.intercom.com/press
 - Mapbox: https://www.mapbox.com/about/press/brand-guidelines
+- Mixpanel: https://brand.mixpanel.com
 - Neon: https://neon.com/brand
 - Netlify: https://www.netlify.com/press/
+- New Relic: https://newrelic.com/about/media-assets#guidelines
+- PayPal: https://newsroom.paypal-corp.com/media-resources
 - PostHog: https://posthog.com/handbook/company/brand-assets
 - Vercel: https://vercel.com/geist/brands
 - Webflow: https://brand-at.webflow.io

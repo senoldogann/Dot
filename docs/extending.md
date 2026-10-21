@@ -16,14 +16,16 @@ ready, and where its data goes. **Check again** reads them all anew. `GET /api/p
 
 Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
 logo such as GitHub's or X's reads in the dark scheme too). The logos are files of `static/icons/plugins`: from
-[gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the five brands it draws as a wordmark alone
-(Stripe, Box, Wix, Zapier and Webflow), Simple Icons' symbol in the brand's colour (version 16.35.0, CC0); the
+[gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the brands it draws as a wordmark alone
+(Stripe, Box, Wix, Zapier, Webflow and Mixpanel) or not at all (Calendly and Semrush), Simple Icons' symbol in the
+brand's colour (version 16.35.0, CC0); the
 folder's LICENSE names the files, the source and the commit they came from, and the brands' guidelines. A mark
 identifies its service and nothing more. The applications of this Mac (Mail, Calendar, Notes, Reminders, Messages,
 Contacts, Excel, Word, PowerPoint, Outlook and OneDrive) show the icon of the application you have installed, read from
 its bundle when the page is drawn (`GET /api/connections/{id}/icon`, a PNG; `connections/app_icons.py`), since Apple's
 and Microsoft's artwork is not Dot's to ship; one that is not installed keeps its own mark, a logo, an icon of the
-interface or letters (DeepWiki, Context7, Jina, Canva and Outlook have no logo to show). A server added by hand wears
+interface or letters (DeepWiki, Context7, Jina, Canva, Outlook, Mobbin, Parallel, Plain, MailerLite and Klaviyo have
+no logo to show). A server added by hand wears
 the mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item
 477).
 
@@ -72,7 +74,10 @@ The ways a service connects:
 - **MCP server** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
   Supabase and monday.com too (item 408), and GitLab, PostHog, Zapier, Webflow, ClickUp, Postman, Netlify, Apify, Miro,
   Heroku and Atlassian (item 413: Dot's own client registered with each and each opened its sign-in page to it on
-  2026-10-19), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs and Jina, open to all, and the services that
+  2026-10-19), Mobbin, Semrush, Parallel Task, Plain, MailerLite, Airtable, Klaviyo, Calendly, Amplitude, Mixpanel, New
+  Relic and PayPal (item 498: each one's metadata, read on 2026-10-21, offers a client that registers itself without a
+  secret), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs, Jina and Parallel Search, open to all, and the
+  services that
   take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix, Firecrawl and Tavily;
   a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to over standard input
   and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation, and with a key

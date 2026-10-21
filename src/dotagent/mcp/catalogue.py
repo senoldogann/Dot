@@ -12,7 +12,14 @@ each opened its sign-in page to it. The addresses, the keys they take and the co
 and package registries read on 2026-10-19. Left out, as Dot cannot connect to them: Asana, Slack, Google, Box, Render,
 HubSpot and Square (clients registered by hand), Vercel and Canva (approved clients only: Canva refused Dot's), Figma's
 own server (it refused Dot's registration; Framelink's server reads Figma with your token instead) and Semgrep's (it
-refused the resource Dot asks for). Any of them can still be added by its address."""
+refused the resource Dot asks for). Any of them can still be added by its address.
+
+The services item 498 added were checked on 2026-10-21 by GET alone, as Dot's client reads them: each server's protected
+resource metadata and its authorization server's metadata offer dynamic client registration, a client without a secret
+(``none``) and PKCE with S256; Parallel's Search server is open to all, as its docs say. Left out then: Ahrefs (its
+metadata names no client without a secret), Make and Pipedrive (a client with a secret only), Datadog (its address is
+under ``/api/unstable/`` and is one region's), Zoom (clients registered by hand), Dropbox (registration for a few named
+clients only) and Plaid (a token of client credentials, no sign-in), the last three as their docs say."""
 
 import re
 from typing import Literal, Self
@@ -462,5 +469,95 @@ MCP_SERVICES: tuple[McpService, ...] = (
                 help="https://grafana.com/docs/grafana/latest/administration/service-accounts/",
             ),
         ),
+    ),
+    McpService(
+        id="mobbin",
+        name="Mobbin",
+        does="Search Mobbin's library of real app and web screens and flows for design references.",
+        url="https://api.mobbin.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="semrush",
+        name="Semrush",
+        does="Research keywords, domains, backlinks and traffic with Semrush's data.",
+        url="https://mcp.semrush.com/v2/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="parallel-search",
+        name="Parallel Search",
+        does="Search the web with Parallel's index, built for agents; free without a key.",
+        url="https://search.parallel.ai/mcp",
+    ),
+    McpService(
+        id="parallel-task",
+        name="Parallel Task",
+        does="Run Parallel's deep research and enrichment tasks over the web.",
+        url="https://task-mcp.parallel.ai/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="plain",
+        name="Plain",
+        does="Read and answer support threads, customers and companies in Plain.",
+        url="https://mcp.plain.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="mailerlite",
+        name="MailerLite",
+        does="Manage subscribers, groups, campaigns and automations in MailerLite.",
+        url="https://mcp.mailerlite.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="airtable",
+        name="Airtable",
+        does="Read and change the bases, tables and records of your Airtable.",
+        url="https://mcp.airtable.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="klaviyo",
+        name="Klaviyo",
+        does="Work with your Klaviyo profiles, lists, campaigns, flows and their reports.",
+        url="https://mcp.klaviyo.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="calendly",
+        name="Calendly",
+        does="See your Calendly event types and meetings, and book or cancel them.",
+        url="https://mcp.calendly.com",
+        signs_in=True,
+    ),
+    McpService(
+        id="amplitude",
+        name="Amplitude",
+        does="Ask your Amplitude analytics: charts, dashboards, cohorts and experiments.",
+        url="https://mcp.amplitude.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="mixpanel",
+        name="Mixpanel",
+        does="Query your Mixpanel events, funnels, retention and reports.",
+        url="https://mcp.mixpanel.com/mcp",
+        signs_in=True,
+    ),
+    McpService(
+        id="newrelic",
+        name="New Relic",
+        does="Query your New Relic telemetry, alerts and incidents.",
+        url="https://mcp.newrelic.com/mcp/",
+        signs_in=True,
+    ),
+    McpService(
+        id="paypal",
+        name="PayPal",
+        does="Look up and manage invoices, orders, payments, subscriptions and disputes in PayPal.",
+        url="https://mcp.paypal.com/mcp",
+        signs_in=True,
     ),
 )
