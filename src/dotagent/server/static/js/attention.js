@@ -53,9 +53,11 @@ export function notificationsAvailable() {
 }
 
 /** Whether this is an iPhone's or an iPad's browser tab, where notifications come only to Dot added to the Home Screen
- * and opened from there (item 501). */
+ * and opened from there (item 501). An iPad's Safari names itself a Mac, one with a touch screen. */
 export function homeScreenNeeded() {
-  return /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches;
+  const agent = navigator.userAgent;
+  const apple = /iPhone|iPad|iPod/.test(agent) || (/Macintosh/.test(agent) && navigator.maxTouchPoints > 1);
+  return apple && !window.matchMedia("(display-mode: standalone)").matches;
 }
 
 export function notificationsBlocked() {

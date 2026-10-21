@@ -156,7 +156,7 @@ function buildNotifications() {
     always.toggle.disabled = !notificationsOn();
     if (!available && homeScreenNeeded()) {
       setting.note.textContent =
-        "On an iPhone, notifications come to Dot added to the Home Screen: in Safari, Share › Add to Home Screen, open Dot from there and switch this on. The phone is then told when a run ends or Dot needs you, also when Dot is closed.";
+        "On an iPhone or an iPad, notifications come to Dot added to the Home Screen: in Safari, Share › Add to Home Screen, open Dot from there and switch this on. It is then told when a run ends or Dot needs you, also when Dot is closed.";
     } else if (!available) {
       setting.note.textContent = "This browser cannot show notifications.";
     } else if (blocked) {
