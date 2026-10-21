@@ -266,7 +266,9 @@ class ApprovalRecord(FrozenModel):
     """A question a run asked: of the policy, of the agent itself, or one answered without a person. A step kept for the
     owner (item 482) also has ``digest``, the fingerprint of its action that keeps it once in its chat, and
     ``kept_until``, when it lapses; both are None for any other. The owner's yes to a kept ask (item 483) holds until
-    ``permit_until`` and is spent at ``used_at``, the first time the run does the step; None for any other."""
+    ``permit_until`` and is spent at ``used_at``, the first time the run does the step; None for any other. A kept step
+    belongs to the conversation ``scope_thread_id`` and, for the sessions of a campaign, to ``scope_campaign_id``
+    (item 484), where it is kept once and its answer holds."""
 
     id: str
     run_id: str
@@ -283,6 +285,8 @@ class ApprovalRecord(FrozenModel):
     kept_until: float | None
     permit_until: float | None
     used_at: float | None
+    scope_thread_id: str | None
+    scope_campaign_id: str | None
 
 
 class DraftRecord(FrozenModel):

@@ -243,7 +243,7 @@ async def test_a_hand_off_nobody_answers_is_kept_and_i_did_it_carries_the_work_o
         assert skipped.status == "denied"
         late, due = [
             await runtime.store.create_kept_approval(
-                run.id, "shell", "file the invoice", "handoff", {}, digest, time.time() - 1.0
+                run.id, "shell", "file the invoice", "handoff", {}, digest, time.time() - 1.0, run.thread_id, None
             )
             for digest in ("late", "due")
         ]
@@ -395,7 +395,7 @@ async def test_rewinding_the_chat_takes_back_a_yes_not_used_yet(login_env: dict[
         await runtime.store.grant_permit(kept.id, UI_SOURCE, "", time.time() + 3600.0)
         await runtime.store.rewind_chat(run.id, [found.id for found in await runtime.store.runs_from(run.id)])
         assert (await runtime.store.get_approval(kept.id)).permit_until is None
-        assert await runtime.store.take_permit(kept.digest, run.thread_id, time.time()) is None
+        assert await runtime.store.take_permit(kept.digest, run.thread_id, None, time.time()) is None
 
 
 async def test_what_the_policy_decides_now_beats_a_yes_given_earlier(login_env: dict[str, str]) -> None:
@@ -431,7 +431,15 @@ async def test_past_the_caps_a_hand_off_is_asked_as_before_and_refused_when_nobo
         await _ended(manager, earlier.id)
         for number in range(KEPT_HERE):
             await runtime.store.create_kept_approval(
-                earlier.id, "shell", f"file invoice {number}", "handoff", {}, f"d{number}", time.time() + 3600.0
+                earlier.id,
+                "shell",
+                f"file invoice {number}",
+                "handoff",
+                {},
+                f"d{number}",
+                time.time() + 3600.0,
+                earlier.thread_id,
+                None,
             )
         run: RunRecord = await manager.start(
             GOAL,

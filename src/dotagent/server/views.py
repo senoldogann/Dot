@@ -966,7 +966,8 @@ class CampaignSummary(FrozenModel):
 class CampaignDetail(FrozenModel):
     """A campaign as its page shows it: its sessions, oldest first; the session working now and when the next one
     starts, as its summary says them; the newest entries of its ledger, oldest first; the questions its sessions asked
-    the owner and what became of them, oldest first; and the tokens its sessions and the runs they delegated to used."""
+    the owner and the steps they kept for them (item 484), and what became of them, oldest first; and the tokens its
+    sessions and the runs they delegated to used."""
 
     record: CampaignRecord
     sessions: list[RunRecord]

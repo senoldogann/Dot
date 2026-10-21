@@ -3,6 +3,7 @@ row brought no progress, and which routes a stuck campaign refuses."""
 
 from dotagent.agent.campaign import (
     Brief,
+    BriefKept,
     BriefQuestion,
     LastSession,
     next_session_at,
@@ -12,7 +13,7 @@ from dotagent.agent.campaign import (
     session_number,
     sessions_without_progress,
 )
-from dotagent.store.models import CampaignEntry, CampaignEntryKind, RunRecord
+from dotagent.store.models import ApprovalStatus, CampaignEntry, CampaignEntryKind, RunRecord
 
 GOAL: str = "Collect 50 leads into leads.csv."
 NOW: float = 1_000_000.0
@@ -53,6 +54,7 @@ def _brief(
         progress=progress,
         entries=entries,
         questions=questions,
+        kept=(),
         last=last,
         without_progress=without_progress,
         patience=3,
@@ -169,13 +171,16 @@ def test_a_brief_shows_the_newest_progress_also_when_newer_entries_push_it_out_o
 
 def test_the_next_session_follows_the_plan_else_waits_for_an_answer_else_comes_after_the_gap() -> None:
     planned: float = NOW + 5 * HOUR
-    assert next_session_at(NOW, planned, "Your sender address.", ["left"], 60, 24) == planned
+    assert next_session_at(NOW, planned, "Your sender address.", ["left"], False, 60, 24) == planned
     # The session ended needing the owner, and no question it left is answered yet.
-    assert next_session_at(NOW, None, "Your sender address.", ["left", "left"], 60, 24) == NOW + 24 * HOUR
+    assert next_session_at(NOW, None, "Your sender address.", ["left", "left"], False, 60, 24) == NOW + 24 * HOUR
     # One is answered, it needs nothing, or it left no question: the usual gap.
-    assert next_session_at(NOW, None, "Your sender address.", ["left", "approved"], 60, 24) == NOW + HOUR
-    assert next_session_at(NOW, None, "", ["left"], 60, 24) == NOW + HOUR
-    assert next_session_at(NOW, None, "Your sender address.", [], 60, 24) == NOW + HOUR
+    assert next_session_at(NOW, None, "Your sender address.", ["left", "approved"], False, 60, 24) == NOW + HOUR
+    assert next_session_at(NOW, None, "", ["left"], False, 60, 24) == NOW + HOUR
+    assert next_session_at(NOW, None, "Your sender address.", [], False, 60, 24) == NOW + HOUR
+    # A step it kept for the owner waits for them, whatever it said it needs (item 484).
+    assert next_session_at(NOW, None, "", [], True, 60, 24) == NOW + 24 * HOUR
+    assert next_session_at(NOW, planned, "", [], True, 60, 24) == planned
 
 
 def test_the_sessions_without_progress_are_the_ones_after_the_newest_progress_entry() -> None:
@@ -214,3 +219,36 @@ def test_a_session_number_counts_the_sessions_of_the_campaign_from_one() -> None
         for run_id in ("run_a", "run_b", "run_c")
     ]
     assert [session_number(sessions, run_id) for run_id in ("run_a", "run_b", "run_c")] == [1, 2, 3]
+
+
+def test_a_brief_says_what_became_of_the_steps_kept_for_the_owner() -> None:
+    def kept(summary: str, handoff: bool, status: ApprovalStatus, used: bool, usable: bool) -> BriefKept:
+        return BriefKept(
+            summary=summary, kept_at=NOW - 3 * HOUR, handoff=handoff, status=status, note="", used=used, usable=usable
+        )
+
+    brief: str = render_brief(
+        _brief(4, "50 leads in leads.csv", (), (), None, 0).model_copy(
+            update={
+                "kept": (
+                    kept("Pay the list", True, "left", False, False),
+                    kept("Run: ./send.sh", False, "left", False, False),
+                    kept("Pay the fee", True, "approved", False, False),
+                    kept("Run: ./export.sh", False, "approved", False, True),
+                    kept("Run: ./import.sh", False, "approved", True, False),
+                    kept("Run: ./clean.sh", False, "denied", False, False),
+                    kept("Run: ./old.sh", False, "expired", False, False),
+                )
+            }
+        )
+    )
+    assert brief.endswith(
+        "Steps kept for the owner when nobody answered them (do none of them unless a line says you may):\n"
+        "- “Pay the list”: waiting for the owner to do it themselves since 3 h; do not try it again\n"
+        "- “Run: ./send.sh”: waiting for the owner to allow it since 3 h; do not try it again\n"
+        "- “Pay the fee”: the owner did it themselves; go on from there.\n"
+        "- “Run: ./export.sh”: allowed by the owner once: do it when you reach it, exactly as it was, once.\n"
+        "- “Run: ./import.sh”: allowed by the owner once, and done\n"
+        "- “Run: ./clean.sh”: skipped by the owner: do not try it again or another way round it\n"
+        "- “Run: ./old.sh”: not answered in time, and lapsed; do not try it again"
+    )

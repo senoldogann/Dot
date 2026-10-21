@@ -368,8 +368,9 @@ class RunGate:
         return await self._ask_user(info, decision, "", tainted), "user"
 
     async def _kept_answer(self, info: ActionInfo, decision: Decision, tainted: bool) -> ApprovalRecord | None:
-        """What the owner answered to this step when it was kept for them in this chat (items 482, 483): a Skip they
-        have not taken back by writing here since refuses it at once, with no card; their yes to a kept question,
+        """What the owner answered to this step when it was kept for them where this run keeps its steps (items 482 to
+        484: its chat, or its campaign's conversation): a Skip they have not taken back by writing there since refuses
+        it at once, with no card; their yes to a kept question,
         unused and in time, lets this question through once, and is returned (None: neither). Only a run that keeps
         steps reads them, and only for a step it would keep: a refusal, a question the run's reading raised and yolo,
         which asks nothing, never come here."""
@@ -380,14 +381,14 @@ class RunGate:
         digest: str | None = kept_digest(info)
         if digest is None or not (asks or decision.verdict == "handoff"):
             return None
-        skipped: ApprovalRecord | None = await self._approvals.skipped(digest, parking.thread_id)
+        skipped: ApprovalRecord | None = await self._approvals.skipped(digest, parking)
         if skipped is not None:
             await self._emit_policy(info, decision, tainted)
             log.warning("skipped_step_refused", run_id=self._run_id, tool=info.tool, approval_id=skipped.id)
             raise ApprovalRejected(skipped_text(skipped.id), {"action": _describe(info), "approval_id": skipped.id})
         if not asks:
             return None
-        allowed: ApprovalRecord | None = await self._approvals.take_permit(digest, parking.thread_id, time.time())
+        allowed: ApprovalRecord | None = await self._approvals.take_permit(digest, parking, time.time())
         if allowed is None:
             return None
         await self._approvals.record_automatic(
@@ -416,9 +417,7 @@ class RunGate:
             severity,
             _describe(info),
             kept_digest(info),
-            parking.keep_s,
-            parking.thread_id,
-            parking.schedule_id,
+            parking,
         )
         if kept is None:
             return ApprovalRejected(
