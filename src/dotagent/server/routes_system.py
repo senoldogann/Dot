@@ -278,6 +278,7 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
             goal_mode=config.agent.goal_mode,
             schedule_history_runs=config.scheduler.history_runs,
             schedule_same_chat=config.scheduler.same_chat,
+            schedule_stop_after_failures=config.scheduler.stop_after_failures,
             browser_mode=ctx.runtime.browser.mode,
             desktop_enabled=config.desktop.enabled,
             mcp_tools=len(ctx.runtime.mcp.tools),

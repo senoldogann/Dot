@@ -221,6 +221,16 @@ def test_an_event_becomes_the_message_the_phone_shows_or_none(
             ),
         ),
         (
+            "schedule_stopped",
+            {"schedule_id": "sch_1", "name": "weekly report", "failures": 3},
+            PushMessage(
+                title="A schedule was switched off",
+                body="weekly report: its last 3 runs failed",
+                route="#/schedules",
+                state="failed",
+            ),
+        ),
+        (
             "learning_stalled",
             {"reason": "Drawing lessons from runs failed 3 times in a row: the embedder is down"},
             PushMessage(

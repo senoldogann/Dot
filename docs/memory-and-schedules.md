@@ -163,10 +163,24 @@ composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat and whether it is on
-(`history_runs`, `same_chat` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the
-standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
+(`history_runs`, `same_chat`, `stop_after_failures` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
+configured ones and the standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
 creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
 the form is open, **New schedule** reads **Close**, with a cross.
+
+**Run now** (the play button of a schedule's row, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
+once, switched on or off, due or not; the button says that it does real work, as at its time, with the approvals its run
+takes, and the run's page opens, where Stop is. The run goes as a firing goes: unattended, with the schedule's own
+choices (a yolo schedule's run asks nothing), the digest of its earlier runs, in a chat of its own titled `<name> ·
+<time> · by hand` (or in the schedule's chat, with "the same chat"), and its first message says it was started by hand.
+Nothing of when the schedule fires next nor of whether it is switched on changes: a one-time schedule is still due at
+its moment. It does not start while the emergency stop is engaged, nor while a run of the schedule is at work or being
+started (409), in a daemon that runs no scheduler either; a repeating schedule's firing whose time comes meanwhile is
+skipped as for a run still going, and a one-time schedule waits, still due, and fires once that run has ended. A start
+the daemon refuses leaves no chat behind and is no missed firing. **Firings** under a schedule lists its last runs, at
+its time and by hand, newest first, one at work among them, each with how it went, when, its chat and the first line of
+its answer (`GET /api/schedules/<id>/firings?limit=`, up to 50); a later firing's digest counts a run by hand among its
+earlier runs.
 
 - Schedules fire only while the daemon runs and the Mac is awake; `dotx service install` keeps the daemon running.
 - A firing is at most once. One that is overdue by more than `misfire_grace_s` (the daemon was off, or the Mac slept)
@@ -179,4 +193,10 @@ the form is open, **New schedule** reads **Close**, with a cross.
   their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick tries again. Only
   20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an
   error, so that schedules never stop firing unseen; the service that `dotx service install` sets up starts it again.
+- A repeating schedule whose runs end failed so many times in a row is switched off, says so as its status ("switched
+  off: its last 3 runs failed") and tells you once (item 458): **Switch off after** in its form (3, 5, 10, 20, never),
+  else `[scheduler] stop_after_failures` (0, never, by default). Its row says how many failed in a row. A run done sets
+  the row to 0, a run cancelled (stopped by you, the emergency stop or the daemon) counts neither way, a run started
+  by hand counts as one at its time, and a firing that started no run counts not at all. A one-time schedule is never
+  switched off by it. Switching a schedule on again, or changing it, starts its row afresh.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

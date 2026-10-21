@@ -243,7 +243,11 @@ stay (item 274): formatted as it comes, drawn at most once a frame with the part
 caret at the end of its text, so that its end moves nothing. An answer that ends a run while its page is open is written
 in the same way (item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands
 on it as it will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a reply
-that streamed already and reduced motion show it at once. The answer of the run is the last message, with a copy button
+that streamed already and reduced motion show it at once. A chat whose run is over opens drawn whole (item 454): its
+events, those of the runs it delegated to, and the work of the turn before it are read before the page is drawn, so
+nothing fills in as the stream comes. A message sent from a chat that is over starts the next run in the same chat
+without a jump: the chat stands where it was, at its foot, inert, until the next run's page is drawn in its place,
+never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
 (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
 the run took shows where the pointer rests on it (on a touch screen it always shows). A copy out of the conversation
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
@@ -532,8 +536,9 @@ desktop notifications (off until you switch them on; the browser asks for its pe
 when it asks for an approval, a question or your help, and when it leaves you a question that a run could not wait for
 (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or stopped, with the
 first line of its answer; the sub-runs of a run stay quiet); when a campaign ends by itself (achieved, or stopped by
-the emergency stop or by `campaign_max_sessions`); and when a schedule misses a firing that nobody saw (overdue, or
-its run could not start; told once while the reason stays the same). It says nothing while you are looking at that
+the emergency stop or by `campaign_max_sessions`); when a schedule misses a firing that nobody saw (overdue, or its
+run could not start; told once while the reason stays the same); and when a repeating schedule is switched off
+because its runs failed so many times in a row (item 458, once). It says nothing while you are looking at that
 run: its page open, the tab visible and the window active. On another
 page, in a background tab or in an inactive window you are told; "Tell me even when I am looking" under the same
 setting turns the rule off. Clicking a notification opens what it tells of. The tab's
@@ -676,6 +681,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /memories`, `GET /memories/search`, `POST /memories`, `GET\|PATCH\|DELETE /memories/{id}` | notes                                         |
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule) |
+| `POST /schedules/{id}/run`, `GET /schedules/{id}/firings?limit=` | a run of the schedule started by hand, 201 (409 while the emergency stop is engaged, while one of its runs is at work, or in a daemon that runs no scheduler); its last runs, at its time and by hand, newest first (item 455) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |

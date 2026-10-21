@@ -551,6 +551,13 @@ navigation_backoff_ms = 80
 # Tabs one conversation thread may keep open; the oldest background tab is closed beyond that.
 max_tabs = 4
 tab_idle_s = 1800.0
+# Dot's own Chrome, and the Playwright driver with it, close once nothing used them for this long (item 454): no step of
+# a chat is under way in it, no run at work holds tabs in it, no page is being read in it for the web tools or watched
+# under "Dot's computer", no task is being taught in it and its window is not the one in front. A Chrome left open keeps
+# memory, and macOS takes it for your Google Chrome, whose Dock icon then brings it forward instead of opening yours.
+# The next call that needs it starts it again on the same profile, signed in as before (item 453 keeps the session
+# cookies across its restarts; Incognito keeps nothing); the chats' tabs go with it. 0, the default, keeps it open until the daemon stops.
+idle_close_s = 0.0
 screenshot_quality = 60
 max_batch_steps = 5
 read_text_chars = 8000
@@ -724,6 +731,9 @@ history_chars = 4000
 # Whether a firing goes on in the chat of the one before (its run reads their conversation, not the digest)
 # instead of a new chat; a schedule may choose its own.
 same_chat = false
+# How many of a repeating schedule's runs in a row may end failed before it is switched off and you are told (item 458;
+# 0 = never, as before; a schedule may choose its own). A run cancelled counts neither way, and one done starts again.
+stop_after_failures = 0
 
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML

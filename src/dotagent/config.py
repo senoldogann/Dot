@@ -364,6 +364,8 @@ class BrowserConfig(FrozenModel):
     navigation_backoff_ms: int
     max_tabs: int = Field(ge=1)
     tab_idle_s: float = Field(gt=0, allow_inf_nan=False)
+    # Dot's own Chrome closes once unused this long (item 454); 0 keeps it open until the daemon stops.
+    idle_close_s: float = Field(ge=0, allow_inf_nan=False)
     # The JPEG quality Chrome takes a screenshot with.
     screenshot_quality: int = Field(ge=1, le=100)
     max_batch_steps: int
@@ -562,6 +564,8 @@ class SchedulerConfig(FrozenModel):
     history_runs: int = Field(ge=0, le=20)
     history_chars: int = Field(ge=500, le=20_000)
     same_chat: bool
+    # Item 458: how many failed runs in a row switch a repeating schedule off (0: never); a schedule may choose its own.
+    stop_after_failures: int = Field(ge=0, le=50)
 
 
 type McpTransport = Literal["stdio", "http", "sse"]
