@@ -7306,7 +7306,6 @@ button.attach-chip:hover {
   color: var(--text-2);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
-  cursor: pointer;
 }
 
 .template-also .switch {
@@ -7402,7 +7401,6 @@ button.attach-chip:hover {
 
   .template-card > .template-also {
     grid-area: also;
-    align-items: center;
     min-height: 40px;
   }
 
