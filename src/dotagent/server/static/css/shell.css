@@ -589,12 +589,34 @@
   min-width: 0;
 }
 
-/* Connect apps (item 492): a row of its own over Settings, a pill with the plug, its words and the marks of the
-   servers Dot is connected to, each a small light tile as on Customize, a little over the one before it. */
+/* Settings is its cog alone (item 492), its name kept for a reader of the screen. */
+.side-foot > .side-settings {
+  flex: none;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+}
+
+.side-foot > .side-settings > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.side-foot > .side-settings > .icon {
+  width: 18px;
+  height: 18px;
+}
+
+/* Connect apps (item 492), right of the cog: a pill with the plug, its words and the marks of the servers Dot is
+   connected to, each a small light tile as on Customize, a little over the one before it. */
 .side-connect {
   display: flex;
-  flex: 1 1 100%;
-  order: -1;
+  flex: 1 1 auto;
   align-items: center;
   gap: 8px;
   min-width: 0;
@@ -935,7 +957,6 @@
   }
 
   .side-foot > .side-connect {
-    order: 0;
     min-height: 0;
   }
 

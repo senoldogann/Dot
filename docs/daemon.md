@@ -26,10 +26,10 @@ them, and the fold is kept. Working lists too what is no chat's: a schedule abou
 (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and its time among the
 days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
 chat in sight, and the search finds the chats at work
-too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**,
-**Schedules** (a page of its own since item 401) and **Customize**
-([Customize › Plugins](extending.md#customize--plugins)); in the foot, **Connect apps**
-([Connect apps](extending.md#connect-apps), item 492), **Settings** and
+too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
+and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
+([Connect apps](extending.md#connect-apps), item 492), which leads to
+[Customize › Plugins](extending.md#customize--plugins), and
 the red square of the **Emergency stop**, which stays there while the sidebar is closed (item 273): the top bar then holds the
 sidebar's opener alone, the size of the sidebar's own buttons and of the side panel's switch and close. The top bar
 shows only what needs you: the bell of the approvals waiting — a click opens the chat of the one that has waited

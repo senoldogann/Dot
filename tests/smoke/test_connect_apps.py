@@ -1,4 +1,4 @@
-"""Connect apps (item 492) end to end: the button at the foot of the sidebar, over Settings, opens the services Dot
+"""Connect apps (item 492) end to end: the button at the foot of the sidebar, right of Settings, opens the services Dot
 works with in a dialog over the page, wide and light in the desktop shell, and on a phone and dark. Suggested for you
 (the popular services) leads, then each section's first six tiles with See all; a chip shows one section, the search
 what it finds and keeps its focus, Connected what Dot is connected to; each tile shows one thing to do or where it
@@ -153,12 +153,17 @@ async def test_connect_apps_opens_the_services_in_a_dialog_from_the_foot_of_the_
             page: Page = await _page(browser, address, 1280, "light")
             errors: list[str] = []
             page.on("pageerror", lambda error: errors.append(str(error)))
-            # The button stands over Settings, in sight, and wears the mark of the server that is ready.
+            # The button stands right of the cog of Settings, on its row and in sight, and wears the mark of the
+            # server that is ready; the list of pages names Customize no more.
             button: Locator = page.locator("#sidebar .side-foot").get_by_role("button", name="Connect apps")
             await expect(button).to_be_visible()
             settings: FloatRect = await _box(page.locator("#sidebar .side-foot").get_by_role("link", name="Settings"))
             at: FloatRect = await _box(button)
-            assert at["y"] + at["height"] <= settings["y"] and at["y"] + at["height"] <= 860, (at, settings)
+            assert at["x"] >= settings["x"] + settings["width"] and at["y"] + at["height"] <= 860, (at, settings)
+            assert abs((at["y"] + at["height"] / 2) - (settings["y"] + settings["height"] / 2)) <= 1, (at, settings)
+            await expect(page.locator("#sidebar nav.side-links a.side-link")).to_have_text(
+                ["Agents", "Campaigns", "Schedules"]
+            )
             marks: Locator = button.locator(".side-connect-mark")
             await expect(marks).to_have_count(1)
             await expect(marks.locator("img")).to_have_attribute("src", f"/icons/plugins/{sentry.logo}")

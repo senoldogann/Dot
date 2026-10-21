@@ -370,11 +370,14 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
-  const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
-  // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns
-  // and Schedules.
+  // Settings is its cog at the foot, beside Connect apps (item 492); its name stays for a reader of the screen.
+  const settingsLink = el(
+    "a",
+    { class: "side-link side-settings", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate },
+    icon("settings"),
+    el("span", null, "Settings"),
+  );
   const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
-  const customizeLink = el("a", { class: "side-link", href: "#/customize/plugins", onclick: onNavigate }, icon("plug"), el("span", null, "Customize"));
 
   // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
   // under a chat among them; while chats are being chosen, their boxes. A row folded away is left out.
@@ -1142,12 +1145,13 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       el("span", { class: "grow" }, "New chat"),
       el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
     ),
-    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink, customizeLink),
+    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
   );
-  // Connect apps (item 492): beside Settings, the dialog of the services Dot works with, with the marks of the MCP
-  // servers it is connected to; on a phone, a round button of its own.
+  // Connect apps (item 492): at the foot, right of the cog of Settings, the dialog of the services Dot works with,
+  // with the marks of the MCP servers it is connected to; it leads to Customize, which the list of pages no longer
+  // names. On a phone, a round button of its own.
   const connectMarks = el("span", { class: "side-connect-marks", "aria-hidden": "true" });
   const connectButton = el(
     "button",
@@ -1238,7 +1242,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(campaignsLink, tab === "campaigns");
       mark(schedulesLink, tab === "schedules");
       mark(settingsLink, tab === "settings");
-      mark(customizeLink, tab === "customize");
       routeRunId = runId;
       routeThreadId = null;
       keptUnread = null;

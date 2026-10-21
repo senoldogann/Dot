@@ -2,7 +2,7 @@
 
 ## Customize › Plugins
 
-**Customize**, the sidebar's page under Campaigns and Schedules (items 278, 289, 316 and 401), has two tabs: **Plugins**, the services Dot
+**Customize** (items 278, 289, 316 and 401), which [Connect apps](#connect-apps) leads to since item 492, has two tabs: **Plugins**, the services Dot
 works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
 leads to Plugins.
 
@@ -29,7 +29,7 @@ the mark of the service it is one of, and the composer's menus draw a server and
 
 ### Connect apps
 
-**Connect apps** (item 492), at the foot of the sidebar over Settings, opens the same services in a dialog over the
+**Connect apps** (item 492), at the foot of the sidebar right of the cog of Settings, opens the same services in a dialog over the
 page, wearing the marks of the first three MCP servers that are ready. It has a search, a chip for each section,
 **Suggested for you** (the popular services), then each section's first six tiles with **See all**, and **N connected**,
 which lists what Dot is connected to. A tile shows one thing: its first step as a button (**Add**, **Sign in**,
