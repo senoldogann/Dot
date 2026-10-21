@@ -220,9 +220,10 @@ async def test_the_step_group_folds_and_unfolds_while_the_run_still_works(tmp_pa
                 await browser.close()
 
 
-async def test_calls_whose_mark_is_shared_keep_their_names_and_say_what_they_did() -> None:
-    """A call whose mark several tools share (a file's) keeps its tool's name and says what it did once it is done, so a
-    write and a read of one file are told apart; only a command is its own words alone (item 402)."""
+async def test_a_read_and_a_write_say_what_they_did_and_wear_their_own_marks() -> None:
+    """A read and a write of one file are told apart by their marks and their words, and neither carries its tool's name
+    (item 506): the eye for a read, the file for a write, "Read"/"Write" once the call is done. A command keeps its own
+    words alone (item 402)."""
     model: ScriptedProvider = ScriptedProvider(_PROVIDER, list(_FILE_SCRIPT))
     async with _served(model) as (runtime, manager, address):
         run: RunRecord = await manager.start(
@@ -242,9 +243,11 @@ async def test_calls_whose_mark_is_shared_keep_their_names_and_say_what_they_did
                 if not await group.evaluate("(node) => node.open"):
                     await group.locator("summary.steps-head").click()
                 rows: Locator = group.locator(".steps-body .tool-head")
-                await expect(rows.locator(".tool-name")).to_have_text(["write_file", "read_file"])
-                await expect(rows.locator(".tool-name.visually-hidden")).to_have_count(0)
+                await expect(rows.locator(".tool-name.visually-hidden")).to_have_count(2)
+                await expect(rows.locator(".tool-state [data-icon='file']")).to_have_count(1)
+                await expect(rows.locator(".tool-state [data-icon='eye']")).to_have_count(1)
                 said: list[str] = await rows.locator(".tool-sum").all_text_contents()
                 assert len(said) == 2 and said[0] != said[1] and all(_NOTE in words for words in said), said
+                assert said[0].startswith("Write") and said[1].startswith("Read"), said
             finally:
                 await browser.close()

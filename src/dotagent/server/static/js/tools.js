@@ -214,8 +214,13 @@ function nameParts(tool) {
 export function toolRow({ tool, args }) {
   const state = el("span", { class: "tool-state" }, el("span", { class: "spinner" }));
   const words = describeArguments(args);
-  const command = callKind(tool) === "command";
-  const named = words === "" || !command;
+  const kind = callKind(tool);
+  const command = kind === "command";
+  // A command reads as code and, opened, shows the command itself rather than the call's arguments (item 506). A read
+  // or a write says what it did in the policy's words ("Read notes.txt"), and its mark says what it is, so it keeps no
+  // tool's name either.
+  const plain = typeof args === "object" && args !== null && typeof args.command === "string" && Object.keys(args).length === 1 ? args.command : null;
+  const named = words === "" || (!command && kind !== "read" && kind !== "write");
   const summary = el("span", { class: "tool-sum" }, words);
   const time = el("span", { class: "tool-time" });
   const badges = el("span", { class: "cluster" });
@@ -230,7 +235,7 @@ export function toolRow({ tool, args }) {
     el("span", { class: "chev" }, icon("chevron")),
   );
   const body = el("div", { class: "tool-body" });
-  const details = el("details", { class: "tool running" }, head, body);
+  const details = el("details", { class: command ? "tool command running" : "tool running" }, head, body);
   const shots = el("div", { class: "shots" });
   const node = el("div", { class: "stack tight" }, details, shots);
   let result = null;
@@ -242,7 +247,9 @@ export function toolRow({ tool, args }) {
     const argsText = JSON.stringify(args, null, 2);
     // replaceChildren writes a null as the word "null": a section that is not there is left out before (item 472).
     const parts = [
-      section("Arguments", el("pre", { class: "out" }, argsText), argsText),
+      plain === null
+        ? section("Arguments", el("pre", { class: "out" }, argsText), argsText)
+        : section("Command", el("pre", { class: "out" }, plain), plain),
       result === null
         ? el("div", { class: "small muted" }, cut ? "Cut off: the run ended before this call reported back." : "Still running…")
         : section(
