@@ -1,6 +1,7 @@
 """Schedules: goals that Dot runs later or on a cron expression, started by the daemon."""
 
 from dotagent.core.types import FrozenModel
+from dotagent.store.models import RunStatus
 
 # The ``source`` of the threads and runs that a schedule starts.
 SCHEDULE_SOURCE: str = "schedule"
@@ -20,6 +21,20 @@ class ScheduleMissed(FrozenModel):
     schedule_id: str
     name: str
     status: str
+
+
+# The live event, of Dot itself, of the end of a schedule's run that its level of notices tells (item 461); the phone
+# and the desktop word it as every end of a run.
+SCHEDULE_RUN_ENDED_EVENT: str = "schedule_run_ended"
+
+
+class ScheduleRunEnded(FrozenModel):
+    """What ``schedule_run_ended`` carries: the schedule, its run, how the run ended and its answer."""
+
+    schedule_id: str
+    run_id: str
+    status: RunStatus
+    result: str
 
 
 # The live event, of Dot itself, of a repeating schedule switched off because its runs failed so many times in a row

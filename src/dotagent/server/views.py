@@ -48,6 +48,7 @@ from dotagent.store.models import (
     HarnessVersion,
     MemoryRecord,
     MemoryScore,
+    NotifyLevel,
     QueuedMessage,
     RuleRecord,
     RunMode,
@@ -483,6 +484,7 @@ class ScheduleCreateRequest(FrozenModel):
     history_runs: int | None = Field(default=None, ge=0, le=20)
     same_chat: bool | None = None
     stop_after_failures: int | None = Field(default=None, ge=0, le=50)
+    notify: NotifyLevel | None = None
 
 
 class ScheduleUpdateRequest(FrozenModel):
@@ -503,6 +505,7 @@ class ScheduleUpdateRequest(FrozenModel):
     history_runs: int | None = Field(default=None, ge=0, le=20)
     same_chat: bool | None = None
     stop_after_failures: int | None = Field(default=None, ge=0, le=50)
+    notify: NotifyLevel | None = None
     speed: Speed | None = None
     enabled: bool
 
@@ -1283,6 +1286,7 @@ class StatusView(FrozenModel):
     schedule_history_runs: int
     schedule_same_chat: bool
     schedule_stop_after_failures: int
+    schedule_notify: NotifyLevel
     browser_mode: BrowserMode
     desktop_enabled: bool
     mcp_tools: int

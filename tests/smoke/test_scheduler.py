@@ -253,6 +253,7 @@ async def test_the_model_can_create_list_and_delete_schedules(runtime: Runtime) 
         history_runs=None,
         same_chat=True,
         stop_after_failures=None,
+        notify=None,
     )
 
     listed, action = await _call(runtime, run, "schedule_list", {})
@@ -850,6 +851,7 @@ async def test_a_schedule_is_edited_whole_and_keeps_its_history(runtime: Runtime
         history_runs=None,
         same_chat=None,
         stop_after_failures=None,
+        notify=None,
     )
     edited: ScheduleRecord = await edit_schedule(
         runtime.store,
@@ -950,6 +952,7 @@ async def test_a_schedule_starts_its_runs_with_the_mode_model_and_approvals_it_w
         history_runs=None,
         same_chat=None,
         stop_after_failures=None,
+        notify=None,
     )
     request: ScheduleRequest = _once(runtime, "Chosen", 3).model_copy(update={"mode": "task", "options": options})
     # The moment was written in the configured zone; read it in the schedule's own zone instead it would move, so give

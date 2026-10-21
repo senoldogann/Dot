@@ -541,11 +541,12 @@ Notifications adds
 desktop notifications (off until you switch them on; the browser asks for its permission on that click): Dot says
 when it asks for an approval, a question or your help, and when it leaves you a question that a run could not wait for
 (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or stopped, with the
-first line of its answer; the sub-runs of a run stay quiet); when a campaign ends by itself (achieved, or stopped by
-the emergency stop or by `campaign_max_sessions`); when a schedule misses a firing that nobody saw (overdue, or its
-run could not start; told once while the reason stays the same); and when a repeating schedule is switched off
-because its runs failed so many times in a row (item 458, once). It says nothing while you are looking at that
-run: its page open, the tab visible and the window active. On another
+first line of its answer; the sub-runs of a run stay quiet, and a schedule's run is told as its notification level
+says, item 461, see [Memory and schedules](memory-and-schedules.md)); when a campaign ends by itself (achieved, or
+stopped by the emergency stop or by `campaign_max_sessions`); when a schedule misses a firing that nobody saw (overdue,
+or its run could not start; told once while the reason stays the same, and not at its level "never"); and when a
+repeating schedule is switched off because its runs failed so many times in a row (item 458, once). It says nothing
+while you are looking at that run: its page open, the tab visible and the window active. On another
 page, in a background tab or in an inactive window you are told; "Tell me even when I am looking" under the same
 setting turns the rule off. Clicking a notification opens what it tells of. The tab's
 icon is the same face in the state of the whole of Dot (amber ring while something waits for you, working while a run

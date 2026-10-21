@@ -28,6 +28,9 @@ DraftChannel = Literal["mail", "message"]
 # refused it, and the owner may send it again or discard it; ``sent`` and ``discarded`` are final.
 DraftStatus = Literal["waiting", "sending", "sent", "discarded", "failed"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
+# How the end of a schedule's run is told (item 461): every end, only a first failure or an end that needs the owner,
+# or nothing.
+NotifyLevel = Literal["always", "problems", "never"]
 # ``active``: its sessions go on; ``achieved``: the goal checker accepted its evidence, or the owner said so;
 # ``stopped``: the owner stopped it (also with the emergency stop of desktop control, which ends its session), or it ran
 # the sessions ``[agent] campaign_max_sessions`` allows.
@@ -363,7 +366,8 @@ class ScheduleOptions(FrozenModel):
     the main model, its default reasoning level, the standard speed, the configured approvals, no goal mode, the
     configured time zone, ``[scheduler] history_runs`` earlier runs' answers in front of the goal and ``[scheduler]
     same_chat`` (item 257), and ``[scheduler] stop_after_failures`` for how many failed runs in a row switch a
-    repeating schedule off (item 458). A schedule a run makes keeps that run's choices and its chat (item 291)."""
+    repeating schedule off (item 458), and ``[scheduler] notify`` for how its runs' ends are told (item 461). A
+    schedule a run makes keeps that run's choices and its chat (item 291)."""
 
     model: str | None
     effort: Effort | None
@@ -374,6 +378,7 @@ class ScheduleOptions(FrozenModel):
     history_runs: int | None
     same_chat: bool | None
     stop_after_failures: int | None
+    notify: NotifyLevel | None
 
 
 class ScheduleRecord(FrozenModel):
