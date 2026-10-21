@@ -12,7 +12,8 @@ const FOLLOW_FOR_MS = 10 * 60 * 1000;
 // The providers' own marks, in full colour: the files the list of the plugins shows Google and Microsoft with.
 const MARKS = { google: "/icons/plugins/google-icon.svg", microsoft: "/icons/plugins/microsoft-icon.svg" };
 
-/** The card: returns `element` and `dispose()`. */
+/** The card: returns `element`, `read`, which settles once the card has read the accounts the first time or said why
+ * it could not, and `dispose()`. */
 export function accountsCard() {
   let disposed = false;
   let following = null;
@@ -132,9 +133,11 @@ export function accountsCard() {
     }
   };
   window.addEventListener("focus", reread);
-  attempt(load);
+  // What is drawn under the card waits for its first read (item 511): the providers' rows it gets then would push it.
+  const read = attempt(load);
   return {
     element,
+    read,
     dispose: () => {
       disposed = true;
       clearTimeout(following);

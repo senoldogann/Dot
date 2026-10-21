@@ -156,7 +156,8 @@ async def test_the_pages_are_drawn_as_dot_is_in_light_and_dark_wide_and_on_a_pho
                         if outcome == "declined":
                             await expect(page.locator(".callback-reason")).to_have_text("server_error: Try later.")
                             marked: bool = await page.evaluate(
-                                "document.querySelector('.callback-mark img').naturalWidth > 0"
+                                "(() => { const mark = document.querySelector('.callback-mark img');"
+                                " return mark.decode().then(() => mark.naturalWidth > 0); })()"
                             )
                             assert marked, "the mark of Google did not load under the content security policy"
                         grounds[name] = _sum(await page.evaluate("getComputedStyle(document.body).backgroundColor"))

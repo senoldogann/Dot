@@ -511,7 +511,7 @@ async def test_the_box_that_edits_a_queued_message_shows_its_files_small_and_the
                 # The photo shows its own picture, read from the daemon.
                 picture: Locator = chips.nth(1).locator("img.attach-thumb")
                 await expect(picture).to_have_attribute("src", re.compile(r"^blob:"))
-                assert await picture.evaluate("(image) => image.complete && image.naturalWidth > 0")
+                assert await picture.evaluate("(image) => image.decode().then(() => image.naturalWidth > 0)")
                 # No words on a chip: its name is the tooltip, its × removes it.
                 await expect(chips.first.locator(".attach-remove")).to_be_visible()
                 assert (await chips.first.text_content() or "").strip() == ""

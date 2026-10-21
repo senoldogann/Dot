@@ -141,11 +141,13 @@ has from its config, a plugin or another agent (Customize › Skills › Found o
 
 Customize › Plugins opens on **Accounts** (item 422), above the list and not on a service's own page: Google (Gmail,
 Google Calendar) and Microsoft (Outlook, Microsoft 365), each with its own mark, through their official sign-ins, with
-the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page in a new tab; you say yes there, the provider sends the browser back to
-the daemon's `/oauth/callback` on this Mac's own address with a code, which Dot trades for tokens with PKCE, and the
-card follows until the account is there, named by its address; **Sign out** takes it away. A sign-in starts only from a
-page on this Mac (the provider comes back to the Mac's loopback address, which a phone does not reach). An account's
-access token is refreshed with its refresh token once it is about to run out.
+the client you register with each, as each asks of an app that runs on a computer. **Sign in** opens the provider's page
+in a new tab; you say yes there, the provider sends the browser back to the daemon's `/oauth/callback` on this Mac's own
+address with a code, which Dot trades for tokens with PKCE, and the card follows until the account is there, named by
+its address; **Sign out** takes it away. The list below the card is drawn once the card has read the accounts (item
+511), so the tiles do not move down under a finger as its rows come. A sign-in starts only from a page on this Mac (the
+provider comes back to the Mac's loopback address, which a phone does not reach). An account's access token is refreshed
+with its refresh token once it is about to run out.
 
 The tab the provider sends you back to is a page of Dot's own look (item 437), light or dark as the Mac is: it names the
 account with its address and says how the sign-in came out, signed in, or not signed in because you said no, the
