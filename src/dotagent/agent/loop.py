@@ -925,7 +925,7 @@ def _new_memories_note(live: LiveNotes) -> str:
 
 
 def _team_name(name: str) -> str:
-    """The name of the ready team an agent called ``name`` is in (item 511), empty for none."""
+    """The name of the ready team an agent called ``name`` is in (item 512), empty for none."""
     found: AgentTeam | None = team_of(name)
     return "" if found is None else found.name
 

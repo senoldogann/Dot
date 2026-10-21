@@ -162,7 +162,7 @@ async def test_a_home_that_cannot_list_its_tools_says_so_on_the_cards_and_marks_
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await expect(page.locator("#sidebar .side-foot")).to_be_visible()
                 # The agents' list fails too, once the app is up (it reads the faces from it as it starts): the teams
-                # show, unmarked, and say why (item 511).
+                # show, unmarked, and say why (item 512).
                 await page.route("**/api/agents", lambda route: route.fulfill(status=500, body="no"))
                 await page.goto(f"{address}/#/agents")
                 await expect(page.locator(".template-card")).to_have_count(len(TEMPLATES))
@@ -442,7 +442,7 @@ async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner
 ) -> None:
     """Item 504: Use team makes the agents of the team's templates, each as its template's Use makes one; an agent of
     the owner's with a member's name, in another case, is kept as it is, but for message_agent, which one that names
-    its tools is given (item 511); used again, the team makes none and gives nothing; a team that is not there is a
+    its tools is given (item 512); used again, the team makes none and gives nothing; a team that is not there is a
     404; and a team one of whose agents this home cannot make makes none of them."""
     team: AgentTeam = next(each for each in TEAMS if each.id == "engineering")
     with scratch_home() as home, eval_environment(home, {}):

@@ -6,7 +6,7 @@ An agent is a profile you make for a kind of work: a name, a role in one line, i
 model, a reasoning level, approvals, the tools it may use; each left out takes the configured one, and **All tools**,
 over the tools' boxes, means every tool, any added later too: an agent with every tool opens with every box ticked,
 every box ticked saves as every tool, an agent that names each tool there is keeps them named through a save until you
-tick All tools yourself, and none ticked is refused, item 511) and a look: a shape, a rest expression and a colour of
+tick All tools yourself, and none ticked is refused, item 512) and a look: a shape, a rest expression and a colour of
 the character (see the design system), picked in the editor's Look field with a moving preview, worn as a still face
 wherever the agent shows, and until you choose one the shape and colour its id's hue gives it (`PUT
 /api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
@@ -76,7 +76,7 @@ template's schedule is `POST /api/schedules` with `"enabled": false`.
 **Teams** (item 504) shows four teams, each a few templates whose agents work side by side: the Content team (Research
 Desk, Copy Editor), the Engineering team (Bug Reproduction, Reviewer, Release QA), the Growth team (Competitor Watch,
 Paid Media, Product Performance, Sales Outbound) and the Office team (Chief of Staff, Expense Manager). Each card says
-what the team does and shows the faces and names of its agents, those you have already marked **Yours** (item 511).
+what the team does and shows the faces and names of its agents, those you have already marked **Yours** (item 512).
 **Use team** makes, in one click, each agent of the team you do not have yet, as its template's **Use template** makes
 it. An agent of yours with the name of one of them, in any case, is that agent, kept as it is but for one thing: one
 that names its tools without `message_agent` is given it, so that it can hand its teammates their parts, and the toast
@@ -84,7 +84,7 @@ says so; a team one of whose agents this home cannot make (a tool it lacks) make
 whose agents suggest schedules offers **Add their schedules too, switched off**, for the agents it makes. A team is its
 agents and nothing besides: you ask Dot, or any of them, for the work, and it hands each agent its part through messages
 (below) and puts their answers together. Every template names `message_agent` beside `delegate`, and a member's run is
-told its team (item 511): the prompt's Team section says "You are in the Growth team", lists its teammates first, each
+told its team (item 512): the prompt's Team section says "You are in the Growth team", lists its teammates first, each
 agent with the team it is in, and says that a part an agent's role fits goes to that agent with `message_agent`, not to
 `delegate`, which is for a part no agent's role covers. An agent is in a team when its name is a member's, read as Use
 team reads it (`team_of`), whoever made it. The API: `GET /api/agent-teams` and `POST /api/agent-teams/{id}/use` (201

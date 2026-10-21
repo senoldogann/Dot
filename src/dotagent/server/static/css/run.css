@@ -914,7 +914,7 @@
   min-width: 0;
 }
 
-/* A group's head is one line whatever its width (item 511, the owner's word): the summary of what it did gives way
+/* A group's head is one line whatever its width (item 512, the owner's word): the summary of what it did gives way
    with an ellipsis, and its time, the badge of failed calls and the chevron keep their place at its end. */
 .steps-head {
   display: flex;
@@ -1924,7 +1924,7 @@
   flex: none;
 }
 
-/* Who holds the browser is one line (item 511): a name too long gives way with an ellipsis, not two more lines. */
+/* Who holds the browser is one line (item 512): a name too long gives way with an ellipsis, not two more lines. */
 .computer-who {
   min-width: 0;
   overflow: hidden;
@@ -1942,7 +1942,7 @@
   white-space: nowrap;
 }
 
-/* A panel too narrow for the words and both buttons on one line stacks them (item 511): the words on top, the buttons
+/* A panel too narrow for the words and both buttons on one line stacks them (item 512): the words on top, the buttons
    under them sharing the width, in a card rather than a pill. */
 .computer-body {
   container: computer-body / inline-size;

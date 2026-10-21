@@ -195,7 +195,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     async def use_team(team_id: str) -> TeamUse:
         """A team's agents (item 504), each made as its template's Use makes one. A member with the name of an agent
         the owner has, read without regard to case as the team tools read it, is that agent, kept as it is but for one
-        thing (item 511): one that names its tools without ``message_agent`` is given it, so that it can hand its
+        thing (item 512): one that names its tools without ``message_agent`` is given it, so that it can hand its
         teammates their parts (``joined``). The others are all checked (their model and tools) before any is made or
         given anything, so a team one of whose agents this home cannot make makes none. Past the checks they are made
         one by one, not in one transaction: a store that fails part way leaves the ones made, and two Uses at once may

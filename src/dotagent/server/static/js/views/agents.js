@@ -145,7 +145,7 @@ function templateCard(template, onUse, known) {
 }
 
 /** A team's card (item 504): its name and what it does, the faces and names of its agents, those the owner has
-    already marked Yours (`owned`, their names in lower case, item 511), and Use team, which makes the ones the owner
+    already marked Yours (`owned`, their names in lower case, item 512), and Use team, which makes the ones the owner
     lacks. A team one of whose agents suggests a schedule offers to add the schedules of the agents it makes, switched
     off as a template's (item 464); `onUse(team, members, alsoSchedules)` makes them. */
 function teamCard(team, templates, onUse, owned) {
@@ -251,7 +251,7 @@ function select(label, entries, value) {
   return element;
 }
 
-/** The checkboxes of the tools under one that ticks them all (item 511): an agent with every tool (`chosen` empty)
+/** The checkboxes of the tools under one that ticks them all (item 512): an agent with every tool (`chosen` empty)
     opens with every box ticked, and every box ticked saves as every tool (`widens`), unless the boxes are the tools the
     agent names, unchanged, and All tools was not ticked: those stay named, so a save that changed nothing never lifts
     its bounds, and ticking All tools always does. */
@@ -613,7 +613,7 @@ function mountList(root, ctx) {
     }
     const made = AND_LIST.format(used.made.map((record) => record.name));
     const had = used.kept.length === 0 ? "" : ` Already yours and kept as they were: ${AND_LIST.format(used.kept.map((record) => record.name))}.`;
-    // A kept agent that named its tools was given message_agent, to hand its teammates their parts (item 511).
+    // A kept agent that named its tools was given message_agent, to hand its teammates their parts (item 512).
     const joined = used.joined.length === 0 ? "" : ` ${AND_LIST.format(used.joined)} can message ${used.joined.length === 1 ? "its" : "their"} teammates now.`;
     if (used.made.length === 0) {
       toast("ok", `You have every agent of the ${team.name} already.${joined}`);

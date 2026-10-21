@@ -506,7 +506,7 @@ async def test_an_agent_edited_before_its_lists_load_keeps_its_tools_and_its_lev
 async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_tool(
     runtime: Runtime, client: httpx.AsyncClient
 ) -> None:
-    """Item 511: the editor's tools have All tools, which ticks every box; all ticked saves the agent with every tool,
+    """Item 512: the editor's tools have All tools, which ticks every box; all ticked saves the agent with every tool,
     such an agent opens with every box ticked, and a form with none ticked saves nothing. An agent that names every
     tool listed keeps them named through a save that changed nothing, no save lifting its bounds by itself, until the
     owner ticks All tools."""

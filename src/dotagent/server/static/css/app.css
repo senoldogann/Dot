@@ -4500,7 +4500,7 @@ dialog.modal.connect-apps[open] {
 }
 
 /* A name too long for the row, as an MCP tool's can be, gives way with an ellipsis rather than widen the chat (item
-   360) or take a second line (item 511): its row is one line, the name at most half of it, the whole name its title. */
+   360) or take a second line (item 512): its row is one line, the name at most half of it, the whole name its title. */
 .tool-name {
   font-family: var(--mono);
   font-weight: var(--weight-title);
@@ -7516,7 +7516,7 @@ button.attach-chip:hover {
   accent-color: var(--accent);
 }
 
-/* The box that ticks every tool (item 511), over the tools, with how many of them are ticked. */
+/* The box that ticks every tool (item 512), over the tools, with how many of them are ticked. */
 .tool-pick-all {
   align-self: flex-start;
   font-weight: var(--weight-label);

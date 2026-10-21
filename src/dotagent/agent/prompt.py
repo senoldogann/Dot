@@ -30,7 +30,7 @@ from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
 class AgentBrief(FrozenModel):
     """What the prompt says of the agent a run belongs to (item 86), or of one of its team. ``made_by_dot`` is whether
     a run of Dot's made it (item 307): its instructions are then Dot's, not the owner's. ``team`` is the name of the
-    ready team it is in (``agent.templates.team_of``, item 511), empty for none."""
+    ready team it is in (``agent.templates.team_of``, item 512), empty for none."""
 
     name: str
     role: str
@@ -674,7 +674,7 @@ def _help_section(tool_names: Sequence[str]) -> str:
 
 
 def _delegate_section(tool_names: Sequence[str], team: Sequence[AgentBrief]) -> str:
-    """Only when delegate is offered; with a team to message, a part an agent's role fits is that agent's (item 511)."""
+    """Only when delegate is offered; with a team to message, a part an agent's role fits is that agent's (item 512)."""
     if DELEGATE_TOOL not in tool_names:
         return ""
     if team and MESSAGE_AGENT_TOOL in tool_names:
@@ -835,7 +835,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
 
 def _team_section(agent: AgentBrief | None, team: Sequence[AgentBrief], tool_names: Sequence[str]) -> str:
     """The agents the run may message (item 87): a line each, with the ready team it is in, and when to send one a
-    message: a part an agent's role fits is that agent's, not a helper's (item 511). The run's agent's own team comes
+    message: a part an agent's role fits is that agent's, not a helper's (item 512). The run's agent's own team comes
     first. A run that may make a teammate (item 99) is told when one is worth making, and, with no team yet, that it
     may start one."""
     if MESSAGE_AGENT_TOOL not in tool_names:

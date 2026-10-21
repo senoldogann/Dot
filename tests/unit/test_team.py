@@ -100,7 +100,7 @@ def _brief(name: str, role: str, team: str) -> AgentBrief:
 
 
 def test_an_agent_of_a_ready_team_lists_its_teammates_first_and_hands_them_their_parts() -> None:
-    """Item 511: Competitor Watch's chat delegated the Growth team's work to helpers. Its run is told its team, names
+    """Item 512: Competitor Watch's chat delegated the Growth team's work to helpers. Its run is told its team, names
     its teammates first, and hands a part an agent's role fits to that agent rather than to delegate."""
     watch: AgentBrief = _brief("Competitor Watch", "Watches the competitors", "Growth team")
     team: tuple[AgentBrief, ...] = (

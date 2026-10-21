@@ -58,7 +58,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   );
   const controlNote = el("span", { class: "small muted computer-control-note", role: "status" });
   const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
-  // The buttons stand together, so that a narrow panel puts them on a line of their own under the words (item 511).
+  // The buttons stand together, so that a narrow panel puts them on a line of their own under the words (item 512).
   const actions = el("span", { class: "computer-actions" }, ...(coarse ? [useButton, handButton] : [handButton, useButton]));
   const pill = el("div", { class: "computer-pill" }, icon("hand"), who, actions, controlNote);
   let control = null;

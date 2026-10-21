@@ -365,7 +365,7 @@ async def test_dot_builds_a_team_within_its_bounds_and_a_run_of_another_chat_sen
 async def test_an_agent_of_a_ready_team_hands_its_teammate_a_part_from_its_own_chat(
     runtime: Runtime, manager: RunManager, client: httpx.AsyncClient
 ) -> None:
-    """Item 511: Competitor Watch's chat delegated the Growth team's work to helpers, as its tools named delegate and
+    """Item 512: Competitor Watch's chat delegated the Growth team's work to helpers, as its tools named delegate and
     not message_agent. A team's agents can message one another now, and a member's run is told its team, its
     teammates first: Competitor Watch sends Paid Media a part from its own chat."""
     used = await client.post("/api/agent-teams/growth/use")
