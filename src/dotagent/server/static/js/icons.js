@@ -400,13 +400,13 @@ export function toolIconName(tool) {
   if (tool === "shell" || tool.startsWith("terminal_")) {
     return "terminal";
   }
-  if (tool === "read_file" || tool === "list_dir") {
+  if (tool === "read_file") {
     return "eye";
   }
   if (tool === "find_files" || tool === "search_files") {
     return "search";
   }
-  if (tool === "write_file" || tool === "edit_file") {
+  if (tool === "write_file" || tool === "edit_file" || tool === "list_dir") {
     return "file";
   }
   if (tool.startsWith("memory_")) {

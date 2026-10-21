@@ -207,9 +207,10 @@ function nameParts(tool) {
  * A row for a tool call, one line in line with its group's head (item 402): its mark (a spinner while it runs, then the
  * mark of its kind, in the failure's colour when it failed; item 403), what it did and the way into it. A command is the
  * command itself, its tool's name for screen readers alone and the policy's words its tooltip, since its mark says what
- * it is; a read or a write says what it does in the policy's words from the start ("Read notes.txt"), its mark saying
- * which it is, and keeps no tool's name (item 506); another call keeps its tool's name beside its words. `finish(result)`
- * fills in the outcome once the `tool_result` event arrives.
+ * it is; a read or a write says Read, Write or Edit and what it acts on from the start ("Read notes.txt"), its mark
+ * saying which it is, and keeps no tool's name (item 506), the policy's words taking that place once it is done;
+ * another call keeps its tool's name beside its words. `finish(result)` fills in the outcome once the `tool_result` event
+ * arrives.
  */
 export function toolRow({ tool, args }) {
   const state = el("span", { class: "tool-state" }, el("span", { class: "spinner" }));
