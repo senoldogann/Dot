@@ -18,8 +18,9 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Download, Locator, Page, async_playwright, expect
 
+from dotagent.agent import templates as gallery
 from dotagent.agent.manager import RunManager
-from dotagent.agent.templates import TEMPLATES
+from dotagent.agent.templates import TEAMS, TEMPLATES, AgentTeam
 from dotagent.config import load_default_config
 from dotagent.core.paths import env_file_path
 from dotagent.core.types import JsonObject
@@ -407,5 +408,139 @@ async def test_a_template_schedule_is_added_switched_off_and_read_and_switched_o
                     await expect(switch).to_have_attribute("aria-checked", "true")
                     await expect(row.locator(".row-meta")).to_contain_text("Next ")
                     await page.close()
+            finally:
+                await browser.close()
+
+
+def _names(team: AgentTeam) -> list[str]:
+    return [next(template.name for template in TEMPLATES if template.id == member) for member in team.members]
+
+
+async def test_a_team_makes_the_agents_the_owner_lacks_and_keeps_those_the_owner_has(
+    login_env: dict[str, str], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 504: Use team makes the agents of the team's templates, each as its template's Use makes one; an agent of
+    the owner's with a member's name, in another case, is kept as it is; used again, the team makes none; a team that
+    is not there is a 404; and a team one of whose agents this home cannot make makes none of them."""
+    team: AgentTeam = next(each for each in TEAMS if each.id == "engineering")
+    with scratch_home() as home, eval_environment(home, {}):
+        async with (
+            _daemon(login_env) as (_runtime, address),
+            httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http,
+        ):
+            listed: list[JsonObject] = (await http.get("/api/agent-teams")).raise_for_status().json()
+            assert [each["id"] for each in listed] == [each.id for each in TEAMS]
+            mine: JsonObject = (
+                (
+                    await http.post(
+                        "/api/agents",
+                        json={
+                            "name": "REVIEWER",
+                            "role": "Mine",
+                            "instructions": "",
+                            "model": "",
+                            "effort": None,
+                            "approvals": None,
+                        },
+                    )
+                )
+                .raise_for_status()
+                .json()
+            )
+            used = await http.post(f"/api/agent-teams/{team.id}/use")
+            assert used.status_code == 201, used.text
+            body: JsonObject = used.json()
+            made: list[JsonObject] = body["made"]
+            assert [record["name"] for record in made] == [name for name in _names(team) if name != "Reviewer"]
+            assert [record["id"] for record in body["kept"]] == [mine["id"]]
+            for record in made:
+                template = next(each for each in TEMPLATES if each.name == record["name"])
+                assert (record["role"], record["instructions"], tuple(record["tools"])) == (
+                    template.role,
+                    template.instructions,
+                    template.tools,
+                )
+                assert record["look"] == template.look.model_dump(mode="json")
+            again: JsonObject = (await http.post(f"/api/agent-teams/{team.id}/use")).raise_for_status().json()
+            assert again["made"] == []
+            assert [record["id"] for record in again["kept"]] == [made[0]["id"], mine["id"], made[1]["id"]]
+            assert (await http.post("/api/agent-teams/no-such-team/use")).status_code == 404
+            # A team whose second agent names a tool this home lacks makes none, not its first.
+            strange = TEMPLATES[0].model_copy(
+                update={"id": "strange", "name": "Strange", "tools": (*TEMPLATES[0].tools, STRANGE_TOOL)}
+            )
+            monkeypatch.setattr(gallery, "TEMPLATES", (*TEMPLATES, strange))
+            monkeypatch.setattr(
+                gallery,
+                "TEAMS",
+                (*TEAMS, AgentTeam(id="strange", name="Strange team", purpose="-", members=("copy-editor", "strange"))),
+            )
+            refused = await http.post("/api/agent-teams/strange/use")
+            assert refused.status_code == 422, refused.text
+            assert STRANGE_TOOL in refused.text
+            names: list[str] = [each["record"]["name"] for each in (await http.get("/api/agents")).json()]
+            assert "Copy Editor" not in names and "Strange" not in names
+
+
+@pytest.mark.browser
+async def test_a_team_card_makes_its_agents_in_one_click_with_their_schedules_switched_off(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """Item 504: the Agents page offers the teams above the templates, each card with its name, what it does and the
+    faces and names of its agents; Use team, its schedules asked for, makes the agents and adds the schedules of those
+    that suggest one, switched off, and the toast names them; used again, it says the owner has them already. Wide and
+    light, and on a phone and dark, inside the window."""
+    team: AgentTeam = next(each for each in TEAMS if each.id == "growth")
+    names: list[str] = _names(team)
+    scheduled: list[str] = [
+        template.name for template in TEMPLATES if template.id in team.members and template.cron != ""
+    ]
+    assert scheduled, "the team should suggest a schedule"
+    with scratch_home() as home, eval_environment(home, {}):
+        async with (
+            _daemon(login_env) as (runtime, address),
+            httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http,
+            async_playwright() as playwright,
+        ):
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await _open(browser, address, "/agents", 1280, "light")
+                cards: Locator = page.locator(".team-card")
+                await expect(cards).to_have_count(len(TEAMS))
+                await expect(cards.locator(".template-name")).to_have_text([each.name for each in TEAMS])
+                await expect(cards.locator(".template-role")).to_have_text([each.purpose for each in TEAMS])
+                # The templates' gallery is as it was: a card a template.
+                await expect(page.locator(".template-card")).to_have_count(len(TEMPLATES))
+                card: Locator = page.locator(f".team-card[data-team='{team.id}']")
+                await expect(card.locator(".team-members > li")).to_have_text(names)
+                await expect(card.locator(".avatar")).to_have_count(len(names))
+                also: Locator = card.get_by_role("switch", name="Also add their schedules")
+                await also.click()
+                await expect(also).to_have_attribute("aria-checked", "true")
+                await card.screenshot(path=tmp_path / "team-card-1280-light.png")
+                use: Locator = card.get_by_role("button", name=f"Use the team {team.name}")
+                await use.click()
+                await expect(_toast(page, "ok", f"{team.name}: ")).to_be_visible()
+                await expect(_toast(page, "ok", "Their schedules are switched off")).to_be_visible()
+                summaries: list[JsonObject] = (await http.get("/api/agents")).raise_for_status().json()
+                assert [each["record"]["name"] for each in summaries[1:]] == names
+                views: list[JsonObject] = (await http.get("/api/schedules")).raise_for_status().json()
+                assert sorted((view["record"]["name"], view["record"]["enabled"]) for view in views) == sorted(
+                    (name, False) for name in scheduled
+                )
+                await use.click()
+                await expect(_toast(page, "ok", f"You have every agent of the {team.name} already.")).to_be_visible()
+                assert len((await http.get("/api/agents")).raise_for_status().json()) == 1 + len(names)
+                await page.screenshot(path=tmp_path / "teams-1280-light.png", full_page=True)
+                await page.close()
+                phone: Page = await _open(browser, address, "/agents", 390, "dark")
+                await expect(phone.locator(".team-card")).to_have_count(len(TEAMS))
+                for index in range(len(TEAMS)):
+                    box = await phone.locator(".team-card").nth(index).bounding_box()
+                    assert box is not None
+                    assert box["x"] + box["width"] <= 390
+                assert await _overflow(phone) <= 0
+                await phone.screenshot(path=tmp_path / "teams-390-dark.png", full_page=True)
+                await phone.close()
             finally:
                 await browser.close()

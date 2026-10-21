@@ -1,9 +1,9 @@
 // Agents (item 86): the profiles the owner makes, each with a face in its own hue, a name, a role in one line,
 // instructions that open the prompt of its runs, and bounds for them (a model, a reasoning level, approvals, tools).
-// The list (#/agents) shows Dot first and then the agents, each with its newest chat, and under them the templates an
-// agent starts from in one click (item 315); an agent's page (#/agents/<id>) greets with its face and role, takes a
-// message for it and lists its chats; the editor makes or changes an agent. An agent goes out as a file from its page
-// and comes back, in this home or another, from the list's Import.
+// The list (#/agents) shows Dot first and then the agents, each with its newest chat, and under them the teams (item
+// 504) and the templates (item 315) agents start from in one click; an agent's page (#/agents/<id>) greets with its
+// face and role, takes a message for it and lists its chats; the editor makes or changes an agent. An agent goes out as
+// a file from its page and comes back, in this home or another, from the list's Import.
 
 import { actorFace, dotFace, fallbackLook, liveFace, rememberLook } from "../actors.js";
 import { api } from "../api.js";
@@ -33,6 +33,8 @@ const MAX_GOAL_PX = 320;
 const WORKING = new Set(["queued", "running", "blocked"]);
 // The largest agent file Import reads: its instructions take at most 50,000 characters, of up to four bytes each.
 const MOST_AGENT_FILE_BYTES = 256 * 1024;
+// Names in one line of words, as a toast says them: "A", "A and B", "A, B, and C".
+const AND_LIST = new Intl.ListFormat("en", { style: "long", type: "conjunction" });
 
 function faceOf(record, latest) {
   if (record.id === DOT_ID) {
@@ -137,6 +139,50 @@ function templateCard(template, onUse, known) {
     ),
     alsoRow,
     templateTools(template, known),
+    use,
+  );
+}
+
+/** A team's card (item 504): its name and what it does, the faces and names of its agents, and Use team, which makes
+    the ones the owner lacks. A team one of whose agents suggests a schedule offers to add the schedules of the agents
+    it makes, switched off as a template's (item 464); `onUse(team, members, alsoSchedules)` makes them. */
+function teamCard(team, templates, onUse) {
+  const members = team.members.map((id) => templates.get(id));
+  const alsoWords = "Also add their schedules, switched off until you read their goals";
+  const also = members.some((template) => template.cron !== "")
+    ? el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords })
+    : null;
+  also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, alsoWords)), also);
+  const use = el(
+    "button",
+    { class: "btn sm template-use", type: "button", "aria-label": `Use the team ${team.name}` },
+    icon("plus"),
+    el("span", { class: "use-long" }, "Use team"),
+    el("span", { class: "use-short" }, "Use"),
+  );
+  use.addEventListener("click", async () => {
+    use.disabled = true;
+    try {
+      await attempt(() => onUse(team, members, also !== null && also.getAttribute("aria-checked") === "true"));
+    } finally {
+      use.disabled = false;
+    }
+  });
+  return el(
+    "article",
+    { class: "card team-card", dataset: { team: team.id } },
+    el(
+      "div",
+      { class: "template-head" },
+      el("div", { class: "row-main" }, el("div", { class: "template-name" }, team.name), el("div", { class: "template-role" }, team.purpose)),
+    ),
+    el(
+      "ul",
+      { class: "team-members", "aria-label": `The agents of the ${team.name}` },
+      members.map((template) => el("li", null, actorFace(`template-${template.id}`, "idle", template.look), el("span", null, template.name))),
+    ),
+    alsoRow,
     use,
   );
 }
@@ -374,8 +420,9 @@ function mountList(root, ctx) {
     try {
       // The tools this home has, so that a card marks one it lacks. A home that cannot list them still shows the
       // templates, their tools unmarked, and says above them that it could not tell which are missing.
-      const [listed, named] = await Promise.all([
+      const [listed, teams, named] = await Promise.all([
         api.get("/agent-templates"),
+        api.get("/agent-teams"),
         api.get("/tools").then(
           (names) => ({ names, problem: null }),
           (error) => ({ names: null, problem: error }),
@@ -383,9 +430,17 @@ function mountList(root, ctx) {
       ]);
       const known = named.names === null ? null : new Set(named.names);
       const listingProblem = named.problem;
+      const byId = new Map(listed.map((template) => [template.id, template]));
       if (!disposed) {
         // `replaceChildren` draws a null as the word "null": the cards' note is a child only when there is one.
         templates.replaceChildren(
+          el("div", { class: "section-label" }, "Start from a team"),
+          el(
+            "p",
+            { class: "hint" },
+            "A team is a few of the agents below, made in one click. Ask Dot for the work, and it hands each agent its part and puts their answers together. An agent of that name you have already is kept as it is.",
+          ),
+          el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam))),
           el("div", { class: "section-label" }, "Start from a template"),
           el("p", { class: "hint" }, "Each becomes an agent of yours, to change as you like. What one writes to a person is a draft that you send."),
           ...(listingProblem === null
@@ -423,6 +478,38 @@ function mountList(root, ctx) {
       }
     }
     ctx.navigate(`/agents/${saved.id}`);
+  }
+
+  // The team's agents the owner lacks (item 504), then the schedules of those it made when they were asked for,
+  // switched off as a template's (item 464). A schedule that could not be added leaves its agent made, and the toast
+  // says which and why. The list then shows the agents.
+  async function useTeam(team, members, alsoSchedules) {
+    const used = await api.post(`/agent-teams/${team.id}/use`, null);
+    for (const record of [...used.made, ...used.kept]) {
+      rememberLook(record.id, record.look);
+    }
+    const scheduled = alsoSchedules ? used.made.filter((record) => members.find((member) => member.name === record.name).cron !== "") : [];
+    const missed = [];
+    for (const record of scheduled) {
+      const template = members.find((member) => member.name === record.name);
+      try {
+        await api.post("/schedules", { name: record.name, goal: template.task, cron: template.cron, agent_id: record.id, enabled: false });
+      } catch (error) {
+        // The toast ends the list with its own full stop, so a message's own is taken off.
+        missed.push(`${record.name}: ${error.message.replace(/\.$/, "")}`);
+      }
+    }
+    const made = AND_LIST.format(used.made.map((record) => record.name));
+    const had = used.kept.length === 0 ? "" : ` Already yours and kept as they were: ${AND_LIST.format(used.kept.map((record) => record.name))}.`;
+    if (used.made.length === 0) {
+      toast("ok", `You have every agent of the ${team.name} already.`);
+    } else if (missed.length > 0) {
+      toast("error", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}.${had}`);
+    } else {
+      const off = scheduled.length === 0 ? "" : " Their schedules are switched off: read their goals, then switch them on.";
+      toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${off}`);
+    }
+    await reload();
   }
 
   async function reload() {

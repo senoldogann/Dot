@@ -500,6 +500,52 @@ def find_template(template_id: str) -> AgentTemplate:
     return found
 
 
+class AgentTeam(FrozenModel):
+    """A team to start from (item 504): templates whose agents work side by side, made in one click. Dot hands each
+    the part of a goal its role fits (``message_agent``) and puts their answers together, so a team is its agents and
+    nothing besides: ``members`` names their templates, in the order its card shows them."""
+
+    id: str
+    name: str
+    purpose: str
+    members: tuple[str, ...]
+
+
+TEAMS: tuple[AgentTeam, ...] = (
+    AgentTeam(
+        id="content",
+        name="Content team",
+        purpose="Researches a subject with sources, then edits the draft until it reads like a person wrote it",
+        members=("research-desk", "copy-editor"),
+    ),
+    AgentTeam(
+        id="engineering",
+        name="Engineering team",
+        purpose="Reproduces a reported bug, reviews the change against REVIEW.md and walks the release",
+        members=("bug-reproduction", "reviewer", "release-qa"),
+    ),
+    AgentTeam(
+        id="growth",
+        name="Growth team",
+        purpose="Watches the competitors, the ads and the product's numbers, and drafts first emails to prospects",
+        members=("competitor-watch", "paid-media", "product-performance", "sales-outbound"),
+    ),
+    AgentTeam(
+        id="office",
+        name="Office team",
+        purpose="Keeps the owner's day, inbox, follow-ups and expense reports in order",
+        members=("chief-of-staff", "expense-manager"),
+    ),
+)
+
+
+def find_team(team_id: str) -> AgentTeam:
+    found: AgentTeam | None = next((each for each in TEAMS if each.id == team_id), None)
+    if found is None:
+        raise NotFoundError("agent team not found", {"team_id": team_id})
+    return found
+
+
 def agent_file(record: AgentRecord, known: Sequence[str]) -> AgentFile:
     """``record`` as a file. Words that hold a secret are refused, so that no file of an agent carries one: one of the
     ``known`` secrets Dot holds (:func:`dotagent.secrets.known_secrets`), or a key, a token or a password by its form

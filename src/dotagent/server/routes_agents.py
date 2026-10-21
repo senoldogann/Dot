@@ -7,7 +7,16 @@ import time
 from fastapi import APIRouter
 
 from dotagent.agent.playbooks import PlaybookEntry, list_playbooks, release_playbooks
-from dotagent.agent.templates import TEMPLATES, AgentFile, AgentTemplate, agent_file, find_template
+from dotagent.agent.templates import (
+    TEAMS,
+    TEMPLATES,
+    AgentFile,
+    AgentTeam,
+    AgentTemplate,
+    agent_file,
+    find_team,
+    find_template,
+)
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import playbooks_dir
 from dotagent.llm.router import parse_model_ref
@@ -15,9 +24,18 @@ from dotagent.secrets import known_secrets
 from dotagent.server.activity import start_of_today
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_system import learned_skill_view
-from dotagent.server.views import AgentDetail, AgentLearning, AgentRequest, AgentSummary, TeamMessage, TeamView
+from dotagent.server.views import (
+    AgentDetail,
+    AgentLearning,
+    AgentRequest,
+    AgentSummary,
+    TeamMessage,
+    TeamUse,
+    TeamView,
+)
 from dotagent.store.db import Store
 from dotagent.store.models import DOT_AGENT, DOT_AGENT_ID, AgentLook, AgentRecord, MemoryRecord, RunRecord
+from dotagent.tools.team import find_agent
 
 # How many of its newest runs an agent's page shows.
 _PAGE_RUNS: int = 50
@@ -39,6 +57,20 @@ def _checked(request: AgentRequest, known: frozenset[str]) -> AgentRequest:
             f"an agent names tools that do not exist here: {', '.join(unknown)}", {"tools": ", ".join(unknown)}
         )
     return request
+
+
+def _template_request(chosen: AgentTemplate) -> AgentRequest:
+    """What a template's Use asks for: a copy of it, which the owner then changes as any agent."""
+    return AgentRequest(
+        name=chosen.name,
+        role=chosen.role,
+        instructions=chosen.instructions,
+        model="",
+        effort=None,
+        approvals=None,
+        tools=list(chosen.tools) or None,
+        look=chosen.look,
+    )
 
 
 def new_agent_tools(said: list[str] | None) -> tuple[str, ...]:
@@ -119,7 +151,10 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         return [dot] + [AgentSummary(record=agent, latest=latest.get(agent.id)) for agent in await store.list_agents()]
 
     async def created(request: AgentRequest) -> AgentRecord:
-        checked: AgentRequest = _checked(request, known)
+        return await saved(_checked(request, known))
+
+    async def saved(checked: AgentRequest) -> AgentRecord:
+        """The agent of a request ``_checked`` passed."""
         return await store.create_agent(
             checked.name,
             checked.role,
@@ -144,19 +179,31 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     @router.post("/agent-templates/{template_id}/use", status_code=201)
     async def use_template(template_id: str) -> AgentRecord:
         """An agent made from a template: a copy, which the owner then changes as any agent."""
-        chosen: AgentTemplate = find_template(template_id)
-        return await created(
-            AgentRequest(
-                name=chosen.name,
-                role=chosen.role,
-                instructions=chosen.instructions,
-                model="",
-                effort=None,
-                approvals=None,
-                tools=list(chosen.tools) or None,
-                look=chosen.look,
-            )
-        )
+        return await created(_template_request(find_template(template_id)))
+
+    @router.get("/agent-teams")
+    async def agent_teams() -> list[AgentTeam]:
+        """The teams to start from (item 504), in the gallery's order."""
+        return list(TEAMS)
+
+    @router.post("/agent-teams/{team_id}/use", status_code=201)
+    async def use_team(team_id: str) -> TeamUse:
+        """A team's agents (item 504), each made as its template's Use makes one. A member with the name of an agent
+        the owner has, read without regard to case as the team tools read it, is that agent, kept as it is; the others
+        are all checked (their model and tools) before any is made, so a team one of whose agents this home cannot make
+        makes none. Past the checks they are made one by one, not in one transaction: a store that fails part way
+        leaves the ones made, and two Uses at once may make an agent twice, as two clicks of a template's Use may."""
+        chosen: AgentTeam = find_team(team_id)
+        agents: list[AgentRecord] = await store.list_agents()
+        kept: list[AgentRecord] = []
+        to_make: list[AgentRequest] = []
+        for template in (find_template(member) for member in chosen.members):
+            have: AgentRecord | None = find_agent(agents, template.name)
+            if have is None:
+                to_make.append(_checked(_template_request(template), known))
+            else:
+                kept.append(have)
+        return TeamUse(made=[await saved(request) for request in to_make], kept=kept)
 
     @router.post("/agents/import", status_code=201)
     async def import_agent(file: AgentFile) -> AgentRecord:

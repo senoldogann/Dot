@@ -8,7 +8,7 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from dotagent.agent.templates import TEMPLATES, find_template
+from dotagent.agent.templates import TEAMS, TEMPLATES, find_team, find_template
 from dotagent.config import load_default_config
 from dotagent.core.errors import NotFoundError
 from dotagent.scheduler.timing import plan_cron
@@ -75,3 +75,22 @@ def test_a_template_that_suggests_a_schedule_carries_the_one_its_card_says() -> 
         )
         assert template.task.endswith("."), template.id
     assert len(suggesting) == 10, suggesting
+
+
+def test_every_team_is_made_of_templates_there_are_each_named_once() -> None:
+    """Item 504: a team has an id of its own, is found under it, and names two templates of the gallery at least, each
+    once, so its card shows each agent and its Use makes each one."""
+    ids: list[str] = [team.id for team in TEAMS]
+    assert len(set(ids)) == len(ids)
+    known: set[str] = {template.id for template in TEMPLATES}
+    for team in TEAMS:
+        assert len(team.members) >= 2, team.id
+        assert len(set(team.members)) == len(team.members), team.id
+        assert set(team.members) <= known, team.id
+        assert team.purpose != "", team.id
+        assert find_team(team.id) == team
+
+
+def test_a_team_that_is_not_there_is_a_not_found() -> None:
+    with pytest.raises(NotFoundError):
+        find_team("no-such-team")

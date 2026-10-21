@@ -69,6 +69,18 @@ opens it; a file that names a tool this home lacks is refused with the tool's na
 secret, and for a file that is not an agent's or names tools not here); a template's schedule is `POST /api/schedules`
 with `"enabled": false`.
 
+Above the templates, **Start from a team** (item 504) shows four teams, each a few templates whose agents work side by
+side: the Content team (Research Desk, Copy Editor), the Engineering team (Bug Reproduction, Reviewer, Release QA), the
+Growth team (Competitor Watch, Paid Media, Product Performance, Sales Outbound) and the Office team (Chief of Staff,
+Expense Manager). Each card says what the team does and shows the faces and names of its agents. **Use team** makes,
+in one click, each agent of the team you do not have yet, as its template's **Use template** makes it. An agent of
+yours with the name of one of them, in any case, is that agent, kept as it is; a team one of whose agents this home
+cannot make (a tool it lacks) makes none of them and says why. A team whose agents suggest schedules offers **Also add
+their schedules, switched off until you read their goals**, for the agents it makes. A team is its agents and nothing
+besides: you ask Dot for the work, and Dot hands each agent its part through messages (below) and puts their answers
+together. The API: `GET /api/agent-teams` and `POST /api/agent-teams/{id}/use` (201 with the agents it `made` and the
+ones of yours it `kept`; 404 for a team that is not there, 422 for one that cannot be made).
+
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An
 agent's run is handed its own lessons first, then Dot's notes, never another agent's, at its start and through
