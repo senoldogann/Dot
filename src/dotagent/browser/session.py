@@ -1375,8 +1375,15 @@ class BrowserSession:
         secrets: tuple[str, ...] = self._live_secrets()
         shown: str = masked(url, secrets)
         if secrets and in_address(url, secrets):
-            # Shown and logged by its site alone: a form of the value masking does not know may be in the rest.
-            shown = f"{urlsplit(url).scheme}://{urlsplit(url).netloc}/[an address that carries a filled value]"
+            # Shown and logged by its host alone, or by its scheme when the host is where the value is: a form of the
+            # value masking does not know may be anywhere in it.
+            parts = urlsplit(url)
+            host: str = parts.hostname or ""
+            shown = (
+                f"{parts.scheme}://[a host that carries a filled value]"
+                if in_address(host, secrets)
+                else f"{parts.scheme}://{host}/[an address that carries a filled value]"
+            )
             verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
         else:
             try:

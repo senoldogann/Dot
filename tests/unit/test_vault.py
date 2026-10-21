@@ -116,8 +116,9 @@ def test_a_value_is_masked_as_an_address_and_a_json_string_write_it_too() -> Non
         ("https://example.com/x?p=pa%25s+word", True),
         ("https://example.com/x?p=pa%2525s%2520word", True),
         ("https://example.com/x?p=482913", True),
+        ("https://example.com/x?p=%2561%2562%2563%2564", True),
         ("https://example.com/x?p=48291", False),
     ],
 )
 def test_an_address_carries_a_value_however_its_escapes_write_it(address: str, carries: bool) -> None:
-    assert in_address(address, ["Pässwort1", "pa%s word", "482913"]) == carries
+    assert in_address(address, ["Pässwort1", "pa%s word", "482913", "abcd"]) == carries

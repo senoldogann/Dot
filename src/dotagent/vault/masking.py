@@ -14,6 +14,8 @@ from pydantic import JsonValue
 MASK: str = "[filled from 1Password]"
 # The shortest value masked: a one-time code has six digits; a shorter one would match ordinary text.
 _MASKED_FROM_CHARS: int = 4
+# How many times over the escapes of an address are read back, for a value escaped again and again.
+_READ_BACK_TIMES: int = 3
 # What a browser leaves as it is when it writes a form's field into an address (the URL standard's form encoding).
 _FORM_KEPT: frozenset[str] = frozenset(string.ascii_letters + string.digits + "*-._")
 
@@ -61,19 +63,29 @@ def masked(text: str, values: Iterable[str]) -> str:
 
 
 def _read_back(address: str) -> frozenset[str]:
-    """``address`` as it is and with its escapes read back, as UTF-8 and as a page of Western European text writes
-    them (Windows-1252, which browsers read Latin-1 as), with ``+`` as a space and as itself."""
+    """``address`` as it is and with its escapes read back, up to :data:`_READ_BACK_TIMES` times over (an escape of
+    an escape), as UTF-8 and as a page of Western European text writes them (Windows-1252, which browsers read Latin-1
+    as), with ``+`` as a space and as itself."""
     readings: set[str] = {address}
-    for text in (address, address.replace("+", " ")):
-        for encoding in ("utf-8", "cp1252"):
-            readings.add(unquote(text, encoding=encoding, errors="replace"))
+    latest: set[str] = {address}
+    for _ in range(_READ_BACK_TIMES):
+        latest = {
+            unquote(spelled, encoding=encoding, errors="replace")
+            for reading in latest
+            for spelled in (reading, reading.replace("+", " "))
+            for encoding in ("utf-8", "cp1252")
+        } - readings
+        if not latest:
+            break
+        readings |= latest
     return frozenset(readings)
 
 
 def in_address(address: str, values: Iterable[str]) -> bool:
     """Whether ``address`` carries one of ``values`` of a few characters or more: in any of the forms :func:`masked`
-    knows, in the address as it is or once its escapes are read back. Reading the escapes back finds a value however a
-    form or a script wrote it, an escape left as it was, a byte of another charset or a part encoded twice."""
+    knows, in the address as it is or once its escapes are read back. Reading them back finds a value as a form or a
+    script escaped it, an escape left as it was, a byte of a Western European charset, or escapes of escapes, a few
+    times over; a value a script changed otherwise is not found."""
     kept: tuple[str, ...] = tuple(values)
     return any(masked(reading, kept) != reading for reading in _read_back(address))
 

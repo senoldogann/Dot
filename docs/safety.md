@@ -236,11 +236,11 @@ a note that it was saved while reading outside content.
     neither. Dot's own Chrome refuses every request whose address carries one, as it is or once its escapes are read
     back (as UTF-8, and as a page of Western European text writes them), as a form that names no method sends it, or a
     script: a password for as long as Dot runs, a code for five minutes after it went in. The refusal and Dot's log
-    name such a request by its site alone. A page in another legacy charset (Shift_JIS, KOI8-R and the like) can write
-    a value Dot does not read back. Your own Chrome
-    (Settings › Browser › My Chrome) sends its requests unguarded, so there Dot fills a username alone; your password
-    manager fills the rest. A page can still write them into its own words, which Dot masks where it shows them
-    whole; only the login's own site, which has them anyway, can do that.
+    name such a request by its host alone, or by its scheme when the value is in the host. A page in another legacy
+    charset (Shift_JIS, KOI8-R and the like) can write a value Dot does not read back. Your own Chrome (Settings ›
+    Browser › My Chrome) sends its requests unguarded, so there Dot fills a username alone; your password manager
+    fills the rest. A page can still write them into its own words, which Dot masks where it shows them whole; only
+    the login's own site, which has them anyway, can do that.
   - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
     stricter), and in `auto` you answer it, not the review model.
   - The token is kept in Dot's `.env`, which no tool of a run may read, under a name `op` does not read. The shell
