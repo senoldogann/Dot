@@ -1,32 +1,5 @@
 # Autonomy roadmap and handoff
 
-### 451. A message sent on one screen shows at once on the other
-
-**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent on the phone did not show on the desktop
-until the chat was left and opened again, and the same the other way round; fix that alone. **Cause.** A message sent to
-a chat at rest starts the chat's next run (`POST /runs` with its thread); the screen it was sent from goes on at that
-run, but a page of the same chat elsewhere follows only its own run's stream and was never told: the lifecycle stream's
-`run_queued` carries no thread, and nothing read the chat again. A message queued while a run works already showed
-everywhere (`queue_changed`), and a steer on the run's own stream. **As built** (`views/run.js`). A page that shows the
-chat's newest run goes on at the newer one, as the screen it was sent from does: when a run of the chat is queued (it
-reads the chat's newest runs once on a root `run_queued`), and once the lifecycle stream is back after a break, which
-replays nothing (a phone put away). What was typed there and not sent goes with it as the newer run's draft (`moveDraft`
-of `composer.js`). A page whose run was not the chat's newest when it first read the chat stays where it is: an earlier
-run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its address, or a
-delegated run; such a page reads the chat once. The tab keeps the run it showed as the chat's newest
-(`dot.chatShown.<thread>` in its session storage) until the page leaves it, so a phone's page that the browser loads
-again goes on from where it stood. Every way the page goes on (a message sent there, the queue's next one, an answer,
-Continue, a rewind) takes one guard, so two of them at once open the run once. The pre-push review's first pass stopped
-a page that took every page not reached by a link (main.js's history state) for the chat: the sidebar's Activity rows
-count as no link, and a question left on an earlier run could no longer be answered there. Its second and third passes
-found the same of questions: a page whose run left questions open stays for them, and once the last one closes, answered
-there or on another screen or skipped, it looks again whether the chat went on (`paintQuestions`). Tests:
-`tests/smoke/test_chat_follows.py` (Chrome wide and WebKit as a phone on one chat: the phone's message shows on the wide
-window and the wide window's on the phone, the wide window's unsent words go with it, a page of the earlier run opened
-by its address stays, and a phone's page loaded again after it showed the chat opens where the chat is; a run that left
-two questions, open on both screens: the first answer keeps both pages there, the last, sent on the phone, opens the
-chat's newest run on both; on main the wide window never moves). Docs: `docs/daemon.md`.
-
 The owner asked for Dot's autonomy to be smarter, steadier and sturdier **whatever model runs it**. This file is the
 handoff for that work: what is planned, why, in which order, what is done and how it was checked. If you continue the
 work, read it first, and keep the status table, the item sections and the log at the bottom true. It is the only record
@@ -16097,6 +16070,33 @@ rather than running off the top.
 Tests: `tests/smoke/test_composer_picks.py` (`@` lists no Skills and no Commands, a hand-added server draws the plug, the
 menu's box stays inside the window on a phone, and `/` carries the skill and picks it); `tests/unit/test_palette.py`
 (a catalogued server's logo reaches the palette, a hand-added one has none).
+### 451. A message sent on one screen shows at once on the other
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent on the phone did not show on the desktop
+until the chat was left and opened again, and the same the other way round; fix that alone. **Cause.** A message sent to
+a chat at rest starts the chat's next run (`POST /runs` with its thread); the screen it was sent from goes on at that
+run, but a page of the same chat elsewhere follows only its own run's stream and was never told: the lifecycle stream's
+`run_queued` carries no thread, and nothing read the chat again. A message queued while a run works already showed
+everywhere (`queue_changed`), and a steer on the run's own stream. **As built** (`views/run.js`). A page that shows the
+chat's newest run goes on at the newer one, as the screen it was sent from does: when a run of the chat is queued (it
+reads the chat's newest runs once on a root `run_queued`), and once the lifecycle stream is back after a break, which
+replays nothing (a phone put away). What was typed there and not sent goes with it as the newer run's draft (`moveDraft`
+of `composer.js`). A page whose run was not the chat's newest when it first read the chat stays where it is: an earlier
+run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its address, or a
+delegated run; such a page reads the chat once. The tab keeps the run it showed as the chat's newest
+(`dot.chatShown.<thread>` in its session storage) until the page leaves it, so a phone's page that the browser loads
+again goes on from where it stood. Every way the page goes on (a message sent there, the queue's next one, an answer,
+Continue, a rewind) takes one guard, so two of them at once open the run once. The pre-push review's first pass stopped
+a page that took every page not reached by a link (main.js's history state) for the chat: the sidebar's Activity rows
+count as no link, and a question left on an earlier run could no longer be answered there. Its second and third passes
+found the same of questions: a page whose run left questions open stays for them, and once the last one closes, answered
+there or on another screen or skipped, it looks again whether the chat went on (`paintQuestions`). Tests:
+`tests/smoke/test_chat_follows.py` (Chrome wide and WebKit as a phone on one chat: the phone's message shows on the wide
+window and the wide window's on the phone, the wide window's unsent words go with it, a page of the earlier run opened
+by its address stays, and a phone's page loaded again after it showed the chat opens where the chat is; a run that left
+two questions, open on both screens: the first answer keeps both pages there, the last, sent on the phone, opens the
+chat's newest run on both; on main the wide window never moves). Docs: `docs/daemon.md`.
+
 ### 454. A chat that goes on without a jump, a finished chat drawn whole, and Dot's Chrome closed once unused
 
 **Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent scrolls the chat up and down before it
@@ -17214,10 +17214,10 @@ with one event, switching it on again; a one-time schedule and one without a lim
   OpenBot is written down.
 - 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.
-- 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat's
-  newest run goes on at the run a message from another screen started, at once, after a break of its stream, and as a
-  phone loads it again; a page of an earlier run stays.
 - 2026-10-21 (Opus 5.5): item 455 on `item-455-run-now` from `main`: a schedule runs now by hand, as its firing would,
   its time and switch kept, and its Firings list its last runs.
 - 2026-10-21 (Opus 5.5): item 458 on `item-458-stop-after-failures` from `main`: a repeating schedule whose runs failed
   so many times in a row is switched off and you are told once; its row counts them.
+- 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat's
+  newest run goes on at the run a message from another screen started, at once, after a break of its stream, and as a
+  phone loads it again; a page of an earlier run stays.
