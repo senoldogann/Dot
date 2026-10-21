@@ -1227,17 +1227,26 @@ class RunManager:
             record: ApprovalRecord = await self._runtime.store.get_approval(approval_id)
             if record.status != "left":
                 return await self._runtime.approvals.resolve(approval_id, approve, source, note)
-            if record.kept_until is not None:
-                return await self._decide_kept(record, approve, source, note)
-            if approve and note.strip() == "":
-                raise InvalidValueError("the answer to the question is empty", {"approval_id": approval_id})
             asked: RunRecord = await self._runtime.store.get_run(record.run_id)
-            if asked.campaign_id is None:
-                if approve:
-                    await self._carry_on(record, source, note)
-                return await self._runtime.approvals.resolve(approval_id, approve, source, note)
-            campaign_id: str = asked.campaign_id
-            decided, ended = await self._decide_for_session(record, approve, source, note)
+            if record.kept_until is not None:
+                decided: ApprovalRecord = await self._decide_kept(record, approve, source, note)
+                # A step a session kept, or a run it delegated (item 485), answered once the session ended (item 484):
+                # the campaign's next session comes forward, once the session planned it, and its brief says what the
+                # owner answered.
+                asked = await self._root_of(record.run_id)
+                ended: bool = record.scope_campaign_id is not None and asked.status not in WORKING_STATUSES
+                if not ended or record.scope_campaign_id is None:
+                    return decided
+                campaign_id: str = record.scope_campaign_id
+            else:
+                if approve and note.strip() == "":
+                    raise InvalidValueError("the answer to the question is empty", {"approval_id": approval_id})
+                if asked.campaign_id is None:
+                    if approve:
+                        await self._carry_on(record, source, note)
+                    return await self._runtime.approvals.resolve(approval_id, approve, source, note)
+                campaign_id = asked.campaign_id
+                decided, ended = await self._decide_for_session(record, approve, source, note)
         if ended:
             ending: RunHandle | None = self._handles.get(asked.id)
             if ending is not None:
@@ -1559,20 +1568,12 @@ class RunManager:
         step's chat (:meth:`_carry_kept`), delivered before the step is decided, so one that cannot be delivered leaves
         it open. "Allow once" stores the yes first, unused and told to no page, so that the step the run does again
         finds it; it is told once the work was carried on, and taken back when it could not be, the card as it was.
-        Skip only closes it. A step past its time has lapsed, and is closed so. A step a session of a campaign kept
-        (item 484), answered once the session ended, brings the campaign's next session forward, whose brief says
-        what the owner answered."""
+        Skip only closes it. A step past its time has lapsed, and is closed so."""
         now: float = time.time()
         if record.kept_until is not None and record.kept_until <= now:
             await self._runtime.approvals.lapse(record)
             raise RunConflict("this step was kept for you too long and has lapsed", {"approval_id": record.id})
-        decided: ApprovalRecord = await self._answer_kept(record, approve, source, note, now)
-        if record.scope_campaign_id is not None:
-            # The session at the top of the run that kept it (item 485): once it has ended, the next one reads it.
-            session: RunRecord = await self._root_of(record.run_id)
-            if session.status not in WORKING_STATUSES:
-                await self._bring_session_forward(record.scope_campaign_id)
-        return decided
+        return await self._answer_kept(record, approve, source, note, now)
 
     async def _answer_kept(
         self, record: ApprovalRecord, approve: bool, source: str, note: str, now: float
@@ -2691,10 +2692,8 @@ class RunManager:
                 await self._tell_campaign_stopped(run, campaign, spent)
                 return
             asked: list[ApprovalRecord] = await runtime.store.run_questions(run.id, ASK_USER_TOOL)
-            kept_open: bool = any(
-                record.status == "left" and record.kept_until is not None
-                for record in await runtime.store.run_approvals(run.id)
-            )
+            # A step kept for the owner in the campaign, by this session or an earlier one, still waits (item 484).
+            kept_open: bool = (await runtime.store.count_open_kept(campaign.thread_id, campaign.id, None))[0] > 0
             following: float = next_session_at(
                 time.time(),
                 campaign.next_session_at,

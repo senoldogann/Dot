@@ -51,7 +51,7 @@ from dotagent.core.paths import connected_servers_path, env_file_path
 from dotagent.evals.runner import SCRIPTED_MODEL
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService, ServiceSecret
 from dotagent.mcp.connected import read_connected
-from dotagent.mcp.hub import McpHub, open_hub
+from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, McpHub, open_hub
 from dotagent.mcp.signin import SIGN_IN_AGAIN, read_sign_in, sign_in_path
 from dotagent.mcp.types import McpTool
 from dotagent.runtime import Runtime, build_runtime, close_runtime
@@ -191,10 +191,10 @@ async def _stop(served: _Served) -> None:
     await served.task
 
 
-def _signed_server(provider: _YesSayer, base: str) -> MCPServer:
-    """An MCP server that is its own authorization server at ``base``, with one tool."""
-    server: MCPServer = MCPServer(
-        "signed",
+def _auth_server(name: str, provider: _YesSayer, base: str) -> MCPServer:
+    """An MCP server ``name`` that is its own authorization server at ``base``, with no tool yet."""
+    return MCPServer(
+        name,
         auth_server_provider=provider,
         auth=AuthSettings(
             issuer_url=base,
@@ -207,11 +207,32 @@ def _signed_server(provider: _YesSayer, base: str) -> MCPServer:
         ),
     )
 
+
+def _signed_server(provider: _YesSayer, base: str) -> MCPServer:
+    """An MCP server that is its own authorization server at ``base``, with one tool."""
+    server: MCPServer = _auth_server("signed", provider, base)
+
     @server.tool()
     def whoami() -> str:
         """Who the caller is signed in as."""
         return "the owner, signed in"
 
+    return server
+
+
+def _many_signed_server(provider: _YesSayer, base: str) -> MCPServer:
+    """An MCP server that is its own authorization server at ``base``, with more tools than Dot hands a model at
+    once."""
+    server: MCPServer = _auth_server("many", provider, base)
+
+    def tool(number: int) -> None:
+        def run() -> str:
+            return f"tool {number:02d} ran"
+
+        server.add_tool(run, name=f"tool_{number:02d}", description=f"Does the {number:02d}th thing of the many.")
+
+    for number in range(MAX_UNFILTERED_TOOLS + 1):
+        tool(number)
     return server
 
 
@@ -386,6 +407,44 @@ async def test_remove_forgets_the_server_and_its_sign_in(world: _World) -> None:
     assert "signed" not in world.runtime.mcp.connected()
     assert read_connected(connected_servers_path()).servers == ()
     assert not sign_in_path("signed").exists()
+
+
+async def test_a_server_that_signs_in_and_offers_too_many_tools_has_them_chosen_with_its_sign_in(
+    world: _World,
+) -> None:
+    """Item 499: the try signs in and is left out for its tools; Choose tools lists them and connects the chosen with
+    the sign-in the try gave, which is kept with them."""
+    provider: _YesSayer = _YesSayer()
+    listener: socket.socket = bind_listener("127.0.0.1", 0)
+    base: str = f"http://127.0.0.1:{listener.getsockname()[1]}"
+    served: _Served = await _serve(_many_signed_server(provider, base).streamable_http_app(), listener)
+    try:
+        async with _client(world) as client:
+            added: httpx.Response = await client.post(
+                "/api/mcp/servers",
+                json={"service": None, "name": "many", "address": f"{base}/mcp", "origin": world.dot},
+            )
+            assert added.status_code == 200, added.text
+            link: object = added.json()["link"]
+            assert isinstance(link, str)
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30.0) as browser:
+                assert (await browser.get(link)).status_code == 200
+            left: dict[str, object] = await _ready(client, "many")
+            assert (left["state"], left["picks_tools"], left["signs_in"]) == ("left_out", True, True)
+            offered: httpx.Response = await client.get("/api/mcp/servers/many/offered")
+            assert offered.status_code == 200, offered.text
+            assert len(offered.json()["tools"]) == MAX_UNFILTERED_TOOLS + 1
+            chosen: httpx.Response = await client.put("/api/mcp/servers/many/allow", json={"tools": ["tool_01"]})
+            assert chosen.status_code == 200, chosen.text
+            assert (chosen.json()["state"], chosen.json()["tools"]) == ("ready", ["tool_01"])
+            assert await _called(world.runtime.mcp, "many", "tool_01") == "tool 01 ran"
+            (kept,) = read_connected(connected_servers_path()).servers
+            assert (kept.name, kept.oauth, kept.allow) == ("many", True, ["tool_01"])
+            assert provider.authorized == 1
+            removed: httpx.Response = await client.delete("/api/mcp/servers/many")
+            assert removed.status_code == 200, removed.text
+    finally:
+        await _stop(served)
 
 
 async def test_a_server_open_to_all_is_added_without_a_sign_in(world: _World) -> None:
