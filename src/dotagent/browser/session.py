@@ -1988,7 +1988,14 @@ class BrowserSession:
             async with self._locked(thread_id) as thread:
                 tab: Tab = await self._current_tab(thread)
                 if tab.page.url in _BLANK_URLS or tab.page.url.startswith("about:blank"):
-                    await tab.page.goto(_TEACH_START_PAGE, wait_until="commit")
+                    try:
+                        await tab.page.goto(_TEACH_START_PAGE, wait_until="commit")
+                    except PlaywrightError as error:
+                        raise BrowserError(
+                            "the blank tab could not open the page a task starts from: open the page yourself, then "
+                            "start again",
+                            {"url": _TEACH_START_PAGE, "error": truncate_middle(str(error), _LAUNCH_ERROR_CHARS)},
+                        ) from error
                 recording: Recording = Recording(thread_id=thread_id, page=tab.page, tab_index=thread.active + 1)
                 # In place before the script goes in: the page it is put into reports itself at once, and a step that
                 # comes before the recording would be dropped.
