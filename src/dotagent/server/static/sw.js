@@ -31,7 +31,9 @@ const PAGES_PREFIX = "/pages/";
 // network too.
 const OFFLINE_CACHE = "dot-offline";
 const OFFLINE_PAGE = "/offline.html";
-const OFFLINE_FILES = [OFFLINE_PAGE, "/css/app.css", "/css/themes.css"];
+// The page a phone shows while Dot is out of reach, and what it draws with: Dot added to a home screen from it wears
+// its own icon (item 501), not the letter iOS draws for an address with none.
+const OFFLINE_FILES = [OFFLINE_PAGE, "/css/app.css", "/css/themes.css", "/apple-touch-icon.png", "/manifest.webmanifest"];
 
 // The pages answered from a kept copy, by their client's id: the cache whose files they take.
 const keptClients = new Map();
