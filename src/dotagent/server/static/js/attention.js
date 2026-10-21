@@ -208,6 +208,17 @@ function tellAboutMissedFiring(event) {
   tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/schedules", state: "failed" });
 }
 
+function tellAboutStoppedSchedule(event) {
+  const { schedule_id: id, name, failures } = event.data;
+  tell({
+    title: "A schedule was switched off",
+    body: shorten(`${name}: its last ${failures} runs failed`),
+    tag: `schedule-${id}`,
+    route: "#/schedules",
+    state: "failed",
+  });
+}
+
 function tellAboutLearningStalled(event) {
   tell({ title: "Dot's learning has stopped", body: shorten(event.data.reason), tag: "learning-stalled", route: "#/settings/memory", state: "failed" });
 }
@@ -228,6 +239,8 @@ function onLifecycleEvent(event) {
       tellAboutCampaign(event);
     } else if (event.kind === "schedule_missed") {
       tellAboutMissedFiring(event);
+    } else if (event.kind === "schedule_stopped") {
+      tellAboutStoppedSchedule(event);
     } else if (event.kind === "learning_stalled") {
       tellAboutLearningStalled(event);
     }

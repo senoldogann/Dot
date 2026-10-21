@@ -16171,6 +16171,33 @@ second start by hand nor at its time and a click racing a tick, the emergency st
 yolo schedule's run in yolo, and the page at 1280 px and at 390 px as a touch screen: the button's title, the run's
 page, the list). The scheduler's own tests pass unchanged. Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`.
 
+### 458. A repeating schedule whose runs keep failing is switched off, and you are told
+
+**Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its second part:
+"a repeating schedule switched off after N failed runs in a row". Today a schedule whose goal cannot be reached any more
+(a site moved, a key expired) fails at every firing, unseen but for the end of each run. **As built.** A schedule keeps
+how many of its runs in a row ended failed (`runs_failed_in_row`, a column; not derived from the last runs, so that
+after the owner fixes the cause and switches it on again one more failure does not switch it straight off):
+`Store.record_schedule_outcome` writes a run's end and the row together (`done` sets it to 0, `failed` adds one,
+`cancelled` leaves it), in the watch of every run of the schedule, at its time and by hand alike (a run by hand that
+ends done starts the row again, which is how the owner tries a fix). A firing that started no run counts not at all.
+When a repeating schedule that is on reaches its limit (`ScheduleOptions.stop_after_failures`, its form's **Switch off
+after**: 3, 5, 10, 20 or never; else `[scheduler] stop_after_failures`, 0 = never, which is how Dot worked), it is
+switched off for good with the status "switched off: its last N runs failed" and the live event `schedule_stopped`, told
+once by the phone and the desktop (the schedule is off afterwards); a one-time schedule is never switched off by it.
+Switching a schedule on again, or changing it, starts its row afresh and clears that status. The row says "N failed in a
+row", with when it switches itself off in its title; the form's default names the configured value
+(`StatusView.schedule_stop_after_failures`). The critique's points taken: the counter moves for every schedule and only
+the switch-off is the repeating ones'; the event is sent only when the switch-off changed the row; the column is named
+apart from the failures to start of `scheduler/failures.py`. Not done: the critique's one tuple of option columns, left
+for the notification level, which adds the next option. Yolo is untouched: a yolo schedule's runs count as any other's,
+and nothing is asked. Tests: `tests/unit/test_schedule_stop.py` (the limit, the rule, the store's row),
+`tests/unit/test_push.py` (the phone's message), `tests/smoke/test_schedule_stop.py` (through the routes and a real
+scheduler: two failed and one done, a timed firing's failure counting, the third in a row switching off a yolo schedule
+with one event, switching it on again; a one-time schedule and one without a limit kept on; the page at 1280 px and at
+390 px as a touch screen: the row's note and the form's limit). Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`,
+`defaults.toml`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -17138,3 +17165,5 @@ page, the list). The scheduler's own tests pass unchanged. Docs: `docs/memory-an
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.
 - 2026-10-21 (Opus 5.5): item 455 on `item-455-run-now` from `main`: a schedule runs now by hand, as its firing would,
   its time and switch kept, and its Firings list its last runs.
+- 2026-10-21 (Opus 5.5): item 458 on `item-458-stop-after-failures` from `main`: a repeating schedule whose runs failed
+  so many times in a row is switched off and you are told once; its row counts them.
