@@ -99,7 +99,8 @@ def _loop_schedule(text: str, every: str, mode: RunMode, options: ScheduleOption
 
 def _opening_options(request: StartRunRequest) -> ScheduleOptions:
     """The options a schedule of the chat that ``request`` opens takes (``chat_options`` of its first run), read from
-    the request before the run is: what the configuration fills in stays None, as a schedule reads it."""
+    the request before the run is: what the configuration fills in stays None, as a schedule reads it, and the chat's
+    agent is the schedule's (item 463)."""
     return ScheduleOptions(
         model=request.model,
         effort=request.effort,
@@ -111,7 +112,7 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
         same_chat=True,
         stop_after_failures=None,
         notify=None,
-        agent_id=None,
+        agent_id=request.agent_id,
     )
 
 

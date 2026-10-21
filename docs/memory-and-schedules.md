@@ -168,8 +168,9 @@ off, how the end of its runs is told, the agent it runs as and whether it is on 
 configured ones and the standard speed; a `PATCH` that leaves `agent_id` out keeps the schedule's agent, and `null`
 makes it Dot's).
 Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
-chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
-the form is open, **New schedule** reads **Close**, with a cross.
+chat's choices, which are yours: the model of a run cannot pick another approval mode for it, nor an agent; one made
+in a chat with one of your agents runs as that agent (item 463), and one made in Dot's chat as Dot. While the form is
+open, **New schedule** reads **Close**, with a cross.
 
 **Run now** (the play button of a schedule's row, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
 once, switched on or off, due or not; the button says that it does real work, as at its time, with the approvals its run
