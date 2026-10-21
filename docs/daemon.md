@@ -386,7 +386,8 @@ next tool call, brings its tab to the front either way, in the Chrome the run wo
 campaign's), and the pill reads "You have control" (when the tab cannot be brought up, the run is not held): the Chrome
 window is on your Mac, so sign in, pass a CAPTCHA or do a step yourself; **Return control** lets the run go on, and the
 result of the tool call that waited tells the model how long you had the browser and that the page may have changed, so
-it takes a snapshot first. The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
+it takes a snapshot first, which shows `[hidden]` for what you typed in a password, one-time-code or card field outside
+`yolo` (item 467). The timeline keeps both moments (`takeover`, `handback`), and `dotx run` prints them. A
 takeover is refused while `[browser] headless = true` (there is no window to use), and the run page keeps the last frame
 once the run has ended.
 

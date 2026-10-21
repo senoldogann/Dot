@@ -288,11 +288,11 @@ def saved_files(directory: Path) -> list[Path]:
 
 
 async def act(browser: BrowserSession, thread: str, steps: list[Step], accept: bool) -> ActOutcome:
-    return await browser.act(thread, steps, accept, refuse_secret_field)
+    return await browser.act(thread, steps, accept, refuse_secret_field, True)
 
 
 async def test_snapshot_has_refs_and_prunes_what_is_far_below_the_fold(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("prune", f"{site}/")
+    view: PageView = await browser.open_url("prune", f"{site}/", True)
     assert view.title == "Home"
     assert view.status == 200
     assert ref_of(view.body, 'button "Increment"')
@@ -301,7 +301,7 @@ async def test_snapshot_has_refs_and_prunes_what_is_far_below_the_fold(browser: 
 
 
 async def test_click_returns_only_what_changed(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("delta", f"{site}/")
+    view: PageView = await browser.open_url("delta", f"{site}/", True)
     outcome: ActOutcome = await act(
         browser, "delta", [Step(action="click", ref=ref_of(view.body, 'button "Increment"'))], False
     )
@@ -313,7 +313,7 @@ async def test_click_returns_only_what_changed(browser: BrowserSession, site: st
 
 
 async def test_form_batch_fills_selects_checks_and_submits(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("form", f"{site}/form")
+    view: PageView = await browser.open_url("form", f"{site}/form", True)
     steps: list[Step] = [
         Step(action="fill", ref=ref_of(view.body, 'textbox "Name"'), text="Ada"),
         Step(action="select", ref=ref_of(view.body, 'combobox "Color"'), text="blue"),
@@ -330,7 +330,7 @@ async def test_form_batch_fills_selects_checks_and_submits(browser: BrowserSessi
 async def test_batch_stops_when_the_page_opens_a_tab_and_the_tab_can_be_used(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("popup", f"{site}/")
+    view: PageView = await browser.open_url("popup", f"{site}/", True)
     steps: list[Step] = [
         Step(action="click", ref=ref_of(view.body, 'link "Open popup"')),
         Step(action="click", ref=ref_of(view.body, 'button "Increment"')),
@@ -340,17 +340,17 @@ async def test_batch_stops_when_the_page_opens_a_tab_and_the_tab_can_be_used(
     assert outcome.stopped is not None
     assert "new tab" in outcome.stopped
     assert len(outcome.view.tabs) == 2
-    switched: PageView = await browser.switch_tab("popup", 2)
+    switched: PageView = await browser.switch_tab("popup", 2, True)
     assert switched.title == "Popup"
     assert 'button "Close me"' in switched.body
-    back: PageView = await browser.close_tab("popup", 2)
+    back: PageView = await browser.close_tab("popup", 2, True)
     assert back.title == "Home"
 
 
 async def test_a_tab_whose_page_answers_late_still_stops_the_batch(browser: BrowserSession, site: str) -> None:
     """Chrome tells of the tab before the click returns; Playwright reports it only once its page has answered. The
     batch waited 40 ms for it before (item 342) and went on with its next step on the page it was on."""
-    view: PageView = await browser.open_url("late-tab", f"{site}/opens-late")
+    view: PageView = await browser.open_url("late-tab", f"{site}/opens-late", True)
     steps: list[Step] = [
         Step(action="click", ref=ref_of(view.body, 'link "Open late tab"')),
         Step(action="click", ref=ref_of(view.body, 'button "Stay"')),
@@ -364,7 +364,7 @@ async def test_a_tab_whose_page_answers_late_still_stops_the_batch(browser: Brow
 async def test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_later(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("later-tab", f"{site}/opens-late")
+    view: PageView = await browser.open_url("later-tab", f"{site}/opens-late", True)
     steps: list[Step] = [
         Step(action="click", ref=ref_of(view.body, 'link "Open later tab"')),
         Step(action="click", ref=ref_of(view.body, 'button "Stay"')),
@@ -374,13 +374,13 @@ async def test_a_tab_still_opening_when_the_wait_ends_stops_the_batch_and_joins_
     assert outcome.stopped is not None and outcome.stopped.startswith("a new tab is opening")
     assert len(outcome.view.tabs) == 1
     await asyncio.sleep(_LATER_TAB_S)
-    again: PageView = await browser.snapshot("later-tab")
+    again: PageView = await browser.snapshot("later-tab", True)
     assert [tab.title for tab in again.tabs] == ["Opens late", "Later tab"]
     assert "a new tab opened as tab 2" in again.notes
 
 
 async def test_a_popup_that_closes_itself_is_a_note_not_an_error(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("callback", f"{site}/opener")
+    view: PageView = await browser.open_url("callback", f"{site}/opener", True)
     outcome: ActOutcome = await act(
         browser, "callback", [Step(action="click", ref=ref_of(view.body, 'link "Sign in"'))], False
     )
@@ -398,9 +398,9 @@ async def test_a_popup_that_closes_itself_is_a_note_not_an_error(browser: Browse
 async def test_a_tab_that_closes_under_a_batch_stops_it_without_a_failure_and_shows_the_current_tab(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("closing", f"{site}/")
+    view: PageView = await browser.open_url("closing", f"{site}/", True)
     await act(browser, "closing", [Step(action="click", ref=ref_of(view.body, 'link "Open popup"'))], False)
-    popup: PageView = await browser.switch_tab("closing", 2)
+    popup: PageView = await browser.switch_tab("closing", 2, True)
     steps: list[Step] = [
         Step(action="click", ref=ref_of(popup.body, 'button "Close now"')),
         Step(action="click", ref=ref_of(popup.body, 'button "Close me"')),
@@ -414,7 +414,7 @@ async def test_a_tab_that_closes_under_a_batch_stops_it_without_a_failure_and_sh
 
 
 async def test_dialogs_are_resolved_and_reported(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("dialog", f"{site}/")
+    view: PageView = await browser.open_url("dialog", f"{site}/", True)
     alert: ActOutcome = await act(
         browser, "dialog", [Step(action="click", ref=ref_of(view.body, 'button "Say alert"'))], False
     )
@@ -429,12 +429,12 @@ async def test_dialogs_are_resolved_and_reported(browser: BrowserSession, site: 
 
 
 async def test_download_is_saved_under_a_safe_name(browser: BrowserSession, site: str, downloads: Path) -> None:
-    view: PageView = await browser.open_url("download", f"{site}/")
+    view: PageView = await browser.open_url("download", f"{site}/", True)
     outcome: ActOutcome = await act(
         browser, "download", [Step(action="click", ref=ref_of(view.body, 'link "Download report"'))], False
     )
     assert outcome.stopped is not None
-    later: PageView = await browser.snapshot("download")
+    later: PageView = await browser.snapshot("download", True)
     notes: str = " ".join((*outcome.view.notes, *later.notes))
     assert "download saved to" in notes
     saved: list[Path] = saved_files(downloads)
@@ -446,14 +446,14 @@ async def test_download_is_saved_under_a_safe_name(browser: BrowserSession, site
 
 
 async def test_iframe_content_gets_refs_that_work(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("frame", f"{site}/")
+    view: PageView = await browser.open_url("frame", f"{site}/", True)
     ref: str = ref_of(view.body, 'button "Frame button"')
     await act(browser, "frame", [Step(action="click", ref=ref)], False)
-    assert "clicked inside frame" in (await browser.snapshot("frame")).body
+    assert "clicked inside frame" in (await browser.snapshot("frame", True)).body
 
 
 async def test_password_fields_are_never_typed_into(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("secret", f"{site}/")
+    view: PageView = await browser.open_url("secret", f"{site}/", True)
     ref: str = ref_of(view.body, 'textbox "Account password"')
     outcome: ActOutcome = await act(browser, "secret", [Step(action="fill", ref=ref, text="hunter2")], False)
     assert outcome.steps[0].outcome == "failed"
@@ -464,7 +464,7 @@ async def test_password_fields_are_never_typed_into(browser: BrowserSession, sit
 async def test_urls_outside_the_rules_are_refused(browser: BrowserSession, site: str) -> None:
     for url in ("http://169.254.169.254/latest/meta-data/", "file:///etc/passwd", "javascript:alert(1)"):
         with pytest.raises(BrowserError):
-            await browser.open_url("rules", url)
+            await browser.open_url("rules", url, True)
 
 
 async def test_the_interface_of_dot_is_never_opened(browser_config: BrowserConfig, site: str, tmp_path: Path) -> None:
@@ -480,7 +480,7 @@ async def test_the_interface_of_dot_is_never_opened(browser_config: BrowserConfi
     )
     try:
         with pytest.raises(BrowserError) as refused:
-            await session.open_url("own", f"{site}/")
+            await session.open_url("own", f"{site}/", True)
         assert "Dot's own interface" in str(refused.value.context["reason"]), refused.value.context
     finally:
         await session.aclose()
@@ -488,7 +488,7 @@ async def test_the_interface_of_dot_is_never_opened(browser_config: BrowserConfi
 
 async def test_threads_keep_separate_tabs(browser: BrowserSession, site: str) -> None:
     first, second = await asyncio.gather(
-        browser.open_url("thread-a", f"{site}/popup"), browser.open_url("thread-b", f"{site}/form")
+        browser.open_url("thread-a", f"{site}/popup", True), browser.open_url("thread-b", f"{site}/form", True)
     )
     assert (first.title, second.title) == ("Popup", "Form")
     assert (browser.current_url("thread-a") or "").endswith("/popup")
@@ -496,8 +496,8 @@ async def test_threads_keep_separate_tabs(browser: BrowserSession, site: str) ->
 
 
 async def test_find_reaches_offscreen_elements_and_refs_stay_usable(browser: BrowserSession, site: str) -> None:
-    await browser.open_url("find", f"{site}/")
-    found = await browser.find("find", "Item 250", 5)
+    await browser.open_url("find", f"{site}/", True)
+    found = await browser.find("find", "Item 250", 5, True)
     assert len(found.hits) == 1
     ref: str = ref_of(found.hits[0], "Item 250")
     outcome: ActOutcome = await act(
@@ -507,25 +507,25 @@ async def test_find_reaches_offscreen_elements_and_refs_stay_usable(browser: Bro
 
 
 async def test_page_text_is_paged_and_screenshots_are_jpeg(browser: BrowserSession, site: str) -> None:
-    await browser.open_url("text", f"{site}/")
+    await browser.open_url("text", f"{site}/", True)
     first = await browser.read_text("text", None, 0, 100)
     assert len(first.text) == 100
     assert first.total_chars > 1000
     assert (await browser.read_text("text", None, 100, 100)).text != first.text
-    shot = await browser.screenshot("text")
+    shot = await browser.screenshot("text", True)
     assert shot.data[:2] == b"\xff\xd8"
     assert (shot.width, shot.height) == (1280, 860)
 
 
 async def test_late_rendering_pages_are_shown_after_they_render(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("slow", f"{site}/slow")
+    view: PageView = await browser.open_url("slow", f"{site}/slow", True)
     assert "Loaded late" in view.body
 
 
 async def test_a_scroll_shows_the_part_of_the_page_it_moved_to(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("scroll", f"{site}/")
+    view: PageView = await browser.open_url("scroll", f"{site}/", True)
     assert 'button "Item 100"' not in view.body
-    scrolled: PageView = await browser.scroll("scroll", "down", 2000, None)
+    scrolled: PageView = await browser.scroll("scroll", "down", 2000, None, True)
     assert 'button "Item 100"' in scrolled.body
     assert 'button "Item 10"' not in scrolled.body
 
@@ -533,9 +533,9 @@ async def test_a_scroll_shows_the_part_of_the_page_it_moved_to(browser: BrowserS
 async def test_a_wait_for_text_says_after_how_long_it_appeared_and_shows_what_changed(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("wait-ok", f"{site}/later")
+    view: PageView = await browser.open_url("wait-ok", f"{site}/later", True)
     await act(browser, "wait-ok", [Step(action="click", ref=ref_of(view.body, 'button "Place order"'))], False)
-    wait: TextWait = await browser.wait_text("wait-ok", "Order placed", 5.0)
+    wait: TextWait = await browser.wait_text("wait-ok", "Order placed", 5.0, True)
     assert wait.appeared
     assert 0.2 < wait.waited_s < 2.0, wait.waited_s
     assert "Order placed" in wait.view.body
@@ -547,9 +547,9 @@ async def test_a_wait_for_text_says_after_how_long_it_appeared_and_shows_what_ch
 async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("wait-miss", f"{site}/later")
+    view: PageView = await browser.open_url("wait-miss", f"{site}/later", True)
     await act(browser, "wait-miss", [Step(action="click", ref=ref_of(view.body, 'button "Place order"'))], False)
-    wait: TextWait = await browser.wait_text("wait-miss", "Payment failed", 1.5)
+    wait: TextWait = await browser.wait_text("wait-miss", "Payment failed", 1.5, True)
     assert not wait.appeared
     assert 1.4 < wait.waited_s < 3.0, wait.waited_s
     assert "Order placed" in wait.view.body
@@ -562,10 +562,10 @@ async def test_a_wait_for_text_that_does_not_come_fails_and_still_shows_the_page
 async def test_a_wait_that_times_out_while_a_page_still_loads_shows_it_without_waiting_for_the_rest(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("wait-leaving", f"{site}/leaving")
+    view: PageView = await browser.open_url("wait-leaving", f"{site}/leaving", True)
     await act(browser, "wait-leaving", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
     started: float = time.monotonic()
-    wait: TextWait = await browser.wait_text("wait-leaving", "Arrived", 1.5)
+    wait: TextWait = await browser.wait_text("wait-leaving", "Arrived", 1.5, True)
     took: float = time.monotonic() - started
     assert not wait.appeared
     assert took < 3.0, (took, wait.waited_s)
@@ -585,10 +585,10 @@ async def test_a_wait_that_times_out_checks_where_a_pending_navigation_went_befo
         config, SERVER, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work
     )
     try:
-        view: PageView = await session.open_url("blocked", f"{site}/to-blocked")
+        view: PageView = await session.open_url("blocked", f"{site}/to-blocked", True)
         await act(session, "blocked", [Step(action="click", ref=ref_of(view.body, 'button "Leave"'))], False)
         with pytest.raises(BrowserError, match="may not be opened"):
-            await session.wait_text("blocked", "Arrived", 1.0)
+            await session.wait_text("blocked", "Arrived", 1.0, True)
     finally:
         await session.aclose()
 
@@ -599,7 +599,7 @@ async def test_type_insert_and_fill_reach_an_editor_that_gets_ready_after_the_fo
     """The first three editor steps give the editor the focus anew (the first step, then each after a step in the plain
     field); the last three fill it while it has the focus, two of them with what it holds already, the empty text
     included, which changes nothing in it."""
-    view: PageView = await browser.open_url("editor", f"{site}/editor")
+    view: PageView = await browser.open_url("editor", f"{site}/editor", True)
     editor: str = ref_of(view.body, 'textbox "Post text"')
     plain: str = ref_of(view.body, 'textbox "Plain field"')
     for step, holds in (
@@ -614,15 +614,15 @@ async def test_type_insert_and_fill_reach_an_editor_that_gets_ready_after_the_fo
     ):
         outcome: ActOutcome = await act(browser, "editor", [step], False)
         assert [report.outcome for report in outcome.steps] == ["done"], (step, outcome.steps)
-        shown: str = value_of((await browser.snapshot("editor")).body, "paragraph")
+        shown: str = value_of((await browser.snapshot("editor", True)).body, "paragraph")
         assert shown == f'"{("Editor holds: " + holds).rstrip()}"', step
-    assert value_of((await browser.snapshot("editor")).body, 'textbox "Plain field"') == "key by key"
+    assert value_of((await browser.snapshot("editor", True)).body, 'textbox "Plain field"') == "key by key"
 
 
 async def test_fill_reaches_a_paragraph_of_an_editor_without_a_role_and_a_field_inside_an_editor(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("notes", f"{site}/editor")
+    view: PageView = await browser.open_url("notes", f"{site}/editor", True)
     paragraph: re.Match[str] | None = re.search(r"paragraph \[ref=([^\]]+)\]: Second note", view.body)
     assert paragraph is not None, view.body
     steps: list[Step] = [
@@ -631,13 +631,13 @@ async def test_fill_reaches_a_paragraph_of_an_editor_without_a_role_and_a_field_
     ]
     outcome: ActOutcome = await act(browser, "notes", steps, False)
     assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome.steps
-    body: str = (await browser.snapshot("notes")).body
+    body: str = (await browser.snapshot("notes", True)).body
     assert re.findall(r"paragraph \[ref=[^\]]+\]: (.*)", body)[1:] == ["First note", "Replaced note"]
     assert value_of(body, 'textbox "Inner field"') == "inside"
 
 
 async def test_fill_writes_into_a_document_in_design_mode(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("design", f"{site}/design")
+    view: PageView = await browser.open_url("design", f"{site}/design", True)
     paragraph: re.Match[str] | None = re.search(r"paragraph \[ref=([^\]]+)\]: Old text", view.body)
     assert paragraph is not None, view.body
     steps: list[Step] = [
@@ -646,23 +646,23 @@ async def test_fill_writes_into_a_document_in_design_mode(browser: BrowserSessio
     ]
     outcome: ActOutcome = await act(browser, "design", steps, False)
     assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome.steps
-    body: str = (await browser.snapshot("design")).body
+    body: str = (await browser.snapshot("design", True)).body
     assert "New text" in body
     assert value_of(body, 'textbox "Name"') == "Ada"
 
 
 async def test_a_key_that_makes_an_editor_open_another_page_is_done(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("search-box", f"{site}/search-box")
+    view: PageView = await browser.open_url("search-box", f"{site}/search-box", True)
     box: str = ref_of(view.body, 'textbox "Search"')
     outcome: ActOutcome = await act(browser, "search-box", [Step(action="type", ref=box, text="\n")], False)
     assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
-    assert "?q=cats" in (await browser.snapshot("search-box")).body
+    assert "?q=cats" in (await browser.snapshot("search-box", True)).body
 
 
 async def test_an_insert_at_an_element_that_takes_no_text_fails_instead_of_writing_where_the_focus_is(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("no-text", f"{site}/editor")
+    view: PageView = await browser.open_url("no-text", f"{site}/editor", True)
     steps: list[Step] = [
         Step(action="type", ref=ref_of(view.body, 'textbox "Plain field"'), text="kept"),
         Step(action="insert", ref=ref_of(view.body, "paragraph"), text=" lost"),
@@ -670,25 +670,25 @@ async def test_an_insert_at_an_element_that_takes_no_text_fails_instead_of_writi
     outcome: ActOutcome = await act(browser, "no-text", steps, False)
     assert [report.outcome for report in outcome.steps] == ["done", "failed"], outcome.steps
     assert "insert needs a text field or an editor" in outcome.steps[1].detail
-    assert value_of((await browser.snapshot("no-text")).body, 'textbox "Plain field"') == "kept"
+    assert value_of((await browser.snapshot("no-text", True)).body, 'textbox "Plain field"') == "kept"
 
 
 async def test_a_click_into_an_editor_then_a_write_waits_until_the_editor_is_ready(
     browser: BrowserSession, site: str
 ) -> None:
     """The click gives the editor the focus, so the write that follows finds the focus in it already."""
-    view: PageView = await browser.open_url("clicked-editor", f"{site}/editor?ready=70")
+    view: PageView = await browser.open_url("clicked-editor", f"{site}/editor?ready=70", True)
     editor: str = ref_of(view.body, 'textbox "Post text"')
     steps: list[Step] = [Step(action="click", ref=editor), Step(action="type", ref=editor, text="Hello")]
     outcome: ActOutcome = await act(browser, "clicked-editor", steps, False)
     assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome.steps
-    assert value_of((await browser.snapshot("clicked-editor")).body, "paragraph") == '"Editor holds: Hello"'
+    assert value_of((await browser.snapshot("clicked-editor", True)).body, "paragraph") == '"Editor holds: Hello"'
 
 
 async def test_a_write_the_editor_drops_fails_the_step_instead_of_reporting_done(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("late-editor", f"{site}/editor?ready=400")
+    view: PageView = await browser.open_url("late-editor", f"{site}/editor?ready=400", True)
     editor: str = ref_of(view.body, 'textbox "Post text"')
     outcome: ActOutcome = await act(browser, "late-editor", [Step(action="insert", ref=editor, text="Lost")], False)
     assert [report.outcome for report in outcome.steps] == ["failed"], outcome.steps
@@ -698,26 +698,26 @@ async def test_a_write_the_editor_drops_fails_the_step_instead_of_reporting_done
 async def test_an_editor_that_shows_the_text_a_moment_after_the_write_took_it(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("slow-editor", f"{site}/editor?apply=150")
+    view: PageView = await browser.open_url("slow-editor", f"{site}/editor?apply=150", True)
     editor: str = ref_of(view.body, 'textbox "Post text"')
     outcome: ActOutcome = await act(browser, "slow-editor", [Step(action="insert", ref=editor, text="Late")], False)
     assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
-    assert value_of((await browser.snapshot("slow-editor")).body, "paragraph") == '"Editor holds: Late"'
+    assert value_of((await browser.snapshot("slow-editor", True)).body, "paragraph") == '"Editor holds: Late"'
 
 
 async def test_drag_moves_an_item_onto_another_list(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("board", f"{site}/board")
+    view: PageView = await browser.open_url("board", f"{site}/board", True)
     item: re.Match[str] | None = re.search(r"listitem \[ref=([^\]]+)\]: Write tests", view.body)
     assert item is not None, view.body
     outcome: ActOutcome = await act(
         browser, "board", [Step(action="drag", ref=item.group(1), to_ref=ref_of(view.body, 'list "Done"'))], False
     )
     assert [report.outcome for report in outcome.steps] == ["done"], outcome.steps
-    assert "Moved Write tests to Done" in (await browser.snapshot("board")).body
+    assert "Moved Write tests to Done" in (await browser.snapshot("board", True)).body
 
 
 async def test_cookie_banners_are_declined_instead_of_blocking_actions(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("cookies", f"{site}/cookies")
+    view: PageView = await browser.open_url("cookies", f"{site}/cookies", True)
     outcome: ActOutcome = await act(
         browser, "cookies", [Step(action="click", ref=ref_of(view.body, 'button "Page action"'))], False
     )
@@ -728,7 +728,7 @@ async def test_cookie_banners_are_declined_instead_of_blocking_actions(browser: 
 async def test_a_dialog_in_front_of_the_page_is_shown_first_and_a_blocked_click_says_what_covers_it(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("modal", f"{site}/modal")
+    view: PageView = await browser.open_url("modal", f"{site}/modal", True)
     assert view.overlays == 1
     assert 'dialog "Newsletter"' in view.overlay
     assert 'button "No thanks"' in view.overlay
@@ -758,23 +758,23 @@ async def test_a_dialog_in_front_of_the_page_is_shown_first_and_a_blocked_click_
 
 
 async def test_view_leaves_scaffolding_out_and_links_serve_absolute_targets(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("links", f"{site}/")
+    view: PageView = await browser.open_url("links", f"{site}/", True)
     assert "/url:" not in view.body
     assert "cursor=pointer" not in view.body
-    found = await browser.links("links", "popup", 10)
+    found = await browser.links("links", "popup", 10, True)
     assert len(found.hits) == 1
     assert found.hits[0].endswith(f"Open popup -> {site}/popup")
-    assert (await browser.links("links", "no such link anywhere", 10)).hits == ()
+    assert (await browser.links("links", "no such link anywhere", 10, True)).hits == ()
 
 
 async def test_names_with_a_colon_are_parsed_as_elements_and_links_keep_their_targets(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("colon", f"{site}/colon")
+    view: PageView = await browser.open_url("colon", f"{site}/colon", True)
     button: str | None = browser.peek_line("colon", ref_of(view.body, "Buy now: confirm"))
     assert button is not None
     assert parse_element(button) == Element(role="button", name="Buy now: confirm")
-    found = await browser.links("colon", "", 10)
+    found = await browser.links("colon", "", 10, True)
     assert [hit.split("  ", 1)[1] for hit in found.hits] == [f"Read: more -> {site}/done?x=1"]
 
 
@@ -785,7 +785,7 @@ def line_of(body: str, label: str) -> str:
 async def test_collapsed_dropdowns_list_their_options_and_the_choice_shows_in_the_delta(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("dropdown-view", f"{site}/dropdown")
+    view: PageView = await browser.open_url("dropdown-view", f"{site}/dropdown", True)
     listed: str = line_of(view.body, 'combobox "Shipping"')
     assert listed.endswith(
         ': options "Standard (3-5 days)" [selected], "Express (next day)", "Pick up in store" [disabled]'
@@ -803,7 +803,7 @@ async def test_collapsed_dropdowns_list_their_options_and_the_choice_shows_in_th
 async def test_a_missing_option_fails_fast_and_names_the_options(
     browser: BrowserSession, browser_config: BrowserConfig, site: str
 ) -> None:
-    view: PageView = await browser.open_url("dropdown-miss", f"{site}/dropdown")
+    view: PageView = await browser.open_url("dropdown-miss", f"{site}/dropdown", True)
     step: Step = Step(action="select", ref=ref_of(view.body, 'combobox "Shipping"'), text="Overnight")
     started: float = time.perf_counter()
     outcome: ActOutcome = await act(browser, "dropdown-miss", [step], False)
@@ -815,20 +815,20 @@ async def test_a_missing_option_fails_fast_and_names_the_options(
 
 
 async def test_an_option_a_script_adds_a_moment_later_is_still_chosen(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("dropdown-late", f"{site}/dropdown")
+    view: PageView = await browser.open_url("dropdown-late", f"{site}/dropdown", True)
     steps: list[Step] = [
         Step(action="click", ref=ref_of(view.body, 'button "Load states"')),
         Step(action="select", ref=ref_of(view.body, 'combobox "State"'), text="Texas"),
     ]
     outcome: ActOutcome = await act(browser, "dropdown-late", steps, False)
     assert [report.outcome for report in outcome.steps] == ["done", "done"], outcome
-    assert '"Texas" [selected]' in line_of((await browser.snapshot("dropdown-late")).body, 'combobox "State"')
+    assert '"Texas" [selected]' in line_of((await browser.snapshot("dropdown-late", True)).body, 'combobox "State"')
 
 
 async def test_a_long_dropdown_keeps_its_line_short_and_names_a_choice_it_cannot_show(
     browser: BrowserSession, site: str
 ) -> None:
-    view: PageView = await browser.open_url("dropdown-long", f"{site}/dropdown")
+    view: PageView = await browser.open_url("dropdown-long", f"{site}/dropdown", True)
     listed: str = line_of(view.body, 'combobox "Number"')
     assert len(listed) < 400
     assert listed.endswith('(selected: "Number 250")')
@@ -863,7 +863,7 @@ async def test_a_click_and_a_batch_of_five_clicks_stay_fast(
         config, SERVER, tmp_path / "profile", tmp_path / "downloads", no_runs_at_work
     )
     try:
-        view: PageView = await session.open_url("timing", f"{site}/")
+        view: PageView = await session.open_url("timing", f"{site}/", True)
         click: Step = Step(action="click", ref=ref_of(view.body, 'button "Increment"'))
         singles: list[float] = [await timed_act(session, "timing", [click]) for _ in range(20)]
         batches: list[float] = [await timed_act(session, "timing", [click] * 5) for _ in range(5)]
@@ -886,13 +886,13 @@ def driver_pids() -> list[int]:
 
 async def test_a_dead_driver_fails_one_call_and_the_browser_restarts(browser: BrowserSession, site: str) -> None:
     """Runs last: it replaces the Chrome that the tests above used."""
-    await browser.open_url("driver", f"{site}/")
+    await browser.open_url("driver", f"{site}/", True)
     before: list[int] = driver_pids()
     assert len(before) == 1, before
     os.kill(before[0], signal.SIGKILL)
     with pytest.raises(BrowserError, match="connection to the browser broke"):
-        await browser.open_url("driver", f"{site}/form")
-    view: PageView = await browser.open_url("driver", f"{site}/form")
+        await browser.open_url("driver", f"{site}/form", True)
+    view: PageView = await browser.open_url("driver", f"{site}/form", True)
     assert view.title == "Form"
     assert driver_pids() not in ([], before)
 
@@ -938,7 +938,7 @@ async def test_dots_own_chrome_closes_once_unused_and_starts_again_for_the_next_
         config, SERVER, tmp_path / "profile", tmp_path / "downloads", lambda: frozenset(at_work)
     )
     try:
-        await session.open_url("working", f"{site}/")
+        await session.open_url("working", f"{site}/", True)
         await asyncio.sleep(0.3)
         await session._close_unused()
         assert profile_holder_pid(tmp_path / "profile") is not None
@@ -952,7 +952,7 @@ async def test_dots_own_chrome_closes_once_unused_and_starts_again_for_the_next_
         await asyncio.sleep(0.3)
         await session._close_unused()
         assert await _profile_free(tmp_path / "profile")
-        view: PageView = await session.open_url("next", f"{site}/")
+        view: PageView = await session.open_url("next", f"{site}/", True)
         assert view.title == "Home"
     finally:
         await session.aclose()

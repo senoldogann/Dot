@@ -180,7 +180,8 @@ Both modes share what follows.
   element and what to do about it (close or answer the box, or press Escape).
 - Password, one-time-code and card fields are never filled by Dot outside `yolo`: there the step is refused, and the
   browser is yours to take over; in `yolo` the run fills the field itself and the record of the step says why it would
-  have asked (items 429 and 443, see [Safety](safety.md#safety)). Cookie banners
+  have asked (items 429 and 443, see [Safety](safety.md#safety)). Outside `yolo` the run never reads such a field's
+  value either: the page's lines show `[hidden]` and a screenshot covers the field (item 467). Cookie banners
   are declined (`decline_cookie_banners`; a click on a banner that goes away under it is no error, and one that fails
   with the banner still there is logged as `consent_decline_failed` with the page's address).
 - A conversation thread keeps at most `max_tabs` tabs open and closes idle ones after `tab_idle_s`.

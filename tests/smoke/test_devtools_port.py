@@ -104,7 +104,7 @@ async def test_dots_chrome_takes_devtools_connections_on_the_port(site: str, pro
     assert address == f"http://127.0.0.1:{config.debug_port}"
     session: BrowserSession = BrowserSession(config, SERVER, profile, tmp_path / "downloads", no_runs_at_work)
     try:
-        await session.open_url("run", f"{site}/")
+        await session.open_url("run", f"{site}/", True)
         async with httpx.AsyncClient() as client:
             version: object = (await client.get(f"{address}/json/version")).json()
         assert isinstance(version, dict) and "Chrome" in str(version["Browser"]), version
