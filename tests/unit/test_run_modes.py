@@ -11,7 +11,7 @@ from typing import Literal
 import pytest
 
 from dotagent.agent.compact import drop_old_images
-from dotagent.agent.loop import RunOutcome, SendBack, _after_verdict, _since_goal
+from dotagent.agent.loop import RunOutcome, SendBack, _acts, _after_verdict, _since_goal
 from dotagent.agent.prompt import (
     build_system_prompt,
     clock_note,
@@ -26,8 +26,9 @@ from dotagent.agent.prompt import (
 from dotagent.agent.review import GoalVerdict
 from dotagent.config import load_config
 from dotagent.core.errors import ConfigError
+from dotagent.core.types import JsonObject
 from dotagent.harness.components import NO_HARNESS
-from dotagent.llm.types import ImageData, Message, assistant_message, user_message
+from dotagent.llm.types import ImageData, Message, ToolCall, assistant_message, user_message
 from dotagent.policy.engine import route_for
 from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
@@ -298,6 +299,27 @@ def _asking(source: str, questions: AskMode, tool_names: list[str]) -> str:
             NO_HARNESS,
         )
     )
+
+
+@pytest.mark.parametrize(
+    ("arguments", "questions", "acts"),
+    [
+        ({"question": "Which?"}, "choose", False),
+        ({"question": "Which?", "wait": True}, "choose", True),
+        # As the tool reads its arguments: a "true" it takes for True waits.
+        ({"question": "Which?", "wait": "true"}, "choose", True),
+        # Arguments the tool refuses ask nothing.
+        ({"wait": True}, "choose", False),
+        ({"question": "Which?"}, "wait", True),
+        ({"question": "Which?", "wait": True}, "leave", False),
+    ],
+)
+def test_a_question_left_for_the_user_is_no_act_of_the_run(
+    arguments: JsonObject, questions: AskMode, acts: bool
+) -> None:
+    """Item 506: a step whose only call is a question that does not wait changes nothing until someone answers."""
+    assert _acts([ToolCall(id="call_1", name=ASK_USER_TOOL, arguments=arguments)], questions) is acts
+    assert _acts([ToolCall(id="call_2", name="read_file", arguments={"path": "a"})], questions) is True
 
 
 def test_the_prompt_says_that_a_run_that_chooses_asks_without_wait_when_it_can_go_on() -> None:

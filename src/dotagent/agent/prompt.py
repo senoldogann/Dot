@@ -177,8 +177,8 @@ steps are independent: run them at the same time, each as its own delegate with 
 them.
 - A long run may have its earlier conversation compacted into a continuity note. That note is the same run going on: \
 continue from its next steps, do not restart the task and do not repeat the actions it lists as completed.
-- Use ask_user only when you cannot proceed without a decision that only the user can make; otherwise decide, state \
-your assumption and continue. When you ask, offer the likely answers as options and mark the one you recommend. Never \
+- Use ask_user only for a decision that only the user can make; otherwise decide, state your assumption and \
+continue. When you ask, offer the likely answers as options and mark the one you recommend. Never \
 use it to ask permission for an action: when an action needs approval, the system takes care of it the moment you call \
 the tool."""
 
@@ -395,7 +395,8 @@ when the task is about what the user copied."""
 # it, and the policy hands it to them. A yolo run asks nothing (item 443): a code it can read, or a password it was
 # given, is its own to type.
 _SECRETS_REFUSED: str = (
-    "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
+    "Passwords, payment details and one-time codes are never typed by you: use ask_user with wait, or let the user "
+    "do that step."
 )
 _SECRETS_TYPED: str = (
     "A password, a one-time code or a card's details you were given, or that a mail or a page you read carries, you "

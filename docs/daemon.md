@@ -186,8 +186,8 @@ sent they stand under it as chips (the run's `picks` event); a message that stee
 next one, and the page says so, and a queued message with picks is not steered into the run at work: it stays queued to
 start a run of its own. A run sent with picks starts with each picked server's tool group on from its first step when
 its tools are grouped (with every tool offered they are on anyway), and its first message is your words, then a line
-that names the servers to use, Plan first's (write the plan with `update_plan`, then ask with `ask_user` and act once
-you agree: the prompt asks it, nothing holds the run's tools back), and each picked skill's instructions as the `skill`
+that names the servers to use, Plan first's (write the plan with `update_plan`, then ask with `ask_user`, waiting for
+the answer, and act once you agree: the prompt asks it, nothing holds the run's tools back), and each picked skill's instructions as the `skill`
 tool gives them; the run's goal stays your words. Picks a run cannot start with are refused, with why, and nothing
 starts: a server that is not connected, or none of whose tools a run of its mode may use (a chat's, when the server's
 tools all act), each in its own words, a skill it is not offered, Plan first in a chat or under YOLO (a YOLO run does

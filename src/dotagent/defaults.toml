@@ -251,8 +251,9 @@ revisit_window = 8
 finish_nudges = 2
 # What ask_user does in a run nobody can answer during the run (yolo, scheduled and eval runs): "leave" stores the
 # question for you (the run's page lists it, your answer goes on with the work in the run's thread) and the run goes on
-# at once; "wait" waits for an answer as a run you started in any mode but yolo always does (approval_timeout_s at
-# most).
+# at once; "wait" waits for an answer (approval_timeout_s at most). A run you started in any mode but yolo chooses for
+# each question in the daemon, waiting only when it cannot do anything useful without the answer (item 506), and waits
+# for every answer in a dotx command.
 questions = "leave"
 parallel_tools = 4
 model_call_timeout_s = 420.0

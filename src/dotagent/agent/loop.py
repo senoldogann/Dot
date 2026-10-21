@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
@@ -260,7 +260,7 @@ from dotagent.tools.groups import (
     used_groups,
 )
 from dotagent.tools.mail_calendar import account_lines
-from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, AskUserArgs, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import skill_instructions
@@ -426,8 +426,15 @@ def _acts(calls: Sequence[ToolCall], questions: AskMode) -> bool:
 
 
 def _waits(call: ToolCall, questions: AskMode) -> bool:
-    """Whether the question ``call`` asks waits for its answer."""
-    return questions == "wait" or (questions == "choose" and call.arguments.get("wait") is True)
+    """Whether the question ``call`` asks waits for its answer: every one where the run waits, and one asked with
+    ``wait``, as the tool reads its arguments, where it chooses. A call whose arguments the tool refuses asks nothing,
+    so it waits for nothing."""
+    if questions != "choose":
+        return questions == "wait"
+    try:
+        return AskUserArgs.model_validate(call.arguments).wait
+    except ValidationError:
+        return False
 
 
 def _drain(inbox: asyncio.Queue[UserInput]) -> list[UserInput]:

@@ -299,7 +299,7 @@ async def test_a_picked_skill_and_plan_first_follow_the_owners_words_in_the_firs
     assert words == GOAL
     assert plan == (
         "[Picked in the composer] Plan first: before you change anything, write your plan with update_plan, then ask "
-        "the owner with ask_user whether to go ahead, and act only once they agree."
+        "the owner with ask_user, with wait, whether to go ahead, and act only once they agree."
     )
     assert skills == "[Picked in the composer] The owner picked the skills below for this message."
     # The skill as the skill tool gives it: what it is and where, then its instructions inside their fence.
