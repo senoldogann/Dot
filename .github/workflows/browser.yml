@@ -1,0 +1,54 @@
+# Every browser test (item 486): the smoke tests marked browser, against local pages and a local daemon, in Google
+# Chrome (on the runner's image), Playwright's headless shell and WebKit (the phone's engine). Every night, on demand
+# (`gh workflow run browser.yml --ref <branch>` runs them on a branch) and before a release (release.yml calls it). The
+# core of them runs on every change beside the gate (gate.yml). Nothing is changed or opened here: a red night is
+# GitHub's to show.
+name: browser
+
+on:
+  schedule:
+    - cron: "43 1 * * *"
+  workflow_dispatch:
+  workflow_call:
+
+# The job only reads the code: the token GitHub hands it can do nothing more.
+permissions:
+  contents: read
+
+# Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
+
+concurrency:
+  group: browser-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      DOT_HOME: ${{ github.workspace }}/.ci/home
+      DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
+      DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
+      # The runner's /etc/localtime is not a link into the zone database, so the zone is named here.
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --frozen
+      - name: Browsers
+        run: uv run playwright install chromium-headless-shell webkit
+      - name: Ripgrep
+        run: brew install ripgrep
+      - name: The runner
+        run: sysctl -n hw.ncpu hw.memsize
+      - name: Throw-away home
+        run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+      - name: Browser tests
+        run: >
+          uv run pytest tests/smoke -q -n 3 -p no:cacheprovider --durations=20
+          -m "browser and not live and not internet and not hosted and not desktop"

@@ -1,7 +1,9 @@
 # The gate every change passes before it is merged: the same commands as CONTRIBUTING.md, on macOS because the
 # package depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted
-# model or a stand-in plays the real loop, tools, policy and store. The tests marked live, browser, internet, desktop or
-# hosted stay on the developer's Mac; one that needs the local Ollama server's embedding model skips itself here.
+# model or a stand-in plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding
+# model skips itself here. Beside it, the `browser` job runs the core of the browser tests (item 486): the URL rules of
+# Dot's Chrome, the sign-in, the secret fields, the attach mode and every phone page; browser.yml runs them all every
+# night and before a release. The tests marked live, internet, desktop or hosted stay on the developer's Mac.
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing, as no
@@ -77,3 +79,39 @@ jobs:
         run: >
           uv run pytest tests/smoke -q -n auto -p no:cacheprovider
           -m "not live and not browser and not internet and not desktop and not hosted"
+
+  # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
+  # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
+  # and the face. Three workers: the browser tests are steady at that count, more is what item 437 found flaky.
+  browser:
+    runs-on: macos-latest
+    timeout-minutes: 30
+    env:
+      DOT_HOME: ${{ github.workspace }}/.ci/home
+      DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
+      DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
+      TZ: UTC
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --frozen
+      # Google Chrome is on the runner's image; Playwright's own headless shell and WebKit (the phone's engine) are not.
+      - name: Browsers
+        run: uv run playwright install chromium-headless-shell webkit
+      - name: Ripgrep
+        run: brew install ripgrep
+      - name: The runner
+        run: sysctl -n hw.ncpu hw.memsize
+      - name: Throw-away home
+        run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+      - name: Core browser tests
+        run: >
+          uv run pytest -q -n 3 -p no:cacheprovider --durations=10
+          -m "browser and not live and not internet and not hosted and not desktop"
+          tests/smoke/test_browser_*.py tests/smoke/test_phone_*.py tests/smoke/test_secret_fields.py
+          tests/smoke/test_page_guards.py tests/smoke/test_face.py
