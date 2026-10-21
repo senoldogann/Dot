@@ -518,6 +518,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
           heading: null,
           onSettled: (decided) => attempt(() => questionDecided(decided)),
           leftNote: detail.campaign === null ? LEFT_IN_RUN : LEFT_IN_CAMPAIGN,
+          onUseHere: null,
         });
         questionCards.set(question.id, card.node);
         questionsList.append(card.node);
@@ -1408,6 +1409,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       inspector.addImage(name);
     },
     onQuestionLeft: debounce(() => reconcile(), QUESTIONS_SETTLE_MS),
+    // A hand-off of a browser step offers to use the page from this screen (item 475).
+    onUseHere: () => computer.useHere(),
     onHeld: (held) => {
       computer.setHeld(held);
       if (held) {

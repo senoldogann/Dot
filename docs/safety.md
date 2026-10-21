@@ -8,7 +8,8 @@ carries nothing of yours, and on your yes downloads that version from there ([th
 shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, sent where the configuration points:
 
 - **To the models: the run's conversation.** Each call sends the goal, the messages, what the tools returned (the text
-  of the files and pages the run read, what commands printed) and the screenshots the run takes or is given. By default
+  of the files and pages the run read, what commands printed, never the value of a secret field of a page outside
+  `yolo`, see Secrets below) and the screenshots the run takes or is given. By default
   every role (`main`, `vision`, `fast`, `review`) is a cloud model of Ollama: the Ollama server on this Mac passes each
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
@@ -106,7 +107,26 @@ currency, so list sites that bill in one currency. Empty by default.
    move it one place up or down that order, and **New rule** opens the two ways to write one. A rule that an earlier
    enabled rule fits wherever it fits (no expression, or the same one, on a tool pattern that takes in its own: `*`,
    the same pattern, or one that matches its plain tool name) never decides, and the page says so with the number of
-   the rule that decides in its place (item 449); whether two different expressions overlap it does not tell. It can
+   the rule that decides in its place (item 449); whether two different expressions overlap it does not tell. Under each
+   enabled rule, the page says how it was used on the steps of the last 30 days, with today's rules (`GET
+   /api/rules/usage`, item 473): how many steps it fits, how many it decides as the first rule to fit, how many of those
+   ran in yolo runs or were settled before any rule, and which earlier rule decides the others first. Before a rule is
+   added, **Test on the last 30 days** under its fields (`POST /api/rules/preview`, item 469) tries it on the steps of
+   past runs, as the policy matches rules, and writes nothing. It says how many steps it fits and which earlier rules
+   decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing whatever the rules
+   say, and those settled before any rule is read, by the checks above that no rule changes (money, credentials,
+   messages and posts, Dot's own files, the always-on review, a research run, a spend within its caps; a rule that hands
+   the step to you does take the place of the question about a message, a post or a spend). The steps it would decide it
+   compares with what was decided then: the decision a step's record keeps since item 468, or for a step the gate did
+   not let through (refused, declined, handed to you), what the policy said of it before, in the `policy` event of its
+   call. It says how many would ask more, how many less and how many the same, with the taint the gate weighed then
+   (kept since item 474; for an older step, the run's taint before its result): an allow rule still asks about a step
+   that reaches outside while the run is tainted. A step with no decision on record (held by another run, refused by the
+   review model, from before item 468, or an OpenCode agent's that ran before item 474 or that the gate did not let
+   through) is counted as such. Then come the newest steps it fits, each leading to its run. A drafted rule is tried at
+   once. A try-out reads at most 20,000 steps and two seconds, the newest first, and says so when it read only those; a
+   pattern that takes too long on a past step stops it, with that said, as the daemon would refuse the step. Only steps
+   still in the database count, and a batch of browser or desktop steps is one step, as its record keeps it. It can
    also be said in your own words ("let Dot run git status and git
    diff without asking me"): the review model drafts its parts, the tool, the answer and the commands or words the
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
@@ -176,8 +196,20 @@ a note that it was saved while reading outside content.
   password manager or Keychain Access, in any mode, nor a window of Dot's outside `yolo`: the desktop app's, or one of
   another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
-  title is refused as well). Desktop screenshots black out the password managers' windows; secure fields and web pages
-  are not masked.
+  title is refused as well). Desktop screenshots black out the password managers' windows; their secure fields are not
+  masked.
+- What a run reads of a web page never carries the value of a password, one-time-code or card field, outside `yolo`
+  (item 467): the page's lines show `[hidden]` in its place, in the view of the page, in a search of it and in what
+  changed after a step, and a screenshot covers the field in every frame, a payment provider's too. The fields are the
+  ones Dot refuses to fill, by the page's marking (a `password` input, an `autocomplete` that names a secret); the
+  field's name and ref stay, so it can still be found and filled. A value you type during a takeover, or one a page
+  fills in, stays out of the model's conversation that way; typed from the screen that shows the page (item 470), it
+  goes to the page and nowhere else: the daemon keeps how many clicks and scrolls there were and whether anything was
+  typed, and a failure of the page is told without what you typed. You act there, not Dot: nothing passes the policy,
+  and in Dot's own Chrome the URL rules judge where your taps lead as they judge a run's; in your own Chrome (`attach`)
+  they do not, as for a run's clicks. In `yolo` nothing is masked (item 443): the run reads all it is shown. A page
+  script (`browser_eval`) can still read a field's value, and that step is judged as any other; the live Screen view you
+  watch is not masked.
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).
@@ -332,6 +364,15 @@ same way, except in a run nobody can answer during it (see
 what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
 ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
 commas) or your own words. The run reads which option you chose, and whether it was the one it recommended.
+
+**The record of each step.** Every step that the policy let through keeps, with its result, what decided it (item 468):
+the verdict, where it came from (one of your rules, named, the preset, the guard, the taint, supervised...), the reason,
+the preset of the run, who answered when there was a question: nobody (the policy let it through), you, the review
+model, or yolo, which asks nothing; whether the run was tainted when the gate decided (item 474); and the flags its
+action raised (money, a credential, a message in your name...). Since item 474, a step of an OpenCode agent keeps the
+same. A step refused or handed to you has its `policy` event instead, which names the rule and keeps the taint too. The
+steps a browser batch takes inside one call are the batch's one record; one of them that asked has its own `policy`
+event and approval.
 
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 

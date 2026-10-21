@@ -93,7 +93,8 @@ async def cmd_browser_attach(command: BrowserAttachCommand) -> int:
     )
     try:
         attachment: Attachment = await session.attachment()
-        await session.snapshot(_CHECK_THREAD)
+        # A blank tab, which nothing reads but this check; it hides as a run's view would.
+        await session.snapshot(_CHECK_THREAD, True)
     finally:
         await session.aclose()
     await asyncio.to_thread(set_browser_mode, config_path(), "attach")

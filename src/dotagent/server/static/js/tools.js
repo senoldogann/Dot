@@ -4,6 +4,7 @@ import { imageUrl } from "./api.js";
 import { clip, copyText, duration, el, plural } from "./dom.js";
 import { icon, toolIconName } from "./icons.js";
 import { showImage, toast } from "./ui.js";
+import { showsWhy, whyText } from "./why.js";
 
 const PRIMARY_KEYS = ["command", "url", "path", "query", "goal", "text", "name", "app", "ref", "title", "script", "key"];
 const SUMMARY_CHARS = 200;
@@ -155,6 +156,17 @@ function thumbnail(name) {
   return holder;
 }
 
+/** Why the step ran (item 468), with the way to the rules when one of them decided it. */
+function whyLine(decision, flags) {
+  return el(
+    "p",
+    { class: "small why-line" },
+    whyText(decision, flags),
+    decision.source === "rule" ? " " : null,
+    decision.source === "rule" ? el("a", { class: "why-rules", href: "#/settings/rules" }, "Rules") : null,
+  );
+}
+
 function section(title, content, copyable) {
   return el(
     "div",
@@ -228,7 +240,8 @@ export function toolRow({ tool, args }) {
   function buildBody() {
     built = true;
     const argsText = JSON.stringify(args, null, 2);
-    body.replaceChildren(
+    // replaceChildren writes a null as the word "null": a section that is not there is left out before (item 472).
+    const parts = [
       section("Arguments", el("pre", { class: "out" }, argsText), argsText),
       result === null
         ? el("div", { class: "small muted" }, cut ? "Cut off: the run ended before this call reported back." : "Still running…")
@@ -237,7 +250,9 @@ export function toolRow({ tool, args }) {
             result.text === "" ? el("div", { class: "small muted" }, "(no text)") : textBlock(result.text, !result.ok),
             result.text === "" ? null : result.text,
           ),
-    );
+      result === null || !showsWhy(result.decision, result.kind) ? null : section("Why it ran", whyLine(result.decision, result.flags ?? []), null),
+    ];
+    body.replaceChildren(...parts.filter((part) => part !== null));
   }
 
   details.addEventListener("toggle", () => {

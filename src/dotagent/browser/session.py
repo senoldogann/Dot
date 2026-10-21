@@ -72,6 +72,7 @@ from dotagent.browser.profiles import (
     profile_dir,
     write_default_zoom,
 )
+from dotagent.browser.remote_input import InputEvent, InputResult, MouseButton, dispatch, let_go
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
@@ -148,6 +149,8 @@ _TAB_MARK_BYTES: int = 6
 _UNZOOMED: int = 100
 # A scroll with no distance moves by this share of the page area the model sees.
 _SCROLL_SHARE: float = 0.8
+# How long input from the screen waits for a step of the run that is under way when the owner took it over (item 470).
+_INPUT_WAIT_S: float = 2.0
 
 _LAUNCH_ARGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
@@ -804,6 +807,11 @@ class BrowserSession:
         self._config = self._config.model_copy(update={"raise_window": raise_window})
         _log.info("browser_raise_window", raise_window=raise_window)
 
+    def set_remote_input(self, remote_input: bool) -> None:
+        """Whether the owner may use a held run's page from the screen (item 470), from the next input on."""
+        self._config = self._config.model_copy(update={"remote_input": remote_input})
+        _log.info("browser_remote_input", remote_input=remote_input)
+
     async def set_debug_port(self, port: int) -> None:
         """The port Dot's own Chrome takes DevTools connections on (item 265; 0 for none), from its next start: Dot's
         own Chrome, when it runs on another port, is closed, so that the next call starts it on this one. Refused as
@@ -1245,12 +1253,12 @@ class BrowserSession:
             return Viewport(width=config.viewport_width, height=config.viewport_height)
         return await measure_viewport(tab.page)
 
-    async def _capture(self, tab: Tab) -> _Capture:
+    async def _capture(self, tab: Tab, hide_secrets: bool) -> _Capture:
         config: BrowserConfig = self._config
         # The window's size is read alongside the snapshot, not before it (item 342): in the Chrome of the user it is
         # one more round trip to the page on every capture, and the two reads do not depend on each other.
         viewport, lines = await asyncio.gather(
-            self._viewport(tab), capture_lines(tab.page, _ms(config.action_timeout_s))
+            self._viewport(tab), capture_lines(tab.page, _ms(config.action_timeout_s), hide_secrets)
         )
         kept: tuple[SnapshotLine, ...] = viewport_filter(
             lines, viewport.width, viewport.height, config.viewport_margin_px
@@ -1265,13 +1273,13 @@ class BrowserSession:
             overlays=overlays,
         )
 
-    async def _capture_loaded(self, tab: Tab) -> _Capture:
+    async def _capture_loaded(self, tab: Tab, hide_secrets: bool) -> _Capture:
         """Capture after a navigation; a nearly empty first view gets one more, longer, settle before it is shown."""
-        capture: _Capture = await self._capture(tab)
+        capture: _Capture = await self._capture(tab, hide_secrets)
         if capture.refs >= _MIN_REFS_AFTER_LOAD or tab.page.url in _BLANK_URLS:
             return capture
         await wait_dom_quiet(tab.page, _LATE_QUIET_MS, _LATE_MAX_MS, _ms(self._config.navigation_timeout_s))
-        return await self._capture(tab)
+        return await self._capture(tab, hide_secrets)
 
     async def _tab_title(self, tab: Tab) -> str:
         try:
@@ -1311,18 +1319,18 @@ class BrowserSession:
         tab.rendered_url = url
         return view
 
-    async def _full_view(self, thread: ThreadTabs, tab: Tab) -> PageView:
+    async def _full_view(self, thread: ThreadTabs, tab: Tab, hide_secrets: bool) -> PageView:
         await self._settle(tab)
-        return await self._settled_view(thread, tab)
+        return await self._settled_view(thread, tab, hide_secrets)
 
-    async def _settled_view(self, thread: ThreadTabs, tab: Tab) -> PageView:
+    async def _settled_view(self, thread: ThreadTabs, tab: Tab, hide_secrets: bool) -> PageView:
         """The whole page, of a tab that has just settled."""
-        capture: _Capture = await self._capture(tab)
+        capture: _Capture = await self._capture(tab, hide_secrets)
         return await self._assemble(thread, tab, capture, capture.rendered, "full")
 
-    async def _changes_view(self, thread: ThreadTabs, tab: Tab) -> PageView:
+    async def _changes_view(self, thread: ThreadTabs, tab: Tab, hide_secrets: bool) -> PageView:
         """The page as it is now, as a delta against the last view when that is clearly smaller."""
-        capture: _Capture = await self._capture(tab)
+        capture: _Capture = await self._capture(tab, hide_secrets)
         if tab.rendered and tab.rendered_url == tab.page.url:
             diff = diff_views(tab.rendered, capture.rendered)
             if prefer_diff(diff, capture.rendered):
@@ -1533,7 +1541,7 @@ class BrowserSession:
             "document",
         )
 
-    async def _load(self, thread: ThreadTabs, tab: Tab, url: str) -> PageView:
+    async def _load(self, thread: ThreadTabs, tab: Tab, url: str, hide_secrets: bool) -> PageView:
         self._require_allowed(url)
         config: BrowserConfig = self._config
         tab.status = None
@@ -1552,42 +1560,45 @@ class BrowserSession:
             tab.status = status
         await self._settle(tab)
         await self._enforce_landing(tab)
-        capture: _Capture = await self._capture_loaded(tab)
+        capture: _Capture = await self._capture_loaded(tab, hide_secrets)
         return await self._assemble(thread, tab, capture, capture.rendered, "full")
 
     # ------------------------------------------------------------------ public operations
+    # A view the model reads takes ``hide_secrets``: the value of a field the page marks secret then shows as
+    # ``[hidden]``, in the page's lines and in a screenshot (item 467); the tools give it in every mode but yolo.
 
-    async def open_url(self, thread_id: str, url: str) -> PageView:
+    async def open_url(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
         """Navigate the current tab of the thread."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            return await self._load(thread, tab, url)
+            return await self._load(thread, tab, url, hide_secrets)
 
-    async def new_tab(self, thread_id: str, url: str) -> PageView:
+    async def new_tab(self, thread_id: str, url: str, hide_secrets: bool) -> PageView:
         """Open ``url`` in a new tab that becomes the current one."""
         self._require_allowed(url)
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._create_tab(thread)
-            return await self._load(thread, tab, url)
+            return await self._load(thread, tab, url, hide_secrets)
 
-    async def snapshot(self, thread_id: str) -> PageView:
+    async def snapshot(self, thread_id: str, hide_secrets: bool) -> PageView:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            return await self._full_view(thread, tab)
+            return await self._full_view(thread, tab, hide_secrets)
 
-    async def find(self, thread_id: str, needle: str, limit: int) -> FindResult:
-        """Search the whole page, also outside the viewport, for elements whose role or name contains ``needle``."""
+    async def find(self, thread_id: str, needle: str, limit: int, hide_secrets: bool) -> FindResult:
+        """Search the whole page, also outside the viewport, for elements whose role or name contains ``needle``; a
+        hidden value is not searched."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            capture: _Capture = await self._capture(tab)
+            capture: _Capture = await self._capture(tab, hide_secrets)
             tab.lines = capture.lines
             return FindResult(url=tab.page.url, hits=find_lines(capture.lines, needle, limit))
 
-    async def links(self, thread_id: str, needle: str, limit: int) -> FindResult:
+    async def links(self, thread_id: str, needle: str, limit: int, hide_secrets: bool) -> FindResult:
         """The links of the whole page with absolute targets; ``needle`` filters on link text and target."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            capture: _Capture = await self._capture(tab)
+            capture: _Capture = await self._capture(tab, hide_secrets)
             tab.lines = capture.lines
             return FindResult(url=tab.page.url, hits=link_lines(capture.lines, tab.page.url, needle, limit))
 
@@ -1727,12 +1738,14 @@ class BrowserSession:
                 url=tab.page.url, text=text[offset : offset + max_chars], offset=offset, total_chars=len(text)
             )
 
-    async def screenshot(self, thread_id: str) -> Screenshot:
+    async def screenshot(self, thread_id: str, hide_secrets: bool) -> Screenshot:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             config: BrowserConfig = self._config
             viewport: Viewport = await self._viewport(tab)
-            shot: bytes = await screenshot_jpeg(tab.page, config.screenshot_quality, _ms(config.action_timeout_s))
+            shot: bytes = await screenshot_jpeg(
+                tab.page, config.screenshot_quality, _ms(config.action_timeout_s), hide_secrets
+            )
             # Chrome's zoom is left out of Playwright's CSS pixels: the picture is redrawn at the page's own size.
             data: bytes = await asyncio.to_thread(
                 jpeg_of_size, shot, viewport.width, viewport.height, config.screenshot_quality
@@ -1747,6 +1760,74 @@ class BrowserSession:
             return None
         tab: Tab = thread.tabs[thread.active]
         return None if tab.page.is_closed() else tab
+
+    async def send_input(
+        self, thread_id: str, events: Sequence[InputEvent], still_held: Callable[[], bool]
+    ) -> InputResult:
+        """Do the owner's ``events`` on the thread's current tab (item 470), which starts no Chrome. A step of the run
+        that was under way when the owner took it over is waited for, up to a moment, under the thread's lock; then
+        ``still_held`` must still say the owner holds the run, so that input sent before the owner handed it back
+        never lands after. A failure of the page is said with its address and the kinds of the events only: what the
+        owner types is in no error and no log."""
+        if not self._config.remote_input:
+            raise RunConflict(
+                "using the page from the screen is switched off: [browser] remote_input, in Settings › Browser",
+                {"thread_id": thread_id},
+            )
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or self._tab_of(thread_id) is None:
+            raise RunConflict("the run has no page open", {"thread_id": thread_id})
+        try:
+            async with asyncio.timeout(_INPUT_WAIT_S):
+                await thread.lock.acquire()
+        except TimeoutError:
+            raise RunConflict(
+                "a step of the run is still going; try again in a moment", {"thread_id": thread_id}
+            ) from None
+        try:
+            if not still_held():
+                raise RunConflict("the run is not taken over", {"thread_id": thread_id})
+            tab: Tab | None = self._tab_of(thread_id)
+            if tab is None:
+                raise RunConflict("the run has no page open", {"thread_id": thread_id})
+            viewport: Viewport = await self._viewport(tab)
+            try:
+                await dispatch(tab.page, viewport, events)
+            except Exception as error:  # noqa: BLE001 - raised again below without its words
+                # Whatever failed, its words may hold what the owner typed: only its kind is kept, and it is not
+                # chained, so that no traceback carries it either.
+                raise BrowserError(
+                    "the page did not take the input",
+                    {
+                        "url": tab.page.url,
+                        "events": [event.kind for event in events],
+                        "error_type": type(error).__name__,
+                    },
+                ) from None
+            thread.last_used = time.monotonic()
+            return InputResult(accepted=len(events), url=tab.page.url, width=viewport.width, height=viewport.height)
+        finally:
+            thread.lock.release()
+
+    async def let_go_of_buttons(self, thread_id: str, buttons: frozenset[MouseButton]) -> None:
+        """Let go of the buttons the owner's input left down (item 470), once the run is handed back; a thread with no
+        page has nothing to let go of."""
+        tab: Tab | None = self._tab_of(thread_id)
+        if tab is None or not buttons:
+            return
+        thread: ThreadTabs = self._threads[thread_id]
+        async with thread.lock:
+            try:
+                await let_go(tab.page, buttons)
+            except PlaywrightError as error:
+                raise BrowserError(
+                    "the page did not take the release of a button",
+                    {
+                        "url": tab.page.url,
+                        "buttons": ", ".join(sorted(buttons)),
+                        "error": truncate_middle(str(error), 300),
+                    },
+                ) from error
 
     async def focus(self, thread_id: str) -> str | None:
         """Bring the thread's current tab to the front of its window, for the user to take over; returns its address,
@@ -1966,7 +2047,12 @@ class BrowserSession:
         return False
 
     async def act(
-        self, thread_id: str, steps: Sequence[Step], accept_confirms: bool, secret_field: SecretFieldCheck
+        self,
+        thread_id: str,
+        steps: Sequence[Step],
+        accept_confirms: bool,
+        secret_field: SecretFieldCheck,
+        hide_secrets: bool,
     ) -> ActOutcome:
         """Run the steps in order against the latest snapshot; stop at the first failure or surprise. ``secret_field``
         decides what a step does at a field that takes a secret: a step it refuses fails and stops the batch, and one
@@ -1982,9 +2068,9 @@ class BrowserSession:
             await self._settle(current)
             await self._enforce_landing(current)
             view: PageView = (
-                await self._changes_view(thread, current)
+                await self._changes_view(thread, current, hide_secrets)
                 if current is tab
-                else await self._settled_view(thread, current)
+                else await self._settled_view(thread, current, hide_secrets)
             )
             return ActOutcome(steps=tuple(reports), stopped=stopped, view=view)
 
@@ -1994,6 +2080,7 @@ class BrowserSession:
         direction: Literal["down", "up", "top", "bottom"],
         pixels: int | None,
         ref: str | None,
+        hide_secrets: bool,
     ) -> PageView:
         """Scroll the current tab by ``pixels``, or by most of the page area the model sees when ``pixels`` is None."""
         async with self._locked(thread_id) as thread:
@@ -2005,9 +2092,9 @@ class BrowserSession:
             )
             # The wheel lands a few tens of milliseconds after the call returns, inside the DOM quiet window.
             await self._settle(tab)
-            return await self._changes_view(thread, tab)
+            return await self._changes_view(thread, tab, hide_secrets)
 
-    async def wait_text(self, thread_id: str, text: str, timeout_s: float) -> TextWait:
+    async def wait_text(self, thread_id: str, text: str, timeout_s: float, hide_secrets: bool) -> TextWait:
         """Wait until ``text`` is visible on the current tab, at most ``timeout_s``; the page is shown either way.
         After a wait that timed out the page is shown as it is, without a settle that could outlast the wait. A
         navigation still pending then holds the reading until it commits, so the URL rules are checked again once the
@@ -2022,7 +2109,7 @@ class BrowserSession:
             elif not tab.nav_idle.is_set():
                 add_note(tab, _STILL_LOADING)
             await self._enforce_landing(tab)
-            view: PageView = await self._changes_view(thread, tab)
+            view: PageView = await self._changes_view(thread, tab, hide_secrets)
             await self._enforce_landing(tab)
             return TextWait(appeared=appeared, waited_s=waited_s, view=view)
 
@@ -2060,16 +2147,16 @@ class BrowserSession:
                 seconds=seconds,
             )
 
-    async def back(self, thread_id: str) -> PageView:
+    async def back(self, thread_id: str, hide_secrets: bool) -> PageView:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             tab.status = await go_back(tab.page, _ms(self._config.navigation_timeout_s))
             await self._settle(tab)
             await self._enforce_landing(tab)
-            capture: _Capture = await self._capture_loaded(tab)
+            capture: _Capture = await self._capture_loaded(tab, hide_secrets)
             return await self._assemble(thread, tab, capture, capture.rendered, "full")
 
-    async def switch_tab(self, thread_id: str, index: int) -> PageView:
+    async def switch_tab(self, thread_id: str, index: int, hide_secrets: bool) -> PageView:
         async with self._locked(thread_id) as thread:
             self._require_tab_index(thread, index)
             thread.active = index - 1
@@ -2077,20 +2164,20 @@ class BrowserSession:
             # The tab is made the window's visible one only when the window may be raised (item 97).
             if self._config.raise_window:
                 await bring_to_front(tab.page)
-            return await self._full_view(thread, tab)
+            return await self._full_view(thread, tab, hide_secrets)
 
-    async def close_tab(self, thread_id: str, index: int) -> PageView:
+    async def close_tab(self, thread_id: str, index: int, hide_secrets: bool) -> PageView:
         async with self._locked(thread_id) as thread:
             self._require_tab_index(thread, index)
             await self._close_tab_object(thread, thread.tabs[index - 1])
             tab: Tab = await self._current_tab(thread)
-            return await self._full_view(thread, tab)
+            return await self._full_view(thread, tab, hide_secrets)
 
     def _require_tab_index(self, thread: ThreadTabs, index: int) -> None:
         if not 1 <= index <= len(thread.tabs):
             raise BrowserError("there is no such tab", {"index": index, "open_tabs": len(thread.tabs)})
 
-    async def upload(self, thread_id: str, ref: str, paths: Sequence[str]) -> PageView:
+    async def upload(self, thread_id: str, ref: str, paths: Sequence[str], hide_secrets: bool) -> PageView:
         """Click the upload control ``ref`` and give the file chooser it opens ``paths``."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
@@ -2100,7 +2187,7 @@ class BrowserSession:
             finally:
                 tab.expect_chooser = False
             await self._settle(tab)
-            return await self._changes_view(thread, tab)
+            return await self._changes_view(thread, tab, hide_secrets)
 
     # ------------------------------------------------------------------ reads without browser access
 

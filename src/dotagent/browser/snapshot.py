@@ -502,6 +502,46 @@ def _option_entry(line: SnapshotLine) -> OptionEntry:
     return OptionEntry(name=f'"{line.name}"', selected="selected" in line.attrs, disabled="disabled" in line.attrs)
 
 
+# What a view the model reads shows of the value of a field the page marks secret (item 467).
+HIDDEN_VALUE: str = "[hidden]"
+# The roles of the lines that show what a field holds.
+_FIELD_ROLES: frozenset[str] = frozenset({"textbox", "searchbox", "spinbutton", "combobox"})
+_VALUE_ROLE: str = "text"
+
+
+def filled_fields(lines: Sequence[SnapshotLine]) -> tuple[SnapshotLine, ...]:
+    """The lines of fields that show a value: a text box, search box, spin button or combo box with a ref, whose value
+    is on its own line or, as a field with a placeholder shows it, on a ``text`` line right under it. An empty field
+    shows nothing, and stays as it is."""
+    parents: list[int | None] = _parents(lines)
+    holding: set[int] = {
+        parent for index, parent in enumerate(parents) if parent is not None and lines[index].role == _VALUE_ROLE
+    }
+    return tuple(
+        line
+        for index, line in enumerate(lines)
+        if line.role in _FIELD_ROLES and line.ref is not None and (bool(line.inline) or index in holding)
+    )
+
+
+def _without_value(line: SnapshotLine) -> SnapshotLine:
+    if not line.inline:
+        return line
+    return replace(line, text=line.text.removesuffix(line.inline) + HIDDEN_VALUE, inline=HIDDEN_VALUE)
+
+
+def hide_values(lines: Sequence[SnapshotLine], refs: frozenset[str]) -> tuple[SnapshotLine, ...]:
+    """``lines`` with the value of each field whose ref is in ``refs`` shown as :data:`HIDDEN_VALUE`, on the field's
+    own line and on the ``text`` lines right under it; its name, its ref and its placeholder stay, so the field can
+    still be found and filled. Done before a view is drawn, searched or compared, so none of them sees the value."""
+    parents: list[int | None] = _parents(lines)
+    hidden: set[int] = {index for index, line in enumerate(lines) if line.ref is not None and line.ref in refs}
+    return tuple(
+        _without_value(line) if index in hidden or (line.role == _VALUE_ROLE and parents[index] in hidden) else line
+        for index, line in enumerate(lines)
+    )
+
+
 def fold_options(lines: Sequence[SnapshotLine]) -> tuple[SnapshotLine, ...]:
     """Write the options of each collapsed native dropdown on its own line and drop the option lines.
 

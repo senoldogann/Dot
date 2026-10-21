@@ -7,12 +7,15 @@
 // Above the rules, the switch of the macOS sandbox of a run's commands (item 262).
 
 import { api } from "../api.js";
-import { clip, el, plural } from "../dom.js";
+import { ago, clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paintOpener, paneHead, segmented, switchSetting } from "../panels.js";
+import { outcomeLabel, previewLines, usageLine } from "../rulepreview.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
+// How far back a rule is tried before it is added (item 469).
+const TRY_OUT_DAYS = 30;
 const QUOTE_CHARS = 100;
 // The live event of a rule added, switched or deleted on any page (`rules_changed`, `dotagent.server.routes_data`).
 const RULES_CHANGED = "rules_changed";
@@ -97,7 +100,9 @@ function neverDecides(record, numberOf) {
   );
 }
 
-function ruleRow(record, index, total, numberOf, handlers) {
+/** A rule's row; `used` is the line of how it was used on the last days (item 473), or null until that is read and for a
+ * rule switched off. */
+function ruleRow(record, index, total, numberOf, handlers, used) {
   const answer = answerOf(record.behavior);
   const toggle = el("button", {
     class: "switch",
@@ -135,6 +140,7 @@ function ruleRow(record, index, total, numberOf, handlers) {
         neverDecides(record, numberOf),
       ),
       record.description === "" ? null : el("div", { class: "row-text muted" }, record.description),
+      used === null ? null : el("div", { class: "rule-usage faint small" }, used),
     ),
     el(
       "div",
@@ -178,7 +184,10 @@ function buildForm(onCreated) {
   const answers = segmented(
     ANSWERS.map(({ id, label, text }) => ({ id, label, hint: text })),
     ANSWERS[0].id,
-    () => paintPreview(),
+    () => {
+      paintPreview();
+      putAwayTryOut();
+    },
   );
   answers.element.classList.add("answers");
   answers.element.setAttribute("aria-label", "Then");
@@ -189,9 +198,79 @@ function buildForm(onCreated) {
     preview.replaceChildren(...sentence(glob.value.trim(), regex.value.trim()), " ", el("em", null, answer.label.toLowerCase()), ".");
   }
 
-  glob.addEventListener("input", paintPreview);
-  regex.addEventListener("input", paintPreview);
+  // What the rule would have done on the steps of the last days (item 469); a change of the rule puts it away.
+  const tryOutButton = el("button", { class: "btn", type: "button" }, `Test on the last ${TRY_OUT_DAYS} days`);
+  const tried = el("div", { class: "rule-tryout stack tight", role: "status", hidden: true });
+  // Which try-out may still show: one that answers after the rule changed is left unshown.
+  let tryOutTicket = 0;
+
+  function putAwayTryOut() {
+    tryOutTicket += 1;
+    tried.hidden = true;
+    tried.replaceChildren();
+  }
+
+  glob.addEventListener("input", () => {
+    paintPreview();
+    putAwayTryOut();
+  });
+  regex.addEventListener("input", () => {
+    paintPreview();
+    putAwayTryOut();
+  });
   const create = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Add rule");
+
+  async function tryOut() {
+    const globText = glob.value.trim();
+    if (globText === "") {
+      glob.focus();
+      return;
+    }
+    tryOutTicket += 1;
+    const ticket = tryOutTicket;
+    tryOutButton.disabled = true;
+    try {
+      const view = await api.post("/rules/preview", {
+        behavior: answers.value(),
+        tool_glob: globText,
+        match_regex: regex.value.trim(),
+        days: TRY_OUT_DAYS,
+      });
+      if (ticket !== tryOutTicket) {
+        return;
+      }
+      // replaceChildren writes a null as the word: what is not there is left out first.
+      const parts = [
+        ...previewLines(view, TRY_OUT_DAYS).map((line) => el("p", { class: "small" }, line)),
+        view.problem === null ? null : el("p", { class: "small rule-tryout-problem" }, view.problem),
+        view.examples.length === 0
+          ? null
+          : el(
+              "ul",
+              { class: "firings-list" },
+              view.examples.map((example) =>
+                el(
+                  "li",
+                  { class: "firing" },
+                  el(
+                    "div",
+                    { class: "row-meta" },
+                    el("span", { class: "faint" }, ago(example.at)),
+                    el("a", { class: "firing-title", href: `#/runs/${example.run_id}` }, `${example.tool}: ${example.summary}`),
+                    el("span", { class: "faint" }, outcomeLabel(example.was, example.ok, example.recorded)),
+                  ),
+                ),
+              ),
+            ),
+      ];
+      tried.replaceChildren(...parts.filter((part) => part !== null));
+      tried.hidden = false;
+    } finally {
+      tryOutButton.disabled = false;
+    }
+  }
+
+  tryOutButton.addEventListener("click", () => attempt(tryOut));
 
   async function submit() {
     const globText = glob.value.trim();
@@ -211,6 +290,7 @@ function buildForm(onCreated) {
       regex.value = "";
       description.value = "";
       paintPreview();
+      putAwayTryOut();
       toast("ok", "Rule added at the end of the list.");
       await onCreated();
     } finally {
@@ -227,6 +307,8 @@ function buildForm(onCreated) {
     paintPreview();
     element.scrollIntoView({ block: "nearest" });
     create.focus({ preventScroll: true });
+    // A drafted rule was written without looking at what it would catch: it is tried at once.
+    attempt(tryOut);
   }
 
   create.addEventListener("click", () => attempt(submit));
@@ -247,7 +329,8 @@ function buildForm(onCreated) {
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Then"), answers.element, answerHint),
       field("Why", description, "Optional. Shown when the rule decides."),
     ),
-    el("div", { class: "row" }, el("span", { class: "spacer" }), create),
+    tried,
+    el("div", { class: "row" }, el("span", { class: "spacer" }), tryOutButton, create),
   );
   return { element, fill };
 }
@@ -406,6 +489,10 @@ function buildSandbox(isDisposed) {
 export function mount(root, _ctx) {
   let disposed = false;
   let rules = null;
+  // How the rules were used on the last days (item 473), read after the rules; an answer older than the last read is
+  // left unshown.
+  let usage = null;
+  let usageTicket = 0;
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
 
@@ -423,16 +510,36 @@ export function mount(root, _ctx) {
       onMove: (record, direction) => attempt(() => move(record, direction)),
     };
     const numberOf = (id) => rules.findIndex((record) => record.id === id) + 1;
+    const usedBy = new Map((usage?.rules ?? []).map((used) => [used.rule_id, used]));
+    const lineOf = (record) => {
+      const used = usedBy.get(record.id);
+      return used === undefined ? null : usageLine(used, usage, TRY_OUT_DAYS, numberOf);
+    };
+    const problem = usage === null || usage.problem === null ? null : el("p", { class: "small rule-tryout-problem" }, usage.problem);
     // A rule's arrow keeps the focus through every drawing of the list, whichever of the reads after a move comes last.
     const active = document.activeElement;
     const focused = active instanceof HTMLElement && holder.contains(active) ? active.dataset : null;
+    // replaceChildren writes a null as the word: what is not there is left out first.
     holder.replaceChildren(
-      el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, handlers))),
+      ...[problem, el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, handlers, lineOf(record))))].filter(
+        (part) => part !== null,
+      ),
     );
     if (focused?.rule !== undefined) {
       focusArrow(focused.rule, focused.move);
     }
     count.textContent = plural(rules.length, "rule", "rules");
+  }
+
+  async function loadUsage() {
+    usageTicket += 1;
+    const ticket = usageTicket;
+    const read = await api.get(`/rules/usage?days=${TRY_OUT_DAYS}`);
+    if (disposed || ticket !== usageTicket) {
+      return;
+    }
+    usage = read;
+    paint();
   }
 
   async function reload() {
@@ -442,7 +549,10 @@ export function mount(root, _ctx) {
         return;
       }
       rules = fresh;
+      // What the rules did was counted with the rules as they were: it is read again for these.
+      usage = null;
       paint();
+      attempt(loadUsage);
     } catch (error) {
       if (disposed) {
         return;

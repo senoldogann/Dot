@@ -14,6 +14,7 @@ from dotagent.agent.campaign import CAMPAIGN_ENDED_EVENT
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.learning_health import LEARNING_STALLED_EVENT
 from dotagent.agent.lessons import LESSON_EVENTS
+from dotagent.agent.loop import browser_of
 from dotagent.agent.manager import QUEUE_CHANGED_EVENT, TERMINALS_CHANGED_EVENT
 from dotagent.agent.rewind import CHAT_REWOUND_EVENT
 from dotagent.browser.types import Frame
@@ -88,9 +89,11 @@ def encode_frame(frame: Frame) -> bytes:
 
 async def follow_screencast(ctx: ServerContext, run_id: str) -> AsyncIterator[bytes]:
     """The frames of the run's browser tab while the run is active and the client reads them; nothing is cast while
-    nobody reads. Ends when the run is over or the daemon starts to stop."""
+    nobody reads. Ends when the run is over or the daemon starts to stop. The browser is the one the run works in
+    (:func:`dotagent.agent.loop.browser_of`), a campaign's own too, so that the picture and the input from the screen
+    (item 470) come from the same page."""
     run: RunRecord = await ctx.runtime.store.get_run(run_id)
-    async for frame in ctx.runtime.browser.screencast(run.thread_id):
+    async for frame in (await browser_of(ctx.runtime, run)).screencast(run.thread_id):
         if ctx.stopping.is_set() or run_id not in ctx.manager.active_run_ids():
             return
         yield KEEPALIVE if frame is None else encode_frame(frame)

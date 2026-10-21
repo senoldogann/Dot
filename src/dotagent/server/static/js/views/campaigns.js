@@ -401,6 +401,7 @@ function mountPage(root, ctx, campaignId) {
           heading: el("a", { class: "small", href: `#/runs/${question.run_id}` }, "Open session"),
           onSettled: () => attempt(reload),
           leftNote: LEFT_IN_CAMPAIGN,
+          onUseHere: null,
         });
         questionCards.set(question.id, card.node);
         waiting.append(card.node);

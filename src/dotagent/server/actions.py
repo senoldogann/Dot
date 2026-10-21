@@ -4,6 +4,7 @@ from collections.abc import Mapping, Sequence
 
 from pydantic import JsonValue
 
+from dotagent.agent.authorization import StepDecision
 from dotagent.core.text import truncate_middle
 from dotagent.policy.types import READ_ONLY_KINDS
 from dotagent.server.views import ActionStep, FileEdit
@@ -30,6 +31,18 @@ def _acted(data: Mapping[str, JsonValue]) -> bool:
     return _text(data, "risk") in _ACTING_RISKS
 
 
+def _decision_of(data: Mapping[str, JsonValue]) -> StepDecision | None:
+    """What the policy decided of a step, as its result recorded it (item 468); ``None`` for a result from before,
+    never a guess."""
+    raw: object = data.get("decision")
+    return None if raw is None else StepDecision.model_validate(raw)
+
+
+def _flags_of(data: Mapping[str, JsonValue]) -> list[str]:
+    raw: object = data.get("flags")
+    return [flag for flag in raw if isinstance(flag, str)] if isinstance(raw, list) else []
+
+
 def action_steps(events: Sequence[EventRecord]) -> list[ActionStep]:
     """The acting steps among the tool results of a run, in their order."""
     steps: list[ActionStep] = []
@@ -47,6 +60,8 @@ def action_steps(events: Sequence[EventRecord]) -> list[ActionStep]:
                 summary=_text(event.data, "summary"),
                 ok=event.data.get("ok") is True,
                 evidence=truncate_middle(_text(event.data, "text"), _EVIDENCE_CHARS),
+                flags=_flags_of(event.data),
+                decision=_decision_of(event.data),
             )
         )
     return steps

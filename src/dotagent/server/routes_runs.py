@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 from typing import Annotated
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
 from dotagent.agent.aside import AsideAnswer, answer_aside
@@ -25,6 +25,7 @@ from dotagent.agent.rewind import (
     rewind_chat,
     take_back,
 )
+from dotagent.browser.remote_input import InputBatch, InputResult
 from dotagent.core.errors import InvalidValueError
 from dotagent.core.paths import workspace_dir
 from dotagent.llm.router import parse_model_ref
@@ -37,6 +38,7 @@ from dotagent.server.activity import current_activity
 from dotagent.server.away import read_away
 from dotagent.server.changes import ChangesView, chat_changes, chat_runs
 from dotagent.server.context import ServerContext
+from dotagent.server.guard import local_hosts
 from dotagent.server.sending import send_once
 from dotagent.server.stream import SSE_HEADERS, SSE_TYPE, follow_lifecycle, follow_run, follow_screencast
 from dotagent.server.views import (
@@ -414,6 +416,24 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         await store.get_run(run_id)
         await ctx.manager.take_over(run_id, UI_SOURCE)
         return await detail(run_id)
+
+    @router.post("/runs/{run_id}/takeover/screen", status_code=202)
+    async def take_over_run_on_screen(run_id: str, request: Request) -> RunDetail:
+        """Hold the run at its next tool call for the owner to use its page from the screen that shows it (item 470):
+        nothing comes to the front of the Mac, so a browser without a window is held too. Refused (409) while
+        ``[browser] remote_input`` is off."""
+        await store.get_run(run_id)
+        via_reach_name: bool = request.headers.get("host", "").lower() not in local_hosts(ctx.port)
+        await ctx.manager.take_over_on_screen(run_id, UI_SOURCE, via_reach_name)
+        return await detail(run_id)
+
+    @router.post("/runs/{run_id}/input")
+    async def send_run_input(run_id: str, batch: InputBatch) -> InputResult:
+        """The owner's taps, scrolls and keys on the page of a run they hold (item 470): 409 when it is not held, has
+        no page, a step of it is still going after a moment, or ``[browser] remote_input`` is off. Nothing of what is
+        typed is kept."""
+        await store.get_run(run_id)
+        return await ctx.manager.send_input(run_id, batch)
 
     @router.post("/runs/{run_id}/handback", status_code=202)
     async def hand_back_run(run_id: str) -> RunDetail:

@@ -1,9 +1,11 @@
 // Dot's computer: the page of the run's browser as Chrome paints it, and the handover of that browser to the reader.
 // Nothing is cast while the view is closed or the page is out of sight, and a view whose stream broke comes back by
 // itself (`watchInView`); the card is shown for a run that is going on and keeps its last frame once the run has ended,
-// when Watch goes too (there is no page left to watch). On a phone it also opens over the whole page (item 298).
+// when Watch goes too (there is no page left to watch). On a phone it also opens over the whole page (item 298), and
+// "Use it here" uses the page from this screen while the reader holds the run (item 475).
 
 import { api, watchInView } from "./api.js";
+import { createControl } from "./control.js";
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
 import { panelSection } from "./panels.js";
@@ -27,7 +29,8 @@ const EMPTY_STATES = {
  * it is ("Dot has control"), `sizes` the size chooser of the panel (stagesize.js), above the view beside the page's
  * address.
  * Returns `element`, `setHeld(flag)` (the timeline calls it on the takeover and handback events), `setActive(flag)` (the
- * stream stops with the run), `openFull()` (show it over the whole page, the button of a phone's bar) and `dispose()`.
+ * stream stops with the run), `openFull()` (show it over the whole page, the button of a phone's bar), `useHere()`
+ * (hold the run and use its page from this screen, item 475) and `dispose()`.
  */
 export function createComputer({ runId, active, elsewhere, held, name, sizes }) {
   let isActive = active;
@@ -46,7 +49,17 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   const address = el("div", { class: "small muted computer-url" });
   const who = el("span", { class: "computer-who" });
   const handButton = el("button", { class: "btn sm primary", type: "button", onclick: () => toggleHold() });
-  const pill = el("div", { class: "computer-pill" }, icon("hand"), who, handButton);
+  // Using the page from this screen (item 475): it opens over the whole page and the reader's taps go to it. A screen
+  // that is touched has it first; one with a mouse, Take over first, which brings Chrome up on the Mac.
+  const useButton = el(
+    "button",
+    { class: "btn sm", type: "button", title: "Hold the run and use its page from this screen: your taps, scrolls and keys go to it", onclick: () => useHere() },
+    "Use it here",
+  );
+  const controlNote = el("span", { class: "small muted computer-control-note", role: "status" });
+  const coarse = typeof matchMedia === "function" && matchMedia("(pointer: coarse)").matches;
+  const pill = el("div", { class: "computer-pill" }, icon("hand"), who, ...(coarse ? [useButton, handButton] : [handButton, useButton]), controlNote);
+  let control = null;
   const watchButton = el("button", { class: "btn ghost sm", type: "button", "aria-pressed": "false", onclick: () => (controller === null ? start() : stop()) });
   // A section of the panel: the watch button sits beside the title, and the toolbar under it says where the browser is.
   const card = panelSection({
@@ -70,6 +83,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     who.textContent = isHeld ? "You have control" : `${name} has control`;
     handButton.textContent = isHeld ? "Return control" : "Take over";
     handButton.title = isHeld ? "Let the run go on; it is told the page may have changed" : "Hold the run at its next tool call and use the browser yourself";
+    useButton.hidden = control !== null;
     pill.hidden = !isActive;
     pill.dataset.held = String(isHeld);
   }
@@ -142,12 +156,72 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     try {
       const detail = await api.post(`/runs/${encodeURIComponent(runId)}/${isHeld ? "handback" : "takeover"}`, {});
       isHeld = detail.held;
+      if (!isHeld) {
+        stopControl();
+      }
     } catch (error) {
       toast("error", error.message);
     } finally {
       handButton.disabled = false;
       paint();
     }
+  }
+
+  // Using the page from this screen (item 475): the run is held without bringing anything up on the Mac, the view
+  // opens over the whole page, and the reader's taps, scrolls and keys go to the page until they give the run back.
+  async function useHere() {
+    if (!isActive || control !== null) {
+      return;
+    }
+    useButton.disabled = true;
+    try {
+      if (!isHeld) {
+        const detail = await api.post(`/runs/${encodeURIComponent(runId)}/takeover/screen`, {});
+        isHeld = detail.held;
+      }
+      if (isHeld) {
+        openFull();
+        startControl();
+      }
+    } catch (error) {
+      toast("error", error.message);
+    } finally {
+      useButton.disabled = false;
+      paint();
+    }
+  }
+
+  function startControl() {
+    if (control !== null) {
+      return;
+    }
+    control = createControl({ runId, screen, image, onRefused: refused });
+    handButton.before(control.keyboard);
+    controlNote.textContent = "Your taps go to the page.";
+    paint();
+  }
+
+  function stopControl() {
+    if (control === null) {
+      return;
+    }
+    control.stop();
+    control = null;
+    controlNote.textContent = "";
+    paint();
+  }
+
+  /** What the daemon said when it refused the input: a step the run was taking when it was held keeps the page a
+   * moment, and a run given back from elsewhere is used here no more. */
+  function refused(error) {
+    if (error.status === 409 && error.message.includes("still going")) {
+      controlNote.textContent = "Dot is finishing a step; try again in a moment.";
+      return;
+    }
+    if (error.status === 409) {
+      stopControl();
+    }
+    toast("error", error.message);
   }
 
   // Over the whole page (item 298): the card moves into a dialog of its own,
@@ -177,6 +251,8 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     if (full === null) {
       return;
     }
+    // Closed, the view shows no page to tap: the run stays held until Return control.
+    stopControl();
     const { dialog, home, next } = full;
     full = null;
     home.insertBefore(element, next);
@@ -187,6 +263,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   return {
     element,
     openFull,
+    useHere,
     /** The run's browser has a page (its first browser step): the view starts by itself while the run works. */
     notePage() {
       hasPage = true;
@@ -194,18 +271,23 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
     },
     setHeld(flag) {
       isHeld = flag;
+      if (!flag) {
+        stopControl();
+      }
       paint();
     },
     setActive(flag) {
       isActive = flag;
       if (!flag) {
         isElsewhere = false;
+        stopControl();
         stop();
       }
       paint();
     },
     dispose() {
       full?.dialog.close();
+      stopControl();
       stop();
       if (objectUrl !== null) {
         URL.revokeObjectURL(objectUrl);

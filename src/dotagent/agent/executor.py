@@ -6,6 +6,7 @@ from collections.abc import Callable, Coroutine, Mapping, Sequence
 from dataclasses import dataclass, replace
 from urllib.parse import urlsplit
 
+from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.gate import RunGate, hold_note
 from dotagent.core.errors import (
     ApprovalRejected,
@@ -135,11 +136,13 @@ def _with_approval_note(result: ToolResult, note: str) -> ToolResult:
 @dataclass(frozen=True)
 class _Checked:
     """What a call that reached its tool came to. ``waited_s`` is the time it spent at the gate (:class:`_GateTime`),
-    which its seconds include."""
+    which its seconds include; ``decision`` what the gate decided of it (item 468), ``None`` when it did not let it
+    through or the call never reached it."""
 
     result: ToolResult
     action: ActionInfo | None
     waited_s: float
+    decision: StepDecision | None
 
 
 async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, gate: RunGate) -> _Checked:
@@ -147,16 +150,18 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     at_gate: _GateTime = _GateTime()
     # What the user wrote when approving the call: the model reads it with the result, a failed one's too.
     note: str = ""
+    decision: StepDecision | None = None
     try:
         prepared: PreparedCall = await tool.prepare(call.arguments, ctx)
         action = prepared.action
         # A call that would step on another run at work does not run, and is not asked about (item 301).
         held: str | None = ctx.runtime.peers.conflict(ctx.run_id, call.name, action)
         if held is not None:
-            return _Checked(result=fail(held), action=action, waited_s=0.0)
+            return _Checked(result=fail(held), action=action, waited_s=0.0, decision=None)
         asked_at: float = time.monotonic()
         try:
-            note = await gate.authorize(action)
+            authorized: Authorization = await gate.authorize_recorded(action)
+            note, decision = authorized.note, authorized.decision
             # The user may hold the run (a takeover of the browser): the call waits here, not on its own clock.
             held_s: float = await gate.wait_free()
         finally:
@@ -165,7 +170,12 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         # and from here the check and the footprint are one step, before the call runs (item 305).
         taken: str | None = ctx.runtime.peers.take(ctx.run_id, call.name, action)
         if taken is not None:
-            return _Checked(result=_with_approval_note(fail(taken), note), action=action, waited_s=at_gate.seconds)
+            return _Checked(
+                result=_with_approval_note(fail(taken), note),
+                action=action,
+                waited_s=at_gate.seconds,
+                decision=decision,
+            )
         async with asyncio.timeout(tool.timeout_s) as scope:
             result: ToolResult = await prepared.run(replace(ctx, gate=_PausedClock(ctx.gate, scope, at_gate)))
     except (RunCancelled, FailSafeTriggered):
@@ -178,7 +188,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
         text: str = _describe_failure(exc, tool)
         handed_off: bool = isinstance(exc, HandedOff)
         failed: ToolResult = _with_approval_note(ok(text) if handed_off else fail(text), note)
-        return _Checked(result=failed, action=action, waited_s=at_gate.seconds)
+        return _Checked(result=failed, action=action, waited_s=at_gate.seconds, decision=decision)
     if action is not None and not result.is_error:
         gate.observe(action)
         ctx.runtime.peers.saw(ctx.run_id, call.name, action)
@@ -187,7 +197,7 @@ async def _run_checked(call: ToolCall, tool: RegisteredTool, ctx: ToolContext, g
     noted: ToolResult = _with_approval_note(result, note)
     if held_s > 0.0:
         noted = noted.model_copy(update={"text": f"{noted.text}\n\n{hold_note(held_s)}"})
-    return _Checked(result=noted, action=action, waited_s=at_gate.seconds)
+    return _Checked(result=noted, action=action, waited_s=at_gate.seconds, decision=decision)
 
 
 def _turn_on_action(tool: str, group: str) -> ActionInfo:
@@ -206,6 +216,7 @@ async def _execute_one(
     tool: RegisteredTool | None = registry.tools.get(call.name)
     action: ActionInfo | None = None
     waited_s: float = 0.0
+    decision: StepDecision | None = None
     group: str | None = hidden.get(call.name)
     if group is not None:
         # The model could not know the tool's parameters: it was not in the tool list. The run turns its group on.
@@ -227,7 +238,7 @@ async def _execute_one(
         )
     else:
         checked: _Checked = await _run_checked(call, tool, ctx, gate)
-        result, action, waited_s = checked.result, checked.action, checked.waited_s
+        result, action, waited_s, decision = checked.result, checked.action, checked.waited_s, checked.decision
     clipped: ToolResult = result.model_copy(update={"text": truncate_middle(result.text, ctx.output_chars)})
     seconds: float = time.monotonic() - started
     files: list[str] = await ctx.runtime.store.save_images(clipped.images) if clipped.images else []
@@ -251,6 +262,10 @@ async def _execute_one(
             "channel": channel_of(call.name),
             # Whether the run is tainted after this result: a run that goes on from it takes it over (item 243).
             "tainted": gate.tainted,
+            # What the policy decided of the step and who answered (item 468), and the flags its action raised; a step
+            # inside a batch is not one of these: the batch is, and a step of it that asked has its policy event.
+            "decision": None if decision is None else decision.model_dump(mode="json"),
+            "flags": [] if action is None else list(action.flags),
         },
         True,
     )

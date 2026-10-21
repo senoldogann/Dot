@@ -31,6 +31,7 @@ from dotagent.server.views import (
     BrowserModeRequest,
     BrowserProfileRequest,
     BrowserRaiseRequest,
+    BrowserRemoteInputRequest,
     BrowserView,
 )
 
@@ -64,6 +65,7 @@ def browser_router(ctx: ServerContext) -> APIRouter:
             inspect_page=INSPECT_PAGE,
             attach_timeout_s=session.config.attach_timeout_s,
             raise_window=session.config.raise_window,
+            remote_input=session.config.remote_input,
             debug_port=session.config.debug_port,
             devtools_address=devtools_address(session.config),
             enabled=session.config.enabled,
@@ -129,6 +131,14 @@ def browser_router(ctx: ServerContext) -> APIRouter:
         """Whether Chrome is brought to the front while a run works (item 97); takes effect at once and is kept."""
         session.set_raise_window(request.raise_window)
         await asyncio.to_thread(set_browser_setting, config_path(), "raise_window", request.raise_window)
+        return await state()
+
+    @router.post("/browser/remote-input")
+    async def set_remote_input(request: BrowserRemoteInputRequest) -> BrowserView:
+        """Whether the owner may use a held run's page from the screen that shows it (item 470); takes effect at once
+        and is kept."""
+        ctx.runtime.browsers.set_remote_input(request.remote_input)
+        await asyncio.to_thread(set_browser_setting, config_path(), "remote_input", request.remote_input)
         return await state()
 
     @router.post("/browser/debug-port")

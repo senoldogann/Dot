@@ -111,7 +111,10 @@ as a sheet with a grabber, and a drag of its head down closes it; its Agents tab
 model and what it does now (on a wide window too). The Screen tab with nothing yet says in the same empty panel as the
 other tabs that Dot's computer is quiet and that the screenshots it takes while it works will appear there, with the
 setting that turns it on. Dot's computer opens over the whole screen, with the page's address and who has control (Take
-over), and goes back to the side panel when it closes.
+over), and goes back to the side panel when it closes. **Use it here** holds the run and uses its page from the phone
+(item 475): a tap clicks, a drag scrolls the page, a finger held still and then dragged drags on it, two fingers zoom
+the picture, and **Keyboard** types into the page; the card of a browser step handed to you offers it too, and **Return
+control** gives the run back. A tab a tap opens is not the one the picture shows.
 
 The button at the top left is the one way back (item 338): a chevron on the page's own ground, no circle around it
 (item 373), in a 36 px box. On a chat's page, wherever it was opened from, it opens the list of chats in place, as the

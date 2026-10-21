@@ -1721,6 +1721,41 @@
   border-color: var(--warn);
 }
 
+.computer-control-note:empty {
+  display: none;
+}
+
+/* Using the page from this screen (item 475): the picture takes the reader's fingers, which neither scroll nor zoom
+   the page around it; two fingers zoom the picture itself, kept inside its frame. */
+.computer-screen[data-controlling] {
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.computer-screen[data-controlling] .computer-image {
+  touch-action: none;
+  transform: translate(var(--zoom-x, 0px), var(--zoom-y, 0px)) scale(var(--zoom-scale, 1));
+  transform-origin: 0 0;
+  -webkit-touch-callout: none;
+}
+
+/* The field that takes the screen's keyboard for the page: out of sight, and 16 px high so that a phone does not zoom
+   into it. */
+.control-keys {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 1px;
+  height: 16px;
+  padding: 0;
+  border: 0;
+  font-size: var(--touch-text);
+  opacity: 0;
+  resize: none;
+}
+
 .inspector-strip {
   display: flex;
   gap: 8px;
@@ -1907,6 +1942,8 @@ dialog.computer-full::backdrop {
 }
 
 .computer-full .computer-pill {
+  flex-wrap: wrap;
+  justify-content: center;
   margin-top: 4px;
 }
 
