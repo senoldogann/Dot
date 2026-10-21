@@ -16,6 +16,7 @@ import { onAssistant } from "./assistant.js";
 import { dotName, faceState } from "./face.js";
 import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
+import { markContent, markInk } from "./marks.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
 import { nestRows, progressFacts } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
@@ -37,6 +38,8 @@ const DAY_LABELS = ["Today", "Yesterday", "Previous 7 days", "Older"];
 // A row of the activity sections shows this many words of its title at most, on one line (item 95).
 const ROW_WORDS = 7;
 const ROW_CHARS = 56;
+// Connect apps at the foot shows the marks of this many servers it is connected to (item 492).
+const CONNECTED_MARKS = 3;
 // Which sections the owner folded (`waiting`, `working`, `chats`), and the runs whose delegated runs they folded
 // (`runs`, item 198), kept between visits.
 const FOLDS_KEY = "dot.sideFolds";
@@ -367,11 +370,14 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
   const agentsLink = el("a", { class: "side-link", href: "#/agents", onclick: onNavigate }, icon("user"), el("span", null, "Agents"));
   const campaignsLink = el("a", { class: "side-link", href: "#/campaigns", onclick: onNavigate }, icon("target"), el("span", null, "Campaigns"));
-  const settingsLink = el("a", { class: "side-link", href: "#/settings", onclick: onNavigate }, icon("sliders"), el("span", null, "Settings"));
-  // Customize (item 316): the services Dot connects to and the skills it reads, a page among the others under Campaigns
-  // and Schedules.
+  // Settings is its cog at the foot, beside Connect apps (item 492); its name stays for a reader of the screen.
+  const settingsLink = el(
+    "a",
+    { class: "side-link side-settings", href: "#/settings", title: "Settings", "aria-label": "Settings", onclick: onNavigate },
+    icon("settings"),
+    el("span", null, "Settings"),
+  );
   const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
-  const customizeLink = el("a", { class: "side-link", href: "#/customize/plugins", onclick: onNavigate }, icon("plug"), el("span", null, "Customize"));
 
   // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
   // under a chat among them; while chats are being chosen, their boxes. A row folded away is left out.
@@ -1139,15 +1145,68 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       el("span", { class: "grow" }, "New chat"),
       el("kbd", { "aria-hidden": "true" }, "⇧⌘O"),
     ),
-    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink, customizeLink),
+    el("nav", { class: "side-links", "aria-label": "Pages" }, agentsLink, campaignsLink, schedulesLink),
     activityNav,
     el("nav", { class: "side-recent", "aria-label": "Chats" }, head, bar, list),
   );
-  const foot = el("div", { class: "side-foot" }, settingsLink, compose);
+  // Connect apps (item 492): at the foot, right of the cog of Settings, the dialog of the services Dot works with,
+  // with the marks of the MCP servers it is connected to; it leads to Customize, which the list of pages no longer
+  // names. On a phone, a round button of its own.
+  const connectMarks = el("span", { class: "side-connect-marks", "aria-hidden": "true" });
+  const connectButton = el(
+    "button",
+    { class: "side-connect", type: "button", title: "Connect apps", "aria-label": "Connect apps", onclick: () => attempt(openApps) },
+    icon("plug"),
+    el("span", { class: "side-connect-label" }, "Connect apps"),
+    connectMarks,
+  );
+  let appsDialog = null;
+  // The dialog's script is fetched the first time it opens, as a page's is (main.js).
+  async function openApps() {
+    if (appsDialog !== null) {
+      return;
+    }
+    const { openConnectApps } = await import("./connectapps.js");
+    if (appsDialog !== null || disposed) {
+      return;
+    }
+    appsDialog = openConnectApps({
+      onClose: () => {
+        appsDialog = null;
+        paintConnected();
+      },
+    });
+  }
+  // The marks of the first servers that are ready, each as its service's tile wears it (items 408 and 477).
+  async function paintConnected() {
+    let found;
+    try {
+      found = await api.get("/mcp/servers");
+    } catch (error) {
+      console.warn("the servers Dot is connected to could not be read for Connect apps", error);
+      return;
+    }
+    if (disposed) {
+      return;
+    }
+    const ready = found.servers.filter((server) => server.state === "ready" && server.mark !== null).slice(0, CONNECTED_MARKS);
+    connectMarks.replaceChildren(
+      ...ready.map((server) => {
+        const mark = el("span", { class: "side-connect-mark" }, markContent(server.mark));
+        const ink = markInk(server.mark.colour);
+        if (ink !== null) {
+          mark.style.setProperty("--plugin-ink", ink);
+        }
+        return mark;
+      }),
+    );
+  }
+  paintConnected();
+  const foot = el("div", { class: "side-foot" }, settingsLink, connectButton, compose);
   function placeForWidth() {
     close.replaceChildren(icon(PHONE.matches ? "x" : "panelLeft"));
     if (PHONE.matches) {
-      settingsLink.after(searchBox);
+      connectButton.after(searchBox);
     } else {
       body.prepend(searchBox);
     }
@@ -1183,7 +1242,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(campaignsLink, tab === "campaigns");
       mark(schedulesLink, tab === "schedules");
       mark(settingsLink, tab === "settings");
-      mark(customizeLink, tab === "customize");
+      // Customize is reached from Connect apps, which stands for it while it is open.
+      connectButton.toggleAttribute("data-current", tab === "customize");
       routeRunId = runId;
       routeThreadId = null;
       keptUnread = null;
@@ -1192,6 +1252,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     },
     dispose() {
       disposed = true;
+      appsDialog?.close();
       closeMenu();
       clearInterval(ageTicker);
       clearInterval(workTicker);
