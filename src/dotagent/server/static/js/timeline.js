@@ -357,7 +357,7 @@ function buildFlock() {
  * with the run's goal, to show them under it, and `onGoalPicks(picks)` what the owner picked for it in the composer
  * (item 318); null where the page shows no goal, and they stand in the timeline.
  */
-export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks }) {
+export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGrow, onPlan, onStats, onScaffold, onSetup, onCalls, onCompacted, onRunStatus, onAnswer, onImage, onQuestionLeft, onHeld, onBrowserStep, onGoalFiles, onGoalPicks, onUseHere }) {
   const element = el("div", { class: "timeline" });
   // The card a delegated run's row shows when the pointer rests on it or the focus comes to it (item 226).
   const card = helperCard(element);
@@ -1052,7 +1052,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     },
 
     approval_requested(scope, record) {
-      const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN });
+      const card = approvalCard({ approval: fromEvent(record.run_id, record.data), heading: null, onSettled: () => undefined, leftNote: LEFT_IN_RUN, onUseHere });
       const line = scope.policyLine !== null && scope.container.lastElementChild === scope.policyLine ? scope.policyLine : null;
       scope.policyLine = null;
       cards.set(record.data.approval_id, { card, scope, line, severity: record.data.severity });

@@ -232,7 +232,8 @@ def connections_router(ctx: ServerContext) -> APIRouter:
                 "config",
                 {"app_id": app_id},
             )
-        await session.open_url(_SIGN_IN_THREAD, found_web.sign_in)
+        # The owner signs in on the page; no model reads its view, which hides as a run's would.
+        await session.open_url(_SIGN_IN_THREAD, found_web.sign_in, True)
         await session.focus(_SIGN_IN_THREAD)
         return web_view(found_web, await cookies())
 

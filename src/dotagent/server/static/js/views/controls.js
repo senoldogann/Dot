@@ -177,7 +177,7 @@ export function mount(root, _ctx) {
   const cards = el(
     "div",
     { class: "stack" },
-    approvalCard({ approval: fakeApproval("question", "ask_user", "Which colour?"), heading: null, onSettled: () => {}, leftNote: "" }).node,
+    approvalCard({ approval: fakeApproval("question", "ask_user", "Which colour?"), heading: null, onSettled: () => {}, leftNote: "", onUseHere: null }).node,
     approvalCard({
       approval: fakeQuestion(
         "choice",
@@ -191,6 +191,7 @@ export function mount(root, _ctx) {
       heading: null,
       onSettled: () => {},
       leftNote: "",
+      onUseHere: null,
     }).node,
     approvalCard({
       approval: fakeQuestion(
@@ -206,9 +207,10 @@ export function mount(root, _ctx) {
       heading: null,
       onSettled: () => {},
       leftNote: "",
+      onUseHere: null,
     }).node,
-    approvalCard({ approval: fakeApproval("handoff", "browser_open", "Open https://example.com/ — rule"), heading: null, onSettled: () => {}, leftNote: "" }).node,
-    approvalCard({ approval: fakeApproval("high", "shell", "rm -rf build — aggressive preset still asks for: destructive"), heading: null, onSettled: () => {}, leftNote: "" }).node,
+    approvalCard({ approval: fakeApproval("handoff", "browser_open", "Open https://example.com/ — rule"), heading: null, onSettled: () => {}, leftNote: "", onUseHere: null }).node,
+    approvalCard({ approval: fakeApproval("high", "shell", "rm -rf build — aggressive preset still asks for: destructive"), heading: null, onSettled: () => {}, leftNote: "", onUseHere: null }).node,
   );
   const bubbles = el(
     "div",

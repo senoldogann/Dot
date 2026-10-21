@@ -6,6 +6,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
+from dotagent.agent.authorization import StepDecision
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
@@ -436,6 +437,21 @@ class RuleRequest(FrozenModel):
     description: str = Field(max_length=300)
 
 
+class RulePreviewRequest(FrozenModel):
+    """A rule to try on the steps of the last ``days`` before it is added (item 469)."""
+
+    behavior: Behavior
+    tool_glob: str = Field(min_length=1, max_length=_NAME_CHARS)
+    match_regex: str = Field(max_length=500)
+    days: int = Field(ge=1, le=90)
+
+
+class RulesUsageQuery(FrozenModel):
+    """How far back the rules' use is read (item 473), in days."""
+
+    days: int = Field(ge=1, le=90)
+
+
 class RuleDraftRequest(FrozenModel):
     """A rule in the owner's own words, for the review model to draft (item 110)."""
 
@@ -583,6 +599,12 @@ class BrowserRaiseRequest(FrozenModel):
     """Whether Dot's Chrome is brought to the front while a run works (item 97)."""
 
     raise_window: bool
+
+
+class BrowserRemoteInputRequest(FrozenModel):
+    """Whether the owner may use a held run's page from the screen that shows it (item 470)."""
+
+    remote_input: bool
 
 
 class BrowserDebugPortRequest(FrozenModel):
@@ -835,7 +857,8 @@ class RunDetail(FrozenModel):
 class ActionStep(FrozenModel):
     """One acting tool call of a run, as the Actions panel lists it: when it ran, the tool, the channel it went through
     (``tools.channels``), the kind the policy gave it, its target (a path, an address, an application, a command) and
-    summary, whether it succeeded, and its evidence, the result the model got, clipped."""
+    summary, whether it succeeded, and its evidence, the result the model got, clipped; the flags its action raised and
+    what the policy decided of it (item 468), ``None`` for a step recorded before."""
 
     event_id: int
     at: float
@@ -846,6 +869,8 @@ class ActionStep(FrozenModel):
     summary: str
     ok: bool
     evidence: str
+    flags: list[str]
+    decision: StepDecision | None
 
 
 class FileEdit(FrozenModel):
@@ -1114,7 +1139,7 @@ class BrowserView(FrozenModel):
     while Dot's own profile is open in a plain Chrome window that Settings › Browser opened for the owner to sign in to
     sites (item 344), until the owner quits it. ``enabled`` says whether runs are offered the browser tools, and
     ``look`` how pages look (item 354). ``profile`` is the profile Dot's own Chrome works on, of ``profiles`` (item
-    355)."""
+    355). ``remote_input`` says whether a held run's page can be used from the screen that shows it (item 470)."""
 
     mode: BrowserMode
     connected: bool
@@ -1127,6 +1152,7 @@ class BrowserView(FrozenModel):
     inspect_page: str
     attach_timeout_s: float
     raise_window: bool
+    remote_input: bool
     debug_port: int
     devtools_address: str | None
     enabled: bool
@@ -1464,3 +1490,82 @@ class AwayView(FrozenModel):
     decisions: AwayDecisions
     decision_runs: list[AwayDecisionRun]
     drafts: int
+
+
+class RuleExample(FrozenModel):
+    """A past step a rule tried out fits (item 469): when, in which run, the tool, its summary and target clipped and
+    masked, whether it succeeded, and what the policy decided of it then. ``was`` is ``None`` for a step the gate did
+    not let through or that never reached it (``recorded``), and for one recorded before item 468 (not ``recorded``)."""
+
+    event_id: int
+    run_id: str
+    at: float
+    tool: str
+    summary: str
+    target: str
+    ok: bool
+    was: StepDecision | None
+    recorded: bool
+
+
+class RuleShadow(FrozenModel):
+    """An earlier rule that decides some of the steps a rule tried out fits, as it comes first (item 469)."""
+
+    rule_id: str
+    description: str
+    steps: int
+
+
+class RulePreview(FrozenModel):
+    """What a rule would have done on the past steps (item 469): how many were read (``scanned``, from ``since``; all
+    of the days asked unless ``partial``: the newest only, as a try-out reads at most so many steps for so long) and how
+    many it fits. Of those, ``shadowed_by`` an earlier rule decides first; of the rest, ``in_yolo`` ran in yolo, which
+    asks nothing whatever the rules say; ``before_rules`` were decided before any rule is read, by what no rule changes
+    (money and credentials, messages and posts, Dot's own files, the always-on review, a research run, a spend's caps),
+    and ``would_decide`` it would decide. Of those it would decide: ``stricter``, ``looser`` and ``same`` against what
+    was decided then; ``stopped``, not let through then (refused, declined, handed to the owner, or held by another
+    run), which kept no decision; ``unknown``, recorded before item 468. Then the newest steps it fits, and ``problem``,
+    when its pattern took too long on a step, which the daemon would refuse."""
+
+    scanned: int
+    since: float | None
+    partial: bool
+    fits: int
+    shadowed_by: list[RuleShadow]
+    in_yolo: int
+    before_rules: int
+    would_decide: int
+    stricter: int
+    looser: int
+    same: int
+    stopped: int
+    unknown: int
+    examples: list[RuleExample]
+    problem: str | None
+
+
+class RuleUsage(FrozenModel):
+    """What one enabled rule did on the steps of the last days, with today's rules (item 473): how many steps it fits
+    and when the newest was; of those it is the first rule to fit, how many it decides, how many ran in yolo, which asks
+    nothing whatever the rules say, and how many were settled before any rule; and the earlier rules that decide the
+    others."""
+
+    rule_id: str
+    fits: int
+    last_fit_at: float | None
+    decides: int
+    in_yolo: int
+    before_rules: int
+    shadowed_by: list[RuleShadow]
+
+
+class RulesUsage(FrozenModel):
+    """How the enabled rules were used on the steps of the last days (item 473): how many steps were read
+    (``scanned``, from ``since``; all of the days asked unless ``partial``), each enabled rule's use, and ``problem``,
+    when a rule's pattern took too long on a step, which the daemon refuses."""
+
+    scanned: int
+    since: float | None
+    partial: bool
+    rules: list[RuleUsage]
+    problem: str | None

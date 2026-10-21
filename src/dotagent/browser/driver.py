@@ -10,13 +10,15 @@ from playwright.async_api import CDPSession, ElementHandle, Frame, JSHandle, Loc
 from playwright.async_api import Error as PlaywrightError
 from playwright.async_api import TimeoutError as PlaywrightTimeoutError
 
-from dotagent.browser.safety import key_enters_text, secret_kind
+from dotagent.browser.safety import key_enters_text, secret_kind, secret_selector
 from dotagent.browser.snapshot import (
     SnapshotLine,
     closest_first,
     entries_of,
+    filled_fields,
     fold_options,
     has_option,
+    hide_values,
     parse_snapshot,
     render_options,
 )
@@ -28,6 +30,13 @@ from dotagent.core.text import truncate_middle
 _log = get_logger("dotagent.browser.driver")
 
 _REF_FORMAT: re.Pattern[str] = re.compile(r"^(f\d+)?e\d+$")
+# How long a page may take to say whether a filled field is secret (item 467): short, as every view waits on it.
+_FIELD_PROBE_TIMEOUT_MS: int = 1500
+# How long a page may take to count the elements a locator names (item 471): Playwright's count takes no timeout, and
+# a frame whose script holds its main thread never answers.
+_COUNT_TIMEOUT_S: float = 2.0
+# What a screenshot shows over a secret field (item 467).
+_MASK_COLOUR: str = "#333333"
 # Playwright's text for a ref whose frame generation died with a navigation.
 _STALE_GENERATION: str = "Invalid frame in aria-ref selector"
 _ERROR_CHARS: int = 900
@@ -251,15 +260,55 @@ async def _once_more_after_navigation[T](page: Page, what: str, call: Callable[[
         raise _failure(what, page, {}, second) from second
 
 
-async def capture_lines(page: Page, timeout_ms: int) -> tuple[SnapshotLine, ...]:
+async def capture_lines(page: Page, timeout_ms: int, hide_secrets: bool) -> tuple[SnapshotLine, ...]:
     """One AI snapshot with boxes, the options of collapsed dropdowns folded onto their lines. Taking it replaces the
-    ref table of every frame, so refs always mean the latest."""
+    ref table of every frame, so refs always mean the latest. With ``hide_secrets`` (every mode but yolo, item 467)
+    the value of a field the page marks secret shows as ``[hidden]``."""
     raw: str = await _once_more_after_navigation(
         page,
         "taking the page snapshot failed",
         lambda: page.aria_snapshot(mode="ai", boxes=True, timeout=timeout_ms),
     )
-    return fold_options(parse_snapshot(raw))
+    lines: tuple[SnapshotLine, ...] = parse_snapshot(raw)
+    if hide_secrets:
+        lines = hide_values(lines, await secret_refs(page, filled_fields(lines)))
+    return fold_options(lines)
+
+
+async def _count(locator: Locator) -> int:
+    """How many elements ``locator`` names; ``TimeoutError`` when the page does not say within ``_COUNT_TIMEOUT_S``."""
+    async with asyncio.timeout(_COUNT_TIMEOUT_S):
+        return await locator.count()
+
+
+async def _is_secret(page: Page, ref: str) -> bool:
+    """Whether the field ``ref`` is marked secret. A ref of another shape is never put into a selector, and a field
+    that cannot be asked (gone since the snapshot, its frame closed, too slow) counts as secret: a value is never shown
+    for want of an answer."""
+    if _REF_FORMAT.fullmatch(ref) is None:
+        return True
+    locator: Locator = page.locator(f"aria-ref={ref}")
+    try:
+        if await _count(locator) == 0:
+            _log.warning("browser_field_unreadable", ref=ref, url=page.url, error="gone since the snapshot")
+            return True
+        marking: object = await locator.evaluate(_FIELD_MARKING_SCRIPT, timeout=_FIELD_PROBE_TIMEOUT_MS)
+    except TimeoutError:
+        _log.warning("browser_field_unreadable", ref=ref, url=page.url, error="the page did not answer in time")
+        return True
+    except PlaywrightError as error:
+        _log.warning("browser_field_unreadable", ref=ref, url=page.url, error=str(error))
+        return True
+    return secret_kind(marking) is not None
+
+
+async def secret_refs(page: Page, fields: tuple[SnapshotLine, ...]) -> frozenset[str]:
+    """The refs of ``fields`` that the page marks secret (item 467), each field asked by its own ref, all at once. What
+    the page is like now does not decide for the snapshot taken before: a field added and taken away since, in a frame
+    that went or not, is gone, and so is hidden; only the field the snapshot showed answers for its value."""
+    refs: list[str] = [field.ref for field in fields if field.ref is not None]
+    answers: list[bool] = await asyncio.gather(*(_is_secret(page, ref) for ref in refs))
+    return frozenset(ref for ref, secret in zip(refs, answers, strict=True) if secret)
 
 
 async def page_title(page: Page) -> str:
@@ -372,7 +421,12 @@ async def live_locator(page: Page, ref: str, action: str) -> Locator:
         )
     locator: Locator = page.locator(f"aria-ref={ref}")
     try:
-        match_count: int = await locator.count()
+        match_count: int = await _count(locator)
+    except TimeoutError as error:
+        raise BrowserError(
+            "the page did not answer in time (a script may be holding it); wait, then take a new snapshot",
+            {"action": action, "ref": ref, "url": page.url, "waited_s": _COUNT_TIMEOUT_S},
+        ) from error
     except PlaywrightError as error:
         if _STALE_GENERATION in str(error):
             raise BrowserError(
@@ -650,11 +704,22 @@ async def scroll_page(
         raise _failure("scrolling failed", page, {"direction": direction, "ref": ref}, error) from error
 
 
-async def screenshot_jpeg(page: Page, quality: int, timeout_ms: int) -> bytes:
-    """Viewport screenshot in CSS pixels (so a pixel in the picture is a pixel for ``click_at``, also on Retina)."""
+async def screenshot_jpeg(page: Page, quality: int, timeout_ms: int, hide_secrets: bool) -> bytes:
+    """Viewport screenshot in CSS pixels (so a pixel in the picture is a pixel for ``click_at``, also on Retina). With
+    ``hide_secrets`` (every mode but yolo, item 467) the fields the page marks secret are covered, in every frame."""
+    mask: list[Locator] = (
+        [frame.locator(secret_selector()) for frame in page.frames if not frame.is_detached()] if hide_secrets else []
+    )
     try:
         return await page.screenshot(
-            type="jpeg", quality=quality, animations="disabled", caret="initial", scale="css", timeout=timeout_ms
+            type="jpeg",
+            quality=quality,
+            animations="disabled",
+            caret="initial",
+            scale="css",
+            timeout=timeout_ms,
+            mask=mask,
+            mask_color=_MASK_COLOUR,
         )
     except PlaywrightError as error:
         raise _failure("taking the screenshot failed", page, {}, error) from error
@@ -764,6 +829,17 @@ async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) 
         raise _failure("uploading the files failed", page, {"ref": ref}, error) from error
 
 
+async def _banner_uncounted(banner: Locator) -> str | None:
+    """``None`` when the banner left the page; else why it is taken as still there: it is there, or it could not be
+    counted, or not in time."""
+    try:
+        return None if await _count(banner) == 0 else ""
+    except TimeoutError:
+        return "the page did not answer the count in time"
+    except PlaywrightError as error:
+        return truncate_middle(str(error), _ERROR_CHARS)
+
+
 async def install_consent_handler(page: Page) -> None:
     """Decline cookie banners whenever one blocks an action; banners without a decline button are left alone. A click
     that fails because the banner went away under it (it closed, or the page did) is the outcome the handler is after;
@@ -775,12 +851,16 @@ async def install_consent_handler(page: Page) -> None:
         try:
             await banner.get_by_role("button", name=_DECLINE_BUTTON).first.click(timeout=_CONSENT_CLICK_TIMEOUT_MS)
         except PlaywrightError as error:
-            if page.is_closed() or await banner.count() == 0:
+            if page.is_closed():
+                return
+            uncounted: str | None = await _banner_uncounted(banner)
+            if uncounted is None:
                 return
             _log.warning(
                 "consent_decline_failed",
                 url=truncate_middle(page.url, _ERROR_CHARS),
                 error=truncate_middle(str(error), _ERROR_CHARS),
+                count_error=uncounted or None,
             )
 
     await page.add_locator_handler(banner, decline, no_wait_after=True, times=_CONSENT_HANDLER_TIMES)

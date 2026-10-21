@@ -2,8 +2,9 @@
 which stands in for Dot's interface and counts what reaches it.
 
 Covers the ways a page can send the browser to the interface: a popup, a resource it loads, a fetch, a service worker,
-a link, a script and a redirect on the way; and the daemon's own refusal of navigations that pages of other sites start
-(``Sec-Fetch-Site``), but for the page a sign-in comes back to, measured with the real guard behind a real server.
+a link, a script and a redirect on the way; the way back of a sign-in, the one page of it that opens; and the daemon's
+own refusal of navigations that pages of other sites start (``Sec-Fetch-Site``), but for the page a sign-in comes back
+to, measured with the real guard behind a real server.
 """
 
 import asyncio
@@ -28,6 +29,7 @@ from playwright.async_api import (
     Playwright,
     Response,
     async_playwright,
+    expect,
 )
 from starlette.types import Message, Receive, Scope, Send
 from test_browser import act, ref_of
@@ -37,7 +39,8 @@ from dotagent.browser.types import PageView, ScriptRun, Step
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import ForbiddenUrlError
 from dotagent.mcp.signin import CALLBACK_PATH
-from dotagent.server.guard import LocalGuard
+from dotagent.server.callback_page import Callback, Subject, render
+from dotagent.server.guard import LocalGuard, response_headers
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -64,8 +67,14 @@ class Arrivals:
         return [arrival for arrival in self.items if arrival.path == path]
 
 
+_SIGNED_IN: Callback = Callback(
+    outcome="signed_in", subject=Subject(name="Google", detail="ada@example.com", mark="google-icon.svg"), reason=None
+)
+
+
 class _InsideHandler(BaseHTTPRequestHandler):
-    """The stand-in for Dot's interface: every request that reaches it is recorded, and answered."""
+    """The stand-in for Dot's interface: every request that reaches it is recorded, and answered; the way back of a
+    sign-in with the daemon's own page and headers."""
 
     arrivals: Arrivals = Arrivals()
 
@@ -77,8 +86,13 @@ class _InsideHandler(BaseHTTPRequestHandler):
                 fetch_mode=self.headers.get("Sec-Fetch-Mode"),
             )
         )
-        body: bytes = b"<!doctype html><title>Inside</title><h1>Inside Dot</h1>"
+        way_back: bool = self.path.split("?", 1)[0] == CALLBACK_PATH
+        body: bytes = (
+            render(_SIGNED_IN).encode() if way_back else b"<!doctype html><title>Inside</title><h1>Inside Dot</h1>"
+        )
         self.send_response(200)
+        for name, value in response_headers(CALLBACK_PATH) if way_back else ():
+            self.send_header(name, value)
         self.send_header("Content-Type", "text/html; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
@@ -97,6 +111,7 @@ def _site_pages(inside: str, guarded: str) -> dict[str, str]:
 <a href="{guarded}/">Guarded link</a>
 <a href="/hop-guarded">Hop to guarded</a>
 <a href="/allow">Allow sign-in</a>
+<a href="/back">Back to Dot</a>
 <img src="{inside}/pixel.png" alt="pixel">
 <img src="/own.png" alt="own">
 <p id="out">quiet</p>""",
@@ -118,6 +133,10 @@ def _site_handler(inside: str, guarded: str) -> type[BaseHTTPRequestHandler]:
                 return
             if path == "/hop-guarded":
                 self._redirect(f"{guarded}/")
+                return
+            if path == "/back":
+                # The page of a sign-in that opened in Dot's own Chrome sends the browser back to the daemon (item 448).
+                self._redirect(f"{inside}{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
                 return
             if path == "/allow":
                 # An authorization server that the owner allowed a sign-in on sends the browser back to the daemon.
@@ -295,7 +314,7 @@ async def _settled(seconds: float = 0.5) -> None:
 async def test_a_popup_a_page_opens_to_the_interface_never_reaches_it(
     browser: BrowserSession, site: str, inside: str
 ) -> None:
-    view: PageView = await browser.open_url("popup", f"{site}/")
+    view: PageView = await browser.open_url("popup", f"{site}/", True)
     await act(browser, "popup", [Step(action="click", ref=ref_of(view.body, 'link "Open inside"'))], False)
     await _settled()
     assert _InsideHandler.arrivals.items == []
@@ -307,13 +326,22 @@ async def test_a_popup_a_page_opens_to_the_interface_never_reaches_it(
 async def test_a_resource_a_fetch_and_a_script_of_the_page_are_refused(
     browser: BrowserSession, site: str, inside: str
 ) -> None:
-    await browser.open_url("resource", f"{site}/")
+    await browser.open_url("resource", f"{site}/", True)
     await _settled()
     assert _InsideHandler.arrivals.of("/pixel.png") == []
     fetched: ScriptRun = await browser.run_script(
         "resource", f"fetch('{inside}/api/status').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0
     )
     assert "failed" in fetched.text, fetched
+    # The owner's input to a held run's page (item 470): a page cannot post it either.
+    posted: ScriptRun = await browser.run_script(
+        "resource",
+        f"fetch('{inside}/api/runs/run-1/input', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, "
+        "body: JSON.stringify({events: [{kind: 'text', text: 'from the page'}]})})"
+        ".then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)",
+        10.0,
+    )
+    assert "failed" in posted.text, posted
     # A script that sends the tab there: the request is refused, and the tab is reset as after a redirect there.
     with pytest.raises(ForbiddenUrlError) as refused:
         await browser.run_script("resource", f"() => {{ location.href = '{inside}/script'; }}", 10.0)
@@ -323,7 +351,7 @@ async def test_a_resource_a_fetch_and_a_script_of_the_page_are_refused(
 
 
 async def test_a_service_worker_fetches_nothing_for_the_page(browser: BrowserSession, site: str) -> None:
-    await browser.open_url("worker", f"{site}/sw-page")
+    await browser.open_url("worker", f"{site}/sw-page", True)
     registered: ScriptRun = await browser.run_script(
         "worker",
         "navigator.serviceWorker.register('/sw.js').then(() => 'registered', (e) => 'refused: ' + e.name)",
@@ -339,11 +367,51 @@ async def test_a_redirect_to_the_interface_is_stopped_before_it_is_fetched(brows
     """The route of the context does not see the hops of a redirect; the tab's own Fetch session does."""
     port: int | None = urlsplit(site).port
     with pytest.raises(ForbiddenUrlError) as refused:
-        await browser.open_url("hop", f"http://localhost:{port}/hop")
+        await browser.open_url("hop", f"http://localhost:{port}/hop", True)
     assert "Dot's own interface" in refused.value.reason, refused.value
     assert refused.value.resource_type == "document"
     assert browser.current_url("hop") == "about:blank"
     assert _InsideHandler.arrivals.items == []
+
+
+async def test_the_way_back_of_a_sign_in_reaches_the_daemon_and_the_run_reads_nothing_of_it(
+    browser: BrowserSession, site: str
+) -> None:
+    """A sign-in that opened in Dot's own Chrome ends in a redirect to the daemon's ``/oauth/callback`` (item 448): the
+    hop is sent, so the code reaches the sign-in that waits for it, and the landing check still resets the tab of a run
+    that came there, as on every other page of the interface."""
+    view: PageView = await browser.open_url("back", f"{site}/")
+    with pytest.raises(ForbiddenUrlError) as refused:
+        await act(browser, "back", [Step(action="click", ref=ref_of(view.body, 'link "Back to Dot"'))], False)
+    assert "Dot's own interface" in refused.value.reason, refused.value
+    assert browser.current_url("back") == "about:blank"
+    callbacks: list[Arrival] = _InsideHandler.arrivals.of(f"{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state")
+    assert [arrival.fetch_mode for arrival in callbacks] == ["navigate"], _InsideHandler.arrivals.items
+    assert [arrival.path for arrival in _InsideHandler.arrivals.items] == [callbacks[0].path]
+
+
+async def test_the_page_a_sign_in_comes_back_to_is_drawn_in_a_tab_no_run_drives(
+    browser: BrowserSession, site: str
+) -> None:
+    """macOS hands the provider's page to the Chrome that runs, which may be Dot's own (item 448): in a tab of the
+    owner's there, which no run drives, the way back opens and is drawn in Dot's look from what the page carries
+    itself, the mark too; nothing else of the interface reaches the daemon (its faces are refused, and the system's
+    are drawn)."""
+    context: BrowserContext = await browser._ensure_context()
+    page: Page = await context.new_page()
+    try:
+        await page.goto(f"{site}/")
+        async with page.expect_navigation():
+            await page.click('text="Back to Dot"')
+        await expect(page.locator("h1")).to_have_text("Signed in to Google")
+        assert await page.evaluate("document.querySelector('.callback-mark img').naturalWidth > 0")
+        card: str = await page.evaluate("getComputedStyle(document.querySelector('.signin .card')).backgroundColor")
+        assert card not in ("rgba(0, 0, 0, 0)", "transparent"), card
+        assert [arrival.path for arrival in _InsideHandler.arrivals.items] == [
+            f"{CALLBACK_PATH}?code=MARKER-code&state=MARKER-state"
+        ]
+    finally:
+        await page.close()
 
 
 async def test_a_link_that_redirects_to_the_interface_is_stopped(
@@ -352,7 +420,7 @@ async def test_a_link_that_redirects_to_the_interface_is_stopped(
     """A link straight to the interface, and one whose redirect ends there: the request is refused, the step ends with
     the refusal and the tab is reset, as when a page landed there before."""
     for label, refused_url in (('link "Inside link"', f"{inside}/link"), ('link "Hop to inside"', f"{inside}/chain")):
-        view: PageView = await browser.open_url("link", f"{site}/")
+        view: PageView = await browser.open_url("link", f"{site}/", True)
         with pytest.raises(ForbiddenUrlError) as refused:
             await act(browser, "link", [Step(action="click", ref=ref_of(view.body, label))], False)
         assert refused.value.url == refused_url and "Dot's own interface" in refused.value.reason, refused.value
@@ -382,7 +450,7 @@ async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(
 
 
 async def test_the_pages_and_resources_of_other_servers_load_as_before(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("plain", f"{site}/")
+    view: PageView = await browser.open_url("plain", f"{site}/", True)
     assert view.title == "Outside" and view.status == 200
     own: ScriptRun = await browser.run_script(
         "plain", "fetch('/own.png').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0

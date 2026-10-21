@@ -83,6 +83,11 @@ class BrowserPool:
         for session in (self.main, *self._others.values()):
             session.set_enabled(enabled)
 
+    def set_remote_input(self, remote_input: bool) -> None:
+        """Whether the owner may use a held run's page from the screen (item 470), in every session."""
+        for session in (self.main, *self._others.values()):
+            session.set_remote_input(remote_input)
+
     async def set_look(self, look: PageLook) -> None:
         """How the pages of every session look from their next call on (item 354), as
         :meth:`BrowserSession.set_look` says."""

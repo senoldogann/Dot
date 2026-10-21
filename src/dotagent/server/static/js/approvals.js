@@ -101,11 +101,16 @@ function iconOf(severity) {
 const TAKEOVER_IDLE = "Dot's window comes to the front and the run waits while you have it.";
 const TAKEOVER_HELD = "You have the browser. Do the step, return control, then say you did it.";
 
-/** On the hand-off of a browser step, the offer of the live view: take the browser over, do the step, give it back. */
-function takeoverOffer(runId) {
+/** On the hand-off of a browser step, the offer of the live view: take the browser over, do the step, give it back;
+ * with `onUseHere`, also using the page from this screen, which opens it over the whole page (item 475). */
+function takeoverOffer(runId, onUseHere) {
   let held = false;
   const button = el("button", { class: "btn sm", type: "button" }, icon("hand"), "Take the browser over");
   const text = el("span", { class: "small muted" }, TAKEOVER_IDLE);
+  const here =
+    onUseHere === null
+      ? null
+      : el("div", { class: "row takeover-offer" }, el("button", { class: "btn sm", type: "button", onclick: () => onUseHere() }, "Use it here"), el("span", { class: "small muted" }, "Or use the page from this screen: it opens over the whole page and your taps go to it."));
   button.addEventListener("click", async () => {
     button.disabled = true;
     try {
@@ -119,7 +124,8 @@ function takeoverOffer(runId) {
       button.disabled = false;
     }
   });
-  return el("div", { class: "row takeover-offer" }, button, text);
+  const mac = el("div", { class: "row takeover-offer" }, button, text);
+  return here === null ? mac : el("div", { class: "stack tight" }, mac, here);
 }
 
 // What the policy asks the owner about in every mode that asks, whatever their rules say (item 429): a rule offered for
@@ -178,10 +184,11 @@ function technicalDetails(args) {
 /**
  * A card for one approval. `onSettled(decided)` runs once the daemon answered a decision: `decided` is the decided
  * record when it took the decision, null when it refused it (made already, or not possible now). `leftNote` says what
- * becomes of the answer to a question the run left (LEFT_IN_RUN or LEFT_IN_CAMPAIGN).
+ * becomes of the answer to a question the run left (LEFT_IN_RUN or LEFT_IN_CAMPAIGN). `onUseHere`, where the card
+ * stands beside the run's view, is offered on the hand-off of a browser step: use the page from this screen (item 475).
  * Returns the node and `settle(status, note)`, which turns the card into its decided form.
  */
-export function approvalCard({ approval, heading, onSettled, leftNote }) {
+export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere }) {
   const node = el("div", { class: "approval" });
   const isQuestion = approval.severity === "question";
   const isHandoff = approval.severity === "handoff";
@@ -291,7 +298,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote }) {
           : guarded(approval)
             ? el("div", { class: "small muted" }, "Dot asks you about this in every mode but yolo; no rule turns that off.")
             : ruleOffer(approval),
-        isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId) : null,
+        isHandoff && approval.status === "pending" && approval.tool.startsWith("browser_") ? takeoverOffer(approval.runId, onUseHere) : null,
         el(
           "div",
           { class: "approval-actions" },

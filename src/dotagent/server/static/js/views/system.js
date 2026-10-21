@@ -1166,6 +1166,21 @@ function buildBrowser(isDisposed) {
       }
     },
   });
+  // Whether the owner may use the page of a run they hold from the screen that shows it, a phone's too (item 470).
+  const screenInput = switchSetting({
+    label: "Use the page from the screen while I hold the run",
+    hint: "On, a run you took over can be used from the screen that shows its page: your taps, scrolls and keys go to the page while the run waits. Nothing you type is kept.",
+    read: () => view?.remote_input === true,
+    write: async (on) => {
+      view = await api.post("/browser/remote-input", { remote_input: on });
+    },
+    onToggled: () => {
+      if (!isDisposed()) {
+        screenInput.paint();
+        toast("ok", view.remote_input ? "A run you hold can be used from the screen." : "A run you hold is used only on the Mac.");
+      }
+    },
+  });
   // Settings › Browser (item 354): whether runs may use the browser, how its pages look, and whether a run's page shows
   // by itself.
   const enabled = switchSetting({
@@ -1523,6 +1538,7 @@ function buildBrowser(isDisposed) {
     paintZooms();
     autoComputer.paint();
     raise.paint();
+    screenInput.paint();
     paintPort();
     signInSetting.hidden = view.mode !== "own";
     signIn.disabled = view.signing_in;
@@ -1680,6 +1696,7 @@ function buildBrowser(isDisposed) {
       el("h2", { class: "setting-group-name" }, "While a run works"),
       raise.element,
       autoComputer.element,
+      screenInput.element,
       el("h2", { class: "setting-group-name" }, "Developer"),
       el(
         "div",

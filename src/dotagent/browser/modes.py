@@ -123,7 +123,8 @@ async def adopt_mode(session: BrowserSession, mode: BrowserMode, open_chrome: Ch
         return
     try:
         await session.attachment()
-        await session.snapshot(CHECK_THREAD)
+        # A blank tab, which nothing reads but this check; it hides as a run's view would.
+        await session.snapshot(CHECK_THREAD, True)
         await session.release_thread(CHECK_THREAD)
     except BrowserError:
         await session.switch(previous, previous_dir)

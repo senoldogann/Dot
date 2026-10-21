@@ -193,7 +193,7 @@ async def test_browser_use_in_an_attached_chrome(chrome: ScratchChrome, site: st
         for run in range(_RUNS):
             thread: str = f"speed-{run}"
             started = time.monotonic()
-            view: PageView = await session.open_url(thread, f"{site}/form")
+            view: PageView = await session.open_url(thread, f"{site}/form", True)
             timings["open"].append(time.monotonic() - started)
             assert view.title == "Form"
             steps: list[Step] = [
@@ -202,23 +202,23 @@ async def test_browser_use_in_an_attached_chrome(chrome: ScratchChrome, site: st
                 Step(action="click", ref=ref_of(view.body, 'button "Save"')),
             ]
             started = time.monotonic()
-            done: ActOutcome = await session.act(thread, steps, False, refuse_secret_field)
+            done: ActOutcome = await session.act(thread, steps, False, refuse_secret_field, True)
             timings["act3"].append(time.monotonic() - started)
             assert [report.outcome for report in done.steps] == ["done", "done", "done"], done.steps
             started = time.monotonic()
-            again: PageView = await session.snapshot(thread)
+            again: PageView = await session.snapshot(thread, True)
             timings["snapshot"].append(time.monotonic() - started)
             assert f"Saved Run {run}" in again.body
             started = time.monotonic()
-            await session.screenshot(thread)
+            await session.screenshot(thread, True)
             timings["screenshot"].append(time.monotonic() - started)
             started = time.monotonic()
-            reopened: PageView = await session.open_url(thread, f"{site}/form?again")
+            reopened: PageView = await session.open_url(thread, f"{site}/form?again", True)
             timings["open_again"].append(time.monotonic() - started)
             assert reopened.title == "Form"
             started = time.monotonic()
-            await session.open_url(thread, f"{site}/app")
-            ready: TextWait = await session.wait_text(thread, "Ready", _APP_WAIT_S)
+            await session.open_url(thread, f"{site}/app", True)
+            ready: TextWait = await session.wait_text(thread, "Ready", _APP_WAIT_S, True)
             timings["app"].append(time.monotonic() - started)
             drawn += ready.appeared
             await session.release_thread(thread)

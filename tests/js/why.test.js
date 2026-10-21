@@ -1,0 +1,31 @@
+// Why a step ran (item 468), in words.
+
+import assert from "node:assert/strict";
+import { test } from "node:test";
+
+import { showsWhy, whyText } from "../../src/dotagent/server/static/js/why.js";
+
+function decided(source, answeredBy, reason) {
+  return { verdict: answeredBy === "policy" ? "allow" : "ask", source, reason, rule_id: source === "rule" ? "rul_1" : null, answered_by: answeredBy, preset: "balanced" };
+}
+
+test("what nobody was asked about names the rule, the preset or the reason", () => {
+  assert.equal(whyText(decided("rule", "policy", "Mail is fine"), []), "Allowed by your rule “Mail is fine”.");
+  assert.equal(whyText(decided("preset", "policy", "write actions are allowed in balanced."), []), "Allowed by the balanced preset: write actions are allowed in balanced.");
+  assert.equal(whyText(decided("mode", "policy", "chat runs read"), []), "Allowed: chat runs read.");
+});
+
+test("who answered a question says so, with why it was asked", () => {
+  assert.equal(whyText(decided("guard", "yolo", "money leaves the Mac"), ["financial"]), "YOLO, not asked: money leaves the Mac. Flags: financial.");
+  assert.equal(whyText(decided("taint", "reviewer", "the run read a page"), []), "The review model approved it; the policy asked because the run read a page.");
+  assert.equal(whyText(decided("preset", "user", "deletes ask in balanced"), []), "You approved it; the policy asked because deletes ask in balanced.");
+  assert.equal(whyText(decided("supervised", "user", "Supervised asks before every change"), []), "Supervised: you approved it.");
+});
+
+test("a step says why it ran when it acted or when more than the preset decided it", () => {
+  assert.equal(showsWhy(null, "write"), false);
+  assert.equal(showsWhy(decided("preset", "policy", "reads are allowed"), "read"), false);
+  assert.equal(showsWhy(decided("preset", "policy", "writes are allowed"), "write"), true);
+  assert.equal(showsWhy(decided("rule", "policy", "Mail is fine"), "read"), true);
+  assert.equal(showsWhy(decided("taint", "user", "the run read a page"), "network"), true);
+});

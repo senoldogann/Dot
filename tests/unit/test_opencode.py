@@ -13,6 +13,8 @@ import pytest
 from mcp.types import CallToolResult, ImageContent, TextContent
 from pydantic import JsonValue
 
+from dotagent.agent.authorization import StepDecision
+from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData, assistant_message, user_message
 from dotagent.opencode.bridge import door_name, mcp_result, session_rules
 from dotagent.opencode.events import (
@@ -28,13 +30,16 @@ from dotagent.opencode.events import (
 )
 from dotagent.opencode.run import (
     FREE_TIER_REFUSED,
+    _Call,
     agent_failed,
     bridged_tools,
     local_target,
     meanwhile,
     permission_action,
+    step_result,
 )
 from dotagent.opencode.server import PERMISSIONS, FreeModel, free_models, server_environment
+from dotagent.policy.types import ActionInfo
 from dotagent.tools.base import ToolResult
 from dotagent.tools.browser import build_browser_tools
 from dotagent.tools.delegate import build_delegate_tools
@@ -303,3 +308,92 @@ def test_a_result_of_dots_tool_goes_back_with_its_pictures_and_its_failure() -> 
 def test_a_fetch_of_this_mac_or_its_network_is_seen_in_any_spelling(url: str, local: bool) -> None:
     """The code review's Y1: OpenCode's webfetch reached addresses Dot's own web tools refuse."""
     assert local_target(url) is local
+
+
+def test_a_call_keeps_what_decided_it_as_a_call_of_dots_own_does() -> None:
+    """Item 474: the result of a call the gate let through keeps what decided it and its action's flags; one the gate
+    stopped keeps no decision, its flags still; one that never asked keeps OpenCode's title and no action."""
+    action: ActionInfo = ActionInfo(
+        tool="bash", kind="shell", risk="medium", summary="Run: git push", target="git push", flags=("external_send",)
+    )
+    decided: StepDecision = StepDecision(
+        verdict="ask",
+        source="preset",
+        reason="the preset asks",
+        rule_id=None,
+        answered_by="user",
+        preset="balanced",
+        tainted=True,
+    )
+    seen: ToolSeen = ToolSeen(
+        call_id="call-1",
+        message_id="message-1",
+        tool="bash",
+        status="completed",
+        input={},
+        output="pushed",
+        error="",
+        title="git push",
+        started_ms=1_000,
+        ended_ms=2_500,
+    )
+    let_through: JsonObject = step_result(
+        seen,
+        "opencode_bash",
+        _Call(announced=True, action=action, waited_s=1.25, decision=decided),
+        "pushed",
+        1.5,
+        True,
+    )
+    assert (let_through["decision"], let_through["flags"], let_through["summary"], let_through["kind"]) == (
+        decided.model_dump(mode="json"),
+        ["external_send"],
+        "Run: git push",
+        "shell",
+    )
+    assert (let_through["ok"], let_through["waited_s"], let_through["tainted"]) == (True, 1.25, True)
+    refused: ToolSeen = seen.model_copy(update={"status": "error", "error": "refused"})
+    stopped: JsonObject = step_result(
+        refused, "opencode_bash", _Call(announced=True, action=action), "refused", 0.0, False
+    )
+    assert (stopped["ok"], stopped["decision"], stopped["flags"]) == (False, None, ["external_send"])
+    unasked: JsonObject = step_result(seen, "opencode_read", _Call(announced=True), "text", 0.2, False)
+    assert (unasked["summary"], unasked["kind"], unasked["decision"], unasked["flags"]) == ("git push", "", None, [])
+
+
+def test_a_call_asked_about_twice_keeps_only_what_its_last_ask_was_let_through_for() -> None:
+    """OpenCode asks for a folder outside the workspace, then for the edit itself, for one call: the first let through
+    and the second refused, the call's result keeps no decision, and the edit's action."""
+    folder: ActionInfo = ActionInfo(
+        tool="opencode_external_directory", kind="read", risk="safe", summary="Read /tmp/x", target="/tmp/x", flags=()
+    )
+    edit: ActionInfo = ActionInfo(
+        tool="opencode_edit", kind="write", risk="medium", summary="Edit /tmp/x/a.md", target="/tmp/x/a.md", flags=()
+    )
+    let_through: StepDecision = StepDecision(
+        verdict="allow",
+        source="preset",
+        reason="read-only",
+        rule_id=None,
+        answered_by="policy",
+        preset="balanced",
+        tainted=False,
+    )
+    call: _Call = _Call(announced=True)
+    call.asked(folder)
+    call.decision = let_through
+    call.asked(edit)
+    refused: ToolSeen = ToolSeen(
+        call_id="call-2",
+        message_id="message-1",
+        tool="edit",
+        status="error",
+        input={},
+        output="",
+        error="refused",
+        title="a.md",
+        started_ms=None,
+        ended_ms=None,
+    )
+    result: JsonObject = step_result(refused, "opencode_edit", call, "refused", 0.0, False)
+    assert (result["decision"], result["kind"], result["summary"]) == (None, "write", "Edit /tmp/x/a.md")

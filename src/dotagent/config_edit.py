@@ -38,6 +38,7 @@ type AssistantSetting = Literal["name", "owner", "introduced"]
 type BrowserSetting = Literal[
     "mode",
     "raise_window",
+    "remote_input",
     "debug_port",
     "enabled",
     "profile",
