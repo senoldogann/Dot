@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
+from playwright.async_api import Browser, BrowserContext, Locator, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -25,7 +25,7 @@ from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
 from dotagent.store.models import RunRecord
-from dotagent.tools.meta import FINISH_TOOL
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 
 pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
 
@@ -35,17 +35,26 @@ _FIRST: str = "Name three harbours of the north."
 _FROM_PHONE: str = "And one in the south, from the phone."
 _FROM_WIDE: str = "And one in the west, from the wide window."
 _DRAFT: str = "half a thought typed on the wide window"
+_ASKS: str = "Find the harbour masters, and ask me what you need."
+_QUESTIONS: tuple[str, str] = ("Which coast first?", "How many names?")
 _RUN_WAIT_S: float = 30.0
 # How long a screen may take to show a message sent on the other: the lifecycle event and one read.
 _FOLLOW_MS: int = 10_000
 
 
 def _script() -> list[ScriptedTurn]:
-    """The first run, the message sent on the phone and the one sent on the wide window, each ending at once."""
+    """The first run, the message sent on the phone and the one sent on the wide window, each ending at once; then a run
+    that leaves two questions and ends, and the run each answer starts."""
     done: ScriptedTurn = ScriptedTurn(
         text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "Done.", "success": True}),)
     )
-    return [done, done, done]
+    asks: list[ScriptedTurn] = [
+        ScriptedTurn(
+            text="", calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": question, "options": []}),)
+        )
+        for question in _QUESTIONS
+    ]
+    return [done, done, done, *asks, done, done, done]
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -198,6 +207,28 @@ async def test_a_message_sent_on_one_screen_shows_at_once_on_the_other(
             # where the chat is now.
             reloaded: Page = await _reloaded_screen(webkit, address, south)
             await _shows(reloaded, west, _FROM_WIDE)
+
+            # A run that left two questions, the newest of its chat: the answer to the first starts the chat's next run,
+            # and the page stays for the second; the answer to the last opens the chat's newest run.
+            asked: RunRecord = await manager.start(
+                _ASKS, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+            )
+            await _newest(runtime, asked.thread_id, set())
+            questions: Page = await _screen(chromium, address, f"/runs/{asked.id}", False)
+            cards: Locator = questions.get_by_label("Dot asked you").locator(".approval")
+            await expect(cards).to_have_count(2)
+            await cards.first.get_by_label("Your answer").fill("The north coast.")
+            await cards.first.get_by_role("button", name="Send answer").click()
+            first_answer: RunRecord = await _newest(runtime, asked.thread_id, {asked.id})
+            await expect(cards).to_have_count(1)
+            await questions.wait_for_timeout(1500)
+            assert await questions.evaluate("() => location.hash") == f"#/runs/{asked.id}"
+            await cards.first.get_by_label("Your answer").fill("Ten names.")
+            await cards.first.get_by_role("button", name="Send answer").click()
+            await questions.wait_for_function(
+                "asked => location.hash !== asked", arg=f"#/runs/{asked.id}", timeout=_FOLLOW_MS
+            )
+            assert first_answer.thread_id == asked.thread_id
         finally:
             await chromium.close()
             await webkit.close()

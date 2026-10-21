@@ -481,6 +481,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       }
     }
     await reconcile();
+    // With no question left open here, the page goes on at the chat's newer run if one started meanwhile (item 451).
+    catchUp();
   }
 
   /** `questions` are the stored questions the run left that are still open; a card that is there already stays as it is. */
@@ -1130,7 +1132,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // back after a break (it replays nothing: a phone put away). What was typed here and not sent goes with it, as the
   // newer run's draft. A page whose run was not the chat's newest when it first read the chat stays where it is: an
   // earlier run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its
-  // address, or a delegated run. `newestKnown` is the chat's newest run as the page last read it, null until then;
+  // address, or a delegated run; and a page with a question its run left open stays until none is. `newestKnown` is the chat's newest run as the page last read it, null until then;
   // `shownKey` keeps, in this tab, the run the page showed as the chat's newest until it leaves it, so that a page the
   // browser loads again (a phone's, put away) goes on from where it stood.
   const shownKey = `dot.chatShown.${run.thread_id}`;
@@ -1152,6 +1154,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       return;
     }
     if (newestKnown === runId && newest.id !== runId) {
+      // A question this run left stays answerable here while it is open: the answer to one starts the chat's next run,
+      // and the page opens it once no other question of the run is open (questionDecided).
+      if (questionCards.size > 0) {
+        return;
+      }
       moveDraft(runId, newest.id);
       goOn(`/runs/${newest.id}`);
       return;
