@@ -93,7 +93,11 @@ The ways a service connects:
   with the service as a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and
   renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left
   out with words that bring you back here (**Sign in again**). **Remove** takes a server added here out, with its tools
-  and its sign-in; one set up elsewhere is removed there.
+  and its sign-in, and takes one added from another agent of this Mac back from Dot, stopped at once (item 497; the
+  agent keeps it). A server of a plugin goes with its plugin: **Remove plugin** stops the plugin's servers now, its
+  skills leave the runs that start after, and its folder in Dot's plugins goes to the Trash, from which it can be put
+  back (`DELETE /api/installed-plugins/{name}`); a plugin read from a folder of `[plugins] dirs` is taken out of the
+  config instead. A server of Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
 
 **Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
 its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you

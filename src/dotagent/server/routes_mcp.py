@@ -23,7 +23,10 @@ from dotagent.config import McpServerConfig
 from dotagent.connections.directory import logo_of_service, mark_of_service
 from dotagent.core.errors import ConfigError, DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
-from dotagent.core.paths import connected_servers_path, env_file_path
+from dotagent.core.paths import added_servers_path, connected_servers_path, env_file_path, plugins_dir
+from dotagent.help.added import read_added_servers
+from dotagent.help.added import remove_server as take_back_added_server
+from dotagent.help.elsewhere import dot_server_name
 from dotagent.mcp.catalogue import MCP_SERVICES, McpService
 from dotagent.mcp.connected import ConnectedServers, forget_connected, keep_connected, read_connected
 from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS, McpHub
@@ -31,6 +34,8 @@ from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.mcp.signin import CALLBACK_PATH, SIGN_IN_WAIT_S, SignIns, forget_sign_in, sign_in_path, signed_in
 from dotagent.mcp.types import McpFailure
 from dotagent.oauth.accounts import CameBack, denial_reason
+from dotagent.plugins.removal import is_dots_own, move_to_trash, trash_folder
+from dotagent.plugins.types import Plugin
 from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.callback_page import Callback, Subject, account_callback, render, status_of
 from dotagent.server.context import ServerContext
@@ -235,8 +240,11 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = {}
         for config in ctx.runtime.config.mcp:
             servers.setdefault(config.name, (config, "config"))
-        for config in ctx.runtime.plugins.servers():
-            servers.setdefault(config.name, (config, "plugin"))
+        # A plugin taken out (item 497) is gone from its folder: its servers are not Dot's any more.
+        for plugin in ctx.runtime.plugins.plugins:
+            if plugin.root.is_dir():
+                for config in plugin.servers:
+                    servers.setdefault(config.name, (config, "plugin"))
         recorded: frozenset[str] = frozenset(config.name for config in record.servers)
         for name, config in hub.configs().items():
             servers.setdefault(name, (config, "connected" if name in recorded else "elsewhere"))
@@ -245,6 +253,17 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         for name, attempt in tries.items():
             servers.setdefault(name, (attempt.config, attempt.origin))
         return servers
+
+    def plugin_of(server: str) -> str | None:
+        """The plugin the server ``server`` comes with, by its name."""
+        return next(
+            (
+                plugin.name
+                for plugin in ctx.runtime.plugins.plugins
+                if any(one.name == server for one in plugin.servers)
+            ),
+            None,
+        )
 
     async def everything() -> dict[str, tuple[McpServerConfig, McpOrigin]]:
         return known(await asyncio.to_thread(read_connected, connected_servers_path()))
@@ -269,6 +288,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         return McpServerView(
             name=config.name,
             origin=origin,
+            plugin=plugin_of(config.name) if origin == "plugin" else None,
             address=_address(config),
             service=service if origin == "connected" else None,
             mark=None if service is None else mark_of_service(service),
@@ -456,14 +476,34 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
     @router.delete("/api/mcp/servers/{name}")
     async def remove_server(name: str) -> McpServersView:
         """Remove a server added on the Plugins page, or let go of a try: its tools leave the runs that start after,
-        and Dot forgets its address and its sign-in."""
+        and Dot forgets its address and its sign-in. One added from another agent of this Mac is taken back as
+        Customize › Skills › Found on this Mac takes it back, and stopped now (item 497). A server of Dot's config is
+        the owner's to take out of ``config.toml``, and one of a plugin goes with its plugin
+        (``DELETE /api/installed-plugins/{name}``)."""
         servers: dict[str, tuple[McpServerConfig, McpOrigin]] = await everything()
         found: tuple[McpServerConfig, McpOrigin] | None = servers.get(name)
         if found is None:
             raise NotFoundError("Dot has no MCP server of this name", {"server": name})
+        if found[1] == "elsewhere":
+            path = added_servers_path()
+            record = await asyncio.to_thread(read_added_servers, path)
+            item = next((one for one in record.servers if dot_server_name(one.name) == name), None)
+            if item is None:
+                raise NotFoundError("no MCP server of this name was added from another agent", {"server": name})
+            await asyncio.to_thread(take_back_added_server, path, item.agent, item.name)
+            await hub.disconnect(name)
+            refresh_mcp_tools(ctx.runtime.registry, hub)
+            log.info("mcp_server_taken_back", server=name, agent=item.agent)
+            return await listing()
+        if found[1] == "plugin":
+            raise RunConflict(
+                f"this MCP server comes with the plugin {plugin_of(name)}: remove the plugin",
+                {"server": name, "set_up": found[1], "plugin": plugin_of(name)},
+            )
         if found[1] != "connected":
             raise RunConflict(
-                "this MCP server is set up elsewhere; remove it there", {"server": name, "set_up": found[1]}
+                "this MCP server is set up in Dot's config: take its [[mcp]] block out of config.toml",
+                {"server": name, "set_up": found[1]},
             )
         attempt: _Try | None = tries.pop(name, None)
         if attempt is not None and attempt.task is not None and not attempt.task.done():
@@ -475,6 +515,27 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         await asyncio.to_thread(forget_sign_in, sign_in_path(name))
         await forget_service_secrets(found[0])
         log.info("mcp_server_removed", server=name)
+        return await listing()
+
+    @router.delete("/api/installed-plugins/{name}")
+    async def remove_plugin(name: str) -> McpServersView:
+        """Take the plugin ``name`` out of Dot (item 497): its MCP servers stop now and its skills leave the runs that
+        start after, and its folder goes to the Trash, from which it can be put back. A plugin read from a folder of
+        ``[plugins] dirs`` is refused: the owner takes that folder out of the config."""
+        plugin: Plugin | None = next((one for one in ctx.runtime.plugins.plugins if one.name == name), None)
+        if plugin is None or not plugin.root.is_dir():
+            raise NotFoundError("Dot has no plugin of this name", {"plugin": name})
+        if not is_dots_own(plugin, plugins_dir()):
+            raise RunConflict(
+                f"the plugin {name} is read from {plugin.root.parent}, a folder of [plugins] dirs: take that folder "
+                "out of the config to remove it",
+                {"plugin": name, "folder": str(plugin.root.parent)},
+            )
+        for server in plugin.servers:
+            await hub.disconnect(server.name)
+        refresh_mcp_tools(ctx.runtime.registry, hub)
+        moved = await asyncio.to_thread(move_to_trash, plugin.root, trash_folder())
+        log.info("plugin_removed", plugin=name, trash=str(moved))
         return await listing()
 
     @router.get(CALLBACK_PATH)
