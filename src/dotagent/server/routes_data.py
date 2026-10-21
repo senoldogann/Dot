@@ -11,7 +11,7 @@ from fastapi import APIRouter, Query
 from dotagent.agent.learning_health import LearningHealth, quiet_limit, read_learning_health, stall_reason
 from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import SchedulerConfig
-from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.memory.service import (
     MemoryHit,
@@ -28,6 +28,7 @@ from dotagent.memory.service import (
     update_memory_note,
 )
 from dotagent.policy.drafting import DraftedRule
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import (
     ScheduleRequest,
     create_schedule,
@@ -43,6 +44,7 @@ from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
 from dotagent.server.rule_shadow import rule_views
 from dotagent.server.views import (
+    FiringsQuery,
     LearningHealthView,
     MemoriesQuery,
     MemoryPage,
@@ -59,7 +61,15 @@ from dotagent.server.views import (
     SearchQuery,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import MemoryRecord, MemoryScore, RuleRecord, ScheduleOptions, ScheduleRecord
+from dotagent.store.models import (
+    MemoryRecord,
+    MemoryScore,
+    RuleRecord,
+    RunRecord,
+    ScheduleFiring,
+    ScheduleOptions,
+    ScheduleRecord,
+)
 
 
 def _checked_pattern(pattern: str) -> str:
@@ -307,5 +317,19 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
     @router.delete("/schedules/{schedule_id}")
     async def delete_schedule(schedule_id: str) -> ScheduleView:
         return await view_of(await remove_schedule(store, schedule_id))
+
+    @router.post("/schedules/{schedule_id}/run", status_code=201)
+    async def run_schedule_now(schedule_id: str) -> RunRecord:
+        """Start a run of the schedule now, by hand (item 455): 409 while the emergency stop is engaged, while one of
+        its runs is at work, and in a daemon that runs no scheduler; its next time and its switch stay as they are."""
+        if ctx.scheduler is None:
+            raise RunConflict("this daemon runs no scheduler", {"schedule_id": schedule_id})
+        return await ctx.scheduler.fire_by_hand(schedule_id, time.time())
+
+    @router.get("/schedules/{schedule_id}/firings")
+    async def list_firings(schedule_id: str, query: Annotated[FiringsQuery, Query()]) -> list[ScheduleFiring]:
+        """The schedule's last firings, at its time and by hand, newest first, one at work among them (item 455)."""
+        await store.get_schedule(schedule_id)
+        return await store.schedule_firings(schedule_id, SCHEDULE_SOURCE, query.limit)
 
     return router

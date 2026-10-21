@@ -58,6 +58,12 @@ def late_goal(goal: str, due: float, now: float, zone: ZoneInfo) -> str:
     return f"(Scheduled for {format_local(due, zone)}; it starts late, at {format_local(now, zone)}.)\n\n{goal}"
 
 
+def by_hand_goal(goal: str, now: float, zone: ZoneInfo) -> str:
+    """The goal of a run the owner started by hand (item 455), after a note that it did not start at its time: what its
+    run reads first, while the run keeps the goal alone, as a late firing's does (:func:`late_goal`)."""
+    return f"(Started by hand at {format_local(now, zone)}, not at its time.)\n\n{goal}"
+
+
 def _following(record: ScheduleRecord, now: float, zone: ZoneInfo) -> float | None:
     """When the schedule fires after a firing at ``now``: the next cron time, or never again for a one-time schedule."""
     return None if record.cron is None else next_firing(record.cron, now, zone)
@@ -74,8 +80,8 @@ class Scheduler:
 
     Every firing advances the schedule's next run before the run starts, so a crash can lose a firing but never repeat
     one. Firings that were missed collapse into one, and into none when they are overdue by more than the grace period.
-    A schedule whose previous run is still going skips the firing. The store is the only persistent state; the
-    instance remembers which schedules have a run in flight.
+    A repeating schedule whose previous run is still going skips the firing; a one-time one waits for that run, still
+    due. The store is the only persistent state; the instance remembers which schedules have a run in flight.
 
     The nightly reflection (item 70) fires here too, at ``[agent] reflection_time``: once its daily time has passed
     since the last reflection (or since the last attempt, or since this scheduler was made), it runs in a task of its
@@ -87,6 +93,8 @@ class Scheduler:
         self._manager: RunManager = manager
         self._zone: ZoneInfo = runtime.schedule_zone
         self._in_flight: dict[str, str] = {}
+        # The schedules whose run is being started, by a tick or by hand (item 455), until it is in flight.
+        self._starting: set[str] = set()
         self._watchers: set[asyncio.Task[None]] = set()
         self._loop: asyncio.Task[None] | None = None
         self._reflected_from: float = time.time()
@@ -339,10 +347,10 @@ class Scheduler:
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
         """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
         daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. A one-time
-        schedule has no next time and is never dropped: while the emergency stop is engaged it waits, still due, for
-        the release, and one overdue fires late, its opening saying when it was due (:func:`late_goal`). An emergency
-        stop engaged while the run was being started ends it as one. A firing missed where nobody saw it, one overdue
-        or one whose run could not start, is told (:meth:`_tell_missed`)."""
+        schedule has no next time and is never dropped: while the emergency stop is engaged, or a run of it started by
+        hand works, it waits, still due, and one overdue fires late, its opening saying when it was due
+        (:func:`late_goal`). An emergency stop engaged while the run was being started ends it as one. A firing missed
+        where nobody saw it, one overdue or one whose run could not start, is told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
@@ -365,8 +373,12 @@ class Scheduler:
             failure: FiringFailure | None = await firing_failure(store, record.id)
             if failure is not None and failure.last_failure_at >= record.next_run_at and now < retry_after(failure):
                 return
-        if record.id in self._in_flight:
-            log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight[record.id])
+        if record.id in self._in_flight or record.id in self._starting:
+            if one_time:
+                # Only a run by hand is at work while a one-time schedule is still due (item 455): the schedule waits,
+                # due, and fires once that run has ended, as it waits for the release of the emergency stop.
+                return
+            log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight.get(record.id))
             await store.record_schedule_skip(record.id, following, "skipped: the previous run was still going")
             return
         if late and not one_time:
@@ -375,38 +387,37 @@ class Scheduler:
             await store.record_schedule_skip(record.id, following, overdue)
             await self._tell_missed(record, overdue)
             return
-        config: SchedulerConfig = self._runtime.config.scheduler
-        same_chat: bool = config.same_chat if record.options.same_chat is None else record.options.same_chat
-        kept: int = config.history_runs if record.options.history_runs is None else record.options.history_runs
-        # In the same chat the run reads the earlier runs' conversation; in a new one, the digest of their answers.
-        digest: Digest = (
-            NO_DIGEST
-            if same_chat or kept == 0
-            else history_digest(await store.schedule_runs(record.id, SCHEDULE_SOURCE, kept), zone, config.history_chars)
-        )
-        thread_id, made = await self._firing_chat(record, now, zone, same_chat)
+        self._starting.add(record.id)
+        try:
+            await self._start_due(record, record.next_run_at, now, zone, following, late, overdue_s)
+        finally:
+            self._starting.discard(record.id)
+
+    async def _start_due(
+        self,
+        record: ScheduleRecord,
+        due: float,
+        now: float,
+        zone: ZoneInfo,
+        following: float | None,
+        late: bool,
+        overdue_s: float,
+    ) -> None:
+        """Start the run of the firing of ``record`` that was due at ``due``, once :meth:`_fire` let it: the firing is
+        written (its next time, its chat) before the run starts, so a crash can lose a firing but never repeat one."""
+        store: Store = self._runtime.store
+        one_time: bool = record.cron is None
+        same_chat, digest = await self._history(record, zone)
+        title: str = thread_title(f"{record.name} · {format_local(now, zone)}")
+        thread_id, made = await self._firing_chat(record, same_chat, title)
         await store.record_schedule_fire(record.id, now, following, thread_id, "starting")
         if late:
             log.warning("schedule_fired_late", schedule_id=record.id, overdue_s=round(overdue_s))
-        told: str = late_goal(record.goal, record.next_run_at, now, zone) if late else record.goal
-        # The run reads the earlier runs of the digest, or in the chat it goes on in that chat's last run.
-        carried: tuple[str, ...] = (
-            digest.run_ids if made else tuple(run.id for run in await store.list_runs(1, thread_id))
-        )
+        told: str = late_goal(record.goal, due, now, zone) if late else record.goal
+        carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
         started: RunRecord | None = None
         try:
-            started = await self._manager.start_firing(
-                record.goal,
-                firing_opening(told, digest),
-                record.mode,
-                record.options.model,
-                thread_id,
-                record.options.effort,
-                "standard" if record.options.speed is None else record.options.speed,
-                record.options.approvals,
-                record.options.goal_mode,
-                carried,
-            )
+            started = await self._start(record, firing_opening(told, digest), thread_id, carried)
         except DotError as exc:
             log.error("schedule_start_failed", schedule_id=record.id, error=exc.message, context=exc.context)
             failed: str = f"failed to start: {exc.message}"
@@ -423,16 +434,9 @@ class Scheduler:
             # due again, and is tried again after a wait (``retry_after``; item 351: the firing above had switched it
             # off for good).
             if started is None and one_time:
-                await store.keep_schedule_due(record.id, record.next_run_at, now)
+                await store.keep_schedule_due(record.id, due, now)
         run: RunRecord = started
-        if await _emergency_stop_engaged():
-            log.warning("schedule_run_stopped_emergency_stop", schedule_id=record.id, run_id=run.id)
-            self._manager.end_by_emergency_stop(run.id)
-        self._in_flight[record.id] = run.id
-        # The watch starts first: it frees the schedule when the run ends, even when the store fails the write below.
-        watcher: asyncio.Task[None] = asyncio.create_task(self._watch(record.id, run.id), name=f"watch-{run.id}")
-        self._watchers.add(watcher)
-        watcher.add_done_callback(self._watcher_done)
+        await self._track(record.id, run)
         try:
             await store.set_schedule_status(record.id, "running")
             await record_firing_started(store, record.id)
@@ -458,12 +462,117 @@ class Scheduler:
             goal_mode=run.goal_mode,
         )
 
-    async def _firing_chat(
-        self, record: ScheduleRecord, now: float, zone: ZoneInfo, same_chat: bool
-    ) -> tuple[str, bool]:
+    async def fire_by_hand(self, schedule_id: str, now: float) -> RunRecord:
+        """Start a run of the schedule ``schedule_id`` now, because the owner asked (item 455): switched on or off, due
+        or not. Nothing of when it fires next, nor of whether it is switched on, changes, so a one-time schedule is
+        still due at its time. The run goes as a firing goes: unattended, with the schedule's own choices (a yolo
+        schedule's run is a yolo run), the digest of its earlier runs, in a chat of its own whose title says it was
+        started by hand (or in the schedule's chat, with ``same_chat``), its first message saying so. It does not start
+        while the owner's emergency stop is engaged, nor while a run of the schedule is at work or being started
+        (:class:`RunConflict`). A run that cannot start is the caller's error, the chat made for it gone, and it is no
+        missed firing: the owner is looking."""
+        store: Store = self._runtime.store
+        record: ScheduleRecord = await store.get_schedule(schedule_id)
+        if await _emergency_stop_engaged():
+            raise RunConflict("no schedule starts while the emergency stop is engaged", {"schedule_id": schedule_id})
+        if schedule_id in self._in_flight or schedule_id in self._starting:
+            raise RunConflict(
+                "a run of this schedule is already working",
+                {"schedule_id": schedule_id, "run_id": self._in_flight.get(schedule_id)},
+            )
+        self._starting.add(schedule_id)
+        try:
+            zone: ZoneInfo = await schedule_zone(record.options, self._zone)
+            same_chat, digest = await self._history(record, zone)
+            title: str = thread_title(f"{record.name} · {format_local(now, zone)} · by hand")
+            thread_id, made = await self._firing_chat(record, same_chat, title)
+            carried: tuple[str, ...] = await self._carried(digest, made, thread_id)
+            started: RunRecord | None = None
+            try:
+                started = await self._start(
+                    record, firing_opening(by_hand_goal(record.goal, now, zone), digest), thread_id, carried
+                )
+            finally:
+                if started is None and made:
+                    await self._drop_chat(record.id, thread_id)
+            run: RunRecord = started
+            await self._track(record.id, run)
+            try:
+                await store.record_schedule_hand_run(record.id, now, thread_id)
+            except DotError as exc:
+                # The run started all the same; its watch writes how it ended.
+                log.error(
+                    "schedule_status_not_written",
+                    schedule_id=record.id,
+                    run_id=run.id,
+                    error=exc.message,
+                    context=exc.context,
+                )
+        finally:
+            self._starting.discard(schedule_id)
+        log.info(
+            "schedule_fired_by_hand",
+            schedule_id=record.id,
+            run_id=run.id,
+            thread_id=thread_id,
+            same_chat=not made,
+            history=len(digest.run_ids),
+            approvals=run.approvals,
+        )
+        return run
+
+    async def _history(self, record: ScheduleRecord, zone: ZoneInfo) -> tuple[bool, Digest]:
+        """Whether a firing of ``record`` goes on in the chat of its last one, and the digest of its earlier runs'
+        answers its run reads in a chat of its own; in the same chat it reads their conversation instead."""
+        store: Store = self._runtime.store
+        config: SchedulerConfig = self._runtime.config.scheduler
+        same_chat: bool = config.same_chat if record.options.same_chat is None else record.options.same_chat
+        kept: int = config.history_runs if record.options.history_runs is None else record.options.history_runs
+        digest: Digest = (
+            NO_DIGEST
+            if same_chat or kept == 0
+            else history_digest(await store.schedule_runs(record.id, SCHEDULE_SOURCE, kept), zone, config.history_chars)
+        )
+        return same_chat, digest
+
+    async def _carried(self, digest: Digest, made: bool, thread_id: str) -> tuple[str, ...]:
+        """The earlier runs whose words a firing's run reads: the digest's in a chat made for it, else that chat's last
+        run."""
+        if made:
+            return digest.run_ids
+        return tuple(run.id for run in await self._runtime.store.list_runs(1, thread_id))
+
+    async def _start(self, record: ScheduleRecord, opening: str, thread_id: str, carried: tuple[str, ...]) -> RunRecord:
+        """Start the run of a firing of ``record`` in the chat ``thread_id`` with the schedule's own choices."""
+        return await self._manager.start_firing(
+            record.goal,
+            opening,
+            record.mode,
+            record.options.model,
+            thread_id,
+            record.options.effort,
+            "standard" if record.options.speed is None else record.options.speed,
+            record.options.approvals,
+            record.options.goal_mode,
+            carried,
+        )
+
+    async def _track(self, schedule_id: str, run: RunRecord) -> None:
+        """Keep ``run`` as the schedule's run at work until it ends; its watch, which starts first, frees the schedule
+        and writes the end even when the store fails a write after this. An emergency stop engaged while it was being
+        started ends it as one."""
+        if await _emergency_stop_engaged():
+            log.warning("schedule_run_stopped_emergency_stop", schedule_id=schedule_id, run_id=run.id)
+            self._manager.end_by_emergency_stop(run.id)
+        self._in_flight[schedule_id] = run.id
+        watcher: asyncio.Task[None] = asyncio.create_task(self._watch(schedule_id, run.id), name=f"watch-{run.id}")
+        self._watchers.add(watcher)
+        watcher.add_done_callback(self._watcher_done)
+
+    async def _firing_chat(self, record: ScheduleRecord, same_chat: bool, title: str) -> tuple[str, bool]:
         """The chat a firing's run goes in, and whether it was made for it: with ``same_chat``, the chat of the
-        schedule's last firing while it is there; otherwise, and when the owner deleted that chat, a new one. Either
-        is marked as the schedule's, whose next firings read its runs (item 257)."""
+        schedule's last firing while it is there; otherwise, and when the owner deleted that chat, a new one titled
+        ``title``. Either is marked as the schedule's, whose next firings read its runs (item 257)."""
         store: Store = self._runtime.store
         if same_chat and record.thread_id is not None:
             try:
@@ -473,7 +582,6 @@ class Scheduler:
             else:
                 await store.link_schedule_thread(record.thread_id, record.id)
                 return record.thread_id, False
-        title: str = thread_title(f"{record.name} · {format_local(now, zone)}")
         thread: ThreadRecord = await store.create_thread(title, SCHEDULE_SOURCE)
         await store.link_schedule_thread(thread.id, record.id)
         return thread.id, True
