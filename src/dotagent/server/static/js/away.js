@@ -41,7 +41,7 @@ function runRow(run) {
 function decisionRow(run) {
   return el(
     "li",
-    { class: "firing" },
+    { class: "firing", dataset: { awayDecided: run.run_id } },
     el(
       "div",
       { class: "row-meta" },
@@ -51,12 +51,20 @@ function decisionRow(run) {
   );
 }
 
+/** A "Show N more" that opens the rest of the list `list` in place, or null when it has no more. */
+function moreButton(list, rest, onOpen) {
+  return rest === 0 ? null : el("button", { class: "btn ghost sm", type: "button", dataset: { awayMore: list }, onclick: onOpen }, `Show ${rest} more`);
+}
+
 /** Build the card: `element` (hidden while there is nothing to tell) and `dispose()`. */
 export function buildAway() {
   const element = el("section", { class: "home-away", "aria-label": "While you were away", hidden: true });
   let disposed = false;
   let view = null;
-  let opened = false;
+  // Grows with every load, so a slow answer never overwrites a newer one (nor gives Mark as read an older moment).
+  let ticket = 0;
+  // The lists whose "Show N more" was pressed: they show all their rows until the page is left.
+  const opened = new Set();
   // The first visit of this browser marks the moment: what came before it is not news here.
   if (readPref(READ_KEY) === null) {
     writePref(READ_KEY, String(Date.now() / 1000));
@@ -78,38 +86,28 @@ export function buildAway() {
       element.replaceChildren();
       return;
     }
-    const shown = opened ? view.runs : view.runs.slice(0, ROWS_SHOWN);
-    const rest = view.runs.length - shown.length;
-    const more =
-      rest === 0
-        ? null
-        : el(
-            "button",
-            {
-              class: "btn ghost sm",
-              type: "button",
-              onclick: () => {
-                opened = true;
-                paint();
-              },
-            },
-            `Show ${rest} more`,
-          );
+    const open = (list) => {
+      opened.add(list);
+      paint();
+    };
+    const runs = opened.has("runs") ? view.runs : view.runs.slice(0, ROWS_SHOWN);
+    const decided = opened.has("decisions") ? view.decision_runs : view.decision_runs.slice(0, ROWS_SHOWN);
     element.replaceChildren(
       el("h2", { class: "section-label" }, "While you were away"),
       el(
         "div",
         { class: "card card-pad stack" },
         el("p", { class: "away-line" }, line),
-        view.runs.length === 0 ? null : el("ul", { class: "firings-list" }, ...shown.map(runRow)),
-        more,
+        view.runs.length === 0 ? null : el("ul", { class: "firings-list" }, ...runs.map(runRow)),
+        moreButton("runs", view.runs.length - runs.length, () => open("runs")),
         view.decision_runs.length === 0
           ? null
           : el(
               "div",
-              { class: "stack tight" },
+              { class: "stack tight away-decisions" },
               el("div", { class: "hint" }, "Most decisions made for you"),
-              el("ul", { class: "firings-list" }, ...view.decision_runs.slice(0, ROWS_SHOWN).map(decisionRow)),
+              el("ul", { class: "firings-list" }, ...decided.map(decisionRow)),
+              moreButton("decisions", view.decision_runs.length - decided.length, () => open("decisions")),
             ),
         el("div", { class: "row" }, el("span", { class: "spacer" }), el("button", { class: "btn sm", type: "button", onclick: markRead }, "Mark as read")),
       ),
@@ -117,15 +115,16 @@ export function buildAway() {
   }
 
   async function load() {
+    const mine = ++ticket;
     const since = Number(readPref(READ_KEY));
     try {
       const fresh = await api.get(`/away${query({ since })}`);
-      if (!disposed) {
+      if (!disposed && mine === ticket) {
         view = fresh;
         paint();
       }
     } catch (error) {
-      if (!disposed) {
+      if (!disposed && mine === ticket) {
         console.warn("what happened while you were away could not be read", error);
       }
     }

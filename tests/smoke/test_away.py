@@ -189,9 +189,11 @@ async def test_the_digest_counts_what_schedules_and_campaigns_did_and_what_was_d
 
 
 async def _scheduled_runs(store: Store, count: int) -> None:
+    """``count`` runs of a schedule, each with an approval YOLO answered."""
     chat: ThreadRecord = await _schedule_chat(store, "news")
     for number in range(count):
         ran: RunRecord = await _run(store, chat.id, "Read the news.", "schedule", None, None)
+        await _decided(store, ran.id, "yolo", "approved")
         await store.finish_run(ran.id, "done", f"Read {number + 1} papers.")
 
 
@@ -221,10 +223,16 @@ async def test_the_home_shows_the_news_once_then_mark_as_read_puts_it_away(
                 await asyncio.sleep(0.05)
                 await _scheduled_runs(runtime.store, 3)
                 await page.reload()
-                await expect(card.locator(".away-line")).to_have_text("3 scheduled runs: 3 done")
-                await expect(card.locator("[data-away-run]")).to_have_count(2)
-                await card.get_by_role("button", name="Show 1 more").click()
-                await expect(card.locator("[data-away-run]")).to_have_count(3)
+                await expect(card.locator(".away-line")).to_have_text(
+                    "3 scheduled runs: 3 done · 3 decisions made for you (3 by YOLO)"
+                )
+                for rows, more in (
+                    ("[data-away-run]", '[data-away-more="runs"]'),
+                    ("[data-away-decided]", '[data-away-more="decisions"]'),
+                ):
+                    await expect(card.locator(rows)).to_have_count(2)
+                    await card.locator(more).click()
+                    await expect(card.locator(rows)).to_have_count(3)
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"away-{width}-{scheme}.png"), full_page=True)
                 await card.get_by_role("button", name="Mark as read").click()
