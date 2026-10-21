@@ -411,7 +411,8 @@ taps double-click, a finger dragged scrolls the page, a finger held still a mome
 slider, a selection), two fingers zoom the picture itself, a mouse and a trackpad go as they are, and **Keyboard**
 brings up the screen's keyboard for the page, a key with Control or Meta, or a named key with Alt, going as a chord and
 a character the layout types with Option or AltGr as text. A step the run was taking when you held it keeps the page a
-moment, which the view says, and **Return control** ends it all.
+moment, which the view says, and **Return control** ends it all and closes the view, back to the run's page, as the
+run's end does (item 491).
 
 What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the run's page no longer shows (item 364):
 every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are

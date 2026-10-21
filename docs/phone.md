@@ -114,7 +114,7 @@ setting that turns it on. Dot's computer opens over the whole screen, with the p
 over), and goes back to the side panel when it closes. **Use it here** holds the run and uses its page from the phone
 (item 475): a tap clicks, a drag scrolls the page, a finger held still and then dragged drags on it, two fingers zoom
 the picture, and **Keyboard** types into the page; the card of a browser step handed to you offers it too, and **Return
-control** gives the run back. A tab a tap opens is not the one the picture shows.
+control** gives the run back and closes the view (item 491). A tab a tap opens is not the one the picture shows.
 
 The button at the top left is the one way back (item 338): a chevron on the page's own ground, no circle around it
 (item 373), in a 36 px box. On a chat's page, wherever it was opened from, it opens the list of chats in place, as the

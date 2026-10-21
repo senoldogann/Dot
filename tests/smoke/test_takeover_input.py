@@ -565,6 +565,11 @@ async def _screen_of(page: Page) -> Locator:
     return card
 
 
+# Where the desktop window centres its traffic lights and the room the page keeps for them (test_desktop_lights.py).
+_LIGHTS_Y: float = 26.0
+_LIGHTS_ROOM: float = 96.0
+
+
 @pytest.mark.browser
 async def test_a_phone_uses_the_page_from_its_screen(
     runtime: Runtime, manager: RunManager, served: str, site: _Site, tmp_path: Path
@@ -656,8 +661,10 @@ async def test_a_phone_uses_the_page_from_its_screen(
                 await page.touchscreen.tap(middle[0], middle[1])
                 await _until(runtime, run.thread_id, "document.getElementById('count').textContent", "2")
                 await page.screenshot(path=str(tmp_path / "phone-control-390-dark-zoomed.png"))
+                # Return control gives the run back and closes the view Use it here opened, back to the run's page.
                 await full.get_by_role("button", name="Return control").click()
-                await expect(full.locator(".computer-screen[data-controlling]")).to_have_count(0)
+                await expect(full).to_have_count(0)
+                await expect(card.locator(".computer-screen[data-controlling]")).to_have_count(0)
                 assert not manager.held(run.id)
                 await page.touchscreen.tap(middle[0], middle[1])
                 await asyncio.sleep(0.5)
@@ -698,6 +705,24 @@ async def test_a_hand_off_of_a_browser_step_offers_to_use_the_page_from_this_scr
                 await offer.click()
                 await expect(page.locator("dialog.computer-full .computer-screen[data-controlling]")).to_be_visible()
                 assert manager.held(run.id)
+
+                # In the desktop shell the view's close and title stand right of the traffic lights, on their line, and
+                # Return control closes the view, back to the run's page.
+                desk: Page = await browser.new_page(viewport={"width": 1280, "height": 860}, reduced_motion="reduce")
+                await desk.add_init_script("window.__TAURI__ = {}")
+                await desk.goto(ui_url("127.0.0.1", int(served.rsplit(":", 1)[1]), TOKEN))
+                await desk.goto(f"{served}/#/runs/{run.id}")
+                await desk.locator(".approval .takeover-offer").get_by_role("button", name="Use it here").click()
+                full: Locator = desk.locator("dialog.computer-full")
+                close = await full.get_by_role("button", name="Close Dot's computer").bounding_box()
+                title = await full.locator(".panel-section-title").bounding_box()
+                assert close is not None and title is not None
+                assert close["x"] >= _LIGHTS_ROOM, close
+                assert abs(close["y"] + close["height"] / 2 - _LIGHTS_Y) <= 1.0, close
+                assert title["x"] >= close["x"] + close["width"], (close, title)
+                await full.get_by_role("button", name="Return control").click()
+                await expect(full).to_have_count(0)
+                assert not manager.held(run.id)
             finally:
                 await browser.close()
     finally:
