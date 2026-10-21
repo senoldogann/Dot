@@ -1840,10 +1840,12 @@ a.pill:hover {
   text-overflow: ellipsis;
 }
 
+/* Buttons keep their own height beside a taller form (a key's), not stretched to it. */
 .plugin-actions,
 .skill-actions {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
   gap: 8px;
 }
 
