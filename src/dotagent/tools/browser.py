@@ -382,7 +382,14 @@ async def _page_check(expected: str, outcome: ActOutcome, ctx: ToolContext) -> P
     """The typed judge's numbers about the page after a batch, from its visible text; ``None`` when the judge is off or
     unavailable."""
     page: TextView = await ctx.browser.read_text(ctx.thread_id, None, 0, _CHECKED_PAGE_CHARS)
-    facts: PageFacts = PageFacts(url=outcome.view.url, title=outcome.view.title, text=page.text, expected=expected)
+    # The judge is a model of its own: it reads no login filled from the password manager either (item 493).
+    values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
+    facts: PageFacts = PageFacts(
+        url=masked(outcome.view.url, values),
+        title=masked(outcome.view.title, values),
+        text=masked(page.text, values),
+        expected=expected,
+    )
     return await ctx.runtime.judge.judge_page(facts, ctx.run_id)
 
 
@@ -400,9 +407,14 @@ def _act_tool() -> RegisteredTool:
         # The typed judge reads the clicks whose labels no pattern knows; it can only add reasons, never take one away.
         # It reads them in yolo too, where a payment, a message or a post it finds is the run's (item 443), and the
         # flags it adds are recorded with the step.
+        # The judge is a model of its own: it reads no login filled from the password manager either (item 493).
+        values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
         judgments: list[ClickJudgment] = await asyncio.gather(
             *(
-                ctx.runtime.judge.judge_click(ClickFacts(label=element.name, role=element.role, url=target), ctx.run_id)
+                ctx.runtime.judge.judge_click(
+                    ClickFacts(label=masked(element.name, values), role=element.role, url=masked(target, values)),
+                    ctx.run_id,
+                )
                 for element in unexplained_clicks([(step, element) for step, element, _ in judged])
             )
         )

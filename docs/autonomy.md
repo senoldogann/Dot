@@ -46,7 +46,8 @@ strictest first (item 398). The composer's Options menu lists them with their ic
 In every mode but `yolo`, a change of Dot's own files (its code, plugins, skills, playbooks and emergency stop; see
 [Safety](safety.md#safety)) is a question to you: the review model never answers it, and no rule of yours does either.
 Allowed, the run makes the change with the file tools; a command line never makes it, and neither does OpenCode's own
-agent, which writes past the journal `dotx undo` reads (item 398).
+agent, which writes past the journal `dotx undo` reads (item 398). So is a login filled from your 1Password (item 493):
+the review model never answers it, and a rule of yours can only hand it to you.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
 and the note holds the reason), an `approval_auto` event and one line in the timeline of the run ("YOLO, not asked:
@@ -67,7 +68,7 @@ the last two with every other question.) The modes that ask keep their guard: in
 `auto` money and credentials are still yours (Dot stops and asks you to do that step yourself; the review model is
 never asked about them, and a payment under its pre-approved caps asks you, or the review model in `auto`), and a message
 sent for you or a post in your name still waits for your yes (the review model answers it in `auto`; a rule that allows
-it does not).
+it does not), and a login filled from your 1Password waits for yours alone, in `auto` too.
 
 **If the review model fails** (the provider is down, or the model does not answer in the form asked for after two
 attempts) there is no fallback. That one tool call fails with the error as its result, the run goes on, and the

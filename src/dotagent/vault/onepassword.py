@@ -111,6 +111,15 @@ class Login(FrozenModel):
     websites: tuple[str, ...]
 
 
+class _Listing(FrozenModel):
+    """What a token read of 1Password, and when: its vaults, each with how many logins it holds, and those logins."""
+
+    read_at: float
+    token: SecretStr
+    vaults: tuple[VaultView, ...]
+    logins: tuple[Login, ...]
+
+
 class LoginSecret(FrozenModel):
     """What a login fills a page with, read when the run fills it: its username, password and one-time code, each
     ``None`` when the login has none or it was not asked for; never in a record (``SecretStr``)."""
@@ -178,7 +187,7 @@ class OnePassword:
 
     def __init__(self, cli: Path | None) -> None:
         self._cli: Path | None = cli
-        self._logins: tuple[float, str, tuple[Login, ...]] | None = None
+        self._listing: _Listing | None = None
 
     def cli(self) -> Path | None:
         """The ``op`` Dot runs, or ``None`` while it is not installed."""
@@ -222,20 +231,18 @@ class OnePassword:
 
     async def vaults(self, token: str) -> tuple[VaultView, ...]:
         """The vaults the token reads, each with how many logins it holds."""
-        listed: list[_Vault] = _parsed_list(
-            _Vault, await self._op(("vault", "list", "--format", "json"), token, _READ_TIMEOUT_S), "the vaults"
-        )
-        logins: tuple[Login, ...] = await self.logins(token)
-        return tuple(
-            VaultView(id=vault.id, name=vault.name, logins=sum(1 for login in logins if login.vault_id == vault.id))
-            for vault in listed
-        )
+        return (await self._listed(token)).vaults
 
     async def logins(self, token: str) -> tuple[Login, ...]:
-        """The logins of every vault the token reads, by title, read again a minute at most after the copy kept."""
+        """The logins of every vault the token reads, by title."""
+        return (await self._listed(token)).logins
+
+    async def _listed(self, token: str) -> _Listing:
+        """What the token reads, read again a minute at most after the copy kept."""
         now: float = time.monotonic()
-        if self._logins is not None and self._logins[1] == token and now - self._logins[0] < _LOGINS_FOR_S:
-            return self._logins[2]
+        kept: _Listing | None = self._listing
+        if kept is not None and kept.token.get_secret_value() == token and now - kept.read_at < _LOGINS_FOR_S:
+            return kept
         vaults: list[_Vault] = _parsed_list(
             _Vault, await self._op(("vault", "list", "--format", "json"), token, _READ_TIMEOUT_S), "the vaults"
         )
@@ -256,8 +263,17 @@ class OnePassword:
                 for item in _parsed_list(_ItemOverview, text, "the logins")
             )
         logins: tuple[Login, ...] = tuple(sorted(found, key=lambda login: login.title.lower()))
-        self._logins = (now, token, logins)
-        return logins
+        listing: _Listing = _Listing(
+            read_at=now,
+            token=SecretStr(token),
+            vaults=tuple(
+                VaultView(id=vault.id, name=vault.name, logins=sum(1 for login in logins if login.vault_id == vault.id))
+                for vault in vaults
+            ),
+            logins=logins,
+        )
+        self._listing = listing
+        return listing
 
     async def secret(self, token: str, login: Login, otp: bool) -> LoginSecret:
         """The username and password of ``login``, and its one-time code now when ``otp``: read for a fill alone."""
@@ -328,5 +344,5 @@ class OnePassword:
         return tokens[0]
 
     def forget(self) -> None:
-        """Forget the logins read: the token changed or went."""
-        self._logins = None
+        """Forget what was read: the token changed or went."""
+        self._listing = None

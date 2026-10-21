@@ -91,7 +91,9 @@ currency, so list sites that bill in one currency. Empty by default.
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode that asks,
    whatever your rules say; only a rule that hands the step to you is stricter. A rule that allows it does not answer for
-   you. A `yolo` run asks nothing and makes the step, its record keeping the reason it would have asked for (item 443).
+   you. A login filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, and in `auto` you
+   answer it, not the review model. A `yolo` run asks nothing and makes the step, its record keeping the reason it would
+   have asked for (item 443).
    What the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
    (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
 6. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
@@ -121,8 +123,9 @@ currency, so list sites that bill in one currency. Empty by default.
    past runs, as the policy matches rules, and writes nothing. It says how many steps it fits and which earlier rules
    decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing whatever the rules
    say, and those settled before any rule is read, by the checks above that no rule changes (money, credentials,
-   messages and posts, Dot's own files, the always-on review, a research run, a spend within its caps; a rule that hands
-   the step to you does take the place of the question about a message, a post or a spend). The steps it would decide it
+   messages and posts, a login from your 1Password, Dot's own files, the always-on review, a research run, a spend
+   within its caps; a rule that hands the step to you does take the place of the question about a message, a post, a
+   login or a spend). The steps it would decide it
    compares with what was decided then: the decision a step's record keeps since item 468, or for a step the gate did
    not let through (refused, declined, handed to you), what the policy said of it before, in the `policy` event of its
    call. It says how many would ask more, how many less and how many the same, with the taint the gate weighed then
@@ -213,7 +216,10 @@ a note that it was saved while reading outside content.
   - Every result of the browser tools of the chat masks them from then on, for as long as Dot runs, as typed and as
     an address or a JSON string
     writes them: an error's words and context, a script's value, and the step's summary and target, which the
-    approvals, the policy's events and the review model read (a form sent by GET puts them in the address).
+    approvals, the policy's events and the review model read (a form sent by GET puts them in the address). The judge
+    of clicks and checks gets them masked too, in a button's words and a page's address, title and text. A
+    screenshot of the browser covers the fields they were filled into, in every mode; one of the desktop shows Dot's
+    Chrome as the screen does, the username in its field.
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
     going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
     gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its

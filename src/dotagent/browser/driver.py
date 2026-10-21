@@ -167,6 +167,10 @@ _FIELD_PLACE_SCRIPT: str = (
 # The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
 # no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
 _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
+# The mark of a field a login was filled into (item 493), which every screenshot covers, in every mode: the field shows
+# the username, and a password once the page shows it.
+_FILLED_SELECTOR: str = "[data-dot-vault]"
+_MARK_FILLED_SCRIPT: str = "(element) => element.setAttribute('data-dot-vault', '')"
 
 # Whether the element has the keyboard focus and takes typed text: a text input or a textarea, not disabled or
 # read-only.
@@ -641,6 +645,7 @@ async def fill_login_field(
         )
     typing()
     try:
+        await locator.evaluate(_MARK_FILLED_SCRIPT)
         await locator.fill(value, timeout=timeout_ms)
     except PlaywrightError:
         # Playwright's log of the call is left out, here and in the chain of the error: it may name what was typed.
@@ -776,11 +781,11 @@ async def scroll_page(
 
 
 async def screenshot_jpeg(page: Page, quality: int, timeout_ms: int, hide_secrets: bool) -> bytes:
-    """Viewport screenshot in CSS pixels (so a pixel in the picture is a pixel for ``click_at``, also on Retina). With
-    ``hide_secrets`` (every mode but yolo, item 467) the fields the page marks secret are covered, in every frame."""
-    mask: list[Locator] = (
-        [frame.locator(secret_selector()) for frame in page.frames if not frame.is_detached()] if hide_secrets else []
-    )
+    """Viewport screenshot in CSS pixels (so a pixel in the picture is a pixel for ``click_at``, also on Retina). The
+    fields a login of the password manager was filled into are covered in every mode (item 493), and with
+    ``hide_secrets`` (every mode but yolo, item 467) the fields the page marks secret too, in every frame."""
+    covered: str = f"{secret_selector()}, {_FILLED_SELECTOR}" if hide_secrets else _FILLED_SELECTOR
+    mask: list[Locator] = [frame.locator(covered) for frame in page.frames if not frame.is_detached()]
     try:
         return await page.screenshot(
             type="jpeg",

@@ -7,6 +7,7 @@ login. In auto the owner answers the fill, not the review model.
 """
 
 import asyncio
+import io
 import json
 import re
 import secrets
@@ -20,10 +21,12 @@ from urllib.parse import quote, quote_plus
 
 import pytest
 import pytest_asyncio
+from PIL import Image
 
 from dotagent.agent.gate import RunGate, SiteLocks
 from dotagent.agent.review import ReviewRequest, ReviewVerdict
 from dotagent.agent.verify import new_facts
+from dotagent.browser.types import Screenshot
 from dotagent.config import load_config
 from dotagent.core.errors import BrowserError, ToolInputError
 from dotagent.core.paths import env_file_path, workspace_dir
@@ -70,6 +73,7 @@ class _Handler(BaseHTTPRequestHandler):
         port: int = self.server.port
         pages: dict[str, str] = {
             "/login": f"""<!doctype html><title>Sign in</title><h1>Sign in</h1>
+<style>[name=user] {{ position: fixed; left: 400px; top: 300px; width: 200px; height: 60px }}</style>
 <form action="/home" method="get">
 <label>Email <input name="user" autocomplete="username"></label>
 <label>Password <input name="pass" type="password" autocomplete="current-password"></label>
@@ -255,6 +259,11 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     )
     assert "Filled the username, password, otp of the login This site" in filled.text, filled.text
     _unseen(filled.text)
+    # A screenshot covers the filled fields in every mode, yolo too: the username shows in its field.
+    shot: Screenshot = await runtime.browser.screenshot(ctx.thread_id, False)
+    with Image.open(io.BytesIO(shot.data)) as picture:
+        pixel: object = picture.convert("RGB").getpixel((500, 330))
+    assert isinstance(pixel, tuple) and all(abs(channel - 0x33) < 24 for channel in pixel), pixel
     # No script runs in the chat's tabs while the filled tab is open.
     with pytest.raises(BrowserError, match="scripts stay off"):
         await _call(ctx, gate, "browser_eval", {"script": "document.querySelector('input[type=password]').value"})
