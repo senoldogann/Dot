@@ -216,7 +216,7 @@ export function createComputer({ runId, active, elsewhere, held, name, sizes }) 
   // closes with it, back to the run's page.
   function endUse() {
     stopControl();
-    if (full !== null && full.forUse) {
+    if (full?.forUse) {
       full.dialog.close();
     }
   }

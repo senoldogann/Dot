@@ -18,7 +18,18 @@ from dotagent.mcp.catalogue import MCP_SERVICES
 _STATIC: Path = Path(__file__).parents[2] / "src" / "dotagent" / "server" / "static"
 _LOGOS: Path = _STATIC / "icons" / "plugins"
 _SVG: str = "{http://www.w3.org/2000/svg}"
-_SECTIONS: tuple[str, ...] = ("popular", "communication", "development", "business", "productivity", "mac")
+_SECTIONS: tuple[str, ...] = (
+    "popular",
+    "code",
+    "design",
+    "data",
+    "research",
+    "communication",
+    "productivity",
+    "business",
+    "support",
+    "mac",
+)
 
 
 def _icon_names() -> set[str]:

@@ -1968,6 +1968,293 @@ a.pill:hover {
   margin: 0 16px 8px;
 }
 
+/* Connect apps (item 492, connectapps.js): the services in a dialog over the page, as wide as a page's column and as
+   tall as the screen lets it be. Its head (the way back, the title, Connected and the close), the search and the chips
+   stay while the tiles under them scroll. A tile has no frame: its mark, its name over one line of what Dot does, and
+   one step at its right. */
+dialog.modal.connect-apps {
+  width: min(920px, calc(100vw - 32px));
+  max-width: min(920px, calc(100vw - 32px));
+  height: min(820px, calc(100vh - 64px));
+  height: min(820px, calc(100dvh - 64px));
+  max-height: none;
+  border-radius: var(--radius-lg);
+}
+
+dialog.modal.connect-apps[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+/* In the desktop shell the traffic lights stand over the top left of the window (shell.css): the dialog keeps the
+   top bars' 52 px clear of them. */
+:root[data-shell="desktop"] dialog.modal.connect-apps {
+  height: min(820px, calc(100vh - 104px));
+  height: min(820px, calc(100dvh - 104px));
+}
+
+.connect-apps-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 20px 20px 8px 32px;
+}
+
+.connect-apps[data-view="service"] .connect-apps-head {
+  padding-left: 20px;
+}
+
+.connect-apps-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font-size: var(--text-xl);
+  font-weight: var(--weight-title);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-apps[data-view="service"] .connect-apps-connected {
+  display: none;
+}
+
+/* A service's page names the service under its mark; the dialog keeps its own name for a reader of the screen. */
+.connect-apps[data-view="service"] .connect-apps-title {
+  visibility: hidden;
+}
+
+.connect-apps-connected .icon {
+  width: 14px;
+  height: 14px;
+}
+
+.connect-apps-tools {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 32px;
+}
+
+.connect-apps-tools[hidden],
+.connect-apps-chips[hidden] {
+  display: none;
+}
+
+.connect-apps-find {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-2);
+}
+
+.connect-apps-find:focus-within {
+  border-color: var(--border-strong);
+}
+
+.connect-apps-find .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.connect-apps-search {
+  flex: 1;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  border: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.connect-apps-search:focus {
+  outline: 0;
+  box-shadow: none;
+}
+
+.connect-apps-customize {
+  flex: none;
+  border-radius: var(--radius-pill);
+}
+
+.connect-apps-customize .icon {
+  width: 14px;
+  height: 14px;
+}
+
+/* The chips are one row that scrolls sideways where they do not fit. */
+.connect-apps-chips {
+  display: flex;
+  gap: 8px;
+  padding: 4px 32px 12px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.connect-apps-chip {
+  flex: none;
+  min-height: 32px;
+  padding: 0 var(--space-4);
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  border-color: transparent;
+  color: var(--text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.connect-apps-chip[aria-pressed="true"] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.connect-apps-body {
+  flex: 1;
+  min-height: 0;
+  padding: 4px 32px 24px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.connect-apps-section + .connect-apps-section {
+  margin-top: 28px;
+}
+
+.connect-apps-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 32px;
+  margin-bottom: 4px;
+}
+
+.connect-apps-section-title {
+  margin: 0;
+  font-size: var(--text-md);
+  font-weight: var(--weight-label);
+}
+
+.connect-apps-more {
+  color: var(--text-2);
+}
+
+.connect-apps-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 32px;
+}
+
+.connect-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  padding: var(--space-3) 0;
+}
+
+.connect-tile > .plugin-mark {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+}
+
+.connect-tile-open {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: var(--space-half);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.connect-tile-open:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 4px;
+  border-radius: var(--radius-xs);
+}
+
+.connect-tile-name {
+  overflow: hidden;
+  color: var(--text);
+  font-weight: var(--weight-label);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-tile-does {
+  overflow: hidden;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.connect-tile > .btn,
+.connect-tile > .badge,
+.connect-tile > .chip {
+  flex: none;
+}
+
+.connect-tile-step {
+  min-width: 72px;
+  justify-content: center;
+  border-color: transparent;
+  border-radius: var(--radius-pill);
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+@media (hover: hover) {
+  .connect-tile-step:hover:not(:disabled) {
+    background: var(--surface-3);
+  }
+}
+
+.connect-apps-service {
+  padding-top: 8px;
+}
+
+/* On a phone the dialog takes the screen, with the tiles in one column and its sides closer in. */
+@media (max-width: 720px) {
+  dialog.modal.connect-apps {
+    width: 100vw;
+    max-width: 100vw;
+    height: calc(100dvh - var(--seen-top) - var(--seen-bottom));
+    border: 0;
+    border-radius: 0;
+  }
+
+  .connect-apps-head {
+    padding: calc(12px + var(--safe-top)) 12px 4px 20px;
+  }
+
+  .connect-apps-tools,
+  .connect-apps-chips {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .connect-apps-body {
+    padding: 4px 16px calc(24px + var(--safe-bottom));
+  }
+
+  .connect-apps-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
 .skill-mark {
   display: grid;
   flex: none;
