@@ -17,6 +17,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+from playwright.async_api import Browser, CDPSession, Locator, Page, async_playwright, expect
 from structlog.testing import capture_logs
 
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
@@ -35,7 +36,8 @@ from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
-from dotagent.store.models import EventRecord, RunRecord
+from dotagent.server.links import ui_url
+from dotagent.store.models import EventRecord, RuleRecord, RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 
 pytestmark = [pytest.mark.asyncio(loop_scope="module")]
@@ -540,3 +542,156 @@ async def test_a_hand_back_waits_for_input_under_way_and_counts_it(
         manager.cancel(run.id)
         async with asyncio.timeout(_RUN_WAIT_S):
             await manager.wait(run.id)
+
+
+async def _on_the_page(runtime: Runtime, thread_id: str, script: str) -> object:
+    return await _read(runtime.browser, thread_id, script)
+
+
+async def _touch(cdp: CDPSession, kind: str, points: list[tuple[float, float]]) -> None:
+    """A touch of the screen as a phone sends it: a finger down, moved or up (``kind`` as the protocol names it)."""
+    await cdp.send("Input.dispatchTouchEvent", {"type": kind, "touchPoints": [{"x": x, "y": y} for x, y in points]})
+
+
+async def _screen_of(page: Page) -> Locator:
+    """Dot's computer of the run page, through Run details and its Screen tab."""
+    await page.get_by_role("button", name="Run details").click()
+    await page.get_by_role("tab", name="Screen").click()
+    card: Locator = page.locator("section.computer")
+    await expect(card).to_be_visible()
+    return card
+
+
+@pytest.mark.browser
+async def test_a_phone_uses_the_page_from_its_screen(
+    runtime: Runtime, manager: RunManager, served: str, site: _Site, tmp_path: Path
+) -> None:
+    """Item 475, at 390 by 844 as a touch screen in the dark: Use it here holds the run and opens the view over the
+    whole page; a tap on the picture over the page's button clicks it, a finger dragged up scrolls the page, the
+    Keyboard button types into the page's field and Enter submits its form; Return control stops it all."""
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [_call("browser_open", {"url": f"{site.base}/play"}), _call("shell", {"command": "sleep 30"}), _FINISH],
+    )
+    run: RunRecord = await manager.start(
+        "Use the page", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    try:
+        await _results(runtime, run.id, 1)
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(
+                    viewport={"width": 390, "height": 844},
+                    color_scheme="dark",
+                    is_mobile=True,
+                    has_touch=True,
+                    reduced_motion="reduce",
+                )
+                await page.goto(ui_url("127.0.0.1", int(served.rsplit(":", 1)[1]), TOKEN))
+                await page.goto(f"{served}/#/runs/{run.id}")
+                card: Locator = await _screen_of(page)
+                await card.get_by_role("button", name="Use it here").click()
+                full: Locator = page.locator("dialog.computer-full")
+                await expect(full).to_be_visible()
+                screen: Locator = full.locator(".computer-screen[data-controlling]")
+                await expect(screen).to_be_visible()
+                image: Locator = full.locator(".computer-image")
+                await expect(image).to_be_visible()
+                assert manager.held(run.id)
+                box = await image.bounding_box()
+                assert box is not None
+                await page.touchscreen.tap(box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.5)
+                await _until(runtime, run.thread_id, "document.getElementById('count').textContent", "1")
+                # A finger dragged up the picture scrolls the page down.
+                cdp: CDPSession = await page.context.new_cdp_session(page)
+                x: float = box["x"] + box["width"] * 0.7
+                await _touch(cdp, "touchStart", [(x, box["y"] + box["height"] * 0.8)])
+                for step in range(1, 9):
+                    await _touch(cdp, "touchMove", [(x, box["y"] + box["height"] * (0.8 - step * 0.06))])
+                    await asyncio.sleep(0.03)
+                await _touch(cdp, "touchEnd", [])
+                await _until_true(runtime, run.thread_id, "window.scrollY > 0")
+                await page.touchscreen.tap(box["x"] + box["width"] * 0.2, box["y"] + box["height"] * 0.08)
+                await full.get_by_role("button", name="Keyboard").click()
+                await page.keyboard.type("hello")
+                await page.keyboard.press("Enter")
+                await _until(runtime, run.thread_id, "document.getElementById('field').value", "hello")
+                await _until(runtime, run.thread_id, "document.getElementById('submitted').textContent", "1")
+                assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                await page.screenshot(path=str(tmp_path / "phone-control-390-dark.png"))
+                # Two fingers parted around the middle zoom the picture there; a tap there still clicks the button.
+                middle: tuple[float, float] = (box["x"] + box["width"] * 0.5, box["y"] + box["height"] * 0.5)
+                await _touch(cdp, "touchStart", [(middle[0] - 30, middle[1]), (middle[0] + 30, middle[1])])
+                for step in range(1, 7):
+                    spread: float = 30 + step * 15
+                    await _touch(cdp, "touchMove", [(middle[0] - spread, middle[1]), (middle[0] + spread, middle[1])])
+                    await asyncio.sleep(0.03)
+                await _touch(cdp, "touchEnd", [])
+                zoomed = await image.bounding_box()
+                assert zoomed is not None and zoomed["width"] > box["width"] * 2, (box, zoomed)
+                await page.touchscreen.tap(middle[0], middle[1])
+                await _until(runtime, run.thread_id, "document.getElementById('count').textContent", "2")
+                await page.screenshot(path=str(tmp_path / "phone-control-390-dark-zoomed.png"))
+                await full.get_by_role("button", name="Return control").click()
+                await expect(full.locator(".computer-screen[data-controlling]")).to_have_count(0)
+                assert not manager.held(run.id)
+                await page.touchscreen.tap(middle[0], middle[1])
+                await asyncio.sleep(0.5)
+                assert await _on_the_page(runtime, run.thread_id, "document.getElementById('count').textContent") == "2"
+            finally:
+                await browser.close()
+    finally:
+        manager.cancel(run.id)
+        async with asyncio.timeout(_RUN_WAIT_S):
+            await manager.wait(run.id)
+
+
+@pytest.mark.browser
+async def test_a_hand_off_of_a_browser_step_offers_to_use_the_page_from_this_screen(
+    runtime: Runtime, manager: RunManager, served: str, site: _Site
+) -> None:
+    """Item 475: the card of a browser step handed to the owner, on the run's page, offers Use it here beside Take the
+    browser over; it holds the run and opens the view over the whole page."""
+    rule: RuleRecord = await runtime.store.add_rule("handoff", "browser_open", "handed", "Open it yourself")
+    MODEL.script = ScriptedProvider(_PROVIDER, [_call("browser_open", {"url": f"{site.base}/handed"}), _FINISH])
+    run: RunRecord = await manager.start(
+        "Open the page", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
+    )
+    try:
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(
+                    viewport={"width": 390, "height": 844}, is_mobile=True, has_touch=True, reduced_motion="reduce"
+                )
+                await page.goto(ui_url("127.0.0.1", int(served.rsplit(":", 1)[1]), TOKEN))
+                await page.goto(f"{served}/#/runs/{run.id}")
+                offer: Locator = page.locator(".approval .takeover-offer").get_by_role("button", name="Use it here")
+                await expect(offer).to_be_visible(timeout=_RUN_WAIT_S * 1000)
+                await expect(
+                    page.locator(".approval").get_by_role("button", name="Take the browser over")
+                ).to_be_visible()
+                await offer.click()
+                await expect(page.locator("dialog.computer-full .computer-screen[data-controlling]")).to_be_visible()
+                assert manager.held(run.id)
+            finally:
+                await browser.close()
+    finally:
+        await runtime.store.delete_rule(rule.id)
+        manager.cancel(run.id)
+        async with asyncio.timeout(_RUN_WAIT_S):
+            await manager.wait(run.id)
+
+
+async def _until(runtime: Runtime, thread_id: str, script: str, value: object) -> None:
+    """Wait until ``script`` gives ``value`` in the run's page."""
+    async with asyncio.timeout(10.0):
+        while True:
+            if await _on_the_page(runtime, thread_id, script) == value:
+                return
+            await asyncio.sleep(0.1)
+
+
+async def _until_true(runtime: Runtime, thread_id: str, script: str) -> None:
+    await _until(runtime, thread_id, script, True)
