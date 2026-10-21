@@ -14,7 +14,7 @@ from typing import Literal
 import httpx
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+from playwright.async_api import Browser, Locator, Page, Route, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -151,6 +151,16 @@ async def _standby(http: httpx.AsyncClient) -> object:
     return models["standby"]
 
 
+async def _hold_first(page: Page, pattern: str, until: asyncio.Event) -> None:
+    """Hold the first request of ``page`` to ``pattern`` until ``until`` is set, then let it go on."""
+
+    async def hold(route: Route) -> None:
+        await until.wait()
+        await route.continue_()
+
+    await page.route(pattern, hold, times=1)
+
+
 async def _listed(page: Page) -> list[str]:
     """The standby models the card lists, in their order."""
     rows: Locator = page.locator(".standby-list .standby-row")
@@ -191,9 +201,13 @@ async def test_settings_choose_the_standby_models_in_their_order(runtime: Runtim
                         "(options) => options.map((option) => option.value).filter((value) => value !== '')"
                     )
                     assert sorted(offered) == sorted([SCRIPTED_MODEL, _HAIKU, _OPUS]), offered
-                    # Two adds in a row, the second before the first is answered: both hold, in their order.
+                    # Two adds in a row, the second made while the first is not answered yet (its answer held until
+                    # then): both hold, in their order.
+                    second_made: asyncio.Event = asyncio.Event()
+                    await _hold_first(page, "**/api/models/standby", second_made)
                     await add.select_option(_HAIKU)
                     await add.select_option(_OPUS)
+                    second_made.set()
                     await expect(card.locator(".standby-row")).to_have_count(2)
                     assert await _listed(page) == [_HAIKU, _OPUS]
                     # Opus up: a run tries it first; then Haiku off the list.
