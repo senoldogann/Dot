@@ -182,7 +182,10 @@ nodes hold nodes, which `allow` can leave out) is left out, and Dot starts witho
 with the reason, `dotx run`, `dotx resume` and `dotx chat` say so before they begin, and `dotx doctor` warns of a
 missing command or secret. It is tried again when Dot starts again; `enabled = false` stops trying it. Plugins add their
 servers too (see [Skills and plugins](#skills-and-plugins)); their names become `<plugin>-<server>`. MCP results are
-untrusted content, and the stderr of a stdio server goes to `<logs>/mcp-<name>.log`. A tool whose name's first verb
+untrusted content. An answer longer than one result holds is kept whole in
+`<workspace>/mcp-results/<server>-<tool>-<time>-<id>.txt` (item 494): the result shows the lines at its start that fit,
+inside the fence, and then says where the file is, how long it is and the line to read on from with `read_file`. The
+stderr of a stdio server goes to `<logs>/mcp-<name>.log`. A tool whose name's first verb
 sends or posts (`send_email`, `slack_post_message`, `reply_to_thread`, `create_post`) is a message for you whatever its
 server declares (`external_send` and `message_send`): it waits for your yes in every mode that asks, and no rule of
 yours turns that off (item 429); a `yolo` run asks nothing and sends it, its record keeping the reason (item 443). Any other tool that its server declares read-only (`readOnlyHint`) is taken at its word and runs

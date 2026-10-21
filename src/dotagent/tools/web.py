@@ -41,6 +41,7 @@ from dotagent.tools.base import (
 from dotagent.tools.browser import checked_url
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_flags, resolve_path
+from dotagent.tools.third_party import CRAWL_FOLDER
 from dotagent.web.crawl import (
     CrawledPage,
     CrawlResult,
@@ -68,7 +69,6 @@ _FETCH_TIMEOUT_S: float = 90.0
 _SEARCH_TIMEOUT_S: float = 90.0
 _CRAWL_TIMEOUT_S: float = 900.0
 _EXTRACT_TIMEOUT_S: float = 600.0
-_CRAWL_FOLDER: str = "crawl"
 _MAX_SOURCES: int = 20
 _MAX_FIELDS: int = 20
 # A plain request turned away: the page is read in the browser instead when the run may read quietly (items 59, 98).
@@ -677,7 +677,7 @@ def _crawl_tool() -> RegisteredTool:
         if len(inline) <= budget:
             return mark_untrusted(ok(f"{render_index(result, ())}\n\n{inline}"))
         host: str = scope.url.split("//", 1)[-1].split("/", 1)[0].replace(":", "-")
-        root: Path = ctx.workspace / _CRAWL_FOLDER / f"{host}-{time.strftime('%Y%m%d-%H%M%S')}-{nonce[:6]}"
+        root: Path = ctx.workspace / CRAWL_FOLDER / f"{host}-{time.strftime('%Y%m%d-%H%M%S')}-{nonce[:6]}"
         files: tuple[Path, ...] = await asyncio.to_thread(_crawl_files, root, result)
         return mark_untrusted(
             ok(

@@ -28,10 +28,12 @@ from dotagent.tools.base import (
     ToolArgs,
     ToolResult,
     make_path_tool,
+    mark_untrusted,
     ok,
     ok_with_images,
 )
 from dotagent.tools.context import ToolContext, run_sandbox
+from dotagent.tools.third_party import holds_third_party, matches_third_party
 from dotagent.undo.journal import JournalTarget, note_change, run_journal
 
 _IMAGE_SUFFIXES: frozenset[str] = frozenset({".png", ".jpg", ".jpeg", ".gif", ".webp", ".bmp", ".tiff", ".heic"})
@@ -196,15 +198,18 @@ def _read_file_tool() -> RegisteredTool:
 
     async def run(args: ReadFileArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
         desktop = ctx.runtime.config.desktop
-        return await asyncio.to_thread(
+        path: Path = resolve_path(args.path, ctx)
+        read: ToolResult = await asyncio.to_thread(
             _read_blocking,
-            resolve_path(args.path, ctx),
+            path,
             args.offset or 1,
             args.limit or _DEFAULT_LINE_LIMIT,
             ctx.output_chars - _HEADROOM_CHARS,
             desktop.screenshot_max_edge,
             desktop.jpeg_quality,
         )
+        # A page a crawl kept or an MCP answer kept whole was written by third parties (item 494).
+        return mark_untrusted(read) if holds_third_party(path, ctx.workspace) else read
 
     return make_path_tool(
         name="read_file",
@@ -510,13 +515,17 @@ def _search_files_tool() -> RegisteredTool:
         )
         if code == 1:
             return ok("No matches.")
+        lines: list[str] = stdout.splitlines()
         unread: list[str] | None = _unread(stderr) if code == _RG_ERROR else None
+        found: ToolResult
         if unread is not None:
-            found: str = _capped(stdout.splitlines(), "matches") if stdout.strip() != "" else "No matches."
-            return ok(_with_unread(found, unread))
-        if code != 0:
+            found = ok(_with_unread(_capped(lines, "matches") if stdout.strip() != "" else "No matches.", unread))
+        elif code != 0:
             raise ToolExecutionError("ripgrep failed", {"exit": code, "stderr": stderr[:500], "pattern": args.pattern})
-        return ok(_capped(stdout.splitlines(), "matches"))
+        else:
+            found = ok(_capped(lines, "matches"))
+        # A match in a page a crawl kept or an MCP answer kept whole was written by third parties (item 494).
+        return mark_untrusted(found) if matches_third_party(lines, ctx.workspace) else found
 
     return make_path_tool(
         name="search_files",

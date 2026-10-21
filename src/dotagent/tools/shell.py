@@ -19,6 +19,7 @@ from dotagent.policy.shell import ShellAssessment, assess_shell
 from dotagent.policy.types import ActionInfo, Flag
 from dotagent.tools.base import ACTING_MODES, RegisteredTool, ToolArgs, ToolResult, make_tool
 from dotagent.tools.context import ToolContext, run_sandbox
+from dotagent.tools.third_party import mentions_third_party
 
 _HEAD_BYTES: int = 64 * 1024
 _TAIL_BYTES: int = 192 * 1024
@@ -212,11 +213,13 @@ def build_shell_tool() -> RegisteredTool:
         )
         body: str = output.strip()
         text: str = f"{header}\n{body}" if body else header
-        # What a line that reached the network printed was written by other people: the run reads it as untrusted.
+        # What a line that reached the network printed was written by other people, and so is a page a crawl kept or
+        # an MCP answer kept whole (item 494): the run reads it as untrusted.
         fetched: bool = assess_shell(
             args.command, cwd, ctx.workspace, ctx.runtime.protected, ctx.runtime.dot_paths
         ).fetches
-        return ToolResult(text=text, images=(), is_error=timed_out or code != 0, untrusted=fetched)
+        kept: bool = mentions_third_party(args.command, cwd, ctx.workspace)
+        return ToolResult(text=text, images=(), is_error=timed_out or code != 0, untrusted=fetched or kept)
 
     return make_tool(
         name="shell",
