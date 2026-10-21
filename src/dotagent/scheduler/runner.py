@@ -347,8 +347,9 @@ class Scheduler:
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
         """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
         daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. A one-time
-        schedule has no next time and is never dropped: while the emergency stop is engaged it waits, still due, for
-        the release, and one overdue fires late, its opening saying when it was due (:func:`late_goal`). An emergency
+        schedule has no next time and is never dropped: while the emergency stop is engaged, or a run of it started by
+        hand works, it waits, still due, and one overdue fires late, its opening saying when it was due
+        (:func:`late_goal`). An emergency
         stop engaged while the run was being started ends it as one. A firing missed where nobody saw it, one overdue
         or one whose run could not start, is told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
@@ -374,6 +375,10 @@ class Scheduler:
             if failure is not None and failure.last_failure_at >= record.next_run_at and now < retry_after(failure):
                 return
         if record.id in self._in_flight or record.id in self._starting:
+            if one_time:
+                # Only a run by hand is at work while a one-time schedule is still due (item 455): the schedule waits,
+                # due, and fires once that run has ended, as it waits for the release of the emergency stop.
+                return
             log.warning("schedule_skipped_running", schedule_id=record.id, run_id=self._in_flight.get(record.id))
             await store.record_schedule_skip(record.id, following, "skipped: the previous run was still going")
             return

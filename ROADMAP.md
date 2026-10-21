@@ -16153,22 +16153,23 @@ was started by hand (`by_hand_goal`); `Store.record_schedule_hand_run` writes it
 when it fires next nor of its switch, so a one-time schedule is still due at its moment. It refuses (409) while the
 emergency stop is engaged and while a run of the schedule is at work or being started: a set of the schedules being
 started, entered by a tick's firing and by a hand run alike, closes the window between the check and the run in flight,
-so a click and a tick start one run between them, and a firing whose time comes during a hand run is skipped as for a
-run still going. A start the daemon refuses drops the chat made for it, is the caller's error and no missed firing (the
-owner is looking). `_fire` keeps its order (the firing written before the run starts); its parts both paths need
-(`_history`, `_carried`, `_start`, `_track`) are methods of their own, and `_firing_chat` takes its title. Routes: `POST
-/api/schedules/{id}/run` (201, a run), `GET /api/schedules/{id}/firings` (its last runs, newest first, one at work among
-them, each with its chat's title, `Store.schedule_firings`). On Schedules a row has a play button whose title says it
-does real work with the approvals its run takes (yolo: "asking nothing"), with no question first, as the owner's word of
-2026-10-21 asks of yolo ("YOLO modundaki serbestliğe dokunma"): a click opens the run's page, where Stop is, and a toast
-says it started; **Firings** opens the list under the row, kept open and read again as the list is painted again. The
-critique's corrections: the design's "a gone model is a 422" does not hold (the run starts and fails as a failed run,
-which the list shows), so the refused start is tested with a manager that refuses; the watch is started before the hand
-run's status is written. Tests: `tests/smoke/test_run_now.py` (switched off and run by hand with its time kept, a
-one-time schedule still due, no second start by hand nor at its time and a click racing a tick, the emergency stop, a
-refused start leaving no chat, a yolo schedule's run in yolo, and the page at 1280 px and at 390 px as a touch screen:
-the button's title, the run's page, the list). The scheduler's own tests pass unchanged. Docs:
-`docs/memory-and-schedules.md`, `docs/daemon.md`.
+so a click and a tick start one run between them, and a repeating schedule's firing whose time comes during a hand run
+is skipped as for a run still going, while a one-time schedule waits, still due, and fires once that run has ended (the
+pre-push review found that it was switched off for good by that skip, as its following time is none). A start the daemon
+refuses drops the chat made for it, is the caller's error and no missed firing (the owner is looking). `_fire` keeps its
+order (the firing written before the run starts); its parts both paths need (`_history`, `_carried`, `_start`, `_track`)
+are methods of their own, and `_firing_chat` takes its title. Routes: `POST /api/schedules/{id}/run` (201, a run), `GET
+/api/schedules/{id}/firings` (its last runs, newest first, one at work among them, each with its chat's title,
+`Store.schedule_firings`). On Schedules a row has a play button whose title says it does real work with the approvals
+its run takes (yolo: "asking nothing"), with no question first, as the owner's word of 2026-10-21 asks of yolo ("YOLO
+modundaki serbestliğe dokunma"): a click opens the run's page, where Stop is, and a toast says it started; **Firings**
+opens the list under the row, kept open and read again as the list is painted again. The critique's corrections: the
+design's "a gone model is a 422" does not hold (the run starts and fails as a failed run, which the list shows), so the
+refused start is tested with a manager that refuses; the watch is started before the hand run's status is written.
+Tests: `tests/smoke/test_run_now.py` (switched off and run by hand with its time kept, a one-time schedule still due, no
+second start by hand nor at its time and a click racing a tick, the emergency stop, a refused start leaving no chat, a
+yolo schedule's run in yolo, and the page at 1280 px and at 390 px as a touch screen: the button's title, the run's
+page, the list). The scheduler's own tests pass unchanged. Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`.
 
 ## Log
 

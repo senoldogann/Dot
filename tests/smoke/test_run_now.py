@@ -211,6 +211,36 @@ async def test_a_one_time_schedule_run_by_hand_is_still_due_at_its_time(
     assert (after.enabled, after.next_run_at, after.last_status) == (True, created.next_run_at, "done")
 
 
+async def test_a_one_time_schedule_whose_moment_comes_during_its_run_by_hand_fires_once_that_run_has_ended(
+    runtime: Runtime, manager: RunManager, scheduler: Scheduler, client: httpx.AsyncClient
+) -> None:
+    """A one-time schedule has no next time to skip to: due while its run by hand works, it waits, still due, and fires
+    once that run has ended (the pre-push review's finding: it was switched off for good)."""
+    moment: str = (datetime.now() + timedelta(minutes=10)).strftime("%Y-%m-%dT%H:%M")
+    created: ScheduleRecord = await _schedule(
+        client, {"name": "once soon", "goal": "Check once.", "cron": None, "at": moment}
+    )
+    assert created.next_run_at is not None
+    WORKER.held = asyncio.Event()
+    try:
+        by_hand: RunRecord = await _run_by_hand(client, created.id)
+        await scheduler.tick(created.next_run_at + 1)
+        waiting: ScheduleRecord = await runtime.store.get_schedule(created.id)
+        assert (waiting.enabled, waiting.next_run_at) == (True, created.next_run_at)
+    finally:
+        WORKER.held.set()
+        WORKER.held = None
+    assert (await _ended(manager, by_hand)).status == "done"
+    await _settled(runtime, scheduler, created.id)
+    await scheduler.tick(created.next_run_at + 2)
+    firings: list[JsonObject] = (await client.get(f"/api/schedules/{created.id}/firings")).json()
+    assert len(firings) == 2, firings
+    fired: RunRecord = RunRecord.model_validate(firings[0]["run"])
+    assert fired.id != by_hand.id and (await _ended(manager, fired)).status == "done"
+    after: ScheduleRecord = await _settled(runtime, scheduler, created.id)
+    assert (after.enabled, after.next_run_at) == (False, None)
+
+
 async def test_a_schedule_does_not_run_twice_at_once_by_hand_or_at_its_time(
     runtime: Runtime, manager: RunManager, scheduler: Scheduler, client: httpx.AsyncClient
 ) -> None:
