@@ -1361,14 +1361,16 @@ class RunManager:
         handle: RunHandle = self._handle(run_id)
         browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
         handle.gate.hold()
+        # A run held on the Mac may be used from a screen as well (item 475): its hold is the screen's too, kept from
+        # the moment the run is held, so that an end that comes meanwhile ends it.
+        self._holds[run_id] = _Hold(hold=ScreenHold(False), browser=browser)
         try:
             url: str | None = await browser.focus(handle.thread_id)
         except BaseException:
             # No tab came to the front for the user: the run goes on.
+            self._end_hold(run_id, handle.thread_id)
             handle.gate.release()
             raise
-        # A run held on the Mac may be used from a screen as well (item 475): its hold is the screen's too.
-        self._holds[run_id] = _Hold(hold=ScreenHold(False), browser=browser)
         await self._runtime.bus.emit(run_id, TAKEOVER_EVENT, {"source": source, "url": url}, True)
         return url
 
@@ -1416,16 +1418,23 @@ class RunManager:
         handle: RunHandle = self._handle(run_id)
         if not handle.gate.held:
             raise RunConflict("the run is not taken over", {"run_id": run_id})
-        held: _Hold | None = self._holds.pop(run_id, None)
-        used: InputTally = NO_INPUT if held is None else held.hold.end()
-        if held is not None:
-            self._let_go(run_id, handle.thread_id, held)
+        held: _Hold | None = self._end_hold(run_id, handle.thread_id)
+        used: InputTally = NO_INPUT if held is None else held.hold.tally
         held_s: float = handle.gate.release()
         data: JsonObject = {"source": source, "held_s": round(held_s, 1)}
         if held is not None and (held.hold.on_screen or used != NO_INPUT):
             data["inputs"] = {"clicks": used.clicks, "scrolls": used.scrolls, "typed": used.typed}
         await self._runtime.bus.emit(run_id, HANDBACK_EVENT, data, True)
         return held_s
+
+    def _end_hold(self, run_id: str, thread_id: str) -> _Hold | None:
+        """End the owner's hold of the run, when there is one (item 479): no batch of their input begins after, and
+        what it left pressed is let go (:meth:`_let_go`); the hold, with what its input did, for the record."""
+        held: _Hold | None = self._holds.pop(run_id, None)
+        if held is not None:
+            held.hold.end()
+            self._let_go(run_id, thread_id, held)
+        return held
 
     def _let_go(self, run_id: str, thread_id: str, held: _Hold) -> None:
         """Let go of what the owner's input left pressed, now that their hold is over (item 479), unless a batch of it
@@ -2211,10 +2220,7 @@ class RunManager:
             self._handles.pop(run.id, None)
             # A run that ends held ends its hold too: no batch of the owner's input begins after, and what it left
             # pressed is let go, by the last batch under way or here, waiting on nothing (item 479).
-            held: _Hold | None = self._holds.pop(run.id, None)
-            if held is not None:
-                held.hold.end()
-                self._let_go(run.id, run.thread_id, held)
+            self._end_hold(run.id, run.thread_id)
             self._emergency.discard(run.id)
             self._cutting.discard(run.id)
             finished.set()
