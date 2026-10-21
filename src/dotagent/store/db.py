@@ -3419,13 +3419,17 @@ class Store:
         enabled: bool,
         next_run_at: float | None,
     ) -> ScheduleRecord:
-        """Replace what a schedule does and when; its history (last run, thread, status) stays, and its row of failed
-        runs starts afresh (item 458)."""
+        """Replace what a schedule does and when; its history (last run, thread, status) stays, its row of failed runs
+        starts afresh, and one switched on no longer says it was switched off for them (item 458), as the form's switch
+        is this way and not ``enable``'s."""
+        on: int = 1 if enabled else 0
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
             " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
-            " stop_after_failures = ?, enabled = ?, next_run_at = ?, runs_failed_in_row = 0 WHERE id = ?",
-            (name, cron, run_at, goal, mode, *_option_values(options), 1 if enabled else 0, next_run_at, schedule_id),
+            " stop_after_failures = ?, enabled = ?, next_run_at = ?, runs_failed_in_row = 0,"
+            " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
+            " WHERE id = ?",
+            (name, cron, run_at, goal, mode, *_option_values(options), on, next_run_at, on, schedule_id),
         )
         await self._db.commit()
         return await self.get_schedule(schedule_id)

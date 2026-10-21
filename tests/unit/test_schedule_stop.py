@@ -57,6 +57,15 @@ async def test_the_store_keeps_the_row_of_failed_runs(tmp_path: Path) -> None:
         assert await store.switch_off_schedule(record.id, "switched off: again") is False
         off: ScheduleRecord = await store.get_schedule(record.id)
         assert (off.enabled, off.next_run_at, off.last_status) == (False, None, "switched off: its last 3 runs failed")
+        # Switched on again, by either way, it no longer says it was switched off.
+        await store.set_schedule_enabled(record.id, True, 3.0)
+        assert (await store.get_schedule(record.id)).last_status == ""
+        await store.switch_off_schedule(record.id, "switched off: its last 3 runs failed")
+        await store.update_schedule(
+            record.id, "report", "*/5 * * * *", None, "Write it.", "task", UNSET_OPTIONS, True, 4.0
+        )
+        changed: ScheduleRecord = await store.get_schedule(record.id)
+        assert (changed.enabled, changed.last_status, changed.runs_failed_in_row) == (True, "", 0)
         assert await store.record_schedule_outcome("sch_missing", "failed") is None
     finally:
         await store.close()

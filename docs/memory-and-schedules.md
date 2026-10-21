@@ -163,8 +163,8 @@ composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat and whether it is on
-(`history_runs`, `same_chat` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the
-standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
+(`history_runs`, `same_chat`, `stop_after_failures` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
+configured ones and the standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
 creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
 the form is open, **New schedule** reads **Close**, with a cross.
 

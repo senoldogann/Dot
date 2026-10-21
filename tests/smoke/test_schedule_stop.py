@@ -201,9 +201,27 @@ async def test_a_repeating_schedule_failing_its_limit_in_a_row_is_switched_off_a
         finally:
             listening.cancel()
     assert [event.data for event in told] == [{"schedule_id": created.id, "name": "flaky", "failures": 3}]
-    # Switched on again, its row starts afresh.
-    on: httpx.Response = await client.post(f"/api/schedules/{created.id}/enable")
-    assert on.json()["record"]["runs_failed_in_row"] == 0 and on.json()["record"]["enabled"] is True
+    # Switched on again from its form (the whole schedule, PATCH), its row starts afresh and its status is cleared.
+    whole: JsonObject = {
+        "name": "flaky",
+        "goal": "Try.",
+        "cron": "*/5 * * * *",
+        "at": None,
+        "mode": "task",
+        "model": None,
+        "effort": None,
+        "speed": None,
+        "approvals": "yolo",
+        "goal_mode": None,
+        "timezone": None,
+        "history_runs": None,
+        "same_chat": None,
+        "stop_after_failures": 3,
+        "enabled": True,
+    }
+    on: httpx.Response = await client.patch(f"/api/schedules/{created.id}", json=whole)
+    assert on.status_code == 200, on.text
+    assert (on.json()["record"]["enabled"], on.json()["record"]["runs_failed_in_row"]) == (True, 0)
     assert on.json()["record"]["last_status"] == ""
 
 
