@@ -221,7 +221,12 @@ async def test_a_stream_is_said_to_be_live_only_once_the_server_has_taken_it(pag
         }""",
         _RETRIES_MS,
     )
-    assert told == [["reconnecting", "reconnecting"], ["live"]]
+    assert isinstance(told, list) and len(told) == 2, told
+    refused, taken = told
+    # However often the page tried the stream the server refused in that time (twice on a Mac, once on a slower
+    # runner, item 486), it never said it was live; the one the server took is.
+    assert isinstance(refused, list) and refused and set(refused) == {"reconnecting"}, told
+    assert taken == ["live"], told
 
 
 async def _answer_with_an_error(route: Route) -> None:

@@ -3431,7 +3431,7 @@ dialog.modal.connect-apps[open] {
 /* The Options menu: the four approval modes with what each does and YOLO's warning once it is chosen (item 398), then
    Execution's switches (Keep going, Goal mode, Plan first), whole where the window has the room. */
 .composer-popover:has(.approval-list) {
-  max-height: min(600px, var(--room-above, 600px));
+  max-height: min(640px, var(--room-above, 640px));
 }
 
 .pop-option {

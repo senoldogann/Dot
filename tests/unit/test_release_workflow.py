@@ -1,6 +1,8 @@
-"""The release publishes only what the gate passed again (item 457): the publish job needs the tag's job and the
-gate's, keeps the environment the PyPI publisher names, and is the only job with an identity token; the gate can be
-called. Read from the workflow files themselves, so an edit that drops one is caught before a tag is pushed."""
+"""The release publishes only what the gate passed again (item 457), the core of the browser tests with it (item
+486): the publish job needs the tag's job and the gate's, keeps the environment the PyPI publisher names, and is the
+only job with an identity token; the gate can be called, and its browser job runs there as on every change. Every
+browser test runs at night and on demand. Read from the workflow files themselves, so an edit that drops one is caught
+before a tag is pushed."""
 
 from pathlib import Path
 
@@ -17,7 +19,7 @@ def _workflow(name: str) -> JsonObject:
     return loaded
 
 
-def test_nothing_is_published_unless_the_tag_and_the_gate_passed() -> None:
+def test_nothing_is_published_unless_the_tag_the_gate_and_the_browser_tests_passed() -> None:
     release: JsonObject = _workflow("release.yml")
     # The workflow's own permissions read the code and nothing else, so no job takes an identity token from them.
     assert release["permissions"] == {"contents": "read"}
@@ -30,6 +32,11 @@ def test_nothing_is_published_unless_the_tag_and_the_gate_passed() -> None:
     assert set(publish["needs"]) == {"tag", "gate"}
     assert publish["environment"] == "pypi"
     assert jobs["gate"] == {"needs": "tag", "uses": "./.github/workflows/gate.yml"}
+    # The gate the release calls runs the core of the browser tests, in its parts, with nothing that skips them there.
+    gate_jobs = _workflow("gate.yml")["jobs"]
+    assert isinstance(gate_jobs, dict)
+    assert "if" not in gate_jobs["browser"]
+    assert [part["name"] for part in gate_jobs["browser"]["strategy"]["matrix"]["part"]] == ["pages", "phone"]
     tokened: list[str] = [
         name
         for name, job in jobs.items()
@@ -47,3 +54,6 @@ def test_the_gate_can_be_called_and_runs_as_before_on_changes_and_on_main() -> N
     triggers = _workflow("gate.yml")[True]
     assert isinstance(triggers, dict)
     assert "workflow_call" in triggers and "pull_request" in triggers and "push" in triggers
+    browser = _workflow("browser.yml")[True]
+    assert isinstance(browser, dict)
+    assert set(browser) == {"workflow_dispatch", "schedule"}

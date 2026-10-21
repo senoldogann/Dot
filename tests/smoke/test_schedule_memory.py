@@ -282,8 +282,11 @@ async def served(runtime: Runtime) -> AsyncIterator[str]:
 
 @pytest.mark.browser
 async def test_settings_show_the_two_choices_and_the_chat_shows_the_goal_alone(
-    runtime: Runtime, served: str, tmp_path: Path
+    runtime: Runtime, lister: Lister, served: str, tmp_path: Path
 ) -> None:
+    if not any(record.name == "Listings" for record in await runtime.store.list_schedules()):
+        # Alone, or among the browser tests only (item 486): the two firings of the first test are made here.
+        await _two_firings(runtime, lister, "Listings", None, _as_it_ended)
     schedules: list[ScheduleRecord] = await runtime.store.list_schedules()
     digested: ScheduleRecord = next(record for record in schedules if record.name == "Listings")
     assert digested.thread_id is not None

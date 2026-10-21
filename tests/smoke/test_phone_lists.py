@@ -9,6 +9,7 @@ named a tool. The model is a scripted one.
 """
 
 import asyncio
+import math
 import time
 from collections.abc import AsyncIterator, Iterator
 from contextlib import asynccontextmanager
@@ -49,6 +50,8 @@ _CARD: str = """(card) => {
 }"""
 _LINES: str = "(node) => node.getBoundingClientRect().height / parseFloat(getComputedStyle(node).fontSize)"
 _CLEAR: str = "rgba(0, 0, 0, 0)"
+_MEASURES: int = 20
+_MEASURE_GAP_S: float = 0.1
 
 
 @pytest.fixture
@@ -120,6 +123,17 @@ async def _phone(browser: Browser, playwright: Playwright, device: str) -> Brows
     return context
 
 
+async def _lines_of(facts: Locator) -> float:
+    """How many lines ``facts`` take, measured once its row stands: a row that its working run draws again has no font
+    size for a moment, which makes the count NaN (item 486 found it so on a slower runner)."""
+    for _ in range(_MEASURES):
+        lines: object = await facts.evaluate(_LINES)
+        if isinstance(lines, int | float) and not math.isnan(lines):
+            return float(lines)
+        await asyncio.sleep(_MEASURE_GAP_S)
+    raise AssertionError(f"the row's facts gave no line count in {_MEASURES} tries")
+
+
 async def _ground(card: Locator) -> dict[str, str]:
     await expect(card).to_be_visible(timeout=_PAGE_WAIT_MS)
     found: object = await card.evaluate(_CARD)
@@ -145,8 +159,8 @@ async def test_a_phones_lists_name_their_cards_over_them_and_keep_a_row_to_two_l
                 await expect(row).to_be_visible(timeout=_PAGE_WAIT_MS)
                 facts: Locator = row.locator(".meta-facts")
                 await expect(facts).to_contain_text("step")
-                lines: object = await facts.evaluate(_LINES)
-                assert isinstance(lines, int | float) and lines < _ONE_LINE, (device, lines)
+                lines: float = await _lines_of(facts)
+                assert lines < _ONE_LINE, (device, lines)
 
                 await page.goto(f"{address}/#/customize/plugins/notion")
                 ground: dict[str, str] = await _ground(page.locator(".plugin-card").first)

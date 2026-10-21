@@ -326,6 +326,32 @@ async def test_structured_results_and_pictures_arrive_intact(runtime: Runtime) -
     assert "[image 1: 8x8px]" in _answer(picture, "picture")
 
 
+async def test_a_long_answer_is_kept_whole_in_a_file_whose_reading_is_untrusted(runtime: Runtime) -> None:
+    kept_dir: Path = workspace_dir() / "mcp-results"
+    short, _ = await _call(runtime, "mcp__fixture__echo", {"text": "short"})
+    assert _answer(short, "echo") == "short" and not await asyncio.to_thread(kept_dir.exists)
+
+    body: str = "\n".join(f"row {number:06d} " + "z" * 30 for number in range(1, 5001))
+    long, _ = await _call(runtime, "mcp__fixture__echo", {"text": body})
+    assert long.untrusted and not long.is_error
+    assert len(long.text) <= runtime.config.agent.tool_output_chars
+    (kept,) = await asyncio.to_thread(lambda: list(kept_dir.iterdir()))
+    assert await asyncio.to_thread(kept.read_text, encoding="utf-8") == body
+    assert f"{len(body)} characters in 5000 lines" in long.text and str(kept) in long.text
+
+    # Read back as the model is told to, the file still counts as what the server wrote.
+    read, _ = await _call(runtime, "read_file", {"path": str(kept), "offset": 4999})
+    assert read.untrusted and "row 005000" in read.text
+    searched, _ = await _call(runtime, "search_files", {"pattern": "row 004321"})
+    assert searched.untrusted and "row 004321" in searched.text
+    searched_one, _ = await _call(runtime, "search_files", {"pattern": "row 004321", "path": str(kept)})
+    assert searched_one.untrusted and "row 004321" in searched_one.text
+    tailed, _ = await _call(runtime, "shell", {"command": "tail -n 1 mcp-results/*.txt"})
+    assert tailed.untrusted and "row 005000" in tailed.text
+    plain, _ = await _call(runtime, "shell", {"command": "echo hello"})
+    assert not plain.untrusted
+
+
 async def test_a_failing_tool_is_an_error_result_and_the_server_goes_on(runtime: Runtime) -> None:
     exploded, _ = await _call(runtime, "mcp__fixture__explode", {"reason": "boom"})
     assert exploded.is_error

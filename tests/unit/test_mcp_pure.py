@@ -1,6 +1,7 @@
 """The parts of the MCP support that are plain data transformations: names, tool selection, schemas, how calls are
 classified, how results are rendered, and what the policy makes of an MCP action."""
 
+import asyncio
 import base64
 import io
 import re
@@ -236,7 +237,7 @@ def test_a_server_cannot_close_the_fence_early() -> None:
 
 async def _render(blocks: Sequence[ContentBlock], structured: JsonValue, is_error: bool) -> ToolResult:
     result: CallToolResult = CallToolResult(content=list(blocks), structured_content=structured, is_error=is_error)
-    return await render_call_result("srv", "tool", result, 4000, 512, 70, "n0nce")
+    return await render_call_result("srv", "tool", result, 4000, 512, 70, "n0nce", Path("/nonexistent/mcp-results"))
 
 
 async def test_every_kind_of_block_becomes_text_or_a_picture() -> None:
@@ -283,11 +284,34 @@ async def test_structured_content_is_used_when_there_is_no_other_content() -> No
     assert "(the tool returned no content)" in empty.text and empty.is_error
 
 
-async def test_long_answers_are_cut_inside_the_fence() -> None:
-    result: CallToolResult = CallToolResult(content=[TextContent(text="x" * 50_000)], is_error=False)
-    rendered: ToolResult = await render_call_result("srv", "tool", result, 1000, 512, 70, "n0nce")
+async def test_a_long_answer_is_kept_whole_in_a_file_and_its_start_shown_inside_the_fence(tmp_path: Path) -> None:
+    body: str = "\n".join(f"line {number}" for number in range(1, 5001))
+    result: CallToolResult = CallToolResult(content=[TextContent(text=body)], is_error=False)
+    folder: Path = tmp_path / "mcp-results"
+    rendered: ToolResult = await render_call_result("my srv", "big/list", result, 2000, 512, 70, "n0nce1234", folder)
+    assert rendered.untrusted and len(rendered.text) < 2400
+    (kept,) = await asyncio.to_thread(lambda: list(folder.iterdir()))
+    assert kept.name.startswith("my_srv-big_list-") and kept.name.endswith("-n0nce1.txt")
+    assert await asyncio.to_thread(kept.read_text, encoding="utf-8") == body
+    fenced, note = rendered.text.split('</mcp_content nonce="n0nce1234">\n')
+    shown: list[str] = fenced.split("\n")[1:-1]
+    assert shown == [f"line {number}" for number in range(1, len(shown) + 1)] and len(shown) > 100
+    assert f"lines 1-{len(shown)} of 5000 are above" in note and f"{len(body)} characters" in note
+    assert str(kept) in note and f"offset={len(shown) + 1}" in note
+
+
+async def test_an_answer_within_the_budget_writes_no_file(tmp_path: Path) -> None:
+    result: CallToolResult = CallToolResult(content=[TextContent(text="x" * 1500)], is_error=False)
+    rendered: ToolResult = await render_call_result("srv", "tool", result, 2000, 512, 70, "n0nce", tmp_path / "kept")
+    assert rendered.text.endswith('</mcp_content nonce="n0nce">') and "x" * 1500 in rendered.text
+    assert not await asyncio.to_thread((tmp_path / "kept").exists)
+
+
+async def test_one_line_longer_than_the_budget_shows_its_start(tmp_path: Path) -> None:
+    result: CallToolResult = CallToolResult(content=[TextContent(text="y" * 50_000)], is_error=False)
+    rendered: ToolResult = await render_call_result("srv", "tool", result, 1000, 512, 70, "n0nce", tmp_path)
+    assert "the start of line 1 is above" in rendered.text and "offset=1" in rendered.text
     assert len(rendered.text) < 1500
-    assert rendered.text.endswith('</mcp_content nonce="n0nce">')
 
 
 # --------------------------------------------------------------------------------------------- prompt

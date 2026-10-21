@@ -1,7 +1,10 @@
-# The gate every change passes before it is merged: the same commands as CONTRIBUTING.md, on macOS because the
-# package depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted
-# model or a stand-in plays the real loop, tools, policy and store. The tests marked live, browser, internet, desktop or
-# hosted stay on the developer's Mac; one that needs the local Ollama server's embedding model skips itself here.
+# The gate every change passes before it is merged: the same commands as CONTRIBUTING.md, on macOS because the package
+# depends on PyObjC. The smoke tests here are every one that needs no service, chosen by their marks: a scripted model
+# or a stand-in plays the real loop, tools, policy and store; one that needs the local Ollama server's embedding model
+# skips itself here. Beside it, the `browser` job runs the core of the browser tests (item 486): the URL rules of Dot's
+# Chrome, the sign-in, the secret fields, the attach mode and every phone page, on every change and in the release,
+# which calls this gate; browser.yml runs them all every night and when asked. The tests marked live, internet, desktop
+# or hosted stay on the developer's Mac.
 name: gate
 
 # A change to prose alone (the Markdown at the root, docs/, the issue and pull request templates) runs nothing, as no
@@ -13,8 +16,8 @@ on:
   push:
     branches: [main]
     paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
-  # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457); a call
-  # ignores the paths above, so the gate always runs whole there.
+  # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457), the core
+  # of the browser tests with it (item 486); a call ignores the paths above, so the gate always runs whole there.
   workflow_call:
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
@@ -77,3 +80,57 @@ jobs:
         run: >
           uv run pytest tests/smoke -q -n auto -p no:cacheprovider
           -m "not live and not browser and not internet and not desktop and not hosted"
+
+  # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
+  # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
+  # and the face. In two parts, on runners of their own, each on one worker: a runner has three cores and a worker
+  # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time.
+  browser:
+    name: browser (${{ matrix.part.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - name: pages
+            tests: >-
+              tests/smoke/test_browser_*.py tests/smoke/test_secret_fields.py tests/smoke/test_page_guards.py
+              tests/smoke/test_face.py
+          # A phone back on a network that wakes measures seconds of grace against the runner's own clock, which a
+          # slow runner does not keep: it runs at night (browser.yml) and on the developer's Mac.
+          - name: phone
+            tests: >-
+              tests/smoke/test_phone_*.py --deselect
+              tests/smoke/test_phone_return.py::test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_network_wakes
+    runs-on: macos-latest
+    timeout-minutes: 45
+    env:
+      DOT_HOME: ${{ github.workspace }}/.ci/home
+      DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
+      DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
+      TZ: UTC
+      # The part's files, globs the shell expands.
+      PART_TESTS: ${{ matrix.part.tests }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+      - name: Install
+        run: uv sync --frozen
+      # Google Chrome is on the runner's image; Playwright's own headless shell and WebKit (the phone's engine) are not.
+      - name: Browsers
+        run: uv run playwright install chromium-headless-shell webkit
+      - name: Ripgrep
+        run: brew install ripgrep
+      - name: The runner
+        run: sysctl -n hw.ncpu hw.memsize
+      - name: Throw-away home
+        run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
+      - name: Core browser tests
+        # PART_TESTS is split into its globs on purpose.
+        run: >
+          uv run pytest -q -p no:cacheprovider --durations=10
+          -m "browser and not live and not internet and not hosted and not desktop"
+          $PART_TESTS

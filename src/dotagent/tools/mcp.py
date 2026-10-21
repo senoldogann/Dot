@@ -16,6 +16,7 @@ from dotagent.tools.base import ACTING_MODES, ALL_MODES, PreparedCall, Registere
 from dotagent.tools.context import ToolContext
 from dotagent.tools.mcp_result import FENCE_OVERHEAD_CHARS, render_call_result
 from dotagent.tools.registry import ToolRegistry
+from dotagent.tools.third_party import MCP_FOLDER
 
 _NONCE_BYTES: int = 8
 _DESCRIPTION_CHARS: int = 1200
@@ -103,6 +104,7 @@ def _register(hub: McpHub, tool: McpTool) -> RegisteredTool:
                 config.desktop.screenshot_max_edge,
                 config.desktop.jpeg_quality,
                 secrets.token_hex(_NONCE_BYTES),
+                context.workspace / MCP_FOLDER,
             )
 
         return PreparedCall(action=action, run=run)
