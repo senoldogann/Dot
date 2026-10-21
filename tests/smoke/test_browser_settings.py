@@ -148,7 +148,7 @@ def site() -> Iterator[str]:
 
 
 async def _seen(session: BrowserSession, site: str) -> dict[str, object]:
-    await session.open_url("look", site)
+    await session.open_url("look", site, True)
     seen: ScriptRun = await session.run_script("look", _SEEN, _SCRIPT_WAIT_S)
     assert seen.end == "value", seen
     value: object = json.loads(seen.text)
@@ -190,7 +190,7 @@ async def test_a_page_has_the_size_and_the_colour_scheme_chosen(
         zoomed: dict[str, object] = await _seen(session, site)
         assert (zoomed["width"], zoomed["height"], zoomed["zoom"]) == (1024, 688, 1.25), zoomed
         # The model is told that size, and a pixel of its screenshot is one of the page's, for click_at.
-        drawn = await session.screenshot("look")
+        drawn = await session.screenshot("look", True)
         with Image.open(io.BytesIO(drawn.data)) as picture:
             assert (drawn.width, drawn.height, *picture.size) == (1024, 688, 1024, 688)
         # Filling its window, a page has the window's size, and the model is told that size.
@@ -199,7 +199,7 @@ async def test_a_page_has_the_size_and_the_colour_scheme_chosen(
         )
         filled: dict[str, object] = await _seen(session, site)
         assert filled["width"] != 390, filled
-        shot = await session.screenshot("look")
+        shot = await session.screenshot("look", True)
         assert (shot.width, shot.height) == (filled["width"], filled["height"]), (shot.width, shot.height, filled)
     finally:
         await session.aclose()
@@ -391,16 +391,16 @@ async def test_dots_chrome_works_on_the_profile_in_use_and_incognito_keeps_nothi
             headless, server, browser_data_dir("own", DEFAULT_PROFILE), home / "downloads", no_runs_at_work
         )
         try:
-            await session.open_url("profiles", site)
+            await session.open_url("profiles", site, True)
             assert await _chrome_worked_in(profile_dir(DEFAULT_PROFILE))
             # An added profile is a folder of its own, which Chrome fills when it works on it.
             await asyncio.to_thread(add_profile, "Work")
             await session.use_profile("Work")
             assert session.profile_dir == profile_dir("Work")
-            await session.open_url("profiles", site)
+            await session.open_url("profiles", site, True)
             assert await _chrome_worked_in(profile_dir("Work"))
             await session.use_profile(INCOGNITO_PROFILE)
-            await session.open_url("profiles", site)
+            await session.open_url("profiles", site, True)
             assert await _chrome_worked_in(profile_dir(INCOGNITO_PROFILE))
             # Its Chrome closed, Incognito keeps nothing; the other profiles keep their folders.
             await session.use_profile(DEFAULT_PROFILE)

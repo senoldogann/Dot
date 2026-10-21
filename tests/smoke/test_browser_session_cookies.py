@@ -60,12 +60,12 @@ async def _sent_after_a_restart(config: BrowserConfig, profile: Path, downloads:
     server: ServerConfig = load_default_config().server
     first: BrowserSession = BrowserSession(config, server, profile, downloads, no_runs_at_work)
     try:
-        await first.open_url("set", f"{site}/set")
+        await first.open_url("set", f"{site}/set", True)
     finally:
         await first.aclose()
     again: BrowserSession = BrowserSession(config, server, profile, downloads, no_runs_at_work)
     try:
-        view: PageView = await again.open_url("check", f"{site}/check")
+        view: PageView = await again.open_url("check", f"{site}/check", True)
     finally:
         await again.aclose()
     return view.body

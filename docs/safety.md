@@ -8,7 +8,8 @@ carries nothing of yours, and on your yes downloads that version from there ([th
 shell](daemon.md#the-desktop-shell)). What leaves the Mac is what a run needs, sent where the configuration points:
 
 - **To the models: the run's conversation.** Each call sends the goal, the messages, what the tools returned (the text
-  of the files and pages the run read, what commands printed) and the screenshots the run takes or is given. By default
+  of the files and pages the run read, what commands printed, never the value of a secret field of a page outside
+  `yolo`, see Secrets below) and the screenshots the run takes or is given. By default
   every role (`main`, `vision`, `fast`, `review`) is a cloud model of Ollama: the Ollama server on this Mac passes each
   call on to Ollama's servers once it is signed in. Dot's own work on what its runs did goes there too: lessons,
   playbooks and the nightly reflection to `review`, the shortening of a long run's conversation to `fast`. OpenAI,
@@ -176,8 +177,16 @@ a note that it was saved while reading outside content.
   password manager or Keychain Access, in any mode, nor a window of Dot's outside `yolo`: the desktop app's, or one of
   another application (a browser, an installed web app) that shows the web UI, known at each step by the title the UI
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
-  title is refused as well). Desktop screenshots black out the password managers' windows; secure fields and web pages
-  are not masked.
+  title is refused as well). Desktop screenshots black out the password managers' windows; their secure fields are not
+  masked.
+- What a run reads of a web page never carries the value of a password, one-time-code or card field, outside `yolo`
+  (item 467): the page's lines show `[hidden]` in its place, in the view of the page, in a search of it and in what
+  changed after a step, and a screenshot covers the field in every frame, a payment provider's too. The fields are the
+  ones Dot refuses to fill, by the page's marking (a `password` input, an `autocomplete` that names a secret); the
+  field's name and ref stay, so it can still be found and filled. A value you type during a takeover, or one a page
+  fills in, stays out of the model's conversation that way. In `yolo` nothing is masked (item 443): the run reads all
+  it is shown. A page script (`browser_eval`) can still read a field's value, and that step is judged as any other;
+  the live Screen view you watch is not masked.
 - Environment variables whose names look like secrets (`KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, `CREDENTIAL` or
   `AUTH` in the name) are removed from the processes the shell tool starts, `SSH_AUTH_SOCK` among them, so commands do
   not reach the keys of your SSH agent (`[shell] pass_env` lists exceptions).

@@ -145,7 +145,7 @@ async def test_the_browser_card_opens_dots_profile_to_sign_in_and_follows_the_wi
     async with _served(home) as (runtime, address), async_playwright() as playwright:
         port: int = int(address.rpartition(":")[2])
         # Dot's own Chrome is open, as after a run that browsed.
-        await runtime.browser.snapshot("signing-in")
+        await runtime.browser.snapshot("signing-in", True)
         assert runtime.browser.connected
         chromium: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         webkit: Browser = await playwright.webkit.launch(headless=True)

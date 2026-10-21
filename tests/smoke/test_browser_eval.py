@@ -110,7 +110,7 @@ async def browser(
 async def test_a_script_gives_the_value_of_an_expression_a_function_and_a_promise(
     browser: BrowserSession, site: str
 ) -> None:
-    await browser.open_url("values", f"{site}/")
+    await browser.open_url("values", f"{site}/", True)
     title: ScriptRun = await browser.run_script("values", "document.title", 10.0)
     assert (title.end, json.loads(title.text), title.url, title.surprise) == ("value", "Eval page", f"{site}/", None)
     names: ScriptRun = await browser.run_script("values", _LIST, 10.0)
@@ -124,8 +124,8 @@ async def test_a_script_gives_the_value_of_an_expression_a_function_and_a_promis
 
 
 async def test_each_thread_runs_its_script_in_its_own_tab(browser: BrowserSession, site: str) -> None:
-    await browser.open_url("one", f"{site}/")
-    await browser.open_url("two", f"{site}/other")
+    await browser.open_url("one", f"{site}/", True)
+    await browser.open_url("two", f"{site}/other", True)
     first, second = await asyncio.gather(
         browser.run_script("one", "document.title", 10.0), browser.run_script("two", "document.title", 10.0)
     )
@@ -133,7 +133,7 @@ async def test_each_thread_runs_its_script_in_its_own_tab(browser: BrowserSessio
 
 
 async def test_an_error_and_a_wait_that_ends_first_are_told_apart(browser: BrowserSession, site: str) -> None:
-    await browser.open_url("ends", f"{site}/")
+    await browser.open_url("ends", f"{site}/", True)
     thrown: ScriptRun = await browser.run_script("ends", "() => { throw new Error('boom'); }", 10.0)
     assert (thrown.end, thrown.text) == ("error", "Error: boom")
     waited: ScriptRun = await browser.run_script("ends", "() => new Promise(() => {})", 1.0)
@@ -152,7 +152,7 @@ async def test_an_error_and_a_wait_that_ends_first_are_told_apart(browser: Brows
 async def test_a_script_that_leads_the_tab_elsewhere_lets_it_land_and_says_so(
     browser: BrowserSession, site: str
 ) -> None:
-    await browser.open_url("away", f"{site}/")
+    await browser.open_url("away", f"{site}/", True)
     clicked: ScriptRun = await browser.run_script("away", "() => { document.getElementById('next').click(); }", 10.0)
     assert clicked.end in ("value", "navigated")
     assert clicked.url == f"{site}/next"
@@ -164,7 +164,7 @@ async def test_a_script_that_leads_the_tab_elsewhere_lets_it_land_and_says_so(
 async def test_a_script_that_leads_to_an_address_the_rules_forbid_has_the_tab_reset(
     browser: BrowserSession, site: str
 ) -> None:
-    await browser.open_url("blocked", f"{site}/")
+    await browser.open_url("blocked", f"{site}/", True)
     forbidden: str = site.replace("127.0.0.1", "localhost") + "/next"
     with pytest.raises(BrowserError, match="may not be opened"):
         await browser.run_script("blocked", f"() => {{ location.href = {json.dumps(forbidden)}; }}", 10.0)
@@ -174,7 +174,7 @@ async def test_a_script_that_leads_to_an_address_the_rules_forbid_has_the_tab_re
 async def test_a_forbidden_address_that_answers_after_the_value_came_back_has_the_tab_reset_too(
     browser: BrowserSession, site: str
 ) -> None:
-    await browser.open_url("slow", f"{site}/")
+    await browser.open_url("slow", f"{site}/", True)
     forbidden: str = site.replace("127.0.0.1", "localhost") + "/slow"
     with pytest.raises(BrowserError, match="may not be opened"):
         await browser.run_script("slow", f"() => {{ location.href = {json.dumps(forbidden)}; return 1; }}", 10.0)
@@ -201,7 +201,7 @@ async def test_a_script_runs_in_the_agents_own_tab_of_the_chrome_of_the_user(
     chrome: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
     session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
     try:
-        await session.open_url("agent", f"{site}/")
+        await session.open_url("agent", f"{site}/", True)
         run: ScriptRun = await session.run_script("agent", _LIST, 10.0)
         assert (run.end, json.loads(run.text), run.url) == ("value", ["Ada", "Grace", "Linus"], f"{site}/")
     finally:
@@ -283,7 +283,7 @@ async def test_the_tool_is_a_click_of_medium_risk_and_what_it_gives_back_is_untr
     assert "browser_eval" in {tool.spec.name for tool in tools_for_mode(runtime.registry, "task")}
     assert "browser_eval" not in {tool.spec.name for tool in tools_for_mode(runtime.registry, "research")}
     ctx: ToolContext = await _run_context(runtime)
-    await ctx.browser.open_url(ctx.thread_id, f"{site}/")
+    await ctx.browser.open_url(ctx.thread_id, f"{site}/", True)
     prepared: PreparedCall = await runtime.registry.tools["browser_eval"].prepare({"script": _LIST}, ctx)
     action: ActionInfo = prepared.action
     assert (action.tool, action.kind, action.risk, action.target, action.flags) == (

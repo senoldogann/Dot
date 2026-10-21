@@ -249,7 +249,7 @@ async def test_the_screencast_sends_a_frame_when_the_page_paints_and_nothing_whi
     idle: AsyncGenerator[Frame | None] = cast_browser.screencast(thread)
     assert await _next_frame(idle, _QUIET_WAIT_S) is None
     await idle.aclose()
-    await cast_browser.open_url(thread, f"{site.base}/cast")
+    await cast_browser.open_url(thread, f"{site.base}/cast", True)
     frames: AsyncGenerator[Frame | None] = cast_browser.screencast(thread)
     try:
         first: Frame | None = await _next_frame(frames, _FRAME_WAIT_S)

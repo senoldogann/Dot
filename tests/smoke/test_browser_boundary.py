@@ -295,7 +295,7 @@ async def _settled(seconds: float = 0.5) -> None:
 async def test_a_popup_a_page_opens_to_the_interface_never_reaches_it(
     browser: BrowserSession, site: str, inside: str
 ) -> None:
-    view: PageView = await browser.open_url("popup", f"{site}/")
+    view: PageView = await browser.open_url("popup", f"{site}/", True)
     await act(browser, "popup", [Step(action="click", ref=ref_of(view.body, 'link "Open inside"'))], False)
     await _settled()
     assert _InsideHandler.arrivals.items == []
@@ -307,7 +307,7 @@ async def test_a_popup_a_page_opens_to_the_interface_never_reaches_it(
 async def test_a_resource_a_fetch_and_a_script_of_the_page_are_refused(
     browser: BrowserSession, site: str, inside: str
 ) -> None:
-    await browser.open_url("resource", f"{site}/")
+    await browser.open_url("resource", f"{site}/", True)
     await _settled()
     assert _InsideHandler.arrivals.of("/pixel.png") == []
     fetched: ScriptRun = await browser.run_script(
@@ -323,7 +323,7 @@ async def test_a_resource_a_fetch_and_a_script_of_the_page_are_refused(
 
 
 async def test_a_service_worker_fetches_nothing_for_the_page(browser: BrowserSession, site: str) -> None:
-    await browser.open_url("worker", f"{site}/sw-page")
+    await browser.open_url("worker", f"{site}/sw-page", True)
     registered: ScriptRun = await browser.run_script(
         "worker",
         "navigator.serviceWorker.register('/sw.js').then(() => 'registered', (e) => 'refused: ' + e.name)",
@@ -339,7 +339,7 @@ async def test_a_redirect_to_the_interface_is_stopped_before_it_is_fetched(brows
     """The route of the context does not see the hops of a redirect; the tab's own Fetch session does."""
     port: int | None = urlsplit(site).port
     with pytest.raises(ForbiddenUrlError) as refused:
-        await browser.open_url("hop", f"http://localhost:{port}/hop")
+        await browser.open_url("hop", f"http://localhost:{port}/hop", True)
     assert "Dot's own interface" in refused.value.reason, refused.value
     assert refused.value.resource_type == "document"
     assert browser.current_url("hop") == "about:blank"
@@ -352,7 +352,7 @@ async def test_a_link_that_redirects_to_the_interface_is_stopped(
     """A link straight to the interface, and one whose redirect ends there: the request is refused, the step ends with
     the refusal and the tab is reset, as when a page landed there before."""
     for label, refused_url in (('link "Inside link"', f"{inside}/link"), ('link "Hop to inside"', f"{inside}/chain")):
-        view: PageView = await browser.open_url("link", f"{site}/")
+        view: PageView = await browser.open_url("link", f"{site}/", True)
         with pytest.raises(ForbiddenUrlError) as refused:
             await act(browser, "link", [Step(action="click", ref=ref_of(view.body, label))], False)
         assert refused.value.url == refused_url and "Dot's own interface" in refused.value.reason, refused.value
@@ -382,7 +382,7 @@ async def test_a_page_read_in_a_scratch_tab_is_stopped_on_the_way_too(
 
 
 async def test_the_pages_and_resources_of_other_servers_load_as_before(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("plain", f"{site}/")
+    view: PageView = await browser.open_url("plain", f"{site}/", True)
     assert view.title == "Outside" and view.status == 200
     own: ScriptRun = await browser.run_script(
         "plain", "fetch('/own.png').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0

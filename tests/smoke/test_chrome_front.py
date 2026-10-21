@@ -123,7 +123,7 @@ async def browser(
         config, SERVER, tmp_path_factory.mktemp("profile"), tmp_path_factory.mktemp("downloads"), no_runs_at_work
     )
     # The start takes the front once (macOS starts an application in front) and gives it back; it is item 97's.
-    await session.open_url("first", site)
+    await session.open_url("first", site, True)
     yield session
     await session.aclose()
 
@@ -132,18 +132,18 @@ async def test_the_tabs_dot_opens_and_a_quiet_read_leave_the_front_where_it_was(
     browser: BrowserSession, site: str
 ) -> None:
     await _finder_in_front()
-    fronts: set[str] = await _fronts_during(lambda: browser.new_tab("first", f"{site}/other"))
-    fronts |= await _fronts_during(lambda: browser.open_url("second", site))
+    fronts: set[str] = await _fronts_during(lambda: browser.new_tab("first", f"{site}/other", True))
+    fronts |= await _fronts_during(lambda: browser.open_url("second", site, True))
     fronts |= await _fronts_during(lambda: browser.read_page(f"{site}/other"))
     assert fronts == {_FINDER}
 
 
 @pytest.mark.skipif(not check_permissions().accessibility, reason="giving the front back needs accessibility")
 async def test_a_tab_the_page_opens_takes_the_front_and_dot_gives_it_back(browser: BrowserSession, site: str) -> None:
-    view: PageView = await browser.open_url("popup", site)
+    view: PageView = await browser.open_url("popup", site, True)
     await _finder_in_front()
     step: Step = Step(action="click", ref=_ref_of(view.body, 'link "Open the other page"'))
-    outcome = await browser.act("popup", [step], False, refuse_secret_field)
+    outcome = await browser.act("popup", [step], False, refuse_secret_field, True)
     assert len(outcome.view.tabs) == 2, outcome.view.tabs
     for _ in range(int(3.0 / _POLL_S)):
         if await asyncio.to_thread(_front) == _FINDER:

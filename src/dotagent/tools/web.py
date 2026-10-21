@@ -16,7 +16,7 @@ from urllib.parse import urlsplit, urlunsplit
 from pydantic import Field
 
 from dotagent.agent.helpers import Unavailable, paused_model, unavailable_text
-from dotagent.browser.safety import url_flags
+from dotagent.browser.safety import hides_secrets, url_flags
 from dotagent.browser.session import RenderedDocument
 from dotagent.browser.snapshot import fence_untrusted
 from dotagent.config import AppConfig
@@ -622,7 +622,7 @@ def _renderer_for(ctx: ToolContext) -> Renderer:
     """A page shown in the run's browser tab: its visible text after JavaScript ran."""
 
     async def render(url: str, max_chars: int) -> str:
-        await ctx.browser.open_url(ctx.thread_id, url)
+        await ctx.browser.open_url(ctx.thread_id, url, hides_secrets(ctx.approvals))
         return (await ctx.browser.read_text(ctx.thread_id, None, 0, max_chars)).text
 
     return render

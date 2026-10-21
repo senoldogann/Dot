@@ -307,8 +307,8 @@ async def test_a_tab_of_dot_opens_in_a_window_of_its_own(
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
     )
     try:
-        await session.open_url("own-window", f"{site}/")
-        await session.open_url("other-window", f"{site}/other")
+        await session.open_url("own-window", f"{site}/", True)
+        await session.open_url("other-window", f"{site}/other", True)
         windows: dict[str, int] = await _windows_by_url(chrome.port)
         assert len({windows[f"{site}/mine"], windows[f"{site}/"], windows[f"{site}/other"]}) == 3, windows
     finally:
@@ -324,12 +324,12 @@ async def test_the_colour_scheme_chosen_reaches_new_tabs_and_the_connection_stay
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
     )
     try:
-        await session.open_url("before", f"{site}/")
+        await session.open_url("before", f"{site}/", True)
         await session.set_look(
             PageLook(fit_window=False, viewport_width=1280, viewport_height=860, appearance="dark", zoom=100)
         )
         assert session.connected
-        await session.open_url("after", f"{site}/other")
+        await session.open_url("after", f"{site}/other", True)
         dark: ScriptRun = await session.run_script("after", "matchMedia('(prefers-color-scheme: dark)').matches", 5.0)
         assert (dark.end, dark.text) == ("value", "true"), dark
         kept: ScriptRun = await session.run_script("before", "document.title", 5.0)
@@ -348,12 +348,12 @@ async def test_back_in_the_chrome_of_the_user_takes_no_longer_than_a_page(
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
     )
     try:
-        first: PageView = await session.open_url("back", f"{site}/mine")
+        first: PageView = await session.open_url("back", f"{site}/mine", True)
         with pytest.raises(BrowserError, match="there is no earlier page"):
-            await session.back("back")
-        await session.open_url("back", f"{site}/")
+            await session.back("back", True)
+        await session.open_url("back", f"{site}/", True)
         started: float = time.monotonic()
-        view: PageView = await session.back("back")
+        view: PageView = await session.back("back", True)
         took: float = time.monotonic() - started
         assert view.url == first.url and view.title == "Mine", view
         assert took < _BACK_MOST_S, took
@@ -371,18 +371,22 @@ async def test_the_agent_works_in_tabs_of_its_own_and_the_tabs_of_the_user_stay(
         attachment: Attachment = await session.attachment()
         assert re.match(r"\d+\.", attachment.browser_version), attachment
         assert attachment.open_tabs == 1
-        view: PageView = await session.open_url("first", f"{site}/")
+        view: PageView = await session.open_url("first", f"{site}/", True)
         assert view.title == "Home"
         assert [tab.url for tab in view.tabs] == [f"{site}/"]
         clicked: ActOutcome = await session.act(
-            "first", [Step(action="click", ref=ref_of(view.body, 'button "Increment"'))], False, refuse_secret_field
+            "first",
+            [Step(action="click", ref=ref_of(view.body, 'button "Increment"'))],
+            False,
+            refuse_secret_field,
+            True,
         )
         assert [report.outcome for report in clicked.steps] == ["done"]
         assert clicked.view.mode == "delta"
-        await session.open_url("second", f"{site}/popup")
+        await session.open_url("second", f"{site}/popup", True)
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/", f"{site}/popup"])
 
-        shot: Screenshot = await session.screenshot("first")
+        shot: Screenshot = await session.screenshot("first", True)
         assert Image.open(io.BytesIO(shot.data)).size == (shot.width, shot.height)
         assert (shot.width, shot.height) != (attach_config.viewport_width, attach_config.viewport_height)
 
@@ -409,7 +413,7 @@ async def test_a_page_is_read_quietly_in_a_tab_behind_the_users_and_the_tab_clos
         await wait_for_tabs(chrome.port, [f"{site}/mine"])
         # The read left nothing behind for a thread, and the user's tab is the one in front.
         assert session.current_url("quiet") is None
-        front: PageView = await session.open_url("quiet", f"{site}/")
+        front: PageView = await session.open_url("quiet", f"{site}/", True)
         assert [tab.url for tab in front.tabs] == [f"{site}/"]
     finally:
         await session.aclose()
@@ -423,11 +427,11 @@ async def test_a_tab_the_user_opens_meanwhile_is_not_taken_over(
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
     )
     try:
-        await session.open_url("agent", f"{site}/")
+        await session.open_url("agent", f"{site}/", True)
         await open_tab_as_the_user(chrome.port, f"{site}/other")
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/other", f"{site}/"])
         await asyncio.sleep(_EVENT_GRACE_S)
-        view: PageView = await session.snapshot("agent")
+        view: PageView = await session.snapshot("agent", True)
         assert [tab.url for tab in view.tabs] == [f"{site}/"]
     finally:
         await session.aclose()
@@ -441,9 +445,13 @@ async def test_a_tab_that_a_tab_of_the_agent_opens_is_the_agents_and_closes_with
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
     )
     try:
-        view: PageView = await session.open_url("agent", f"{site}/")
+        view: PageView = await session.open_url("agent", f"{site}/", True)
         opened: ActOutcome = await session.act(
-            "agent", [Step(action="click", ref=ref_of(view.body, 'link "Open popup"'))], False, refuse_secret_field
+            "agent",
+            [Step(action="click", ref=ref_of(view.body, 'link "Open popup"'))],
+            False,
+            refuse_secret_field,
+            True,
         )
         assert [tab.url for tab in opened.view.tabs] == [f"{site}/", f"{site}/popup"]
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/", f"{site}/popup"])
@@ -461,13 +469,13 @@ async def test_a_click_that_asks_for_two_tabs_stops_at_the_one_chrome_opened(
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
     )
     try:
-        view: PageView = await session.open_url("two", f"{site}/two")
+        view: PageView = await session.open_url("two", f"{site}/two", True)
         steps: list[Step] = [
             Step(action="click", ref=ref_of(view.body, 'button "Open two"')),
             Step(action="click", ref=ref_of(view.body, 'button "Stay"')),
         ]
         with capture_logs() as logs:
-            outcome: ActOutcome = await session.act("two", steps, False, refuse_secret_field)
+            outcome: ActOutcome = await session.act("two", steps, False, refuse_secret_field, True)
         assert [report.outcome for report in outcome.steps] == ["done", "skipped"]
         assert outcome.stopped is not None and "new tab" in outcome.stopped
         assert [tab.url for tab in outcome.view.tabs] == [f"{site}/two", f"{site}/popup"]
@@ -490,17 +498,17 @@ async def test_a_session_reports_that_chrome_has_quit_and_works_again_when_chrom
 
     session.tell_reconnects(notice)
     try:
-        await session.open_url("agent", f"{site}/")
+        await session.open_url("agent", f"{site}/", True)
         assert not session.lost and told == []
         await stop_chrome(first)
         assert profile_holder_pid(data_dir) is None
         await asyncio.sleep(_EVENT_GRACE_S)
         assert session.lost and not session.connected
         with pytest.raises(BrowserError, match="Chrome is not running; open Chrome"):
-            await session.snapshot("agent")
+            await session.snapshot("agent", True)
         second: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
         try:
-            view: PageView = await session.open_url("agent", f"{site}/")
+            view: PageView = await session.open_url("agent", f"{site}/", True)
             assert view.title == "Home"
             assert await open_tabs(second.port) == sorted([f"{site}/mine", f"{site}/"])
             assert told == ["told"] and not session.lost and not session.waiting_allow
@@ -524,14 +532,14 @@ async def test_a_reconnection_whose_notice_fails_connects_all_the_same(
 
     session.tell_reconnects(failing)
     try:
-        await session.open_url("agent", f"{site}/")
+        await session.open_url("agent", f"{site}/", True)
         await stop_chrome(first)
         await asyncio.sleep(_EVENT_GRACE_S)
         assert session.lost
         second: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
         try:
             with capture_logs() as logs:
-                view: PageView = await session.open_url("agent", f"{site}/")
+                view: PageView = await session.open_url("agent", f"{site}/", True)
             assert view.title == "Home" and not session.lost
             assert [entry for entry in logs if entry["event"] == "browser_reconnect_notice_failed"]
         finally:
@@ -548,7 +556,7 @@ async def test_a_chrome_that_restarted_and_refuses_says_so_in_one_line(
     first: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
     session: BrowserSession = BrowserSession(attach_config, SERVER, data_dir, tmp_path / "downloads", no_runs_at_work)
     try:
-        await session.open_url("agent", f"{site}/")
+        await session.open_url("agent", f"{site}/", True)
         await stop_chrome(first)
         await asyncio.sleep(_EVENT_GRACE_S)
         second: ScratchChrome = await start_chrome(data_dir, f"{site}/mine")
@@ -558,7 +566,7 @@ async def test_a_chrome_that_restarted_and_refuses_says_so_in_one_line(
             with pytest.raises(
                 BrowserError, match=r"^Chrome was closed or restarted; keep a Chrome window open, click Allow"
             ):
-                await session.open_url("agent", f"{site}/")
+                await session.open_url("agent", f"{site}/", True)
             assert session.lost and not session.waiting_allow
         finally:
             await stop_chrome(second)
@@ -604,8 +612,8 @@ async def test_a_script_reaches_the_runs_own_tab_every_time_while_three_chromes_
         attach_config, SERVER, chrome.data_dir, tmp_path / "downloads", no_runs_at_work
     )
     try:
-        await own.open_url("own", f"{site}/other")
-        await attached.open_url("run", f"{site}/")
+        await own.open_url("own", f"{site}/other", True)
+        await attached.open_url("run", f"{site}/", True)
         titles: list[str] = [(await attached.run_script("run", "document.title", 5.0)).text for _ in range(10)]
         assert titles == ['"Home"'] * 10
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/"])
@@ -622,7 +630,7 @@ async def test_a_session_moves_between_dots_own_chrome_and_the_chrome_of_the_use
     session: BrowserSession = BrowserSession(own_config, SERVER, own_profile, own_home / "downloads", no_runs_at_work)
     try:
         assert (session.mode, session.connected) == ("own", False)
-        home_page: PageView = await session.open_url("own", f"{site}/")
+        home_page: PageView = await session.open_url("own", f"{site}/", True)
         assert home_page.title == "Home"
         assert session.connected
         assert profile_holder_pid(own_profile) is not None
@@ -631,14 +639,14 @@ async def test_a_session_moves_between_dots_own_chrome_and_the_chrome_of_the_use
         assert (session.mode, session.profile_dir) == ("attach", chrome.data_dir)
         assert profile_holder_pid(own_profile) is None
         await wait_for_tabs(chrome.port, [f"{site}/mine"])
-        popup: PageView = await session.open_url("agent", f"{site}/popup")
+        popup: PageView = await session.open_url("agent", f"{site}/popup", True)
         assert popup.title == "Popup"
         await wait_for_tabs(chrome.port, [f"{site}/mine", f"{site}/popup"])
 
         await adopt_mode(session, "own", never_opened)
         assert (session.mode, session.profile_dir, session.connected) == ("own", own_profile, False)
         await wait_for_tabs(chrome.port, [f"{site}/mine"])
-        other: PageView = await session.open_url("own", f"{site}/other")
+        other: PageView = await session.open_url("own", f"{site}/other", True)
         assert other.title == "Other"
         assert profile_holder_pid(own_profile) is not None
     finally:
@@ -682,7 +690,7 @@ async def test_a_switch_to_the_chrome_of_the_user_while_it_is_closed_opens_it_fi
         assert (session.mode, session.profile_dir) == ("attach", data_dir)
         port: int = await wait_for_port(data_dir)
         await wait_for_tabs(port, [f"{site}/mine"])
-        popup: PageView = await session.open_url("agent", f"{site}/popup")
+        popup: PageView = await session.open_url("agent", f"{site}/popup", True)
         assert popup.title == "Popup"
     finally:
         await session.aclose()
@@ -785,7 +793,7 @@ async def test_the_settings_card_follows_chrome_as_it_quits_and_comes_back(
                 .locator("dd")
             )
             line: Locator = card.locator(".attach-standing")
-            await runtime.browsers.main.open_url("card", f"{site}/")
+            await runtime.browsers.main.open_url("card", f"{site}/", True)
             await expect(connection).to_have_text("connected", timeout=_CARD_READS_MS)
             await expect(line).to_contain_text("later runs connect with no click")
             await stop_chrome(first)
@@ -794,7 +802,7 @@ async def test_the_settings_card_follows_chrome_as_it_quits_and_comes_back(
             try:
                 await expect(connection).to_have_text("Chrome restarted", timeout=_CARD_READS_MS)
                 await expect(line).to_contain_text("Chrome asks you to Allow")
-                await runtime.browsers.main.open_url("card", f"{site}/")
+                await runtime.browsers.main.open_url("card", f"{site}/", True)
                 await expect(connection).to_have_text("connected", timeout=_CARD_READS_MS)
             finally:
                 await stop_chrome(second)

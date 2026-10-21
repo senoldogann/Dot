@@ -27,7 +27,7 @@ from dotagent.policy.elements import (
     quiet_assessment,
     typing_reasons,
 )
-from dotagent.policy.types import Flag
+from dotagent.policy.types import ApprovalMode, Flag
 
 _ALLOWED_SCHEMES: frozenset[str] = frozenset({"http", "https"})
 # Addresses a page makes itself, whose data never leaves the page: no server answers them.
@@ -276,6 +276,24 @@ def secret_kind(marking: object) -> SecretKind | None:
         return None
     kinds: list[SecretKind] = [_SECRET_KINDS[token] for token in marking.lower().split() if token in _SECRET_KINDS]
     return next((kind for kind in kinds if kind.startswith("cc-")), kinds[0] if kinds else None)
+
+
+def hides_secrets(approvals: ApprovalMode) -> bool:
+    """Whether a run's views of a page hide the values of the fields the page marks secret (item 467): in every mode
+    but yolo, in which a run sees all it reads and types what a page or a mail gives it (item 443)."""
+    return approvals != "yolo"
+
+
+def secret_selector() -> str:
+    """The CSS selector of the fields :func:`secret_kind` takes for secret (item 467), as the driver's field marking
+    reads them: password inputs, and the inputs and text areas whose autocomplete names a secret among its tokens
+    (``section-pay shipping cc-number`` too), whatever their case."""
+    return ", ".join(
+        [
+            'input[type="password" i]',
+            *(f'{tag}[autocomplete~="{kind}" i]' for kind in _SECRET_KINDS for tag in ("input", "textarea")),
+        ]
+    )
 
 
 def secret_field_label(kind: SecretKind) -> str:
