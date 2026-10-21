@@ -181,8 +181,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   that a `dotx` command left when it died, by the daemon within half a minute when it runs. Either can be resumed, and
   so can a run that a shutdown of the daemon cut off (see
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)).
-- A message sent to a running run (steering) reaches the model at its next step. It also clears the run's untrusted
-  mark (see [Safety](safety.md#safety)).
+- A message sent to a running run (steering) reaches the model at once: a step whose model is still answering is cut
+  short and asked again with the message (item 509); a tool already at work finishes first, and a step past the run's
+  limit ends with its finish. It also clears the run's untrusted mark (see [Safety](safety.md#safety)).
 - A run belongs to the daemon, not to the page that started it: leave the chat and it goes on, its status stays live in
   the sidebar, and you can steer it when you come back.
 - A run of a `dotx` command (`dotx run`, `dotx resume`, `dotx chat`) is on the pages too while the daemon runs: it works

@@ -33,7 +33,11 @@ rows "<name> is paused" (see [Memory and schedules](memory-and-schedules.md)). W
 one of its schedules and the messages of other agents still reach it, and runs already working go on, each with its
 Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
-An agent can start from a template (item 315). Under the list, **Start from a template** shows fourteen: Sales
+The page is in two parts (item 509): **Your agents**, with their count, and under them **Add ready-made agents**, which
+shows the teams or the single agents, one of the two at a time (**Teams** first; the one chosen last while the app is
+open).
+
+An agent can start from a template (item 315). **Single agents** shows fourteen: Sales
 Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of
 Staff, Reviewer, Research Desk, Competitor Watch, Release QA, Copy Editor and Design Critic, each with its face, its
 role, what it needs of the Mac and the schedule it suggests. **Use template** makes the agent in one click and opens
@@ -69,7 +73,7 @@ opens it; a file that names a tool this home lacks is refused with the tool's na
 secret, and for a file that is not an agent's or names tools not here); a template's schedule is `POST /api/schedules`
 with `"enabled": false`.
 
-Above the templates, **Start from a team** (item 504) shows four teams, each a few templates whose agents work side by
+**Teams** (item 504) shows four teams, each a few templates whose agents work side by
 side: the Content team (Research Desk, Copy Editor), the Engineering team (Bug Reproduction, Reviewer, Release QA), the
 Growth team (Competitor Watch, Paid Media, Product Performance, Sales Outbound) and the Office team (Chief of Staff,
 Expense Manager). Each card says what the team does and shows the faces and names of its agents. **Use team** makes,

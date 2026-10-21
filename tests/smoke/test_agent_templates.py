@@ -110,6 +110,15 @@ async def _open(browser: Browser, address: str, route: str, width: int, scheme: 
     return page
 
 
+async def _singles(page: Page) -> None:
+    """Show the single agents of the ready-made ones, which the page shows after its teams (item 509)."""
+    await (
+        page.get_by_role("group", name="Ready-made agents")
+        .get_by_role("button", name=re.compile("^Single agents"))
+        .click()
+    )
+
+
 def _hold_secret() -> None:
     """Give the home of the environment a secret in its .env, as an API key the owner saved."""
     env_file_path().write_text(f"DOT_TEST_SECRET={HELD_SECRET}\n", encoding="utf-8")
@@ -153,6 +162,7 @@ async def test_a_home_that_cannot_list_its_tools_says_so_on_the_cards_and_marks_
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
                 await page.goto(f"{address}/#/agents")
                 await expect(page.locator(".template-card")).to_have_count(len(TEMPLATES))
+                await _singles(page)
                 notice = page.locator("[data-templates-tools-unknown]")
                 await expect(notice).to_contain_text("could not be listed")
                 # No card claims a tool is missing, and the notice is the one place that says why.
@@ -176,6 +186,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 page: Page = await _open(browser, address, "/agents", 1280, "light")
                 cards: Locator = page.locator(".template-card")
                 await expect(cards).to_have_count(len(TEMPLATES))
+                await _singles(page)
                 await expect(cards.locator(".template-name")).to_have_text([template.name for template in TEMPLATES])
                 await expect(cards.locator(".template-role")).to_have_text([template.role for template in TEMPLATES])
                 await expect(cards.locator(".avatar")).to_have_count(len(TEMPLATES))
@@ -192,6 +203,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await page.screenshot(path=tmp_path / "templates-1280-light.png", full_page=True)
                 phone: Page = await _open(browser, address, "/agents", 390, "dark")
                 await expect(phone.locator(".template-card")).to_have_count(len(TEMPLATES))
+                await _singles(phone)
                 # One card a row on a phone, inside the window.
                 lefts: set[float] = set()
                 for index in range(len(TEMPLATES)):
@@ -324,6 +336,7 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
             try:
                 phone = await _open(browser, address, "/agents", 390, "dark")
                 await expect(phone.locator(".template-card")).to_have_count(len(TEMPLATES))
+                await _singles(phone)
                 # A tool this home does not have is marked on the card before the click that would be refused (item
                 # 425): here the Mac's own tools are off, so the AppleScript three templates name is struck through.
                 chief: Locator = phone.locator('.template-card[data-template="chief-of-staff"]')
@@ -377,6 +390,7 @@ async def test_a_template_schedule_is_added_switched_off_and_read_and_switched_o
             try:
                 for width, scheme in ((1280, "light"), (390, "dark")):
                     page: Page = await _open(browser, address, "/agents", width, scheme)
+                    await _singles(page)
                     card: Locator = page.locator(f".template-card[data-template='{template.id}']")
                     await expect(card).to_be_visible()
                     no_offer: Locator = page.locator(f".template-card[data-template='{plain.id}'] .template-also")

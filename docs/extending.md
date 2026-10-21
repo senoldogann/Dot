@@ -32,7 +32,8 @@ the mark of the service it is one of, and the composer's menus draw a server and
 ### Connect apps
 
 **Connect apps** (item 492), at the foot of the sidebar right of the cog of Settings, opens the same services in a dialog over the
-page, wearing the marks of the first three MCP servers that are ready. It has a search, a chip for each section,
+page, on the sidebar's own ground as the cog is, wearing the marks of three MCP servers that are ready, another three
+of them every few seconds when more are (item 509). It has a search, a chip for each section,
 **Suggested for you** (the popular services), then each section's first six tiles with **See all**, and **N connected**,
 which lists what Dot is connected to. A tile shows one thing: its first step as a button (**Add**, **Sign in**,
 **Allow**, **Open System Settings**), or where the service stands once it is connected, or **Not tried yet**. A tile

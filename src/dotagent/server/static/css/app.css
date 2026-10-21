@@ -7544,28 +7544,67 @@ button.attach-chip:hover {
   line-height: var(--leading-sm);
 }
 
+/* What a template needs and when it runs (item 509): a line each, its icon in place of a label. */
 .template-facts {
   display: grid;
   gap: 4px;
-  margin: 0;
+  color: var(--text-2);
   font-size: var(--text-sm);
   line-height: var(--leading-sm);
 }
 
-.template-facts > div {
+.template-fact {
   display: flex;
+  align-items: flex-start;
   gap: 8px;
+  min-width: 0;
 }
 
-.template-facts dt {
+.template-fact > .icon {
   flex: none;
-  width: 72px;
+  width: 14px;
+  height: 14px;
+  margin-top: var(--space-half);
   color: var(--muted);
 }
 
-.template-facts dd {
+/* The Agents page in two parts (item 509): the owner's agents, then the ready-made ones, each under its own head. */
+.agents-part {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+
+.agents-part:first-of-type {
+  margin-top: 0;
+}
+
+.agents-part > .hint {
   margin: 0;
-  min-width: 0;
+}
+
+.agents-part-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.agents-part-head > .section-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.agents-count:not(:empty) {
+  padding: 0 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  color: var(--muted);
+  font-size: var(--text-sm);
 }
 
 .template-card > .btn {
