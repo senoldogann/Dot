@@ -326,15 +326,15 @@ def _count_ruled(kept: RuleTally, step: StepRow, behavior: Behavior) -> None:
 
 def _slow_rule(number: int, step: StepRow, error: ConfigError, reached: bool) -> str:
     """What stops a count of the rules' use: rule ``number``'s pattern took too long on ``step``, or could not be read.
-    ``reached`` says whether the policy would have come to that rule, no earlier one fitting the step: the daemon then
-    refuses the step, and else it decided it by the earlier rule."""
+    The daemon refuses a step that reaches that rule; ``reached`` says whether this one would, no earlier rule fitting
+    it (a check before every rule may still have settled it)."""
     said: str = (
         f"The pattern of rule #{number} takes longer than the daemon allows on a past step ({step.tool}: "
         f"{plain_line(redact_secrets(step.summary), _EXAMPLE_CHARS)}), or cannot be read: {error.message}."
     )
     if reached:
-        return f"{said} The daemon refuses such a step."
-    return f"{said} An earlier rule decided this step, but the daemon refuses one that reaches rule #{number}."
+        return f"{said} The daemon refuses a step that reaches rule #{number}."
+    return f"{said} An earlier rule fits this step first, but the daemon refuses a step that reaches rule #{number}."
 
 
 def tally_usage(tally: UsageTally, rules: Sequence[RuleRecord], steps: Sequence[StepRow], deadline: float) -> int:
