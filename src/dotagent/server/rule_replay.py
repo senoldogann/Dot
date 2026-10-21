@@ -1,7 +1,8 @@
 """Trying a rule on past steps before it is added (item 469): which of the steps of the last days it fits, which of
 those an earlier rule decides first, which no rule decides (a yolo run's, or what the policy settles before it reads
-any rule), and how what it would decide compares with what was decided then (recorded since item 468). The steps are
-the ``tool_result`` events, read newest first by pages, at most so many and for so long, and the rule is matched as the
+any rule), and how what it would decide compares with what was decided then: the decision a step's record keeps since
+item 468, or for a step the gate did not let through, what the policy event of its call said. The steps are the
+``tool_result`` events, read newest first by pages, at most so many and for so long, and the rule is matched as the
 policy matches rules (:func:`dotagent.policy.engine.match_rule`), the policy itself untouched: nothing is written and
 nothing decided."""
 
@@ -12,10 +13,12 @@ from collections.abc import Sequence
 from typing import get_args
 
 from dotagent.agent.authorization import StepDecision
+from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.core.errors import ConfigError
 from dotagent.core.text import plain_line, redact_secrets
+from dotagent.core.types import FrozenModel
 from dotagent.policy.engine import match_rule
-from dotagent.policy.types import ActionInfo, ActionKind, DecisionSource, Risk, Verdict
+from dotagent.policy.types import TAINT_ESCALATION_FLAGS, ActionInfo, ActionKind, DecisionSource, Risk, Verdict
 from dotagent.server.views import RuleExample, RulePreview, RuleShadow
 from dotagent.store.db import Store
 from dotagent.store.models import Behavior, RuleRecord, StepRow
@@ -96,15 +99,34 @@ def _example(step: StepRow) -> RuleExample:
     )
 
 
-def _settled_before_rules(was: StepDecision, behavior: Behavior) -> bool:
+class _Said(FrozenModel):
+    """What the policy said of a step then: where the answer came from and what it was."""
+
+    source: DecisionSource
+    verdict: Verdict
+
+
+def _said(step: StepRow) -> _Said | None:
+    """What the policy said of the step then: the decision its record keeps, or for a step the gate did not let through
+    (refused, declined, handed to the owner), the policy event of its call; ``None`` when neither says."""
+    was: StepDecision | None = _was(step)
+    if was is not None:
+        return _Said(source=was.source, verdict=was.verdict)
+    if step.stopped_by is not None:
+        return _Said.model_validate(step.stopped_by)
+    return None
+
+
+def _settled_before_rules(said: _Said, behavior: Behavior) -> bool:
     """Whether what decided the step then comes before every rule, so that the rule tried would change nothing."""
-    return was.source in _BEFORE_RULES and not (was.source in _HANDOFF_FIRST and behavior == "handoff")
+    return said.source in _BEFORE_RULES and not (said.source in _HANDOFF_FIRST and behavior == "handoff")
 
 
-def _verdict_now(was: StepDecision, behavior: Behavior) -> Verdict:
+def _verdict_now(step: StepRow, behavior: Behavior) -> Verdict:
     """What the policy would decide of the step with the rule tried deciding it: the rule's answer, but for an ``allow``
-    on a step the taint made a question then, which the taint makes a question again (``preapproved`` it does not)."""
-    if was.source == "taint" and behavior == "allow":
+    on a step that reaches outside while the run was tainted, which the taint makes a question (``preapproved`` it does
+    not; policy/engine.py, decide_past_review)."""
+    if behavior == "allow" and step.tainted_before and TAINT_ESCALATION_FLAGS.intersection(step.flags):
         return "ask"
     return _VERDICT[behavior]
 
@@ -131,23 +153,25 @@ class Tally:
 
 def _count_first(tally: Tally, step: StepRow, behavior: Behavior) -> None:
     """Count a step whose first rule to fit is the one tried: a yolo run's, which asks nothing whatever the rules say;
-    one settled before any rule; or one it would decide, against what was decided then."""
+    one settled before any rule; or one it would decide, against what was decided then. Of those, a step that did not
+    run and whose record does not say why (another run held what it needed, the review model refused it) is
+    ``stopped``, and one with no decision on record at all (from before item 468, an OpenCode agent's) ``unknown``."""
     if step.yolo:
         tally.in_yolo += 1
         return
-    was: StepDecision | None = _was(step)
-    if was is not None and _settled_before_rules(was, behavior):
+    said: _Said | None = _said(step)
+    if said is not None and _settled_before_rules(said, behavior):
         tally.before_rules += 1
         return
     tally.would_decide += 1
-    if was is None:
+    if said is None:
         if step.recorded:
             tally.stopped += 1
         else:
             tally.unknown += 1
         return
-    now: int = _STRICTNESS[_verdict_now(was, behavior)]
-    then: int = _STRICTNESS[was.verdict]
+    now: int = _STRICTNESS[_verdict_now(step, behavior)]
+    then: int = _STRICTNESS[said.verdict]
     if now > then:
         tally.stricter += 1
     elif now < then:
@@ -230,7 +254,7 @@ async def preview_rule(
     ends: float = time.monotonic() + _BUDGET_S
     while True:
         wanted: int = min(_PAGE, _MAX_STEPS - tally.scanned)
-        page: list[StepRow] = await store.tool_steps(floor, before, wanted)
+        page: list[StepRow] = await store.tool_steps(floor, before, wanted, TAINT_EVENTS)
         done: int = 0
         while done < len(page):
             done += tally_steps(tally, existing, candidate, page[done:], min(ends, time.monotonic() + _SLICE_S))
@@ -245,5 +269,5 @@ async def preview_rule(
             return preview_of(tally, existing, False)
         before = page[-1].event_id
         if tally.scanned >= _MAX_STEPS or time.monotonic() > ends:
-            left: list[StepRow] = await store.tool_steps(floor, before, 1)
+            left: list[StepRow] = await store.tool_steps(floor, before, 1, TAINT_EVENTS)
             return preview_of(tally, existing, left != [])

@@ -31,12 +31,14 @@ export function previewLines(view, days) {
     lines.push(`${plural(view.before_rules, "is", "are")} settled before any rule, by checks no rule changes, such as money, credentials, messages and posts, and Dot's own files.`);
   }
   if (view.would_decide > 0) {
+    // A step that did not run and whose record does not say why, and one from before Dot kept its decisions, are alike
+    // here: there is nothing to compare them with.
+    const unrecorded = view.stopped + view.unknown;
     const changes = [
       view.stricter > 0 ? `${view.stricter} would ask more than they did` : null,
       view.looser > 0 ? `${view.looser} would ask less` : null,
       view.same > 0 ? `${view.same} the same` : null,
-      view.stopped > 0 ? `${view.stopped} did not run then` : null,
-      view.unknown > 0 ? `${view.unknown} from before Dot kept its decisions` : null,
+      unrecorded > 0 ? `${unrecorded} with no decision on record` : null,
     ].filter((part) => part !== null);
     lines.push(`It would decide ${view.would_decide} of them${changes.length > 0 ? `: ${changes.join(", ")}` : ""}.`);
   }

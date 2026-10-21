@@ -27,7 +27,7 @@ test("what a rule would have done, said in lines", () => {
   assert.deepEqual(previewLines(VIEW, 30), [
     "Would have matched 18 of 3200 steps in the last 30 days.",
     "An earlier rule decides some of them first: Do it (9).",
-    "It would decide 9 of them: 3 would ask more than they did, 1 the same, 2 did not run then, 3 from before Dot kept its decisions.",
+    "It would decide 9 of them: 3 would ask more than they did, 1 the same, 5 with no decision on record.",
   ]);
 });
 

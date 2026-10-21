@@ -115,24 +115,68 @@ async def _run(runtime: Runtime, approvals: ApprovalMode) -> RunRecord:
     )
 
 
+def _policy(summary: str, source: str, verdict: str) -> JsonObject:
+    """The policy event the gate writes before it asks, hands off or refuses (agent/gate.py, _emit_policy)."""
+    return {
+        "tool": "shell",
+        "kind": "shell",
+        "risk": "medium",
+        "summary": summary,
+        "target": summary.removeprefix("Run: "),
+        "amount": None,
+        "flags": [],
+        "verdict": verdict,
+        "source": source,
+        "reason": "what the policy said",
+        "rule_id": None,
+    }
+
+
+def _not_run(summary: str, call_id: str, tainted: bool) -> JsonObject:
+    """The result of a call the gate did not let through, or another run held: it keeps no decision (item 468)."""
+    return {
+        **_result("shell", "shell", summary),
+        "call_id": call_id,
+        "ok": False,
+        "decision": None,
+        "flags": [],
+        "tainted": tainted,
+    }
+
+
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def seeded(runtime: Runtime) -> list[EventRecord]:
-    """The steps of two past runs, oldest first: in one that asked, a push from before item 468, a push the gate did not
-    let through, a push the owner approved, a listing, a file written and a call that never reached the policy; in a
-    yolo run, a push."""
+    """The steps of two past runs, oldest first. In one that asked: a push from before item 468; a push the owner
+    declined, after the policy event that asked; a forced push handed to the owner, as money and credentials are, which
+    left the run tainted; a push sending out that the owner approved while the run was tainted; a listing; a file
+    written; a call that never reached the policy; a push another run held. In a yolo run, a push."""
+    store = runtime.store
     asked: RunRecord = await _run(runtime, "ask")
     yolo: RunRecord = await _run(runtime, "yolo")
-    stopped: JsonObject = {**_result("shell", "shell", "Run: git push --tags"), "ok": False, "decision": None}
-    results: list[tuple[str, JsonObject]] = [
-        (asked.id, _result("shell", "shell", "Run: git push origin main")),
-        (asked.id, {**stopped, "flags": []}),
-        (asked.id, _decided("shell", "shell", "Run: git push", "ask", "user")),
-        (asked.id, _decided("shell", "shell", "Run: ls", "allow", "policy")),
-        (asked.id, _decided("write_file", "write", "Write notes.md", "allow", "policy")),
-        (asked.id, _result("no_such_tool", "", "")),
-        (yolo.id, _decided("shell", "shell", "Run: git push", "ask", "yolo")),
+    steps: list[EventRecord] = [
+        await store.add_event(asked.id, "tool_result", _result("shell", "shell", "Run: git push origin main"))
     ]
-    return [await runtime.store.add_event(run_id, "tool_result", data) for run_id, data in results]
+    for call_id, summary, source, verdict, tainted in (
+        ("c1", "Run: git push --tags", "preset", "ask", False),
+        ("c2", "Run: git push --force", "hard_stop", "handoff", True),
+    ):
+        await store.add_event(asked.id, "tool_call", {"call_id": call_id, "tool": "shell", "args": {}})
+        await store.add_event(asked.id, "policy", _policy(summary, source, verdict))
+        steps.append(await store.add_event(asked.id, "tool_result", _not_run(summary, call_id, tainted)))
+    sent: JsonObject = {**_decided("shell", "shell", "Run: git push", "ask", "user"), "flags": ["external_send"]}
+    for data in (
+        sent,
+        _decided("shell", "shell", "Run: ls", "allow", "policy"),
+        _decided("write_file", "write", "Write notes.md", "allow", "policy"),
+        _result("no_such_tool", "", ""),
+    ):
+        steps.append(await store.add_event(asked.id, "tool_result", data))
+    await store.add_event(asked.id, "tool_call", {"call_id": "c7", "tool": "shell", "args": {}})
+    steps.append(await store.add_event(asked.id, "tool_result", _not_run("Run: git push --dry-run", "c7", True)))
+    steps.append(
+        await store.add_event(yolo.id, "tool_result", _decided("shell", "shell", "Run: git push", "ask", "yolo"))
+    )
+    return steps
 
 
 async def test_the_store_finds_where_a_moment_starts_by_halving_the_ids(
@@ -153,16 +197,16 @@ async def test_the_route_tries_a_rule_on_past_steps_and_writes_nothing(
     )
     assert tried.status_code == 200, tried.text
     view = tried.json()
-    # The call that never reached the policy is not a step; the yolo run's push is counted apart.
-    assert (view["scanned"], view["fits"], view["in_yolo"], view["would_decide"], view["partial"]) == (
-        6,
-        4,
-        1,
-        3,
-        False,
+    # The call that never reached the policy is not a step. The yolo run's push and the push handed to the owner, as
+    # money and credentials are, are counted apart. The declined push would now go ahead (its policy event said the
+    # preset asked); the approved one sending out would still ask, as the run was tainted; the push another run held
+    # and the one from before item 468 have no decision on record.
+    counts: tuple[object, ...] = tuple(
+        view[key] for key in ("scanned", "fits", "in_yolo", "before_rules", "would_decide", "partial", "problem")
     )
-    assert (view["looser"], view["stopped"], view["unknown"], view["problem"]) == (1, 1, 1, None)
-    newest_first: list[int] = [seeded[6].id, seeded[2].id, seeded[1].id, seeded[0].id]
+    assert counts == (8, 6, 1, 1, 4, False, None)
+    assert (view["stricter"], view["looser"], view["same"], view["stopped"], view["unknown"]) == (0, 1, 1, 1, 1)
+    newest_first: list[int] = [seeded[index].id for index in (8, 7, 3, 2, 1, 0)]
     assert [example["event_id"] for example in view["examples"]] == newest_first
     assert await runtime.store.list_rules() == rules_before
     not_a_pattern: httpx.Response = await client.post(
@@ -202,15 +246,15 @@ async def test_the_rules_page_tests_a_rule_before_it_is_added(
                 test: Locator = page.get_by_role("button", name="Test on the last 30 days")
                 await test.click()
                 tried: Locator = page.locator(".rule-tryout")
-                await expect(tried).to_contain_text("Would have matched 4 of 6 steps in the last 30 days.")
+                await expect(tried).to_contain_text("Would have matched 6 of 8 steps in the last 30 days.")
                 await expect(tried).to_contain_text("1 ran in YOLO, which asks nothing whatever the rules say.")
+                await expect(tried).to_contain_text("1 is settled before any rule, by checks no rule changes")
                 await expect(tried).to_contain_text(
-                    "It would decide 3 of them: 1 would ask less, 1 did not run then, 1 from before Dot kept its"
-                    " decisions."
+                    "It would decide 4 of them: 1 would ask less, 1 the same, 2 with no decision on record."
                 )
-                await expect(tried.locator(".firing-title")).to_have_count(4)
+                await expect(tried.locator(".firing-title")).to_have_count(6)
                 await expect(tried.locator(".firing-title").first).to_have_text("shell: Run: git push")
-                await expect(tried.locator(".firing").nth(2)).to_contain_text("did not run")
+                await expect(tried.locator(".firing").nth(1)).to_contain_text("did not run")
                 await expect(tried).not_to_contain_text("null")
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await page.screenshot(path=str(tmp_path / f"tryout-{width}-{scheme}.png"), full_page=True)
@@ -221,7 +265,7 @@ async def test_the_rules_page_tests_a_rule_before_it_is_added(
                 await page.get_by_role("textbox", name="Pattern").fill("git push")
                 await test.click()
                 await tried.locator(".firing-title").first.click()
-                await expect(page).to_have_url(re.compile(f"#/runs/{seeded[6].run_id}$"))
+                await expect(page).to_have_url(re.compile(f"#/runs/{seeded[8].run_id}$"))
                 await page.close()
         finally:
             await browser.close()

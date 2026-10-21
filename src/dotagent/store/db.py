@@ -541,6 +541,19 @@ def _tool_names(value: object) -> tuple[str, ...]:
     return tuple(value)
 
 
+# How many of its run's own events before a step's result are searched for the call it ended (item 469): a call the gate
+# stopped has its ``tool_call``, its ``policy`` event and its question's events there, and those of the read-only calls
+# that ran beside it; a search with no bound would walk the whole run for a result whose call is not there.
+_STEP_CALL_EVENTS: int = 50
+
+
+def _step_flags(value: object) -> tuple[str, ...]:
+    """The flags a step's result keeps of its action (item 468): a JSON array of names."""
+    if not isinstance(value, list) or not all(isinstance(item, str) for item in value):
+        raise StoreError("a step's result has flags that are not a list of names", {"flags": repr(value)})
+    return tuple(value)
+
+
 def _agent(row: aiosqlite.Row) -> AgentRecord:
     return AgentRecord(
         id=row["id"],
@@ -2301,20 +2314,39 @@ class Store:
                 low = int(row["id"]) + 1
         return low
 
-    async def tool_steps(self, floor_id: int, before_id: int, limit: int) -> list[StepRow]:
+    async def tool_steps(self, floor_id: int, before_id: int, limit: int, taint_kinds: Sequence[str]) -> list[StepRow]:
         """The newest ``limit`` steps whose action reached the policy (a ``tool_result`` with a kind) among the events
-        from ``floor_id`` up to, not with, ``before_id``, newest first, with whether their run was in yolo (item 469);
-        SQLite reads the fields out of each event's JSON, so a page carries no event's whole text."""
+        from ``floor_id`` up to, not with, ``before_id``, newest first (item 469): with whether their run was in yolo,
+        whether the run was tainted when the step was decided (after the newest of its events of ``taint_kinds`` before
+        the step, as :func:`dotagent.agent.gate.tainted_after` reads them), and, for a step whose record says the gate
+        did not let it through, what the ``policy`` event of its call said, looked for among the run's own events since
+        the call's ``tool_call``, at most :data:`_STEP_CALL_EVENTS` back. SQLite reads the fields out of each event's
+        JSON, so a page carries no event's whole text."""
+        kinds: str = ", ".join("?" for _ in taint_kinds)
         rows = await self._all(
             "SELECT e.id, e.run_id, e.ts, json_extract(e.data, '$.tool') AS tool,"
             " json_extract(e.data, '$.kind') AS action_kind, json_extract(e.data, '$.risk') AS risk,"
             " json_extract(e.data, '$.summary') AS summary, json_extract(e.data, '$.target') AS target,"
             " json_extract(e.data, '$.ok') AS ok, json_extract(e.data, '$.decision') AS decision,"
-            " json_type(e.data, '$.decision') IS NOT NULL AS recorded, COALESCE(r.approvals = 'yolo', 0) AS yolo"
+            " json_type(e.data, '$.decision') IS NOT NULL AS recorded, json_extract(e.data, '$.flags') AS flags,"
+            " COALESCE(r.approvals = 'yolo', 0) AS yolo,"
+            " COALESCE((SELECT t.kind != 'steer' AND json_type(t.data, '$.tainted') = 'true' FROM events AS t"
+            f" WHERE t.run_id = e.run_id AND t.id < e.id AND t.kind IN ({kinds}) ORDER BY t.id DESC LIMIT 1), 0)"
+            " AS tainted_before,"
+            " CASE WHEN json_type(e.data, '$.decision') = 'null' THEN (SELECT json_object('source',"
+            " json_extract(p.data, '$.source'), 'verdict', json_extract(p.data, '$.verdict')) FROM events AS p"
+            " WHERE p.run_id = e.run_id AND p.kind = 'policy' AND p.id < e.id AND p.id > (SELECT c.id FROM events AS c"
+            " WHERE c.run_id = e.run_id AND c.id < e.id AND c.id >= COALESCE((SELECT a.id FROM events AS a"
+            " WHERE a.run_id = e.run_id AND a.id < e.id ORDER BY a.id DESC LIMIT 1 OFFSET ?), 0)"
+            " AND c.kind = 'tool_call' AND json_extract(c.data, '$.call_id') = json_extract(e.data, '$.call_id')"
+            " ORDER BY c.id DESC LIMIT 1)"
+            " AND json_extract(p.data, '$.summary') = json_extract(e.data, '$.summary')"
+            " AND json_extract(p.data, '$.target') = json_extract(e.data, '$.target') ORDER BY p.id DESC LIMIT 1)"
+            " END AS stopped_by"
             " FROM events AS e LEFT JOIN runs AS r ON r.id = e.run_id"
             " WHERE e.id >= ? AND e.id < ? AND e.kind = 'tool_result'"
             " AND COALESCE(json_extract(e.data, '$.kind'), '') != '' ORDER BY e.id DESC LIMIT ?",
-            (floor_id, before_id, limit),
+            (*taint_kinds, _STEP_CALL_EVENTS - 1, floor_id, before_id, limit),
         )
         return [
             StepRow(
@@ -2329,6 +2361,11 @@ class Store:
                 ok=bool(row["ok"]),
                 decision=None if row["decision"] is None else parse_json_object(row["decision"], "a step's decision"),
                 recorded=bool(row["recorded"]),
+                flags=() if row["flags"] is None else _step_flags(parse_json_value(row["flags"], "a step's flags")),
+                tainted_before=bool(row["tainted_before"]),
+                stopped_by=(
+                    None if row["stopped_by"] is None else parse_json_object(row["stopped_by"], "a step's policy event")
+                ),
                 yolo=bool(row["yolo"]),
             )
             for row in rows
