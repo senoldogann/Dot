@@ -33,7 +33,14 @@ from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.runtime import Runtime, build_runtime, close_runtime
 from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE
 from dotagent.scheduler.failures import SCHEDULE_FAILURES_KEY, FiringFailures, parse_failures, record_firing_failure
-from dotagent.scheduler.plans import UNSET_OPTIONS, ScheduleRequest, create_schedule, edit_schedule
+from dotagent.scheduler.plans import (
+    UNSET_OPTIONS,
+    ScheduleRequest,
+    create_schedule,
+    create_schedule_off,
+    edit_schedule,
+    enable_schedule,
+)
 from dotagent.scheduler.runner import FAILED_TICKS_TO_END, Scheduler
 from dotagent.scheduler.timing import format_local, named_zone, next_firing
 from dotagent.store.models import (
@@ -304,6 +311,24 @@ async def test_the_number_of_switched_on_schedules_is_limited(runtime: Runtime) 
         await _schedule(runtime, _cron(f"Schedule {number}", "0 9 * * *"))
     with pytest.raises(ToolExecutionError, match="too many schedules"):
         await _schedule(runtime, _cron("One too many", "0 9 * * *"))
+
+
+async def test_a_schedule_added_switched_off_takes_no_room_until_it_is_switched_on(runtime: Runtime) -> None:
+    """Item 464: a template's schedule is added switched off, so it waits for no firing and takes none of the room for
+    the ones switched on; its time is checked as any schedule's, and switching it on checks the room."""
+    limit: int = runtime.config.scheduler.max_schedules
+    for number in range(limit):
+        await _schedule(runtime, _cron(f"Schedule {number}", "0 9 * * *"))
+    scheduler = runtime.config.scheduler
+    off: ScheduleRecord = await create_schedule_off(
+        runtime.store, scheduler, runtime.schedule_zone, _cron("Read me first", "0 9 * * 1-5"), time.time()
+    )
+    assert (off.enabled, off.next_run_at) == (False, None)
+    assert (await runtime.store.get_schedule(off.id)).enabled is False
+    with pytest.raises(ToolExecutionError, match="too many schedules"):
+        await enable_schedule(runtime.store, scheduler, runtime.schedule_zone, off.id, time.time())
+    with pytest.raises(ToolInputError):
+        await create_schedule_off(runtime.store, scheduler, runtime.schedule_zone, _cron("Too often", "* * * * *"), 0.0)
 
 
 # --------------------------------------------------------------------------------- firing and skipping

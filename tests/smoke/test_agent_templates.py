@@ -354,3 +354,57 @@ async def test_each_template_becomes_an_agent_in_one_click_and_its_file_makes_th
                 await phone.screenshot(path=tmp_path / "imported-390-dark.png")
             finally:
                 await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_template_schedule_is_added_switched_off_and_read_and_switched_on_on_the_agents_page(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """Item 464: a template that suggests a schedule offers to add it with the agent, and one that suggests none does
+    not; ticked, the agent is made and its schedule added switched off, as the agent's, with the template's time and
+    goal, and the agent's page lists it with its goal in full and its switch, which switches it on. Wide and light,
+    and on a phone and dark."""
+    template = next(one for one in TEMPLATES if one.id == "chief-of-staff")
+    plain = next(one for one in TEMPLATES if one.cron == "")
+    with scratch_home() as home, eval_environment(home, {}):
+        async with (
+            _daemon(login_env) as (runtime, address),
+            httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as http,
+            async_playwright() as playwright,
+        ):
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                for width, scheme in ((1280, "light"), (390, "dark")):
+                    page: Page = await _open(browser, address, "/agents", width, scheme)
+                    card: Locator = page.locator(f".template-card[data-template='{template.id}']")
+                    await expect(card).to_be_visible()
+                    no_offer: Locator = page.locator(f".template-card[data-template='{plain.id}'] .template-also")
+                    await expect(no_offer).to_have_count(0)
+                    also: Locator = card.get_by_role("checkbox", name="Also add this schedule")
+                    await also.check()
+                    await card.screenshot(path=tmp_path / f"template-card-{width}-{scheme}.png")
+                    await card.get_by_role("button", name=f"Use the template {template.name}").click()
+                    await expect(page).to_have_url(_AGENT_URL)
+                    agent_id: str = page.url.rpartition("/")[2]
+                    row: Locator = page.locator("[data-section='schedules'] .list-row")
+                    await expect(row).to_have_count(1)
+                    await expect(row.locator(".agent-schedule-goal")).to_have_text(template.task)
+                    switch: Locator = row.get_by_role("switch")
+                    await expect(switch).to_have_attribute("aria-checked", "false")
+                    await expect(row.locator(".badge")).to_have_text("switched off")
+                    views: list[JsonObject] = (await http.get("/api/schedules")).raise_for_status().json()
+                    kept: list[tuple[object, ...]] = [
+                        (record["name"], record["cron"], record["goal"], record["enabled"], record["next_run_at"])
+                        for record in (view["record"] for view in views)
+                        if record["options"]["agent_id"] == agent_id
+                    ]
+                    assert kept == [(template.name, template.cron, template.task, False, None)], kept
+                    assert await _overflow(page) <= 0
+                    await page.screenshot(path=tmp_path / f"agent-schedule-{width}-{scheme}.png", full_page=True)
+                    # Read, it is switched on from the agent's page, and waits for its next firing.
+                    await switch.click()
+                    await expect(switch).to_have_attribute("aria-checked", "true")
+                    await expect(row.locator(".row-meta")).to_contain_text("Next ")
+                    await page.close()
+            finally:
+                await browser.close()
