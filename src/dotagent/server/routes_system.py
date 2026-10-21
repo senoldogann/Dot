@@ -25,7 +25,7 @@ from dotagent.config_edit import (
     set_shell_sandbox,
     set_standby_models,
 )
-from dotagent.connections.directory import logo_of_service
+from dotagent.connections.directory import ServiceMark, mark_of_service
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -72,6 +72,7 @@ from dotagent.help.elsewhere import (
     FoundElsewhere,
     FoundServer,
     FoundSkill,
+    copied_skill_names,
     found_elsewhere,
 )
 from dotagent.launchd import JobState, inspect_job, service_runs
@@ -537,13 +538,14 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         catalog: SkillCatalog = await asyncio.to_thread(
             load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
-        # Each server's logo, the one its Customize tile wears (item 408): the composer's @ menu draws it as the page
-        # does (item 447).
-        logos: dict[str, str | None] = {
-            name: logo_of_service(service) if (service := service_of(server)) is not None else None
+        imported: frozenset[str] = await asyncio.to_thread(copied_skill_names, catalog.skills)
+        # Each server's mark, the one its Customize tile wears (item 408): the composer's menus draw it as the page
+        # does (items 447 and 477).
+        marks: dict[str, ServiceMark | None] = {
+            name: mark_of_service(service) if (service := service_of(server)) is not None else None
             for name, server in ctx.runtime.mcp.configs().items()
         }
-        return palette_view(catalog.skills, ctx.runtime.mcp.tools, logos)
+        return palette_view(catalog.skills, imported, ctx.runtime.mcp.tools, marks)
 
     @router.get("/doctor")
     async def doctor() -> list[CheckResult]:

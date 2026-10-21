@@ -12,7 +12,8 @@ import { api } from "./api.js";
 import { SEND_KEY, settingValue } from "./appearance/settings.js";
 import { createAttachments } from "./attachments.js";
 import { el, setText } from "./dom.js";
-import { icon, toolIconName } from "./icons.js";
+import { icon } from "./icons.js";
+import { markContent, markInk, skillMark } from "./marks.js";
 import { touchFirst, trackHeight } from "./layout.js";
 import { openMenu } from "./menu.js";
 import { markdownMirror } from "./mirror.js";
@@ -79,7 +80,7 @@ function loadPalette() {
 
 /** Wire `textarea`: `send()` on the key that sends (Enter, or ⌘Enter: `SEND_KEY`; never plain Return on a touch screen), autosize up to `maxPx`, the slash
  * menu with `commands` (`{ label: "/btw", hint, insert }`, or `run()` for one that acts on the composer), the at menu
- * of the MCP servers and the plugins, each with its logo (items 367 and 447), and the markdown it holds shown under
+ * of the MCP servers and the plugins, each with its service's mark (items 367, 447 and 477), and the markdown it holds shown under
  * it; `edited()` runs after a pick of the menu changed the text, as the input event does after typing, and `picked(pick)` after a skill or
  * a tool was picked for the message (`{ kind, name }`, item 318). Returns the menu element and the box's field (the box
  * with its markdown under it) to place in the composer's frame, `autosize()`, to call after any change of the text, and
@@ -111,36 +112,25 @@ function wireComposer(textarea, { maxPx, send, commands, edited, picked }) {
     range = null;
   }
 
-  function itemIconName(item) {
-    if (item.kind === "command") {
-      return item.label === "/loop" ? "refresh" : "terminal";
-    }
-    if (item.kind === "plugin") {
-      return "plug";
+  function itemMark(item) {
+    // An MCP server, and each of its tools, wear the mark of its service as the service's Customize tile wears it, on
+    // that tile's light ground, or the plug for a server of no service (items 447 and 477).
+    if (item.kind === "plugin" || item.kind === "tool") {
+      const mark = item.mark ?? null;
+      const span = el("span", { class: "slash-mark", dataset: { kind: item.kind, mark: "service" } }, markContent(mark));
+      const ink = mark === null ? null : markInk(mark.colour);
+      if (ink !== null) {
+        span.style.setProperty("--plugin-ink", ink);
+      }
+      return span;
     }
     if (item.kind === "skill") {
-      // The skill's own icon (item 408); the palette of an older daemon names none.
-      return item.icon ?? "sparkles";
+      // A skill wears its Customize card's mark (item 477), in its pick's colour.
+      const span = el("span", { class: "slash-mark", dataset: { kind: "skill" } }, icon(skillMark(item)));
+      span.style.setProperty("--pick-tint", `var(--character-${pickColour(item.label)})`);
+      return span;
     }
-    if (item.kind === "tool") {
-      return toolIconName(item.label);
-    }
-    return "sparkles";
-  }
-
-  function itemMark(item) {
-    const iconName = itemIconName(item);
-    // An MCP server wears the logo its Customize tile wears (item 447), or the plug where it has none (item 408).
-    const mark =
-      item.logo === undefined || item.logo === null
-        ? icon(iconName)
-        : el("img", { class: "plugin-logo", src: `/icons/plugins/${item.logo}`, alt: "" });
-    const span = el("span", { class: "slash-mark", dataset: { kind: item.kind ?? "command" } }, mark);
-    if (item.kind === "plugin" || item.kind === "skill" || item.kind === "tool") {
-      const tintName = item.serverName ?? item.label;
-      span.style.setProperty("--pick-tint", `var(--character-${pickColour(tintName)})`);
-    }
-    return span;
+    return el("span", { class: "slash-mark", dataset: { kind: "command" } }, icon(item.label === "/loop" ? "refresh" : "terminal"));
   }
 
   function paint() {

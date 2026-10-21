@@ -21,6 +21,8 @@ class SkillRoot(FrozenModel):
     source: str
 
 
+# Where a skill of Dot's own skills folder was found: the owner's, and Dot's copies of other agents' (item 165).
+HOME_SOURCE: str = "home"
 # Where a skill that Dot distilled itself was found (:mod:`dotagent.agent.playbooks`).
 PLAYBOOK_SOURCE: str = "learned"
 # Where a skill that comes with Dot was found, and the folder of those skills in the package (item 196).
@@ -33,7 +35,7 @@ def skill_roots(config: SkillsConfig, plugins: Sequence[Plugin], playbooks: Path
     folder when playbooks are on (``None`` when they are off: a playbook that exists is not offered then), then the
     skills that come with Dot when ``[skills] builtin`` is on. A playbook folder that does not exist yet is no problem:
     none was written."""
-    roots: list[SkillRoot] = [SkillRoot(path=skills_dir(), source="home")]
+    roots: list[SkillRoot] = [SkillRoot(path=skills_dir(), source=HOME_SOURCE)]
     roots.extend(SkillRoot(path=Path(entry).expanduser(), source="config") for entry in config.dirs)
     for plugin in plugins:
         roots.extend(SkillRoot(path=folder, source=f"plugin {plugin.name}") for folder in plugin.skill_dirs)

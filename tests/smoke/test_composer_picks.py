@@ -30,12 +30,14 @@ from dotagent.agent.picks import PICKS_EVENT
 from dotagent.agent.playbooks import playbook_name
 from dotagent.agent.review import PLAYBOOK_TOOL
 from dotagent.config import AppConfig, McpServerConfig, ToolSurface, load_default_config
+from dotagent.connections.directory import ServiceMark, mark_of_service
 from dotagent.core.paths import playbooks_dir
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.evals import EVAL_SOURCE
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
 from dotagent.evals.scripted import ScriptedProvider
 from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.help.elsewhere import ADDED_MARKER, SkillCopy
 from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply
 from dotagent.runtime import Runtime, close_runtime, open_runtime
@@ -687,38 +689,150 @@ async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_ski
                 await browser.close()
 
 
+# The services of the catalogue whose tiles wear each sort of mark (connections/directory.py): an icon, letters, a logo.
+MARKED: tuple[str, ...] = ("deepwiki", "context7", "microsoft-learn")
+# A server of the config at DeepWiki's address, switched off so that nothing is reached: its tile wears DeepWiki's mark.
+WIKI: str = "my-wiki"
+COPIED_SKILL: str = "copied-skill"
+LEARNED_SKILL: str = "learned-skill"
+
+
+def _palette_skill(name: str, source: str, imported: bool) -> JsonObject:
+    return {"name": name, "description": f"The {name}.", "source": source, "icon": "mail", "imported": imported}
+
+
+def _write_copied_skill(home: Path, theirs: Path) -> None:
+    """A skill Dot copied from Claude Code's ``theirs`` into its skills folder, with the marker that says so."""
+    copied: Path = home / "skills" / COPIED_SKILL
+    copied.mkdir(parents=True)
+    (copied / "SKILL.md").write_text(
+        f"---\nname: {COPIED_SKILL}\ndescription: Another agent's skill.\n---\n# Steps\n", encoding="utf-8"
+    )
+    made: SkillCopy = SkillCopy(agent="Claude Code", name=COPIED_SKILL, folder=theirs)
+    (copied / ADDED_MARKER).write_text(made.model_dump_json(), encoding="utf-8")
+
+
+async def _mark_of(mark: Locator) -> str:
+    """What a mark shows, as the page drew it: its picture's file, its icon's name or its letters."""
+    shown: str = await mark.evaluate(
+        """(node) => {
+          const picture = node.querySelector("img.plugin-logo");
+          if (picture !== null) {
+            return `logo:${picture.getAttribute("src")}`;
+          }
+          const glyph = node.querySelector("svg[data-icon]");
+          return glyph !== null ? `icon:${glyph.dataset.icon}` : `letters:${node.textContent.trim()}`;
+        }"""
+    )
+    return shown
+
+
 @pytest.mark.browser
-async def test_a_server_of_the_at_menu_wears_the_logo_its_customize_tile_wears(
-    login_env: dict[str, str], tmp_path: Path
-) -> None:
-    """Item 446: the @ menu draws a server as the Customize page does — its own logo, from the palette — where a server
-    added by hand wears the plug. The palette is this page's alone here, since no catalogue service answers offline."""
+async def test_the_menus_wear_the_marks_the_customize_page_wears(login_env: dict[str, str], tmp_path: Path) -> None:
+    """Items 447 and 477: a server of the at menu, and each of its tools in the slash menu, wear the mark its service's
+    Customize tile wears — a logo, an icon (DeepWiki's) or letters (Context7's) — on that tile's light ground, and a
+    server of no service the plug; a skill wears its Customize card's mark: an imported one's, a learned one's, else its
+    own. The daemon says which skill is a copy and which server is of which service, and a server of the config at a
+    service's address wears the service's mark on its own tile too. The menus' palette names the catalogue's servers,
+    with the directory's marks, since none answers offline. Wide and light, and on a phone and dark."""
     with scratch_home() as home, eval_environment(home, {}):
         _write_skill(home)
+        _write_copied_skill(home, tmp_path / "theirs")
+        base: AppConfig = _config("full")
+        wiki: McpServerConfig = McpServerConfig(name=WIKI, url="https://mcp.deepwiki.com/mcp", enabled=False)
+        config: AppConfig = base.model_copy(update={"mcp": [*base.mcp, wiki]})
         async with (
-            _daemon(login_env, _config("full"), []) as (runtime, manager, _model),
+            _daemon(login_env, config, []) as (runtime, manager, _model),
+            _client(runtime, manager) as client,
             _served(runtime, manager) as address,
             async_playwright() as playwright,
         ):
+            # The daemon's own word: the copy is imported, the owner's skill is not, the fixture is of no service, and
+            # the server at DeepWiki's address wears DeepWiki's mark.
+            palette: JsonObject = (await client.get("/api/palette")).raise_for_status().json()
+            skills: dict[str, bool] = {skill["name"]: skill["imported"] for skill in palette["skills"]}
+            assert skills[COPIED_SKILL] is True and skills[SKILL_NAME] is False, skills
+            assert [(server["name"], server["mark"]) for server in palette["servers"]] == [(SERVER, None)]
+            servers: JsonObject = (await client.get("/api/mcp/servers")).raise_for_status().json()
+            wiki_mark: ServiceMark | None = mark_of_service("deepwiki")
+            assert wiki_mark is not None
+            assert [one["mark"] for one in servers["servers"] if one["name"] == WIKI] == [wiki_mark.model_dump()]
+            menus: JsonObject = {
+                "skills": [
+                    _palette_skill(COPIED_SKILL, "home", True),
+                    _palette_skill(LEARNED_SKILL, "learned", False),
+                    _palette_skill(SKILL_NAME, "home", False),
+                ],
+                "servers": [
+                    {
+                        "name": name,
+                        "tools": [{"name": f"{name}_lookup", "description": "Look it up."}],
+                        "mark": None if (found := mark_of_service(name)) is None else found.model_dump(),
+                    }
+                    for name in (*MARKED, SERVER)
+                ],
+            }
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:
-                page: Page = await _home_page(browser, address, 390, "dark")
-                await page.route(
-                    "**/api/palette",
-                    lambda route: route.fulfill(
-                        json={"skills": [], "servers": [{"name": SERVER, "tools": [], "logo": "context7.svg"}]}
-                    ),
-                )
-                goal: Locator = page.locator("textarea[aria-label='Goal']")
-                menu: Locator = page.locator(".composer .slash-menu")
-                await goal.click()
-                await goal.type("@")
-                await expect(menu).to_be_visible()
-                server: Locator = menu.get_by_role("option").filter(has_text=SERVER).first
-                await expect(server.locator("img.plugin-logo")).to_have_attribute(
-                    "src", re.compile(r"/icons/plugins/context7\.svg$")
-                )
-                await expect(server.locator(".slash-mark svg")).to_have_count(0)
-                await page.close()
+                passes: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+                for width, scheme in passes:
+                    page: Page = await _home_page(browser, address, width, scheme)
+                    await page.goto(f"{address}/#/customize/plugins")
+                    await page.get_by_role("button", name=re.compile(r"^All \d+$")).click()
+                    tiles: dict[str, str] = {
+                        name: await _mark_of(page.locator(f".plugin-tile[data-plugin='{name}'] .plugin-mark"))
+                        for name in MARKED
+                    }
+                    assert tiles == {
+                        "deepwiki": "icon:search",
+                        "context7": "letters:C7",
+                        "microsoft-learn": "logo:/icons/plugins/microsoft-icon.svg",
+                    }, tiles
+                    await page.get_by_role("button", name=re.compile(r"^Connected \d+$")).click()
+                    own_tile: str = await _mark_of(page.locator(f".plugin-server[data-server='{WIKI}'] .plugin-mark"))
+                    assert own_tile == tiles["deepwiki"], own_tile
+                    await page.route("**/api/palette", lambda route: route.fulfill(json=menus))
+                    await page.goto(f"{address}/#/customize/skills")
+                    cards: dict[str, str] = {
+                        name: await _mark_of(page.locator(f".skill-card[data-skill='{name}'] .skill-mark"))
+                        for name in (COPIED_SKILL, SKILL_NAME)
+                    }
+                    assert cards == {COPIED_SKILL: "icon:download", SKILL_NAME: "icon:mail"}, cards
+                    await page.goto(f"{address}/#/runs")
+                    goal: Locator = page.locator("textarea[aria-label='Goal']")
+                    menu: Locator = page.locator(".composer .slash-menu")
+                    await goal.click()
+                    await goal.type("@")
+                    await expect(menu.get_by_role("option")).to_have_count(len(MARKED) + 1)
+                    for name in MARKED:
+                        mark: Locator = menu.get_by_role("option").filter(has_text=name).locator(".slash-mark")
+                        assert await _mark_of(mark) == tiles[name], name
+                        # On the tile's own ground, light in both colour schemes, as on the Customize page.
+                        ground: str = await mark.evaluate("(node) => getComputedStyle(node).backgroundColor")
+                        assert ground == "rgb(255, 255, 255)", (name, ground)
+                    fixture: Locator = menu.get_by_role("option").filter(has_text=SERVER).locator(".slash-mark")
+                    assert await _mark_of(fixture) == "icon:plug"
+                    await page.screenshot(path=str(tmp_path / f"at-marks-{width}-{scheme}.png"), animations="disabled")
+                    await goal.fill("")
+                    await goal.type("/")
+                    for name in MARKED:
+                        tool: Locator = (
+                            menu.get_by_role("option").filter(has_text=f"{name}_lookup").locator(".slash-mark")
+                        )
+                        assert await _mark_of(tool) == tiles[name], name
+                    skill_marks: dict[str, str] = {
+                        name: await _mark_of(menu.get_by_role("option").filter(has_text=name).locator(".slash-mark"))
+                        for name in (COPIED_SKILL, LEARNED_SKILL, SKILL_NAME)
+                    }
+                    assert skill_marks == {
+                        COPIED_SKILL: cards[COPIED_SKILL],
+                        LEARNED_SKILL: "icon:brain",
+                        SKILL_NAME: cards[SKILL_NAME],
+                    }, skill_marks
+                    await page.screenshot(
+                        path=str(tmp_path / f"slash-marks-{width}-{scheme}.png"), animations="disabled"
+                    )
+                    await goal.fill("")
+                    await page.close()
             finally:
                 await browser.close()

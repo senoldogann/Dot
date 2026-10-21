@@ -1,7 +1,7 @@
 // The words of the composer's menu, without the page: which word of the composer opens it, what the menu offers for it
 // and what a pick puts into the text, or picks for the message (item 318). A slash word opens the commands, the skills
-// and the MCP tools; an at word the MCP servers and the plugins, with the logo each tile wears, to pick for the message
-// (items 367 and 447).
+// and the MCP tools; an at word the MCP servers and the plugins, to pick for the message (items 367 and 447). A server
+// and each of its tools wear the mark its Customize tile wears, and a skill its Customize card's (item 477).
 // composer.js draws the menu and listens to the keys.
 
 /** The word the caret is in when it opens the menu: `{ start, word, trigger }`, `trigger` "/" or "@" and `word` what
@@ -37,6 +37,8 @@ export function paletteGroups(commands, palette) {
         label: skill.name,
         hint: skill.description,
         icon: skill.icon,
+        source: skill.source,
+        imported: skill.imported,
         kind: "skill",
         pick: { kind: "skill", name: skill.name },
       })),
@@ -53,6 +55,7 @@ export function paletteGroups(commands, palette) {
           hint: tool.description,
           kind: "tool",
           serverName: server.name,
+          mark: server.mark ?? null,
           pick: { kind: "plugin", name: server.name },
         })),
       });
@@ -61,9 +64,9 @@ export function paletteGroups(commands, palette) {
   return groups;
 }
 
-/** The groups of the at menu (item 367): the MCP servers and the plugins, by their names, each with its own logo —
- * and nothing else: the skills and the commands are the slash menu's (the owner's word of 2026-10-21, item 447). A pick
- * is a chip for the message. */
+/** The groups of the at menu (item 367): the MCP servers and the plugins, by their names, each with its service's
+ * mark — and nothing else: the skills and the commands are the slash menu's (the owner's word of 2026-10-21, item 447).
+ * A pick is a chip for the message. */
 export function pickGroups(palette) {
   if (palette === null || palette.servers.length === 0) {
     return [];
@@ -77,7 +80,7 @@ export function pickGroups(palette) {
         label: server.name,
         hint: `${server.tools.length} ${server.tools.length === 1 ? "tool" : "tools"}`,
         kind: "plugin",
-        logo: server.logo ?? null,
+        mark: server.mark ?? null,
         pick: { kind: "plugin", name: server.name },
       })),
     },

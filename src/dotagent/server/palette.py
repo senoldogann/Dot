@@ -4,14 +4,18 @@ composer, not on the daemon."""
 
 from collections.abc import Mapping, Sequence
 
+from dotagent.connections.directory import ServiceMark
 from dotagent.mcp.types import McpTool
 from dotagent.server.views import PaletteServer, PaletteSkill, PaletteTool, PaletteView
 from dotagent.skills.types import Skill
 
 
-def palette_view(skills: Sequence[Skill], tools: Sequence[McpTool], logos: Mapping[str, str | None]) -> PaletteView:
-    """The skills by name and the servers by name, each with its tools by the name the model calls them by and the logo
-    its Customize tile wears (item 408), when ``logos`` knows one."""
+def palette_view(
+    skills: Sequence[Skill], imported: frozenset[str], tools: Sequence[McpTool], marks: Mapping[str, ServiceMark | None]
+) -> PaletteView:
+    """The skills by name, each saying whether it is Dot's copy of another agent's (its name in ``imported``), and the
+    servers by name, each with its tools by the name the model calls them by and the mark its Customize tile wears
+    (items 408 and 477), when ``marks`` knows one."""
     servers: dict[str, list[PaletteTool]] = {}
     for tool in sorted(tools, key=lambda tool: (tool.server, tool.exposed_name)):
         servers.setdefault(tool.server, []).append(
@@ -19,10 +23,16 @@ def palette_view(skills: Sequence[Skill], tools: Sequence[McpTool], logos: Mappi
         )
     return PaletteView(
         skills=tuple(
-            PaletteSkill(name=skill.name, description=skill.description, source=skill.source, icon=skill.icon)
+            PaletteSkill(
+                name=skill.name,
+                description=skill.description,
+                source=skill.source,
+                icon=skill.icon,
+                imported=skill.name in imported,
+            )
             for skill in sorted(skills, key=lambda skill: skill.name)
         ),
         servers=tuple(
-            PaletteServer(name=name, tools=tuple(listed), logo=logos.get(name)) for name, listed in servers.items()
+            PaletteServer(name=name, tools=tuple(listed), mark=marks.get(name)) for name, listed in servers.items()
         ),
     )
