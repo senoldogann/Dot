@@ -191,9 +191,9 @@ async def test_allow_once_of_a_step_an_earlier_session_kept_reaches_the_session_
             _turn(targets),
             _report(),
             _finish("The report waits for the owner's yes."),
-            # Session 2 meets the same step, waiting already; then the owner allows it while it works.
+            # Session 2 meets the same step, waiting already; then the owner allows it while it works, which cuts
+            # its held step short (item 509), and the step asked again does it.
             _report(),
-            _finish("Still waiting for the yes."),
             _report(),
             _finish("Exported."),
         ],

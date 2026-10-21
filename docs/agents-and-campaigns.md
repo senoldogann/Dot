@@ -33,53 +33,55 @@ rows "<name> is paused" (see [Memory and schedules](memory-and-schedules.md)). W
 one of its schedules and the messages of other agents still reach it, and runs already working go on, each with its
 Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
-An agent can start from a template (item 315). Under the list, **Start from a template** shows fourteen: Sales
-Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of
-Staff, Reviewer, Research Desk, Competitor Watch, Release QA, Copy Editor and Design Critic, each with its face, its
-role, what it needs of the Mac and the schedule it suggests. **Use template** makes the agent in one click and opens
-its page; it is then an agent like any other, to change in the
-editor. Every template names the tools its agent may use (item 425), and its card counts them under **Tools** (a 40 px row to tap on a phone) and lists
-the names a click below it: no template starts an agent with every tool, and a tool this home does not have (its group
-off in the configuration, or its app not here) is struck through with the reason, since such a template is refused on use. Every
-template's instructions also say that what leaves the Mac for a person is a draft for you to send (`draft_message`, see [Drafts](runs.md#drafts)). Sales
-Outbound, Talent Scout, Paid Media, Product Performance, Research Desk, Competitor Watch, Release QA and Design Critic
-name the web, Dot's Chrome, files, memory, plans, pages and `draft_message`, none of which drives Mail, Messages or a
-terminal; a Send pressed on a web page is an external send, under your approvals. Copy Editor names the same without
-the web and Chrome. Chief of Staff and Account Health add `apple_script`, the way into Mail and Calendar. Expense
-Manager adds it with `shell` for the folders the receipts sit in; Bug Reproduction and Reviewer run things, so they
-name the shell and the terminal's tools, and the Reviewer names no web at all. Ten templates suggest a schedule
-(item 464): Sales Outbound and Account Health on weekdays at 9:00 and 8:30, Chief of Staff on weekdays at 7:30, Paid
-Media every day at 8:00, Talent Scout on Mondays at 10:00, Product Performance and Competitor Watch on Mondays at 9:00
-and 8:00, and Expense Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a
-switch, **Also add this schedule, switched off until you read its goal**: on, **Use template** makes the agent and a
-schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the agent's
-instructions then guide; the schedule is added switched off, so nothing runs before you have read what it will do, and
-a schedule that could not be added leaves the agent made and says why. An agent's page lists the schedules its runs
-run as under **Schedules**, each with its goal in full, when it runs and its switch, and **Edit** on the Schedules
-page. An agent's page has
-**Export** in its bar: a file
-`<name>.dot-agent.json` with the agent's name, role, instructions, model, reasoning level, approvals, tools and look
-(`"format": "dot-agent"`, `"version": 1`), never its id, memory, lessons, skills or chats. An agent whose name, role
-or instructions hold a secret is not exported, and the page says to take it out first: a value Dot holds (any value
-of the home's `.env`, and a key the daemon has read from the Keychain), or a key, a token or a password by its form,
-as the masking of secrets finds them. **Import** on the Agents page makes the same agent from such a file, in this home or another, and
-opens it; a file that names a tool this home lacks is refused with the tool's name. The API: `GET
-/api/agent-templates` (each with `cron` and `task`, empty for one that suggests no schedule), `POST
-/api/agent-templates/{id}/use`, `GET /api/agents/{id}/export` and `POST /api/agents/import` (422 for Dot, for a
-secret, and for a file that is not an agent's or names tools not here); a template's schedule is `POST /api/schedules`
-with `"enabled": false`.
+The page is in two parts (item 509): **Your agents**, with their count, and under them **Add ready-made agents**, which
+shows the teams or the single agents, one of the two at a time (**Teams** first; the one chosen last while the app is
+open).
 
-Above the templates, **Start from a team** (item 504) shows four teams, each a few templates whose agents work side by
-side: the Content team (Research Desk, Copy Editor), the Engineering team (Bug Reproduction, Reviewer, Release QA), the
-Growth team (Competitor Watch, Paid Media, Product Performance, Sales Outbound) and the Office team (Chief of Staff,
-Expense Manager). Each card says what the team does and shows the faces and names of its agents. **Use team** makes,
-in one click, each agent of the team you do not have yet, as its template's **Use template** makes it. An agent of
-yours with the name of one of them, in any case, is that agent, kept as it is; a team one of whose agents this home
-cannot make (a tool it lacks) makes none of them and says why. A team whose agents suggest schedules offers **Also add
-their schedules, switched off until you read their goals**, for the agents it makes. A team is its agents and nothing
-besides: you ask Dot for the work, and Dot hands each agent its part through messages (below) and puts their answers
-together. The API: `GET /api/agent-teams` and `POST /api/agent-teams/{id}/use` (201 with the agents it `made` and the
-ones of yours it `kept`; 404 for a team that is not there, 422 for one that cannot be made).
+An agent can start from a template (item 315). **Single agents** shows fourteen: Sales Outbound, Talent Scout, Paid
+Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of Staff, Reviewer, Research Desk,
+Competitor Watch, Release QA, Copy Editor and Design Critic, each with its face, its role, what it needs of the Mac and
+the schedule it suggests. **Use template** makes the agent in one click and opens its page; it is then an agent like any
+other, to change in the editor. Every template names the tools its agent may use (item 425), and its card counts them
+under **Tools** (a 40 px row to tap on a phone) and lists the names a click below it: no template starts an agent with
+every tool, and a tool this home does not have (its group off in the configuration, or its app not here) is struck
+through with the reason, since such a template is refused on use. Every template's instructions also say that what
+leaves the Mac for a person is a draft for you to send (`draft_message`, see [Drafts](runs.md#drafts)). Sales Outbound,
+Talent Scout, Paid Media, Product Performance, Research Desk, Competitor Watch, Release QA and Design Critic name the
+web, Dot's Chrome, files, memory, plans, pages and `draft_message`, none of which drives Mail, Messages or a terminal; a
+Send pressed on a web page is an external send, under your approvals. Copy Editor names the same without the web and
+Chrome. Chief of Staff and Account Health add `apple_script`, the way into Mail and Calendar. Expense Manager adds it
+with `shell` for the folders the receipts sit in; Bug Reproduction and Reviewer run things, so they name the shell and
+the terminal's tools, and the Reviewer names no web at all. Ten templates suggest a schedule (item 464): Sales Outbound
+and Account Health on weekdays at 9:00 and 8:30, Chief of Staff on weekdays at 7:30, Paid Media every day at 8:00,
+Talent Scout on Mondays at 10:00, Product Performance and Competitor Watch on Mondays at 9:00 and 8:00, and Expense
+Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a switch, **Add its schedule
+too, switched off** (its full name for a screen reader says until you read its goal): on, **Use template** makes the
+agent and a schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which
+the agent's instructions then guide; the schedule is added switched off, so nothing runs before you have read what it
+will do, and a schedule that could not be added leaves the agent made and says why. An agent's page lists the schedules
+its runs run as under **Schedules**, each with its goal in full, when it runs and its switch, and **Edit** on the
+Schedules page. An agent's page has **Export** in its bar: a file `<name>.dot-agent.json` with the agent's name, role,
+instructions, model, reasoning level, approvals, tools and look (`"format": "dot-agent"`, `"version": 1`), never its id,
+memory, lessons, skills or chats. An agent whose name, role or instructions hold a secret is not exported, and the page
+says to take it out first: a value Dot holds (any value of the home's `.env`, and a key the daemon has read from the
+Keychain), or a key, a token or a password by its form, as the masking of secrets finds them. **Import** on the Agents
+page makes the same agent from such a file, in this home or another, and opens it; a file that names a tool this home
+lacks is refused with the tool's name. The API: `GET /api/agent-templates` (each with `cron` and `task`, empty for one
+that suggests no schedule), `POST /api/agent-templates/{id}/use`, `GET /api/agents/{id}/export` and `POST
+/api/agents/import` (422 for Dot, for a secret, and for a file that is not an agent's or names tools not here); a
+template's schedule is `POST /api/schedules` with `"enabled": false`.
+
+**Teams** (item 504) shows four teams, each a few templates whose agents work side by side: the Content team (Research
+Desk, Copy Editor), the Engineering team (Bug Reproduction, Reviewer, Release QA), the Growth team (Competitor Watch,
+Paid Media, Product Performance, Sales Outbound) and the Office team (Chief of Staff, Expense Manager). Each card says
+what the team does and shows the faces and names of its agents. **Use team** makes, in one click, each agent of the team
+you do not have yet, as its template's **Use template** makes it. An agent of yours with the name of one of them, in any
+case, is that agent, kept as it is; a team one of whose agents this home cannot make (a tool it lacks) makes none of
+them and says why. A team whose agents suggest schedules offers **Add their schedules too, switched off**, for the
+agents it makes. A team is its agents and nothing besides: you ask Dot for the work, and Dot hands each agent its part
+through messages (below) and puts their answers together. The API: `GET /api/agent-teams` and `POST
+/api/agent-teams/{id}/use` (201 with the agents it `made` and the ones of yours it `kept`; 404 for a team that is not
+there, 422 for one that cannot be made).
 
 An agent learns for itself. A lesson drawn from an agent's run is the agent's own (the note carries its `agent_id`), and
 so is a skill its run was distilled into (`agent_id` in `playbook.json`); Dot's lessons and skills are everyone's. An

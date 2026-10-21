@@ -2,7 +2,7 @@
 
 import asyncio
 import time
-from collections.abc import Mapping, Sequence, Set
+from collections.abc import Awaitable, Mapping, Sequence, Set
 from dataclasses import dataclass, replace
 from datetime import datetime
 from pathlib import Path
@@ -12,6 +12,7 @@ from pydantic import JsonValue, ValidationError
 
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
+    RunInbox,
     StoredAttachment,
     UserInput,
     attachment_summary,
@@ -392,7 +393,7 @@ class AgentRun:
     run: RunRecord
     gate: RunGate
     cancel: asyncio.Event
-    inbox: asyncio.Queue[UserInput]
+    inbox: RunInbox
     spawner: Spawner
     opening: RunOpening
 
@@ -435,15 +436,6 @@ def _waits(call: ToolCall, questions: AskMode) -> bool:
         return AskUserArgs.model_validate(call.arguments).wait
     except ValidationError:
         return False
-
-
-def _drain(inbox: asyncio.Queue[UserInput]) -> list[UserInput]:
-    texts: list[UserInput] = []
-    while True:
-        try:
-            texts.append(inbox.get_nowait())
-        except asyncio.QueueEmpty:
-            return texts
 
 
 class Compaction(FrozenModel):
@@ -1421,6 +1413,23 @@ async def _complete_in_time(
         ) from exc
 
 
+async def _complete_unless_steered(inbox: RunInbox, call: Awaitable[ModelReply]) -> ModelReply | None:
+    """Await the model's reply to a step, unless a message to the run (a steer, the answer to a question) arrives
+    first: the call is then cancelled and ``None`` returned, and the loop reads the message, which stays in the inbox,
+    before it asks again (item 509). An error of the call is raised as it was."""
+    reply_task: asyncio.Future[ModelReply] = asyncio.ensure_future(call)
+    heard: asyncio.Task[None] = asyncio.ensure_future(inbox.arrival())
+    racing: set[asyncio.Future[ModelReply] | asyncio.Future[None]] = {reply_task, heard}
+    try:
+        await asyncio.wait(racing, return_when=asyncio.FIRST_COMPLETED)
+    finally:
+        heard.cancel()
+        if not reply_task.done():
+            reply_task.cancel()
+        await asyncio.wait(racing)
+    return None if reply_task.cancelled() else reply_task.result()
+
+
 def _connection_broke(error: Exception) -> bool:
     """Whether ``error`` says that the model could not be reached, rather than that it cannot answer for a while or
     refused the request: the connection broke or timed out, or its server failed with a status that retrying can get
@@ -1923,8 +1932,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     while True:
         if agent.cancel.is_set():
             raise RunCancelled("the run was stopped", {"run_id": run.id})
-        steered: list[UserInput] = _drain(agent.inbox)
-        for sent in steered:
+        while not agent.inbox.empty():
+            sent: UserInput = agent.inbox.first()
             text: str = sent.text
             note: Message = await message_with_attachments(
                 runtime, run.thread_id, run.id, text, sent.files, info.vision
@@ -1937,6 +1946,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 agent.gate.add_instruction(sent.said)
                 ledger = with_instruction(ledger, sent.said)
             await runtime.store.append_messages(run.thread_id, [note])
+            # Taken once it is in the thread, with nothing awaited between: a stop before leaves it to the run's end.
+            agent.inbox.get_nowait()
             await runtime.bus.emit(run.id, "steer", steer_event(sent, agent.gate.tainted), True)
         changed: list[MemoryRecord] = await runtime.store.memories_changed_since(memory_seen_at, run.id)
         if changed:
@@ -2022,9 +2033,20 @@ async def run_agent(agent: AgentRun) -> RunEnd:
         steps += 1
         asked_at: float = time.monotonic()
         try:
-            reply: ModelReply = await _complete_in_time(
+            call: Awaitable[ModelReply] = _complete_in_time(
                 runtime, step_ref, request, sink, step_origin, config.model_call_timeout_s
             )
+            # A step past the run's limit is its last: a message does not hold back the finish it ends with.
+            heard: ModelReply | None = (
+                await call if past_limit is not None else await _complete_unless_steered(agent.inbox, call)
+            )
+            if heard is None:
+                # A message arrived while the model was at the step: the step is given up and asked again with it.
+                log.info("step_steered", run_id=run.id, step=steps, model=step_ref.label)
+                await sink(_RESET)
+                steps -= 1
+                continue
+            reply: ModelReply = heard
             # A reply the service's content filter stopped is handled as a model that cannot answer this run: a
             # routed step goes back to the run's own model, the run's own model hands over to a standby one.
             filtered: ProviderFilterError | None = filtered_stop(reply, step_ref.label)

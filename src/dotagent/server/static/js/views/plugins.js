@@ -164,8 +164,8 @@ function wayRow(catalogue, way) {
       const keyed = service !== null && service !== undefined && service.secrets.length > 0;
       const button = el("button", { class: "btn sm primary", type: "button", disabled: catalogue.busy(`mcp:${way.ref}`) }, "Add");
       button.addEventListener("click", () => attempt(() => (keyed ? catalogue.askSecrets(service) : catalogue.add({ service: way.ref, name: null, address: null, secrets: {} }))));
-      // A service that takes a key asks for it here too (item 408), under the row.
-      actions = el("div", { class: "plugin-actions" }, button, keyed && catalogue.asking() === way.ref ? catalogue.secretsForm(service) : null);
+      // A service that takes a key asks for it here too (item 408): its form, with its own Add, takes the button's place.
+      actions = el("div", { class: "plugin-actions" }, keyed && catalogue.asking() === way.ref ? catalogue.secretsForm(service) : button);
       badge = el("span", { class: "badge b-muted" }, serviceWords(service));
     } else {
       badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);

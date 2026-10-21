@@ -70,8 +70,9 @@ function agentRow({ record, latest }) {
 
 // ------------------------------------------------------------------------------------------------- templates and files
 
-function templateFact(label, text) {
-  return el("div", null, el("dt", null, label), el("dd", null, text));
+/** A line of a template's card (item 509): an icon, and the fact in words, its name kept for a reader of the screen. */
+function templateFact(name, glyph, text) {
+  return el("div", { class: "template-fact", title: name }, icon(glyph), el("span", { class: "visually-hidden" }, `${name}: `), el("span", null, text));
 }
 
 /** A template's tools (item 425): how many it may use, and the names themselves a click away, so that the owner sees
@@ -106,7 +107,7 @@ function templateCard(template, onUse, known) {
   const alsoWords = "Also add this schedule, switched off until you read its goal";
   const also = template.cron === "" ? null : el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords });
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, alsoWords)), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Add its schedule too, switched off")), also);
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
@@ -132,10 +133,10 @@ function templateCard(template, onUse, known) {
       el("div", { class: "row-main" }, el("div", { class: "template-name" }, template.name), el("div", { class: "template-role" }, template.role)),
     ),
     el(
-      "dl",
+      "div",
       { class: "template-facts" },
-      templateFact("Needs", template.needs),
-      templateFact("Schedule", template.schedule === "" ? "When you ask" : template.schedule),
+      templateFact("Needs", "plug", template.needs),
+      templateFact("Schedule", "clock", template.schedule === "" ? "When you ask" : template.schedule),
     ),
     alsoRow,
     templateTools(template, known),
@@ -153,7 +154,7 @@ function teamCard(team, templates, onUse) {
     ? el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords })
     : null;
   also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
-  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, alsoWords)), also);
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, "Add their schedules too, switched off")), also);
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the team ${team.name}` },
@@ -409,12 +410,26 @@ function agentForm({ record, onSaved, onCancel }) {
 
 // ------------------------------------------------------------------------------------------------- the list
 
+// Which of the ready-made agents the Agents page shows (item 509), the teams or the single agents: the one chosen last,
+// while the app is open.
+let shownPane = "teams";
+
 function mountList(root, ctx) {
   let disposed = false;
   let ticket = 0;
   const holder = el("div", null, loadingPanel());
   const editorSlot = el("div", null);
-  const templates = el("section", { class: "stack", "aria-label": "Templates" }, loadingPanel());
+  // The page in two parts (item 509): the agents the owner has, then the ready-made ones to add, a team or one agent
+  // at a time, one of the two shown.
+  const mineCount = el("span", { class: "agents-count" });
+  const yours = el(
+    "section",
+    { class: "agents-part", "aria-label": "Your agents" },
+    el("div", { class: "agents-part-head" }, el("h2", { class: "section-label" }, "Your agents", mineCount)),
+    el("p", { class: "hint" }, "Open one to give it work, read its chats or change it. Ask Dot for a big job and it hands parts to them."),
+    holder,
+  );
+  const templates = el("section", { class: "agents-part", "aria-label": "Templates" }, loadingPanel());
 
   async function loadTemplates() {
     try {
@@ -433,26 +448,53 @@ function mountList(root, ctx) {
       const byId = new Map(listed.map((template) => [template.id, template]));
       if (!disposed) {
         // `replaceChildren` draws a null as the word "null": the cards' note is a child only when there is one.
-        templates.replaceChildren(
-          el("div", { class: "section-label" }, "Start from a team"),
-          el(
-            "p",
-            { class: "hint" },
-            "A team is a few of the agents below, made in one click. Ask Dot for the work, and it hands each agent its part and puts their answers together. An agent of that name you have already is kept as it is.",
+        const panes = {
+          teams: el(
+            "div",
+            { class: "stack tight", dataset: { pane: "teams" } },
+            el("p", { class: "hint" }, "A few agents that work together, made in one click. An agent of that name you have already is kept as it is."),
+            el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam))),
           ),
-          el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam))),
-          el("div", { class: "section-label" }, "Start from a template"),
-          el("p", { class: "hint" }, "Each becomes an agent of yours, to change as you like. What one writes to a person is a draft that you send."),
-          ...(listingProblem === null
-            ? []
-            : [
-                el(
-                  "p",
-                  { class: "hint", dataset: { templatesToolsUnknown: "" } },
-                  `The tools could not be listed: ${listingProblem.message}. A template that names one this home lacks is refused when used.`,
-                ),
-              ]),
-          el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate, known))),
+          single: el(
+            "div",
+            { class: "stack tight", dataset: { pane: "single" } },
+            el("p", { class: "hint" }, "One agent of yours, to change as you like. What one writes to a person is a draft that you send."),
+            ...(listingProblem === null
+              ? []
+              : [
+                  el(
+                    "p",
+                    { class: "hint", dataset: { templatesToolsUnknown: "" } },
+                    `The tools could not be listed: ${listingProblem.message}. A template that names one this home lacks is refused when used.`,
+                  ),
+                ]),
+            el("div", { class: "template-grid" }, listed.map((template) => templateCard(template, useTemplate, known))),
+          ),
+        };
+        const choices = [
+          { id: "teams", label: `Teams (${teams.length})` },
+          { id: "single", label: `Single agents (${listed.length})` },
+        ];
+        const buttons = choices.map((choice) => el("button", { type: "button", dataset: { pane: choice.id }, onclick: () => show(choice.id) }, choice.label));
+        const show = (id) => {
+          shownPane = id;
+          for (const button of buttons) {
+            button.setAttribute("aria-pressed", String(button.dataset.pane === id));
+          }
+          for (const [key, pane] of Object.entries(panes)) {
+            pane.hidden = key !== id;
+          }
+        };
+        show(shownPane);
+        templates.replaceChildren(
+          el(
+            "div",
+            { class: "agents-part-head" },
+            el("h2", { class: "section-label" }, "Add ready-made agents"),
+            el("div", { class: "segmented", role: "group", "aria-label": "Ready-made agents" }, buttons),
+          ),
+          panes.teams,
+          panes.single,
         );
       }
     } catch (error) {
@@ -522,6 +564,7 @@ function mountList(root, ctx) {
       for (const { record } of summaries) {
         rememberLook(record.id, record.look);
       }
+      mineCount.textContent = String(summaries.length);
       holder.replaceChildren(el("div", { class: "card" }, summaries.map(agentRow)));
     } catch (error) {
       if (!disposed && mine === ticket) {
@@ -571,9 +614,9 @@ function mountList(root, ctx) {
     }
   });
   root.append(
-    pageHead("Agents", "Dot, and the agents you or Dot made: each with a face, a role and its own chats.", el("div", { class: "cluster" }, teamLink, importButton, chooser, newButton)),
+    pageHead("Agents", "Dot, and the agents you or Dot made, each with a role and its own chats.", el("div", { class: "cluster" }, teamLink, importButton, chooser, newButton)),
     editorSlot,
-    holder,
+    yours,
     templates,
   );
   const stopLifecycle = onLifecycle((event) => {

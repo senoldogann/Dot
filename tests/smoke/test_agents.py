@@ -363,7 +363,7 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             assert len(rows_text) == 2 and "Scout" in rows_text[1] and "Find two sources" in rows_text[1], rows_text
             # The templates under them say nothing of a tool list that loaded, and no empty part is written as "null".
             templates = page_ui.locator("section[aria-label='Templates']")
-            await expect(templates).to_contain_text("Start from a template")
+            await expect(templates).to_contain_text("Single agents")
             await expect(templates).not_to_contain_text("null")
             await page_ui.screenshot(path=str(out / "agents.png"))
             await page_ui.goto(f"http://{host}:{port}/#/agents/{agent_id}")
