@@ -256,12 +256,13 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                     session_row = sidebar.locator("[data-section=working] > a.side-activity")
                     await expect(session_row).to_contain_text("Find leads")
                     await expect(session_row.locator(".avatar")).to_have_count(1)
-                    # The delegated run hangs under its parent, with its steps; the parent says it delegated one.
-                    nested = sidebar.locator("[data-section=working] .side-children a.side-child")
-                    await expect(nested).to_have_count(1)
-                    await expect(nested).to_contain_text("Scan the catalogue")
-                    await expect(nested).to_contain_text("step")
-                    await expect(sidebar.locator("[data-section=working]")).to_contain_text("1 delegated run")
+                    # The chat's row wears the face of the run it delegated, under its name (item 507), and nothing
+                    # hangs under it: the row's name says how many the chat delegated.
+                    working_row = sidebar.locator("[data-section=working] .side-chat > .side-run")
+                    await expect(working_row.locator(".side-chat-helpers .side-helper .avatar")).to_have_count(1)
+                    await expect(working_row.locator(".side-helper-more")).to_have_count(0)
+                    await expect(sidebar.locator("[data-section=working] .side-children")).to_have_count(0)
+                    assert "1 helper" in (await working_row.get_attribute("aria-label") or "")
                     await page.screenshot(path=str(tmp_path / f"sidebar-{width}-{scheme}.png"))
                     await sidebar.locator("[data-section=waiting] a.side-activity").click()
                     await expect(page).to_have_url(f"http://{host}:{port}/#/runs/{asking.id}")

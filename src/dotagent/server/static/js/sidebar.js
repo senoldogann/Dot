@@ -4,9 +4,8 @@
 // run works says Working and for how long (item 122). A chat's menu (item 130) pins it,
 // names it, copies its link, starts choosing chats with it and deletes it; the pinned chats come first, under Pinned.
 // A chat whose latest run ended after it was last seen is unread (item 131): an accent dot, until it is opened, or Mark
-// read. Each chat stands once (item 202): a chat at work stands under Working, with the
-// runs it delegated folded under it, and goes back among the days once it rests; a pinned one stays under Pinned, its
-// delegated runs under it.
+// read. Each chat stands once (item 202): a chat at work stands under Working, wearing the faces of the runs it delegated
+// (item 507), and goes back among the days once it rests; a pinned one stays under Pinned, with the same faces.
 
 import { ApiError, api, request } from "./api.js";
 import { age, clip, clipWords, copyText, dateTime, debounce, el, foldSearch, keepChildren, plural, setText, workingFor } from "./dom.js";
@@ -18,7 +17,7 @@ import { chatLook } from "./hues.js";
 import { PHONE } from "./layout.js";
 import { markContent, markInk } from "./marks.js";
 import { closeMenu, menuOpenedBy, openMenu } from "./menu.js";
-import { nestRows, progressFacts } from "./nesting.js";
+import { nestRows } from "./nesting.js";
 import { readFolds, writePref } from "./prefs.js";
 import { requestCompose } from "./shortcuts.js";
 import { onLifecycle, onStreamBack, readFailed } from "./state.js";
@@ -131,24 +130,63 @@ function chatFaceOf(chat) {
   };
 }
 
-/** A chat's name over its last line (item 277): its latest words, "You:" before the owner's own. */
-function chatText(chat) {
-  const words = chat.last_message ?? "";
-  const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
+// The faces a row shows of the runs it delegated, the rest counted (item 507), as the marks of the connected apps stand
+// over one another in the foot.
+const SIDE_HELPERS = 3;
+
+/** The runs a row delegated, as small faces laid over one another (item 507): three at most, the rest counted, a run
+ * without an actor a dot of its state. The row that wears them opens the chat they work in. */
+function helperFaces(children) {
+  if (children.length === 0) {
+    return null;
+  }
+  const shown = children.slice(0, SIDE_HELPERS);
+  const more = children.length - shown.length;
   return el(
     "span",
-    { class: "side-chat-text" },
-    el("span", { class: "side-run-goal" }, clip(chat.title, 120)),
-    last === "" ? null : el("span", { class: "side-chat-last" }, last),
+    { class: "side-helpers", "aria-hidden": "true" },
+    ...shown.map((kid) =>
+      kid.actor_id === null
+        ? el(
+            "span",
+            { class: "side-helper" },
+            el("span", { class: `status-dot s-${WORKING.has(kid.status) ? "running" : kid.status}` }),
+          )
+        : el(
+            "span",
+            { class: "side-helper" },
+            actorFace(kid.actor_id, WORKING.has(kid.status) ? "working" : faceState(kid.status), null),
+          ),
+    ),
+    more > 0 ? el("span", { class: "side-helper-more" }, `+${more}`) : null,
   );
 }
 
+/** A chat's name over its last line (item 277): its latest words, "You:" before the owner's own — or, while runs it
+ * delegated work, their faces with how many they are (item 507), the line its last words would take. */
+function chatText(chat, children = []) {
+  const words = chat.last_message ?? "";
+  const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
+  const faces = helperFaces(children);
+  const under =
+    faces === null
+      ? last === ""
+        ? null
+        : el("span", { class: "side-chat-last" }, el("span", { class: "side-chat-words" }, last))
+      : el("span", { class: "side-chat-last side-chat-helpers" }, faces);
+  return el("span", { class: "side-chat-text" }, el("span", { class: "side-run-goal" }, clip(chat.title, 120)), under);
+}
+
 /** A chat as a link: it opens on the latest run a person started on it. Its creature (`face`, item 277) stands at its
- * left, its name over its last line; at its right, its last activity in the fewest characters (item 121), or, while its
- * latest run works, Working and for how long (item 122), over the accent dot of a chat that is unread (item 131). A
- * daemon from before item 131 sends no `unread`, and its chats are read. */
-function chatLink(chat, onNavigate, face) {
-  const word = [STATUS_WORD[chat.latest_status], chat.unread === true ? "unread" : undefined].filter((part) => part !== undefined).join(", ");
+ * left, its name over its last line, where the faces of the runs it delegated stand instead of its last words while they
+ * work (item 507); at its right its last activity in the fewest characters (item 121), or, while its latest run works,
+ * Working and for how long (item 122), over the accent dot of a chat that is unread (item 131). A daemon from before
+ * item 131 sends no `unread`, and its chats are read. */
+function chatLink(chat, onNavigate, face, children) {
+  const helpers = children.length === 1 ? "1 helper" : children.length > 1 ? `${children.length} helpers` : "";
+  const word = [STATUS_WORD[chat.latest_status], helpers, chat.unread === true ? "unread" : undefined]
+    .filter((part) => part !== undefined && part !== "")
+    .join(", ");
   const title = clip(chat.title, 120);
   return el(
     "a",
@@ -160,7 +198,7 @@ function chatLink(chat, onNavigate, face) {
       onclick: onNavigate,
     },
     face,
-    chatText(chat),
+    chatText(chat, children),
     el(
       "span",
       { class: "side-chat-meta" },
@@ -172,19 +210,19 @@ function chatLink(chat, onNavigate, face) {
   );
 }
 
-/** One row of the activity sections: the state dot, the title and what it needs or where it works. A delegated run
- * (`child`) sits under its parent with its steps, and one that ended says how. A run of the Working section says
- * Working and for how long at its right (item 122); a schedule due there does not work yet. */
-function activityRow(row, onNavigate, child) {
+/** One row of the activity sections: the state dot, the title and what it needs or where it works, and the faces of the
+ * runs it delegated (item 507). A run of the Working section says Working and for how long at its right (item 122); a
+ * schedule due there does not work yet. */
+function activityRow(row, onNavigate, children) {
   const ended = ENDED.has(row.status);
-  const detail = child ? progressFacts(row) : [row.channel, row.detail].filter((part) => part !== "");
+  const detail = [row.channel, row.detail].filter((part) => part !== "");
   const facts = ended ? [row.status, ...detail] : detail;
   const words = facts.join(", ");
   const state = row.section === "waiting" ? "waiting" : ended ? faceState(row.status) : "working";
   return el(
     "a",
     {
-      class: child ? "side-run side-activity side-child" : "side-run side-activity",
+      class: "side-run side-activity",
       href: row.href,
       title: clip(row.title, 240),
       "aria-label": words === "" ? row.title : `${row.title} (${words})`,
@@ -199,44 +237,14 @@ function activityRow(row, onNavigate, child) {
       el("span", { class: "side-activity-title" }, clipWords(row.title, ROW_WORDS, ROW_CHARS)),
       facts.length === 0 ? null : el("small", { class: "side-activity-detail" }, facts.join(" · ")),
     ),
+    helperFaces(children),
     row.section === "working" && row.run_id !== null && WORKING.has(row.status) ? workingSlot(row.since) : null,
   );
 }
 
-/** `head`, the row of the run `runId`, with the runs it delegated under it, at work or ended (item 198), behind a
- * button that says how many and folds them; with none, `head` alone. `folded` holds the runs whose delegated runs are
- * folded; `onFold(runId, folded)` keeps a change, which the button shows at once. */
-function withDelegated(head, runId, children, onNavigate, folded, onFold) {
-  if (children.length === 0) {
-    return head;
-  }
-  const hidden = folded.has(runId);
-  const list = el("div", { class: "side-children", id: `side-children-${runId}`, hidden }, children.map((kid) => activityRow(kid, onNavigate, true)));
-  const working = children.filter((kid) => WORKING.has(kid.status)).length;
-  const count = children.length === 1 ? "1 delegated run" : `${children.length} delegated runs`;
-  const toggle = el(
-    "button",
-    {
-      class: "side-fold side-children-fold",
-      type: "button",
-      "aria-expanded": hidden ? "false" : "true",
-      "aria-controls": list.id,
-      onclick: () => {
-        const fold = !list.hidden;
-        list.hidden = fold;
-        toggle.setAttribute("aria-expanded", fold ? "false" : "true");
-        onFold(runId, fold);
-      },
-    },
-    icon("chevron"),
-    working > 0 && working < children.length ? `${count} · ${working} working` : count,
-  );
-  return el("div", { class: "side-family" }, head, toggle, list);
-}
-
-/** The rows of a section: each parent, then the runs it delegated under it (`withDelegated`). */
-function activityRows(rows, onNavigate, folded, onFold) {
-  return nestRows(rows).map(({ row, children }) => withDelegated(activityRow(row, onNavigate, false), row.run_id, children, onNavigate, folded, onFold));
+/** The rows of a section: each run, wearing the faces of the runs it delegated (item 507). */
+function activityRows(rows, onNavigate) {
+  return nestRows(rows).map(({ row, children }) => activityRow(row, onNavigate, children));
 }
 
 /**
@@ -379,8 +387,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   );
   const schedulesLink = el("a", { class: "side-link", href: "#/schedules", onclick: onNavigate }, icon("calendar"), el("span", null, "Schedules"));
 
-  // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's, the delegated runs
-  // under a chat among them; while chats are being chosen, their boxes. A row folded away is left out.
+  // The rows the arrow keys walk and the search's Enter opens, in order: Working's and the list's; while chats are being
+  // chosen, their boxes. A row folded away is left out.
   function rows() {
     const nodes = selecting
       ? list.querySelectorAll("input.side-check")
@@ -634,7 +642,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
         if (key === "working") {
           items = found.map(workingEntry);
         } else if (!folded) {
-          items = activityRows(activity[key], onNavigate, foldedRuns(), foldRun);
+          items = activityRows(activity[key], onNavigate);
         }
         return el(
           "section",
@@ -649,9 +657,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   // An entry of Working: a chat at work, or a row that is no chat's, each with the runs it delegated under it.
   function workingEntry(entry) {
     const node =
-      entry.chat === null
-        ? withDelegated(activityRow(entry.row, onNavigate, false), entry.row.run_id, entry.children, onNavigate, foldedRuns(), foldRun)
-        : chatEntry(entry.chat, entry);
+      entry.chat === null ? activityRow(entry.row, onNavigate, entry.children) : chatEntry(entry.chat, entry);
     workingNodes.push({ chatId: entry.chat === null ? null : entry.chat.id, node });
     return node;
   }
@@ -676,13 +682,12 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     return actorFace(id, state, look);
   }
 
-  // A chat's entry: its row and, while its latest run works (`family`, that run's row and the runs it delegated; null
-  // at rest), those runs under it (item 202).
+  // A chat's entry: its row, wearing while its latest run works (`family`, that run's row and the runs it delegated;
+  // null at rest) the faces of those runs (items 202 and 507).
   function chatEntry(chat, family) {
-    const link = chatLink(chat, onNavigate, faceOf(chat));
+    const link = chatLink(chat, onNavigate, faceOf(chat), family === null ? [] : family.children);
     rowNodes.set(chat.id, link);
-    const row = chatRow(chat, link);
-    return family === null ? row : withDelegated(row, family.row.run_id, family.children, onNavigate, foldedRuns(), foldRun);
+    return chatRow(chat, link);
   }
 
   // A chat's row: its link and the button of its menu, which a right-click on the row and the context-menu key open
@@ -958,24 +963,6 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       return;
     }
     resolveThread(routeRunId);
-  }
-
-  // The runs whose delegated runs the owner folded (item 198), kept with the folds of the sections; a run that is no
-  // longer listed is forgotten at the next fold.
-  function foldedRuns() {
-    return new Set(Array.isArray(folds.runs) ? folds.runs.filter((id) => typeof id === "string") : []);
-  }
-
-  function foldRun(runId, fold) {
-    const listed = new Set(activity === null ? [] : activity.working.map((row) => row.run_id));
-    const runs = new Set([...foldedRuns()].filter((id) => listed.has(id)));
-    if (fold) {
-      runs.add(runId);
-    } else {
-      runs.delete(runId);
-    }
-    folds = { ...folds, runs: [...runs] };
-    writePref(FOLDS_KEY, JSON.stringify(folds));
   }
 
   // The newest load answers for what is shown: an older answer that comes after it is dropped, not painted over it.

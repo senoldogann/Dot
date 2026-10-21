@@ -213,7 +213,7 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(chats.locator(".side-group").first).to_be_visible()
                 await expect(working).to_be_visible()
                 await page.screenshot(path=str(tmp_path / f"side-{width}-{scheme}.png"))
-                # Working: the chat at work, once, as a chat with its menu and its time, its delegated runs under it.
+                # Working: the chat at work, once, as a chat with its menu, its time and the faces of what it delegated.
                 await expect(working.locator(".side-label")).to_have_text("Working 1")
                 row: Locator = working.locator(".side-chat").filter(
                     has=page.locator(f"a.side-run[href='#/runs/{shelves.id}']")
@@ -221,16 +221,20 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(row).to_have_count(1)
                 await expect(row.locator(".side-working")).to_have_text(_WORKING)
                 await expect(row.get_by_role("button", name="More for Read the shelves")).to_have_count(1)
-                await expect(working.locator("button.side-children-fold")).to_have_text("3 delegated runs · 1 working")
-                await expect(working.locator(".side-children a.side-child")).to_have_count(len(_SHELVES))
+                # The chat wears the faces of the runs it delegated (item 507): three here, laid over one another, and
+                # nothing hangs under the row; its name for a screen reader says how many there are.
+                await expect(row.locator(".side-chat-helpers .side-helper")).to_have_count(len(_SHELVES))
+                await expect(row.locator(".side-helpers .avatar[data-state='working']")).to_have_count(1)
+                await expect(working.locator(".side-children")).to_have_count(0)
+                assert "3 helpers" in (await row.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(chats.locator(f"a[href='#/runs/{shelves.id}']")).to_have_count(0)
                 # The pinned chat at work stays among the pinned ones, with the run it delegated under it.
                 await expect(chats.locator(".side-group > .side-label")).to_have_text(["Pinned", "Today"])
                 pinned: Locator = chats.locator(".side-group").first
                 await expect(_titles(pinned)).to_have_text(["Count the boxes"])
                 await expect(pinned.locator(".side-chat .side-working")).to_have_text(_WORKING)
-                await expect(pinned.locator("button.side-children-fold")).to_have_text("1 delegated run")
-                await expect(pinned.locator(".side-children a.side-child")).to_have_count(1)
+                await expect(pinned.locator(".side-chat-helpers .side-helper")).to_have_count(1)
+                assert "1 helper" in (await pinned.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(working.locator(f"a[href='#/runs/{boxes.id}']")).to_have_count(0)
                 # What waits for an answer is above; its chat keeps its place among the days, its creature waiting.
                 await expect(sidebar.locator("[data-section=waiting] .side-label")).to_have_text("Waiting for you 1")
