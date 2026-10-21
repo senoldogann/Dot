@@ -7,4 +7,4 @@ rules:
       # cannot reach them; and the release runs only for a tag, so GitHub's new $/ form there would first be tried by a
       # release.
       - release.yml:44
-      - release.yml:48
+      - release.yml:49

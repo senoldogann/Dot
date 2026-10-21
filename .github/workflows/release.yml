@@ -42,7 +42,8 @@ jobs:
   gate:
     needs: tag
     uses: ./.github/workflows/gate.yml
-  # Every browser test, as the night runs them (item 486); the gate runs their core.
+  # Every browser test, as the night runs them (item 486); the gate's own core of them steps aside here, as gate.yml
+  # reads this workflow's name (release) to know it is called by it.
   browser:
     needs: tag
     uses: ./.github/workflows/browser.yml

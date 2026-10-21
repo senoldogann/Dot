@@ -16,7 +16,8 @@ on:
     branches: [main]
     paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
   # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457); a call
-  # ignores the paths above, so the gate always runs whole there.
+  # ignores the paths above, so the gate always runs whole there; its browser job steps aside, as the release runs
+  # every browser test itself (item 486).
   workflow_call:
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
