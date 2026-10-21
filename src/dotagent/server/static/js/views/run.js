@@ -467,7 +467,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // ------------------------------------------------------------------------------------------ questions
   // The questions the run left for you and went on without, while they are open; an answer carries the work on in
   // this conversation: into this run while it works, else into a new run on the thread, which the page opens once no
-  // other question of this run is open here. A skip, or a decision the daemon refused, only refreshes the page.
+  // other question of this run is open here. A skip, or a decision the daemon refused, refreshes the page; once the
+  // last question open here has closed, the page goes on at the chat's newer run if one started meanwhile (item 451).
   const questionsList = el("div", { class: "stack tight", hidden: true, "aria-label": "Dot asked you" });
   const questionCards = new Map();
 
