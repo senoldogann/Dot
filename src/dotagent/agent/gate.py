@@ -380,14 +380,14 @@ class RunGate:
         digest: str | None = kept_digest(info)
         if digest is None or not (asks or decision.verdict == "handoff"):
             return None
-        skipped: ApprovalRecord | None = await self._approvals.skipped(digest, parking.thread_id)
+        skipped: ApprovalRecord | None = await self._approvals.skipped(digest, parking)
         if skipped is not None:
             await self._emit_policy(info, decision, tainted)
             log.warning("skipped_step_refused", run_id=self._run_id, tool=info.tool, approval_id=skipped.id)
             raise ApprovalRejected(skipped_text(skipped.id), {"action": _describe(info), "approval_id": skipped.id})
         if not asks:
             return None
-        allowed: ApprovalRecord | None = await self._approvals.take_permit(digest, parking.thread_id, time.time())
+        allowed: ApprovalRecord | None = await self._approvals.take_permit(digest, parking, time.time())
         if allowed is None:
             return None
         await self._approvals.record_automatic(
@@ -416,9 +416,7 @@ class RunGate:
             severity,
             _describe(info),
             kept_digest(info),
-            parking.keep_s,
-            parking.thread_id,
-            parking.schedule_id,
+            parking,
         )
         if kept is None:
             return ApprovalRejected(

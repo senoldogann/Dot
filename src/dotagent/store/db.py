@@ -646,6 +646,8 @@ def _approval(row: aiosqlite.Row) -> ApprovalRecord:
         kept_until=row["kept_until"],
         permit_until=row["permit_until"],
         used_at=row["used_at"],
+        scope_thread_id=row["scope_thread_id"],
+        scope_campaign_id=row["scope_campaign_id"],
     )
 
 
@@ -896,13 +898,15 @@ _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("paused_at", "REAL"),
 )
 # Columns of ``approvals`` added later: a step kept for the owner (item 482) has the fingerprint of its action and when
-# it lapses, and the owner's yes to a kept ask (item 483) until when it holds and when it was spent; NULL for every
-# other question, as for all of them before.
+# it lapses, the owner's yes to a kept ask (item 483) until when it holds and when it was spent, and the conversation
+# and the campaign it belongs to (item 484); NULL for every other question, as for all of them before.
 _ADDED_APPROVAL_COLUMNS: tuple[tuple[str, str], ...] = (
     ("digest", "TEXT"),
     ("kept_until", "REAL"),
     ("permit_until", "REAL"),
     ("used_at", "REAL"),
+    ("scope_thread_id", "TEXT"),
+    ("scope_campaign_id", "TEXT"),
 )
 # The kv key of Dot's own look (item 102), an ``AgentLook`` as JSON.
 DOT_LOOK_KEY: str = "look:dot"
@@ -932,7 +936,12 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
     await _add_columns(connection, "harness_experiences", _ADDED_HARNESS_EXPERIENCE_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
-    await _add_columns(connection, "approvals", _ADDED_APPROVAL_COLUMNS)
+    if "scope_thread_id" in await _add_columns(connection, "approvals", _ADDED_APPROVAL_COLUMNS):
+        # A step kept before item 484 belongs to the chat of the run that kept it.
+        await connection.execute(
+            "UPDATE approvals SET scope_thread_id = (SELECT thread_id FROM runs WHERE runs.id = approvals.run_id)"
+            " WHERE kept_until IS NOT NULL"
+        )
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
         await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
@@ -2500,8 +2509,8 @@ class Store:
     async def _insert_approval(self, record: ApprovalRecord) -> None:
         await self._db.execute(
             "INSERT INTO approvals(id, run_id, created_at, decided_at, status, tool, summary, severity, args, "
-            "decided_by, note, digest, kept_until, permit_until, used_at)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "decided_by, note, digest, kept_until, permit_until, used_at, scope_thread_id, scope_campaign_id)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.run_id,
@@ -2518,6 +2527,8 @@ class Store:
                 record.kept_until,
                 record.permit_until,
                 record.used_at,
+                record.scope_thread_id,
+                record.scope_campaign_id,
             ),
         )
         await self._db.commit()
@@ -2541,6 +2552,8 @@ class Store:
             kept_until=None,
             permit_until=None,
             used_at=None,
+            scope_thread_id=None,
+            scope_campaign_id=None,
         )
         await self._insert_approval(record)
         return record
@@ -2566,6 +2579,8 @@ class Store:
             kept_until=None,
             permit_until=None,
             used_at=None,
+            scope_thread_id=None,
+            scope_campaign_id=None,
         )
         await self._insert_approval(record)
         return record
@@ -2579,10 +2594,13 @@ class Store:
         args: JsonObject,
         digest: str | None,
         kept_until: float,
+        scope_thread_id: str,
+        scope_campaign_id: str | None,
     ) -> ApprovalRecord:
         """Store a step a run kept for the owner when nobody answered its question in time (item 482): ``left`` until
         the owner answers it, skips it or it lapses at ``kept_until``; ``digest`` is the fingerprint of its action, None
-        for one whose card shows less than all of it."""
+        for one whose card shows less than all of it; it belongs to the conversation ``scope_thread_id`` and the
+        campaign ``scope_campaign_id`` (item 484)."""
         record: ApprovalRecord = ApprovalRecord(
             id=new_id("apr"),
             run_id=run_id,
@@ -2599,28 +2617,33 @@ class Store:
             kept_until=kept_until,
             permit_until=None,
             used_at=None,
+            scope_thread_id=scope_thread_id,
+            scope_campaign_id=scope_campaign_id,
         )
         await self._insert_approval(record)
         return record
 
-    async def open_kept(self, digest: str, thread_id: str) -> ApprovalRecord | None:
-        """The step of fingerprint ``digest`` that a run of the chat ``thread_id`` kept and nobody answered yet, the
-        oldest; None when there is none (item 482)."""
+    async def open_kept(self, digest: str, thread_id: str, campaign_id: str | None) -> ApprovalRecord | None:
+        """The step of fingerprint ``digest`` kept in the conversation ``thread_id`` (of the campaign ``campaign_id``)
+        that nobody answered yet, the oldest; None when there is none (items 482, 484)."""
         row = await self._one(
-            "SELECT a.* FROM approvals AS a JOIN runs AS r ON r.id = a.run_id"
-            " WHERE a.digest = ? AND a.status = 'left' AND r.thread_id = ? ORDER BY a.created_at LIMIT 1",
-            (digest, thread_id),
+            "SELECT * FROM approvals WHERE digest = ? AND status = 'left' AND scope_thread_id = ?"
+            " AND scope_campaign_id IS ? ORDER BY created_at LIMIT 1",
+            (digest, thread_id, campaign_id),
         )
         return None if row is None else _approval(row)
 
-    async def count_open_kept(self, thread_id: str, schedule_id: str | None) -> tuple[int, int]:
-        """How many steps kept for the owner wait now: of the chat ``thread_id`` and the chats of the schedule
-        ``schedule_id`` (each firing of a schedule may have a chat of its own), and of all (item 482)."""
+    async def count_open_kept(
+        self, thread_id: str, campaign_id: str | None, schedule_id: str | None
+    ) -> tuple[int, int]:
+        """How many steps kept for the owner wait now: of the conversation ``thread_id`` (of the campaign
+        ``campaign_id``) and the chats of the schedule ``schedule_id`` (each firing of a schedule may have a chat of its
+        own), and of all (items 482, 484)."""
         row = await self._one(
-            "SELECT COUNT(*) AS overall, COALESCE(SUM(r.thread_id = ? OR (t.schedule_id IS NOT NULL AND t.schedule_id"
-            " = ?)), 0) AS here FROM approvals AS a JOIN runs AS r ON r.id = a.run_id"
-            " LEFT JOIN threads AS t ON t.id = r.thread_id WHERE a.status = 'left' AND a.kept_until IS NOT NULL",
-            (thread_id, schedule_id),
+            "SELECT COUNT(*) AS overall, COALESCE(SUM((a.scope_thread_id = ? AND a.scope_campaign_id IS ?)"
+            " OR (t.schedule_id IS NOT NULL AND t.schedule_id = ?)), 0) AS here FROM approvals AS a"
+            " LEFT JOIN threads AS t ON t.id = a.scope_thread_id WHERE a.status = 'left' AND a.kept_until IS NOT NULL",
+            (thread_id, campaign_id, schedule_id),
         )
         if row is None:
             return 0, 0
@@ -2651,14 +2674,16 @@ class Store:
         return await self.get_approval(approval_id)
 
     @_writing
-    async def take_permit(self, digest: str, thread_id: str, now: float) -> ApprovalRecord | None:
-        """Spend the owner's yes to the step of fingerprint ``digest`` kept in the chat ``thread_id`` (item 483): the
-        oldest unused one still in time at ``now`` is spent, once; None when there is none."""
+    async def take_permit(
+        self, digest: str, thread_id: str, campaign_id: str | None, now: float
+    ) -> ApprovalRecord | None:
+        """Spend the owner's yes to the step of fingerprint ``digest`` kept in the conversation ``thread_id`` (of the
+        campaign ``campaign_id``; items 483, 484): the oldest unused one still in time at ``now`` is spent, once; None
+        when there is none."""
         row = await self._one(
-            "SELECT a.id FROM approvals AS a JOIN runs AS r ON r.id = a.run_id WHERE a.digest = ?"
-            " AND a.status = 'approved' AND a.permit_until > ? AND a.used_at IS NULL AND r.thread_id = ?"
-            " ORDER BY a.decided_at LIMIT 1",
-            (digest, now, thread_id),
+            "SELECT id FROM approvals WHERE digest = ? AND status = 'approved' AND permit_until > ? AND used_at IS NULL"
+            " AND scope_thread_id = ? AND scope_campaign_id IS ? ORDER BY decided_at LIMIT 1",
+            (digest, now, thread_id, campaign_id),
         )
         if row is None:
             return None
@@ -2668,22 +2693,25 @@ class Store:
         await self._db.commit()
         return await self.get_approval(row["id"]) if spent.rowcount == 1 else None
 
-    async def skipped_kept(self, digest: str, thread_id: str, owners: Sequence[str]) -> ApprovalRecord | None:
-        """The newest step of fingerprint ``digest`` kept in the chat ``thread_id`` that the owner skipped (decided by
-        one of ``owners``, the sources of the owner's answers and runs) and that they have not taken back since by
-        writing in the chat: no run of theirs started there after it, and no message of theirs reached a run there (a
-        steer that vouches; item 483). None when there is none."""
+    async def skipped_kept(
+        self, digest: str, thread_id: str, campaign_id: str | None, owners: Sequence[str]
+    ) -> ApprovalRecord | None:
+        """The newest step of fingerprint ``digest`` kept in the conversation ``thread_id`` (of the campaign
+        ``campaign_id``) that the owner skipped (decided by one of ``owners``, the sources of the owner's answers and
+        runs) and that they have not taken back since by writing there: no run of theirs started in the conversation
+        after it, and no message of theirs reached a run of it (a steer that vouches, into a run of the conversation or
+        a session of the campaign; items 483, 484). None when there is none."""
         marks: str = ", ".join("?" for _ in owners)
         row = await self._one(
-            "SELECT a.* FROM approvals AS a JOIN runs AS r ON r.id = a.run_id WHERE a.digest = ? AND r.thread_id = ?"
+            "SELECT a.* FROM approvals AS a WHERE a.digest = ? AND a.scope_thread_id = ? AND a.scope_campaign_id IS ?"
             f" AND a.status = 'denied' AND a.kept_until IS NOT NULL AND a.decided_by IN ({marks})"
-            " AND NOT EXISTS (SELECT 1 FROM runs AS o WHERE o.thread_id = r.thread_id AND o.created_at > a.decided_at"
-            f" AND o.source IN ({marks}))"
+            " AND NOT EXISTS (SELECT 1 FROM runs AS o WHERE o.thread_id = a.scope_thread_id"
+            f" AND o.created_at > a.decided_at AND o.source IN ({marks}))"
             " AND NOT EXISTS (SELECT 1 FROM events AS e JOIN runs AS s ON s.id = e.run_id"
-            " WHERE s.thread_id = r.thread_id AND e.kind = 'steer' AND e.ts > a.decided_at"
-            " AND COALESCE(json_type(e.data, '$.vouches'), '') != 'false')"
+            " WHERE (s.thread_id = a.scope_thread_id OR s.campaign_id = a.scope_campaign_id) AND e.kind = 'steer'"
+            " AND e.ts > a.decided_at AND COALESCE(json_type(e.data, '$.vouches'), '') != 'false')"
             " ORDER BY a.decided_at DESC LIMIT 1",
-            (digest, thread_id, *owners, *owners),
+            (digest, thread_id, campaign_id, *owners, *owners),
         )
         return None if row is None else _approval(row)
 
@@ -2725,6 +2753,8 @@ class Store:
             kept_until=None,
             permit_until=None,
             used_at=None,
+            scope_thread_id=None,
+            scope_campaign_id=None,
         )
         await self._insert_approval(record)
         return record
@@ -4366,6 +4396,16 @@ class Store:
             "SELECT approvals.* FROM approvals JOIN runs ON runs.id = approvals.run_id"
             " WHERE runs.campaign_id = ? AND approvals.tool = ? ORDER BY approvals.created_at DESC LIMIT ?",
             (campaign_id, tool, limit),
+        )
+        return [_approval(row) for row in reversed(rows)]
+
+    async def campaign_kept(self, campaign_id: str, limit: int) -> list[ApprovalRecord]:
+        """The newest ``limit`` steps that the campaign's sessions kept for the owner (item 484), whatever became of
+        them, oldest first."""
+        rows = await self._all(
+            "SELECT * FROM approvals WHERE scope_campaign_id = ? AND kept_until IS NOT NULL"
+            " ORDER BY created_at DESC LIMIT ?",
+            (campaign_id, limit),
         )
         return [_approval(row) for row in reversed(rows)]
 

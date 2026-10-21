@@ -327,6 +327,8 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
         {"tool": "write_file", "kind": "write", "risk": "medium", "target": target, "amount": None, "flags": []},
         "digest-1042",
         time.time() + 72 * 3600,
+        run.thread_id,
+        None,
     )
     report: ApprovalRecord = await runtime.store.create_kept_approval(
         run.id,
@@ -336,6 +338,8 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
         {"tool": "shell", "kind": "shell", "risk": "medium", "target": "./report.sh", "amount": None, "flags": []},
         "digest-report",
         time.time() + 72 * 3600,
+        run.thread_id,
+        None,
     )
     activity: httpx.Response = await client.get("/api/activity")
     assert activity.status_code == 200, activity.text

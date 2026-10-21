@@ -5,7 +5,7 @@ import time
 from typing import Literal
 
 from dotagent.agent.declined import OWNER_DECIDERS
-from dotagent.agent.parking import KEPT_HERE, KEPT_OVERALL
+from dotagent.agent.parking import KEPT_HERE, KEPT_OVERALL, Parking
 from dotagent.core.errors import RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonObject
@@ -163,24 +163,32 @@ class ApprovalBroker:
         severity: str,
         args: JsonObject,
         digest: str | None,
-        keep_s: float,
-        thread_id: str,
-        schedule_id: str | None,
+        parking: Parking,
     ) -> Kept | None:
-        """Keep a step that nobody answered in time for the owner (item 482): ``left`` until they answer it, skip it or
-        ``keep_s`` passes, the run going on without it; ``question_left`` is its one event until then. The same step
-        (``digest``) kept already in the chat is that one again, and a step of no digest is kept anew; past the caps
-        (:data:`KEPT_HERE` in the chat or the schedule's chats, :data:`KEPT_OVERALL` in all) it is not kept, and None
-        says so."""
-        waiting: ApprovalRecord | None = None if digest is None else await self._store.open_kept(digest, thread_id)
+        """Keep a step that nobody answered in time for the owner (item 482) where ``parking`` says (its conversation,
+        and its campaign for a session, item 484): ``left`` until they answer it, skip it or its time passes, the run
+        going on without it; ``question_left`` is its one event until then. The same step (``digest``) kept already
+        there is that one again, and a step of no digest is kept anew; past the caps (:data:`KEPT_HERE` there or in the
+        schedule's chats, :data:`KEPT_OVERALL` in all) it is not kept, and None says so."""
+        waiting: ApprovalRecord | None = (
+            None if digest is None else await self._store.open_kept(digest, parking.thread_id, parking.campaign_id)
+        )
         if waiting is not None:
             return Kept(record=waiting, created=False)
-        here, overall = await self._store.count_open_kept(thread_id, schedule_id)
+        here, overall = await self._store.count_open_kept(parking.thread_id, parking.campaign_id, parking.schedule_id)
         if here >= KEPT_HERE or overall >= KEPT_OVERALL:
             log.warning("step_not_kept", run_id=run_id, tool=tool, here=here, overall=overall)
             return None
         record: ApprovalRecord = await self._store.create_kept_approval(
-            run_id, tool, summary, severity, args, digest, time.time() + keep_s
+            run_id,
+            tool,
+            summary,
+            severity,
+            args,
+            digest,
+            time.time() + parking.keep_s,
+            parking.thread_id,
+            parking.campaign_id,
         )
         await self._bus.emit(
             run_id,
@@ -236,14 +244,16 @@ class ApprovalBroker:
             True,
         )
 
-    async def take_permit(self, digest: str, thread_id: str, now: float) -> ApprovalRecord | None:
-        """Spend the owner's yes to the step ``digest`` kept in the chat ``thread_id``, once (item 483)."""
-        return await self._store.take_permit(digest, thread_id, now)
+    async def take_permit(self, digest: str, parking: Parking, now: float) -> ApprovalRecord | None:
+        """Spend the owner's yes to the step ``digest`` kept where ``parking`` says, once (items 483, 484)."""
+        return await self._store.take_permit(digest, parking.thread_id, parking.campaign_id, now)
 
-    async def skipped(self, digest: str, thread_id: str) -> ApprovalRecord | None:
-        """The step ``digest`` kept in the chat ``thread_id`` that the owner skipped and has not taken back by writing
-        there since (item 483), if any."""
-        return await self._store.skipped_kept(digest, thread_id, tuple(sorted(OWNER_DECIDERS)))
+    async def skipped(self, digest: str, parking: Parking) -> ApprovalRecord | None:
+        """The step ``digest`` kept where ``parking`` says that the owner skipped and has not taken back by writing
+        there since (items 483, 484), if any."""
+        return await self._store.skipped_kept(
+            digest, parking.thread_id, parking.campaign_id, tuple(sorted(OWNER_DECIDERS))
+        )
 
     async def resolve(self, approval_id: str, approve: bool, decided_by: str, note: str) -> ApprovalRecord:
         """Record a decision. Raises if the approval does not exist or was already decided. A question a run left has

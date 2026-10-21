@@ -38,10 +38,13 @@ _UNPERMITTED_SOURCES: frozenset[DecisionSource] = frozenset({"taint", "own_files
 
 
 class Parking(FrozenModel):
-    """Where a run keeps the steps nobody answers (item 482): its chat, the schedule whose chat it is (None for none),
-    and how long a kept step waits, in seconds."""
+    """Where a run keeps the steps nobody answers (items 482, 484): the conversation they belong to (``thread_id``: the
+    run's chat, or the campaign's conversation for a session of a campaign, where the owner talks to it), the campaign
+    whose sessions share them (None for a chat), the schedule whose chat it is (None for none), and how long a kept
+    step waits, in seconds. The same step is kept once there, and the owner's yes and Skip hold there."""
 
     thread_id: str
+    campaign_id: str | None
     schedule_id: str | None
     keep_s: float
 
@@ -50,17 +53,22 @@ def parking_for(
     policy: PolicyConfig,
     approval_mode: ApprovalMode,
     delegated: bool,
-    session: bool,
     evaluated: bool,
-    thread_id: str,
+    conversation_id: str,
+    campaign_id: str | None,
     schedule_id: str | None,
 ) -> Parking | None:
-    """The run's parking, or None where a question nobody answers ends as a refusal: ``unanswered`` is ``"refuse"``; the
-    run is a yolo one, which asks nothing; a delegated run, whose parent decides; a session of a campaign (its questions
-    wait for the next session); or an eval's."""
-    if policy.unanswered != "park" or approval_mode == "yolo" or delegated or session or evaluated:
+    """The run's parking in the conversation ``conversation_id`` (of the campaign ``campaign_id`` for a session), or
+    None where a question nobody answers ends as a refusal: ``unanswered`` is ``"refuse"``; the run is a yolo one, which
+    asks nothing; a delegated run, whose parent decides; or an eval's."""
+    if policy.unanswered != "park" or approval_mode == "yolo" or delegated or evaluated:
         return None
-    return Parking(thread_id=thread_id, schedule_id=schedule_id, keep_s=policy.parked_hours * 3600.0)
+    return Parking(
+        thread_id=conversation_id,
+        campaign_id=campaign_id,
+        schedule_id=schedule_id,
+        keep_s=policy.parked_hours * 3600.0,
+    )
 
 
 def kept_digest(info: ActionInfo) -> str | None:

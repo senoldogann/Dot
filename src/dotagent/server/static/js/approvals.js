@@ -16,6 +16,10 @@ export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While 
 const KEPT_NOTE = "Nobody answered in time, so the run went on without this step. Once you have done it yourself, I did it carries the work on in this conversation.";
 // What a question kept for the owner's yes (item 483) says: Allow once lets the run do this exact step once.
 const KEPT_ASK_NOTE = "Nobody answered in time, so the run went on without this step. Allow once carries the work on in this conversation, where Dot may do this exact step once.";
+// The same for a step a session of a campaign kept (item 484): the answer reaches the session while it works, and the
+// campaign's next session after that.
+const KEPT_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Once you have done it yourself, I did it reaches the session while it works; after that, the campaign's next session reads it and starts right away while the campaign is active.";
+const KEPT_ASK_IN_CAMPAIGN = "Nobody answered in time, so the session went on without this step. Allow once reaches the session while it works; after that, the campaign's next session reads it, may do this exact step once, and starts right away while the campaign is active.";
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {
@@ -188,8 +192,9 @@ function technicalDetails(args) {
 }
 
 /** What a kept step's card says of it: what I did it does, and until when the step waits. */
-function keptNote(handoff, keptUntil) {
-  return `${handoff ? KEPT_NOTE : KEPT_ASK_NOTE} It waits until ${dateTime(keptUntil)}.`;
+function keptNote(handoff, keptUntil, inCampaign) {
+  const said = inCampaign ? (handoff ? KEPT_IN_CAMPAIGN : KEPT_ASK_IN_CAMPAIGN) : handoff ? KEPT_NOTE : KEPT_ASK_NOTE;
+  return `${said} It waits until ${dateTime(keptUntil)}.`;
 }
 
 /**
@@ -304,7 +309,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         ),
         el("div", { class: "approval-text" }, text),
         several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
-        isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil) : leftNote) : null,
+        isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil, leftNote === LEFT_IN_CAMPAIGN) : leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
         isQuestion || isHandoff
           ? null

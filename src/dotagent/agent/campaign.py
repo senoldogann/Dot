@@ -47,6 +47,21 @@ class BriefQuestion(FrozenModel):
     answer: str
 
 
+class BriefKept(FrozenModel):
+    """A step a session kept for the owner when nobody answered it in time (item 484): a hand-off they do themselves
+    (``handoff``) or a question for their yes; ``status`` is ``left`` while it waits, ``approved`` once they did it or
+    allowed it (``used`` once a session did the allowed step, ``usable`` while the yes holds and is unused), ``denied``
+    once they skipped it, ``expired`` once it lapsed; ``note`` is what they wrote with their answer."""
+
+    summary: str
+    kept_at: float
+    handoff: bool
+    status: ApprovalStatus
+    note: str
+    used: bool
+    usable: bool
+
+
 class LastSession(FrozenModel):
     """How the session before this one went. ``cut_off`` is true when the daemon stopped it before it ended."""
 
@@ -78,6 +93,7 @@ class Brief(FrozenModel):
     progress: CampaignEntry | None
     entries: tuple[CampaignEntry, ...]
     questions: tuple[BriefQuestion, ...]
+    kept: tuple[BriefKept, ...]
     last: LastSession | None
     without_progress: int
     patience: int
@@ -117,6 +133,28 @@ def _question_line(question: BriefQuestion, now: float) -> str:
         case "pending":
             state = "waiting for the owner's answer"
     return f"- “{question.summary}”: {state}"
+
+
+def _kept_line(kept: BriefKept, now: float) -> str:
+    """What a session reads of a step a session kept for the owner (item 484)."""
+    said: str = "" if kept.note.strip() == "" else f" They wrote: {kept.note.strip()}"
+    match kept.status:
+        case "left":
+            waits: str = "to do it themselves" if kept.handoff else "to allow it"
+            state: str = f"waiting for the owner {waits} since {_ago(now - kept.kept_at)}; do not try it again"
+        case "approved" if kept.handoff:
+            state = f"the owner did it themselves; go on from there.{said}"
+        case "approved" if kept.used:
+            state = "allowed by the owner once, and done"
+        case "approved" if kept.usable:
+            state = f"allowed by the owner once: do it when you reach it, exactly as it was, once.{said}"
+        case "approved":
+            state = "allowed by the owner once, but the yes lapsed unused; do not try it again"
+        case "denied":
+            state = "skipped by the owner: do not try it again or another way round it"
+        case _:
+            state = "not answered in time, and lapsed; do not try it again"
+    return f"- “{kept.summary}”: {state}"
 
 
 def _last_line(last: LastSession, now: float) -> str:
@@ -175,6 +213,11 @@ def render_brief(brief: Brief) -> str:
         parts.append(
             "Questions left for the owner:\n"
             + "\n".join(_question_line(question, brief.now) for question in brief.questions)
+        )
+    if brief.kept:
+        parts.append(
+            "Steps kept for the owner when nobody answered them (do none of them unless a line says you may):\n"
+            + "\n".join(_kept_line(kept, brief.now) for kept in brief.kept)
         )
     if brief.last is not None:
         parts.append(_last_line(brief.last, brief.now))
@@ -244,16 +287,18 @@ def next_session_at(
     planned: float | None,
     needs: str,
     questions: Sequence[ApprovalStatus],
+    kept_open: bool,
     gap_minutes: float,
     wait_hours: float,
 ) -> float:
     """When the session after one that ended at ``now`` starts: when the session planned it (``planned``, with
     ``campaign_schedule`` or a rhythm), else, after a session that ended needing the owner with questions that it left
-    for them, none answered or skipped yet (``questions`` are their statuses), ``wait_hours`` later (an answer or a skip
-    brings it forward), else ``gap_minutes`` later. A question that expired while the session waited for it can no
-    longer be answered, so nothing waits for it."""
+    for them, none answered or skipped yet (``questions`` are their statuses), or one that kept a step for them still
+    unanswered (``kept_open``, item 484), whatever it said it needs, ``wait_hours`` later (an answer or a skip brings it
+    forward), else ``gap_minutes`` later. A question that expired while the session waited for it can no longer be
+    answered, so nothing waits for it."""
     if planned is not None:
         return planned
-    if needs.strip() and questions and all(status == "left" for status in questions):
+    if kept_open or (needs.strip() and questions and all(status == "left" for status in questions)):
         return now + wait_hours * _SECONDS_PER_HOUR
     return now + gap_minutes * _SECONDS_PER_MINUTE

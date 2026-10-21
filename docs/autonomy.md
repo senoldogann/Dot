@@ -169,8 +169,9 @@ recorded as "You allowed it earlier": a rule that now refuses or hands it to you
 stops it. A yes that cannot reach the conversation (a `dotx` run works there) is taken back and the card stays. Skip on
 a kept step, either kind, holds in that conversation: the same step is refused at once, with no card, until you write
 there again (a message of yours, or a run you start). Any other question still counts as a refusal when nobody answers,
-and nothing is kept in `yolo`, which asks nothing, in a delegated run, whose parent decides, in a session of a campaign
-or in an eval.
+and nothing is kept in `yolo`, which asks nothing, in a delegated run, whose parent decides, or in an eval. A session of
+a campaign keeps its steps for the campaign, shared by its sessions (item 484,
+[Campaigns](agents-and-campaigns.md#campaigns)).
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries and the wait for a model out of reach (see [Models and providers](models.md#models-and-providers));

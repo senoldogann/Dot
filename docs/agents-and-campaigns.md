@@ -134,21 +134,29 @@ a thread of its own, through restarts and days. A campaign whose first session c
   replaces stay in the ledger.
 - **The ledger and the brief.** Each session writes what it did, with numbers and evidence, in the campaign's ledger
   (`campaign_note`: progress, setback, strategy, question or note). The next session opens with a brief instead of a
-  conversation: the goal, the targets, the paths of the files you attached to the goal, what you wrote in the
-  campaign's conversation since it started, the newest strategy and progress, the last 12 entries of the ledger, the
-  questions left for you and what became of them, and how the last session ended. The prompt of a session says to
-  write its progress there, not in the notes of the memory, and what you tell it while it works too. The targets, the
-  ledger and the plan of the next session shape every session after, so writing them carries the `persistence` flag,
-  as saving a memory note does: once a session has read untrusted content, the policy asks first.
+  conversation: the goal, the targets, the paths of the files you attached to the goal, what you wrote in the campaign's
+  conversation since it started, the newest strategy and progress, the last 12 entries of the ledger, the questions left
+  for you and what became of them, the steps kept for you (below) and what became of them, and how the last session
+  ended. The prompt of a session says to write its progress there, not in the notes of the memory, and what you tell it
+  while it works too. The targets, the ledger and the plan of the next session shape every session after, so writing
+  them carries the `persistence` flag, as saving a memory note does: once a session has read untrusted content, the
+  policy asks first.
 - **The next session** starts `campaign_gap_minutes` (60) after the last one ended, unless a session planned it with
   `campaign_schedule` (a moment, after which a rhythm goes on, or a cron rhythm). A session that ended needing you, with
-  questions it left for you and none answered yet, is followed after `campaign_wait_hours` (24) instead; your answer, or
-  your skip, starts the next session right away, and its brief carries it (while the session that asked works in the
-  daemon, your answer goes to it). After `campaign_patience_sessions` (3) sessions in a row without a progress entry,
-  the brief opens the next session with a change of route: it lists the strategies written since the newest progress,
-  which are refused (`campaign_note` does not take one of them again while the campaign is stuck), and asks for another
-  channel (a site's API, a command or a skill instead of its pages), another source or another approach, written as a
-  new strategy entry first. All four live in `[agent]`.
+  questions it left for you and none answered yet, or one that kept a step for you still unanswered, whatever it said it
+  needs, is followed after `campaign_wait_hours` (24) instead; your answer, or your skip, starts the next session right
+  away, and its brief carries it (while the session that asked works in the daemon, your answer goes to it). With
+  `[policy] unanswered = "park"` a session keeps for you, as any run does (item 484,
+  [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)), a step handed to you or a question for
+  your yes that nobody answered: it is the campaign's, kept once for all its sessions, in its conversation; I did it,
+  Allow once or Skip reach the session while it works, and otherwise bring the next session forward with no run of their
+  own, its brief saying what you answered ("allowed by the owner once: do it when you reach it, exactly as it was,
+  once"), so that a later session may do an allowed step once, and none tries a skipped one again until you write in the
+  campaign's conversation. After `campaign_patience_sessions` (3) sessions in a row without a progress entry, the brief
+  opens the next session with a change of route: it lists the strategies written since the newest progress, which are
+  refused (`campaign_note` does not take one of them again while the campaign is stuck), and asks for another channel (a
+  site's API, a command or a skill instead of its pages), another source or another approach, written as a new strategy
+  entry first. All four live in `[agent]`.
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
 are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
 evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with

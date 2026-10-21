@@ -16,6 +16,7 @@ from dotagent.agent.campaign import (
     BRIEF_QUESTIONS,
     CAMPAIGN_ENDED_EVENT,
     Brief,
+    BriefKept,
     BriefQuestion,
     CampaignEnded,
     LastSession,
@@ -1558,11 +1559,24 @@ class RunManager:
         step's chat (:meth:`_carry_kept`), delivered before the step is decided, so one that cannot be delivered leaves
         it open. "Allow once" stores the yes first, unused and told to no page, so that the step the run does again
         finds it; it is told once the work was carried on, and taken back when it could not be, the card as it was.
-        Skip only closes it. A step past its time has lapsed, and is closed so."""
+        Skip only closes it. A step past its time has lapsed, and is closed so. A step a session of a campaign kept
+        (item 484), answered once the session ended, brings the campaign's next session forward, whose brief says
+        what the owner answered."""
         now: float = time.time()
         if record.kept_until is not None and record.kept_until <= now:
             await self._runtime.approvals.lapse(record)
             raise RunConflict("this step was kept for you too long and has lapsed", {"approval_id": record.id})
+        decided: ApprovalRecord = await self._answer_kept(record, approve, source, note, now)
+        if record.scope_campaign_id is not None:
+            asked: RunRecord = await self._runtime.store.get_run(record.run_id)
+            if asked.status not in WORKING_STATUSES:
+                await self._bring_session_forward(record.scope_campaign_id)
+        return decided
+
+    async def _answer_kept(
+        self, record: ApprovalRecord, approve: bool, source: str, note: str, now: float
+    ) -> ApprovalRecord:
+        """Decide a kept step as :meth:`_decide_kept` says, at ``now``."""
         if not approve:
             return await self._runtime.approvals.resolve(record.id, False, source, note)
         if record.severity == "handoff":
@@ -1584,12 +1598,17 @@ class RunManager:
     async def _carry_kept(self, record: ApprovalRecord, source: str, text: str, note: str) -> None:
         """Tell the step's chat what the owner answered to a step kept for them (items 482, 483), in Dot's words
         ``text``: the run working there reads them as the next thing it is told, and otherwise a new run goes on from
-        the goal of the run that kept it, starting tainted when that run ended tainted. The words are Dot's: they clear
-        no taint, and only the ``note`` the owner wrote is their instruction, which is all the new run's goal adds to
-        the goal it goes on from."""
+        the goal of the run that kept it, starting tainted when that run ended tainted; a session of a campaign that
+        ended is followed by the campaign's next session instead, whose brief carries the answer (item 484). The words
+        are Dot's: they clear no taint, and only the ``note`` the owner wrote is their instruction, which is all the new
+        run's goal adds to the goal it goes on from."""
         asked: RunRecord = await self._runtime.store.get_run(record.run_id)
         said: str = note.strip()
-        active: RunHandle | None = self._active_on(asked.thread_id)
+        # A session of a campaign hears it itself, never another run of the campaign's conversation; any other kept
+        # step goes to the run at work in its chat.
+        active: RunHandle | None = (
+            self._handles.get(asked.id) if record.scope_campaign_id is not None else self._active_on(asked.thread_id)
+        )
         if active is not None:
             try:
                 active.inbox.put_nowait(UserInput(text=text, files=(), question_id=record.id, vouches=False, said=said))
@@ -1598,6 +1617,9 @@ class RunManager:
                 await self._carry_kept(record, source, text, note)
                 return
             log.info("kept_step_handed_back", approval_id=record.id, run_id=active.run_id, delivered="steer")
+            return
+        if record.scope_campaign_id is not None:
+            log.info("kept_step_answered_for_the_next_session", approval_id=record.id, run_id=asked.id)
             return
         newest: RunRecord = (await self._runtime.store.list_runs(1, asked.thread_id))[0]
         if newest.status in WORKING_STATUSES:
@@ -1752,6 +1774,18 @@ class RunManager:
             questions=tuple(
                 BriefQuestion(summary=asked.summary, asked_at=asked.created_at, status=asked.status, answer=asked.note)
                 for asked in questions
+            ),
+            kept=tuple(
+                BriefKept(
+                    summary=kept.summary,
+                    kept_at=kept.created_at,
+                    handoff=kept.severity == "handoff",
+                    status=kept.status,
+                    note=kept.note,
+                    used=kept.used_at is not None,
+                    usable=kept.used_at is None and kept.permit_until is not None and kept.permit_until > now,
+                )
+                for kept in await store.campaign_kept(campaign.id, BRIEF_QUESTIONS)
             ),
             last=None
             if last is None
@@ -2130,16 +2164,20 @@ class RunManager:
             )
             if starts_tainted:
                 gate.taint()
-            # A step it hands to the owner that nobody answers in time is kept for them where [policy] unanswered
-            # says so (item 482); never in yolo, a delegated run, a campaign's session or an eval.
+            # A step it hands to the owner, or a question for their yes, that nobody answers in time is kept for them
+            # where [policy] unanswered says so (items 482, 483): in its chat, or for a session of a campaign in the
+            # campaign's conversation, shared by its sessions (item 484); never in yolo, a delegated run or an eval.
+            conversation_id: str = (
+                thread_id if campaign_id is None else (await runtime.store.get_campaign(campaign_id)).thread_id
+            )
             gate.keep_for(
                 parking_for(
                     runtime.config.policy,
                     approval_mode,
                     parent_run_id is not None,
-                    campaign_id is not None,
                     source == EVAL_SOURCE,
-                    thread_id,
+                    conversation_id,
+                    campaign_id,
                     await runtime.store.schedule_of_thread(thread_id),
                 )
             )
@@ -2641,11 +2679,16 @@ class RunManager:
                 await self._tell_campaign_stopped(run, campaign, spent)
                 return
             asked: list[ApprovalRecord] = await runtime.store.run_questions(run.id, ASK_USER_TOOL)
+            kept_open: bool = any(
+                record.status == "left" and record.kept_until is not None
+                for record in await runtime.store.run_approvals(run.id)
+            )
             following: float = next_session_at(
                 time.time(),
                 campaign.next_session_at,
                 needs,
                 [question.status for question in asked],
+                kept_open,
                 runtime.config.agent.campaign_gap_minutes,
                 runtime.config.agent.campaign_wait_hours,
             )
