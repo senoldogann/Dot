@@ -235,8 +235,8 @@ def require_room(scaffold: Scaffold, fixed_tokens: int) -> None:
                 "context_tokens": scaffold.context_tokens,
                 "fixed_tokens": fixed_tokens,
                 "hint": (
-                    "give the model a larger context size in Settings › Models (an Ollama model of this Mac is then "
-                    "asked for the window it needs, up to its own), or pick a model with a larger window"
+                    "give the model a larger context size in Settings › Models (an Ollama model whose own window is "
+                    "larger is then asked for the window it needs, up to its own), or pick a model with a larger window"
                 ),
             },
         )
