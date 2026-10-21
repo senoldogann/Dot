@@ -50,7 +50,7 @@ _PURPOSES: dict[str, str] = {
     "memory_admin": "correcting or forgetting saved notes",
     "drafts": "an email or a message you write for the owner, who sends it from the conversation",
     "team": "making a lasting teammate agent for a role the work needs again or in parallel",
-    "pages": "showing a page you write in HTML in the conversation: charts, tables, diagrams, 3D views",
+    "pages": "showing a page you write in HTML in the conversation: animated charts, tables, diagrams, 3D views",
     "accounts": "the owner's mail and calendars in the Google and Microsoft accounts they signed in, read only",
 }
 # A group's line in the prompt names this many of its tools at most and says how many more there are.

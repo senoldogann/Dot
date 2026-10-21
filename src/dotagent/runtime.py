@@ -401,6 +401,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
         )
         peers: Peers = Peers()
         browsers: BrowserPool = BrowserPool(config.browser, config.server, downloads_dir(), peers.threads)
+        router: ModelRouter = ModelRouter(config, _call_recorder(store, bus), login_env)
         runtime: Runtime = Runtime(
             config=config,
             store=store,
@@ -411,9 +412,9 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),
             accounts=Accounts(store, Keychain(keychain_file()), None),
             vault=OnePassword(None),
-            router=ModelRouter(config, _call_recorder(store, bus), login_env),
+            router=router,
             roles=ModelRoles(config.models),
-            context_sizes=ContextSizes(config.models.context),
+            context_sizes=router.context_sizes,
             judge=judge_for(config, typesafe),
             typesafe=typesafe,
             browser=browsers.main,

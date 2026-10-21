@@ -79,7 +79,12 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   page shows it): `[providers.ollama] num_ctx` (65 536) for a model that runs on this Mac, where it sets the memory of
   the model's cache, and `num_ctx_cloud` (262 144) for a cloud model, whose tag is `cloud` or ends in `-cloud`
   (`kimi-k3:cloud`, `gpt-oss:120b-cloud`) and which runs on Ollama's servers; where the model's own window is larger,
-  the table shows it beside the one Dot asks for ("of 262k (own 1.0M)", items 221 and 250). OpenAI's and OpenCode
+  the table shows it beside the one Dot asks for ("of 262k (own 1.0M)", items 221 and 250). Such a model may be given a
+  context size up to three quarters of its own window in Settings › Models, and Dot then asks Ollama for the window
+  that size needs (the size is three quarters of it, in steps of 1024 tokens, at most the model's own) and the run
+  plans with that same window (item 520): a 9B model of a 262 144-token window given 96K is asked for 131 072, whatever
+  context length Ollama's own settings give it, since the window a request asks for wins. A larger window takes more
+  of the Mac's memory. OpenAI's and OpenCode
   Go's windows come from Dot's tables of their models, kept to their published pages; Anthropic's from its list of
   models. When three quarters of the window is less than the number `context_tokens` sets, or than 96 000 while it is
   `"most"`, the run's budget is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same
@@ -361,8 +366,14 @@ ask for no camera, microphone or position. A link you click in the page opens in
 cannot open one by itself, nor with a click you made elsewhere. A page that loads another page in its frame is closed,
 with Show it again. A page of up to 500,000 characters is kept in the database under an id that cannot be guessed, which
 is all it takes to read it (`GET /pages/<id>`, no token, never cached); it goes with its chat, and with the events of
-its run under `dotx prune`. `dotx run` prints the page's address. The tool is in a group of its own, `pages`, and the
-system prompt asks for a page when a chart, a table, a diagram or a 3D view would say more than words.
+its run under `dotx prune`. `dotx run` prints the page's address. The tool is in a group of its own, `pages`. The
+system prompt asks for a page whenever an answer holds something with a shape (figures to compare, a trend, a
+ranking, a share, a timeline, the steps of a process, how parts connect, a place or a layout), rather than a long
+list or figures in text, one page a question and none for a single number. It asks for a page that lives: animated in
+(bars that grow, lines that draw themselves, rows that slide in, a 3D view that turns), with values on hover, tables
+that sort and series that switch on and off, and still under `prefers-reduced-motion`. It names the libraries that
+fit, in pinned versions: Apache ECharts or Chart.js for charts, Mermaid for diagrams, D3 for a drawing of the run's
+own, three.js for 3D (item 521).
 
 `web_extract(sources, fields)` pulls named fields out of pages or files as JSON without the pages entering the main
 model's context: for every source (an address, or a file: a path, or the name of a file in the workspace such as the

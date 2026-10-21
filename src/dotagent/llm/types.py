@@ -1,5 +1,6 @@
 """Provider-neutral chat types and the provider interface."""
 
+import math
 from collections.abc import Awaitable, Callable
 from typing import Literal, Protocol
 
@@ -135,6 +136,23 @@ class ModelInfo(FrozenModel):
 
 
 DeltaSink = Callable[[StreamDelta], Awaitable[None]]
+
+# The share of a model's window a run plans to fill (item 396): the rest is the room its reply and its next steps need.
+WINDOW_SHARE: float = 0.75
+# A window asked for a context size (item 520) is a whole number of these, so that sizes near each other ask the same.
+WINDOW_STEP: int = 1024
+
+
+def grown_window(window: int | None, own: int | None, chosen: int | None) -> int | None:
+    """The window a request asks of a model whose provider is asked for ``window`` tokens by default and which holds
+    ``own`` itself where that is more (``ModelInfo.own_context_length``, an Ollama model, item 520): with a context size
+    ``chosen`` for it (item 250) that needs more than ``window``, the window that size needs, since it is
+    :data:`WINDOW_SHARE` of it, up to ``own``; else ``window``. The connector that asks and the run that plans with the
+    window both take it from here, so that they never differ."""
+    if window is None or own is None or chosen is None:
+        return window
+    needed: int = math.ceil(chosen / WINDOW_SHARE / WINDOW_STEP) * WINDOW_STEP
+    return min(own, max(window, needed))
 
 
 class ChatProvider(Protocol):

@@ -4,6 +4,7 @@ import asyncio
 import time
 from collections.abc import Mapping, Sequence
 
+from dotagent.agent.sizes import ContextSizes
 from dotagent.config import AppConfig
 from dotagent.core.errors import (
     ConfigError,
@@ -166,6 +167,9 @@ class ModelRouter:
 
     def __init__(self, config: AppConfig, recorder: CallRecorder, login_env: Mapping[str, str]) -> None:
         self._config: AppConfig = config
+        # The context sizes chosen for models (item 250), which runs read as they start and the Ollama connector with
+        # every request: a model of this Mac given one is asked for the window it needs (item 520).
+        self.context_sizes: ContextSizes = ContextSizes(config.models.context)
         self._recorder: CallRecorder = recorder
         self._login_env: dict[str, str] = dict(login_env)
         self._providers: dict[str, ChatProvider] = {}
@@ -180,7 +184,7 @@ class ModelRouter:
         match name:
             case "ollama":
                 key: str | None = await asyncio.to_thread(resolve_secret, self._config.providers.ollama.api_key_env)
-                return OllamaProvider(self._config.providers.ollama, key)
+                return OllamaProvider(self._config.providers.ollama, key, self.context_sizes)
             case "openai":
                 openai = self._config.providers.openai
                 api_key: str = await asyncio.to_thread(require_secret, openai.api_key_env, "the openai provider")
