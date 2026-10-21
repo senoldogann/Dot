@@ -149,14 +149,15 @@ a thread of its own, through restarts and days. A campaign whose first session c
   answer goes to it). With `[policy] unanswered = "park"` a session keeps for you, as any run does (item 484,
   [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)), a step handed to you or a question for
   your yes that nobody answered: it is the campaign's, kept once for all its sessions, in its conversation; I did it and
-  Allow once reach the session while it works, and otherwise, as Skip does, bring the next session forward with no run
-  of their own, its brief saying what you answered ("allowed by the owner once: do it when you reach it, exactly as it
-  was, once"), so that a later session may do an allowed step once, and none tries a skipped one again until you write
-  in the campaign's conversation. After `campaign_patience_sessions` (3) sessions in a row without a progress entry, the
-  brief opens the next session with a change of route: it lists the strategies written since the newest progress, which
-  are refused (`campaign_note` does not take one of them again while the campaign is stuck), and asks for another
-  channel (a site's API, a command or a skill instead of its pages), another source or another approach, written as a
-  new strategy entry first. All four live in `[agent]`.
+  Allow once reach the session while it works, or the campaign's session at work then, which found the step waiting, and
+  otherwise, as Skip does, bring the next session forward with no run of their own, its brief saying what you answered
+  ("allowed by the owner once: do it when you reach it, exactly as it was, once"), so that a later session may do an
+  allowed step once, and none tries a skipped one again until you write in the campaign's conversation. After
+  `campaign_patience_sessions` (3) sessions in a row without a progress entry, the brief opens the next session with a
+  change of route: it lists the strategies written since the newest progress, which are refused (`campaign_note` does
+  not take one of them again while the campaign is stuck), and asks for another channel (a site's API, a command or a
+  skill instead of its pages), another source or another approach, written as a new strategy entry first. All four live
+  in `[agent]`.
 - **Only a verified outcome ends it.** `campaign_achieved` asks the goal checker (the review model) whether the targets
 are reached, from the targets and how they are verified, the progress in the ledger, the session's plan with the
 evidence of its steps, what the session's own calls measured and the session's evidence. Refused, the call fails with
