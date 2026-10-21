@@ -61,3 +61,71 @@ def test_hand_it_to_me_is_the_users_in_every_mode_but_yolo() -> None:
     assert handed.verdict == "handoff" and handed.rule_id == "rule-1"
     assert decide(_PUSH, "task", False, "aggressive", [_rule("ask", "")], None).verdict != "handoff"
     assert [route_for(handed, mode) for mode in ("ask", "auto")] == ["user", "user"]
+
+
+_MESSAGE: ActionInfo = ActionInfo(
+    tool="apple_script",
+    kind="message",
+    risk="medium",
+    summary="Mail: reply to Ada",
+    target="Mail",
+    flags=("message_send",),
+)
+
+
+def _at(position: int, behavior: Behavior, tool_glob: str, match_regex: str, enabled: bool) -> RuleRecord:
+    return RuleRecord(
+        id=f"rule-{position}",
+        position=position,
+        enabled=enabled,
+        behavior=behavior,
+        tool_glob=tool_glob,
+        match_regex=match_regex,
+        description=f"rule {position}",
+        created_at=float(position),
+    )
+
+
+@pytest.mark.parametrize("earlier", ["allow", "preapproved", "ask"])
+def test_a_rule_that_hands_off_decides_wherever_it_stands(earlier: Behavior) -> None:
+    """Item 481: an earlier rule of another answer that fits too does not keep a hand-off from deciding."""
+    rules: list[RuleRecord] = [_at(1, earlier, "shell", "", True), _at(2, "handoff", "shell", "^git push", True)]
+    decision: Decision = decide(_PUSH, "task", False, "cautious", rules, None)
+    assert (decision.verdict, decision.source, decision.rule_id) == ("handoff", "rule", "rule-2")
+
+
+def test_without_a_hand_off_that_fits_the_first_rule_decides_as_before() -> None:
+    """Item 481: a hand-off switched off, or one that does not fit, leaves the first rule that fits to decide, as does a
+    set of rules without any hand-off; of two hand-offs that fit, the first decides."""
+    off: list[RuleRecord] = [_at(1, "allow", "shell", "", True), _at(2, "handoff", "shell", "^git push", False)]
+    assert decide(_PUSH, "task", False, "cautious", off, None).rule_id == "rule-1"
+    other: list[RuleRecord] = [_at(1, "allow", "shell", "", True), _at(2, "handoff", "shell", "^git push", True)]
+    status: Decision = decide(_STATUS, "task", False, "cautious", other, None)
+    assert (status.verdict, status.rule_id) == ("allow", "rule-1")
+    plain: list[RuleRecord] = [_at(1, "ask", "shell", "", True), _at(2, "allow", "shell", "^git push", True)]
+    assert decide(_PUSH, "task", False, "cautious", plain, None).rule_id == "rule-1"
+    two: list[RuleRecord] = [
+        _at(1, "allow", "shell", "", True),
+        _at(2, "handoff", "shell", "push", True),
+        _at(3, "handoff", "*", "", True),
+    ]
+    assert decide(_PUSH, "task", False, "cautious", two, None).rule_id == "rule-2"
+
+
+def test_the_message_guard_and_a_spend_allowance_give_way_to_a_hand_off_an_earlier_rule_used_to_hide() -> None:
+    """Item 481: only a rule that hands the step off is stricter than the question about a message (item 429) and
+    than a spend within its caps (item 385), and now it is that wherever it stands."""
+    rules: list[RuleRecord] = [_at(1, "allow", "*", "", True), _at(2, "handoff", "apple_script", "reply", True)]
+    guarded: Decision = decide(_MESSAGE, "task", False, "aggressive", rules, None)
+    assert (guarded.verdict, guarded.rule_id) == ("handoff", "rule-2")
+    allowance: Decision = Decision(verdict="allow", source="spend", reason="within the caps", rule_id=None)
+    spent: Decision = decide(
+        _PUSH,
+        "task",
+        False,
+        "cautious",
+        [_at(1, "allow", "shell", "", True), _at(2, "handoff", "shell", "push", True)],
+        allowance,
+    )
+    assert (spent.verdict, spent.rule_id) == ("handoff", "rule-2")
+    assert decide(_PUSH, "task", False, "cautious", [_at(1, "allow", "shell", "", True)], allowance) == allowance

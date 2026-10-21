@@ -46,10 +46,11 @@ def test_a_usual_rule_matches_as_before() -> None:
 
 def test_the_first_rule_that_fits_by_position_decides_and_the_rules_after_it_are_not_read() -> None:
     """Item 480: the rule that decides is the first that fits, by its position whatever the order of the list; the
-    expressions of the rules after it are not read, so one that would backtrack, or cannot be read, refuses nothing."""
+    expressions of the rules after it that do not hand off are not read, so one that would backtrack, or cannot be
+    read, refuses nothing (item 481)."""
     first: RuleRecord = _rule(r"git\s+push").model_copy(update={"id": "first", "position": 1, "behavior": "allow"})
-    slow: RuleRecord = _rule(r"(a|aa)+$").model_copy(update={"id": "slow", "position": 2})
-    broken: RuleRecord = _rule("(").model_copy(update={"id": "broken", "position": 3})
+    slow: RuleRecord = _rule(r"(a|aa)+$").model_copy(update={"id": "slow", "position": 2, "behavior": "ask"})
+    broken: RuleRecord = _rule("(").model_copy(update={"id": "broken", "position": 3, "behavior": "allow"})
     pushed: str = "git push " + "a" * 60 + "b"
     decided: RuleRecord | None = match_rule(_action(pushed), [broken, slow, first])
     assert decided is not None and decided.id == "first"
@@ -59,3 +60,17 @@ def test_the_first_rule_that_fits_by_position_decides_and_the_rules_after_it_are
     assert ruling_rule("shell", "git status\ngit status", [first, slow.model_copy(update={"match_regex": ""})]) == (
         slow.model_copy(update={"match_regex": ""})
     )
+
+
+def test_a_later_hand_off_is_read_after_the_first_fit_and_a_slow_one_refuses_the_step() -> None:
+    """Item 481: a rule that hands off decides wherever it stands, so it is read after the first rule that fits, and
+    one whose expression backtracks for long refuses the step as any rule the policy reads does."""
+    first: RuleRecord = _rule(r"git").model_copy(update={"id": "first", "position": 1, "behavior": "allow"})
+    hand_off: RuleRecord = _rule(r"git\s+push").model_copy(update={"id": "mine", "position": 2})
+    decided: RuleRecord | None = match_rule(_action("git push origin main"), [first, hand_off])
+    assert decided is not None and decided.id == "mine"
+    slow: RuleRecord = _rule(r"(a|aa)+$").model_copy(update={"id": "slow", "position": 2})
+    started: float = time.perf_counter()
+    with pytest.raises(ConfigError, match="too long"):
+        match_rule(_action("git " + "a" * 60 + "b"), [first, slow])
+    assert time.perf_counter() - started < RULE_MATCH_TIMEOUT_S + 1.0

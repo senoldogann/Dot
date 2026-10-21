@@ -1566,9 +1566,9 @@ class RulePreview(FrozenModel):
 
 class RuleUsage(FrozenModel):
     """What one enabled rule did on the steps of the last days, with today's rules (item 473): how many steps it fits
-    and when the newest was; of those it is the first rule to fit, how many it decides, how many ran in yolo, which asks
-    nothing whatever the rules say, and how many were settled before any rule; and the earlier rules that decide the
-    others."""
+    and when the newest was; of those it is the rule that decides (item 481: a hand-off wherever it stands, else the
+    first rule to fit), how many it decides, how many ran in yolo, which asks nothing whatever the rules say, and how
+    many were settled before any rule; and the rules that decide the others."""
 
     rule_id: str
     fits: int

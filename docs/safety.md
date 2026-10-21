@@ -98,19 +98,25 @@ currency, so list sites that bill in one currency. Empty by default.
    decides, with one of four answers: *do it* (`allow`), *do it, whatever it has read* (`preapproved`: the question
    untrusted content raises is skipped too), *ask me first* (`ask`) or *hand it to me* (`handoff`: Dot stops, says what
    it needs done and waits; on a browser step you can take the browser over, do it and give it back; when you say you
-   did it, the run goes on from there). The expression is searched, case-insensitive, in the action's one-line summary
-   (a shell command's starts with `Run: `), a line break and its target (the command, the path, the address); one that
-   takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so that a
-   pattern that backtracks for long cannot hold the daemon (item 387). A rule
+   did it, the run goes on from there). A rule that hands the step to you decides wherever it stands, the first of them
+   when two fit (item 481): an earlier rule of another answer does not keep it from deciding, so an exception to a
+   hand-off goes in the hand-off's own expression (a lookahead such as `(?!.*--dry-run)` works). Once a rule fits, only
+   the rules after it that hand off are read. The expression is searched, case-insensitive, in the action's one-line
+   summary (a shell command's starts with `Run: `), a line break and its target (the command, the path, the address);
+   one that takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so
+   that a pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
    is managed there or through `/api/rules`; the page lists the rules in the order they are checked, a rule's arrows
    move it one place up or down that order, and **New rule** opens the two ways to write one. A rule that an earlier
    enabled rule fits wherever it fits (no expression, or the same one, on a tool pattern that takes in its own: `*`,
-   the same pattern, or one that matches its plain tool name) never decides, and the page says so with the number of
-   the rule that decides in its place (item 449); whether two different expressions overlap it does not tell. Under each
+   the same pattern, or one that matches its plain tool name) never decides, nor does a rule that one handing the step
+   to you fits wherever it fits, wherever that one stands, while a hand-off is kept from deciding only by an earlier
+   hand-off; the page says so with the number of the rule that decides in its place (items 449 and 481); whether two
+   different expressions overlap it does not tell. Under each
    enabled rule, the page says how it was used on the steps of the last 30 days, with today's rules (`GET
-   /api/rules/usage`, item 473): how many steps it fits, how many it decides as the first rule to fit, how many of those
-   ran in yolo runs or were settled before any rule, and which earlier rule decides the others first. Before a rule is
+   /api/rules/usage`, item 473): how many steps it fits, how many it decides (as the first rule to fit, or as a
+   hand-off wherever it stands), how many of those ran in yolo runs or were settled before any rule, and which rules
+   decide the others. Before a rule is
    added, **Test on the last 30 days** under its fields (`POST /api/rules/preview`, item 469) tries it on the steps of
    past runs, as the policy matches rules, and writes nothing. It says how many steps it fits and which earlier rules
    decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing whatever the rules

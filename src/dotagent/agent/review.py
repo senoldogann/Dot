@@ -306,8 +306,8 @@ _OWNER_SYSTEM: str = (
 _RULE_SYSTEM: str = (
     "You turn a sentence of the owner of an autonomous agent, Dot, into one of their rules. Dot works on the owner's "
     "Mac with tools. Before each action its safety policy decides whether Dot does it, asks the owner first or hands "
-    "the step to them; the owner's rules come before that decision, and the first rule that fits an action decides "
-    "it.\n\n"
+    "the step to them; the owner's rules come before that decision: a rule that hands the step to the owner decides "
+    "wherever it stands, and otherwise the first rule that fits an action decides it.\n\n"
     "You get the owner's sentence and Dot's tools, each with what it does. Answer by calling "
     f"{RULE_TOOL} exactly once with the parts of the rule; the pattern that matches actions is written from them:\n"
     "- tool: the tool the rule is about, by its exact name from the list, or a pattern with * for a family of tools "

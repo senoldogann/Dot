@@ -168,12 +168,20 @@ def rule_fits(rule: RuleRecord, tool: str, haystack: str) -> bool:
 
 
 def ruling_rule(tool: str, haystack: str, rules: Sequence[RuleRecord]) -> RuleRecord | None:
-    """The rule of ``rules`` that decides a call of ``tool`` whose summary and target are ``haystack``: the first, by
-    position, that fits it (:func:`rule_fits`); the ones after it are not read."""
+    """The rule of ``rules`` that decides a call of ``tool`` whose summary and target are ``haystack`` (item 481): a
+    rule that hands the step to the owner decides wherever it stands, the first of them by position when two fit;
+    any other answer is the first rule by position that fits (:func:`rule_fits`). Once a rule fits, only the rules
+    after it that hand off are read: one of another answer could not decide, and its expression is not matched."""
+    first: RuleRecord | None = None
     for rule in sorted(rules, key=lambda candidate: candidate.position):
-        if rule_fits(rule, tool, haystack):
+        if first is not None and rule.behavior != "handoff":
+            continue
+        if not rule_fits(rule, tool, haystack):
+            continue
+        if rule.behavior == "handoff":
             return rule
-    return None
+        first = rule
+    return first
 
 
 def match_rule(info: ActionInfo, rules: Sequence[RuleRecord]) -> RuleRecord | None:
