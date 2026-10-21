@@ -5,12 +5,13 @@ import asyncio
 import time
 from collections.abc import Mapping, Sequence
 
-from dotagent.agent.approvals import ApprovalBroker, ApprovalOutcome
+from dotagent.agent.approvals import TIMEOUT_DECIDER, ApprovalBroker, ApprovalOutcome, Kept
 from dotagent.agent.authorization import Answerer, Authorization, step_decision
 from dotagent.agent.declined import OWNER_DECIDERS, Declined, declined_key, refusal_text, still_declined
+from dotagent.agent.parking import Parking, kept_digest, kept_text
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
-from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied, RunConflict
+from dotagent.core.errors import ApprovalParked, ApprovalRejected, HandedOff, PolicyDenied, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.events import EventBus
@@ -40,7 +41,8 @@ TAKEOVER_EVENT: str = "takeover"
 HANDBACK_EVENT: str = "handback"
 
 # The events that say whether a run is tainted after them (item 243): it starts so or not (``run_queued``), a tool's
-# result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``).
+# result may taint it (``tool_result``), and a message of the owner that steers it clears the taint (``steer``); Dot's
+# words that the owner did a step kept for them vouch for nothing and keep it as it was (item 482).
 TAINT_EVENTS: tuple[str, ...] = ("run_queued", "tool_result", "steer")
 
 
@@ -54,12 +56,15 @@ def hold_note(seconds: float) -> str:
 
 def tainted_after(events: Sequence[EventRecord]) -> bool:
     """Whether a run was tainted after the newest of ``events``, its newest event of each of :data:`TAINT_EVENTS`: a
-    steer clears the taint, and the others hold whether the run was tainted then. An event stored before they held it
-    counts as untainted, as a run that went on from it was then."""
+    steer of the owner clears the taint, and the others, a steer that vouches for nothing among them, hold whether the
+    run was tainted then. An event stored before they held it counts as untainted, as a run that went on from it was
+    then."""
     if not events:
         return False
     newest: EventRecord = max(events, key=lambda event: event.id)
-    return newest.kind != "steer" and newest.data.get("tainted") is True
+    if newest.kind == "steer" and newest.data.get("vouches") is not False:
+        return False
+    return newest.data.get("tainted") is True
 
 
 def _describe(info: ActionInfo) -> JsonObject:
@@ -150,6 +155,11 @@ class RunGate:
         self._held_since: float | None = None
         # How many of the run's tool calls wait for the user to give the run back now (item 479).
         self.waiting: int = 0
+        # Where the run keeps a step it hands to the owner when nobody answers in time (item 482), None where such a
+        # question ends as a refusal; and whether the owner left one unanswered since they last wrote, so that the
+        # run's next hand-offs are kept at once rather than waited for again.
+        self._parking: Parking | None = None
+        self._owner_away: bool = False
 
     @property
     def instructions(self) -> tuple[str, ...]:
@@ -189,8 +199,15 @@ class RunGate:
         return time.monotonic() - waited_from
 
     def add_instruction(self, text: str) -> None:
-        """Count a message of the user (a steer, the answer to a question) among the instructions the reviewer reads."""
+        """Count a message of the user (a steer, the answer to a question) among the instructions the reviewer reads;
+        the user is there again, so a hand-off is put to them again before it is kept (item 482)."""
         self._instructions = (*self._instructions, text)
+        self._owner_away = False
+
+    def keep_for(self, parking: Parking | None) -> None:
+        """Keep the steps the run hands to the owner that nobody answers in time, as ``parking`` says (item 482); None
+        refuses them as before."""
+        self._parking = parking
 
     def taint(self) -> None:
         """Record that the run has read content that third parties can author."""
@@ -334,6 +351,33 @@ class RunGate:
             return await self._review(info, decision, tainted)
         return await self._ask_user(info, decision, "", tainted), "user"
 
+    async def _keep(self, info: ActionInfo, summary: str) -> ApprovalRejected:
+        """Keep the hand-off ``info`` for the owner (item 482), and what the run is told of it: that it did not happen
+        and waits for them, or, past the caps of the kept steps, a refusal as before."""
+        parking: Parking | None = self._parking
+        if parking is None:
+            raise RunConflict("this run keeps no step for the owner", {"run_id": self._run_id})
+        kept: Kept | None = await self._approvals.keep(
+            self._run_id,
+            info.tool,
+            summary,
+            "handoff",
+            _describe(info),
+            kept_digest(info),
+            parking.keep_s,
+            parking.thread_id,
+            parking.schedule_id,
+        )
+        if kept is None:
+            return ApprovalRejected(
+                "nobody answered in time, and too many steps wait for the user already, so this one is not kept",
+                {"action": _describe(info)},
+            )
+        log.info("step_kept", run_id=self._run_id, tool=info.tool, approval_id=kept.record.id, created=kept.created)
+        return ApprovalParked(
+            kept_text(kept.record.id, kept.created), {"action": _describe(info), "approval_id": kept.record.id}
+        )
+
     async def _emit_policy(self, info: ActionInfo, decision: Decision, tainted: bool) -> None:
         """The event of a step the policy asks about, hands off or refuses, with whether the run was tainted when it
         was weighed (item 474): a step that does not go through keeps no decision in its result, so this is its
@@ -397,9 +441,17 @@ class RunGate:
         await self._emit_policy(info, decision, tainted)
         severity: str = "handoff" if decision.verdict == "handoff" else approval_severity(info)
         summary: str = f"{info.summary} — {decision.reason}" + (f". {passed_on}" if passed_on else "")
+        # A step handed to the owner is kept for them when nobody answers it (item 482): at once while the owner has
+        # left the run's last hand-off unanswered and written nothing since, else once its question expires.
+        keeps: bool = self._parking is not None and decision.verdict == "handoff"
+        if keeps and self._owner_away:
+            raise await self._keep(info, summary)
         outcome: ApprovalOutcome = await self._approvals.request(
             self._run_id, info.tool, summary, severity, _describe(info)
         )
+        if keeps and outcome.status == "expired" and outcome.decided_by == TIMEOUT_DECIDER:
+            self._owner_away = True
+            raise await self._keep(info, summary)
         if outcome.status != "approved":
             # The owner's no is kept; a question nobody answered in time, or one the eval harness refused, is no answer.
             key: str | None = declined_key(info)

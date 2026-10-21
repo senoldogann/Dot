@@ -137,6 +137,25 @@ stopped or fails stays in the conversation as your message, for the next run the
 only closes the question, and a left question never expires. With `wait` such a question waits as in a run you watch,
 for `approval_timeout_s` at most. A run you started in any mode but `yolo` always waits for your answer.
 
+**Steps kept for you.** A step the policy hands to you (money, a credential, a rule of yours that hands it off) waits
+`approval_timeout_s` for **I did it**, as every question of the policy does. With `[policy] unanswered = "park"` (item
+482; the default, `"refuse"`, counts it as a refusal) one nobody answers in that time is kept for you instead: the run
+is told that the step did not happen and waits for you, and goes on with what does not depend on it, or ends and says
+what waits for you; its later hand-offs are kept at once, with no new wait, until you write to it. A kept step is a
+`left` record with the fingerprint of its action (tool, kind, summary, target, amount and flags) and the time it lapses,
+`[policy] parked_hours` (72) on: the run's page lists it as "Kept for you" with the questions it left, the timeline says
+so where it was asked, the Activity list shows it among what waits, `dotx run` prints it, and your phone is told when it is kept.
+The same step is kept once in a chat (the run is told it waits already), and at most 20 wait in a chat or the chats of
+one schedule and 50 in all; past them a hand-off nobody answers is refused as before. **I did it** tells the
+conversation that you did the step yourself, "The user did the step that waited for them (…) themselves; go on from
+there.", with your note: into the run working there, or else as a new run on it, whose goal is the goal of the run that
+kept it with those words under it, with that run's mode, model, reasoning level, approval mode and goal mode, and which
+starts tainted when that run ended tainted. These words are Dot's, not yours: they restore no trust and count among no
+instructions of yours. Skip this step only closes it, and one past its time closes as expired (the daemon looks every half
+minute) and can no longer be answered. A kept step gives the run no authority: a hand-off is yours to do. A question
+that asks your yes, not a hand-off, still counts as a refusal when nobody answers, and nothing is kept in `yolo`, which
+asks nothing, in a delegated run, whose parent decides, in a session of a campaign or in an eval.
+
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries and the wait for a model out of reach (see [Models and providers](models.md#models-and-providers));
 in goal mode by the goal check giving up; at a limit of minutes or tokens you set; or when you stop it. With

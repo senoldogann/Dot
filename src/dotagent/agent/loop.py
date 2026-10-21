@@ -16,6 +16,7 @@ from dotagent.agent.attachments import (
     UserInput,
     attachment_summary,
     message_with_attachments,
+    steer_event,
 )
 from dotagent.agent.campaign import session_number
 from dotagent.agent.compact import (
@@ -1909,11 +1910,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 runtime, run.thread_id, run.id, text, sent.files, info.vision
             )
             history.append(note)
-            agent.gate.clear_taint()
-            agent.gate.add_instruction(text)
-            ledger = with_instruction(ledger, text)
+            if sent.vouches:
+                agent.gate.clear_taint()
+                agent.gate.add_instruction(text)
+                ledger = with_instruction(ledger, text)
             await runtime.store.append_messages(run.thread_id, [note])
-            await runtime.bus.emit(run.id, "steer", {"text": text, "files": attachment_summary(sent.files)}, True)
+            await runtime.bus.emit(run.id, "steer", steer_event(sent, agent.gate.tainted), True)
         changed: list[MemoryRecord] = await runtime.store.memories_changed_since(memory_seen_at, run.id)
         if changed:
             memory_seen_at = max(record.updated_at for record in changed)

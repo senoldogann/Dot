@@ -1,8 +1,10 @@
 """Human-in-the-loop requests: approvals, hand-offs and questions, resolved by the UI or CLI."""
 
 import asyncio
+import time
 from typing import Literal
 
+from dotagent.agent.parking import KEPT_HERE, KEPT_OVERALL
 from dotagent.core.errors import RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.types import FrozenModel, JsonObject
@@ -14,6 +16,8 @@ log = get_logger(__name__)
 
 # The event of a question a run left for the user and went on without; it is decided later with ``approval_decided``.
 QUESTION_LEFT_EVENT: str = "question_left"
+# Who decides a question that nobody answered before its deadline.
+TIMEOUT_DECIDER: str = "timeout"
 
 
 class ApprovalOutcome(FrozenModel):
@@ -21,6 +25,13 @@ class ApprovalOutcome(FrozenModel):
     status: Literal["approved", "denied", "expired"]
     decided_by: str
     note: str
+
+
+class Kept(FrozenModel):
+    """A step kept for the owner (item 482): its record, and whether it was kept now or waited already."""
+
+    record: ApprovalRecord
+    created: bool
 
 
 def _abandoned(approval_id: str, run_id: str) -> ApprovalOutcome:
@@ -65,7 +76,10 @@ class ApprovalBroker:
             outcome = await asyncio.wait_for(future, timeout=self._timeout_s)
         except TimeoutError:
             outcome = ApprovalOutcome(
-                approval_id=record.id, status="expired", decided_by="timeout", note="no decision before the deadline"
+                approval_id=record.id,
+                status="expired",
+                decided_by=TIMEOUT_DECIDER,
+                note="no decision before the deadline",
             )
         finally:
             self._waiting.pop(record.id, None)
@@ -139,6 +153,62 @@ class ApprovalBroker:
             True,
         )
         return record
+
+    async def keep(
+        self,
+        run_id: str,
+        tool: str,
+        summary: str,
+        severity: str,
+        args: JsonObject,
+        digest: str,
+        keep_s: float,
+        thread_id: str,
+        schedule_id: str | None,
+    ) -> Kept | None:
+        """Keep a step that nobody answered in time for the owner (item 482): ``left`` until they answer it, skip it or
+        ``keep_s`` passes, the run going on without it; ``question_left`` is its one event until then. The same step
+        (``digest``) kept already in the chat is that one again; past the caps (:data:`KEPT_HERE` in the chat or the
+        schedule's chats, :data:`KEPT_OVERALL` in all) it is not kept, and None says so."""
+        waiting: ApprovalRecord | None = await self._store.open_kept(digest, thread_id)
+        if waiting is not None:
+            return Kept(record=waiting, created=False)
+        here, overall = await self._store.count_open_kept(thread_id, schedule_id)
+        if here >= KEPT_HERE or overall >= KEPT_OVERALL:
+            log.warning("step_not_kept", run_id=run_id, tool=tool, here=here, overall=overall)
+            return None
+        record: ApprovalRecord = await self._store.create_kept_approval(
+            run_id, tool, summary, severity, args, digest, time.time() + keep_s
+        )
+        await self._bus.emit(
+            run_id,
+            QUESTION_LEFT_EVENT,
+            {
+                "approval_id": record.id,
+                "tool": tool,
+                "summary": summary,
+                "severity": severity,
+                "args": args,
+                "kept_until": record.kept_until,
+            },
+            True,
+        )
+        return Kept(record=record, created=True)
+
+    async def lapse(self, record: ApprovalRecord) -> ApprovalRecord:
+        """End a step kept for the owner whose time is over (item 482): expired, with ``approval_decided`` so that no
+        page offers it any more; one decided meanwhile keeps its decision."""
+        lapsed: ApprovalRecord = await self._store.decide_approval(
+            record.id, "expired", TIMEOUT_DECIDER, "kept past its time"
+        )
+        if lapsed.status == "expired" and lapsed.decided_by == TIMEOUT_DECIDER:
+            await self._bus.emit(
+                record.run_id,
+                "approval_decided",
+                {"approval_id": record.id, "status": "expired", "note": lapsed.note},
+                True,
+            )
+        return lapsed
 
     async def resolve(self, approval_id: str, approve: bool, decided_by: str, note: str) -> ApprovalRecord:
         """Record a decision. Raises if the approval does not exist or was already decided. A question a run left has

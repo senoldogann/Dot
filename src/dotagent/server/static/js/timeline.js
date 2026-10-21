@@ -1061,11 +1061,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       markWaiting(scope, true, record.ts);
     },
 
-    // A question the run left for the user and went on without; it waits in the run's "Dot asked you" list.
+    // A question the run left for the user and went on without, or a step handed to them that nobody answered in time
+    // and the run kept for them (item 482); either waits in the run's list of what it left.
     question_left(scope, record) {
       const data = record.data;
-      const question = typeof data.args.question === "string" ? data.args.question : data.summary;
-      note(scope, record.ts, "help", `Dot asked you “${clip(question, 300)}” and went on without the answer`, "warn");
+      if (typeof data.kept_until === "number") {
+        note(scope, record.ts, "hand", `Kept for you: ${clip(data.summary, 300)}. Nobody answered in time, so Dot went on without it`, "warn");
+      } else {
+        const question = typeof data.args.question === "string" ? data.args.question : data.summary;
+        note(scope, record.ts, "help", `Dot asked you “${clip(question, 300)}” and went on without the answer`, "warn");
+      }
       if (scope.runId === rootRunId) {
         onQuestionLeft();
       }
@@ -1131,6 +1136,11 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     steer(scope, record) {
       const files = record.data.files ?? [];
       const text = record.data.text;
+      // Dot's words that you did a step kept for you (item 482) are no message of yours.
+      if (record.data.vouches === false) {
+        note(scope, record.ts, "hand", clip(text, 400), "");
+        return;
+      }
       place(scope, userMessage({ text, sentAt: record.ts, files, editFromHere: null }), record.ts);
     },
 

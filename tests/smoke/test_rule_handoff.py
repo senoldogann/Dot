@@ -1,6 +1,7 @@
 """A rule in four answers, end to end (item 48): a *hand it to me* rule on ``write_file`` stops the write, the run asks
 the user to do the step, and goes on when the user says they did it. The Rules tab shows the rule as a sentence with
-the four answers in a segmented control, in a headless Chrome at a wide and at a phone width, in light and in dark."""
+the four answers in a segmented control, in a headless Chrome at a wide and at a phone width, in light and in dark. A
+step kept for the owner when nobody answered (item 482) shows as kept, and I did it carries the work on."""
 
 import asyncio
 import time
@@ -296,3 +297,73 @@ async def test_an_earlier_rule_that_allows_the_write_does_not_keep_the_hand_off_
             await runtime.store.delete_rule(record.id)
     assert ended.status == "done", ended
     assert not await asyncio.to_thread(notes.exists)
+
+
+async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_work_on(
+    runtime: Runtime, manager: RunManager, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 482: a hand-off that nobody answered in time and the run kept for the owner is listed on the run's page as
+    "Kept for you", with what I did it does and until when it waits, and among what waits on the Activity list; I did
+    it there starts the run that goes on from it in the same chat, with Dot's words under the goal."""
+    MODEL.script = ScriptedProvider(
+        _PROVIDER,
+        [
+            _turn(FINISH_TOOL, {"answer": "The invoice waits for you.", "success": True}),
+            _turn(FINISH_TOOL, {"answer": "The invoices are filed.", "success": True}),
+        ],
+    )
+    run: RunRecord = await manager.start(
+        "File the invoices", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        await manager.wait(run.id)
+    target: str = str(tmp_path / "invoice-1042.txt")
+    kept: ApprovalRecord = await runtime.store.create_kept_approval(
+        run.id,
+        "write_file",
+        f"Write {target} — {_WHY}",
+        "handoff",
+        {"tool": "write_file", "kind": "write", "risk": "medium", "target": target, "amount": None, "flags": []},
+        "digest-1042",
+        time.time() + 72 * 3600,
+    )
+    activity: httpx.Response = await client.get("/api/activity")
+    assert activity.status_code == 200, activity.text
+    rows: list[dict[str, object]] = [row for row in activity.json()["waiting"] if row["id"] == kept.id]
+    assert [(row["kind"], row["detail"]) for row in rows] == [
+        ("approval", "kept for you; once you did it, saying so carries the work on")
+    ]
+    host: str = client.base_url.host
+    port: int | None = client.base_url.port
+    assert port is not None
+    schemes: tuple[tuple[int, Literal["light", "dark"]], ...] = ((1280, "light"), (390, "dark"))
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for index, (width, scheme) in enumerate(schemes):
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
+                )
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"http://{host}:{port}/#/runs/{run.id}")
+                card = page.locator(".approval.handoff", has_text="Kept for you")
+                await expect(card).to_be_visible()
+                await expect(card).to_contain_text("Nobody answered in time, so the run went on without this step.")
+                await expect(card).to_contain_text("It waits until")
+                await expect(card.get_by_role("button", name="Skip this step")).to_be_visible()
+                assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                await card.scroll_into_view_if_needed()
+                await page.mouse.move(0, 0)
+                await page.screenshot(path=str(tmp_path / f"kept-{width}-{scheme}.png"), animations="disabled")
+                if index == len(schemes) - 1:
+                    await card.get_by_role("button", name="I did it").click()
+                    await expect(card).to_have_count(0)
+                await page.close()
+        finally:
+            await browser.close()
+    assert (await runtime.store.get_approval(kept.id)).status == "approved"
+    follow: RunRecord = (await runtime.store.list_runs(1, run.thread_id))[0]
+    assert follow.id != run.id
+    assert follow.goal.endswith(f"The user did the step that waited for them ({kept.id}) themselves; go on from there.")
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(follow.id)).status == "done"
