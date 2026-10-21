@@ -7,7 +7,7 @@ import time
 import pytest
 
 from dotagent.core.errors import ConfigError
-from dotagent.policy.engine import RULE_MATCH_TIMEOUT_S, match_rule
+from dotagent.policy.engine import RULE_MATCH_TIMEOUT_S, haystack_of, match_rule, rule_fits, ruling_rule
 from dotagent.policy.types import ActionInfo
 from dotagent.store.models import RuleRecord
 
@@ -42,3 +42,20 @@ def test_a_usual_rule_matches_as_before() -> None:
     assert match_rule(_action("git status"), [_rule(r"git\s+push")]) is None
     with pytest.raises(ConfigError, match="invalid regular expression"):
         match_rule(_action("x"), [_rule("(")])
+
+
+def test_the_first_rule_that_fits_by_position_decides_and_the_rules_after_it_are_not_read() -> None:
+    """Item 480: the rule that decides is the first that fits, by its position whatever the order of the list; the
+    expressions of the rules after it are not read, so one that would backtrack, or cannot be read, refuses nothing."""
+    first: RuleRecord = _rule(r"git\s+push").model_copy(update={"id": "first", "position": 1, "behavior": "allow"})
+    slow: RuleRecord = _rule(r"(a|aa)+$").model_copy(update={"id": "slow", "position": 2})
+    broken: RuleRecord = _rule("(").model_copy(update={"id": "broken", "position": 3})
+    pushed: str = "git push " + "a" * 60 + "b"
+    decided: RuleRecord | None = match_rule(_action(pushed), [broken, slow, first])
+    assert decided is not None and decided.id == "first"
+    assert rule_fits(first, "shell", haystack_of(_action(pushed)))
+    assert not rule_fits(first.model_copy(update={"enabled": False}), "shell", haystack_of(_action(pushed)))
+    assert not rule_fits(first, "write_file", haystack_of(_action(pushed)))
+    assert ruling_rule("shell", "git status\ngit status", [first, slow.model_copy(update={"match_regex": ""})]) == (
+        slow.model_copy(update={"match_regex": ""})
+    )
