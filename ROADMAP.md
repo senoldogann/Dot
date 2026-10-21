@@ -17135,8 +17135,6 @@ chat's newest run on both; on main the wide window never moves). Docs: `docs/dae
   OpenBot is written down.
 - 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.
-- 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat goes
-  on at the run a message from another screen started, at once, after a break of its stream, and as it opens again.
 - 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat's
   newest run goes on at the run a message from another screen started, at once, after a break of its stream, and as a
   phone loads it again; a page of an earlier run stays.
