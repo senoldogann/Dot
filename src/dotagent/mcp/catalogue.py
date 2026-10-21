@@ -14,7 +14,7 @@ HubSpot and Square (clients registered by hand), Vercel and Canva (approved clie
 own server (it refused Dot's registration; Framelink's server reads Figma with your token instead) and Semgrep's (it
 refused the resource Dot asks for). Any of them can still be added by its address.
 
-The services item 498 added were checked on 2026-10-21 by GET alone, as Dot's client reads them: each server's protected
+The services item 500 added were checked on 2026-10-21 by GET alone, as Dot's client reads them: each server's protected
 resource metadata and its authorization server's metadata offer dynamic client registration, a client without a secret
 (``none``) and PKCE with S256; Parallel's Search server is open to all, as its docs say. Left out then: Ahrefs (its
 metadata names no client without a secret), Make and Pipedrive (a client with a secret only), Datadog (its address is
