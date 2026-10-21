@@ -24,7 +24,8 @@ Contacts, Excel, Word, PowerPoint, Outlook and OneDrive) show the icon of the ap
 its bundle when the page is drawn (`GET /api/connections/{id}/icon`, a PNG; `connections/app_icons.py`), since Apple's
 and Microsoft's artwork is not Dot's to ship; one that is not installed keeps its own mark, a logo, an icon of the
 interface or letters (DeepWiki, Context7, Jina, Canva and Outlook have no logo to show). A server added by hand wears
-the logo of the service it is one of.
+the mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item
+477).
 
 A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel and Canva (their MCP servers
 let in approved clients only; Canva refused Dot's on 2026-10-19), and Asana and Box (clients registered by hand). Figma

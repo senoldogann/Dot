@@ -3633,6 +3633,19 @@ a.pill:hover {
   border: 1px solid var(--border);
 }
 
+/* A server and its tools wear their service's mark as its Customize tile does (item 477): on the tile's ground, light
+   in both colour schemes, its icon or letters in --plugin-ink. */
+.slash-mark[data-mark="service"] {
+  --plugin-ink: var(--mark-ink);
+  color: var(--plugin-ink);
+  background: var(--mark-ground);
+  box-shadow: inset 0 0 0 1px var(--mark-ring);
+}
+
+.slash-mark .plugin-letters {
+  font-size: var(--text-xs);
+}
+
 .slash-option[aria-selected="true"],
 .slash-option:hover {
   background: var(--surface-2);

@@ -23,7 +23,7 @@ from dotagent.config import (
     SnapshotSound,
 )
 from dotagent.connections.catalogue import ConnectionKind
-from dotagent.connections.directory import PluginView
+from dotagent.connections.directory import PluginView, ServiceMark
 from dotagent.connections.states import ConnectionState, ConnectionStep
 from dotagent.core.types import FrozenModel
 from dotagent.desktop.perms import Pane
@@ -1060,10 +1060,15 @@ class ProviderModels(FrozenModel):
 
 
 class PaletteSkill(FrozenModel):
+    """A skill of the palette: its name, what it is for, where it was found (``skills/catalog.py``), its own ``icon``
+    (item 408), and whether it is ``imported``, Dot's copy of another agent's skill (item 165), which its Customize
+    card marks as such, and so does the composer's menu (item 477)."""
+
     name: str
     description: str
     source: str
     icon: str
+    imported: bool
 
 
 class PaletteTool(FrozenModel):
@@ -1072,12 +1077,12 @@ class PaletteTool(FrozenModel):
 
 
 class PaletteServer(FrozenModel):
-    """An MCP server of the palette: its name, the tools it lists, and its own logo among the plugins' as the Customize
-    page draws it (item 408), or ``None`` for a server added by hand with no service behind it."""
+    """An MCP server of the palette: its name, the tools it lists, and the mark of its service as its Customize tile
+    wears it (items 408 and 477), or ``None`` for a server of no service, which wears the plug."""
 
     name: str
     tools: tuple[PaletteTool, ...]
-    logo: str | None = None
+    mark: ServiceMark | None
 
 
 class PaletteView(FrozenModel):
@@ -1206,8 +1211,9 @@ class McpServerView(FrozenModel):
     the only place that removes one. ``address`` is its URL or its command. ``state``: its tools are offered to runs
     (``ready``, with ``tools``, their names on the server), it was left out (``error`` says why), it is switched off
     in the config, or Dot tries it now, waiting for the owner to sign in on ``link`` (``signing_in``). ``signs_in``:
-    Dot signs in to it with the owner's account, and Sign in again renews that. ``picks_tools``: it was left out for
-    offering too many tools, and the owner chooses those to offer on the page (``allow``)."""
+    Dot signs in to it with the owner's account, and Sign in again renews that. ``mark``: its service's, the one the
+    service's tile wears (item 477), ``None`` for a server of no service (the plug). ``picks_tools``: it was left out
+    for offering too many tools, and the owner chooses those to offer on the page (``allow``)."""
 
     name: str
     origin: McpOrigin
@@ -1218,7 +1224,7 @@ class McpServerView(FrozenModel):
     error: str | None
     link: str | None
     signs_in: bool
-    logo: str | None
+    mark: ServiceMark | None
     picks_tools: bool
 
 

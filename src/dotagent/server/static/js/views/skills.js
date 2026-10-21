@@ -13,6 +13,7 @@
 import { api, query } from "../api.js";
 import { ago, clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
+import { IMPORTED_SKILL_MARK, LEARNED_SKILL_MARK, skillMark } from "../marks.js";
 import { emptyPanel, errorPanel, foldGroup, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
@@ -463,7 +464,7 @@ function learnedCard(skill, onChanged) {
     skill.agent_id === null ? null : el("span", { class: "chip" }, skill.shared ? `${skill.agentName ?? "An agent"}, shared` : (skill.agentName ?? "An agent")),
   ].filter((chip) => chip !== null);
   const facts = factsOf(chips, [skill.host, `Learned from ${plural(skill.runs.length, "run", "runs")}, last ${ago(skill.updated_at)}`, record]);
-  return skillCard({ name: skill.name, description: skill.description, mark: "brain", facts, actions: [share, drop].filter((one) => one !== null), have: skill.retired ? "Retired" : "Learned" });
+  return skillCard({ name: skill.name, description: skill.description, mark: LEARNED_SKILL_MARK, facts, actions: [share, drop].filter((one) => one !== null), have: skill.retired ? "Retired" : "Learned" });
 }
 
 // A chat's run that can give a skill at the owner's word, by what the page knows of it: it ended done, it is no
@@ -657,7 +658,7 @@ export function mount(root) {
     const copies = imported();
     const own = palette.skills.filter((skill) => OWN_SOURCES.has(skill.source) && !copies.has(skill.name) && matches(skill.name, skill.description));
     const ownCards = own.map((skill) =>
-      skillCard({ name: skill.name, description: skill.description, mark: skill.icon, facts: factsOf([], [skill.source === "home" ? "In Dot's skills folder" : "In a folder of the config"]), actions: [], have: "Installed" }),
+      skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], [skill.source === "home" ? "In Dot's skills folder" : "In a folder of the config"]), actions: [], have: "Installed" }),
     );
     const importedCards = [...copies.values()]
       .filter((skill) => matches(skill.name, skill.description))
@@ -665,7 +666,7 @@ export function mount(root) {
         const remove = el("button", { class: "btn ghost sm", type: "button" }, "Remove");
         remove.addEventListener("click", () => attempt(async () => foundChanged(await removeImported(skill))));
         const from = skill.gone ? `Imported from ${skill.agent}, which no longer has it` : `Imported from ${skill.agent}`;
-        return skillCard({ name: skill.name, description: skill.description, mark: "download", facts: factsOf([], [from]), actions: [remove], have: "Installed" });
+        return skillCard({ name: skill.name, description: skill.description, mark: IMPORTED_SKILL_MARK, facts: factsOf([], [from]), actions: [remove], have: "Installed" });
       });
     const named = withAgentNames(items, agents).filter((skill) => matches(skill.name, skill.description));
     const learnedCards = named.map((skill) => learnedCard(skill, changed));
@@ -687,13 +688,13 @@ export function mount(root) {
       section(
         "builtin",
         "Comes with Dot",
-        builtin.map((skill) => skillCard({ name: skill.name, description: skill.description, mark: skill.icon, facts: factsOf([], ["Comes with Dot"]), actions: [], have: "Installed" })),
+        builtin.map((skill) => skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([], ["Comes with Dot"]), actions: [], have: "Installed" })),
       ),
       section(
         "plugins",
         "From plugins",
         fromPlugins.map((skill) =>
-          skillCard({ name: skill.name, description: skill.description, mark: skill.icon, facts: factsOf([el("span", { class: "chip" }, skill.source.slice(PLUGIN_SOURCE.length))], []), actions: [], have: "Installed" }),
+          skillCard({ name: skill.name, description: skill.description, mark: skillMark(skill), facts: factsOf([el("span", { class: "chip" }, skill.source.slice(PLUGIN_SOURCE.length))], []), actions: [], have: "Installed" }),
         ),
       ),
     ];

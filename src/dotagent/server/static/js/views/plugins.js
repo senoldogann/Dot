@@ -13,6 +13,7 @@ import { accountsCard } from "../accounts.js";
 import { api, blobUrl } from "../api.js";
 import { clip, el, foldSearch, plural } from "../dom.js";
 import { icon } from "../icons.js";
+import { markContent, markInk } from "../marks.js";
 import { emptyPanel, errorPanel, field, loadingPanel, segmented } from "../panels.js";
 import { attempt, confirmDialog } from "../ui.js";
 
@@ -51,23 +52,6 @@ const WAY_NAMES = { mcp: "MCP server", mac: "AppleScript", web: "Dot's browser",
 const MCP_POLL_MS = 2000;
 // A server's tile names this many of its tools.
 const SHOWN_TOOLS = 6;
-// A colour lighter than this (its relative luminance, a contrast of 3 to 1 with the tile's white) does not read on the
-// tile: the icon or letters drawn in it take the ink.
-const LIGHTEST_INK = 0.3;
-
-/** The relative luminance of the colour `hex` (six digits, no "#"), as WCAG reckons it. */
-function luminance(hex) {
-  const [r, g, b] = [0, 2, 4].map((at) => {
-    const value = parseInt(hex.slice(at, at + 2), 16) / 255;
-    return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
-  });
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
-}
-
-/** A logo of `static/icons/plugins` as a picture, in its own colours. */
-function logoPicture(file) {
-  return el("img", { class: "plugin-logo", src: `/icons/plugins/${file}`, alt: "" });
-}
 
 /**
  * A service's mark on its tile, which is light in both colour schemes: its logo in its own colours, else the interface's
@@ -77,16 +61,10 @@ function logoPicture(file) {
  * meanwhile, and as it stays when the icon cannot be read (the one that asked says why).
  */
 export function pluginMark(plugin, appIcon) {
-  const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" });
-  if (plugin.colour !== null && luminance(plugin.colour) <= LIGHTEST_INK) {
-    mark.style.setProperty("--plugin-ink", `#${plugin.colour}`);
-  }
-  if (plugin.logo !== null) {
-    mark.append(logoPicture(plugin.logo));
-  } else if (plugin.glyph !== null) {
-    mark.append(icon(plugin.glyph));
-  } else {
-    mark.append(el("span", { class: "plugin-letters" }, plugin.monogram));
+  const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(plugin));
+  const ink = markInk(plugin.colour);
+  if (ink !== null) {
+    mark.style.setProperty("--plugin-ink", ink);
   }
   if (appIcon !== null) {
     appIcon.then(
@@ -463,11 +441,14 @@ export function mount(root, ctx) {
     );
   }
 
-  /** The mark of a server added by hand: the logo of the service it is one of, by its address or its command (item
-   * 408), else the plug. */
+  /** The mark of a server added by hand: the mark of the service it is one of, by its address or its command, as the
+   * service's tile wears it (items 408 and 477), else the plug. */
   function serverMark(server) {
-    const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" });
-    mark.append(server.logo === null ? icon("plug") : logoPicture(server.logo));
+    const mark = el("span", { class: "plugin-mark", "aria-hidden": "true" }, markContent(server.mark));
+    const ink = server.mark === null ? null : markInk(server.mark.colour);
+    if (ink !== null) {
+      mark.style.setProperty("--plugin-ink", ink);
+    }
     return mark;
   }
 

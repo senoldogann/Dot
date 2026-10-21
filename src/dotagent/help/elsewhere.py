@@ -30,6 +30,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.mcp.launch import SECRET_REFERENCE
 from dotagent.plugins.manifest import server_name
 from dotagent.plugins.types import MCP_FILE, SKILLS_DIR, JsonTransport, McpServerJson
+from dotagent.skills.catalog import HOME_SOURCE
 from dotagent.skills.discover import find_skill_files
 from dotagent.skills.parse import parse_skill
 from dotagent.skills.types import Skill
@@ -271,6 +272,15 @@ def copied_from(copy: Path) -> SkillCopy | None:
         return SkillCopy.model_validate_json(marker.read_bytes())
     except (OSError, ValidationError):
         return None
+
+
+def copied_skill_names(skills: Sequence[Skill]) -> frozenset[str]:
+    """The names of those of ``skills`` that are Dot's copies of another agent's: skills of its own folder whose marker
+    says so (:func:`copied_from`). Their Customize card marks them as imported, and so does the composer's menu (item
+    477)."""
+    return frozenset(
+        skill.name for skill in skills if skill.source == HOME_SOURCE and copied_from(skill.root) is not None
+    )
 
 
 def _skill_refusal(skill: Skill, copy: Path, has: DotHas, limit: CopyLimit) -> str | None:

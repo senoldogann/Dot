@@ -50,6 +50,17 @@ class PluginListing(FrozenModel):
     ways: tuple[PluginWay, ...]
 
 
+class ServiceMark(FrozenModel):
+    """A service's mark as its listing's tile wears it: ``logo``, else ``glyph``, else ``monogram``, the glyph or the
+    letters in ``colour`` (``None``: in the ink). A server of the service wears it on the Plugins page and in the
+    composer's menus (item 477)."""
+
+    logo: str | None
+    glyph: str | None
+    monogram: str | None
+    colour: str | None
+
+
 class PluginWayView(FrozenModel):
     """A way as the page shows it: how it connects, where the service's data goes once it does (``None`` for an
     untried way) and what it lets Dot do (its catalogue entry's words; ``None`` for an untried way)."""
@@ -931,10 +942,18 @@ def plugin_views() -> tuple[PluginView, ...]:
     return tuple(plugin_view(listing) for listing in PLUGINS)
 
 
-def logo_of_service(service_id: str) -> str | None:
-    """The file of the mark of the listing whose MCP way is the service ``service_id``, for the servers list (item
-    408); None for a service with no logo, or none of the directory."""
+def mark_of_service(service_id: str) -> ServiceMark | None:
+    """The mark of the listing whose MCP way is the service ``service_id``, as its tile wears it: what the servers list
+    draws a server of the service with (item 408), and the composer's menus too (item 477). None for a service of no
+    listing."""
     for listing in PLUGINS:
         if any(way.kind == "mcp" and way.ref == service_id for way in listing.ways):
-            return listing.logo
+            return ServiceMark(logo=listing.logo, glyph=listing.glyph, monogram=listing.monogram, colour=listing.colour)
     return None
+
+
+def logo_of_service(service_id: str) -> str | None:
+    """The file of the logo of the service ``service_id``'s listing, for the page that says how a sign-in came out;
+    None for a service with no logo, or none of the directory."""
+    mark: ServiceMark | None = mark_of_service(service_id)
+    return None if mark is None else mark.logo
