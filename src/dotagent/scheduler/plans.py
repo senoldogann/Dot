@@ -135,6 +135,23 @@ async def create_schedule(
         timing.first_run,
         request.options,
         thread_id,
+        True,
+    )
+
+
+async def create_schedule_off(
+    store: Store, config: SchedulerConfig, fallback_zone: ZoneInfo, request: ScheduleRequest, now: float
+) -> ScheduleRecord:
+    """Save a new schedule switched off (item 464: the schedule a template suggests, until the owner has read its
+    goal). Its options, its agent and its time are checked as for one switched on (a moment past, a gap under
+    ``[scheduler] min_interval_s``), but not the room for one more switched on, since it is not: switching it on
+    checks that (:func:`enable_schedule`)."""
+    _check_options(request.options)
+    await _check_agent(store, request.options)
+    zone: ZoneInfo = await schedule_zone(request.options, fallback_zone)
+    timing: Timing = plan_timing(request.cron, request.at, zone, config.min_interval_s, now)
+    return await store.add_schedule(
+        request.name, timing.cron, timing.run_at, request.goal, request.mode, None, request.options, None, False
     )
 
 

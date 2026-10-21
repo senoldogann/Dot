@@ -115,7 +115,7 @@ async def _decided(store: Store, run_id: str, decided_by: str, status: str) -> A
 
 async def _schedule_chat(store: Store, name: str) -> ThreadRecord:
     schedule: ScheduleRecord = await store.add_schedule(
-        name, "0 3 * * *", None, "Look.", "task", time.time() + 86_400, UNSET_OPTIONS, None
+        name, "0 3 * * *", None, "Look.", "task", time.time() + 86_400, UNSET_OPTIONS, None, True
     )
     chat: ThreadRecord = await store.create_thread(f"{name} · now", "schedule")
     await store.link_schedule_thread(chat.id, schedule.id)

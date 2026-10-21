@@ -3555,9 +3555,11 @@ class Store:
         next_run_at: float | None,
         options: ScheduleOptions,
         thread_id: str | None,
+        enabled: bool,
     ) -> ScheduleRecord:
-        """A new schedule, switched on; ``thread_id`` is the chat its first firing goes on in when it fires in the same
-        chat (a schedule a run made, item 291), ``None`` for none yet."""
+        """A new schedule, switched on or off (``enabled``; a template's is added switched off, item 464, with no
+        ``next_run_at``); ``thread_id`` is the chat its first firing goes on in when it fires in the same chat (a
+        schedule a run made, item 291), ``None`` for none yet."""
         record: ScheduleRecord = ScheduleRecord(
             id=new_id("sch"),
             name=name,
@@ -3565,7 +3567,7 @@ class Store:
             run_at=run_at,
             goal=goal,
             mode=mode,
-            enabled=True,
+            enabled=enabled,
             created_at=time.time(),
             last_run_at=None,
             next_run_at=next_run_at,
@@ -3586,7 +3588,7 @@ class Store:
                 run_at,
                 goal,
                 mode,
-                1,
+                int(enabled),
                 record.created_at,
                 None,
                 next_run_at,

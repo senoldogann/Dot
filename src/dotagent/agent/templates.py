@@ -25,7 +25,10 @@ class AgentTemplate(FrozenModel):
     only those, none of which drives Mail, Messages or a terminal (a Send it pressed on a web page would be an external
     send, under the owner's approvals); one that reads the owner's mail or calendar adds ``apple_script``, and one that
     runs something adds ``shell`` or the terminal's tools. ``needs`` says in a line what it needs of the Mac,
-    ``schedule`` the schedule to suggest in words, empty for one that runs when asked."""
+    ``schedule`` the schedule to suggest in words, empty for one that runs when asked. ``cron`` and ``task`` are that
+    schedule as one is made (item 464): when it fires, in the owner's time zone, and the goal of each of its runs, which
+    the agent's instructions then guide; both empty exactly when ``schedule`` is. A click that also schedules adds it
+    switched off, so that the owner reads the goal before it runs."""
 
     id: str
     name: str
@@ -35,6 +38,8 @@ class AgentTemplate(FrozenModel):
     look: AgentLook
     needs: str
     schedule: str
+    cron: str
+    task: str
 
 
 class AgentFile(FrozenModel):
@@ -113,6 +118,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="capsule", expression="excited", colour="orange"),
         needs="The web, and Mail to send the drafts",
         schedule="Weekdays at 9:00: ten new prospects",
+        cron="0 9 * * 1-5",
+        task=(
+            "Find ten new prospects who fit the owner's ideal customer and are not in prospects.csv yet, add them to "
+            "it, and draft a first email to each. End with the table of today's prospects and why each fits now."
+        ),
     ),
     AgentTemplate(
         id="talent-scout",
@@ -134,6 +144,11 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="droplet", expression="curious", colour="teal"),
         needs="The web, and Mail to send the drafts",
         schedule="Mondays at 10:00: new candidates",
+        cron="0 10 * * 1",
+        task=(
+            "Look for new candidates for the open role who are not in candidates.csv yet, add those who fit to it, and "
+            "draft a note to each strong fit. End with this week's ranked short list and the reason for each place."
+        ),
     ),
     AgentTemplate(
         id="paid-media",
@@ -153,6 +168,12 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="triangle", expression="attentive", colour="pink"),
         needs="Dot's Chrome signed in to the ad accounts, or their exports",
         schedule="Every day at 8:00: yesterday's results",
+        cron="0 8 * * *",
+        task=(
+            "Read yesterday's results of the owner's paid campaigns, add them to paid-media.csv, and compare yesterday "
+            "and the last 7 days with the 7 before. Change nothing in the ad accounts. End with what moved, what "
+            "spends without results, and three changes at most."
+        ),
     ),
     AgentTemplate(
         id="expense-manager",
@@ -173,6 +194,12 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="squircle", expression="neutral", colour="green"),
         needs="Mail and the folders the receipts are in",
         schedule="Fridays at 16:00: the week's receipts",
+        cron="0 16 * * 5",
+        task=(
+            "Gather this week's receipts from Mail, Downloads and the folders the owner named, add each new one to "
+            "expenses.csv once, and put this week's receipts in one folder. Pay, submit and approve nothing. End with "
+            "this week's totals by category and currency, and the receipts that need a look."
+        ),
     ),
     AgentTemplate(
         id="product-performance",
@@ -195,6 +222,12 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="hexagon", expression="proud", colour="blue"),
         needs="Dot's Chrome signed in to the dashboards, or their exports",
         schedule="Mondays at 9:00: last week's numbers",
+        cron="0 9 * * 1",
+        task=(
+            "Report last week's product numbers: compare them with the week before, add them to metrics.csv, and for "
+            "each number that moved more than usual say why it likely moved and how sure you are. End with what moved, "
+            "why, and what to do about it."
+        ),
     ),
     AgentTemplate(
         id="bug-reproduction",
@@ -215,6 +248,8 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="pebble", expression="suspicious", colour="red"),
         needs="The product to try, and its code or tracker if you have them",
         schedule="",
+        cron="",
+        task="",
     ),
     AgentTemplate(
         id="account-health",
@@ -236,6 +271,12 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="circle", expression="happy", colour="brown"),
         needs="Mail, and your CRM in Dot's Chrome if it is connected",
         schedule="Weekdays at 8:30: the accounts at risk",
+        cron="30 8 * * 1-5",
+        task=(
+            "Check the owner's key accounts for signs of risk since the last check, rate each green, yellow or red "
+            "with its evidence in accounts.csv, and draft a check-in for each yellow or red one. End with the ratings, "
+            "what changed since the last check and the drafts you wrote."
+        ),
     ),
     AgentTemplate(
         id="chief-of-staff",
@@ -257,6 +298,13 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="cloud", expression="attentive", colour="violet"),
         needs="Mail and Calendar",
         schedule="Weekdays at 7:30: the day's brief",
+        cron="30 7 * * 1-5",
+        task=(
+            "Prepare today's brief: read the inbox and the calendar of today and tomorrow, sort the mail, draft the "
+            "answers it needs, prepare each meeting and name the follow-ups due in follow-ups.csv. Accept, decline or "
+            "move no meeting. End with the three things that matter today, the meetings, the drafts waiting and the "
+            "follow-ups due."
+        ),
     ),
     AgentTemplate(
         id="reviewer",
@@ -292,6 +340,12 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="squircle", expression="unimpressed", colour="ink"),
         needs="The repository to review, git, and uv for the checks of what changed",
         schedule="Fridays at 17:00: the week's commits reviewed",
+        cron="0 17 * * 5",
+        task=(
+            "Review the last week's commits of the repository the owner named, against its own REVIEW.md, and write "
+            "the report to reports/. Change no other file. End with the verdict: what must be fixed and what you could "
+            "not check."
+        ),
     ),
     AgentTemplate(
         id="research-desk",
@@ -317,6 +371,8 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="hexagon", expression="curious", colour="grey"),
         needs="The web and Dot's Chrome for the pages that ask for one",
         schedule="",
+        cron="",
+        task="",
     ),
     AgentTemplate(
         id="competitor-watch",
@@ -340,6 +396,12 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="triangle", expression="suspicious", colour="ink"),
         needs="The web, and Dot's Chrome for the pages that need it",
         schedule="Mondays at 8:00: the week's changes",
+        cron="0 8 * * 1",
+        task=(
+            "Read what each competitor the owner named shows in public now, keep it in competitors/<name>/<date>.json, "
+            "and compare it with the last one kept. End with the competitors that moved, each change with its link and "
+            "date, and three moves at most for the owner's product."
+        ),
     ),
     AgentTemplate(
         id="release-qa",
@@ -365,6 +427,13 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="cloud", expression="attentive", colour="green"),
         needs="The live product, Dot's Chrome and a test account of its own",
         schedule="Fridays at 15:00: the week's walk",
+        cron="0 15 * * 5",
+        task=(
+            "Walk the owner's product in the test account the owner named, in Dot's Chrome, step by step as the last "
+            "release left it; say pass or fail for each step, keep this walk in qa-<date>.json and compare it with the "
+            "last one. Change nothing in the product. End with what must be fixed before the next release and which "
+            "calls need the owner."
+        ),
     ),
     AgentTemplate(
         id="copy-editor",
@@ -391,6 +460,8 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="circle", expression="happy", colour="cream"),
         needs="The drafts in the workspace, or the text the owner pastes",
         schedule="",
+        cron="",
+        task="",
     ),
     AgentTemplate(
         id="design-critic",
@@ -416,6 +487,8 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
         look=AgentLook(shape="pebble", expression="unimpressed", colour="violet"),
         needs="A screenshot, a link, or Dot's Chrome on the page",
         schedule="",
+        cron="",
+        task="",
     ),
 )
 

@@ -32,6 +32,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import (
     ScheduleRequest,
     create_schedule,
+    create_schedule_off,
     disable_schedule,
     edit_schedule,
     enable_schedule,
@@ -320,6 +321,8 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 agent_id=request.agent_id,
             ),
         )
+        if not request.enabled:
+            return await view_of(await create_schedule_off(store, config, zone, plan, time.time()))
         return await view_of(await create_schedule(store, config, zone, plan, time.time(), None))
 
     @router.patch("/schedules/{schedule_id}")

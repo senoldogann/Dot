@@ -97,8 +97,12 @@ function templateTools(template, known) {
 }
 
 /** A template's card (item 315): its face, name and role, what it needs of the Mac, the schedule it suggests and the
-    tools its agent may use. */
+    tools its agent may use. One that suggests a schedule offers to add it with the agent (item 464), switched off until
+    the owner has read its goal; `onUse(template, alsoSchedule)` makes them. */
 function templateCard(template, onUse, known) {
+  const also = template.cron === "" ? null : el("input", { type: "checkbox" });
+  const alsoRow =
+    also === null ? null : el("label", { class: "template-also" }, also, el("span", null, "Also add this schedule, switched off until you read its goal"));
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
@@ -109,7 +113,7 @@ function templateCard(template, onUse, known) {
   use.addEventListener("click", async () => {
     use.disabled = true;
     try {
-      await attempt(() => onUse(template));
+      await attempt(() => onUse(template, also !== null && also.checked));
     } finally {
       use.disabled = false;
     }
@@ -129,6 +133,7 @@ function templateCard(template, onUse, known) {
       templateFact("Needs", template.needs),
       templateFact("Schedule", template.schedule === "" ? "When you ask" : template.schedule),
     ),
+    alsoRow,
     templateTools(template, known),
     use,
   );
@@ -400,10 +405,21 @@ function mountList(root, ctx) {
     }
   }
 
-  async function useTemplate(template) {
+  // The agent, then its schedule switched off when it was asked for (item 464): the agent's page lists it with its goal
+  // to read and its switch. A schedule that could not be added leaves the agent made, and the toast says why.
+  async function useTemplate(template, alsoSchedule) {
     const saved = await api.post(`/agent-templates/${template.id}/use`, null);
     rememberLook(saved.id, saved.look);
-    toast("ok", `${saved.name} is ready.`);
+    if (!alsoSchedule) {
+      toast("ok", `${saved.name} is ready.`);
+    } else {
+      try {
+        await api.post("/schedules", { name: saved.name, goal: template.task, cron: template.cron, agent_id: saved.id, enabled: false });
+        toast("ok", `${saved.name} is ready, with its schedule switched off: read its goal, then switch it on.`);
+      } catch (error) {
+        toast("error", `${saved.name} is ready, but its schedule was not added: ${error.message}`);
+      }
+    }
     ctx.navigate(`/agents/${saved.id}`);
   }
 
@@ -649,6 +665,37 @@ function who(record, face) {
   );
 }
 
+/** A schedule the agent's runs run as (item 464): its switch, its name, its goal in full (a template's is added
+ * switched off, to be read before it runs), when it runs, and Edit, on the Schedules page. */
+function agentScheduleRow(view, onToggle) {
+  const { record } = view;
+  const toggle = el("button", {
+    class: "switch",
+    type: "button",
+    role: "switch",
+    "aria-checked": String(record.enabled),
+    "aria-label": `${record.enabled ? "Switch off" : "Switch on"} ${record.name}`,
+    title: record.enabled ? "Switch this schedule off" : "Switch this schedule on",
+    onclick: () => onToggle(record),
+  });
+  const state = !record.enabled
+    ? el("span", { class: "badge b-muted" }, "switched off")
+    : el("span", null, view.next_local === null ? "No further runs" : `Next ${view.next_local}`);
+  return el(
+    "div",
+    { class: "list-row", dataset: { schedule: record.id } },
+    toggle,
+    el(
+      "div",
+      { class: "row-main" },
+      el("div", { class: "row-title" }, record.name),
+      el("div", { class: "agent-schedule-goal" }, record.goal),
+      el("div", { class: "row-meta" }, el("span", { class: "mono", title: "When it runs" }, view.when), state),
+    ),
+    el("div", { class: "row-actions" }, el("a", { class: "btn ghost sm", href: "#/schedules", title: "Edit it on the Schedules page" }, "Edit")),
+  );
+}
+
 /** A lesson the agent learned: the note, how the agent's own runs fared after it, and Forget. */
 function lessonRow(record, score, onForget) {
   const forget = el("button", { class: "btn ghost sm", type: "button" }, "Forget");
@@ -798,6 +845,13 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
+  /** Switch one of the agent's schedules on or off, then show the lists as the daemon has them. */
+  async function switchSchedule(record) {
+    await api.post(`/schedules/${record.id}/${record.enabled ? "disable" : "enable"}`, null);
+    toast("ok", record.enabled ? `${record.name} is switched off.` : `${record.name} is switched on.`);
+    await refresh();
+  }
+
   async function forget(record) {
     const confirmed = await confirmDialog({
       title: "Forget this lesson?",
@@ -813,13 +867,14 @@ function mountPage(root, ctx, agentId) {
     }
   }
 
-  // The agent as the daemon has it now; null when the page went or a later load overtook this one. A failure takes
-  // the place of the page, with a way to try again.
+  // The agent as the daemon has it now, with the schedules its runs run as (item 464); null when the page went or a
+  // later load overtook this one. A failure takes the place of the page, with a way to try again.
   async function load() {
     const mine = ++ticket;
     try {
-      const detail = await api.get(`/agents/${agentId}`);
-      return disposed || mine !== ticket ? null : detail;
+      const [detail, schedules] = await Promise.all([api.get(`/agents/${agentId}`), api.get("/schedules")]);
+      const own = schedules.filter((view) => view.record.options.agent_id === agentId);
+      return disposed || mine !== ticket ? null : { ...detail, schedules: own };
     } catch (error) {
       if (!disposed && mine === ticket) {
         page.replaceChildren(errorPanel(error, () => attempt(reload)));
@@ -850,6 +905,13 @@ function mountPage(root, ctx, agentId) {
       },
     });
     const parts = [
+      homeSection(
+        "schedules",
+        "Schedules",
+        detail.schedules.map((view) => agentScheduleRow(view, (record) => attempt(() => switchSchedule(record)))),
+        folds,
+        toggleFold,
+      ),
       homeSection("chats", "Chats", detail.runs.map(runRow), folds, toggleFold),
       homeSection("learned", "What it learned", learned, folds, toggleFold),
       homeSection("messages", "Messages", detail.messages.map(messageRow), folds, toggleFold),
