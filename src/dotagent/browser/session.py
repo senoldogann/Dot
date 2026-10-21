@@ -456,6 +456,10 @@ class BrowserSession:
         self._launch_lock: asyncio.Lock = asyncio.Lock()
         self._tab_lock: asyncio.Lock = asyncio.Lock()
         self._threads: dict[str, ThreadTabs] = {}
+        # The values filled into each thread's pages from the password manager (item 493), which no result of the
+        # browser tools of the thread shows: kept apart from its tabs, which an idle thread lets go of while its chat
+        # goes on, and for as long as the daemon runs.
+        self._vault_values: dict[str, set[str]] = {}
         self._initial_pages: list[Page] = []
         self._adopting: set[asyncio.Task[None]] = set()
         # The answers under way to requests Chrome holds (:meth:`_guard_hops`), and by page the navigation of its main
@@ -2187,8 +2191,8 @@ class BrowserSession:
     ) -> PageView:
         """Fill a login of the owner's password manager into the thread's current tab (item 493), each part into its
         field, once the page is one of the login's sites (``fills_on`` of its address) and each field one its part may
-        go into, in a document of those sites (:func:`fill_login_field`). A page a script of the run ran in is
-        refused, in any tab of the thread: the script may have left a listener that copies what is typed. The values
+        go into, in a document of those sites (:func:`fill_login_field`). A thread a script of the run ran in is
+        refused while it has a tab open: the script may have left a listener that copies what is typed. The values
         are the thread's to mask from the moment one may be in the page, so that a fill that fails half way leaves
         masked what went in, and no script runs in the thread's tabs while the tab stays open; a field refused before
         anything went in leaves neither. What changed on the page is shown with its
@@ -2200,20 +2204,20 @@ class BrowserSession:
                     "this page is not one of the login's sites: Dot fills a login only on its own site",
                     {"url": tab.page.url},
                 )
-            if any(one.scripted for one in thread.tabs):
-                # A script may have left a listener that copies what is typed, in this page or, from a tab of the same
-                # site, into it.
+            if thread.scripted:
+                # A script may have left a listener that copies what is typed: in its page, in a tab it opened, in a
+                # page Chrome brings back from its cache.
                 raise BrowserError(
-                    "a script of this run ran in a page of this chat: Dot fills a login only where none ran. Open the "
-                    "page again, in a tab where no script ran",
-                    {"url": tab.page.url},
+                    "a script of this run ran in a tab of this chat: Dot fills a login only where none ran. Close the "
+                    "chat's tabs (browser_close_tab), then open the page again",
+                    {"url": tab.page.url, "tabs": len(thread.tabs)},
                 )
             for fill in fills:
                 value: str = fill.value.get_secret_value()
 
                 def typing(typed: str = value) -> None:
                     # From here the value may be in the page: masked, and no script runs while the tab is open.
-                    thread.vault_values.add(typed)
+                    self._vault_values.setdefault(thread_id, set()).add(typed)
                     tab.vault_held = True
 
                 await fill_login_field(
@@ -2226,8 +2230,7 @@ class BrowserSession:
     def vault_values(self, thread_id: str) -> frozenset[str]:
         """The values filled into the thread's pages from the password manager (item 493), which no result of the
         browser tools shows."""
-        thread: ThreadTabs | None = self._threads.get(thread_id)
-        return frozenset() if thread is None else frozenset(thread.vault_values)
+        return frozenset(self._vault_values.get(thread_id, ()))
 
     async def run_script(self, thread_id: str, script: str, timeout_s: float) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
@@ -2247,7 +2250,7 @@ class BrowserSession:
                     {"tabs": len([one for one in thread.tabs if one.vault_held])},
                 )
             tab: Tab = await self._current_tab(thread)
-            tab.scripted = True
+            thread.scripted = True
             before: _Watch = self._watch(thread, tab)
             started: float = time.monotonic()
             end, text = await run_script(tab.page, script, timeout_s)

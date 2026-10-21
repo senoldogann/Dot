@@ -52,7 +52,8 @@ from dotagent.browser.types import (
     VaultFill,
 )
 from dotagent.config import AppConfig, BrowserConfig
-from dotagent.core.errors import DotError, ToolInputError
+from dotagent.core.errors import DotError, ToolExecutionError, ToolInputError
+from dotagent.core.logs import get_logger
 from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
@@ -81,6 +82,8 @@ from dotagent.tools.context import ToolContext
 from dotagent.vault.hosts import fills_on, website_hosts
 from dotagent.vault.masking import masked, masked_json
 from dotagent.vault.onepassword import Login, LoginSecret, kept_token
+
+_log = get_logger(__name__)
 
 _NONCE_BYTES: int = 8
 _HEADROOM_CHARS: int = 3500  # room next to the page body for steps, tabs, notes and the fence lines
@@ -351,7 +354,9 @@ def _secret_field_check(ctx: ToolContext) -> SecretFieldCheck:
     async def enter(field: SecretField) -> None:
         flag: Flag = secret_field_flag(field.kind)
         summary: str = f"Type into {secret_field_label(field.kind)}" + ("" if field.ref is None else f" ({field.ref})")
-        await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, field.url, (flag,)))
+        # The page's address may hold a login filled from the password manager (item 493): the record keeps none.
+        url: str = masked(field.url, ctx.browser.vault_values(ctx.thread_id))
+        await ctx.gate.authorize(_action("browser_act", "browser_input", "high", summary, url, (flag,)))
 
     return enter
 
@@ -940,6 +945,16 @@ def _masked(tool: RegisteredTool) -> RegisteredTool:
             except DotError as error:
                 _mask_error(error, context.browser.vault_values(context.thread_id))
                 raise
+            except Exception as error:
+                # An error that is not Dot's own goes to the model and the log as it reads: once values were filled in
+                # the chat, its words are told masked and its chain is left out, where a value may be.
+                values: frozenset[str] = context.browser.vault_values(context.thread_id)
+                if not values:
+                    raise
+                _log.warning("browser_tool_failed", tool=tool.spec.name, error=type(error).__name__)
+                raise ToolExecutionError(
+                    f"{tool.spec.name} failed: {masked(str(error), values)}", {"error": type(error).__name__}
+                ) from None
             return result.model_copy(
                 update={"text": masked(result.text, context.browser.vault_values(context.thread_id))}
             )

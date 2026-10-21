@@ -273,6 +273,9 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     await _call(ctx, gate, "browser_close_tab", {"index": 1})
     read: ToolResult = await _call(ctx, gate, "browser_eval", {"script": "document.title"})
     assert "Home" in read.text, read.text
+    # The values stay the chat's to mask when its tabs are let go of, as an idle chat's are, while the chat goes on.
+    await runtime.browser.release_thread(ctx.thread_id)
+    assert PASSWORD in runtime.browser.vault_values(ctx.thread_id)
     # The yolo run's record of the fill says what was filled, never a value.
     records: list[ApprovalRecord] = [
         record for record in await runtime.store.list_approvals(None, 50) if record.run_id == ctx.run_id
@@ -292,10 +295,21 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["user"]})
     with pytest.raises(BrowserError, match="in a frame of another site"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["frame"]})
-    # A script of the run ran in the page: it may have left a listener that copies what is typed.
+    # A script of the run ran in the page: it may have left a listener that copies what is typed, in its page or in a
+    # tab it opened, so no tab of the chat gets a login until none of them is open.
     await _call(ctx, gate, "browser_eval", {"script": "1 + 1"})
     with pytest.raises(BrowserError, match="Dot fills a login only where none ran"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["pass"]})
+    opened: ToolResult = await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/login"})
+    fresh: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', opened.text)
+    assert fresh is not None, opened.text
+    with pytest.raises(BrowserError, match="Dot fills a login only where none ran"):
+        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": fresh.group(1)})
+    await _call(ctx, gate, "browser_close_tab", {"index": 2})
+    await _call(ctx, gate, "browser_close_tab", {"index": 1})
+    again: dict[str, str] = await _form(ctx, gate, site)
+    filled: ToolResult = await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": again["pass"]})
+    _unseen(filled.text)
 
 
 async def test_in_auto_the_owner_answers_the_fill_and_not_the_review_model(runtime: Runtime, site: _Site) -> None:
