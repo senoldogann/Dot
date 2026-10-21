@@ -213,12 +213,13 @@ async def _start_campaign(manager: RunManager) -> RunRecord:
     )
 
 
-async def _ended_sessions(runtime: Runtime, campaign_id: str, count: int) -> list[RunRecord]:
-    """The campaign's sessions once ``count`` of them have ended."""
+async def _ended_sessions(runtime: Runtime, manager: RunManager, campaign_id: str, count: int) -> list[RunRecord]:
+    """The campaign's sessions once ``count`` of them have ended and what follows each is planned: a session's end is
+    stored before its campaign's next session is (``RunManager._record_end``), and ``wait`` returns after both."""
     while True:
         sessions: list[RunRecord] = await runtime.store.campaign_sessions(campaign_id)
         if len(sessions) >= count and all(session.status not in WORKING_STATUSES for session in sessions):
-            return sessions
+            return [await manager.wait(session.id) for session in sessions]
         await asyncio.sleep(_POLL_S)
 
 
@@ -313,7 +314,7 @@ async def test_a_session_started_by_the_scheduler_reads_the_brief_and_only_an_ac
             opening: RunRecord = await _start_campaign(manager)
             assert opening.campaign_id is not None
             async with asyncio.timeout(_TIME_LIMIT_S):
-                sessions: list[RunRecord] = await _ended_sessions(runtime, opening.campaign_id, 2)
+                sessions: list[RunRecord] = await _ended_sessions(runtime, manager, opening.campaign_id, 2)
         finally:
             await scheduler.stop()
         told: list[EventRecord] = [ending.queue.get_nowait() for _ in range(ending.queue.qsize())]
