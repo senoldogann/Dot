@@ -5,6 +5,13 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- A message sent from a chat that is over no longer jumps the chat up and back down: it stays at its foot until the
+  next run's page takes its place. A chat whose run is over opens with every message already there, instead of
+  filling in as its stream is read (item 454).
+- `[browser] idle_close_s` closes Dot's own Chrome, with its Playwright driver, once nobody used it for that long, so it
+  does not keep its memory all day; while it runs macOS takes it for your Google Chrome, and a click on Chrome in the
+  Dock brings Dot's forward instead of opening yours. It is off (0) unless you set it; Dot's Chrome starts again signed
+  in as before (Incognito keeps nothing), since it keeps its session cookies (item 454).
 - Schedules: a repeating schedule whose runs fail so many times in a row (its **Switch off after**, or `[scheduler]
   stop_after_failures`; never by default) is switched off and you are told once; its row says how many failed in a
   row (item 458).

@@ -3,7 +3,7 @@
 
 import { actorFace, dotFace, setActorState } from "../actors.js";
 import { agentList } from "../agentlist.js";
-import { api, follow } from "../api.js";
+import { api, eventNotShown, follow, query, sse } from "../api.js";
 import { AUTO_COMPUTER, BUSY_SEND, settingValue } from "../appearance/settings.js";
 import { approvalCard, fromRecord, LEFT_IN_CAMPAIGN, LEFT_IN_RUN } from "../approvals.js";
 import { messageText, readyToSend } from "../attachments.js";
@@ -129,8 +129,8 @@ function planStep(step) {
 }
 
 /**
- * Build the page of a loaded run and start following it. `history` is `{ earlier }`, the runs of the conversation
- * before this one; `historyProblem` is the error that kept them from loading, or null. Returns the
+ * Build the page of a loaded run and start following it. `history` is `loadHistory`'s `{ earlier, read }`, the runs of
+ * the conversation before this one; `historyProblem` is the error that kept them from loading, or null. Returns the
  * function that stops everything the page started.
  */
 // The runs opened last, kept while the page lives (`{ detail, history, messages }`, the stream's messages so far), so
@@ -1379,7 +1379,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
 
   // The conversation grows into the room a short one leaves, so the dock under it stands at the window's foot from the
   // first message (item 129).
-  const earlier = earlierTurns(history.earlier, (past) => (past.rewindable ? () => editFromHere(past) : null), signal);
+  const earlier = earlierTurns(history, (past) => (past.rewindable ? () => editFromHere(past) : null), signal);
   const thread = el(
     "div",
     { class: "run-thread" },
@@ -1447,7 +1447,8 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   paintAgents();
   window.addEventListener("scroll", onScroll, { passive: true });
   thread.addEventListener("scroll", onScroll, { passive: true });
-  // On a phone the chat is one screen while the page is open (item 352, run.css).
+  // On a phone the chat is one screen while the page is open (item 352, run.css); the frame stays while the chat goes on
+  // at its next run, and goes with the page (main.js).
   document.documentElement.classList.add("chat-shell");
   // Lessons change after the run, and a question may be answered or skipped in another tab, as a draft may be sent or
   // discarded on another screen (item 314). A helper that starts or ends is read from the store too.
@@ -1481,9 +1482,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       timeline.tick(Date.now() / 1000);
     }
   };
-  // What was read of the stream before the page left goes in at once; the stream goes on after its last message.
+  // What was read of the stream (before the page left, or whole for a run that is over) goes in at once; the stream goes
+  // on after its last message. An event the page fails to show is told, as on the stream, and the next one goes in.
   for (const message of kept.messages) {
-    take(message);
+    try {
+      take(message);
+    } catch (error) {
+      eventNotShown(`/runs/${runId}/stream`, message, error);
+    }
   }
   keepRun(runId, kept);
   if (kept.messages.length > 0) {
@@ -1528,7 +1534,6 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   return () => {
     window.removeEventListener("scroll", onScroll);
     thread.removeEventListener("scroll", onScroll);
-    document.documentElement.classList.remove("chat-shell");
     filesWatch.disconnect();
     lessonCuts.disconnect();
     settling.disconnect();
@@ -1602,10 +1607,23 @@ export function mount(root, ctx) {
     if (kept === undefined) {
       keptRuns.delete(runId);
     }
-    root.replaceChildren(loadingPanel());
+    // What stands here (the chat that goes on here from another of its runs, main.js's `goOn`; this page read again, or
+    // the error it failed with) stays until this one is drawn over it, only to be seen: a word typed into it or a click
+    // on it would reach a page that is gone.
+    if (root.firstChild === null) {
+      root.replaceChildren(loadingPanel());
+    }
+    for (const child of root.children) {
+      child.inert = true;
+    }
     let detail;
+    let messages = [];
     try {
       detail = await api.get(`/runs/${runId}`);
+      // A run that is over is read whole before it is drawn (item 454), not filled in as its stream comes.
+      if (kept === undefined && !detail.active && !detail.elsewhere) {
+        messages = await storedMessages();
+      }
     } catch (error) {
       if (controller.signal.aborted) {
         return;
@@ -1626,10 +1644,10 @@ export function mount(root, ctx) {
       shown();
       return;
     }
-    let history = { earlier: [] };
+    let history = { earlier: [], read: new Map() };
     let historyProblem = null;
     try {
-      history = await loadHistory(detail.run);
+      history = await loadHistory(detail.run, controller.signal);
     } catch (error) {
       console.warn("the conversation of this run could not be listed", error);
       historyProblem = error;
@@ -1637,9 +1655,19 @@ export function mount(root, ctx) {
     if (controller.signal.aborted) {
       return;
     }
-    const fresh = { detail, history, messages: [] };
+    const fresh = { detail, history, messages };
     stopRun = showRun({ root, ctx, signal: controller.signal, detail, history, historyProblem, reload: () => attempt(() => open(true)), kept: fresh });
     shown();
+  }
+
+  /** The stored events of the run, that is over, and of the runs it delegated to: read whole before the chat is drawn,
+   * so a finished chat opens as it ended instead of filling in as its stream is read (the stream ends after them). */
+  async function storedMessages() {
+    const read = [];
+    for await (const message of sse(`/runs/${runId}/stream${query({ after: 0 })}`, controller.signal, () => undefined)) {
+      read.push(message);
+    }
+    return read;
   }
 
   // The page shows its chat, scrolled where it opens, or why it cannot (item 328): sent once the frame that scrolls it

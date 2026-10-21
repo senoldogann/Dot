@@ -14,7 +14,7 @@ import contextlib
 import re
 import secrets
 import time
-from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Mapping, Sequence
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Iterator, Mapping, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from functools import partial
@@ -456,6 +456,10 @@ class BrowserSession:
         # with the setting up of its session, which a navigation of the page waits for.
         self._guarded: dict[Page, asyncio.Task[None]] = {}
         self._reaper: asyncio.Task[None] | None = None
+        # The uses of Chrome under way that no chat's tabs hold (a page read for the web tools, a count of the cookies),
+        # and when Chrome was last started or such a use ended: the idle close counts both as uses (item 454).
+        self._uses: int = 0
+        self._used_at: float = time.monotonic()
         self._closed: bool = False
         # The front of the Mac around Dot's own Chrome (item 118): Chrome's process, the application that had the front
         # when a thread last began to act, and the checks under way that give the front back after a page's own tab.
@@ -691,6 +695,7 @@ class BrowserSession:
         context.on("close", self._on_context_closed)
         self._initial_pages = list(opened.spare_pages)
         self._context = context
+        self._used_at = time.monotonic()
         if self._reaper is None:
             self._reaper = asyncio.create_task(self._reap_idle())
         return context
@@ -916,8 +921,10 @@ class BrowserSession:
             _log.warning("browser_detach_failed", error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS))
 
     async def _reap_idle(self) -> None:
-        """Release the tabs of the threads not used for ``tab_idle_s``, as long as the session is open. A thread whose
-        tabs cannot be released is logged and tried again at the next round, and the others are still released."""
+        """Release the tabs of the threads not used for ``tab_idle_s``, and close Dot's own Chrome once it is
+        unused (:meth:`_close_unused`), as long as the session is open. A thread whose tabs cannot be released, and a
+        Chrome that cannot be closed, are logged and tried again at the next round; the other threads are still
+        released."""
         while True:
             await asyncio.sleep(_REAP_INTERVAL_S)
             cutoff: float = time.monotonic() - self._config.tab_idle_s
@@ -927,16 +934,61 @@ class BrowserSession:
                     await self.release_thread(thread_id)
                 except Exception:  # noqa: BLE001 - logged with its traceback
                     _log.exception("browser_idle_release_failed", thread_id=thread_id)
+            try:
+                await self._close_unused()
+            except Exception:  # noqa: BLE001 - logged with its traceback
+                _log.exception("browser_idle_close_failed", profile=str(self._profile))
+
+    def _unused(self) -> bool:
+        """Whether Dot's own Chrome, or the driver left from one the owner quit, has been unused for ``idle_close_s``:
+        no chat's step is under way in it, no run at work holds tabs in it, no use that no chat holds is under way
+        (:meth:`_in_use`), no task is being taught in it, and nothing used it for that long since it started."""
+        config: BrowserConfig = self._config
+        if config.mode != "own" or config.idle_close_s == 0 or self._playwright is None or self._closed:
+            return False
+        if self._uses > 0 or self._teaching is not None or threads_in_use(self._threads, self._kept()):
+            return False
+        used: float = max([self._used_at, *(thread.last_used for thread in self._threads.values())])
+        return time.monotonic() - used >= config.idle_close_s
+
+    async def _close_unused(self) -> None:
+        """Close Dot's own Chrome and stop the driver once they are unused (:meth:`_unused`, item 454), unless its
+        window is the one in front, where the owner may be using it. A Chrome left open keeps its memory, and macOS
+        takes it for the owner's Google Chrome: the Dock's icon then brings it forward instead of opening theirs. The
+        next call that needs it starts it again on the same profile; the chats' tabs go with it."""
+        if not self._unused():
+            return
+        chrome: int | None = self._chrome_pid
+        if chrome is not None and await asyncio.to_thread(front_pid) == chrome:
+            return
+        async with self._launch_lock:
+            if not self._unused():
+                return
+            had_chrome: bool = self._context is not None
+            await self._let_go()
+        _log.info("browser_idle_closed", profile=str(self._profile), chrome=had_chrome)
+
+    @contextlib.contextmanager
+    def _in_use(self) -> Iterator[None]:
+        """Count a use of Chrome that no chat's tabs hold while it lasts, and as the latest use once it ends, so that
+        the idle close (:meth:`_unused`) does not close Chrome under it."""
+        self._uses += 1
+        try:
+            yield
+        finally:
+            self._uses -= 1
+            self._used_at = time.monotonic()
 
     async def attachment(self) -> Attachment:
         """The Chrome of the user that this session works in; connects first when it is not connected yet."""
-        context: BrowserContext = await self._ensure_context()
-        browser: Browser | None = self._browser
-        if browser is None:
-            raise BrowserError(
-                "this session works in Dot's own Chrome, not in the open one", {"mode": self._config.mode}
-            )
-        return Attachment(browser_version=browser.version, open_tabs=len(context.pages))
+        with self._in_use():
+            context: BrowserContext = await self._ensure_context()
+            browser: Browser | None = self._browser
+            if browser is None:
+                raise BrowserError(
+                    "this session works in Dot's own Chrome, not in the open one", {"mode": self._config.mode}
+                )
+            return Attachment(browser_version=browser.version, open_tabs=len(context.pages))
 
     async def live_cookies(self) -> frozenset[tuple[str, str]] | None:
         """The host and name of every cookie Dot's own Chrome holds now (item 278); ``None`` while it does not run, and
@@ -945,7 +997,8 @@ class BrowserSession:
         if context is None or self.mode != "own":
             return None
         try:
-            cookies: list[Cookie] = await context.cookies()
+            with self._in_use():
+                cookies: list[Cookie] = await context.cookies()
         except PlaywrightError as error:
             raise BrowserError(
                 "the cookies of Dot's browser could not be listed",
@@ -955,9 +1008,9 @@ class BrowserSession:
 
     async def stored_cookie_count(self) -> int:
         """How many cookies Chrome could read from the profile; cookies it cannot decrypt are not counted."""
-        context: BrowserContext = await self._ensure_context()
         try:
-            return len(await context.cookies())
+            with self._in_use():
+                return len(await (await self._ensure_context()).cookies())
         except PlaywrightError as error:
             raise BrowserError(
                 "the cookies of the browser profile could not be listed",
@@ -1553,6 +1606,11 @@ class BrowserSession:
         return self._config.mode == "own" and not self._config.headless
 
     async def read_page(self, url: str) -> RenderedDocument:
+        """Read ``url`` (:meth:`_read_page`) as a use of Chrome that the idle close waits for."""
+        with self._in_use():
+            return await self._read_page(url)
+
+    async def _read_page(self, url: str) -> RenderedDocument:
         """Read ``url`` in a tab of its own, one no thread owns and that closes when the read is over: the address the
         page ended on, the status of its last main response and its HTML after JavaScript ran and the page settled. A
         page that answered with a bot wall gets a few seconds to pass its own check first. For the web tools, when a
@@ -1782,46 +1840,48 @@ class BrowserSession:
         reads them: a tab that does not change sends nothing, and ``None`` comes once a second in between so the caller
         can check whether it still wants frames. The cast follows the current tab when the model switches or closes it,
         waits while the thread has no tab yet, and ends when the browser is closed."""
-        while not self._closed:
-            tab: Tab | None = self._tab_of(thread_id)
-            if tab is None:
-                await asyncio.sleep(_CAST_POLL_S)
-                yield None
-                continue
-            frames: asyncio.Queue[JsonObject] = asyncio.Queue()
-            try:
-                session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
-            except PlaywrightError:
-                await asyncio.sleep(_CAST_POLL_S)
-                yield None
-                continue
-            try:
-                session.on("Page.screencastFrame", frames.put_nowait)
-                await session.send(
-                    "Page.startScreencast",
-                    {
-                        "format": "jpeg",
-                        "quality": _CAST_QUALITY,
-                        "maxWidth": _CAST_MAX_EDGE,
-                        "maxHeight": _CAST_MAX_EDGE,
-                        "everyNthFrame": 1,
-                    },
-                )
-                while self._tab_of(thread_id) is tab:
-                    try:
-                        frame: JsonObject = await asyncio.wait_for(frames.get(), _CAST_POLL_S)
-                    except TimeoutError:
-                        yield None
-                        continue
-                    await session.send("Page.screencastFrameAck", {"sessionId": frame["sessionId"]})
-                    yield Frame(url=tab.page.url, data=base64.b64decode(str(frame["data"])))
-            except PlaywrightError:
-                # The tab went away under the cast; the loop attaches to whatever tab is current now.
-                pass
-            finally:
-                with contextlib.suppress(PlaywrightError):
-                    await session.send("Page.stopScreencast")
-                    await session.detach()
+        # The owner watches the tab: a use of Chrome the idle close waits for (item 454).
+        with self._in_use():
+            while not self._closed:
+                tab: Tab | None = self._tab_of(thread_id)
+                if tab is None:
+                    await asyncio.sleep(_CAST_POLL_S)
+                    yield None
+                    continue
+                frames: asyncio.Queue[JsonObject] = asyncio.Queue()
+                try:
+                    session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
+                except PlaywrightError:
+                    await asyncio.sleep(_CAST_POLL_S)
+                    yield None
+                    continue
+                try:
+                    session.on("Page.screencastFrame", frames.put_nowait)
+                    await session.send(
+                        "Page.startScreencast",
+                        {
+                            "format": "jpeg",
+                            "quality": _CAST_QUALITY,
+                            "maxWidth": _CAST_MAX_EDGE,
+                            "maxHeight": _CAST_MAX_EDGE,
+                            "everyNthFrame": 1,
+                        },
+                    )
+                    while self._tab_of(thread_id) is tab:
+                        try:
+                            frame: JsonObject = await asyncio.wait_for(frames.get(), _CAST_POLL_S)
+                        except TimeoutError:
+                            yield None
+                            continue
+                        await session.send("Page.screencastFrameAck", {"sessionId": frame["sessionId"]})
+                        yield Frame(url=tab.page.url, data=base64.b64decode(str(frame["data"])))
+                except PlaywrightError:
+                    # The tab went away under the cast; the loop attaches to whatever tab is current now.
+                    pass
+                finally:
+                    with contextlib.suppress(PlaywrightError):
+                        await session.send("Page.stopScreencast")
+                        await session.detach()
 
     async def _run_steps(
         self, thread: ThreadTabs, tab: Tab, steps: Sequence[Step], secret_field: SecretFieldCheck

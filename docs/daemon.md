@@ -243,7 +243,11 @@ stay (item 274): formatted as it comes, drawn at most once a frame with the part
 caret at the end of its text, so that its end moves nothing. An answer that ends a run while its page is open is written
 in the same way (item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands
 on it as it will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a reply
-that streamed already and reduced motion show it at once. The answer of the run is the last message, with a copy button
+that streamed already and reduced motion show it at once. A chat whose run is over opens drawn whole (item 454): its
+events, those of the runs it delegated to, and the work of the turn before it are read before the page is drawn, so
+nothing fills in as the stream comes. A message sent from a chat that is over starts the next run in the same chat
+without a jump: the chat stands where it was, at its foot, inert, until the next run's page is drawn in its place,
+never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
 (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
 the run took shows where the pointer rests on it (on a touch screen it always shows). A copy out of the conversation
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
