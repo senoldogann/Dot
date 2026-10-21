@@ -16086,14 +16086,15 @@ it worked and ended meanwhile is item 446's, left as it built it. *Chrome:* Dot'
 Chrome app on a profile of its own, and it ran until the daemon stopped. Measured with a Chrome started as Dot starts
 it: `open -b com.google.Chrome`, which a Dock click amounts to, starts no Chrome of the owner's but goes to Dot's. It
 can now close with its Playwright driver after `[browser] idle_close_s` unused: no chat's step under way, no run at work
-holding tabs in it, no page read in it for the web tools (`_in_use`), no task taught in it, its window not in front
-(`BrowserSession._close_unused`, run by the tab reaper). It is off (0) by default: a close loses the cookies a site
-keeps only for the session, which item 453 (keeping them across Chrome's restarts) is to fix; once that is in main the
-default can be 300 s. Also measured: a Chrome whose driver is killed exits with it, so a crashed daemon leaves no Chrome
-behind. Left as it was: background terminal commands still run until closed (`terminal_idle_s` closes idle sessions), by
-design for a server a run starts for the owner; while a run works in Dot's Chrome the Dock still brings it forward
-(`attach` mode avoids it). Measured in `tests/smoke/test_chat_scroll.py` (the window falls from 789 px to 0 on the code
-before; a finished chat's answer is there with its page) and `tests/smoke/test_browser.py`.
+holding tabs in it, no page read in it for the web tools or watched under "Dot's computer" (`_in_use`), no task taught
+in it, its window not in front (`BrowserSession._close_unused`, run by the tab reaper). It is off (0) by default: a
+close loses the cookies a site keeps only for the session, which item 453 (keeping them across Chrome's restarts) is to
+fix; once that is in main the default can be 300 s. Also measured: a Chrome whose driver is killed exits with it, so a
+crashed daemon leaves no Chrome behind. Left as it was: background terminal commands still run until closed
+(`terminal_idle_s` closes idle sessions), by design for a server a run starts for the owner; while a run works in Dot's
+Chrome the Dock still brings it forward (`attach` mode avoids it). Measured in `tests/smoke/test_chat_scroll.py` (the
+window falls from 789 px to 0 on the code before; a finished chat's answer is there with its page) and
+`tests/smoke/test_browser.py`.
 
 ## Log
 

@@ -1607,9 +1607,14 @@ export function mount(root, ctx) {
     if (kept === undefined) {
       keptRuns.delete(runId);
     }
-    // The chat that goes on here from another of its runs stands until this one is drawn over it (main.js's `goOn`).
+    // What stands here (the chat that goes on here from another of its runs, main.js's `goOn`; this page read again, or
+    // the error it failed with) stays until this one is drawn over it, only to be seen: a word typed into it or a click
+    // on it would reach a page that is gone.
     if (root.firstChild === null) {
       root.replaceChildren(loadingPanel());
+    }
+    for (const child of root.children) {
+      child.inert = true;
     }
     let detail;
     let messages = [];

@@ -446,10 +446,6 @@ function beginSession() {
    * empty the chat, lift it to its top and drop it back to its foot. */
   function goOn() {
     leavePage();
-    // What stands of it is only to be seen: a word typed into it or a click on it would reach a page that is gone.
-    for (const child of shell.main.children) {
-      child.inert = true;
-    }
     return openPage();
   }
 

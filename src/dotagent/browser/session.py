@@ -1830,46 +1830,48 @@ class BrowserSession:
         reads them: a tab that does not change sends nothing, and ``None`` comes once a second in between so the caller
         can check whether it still wants frames. The cast follows the current tab when the model switches or closes it,
         waits while the thread has no tab yet, and ends when the browser is closed."""
-        while not self._closed:
-            tab: Tab | None = self._tab_of(thread_id)
-            if tab is None:
-                await asyncio.sleep(_CAST_POLL_S)
-                yield None
-                continue
-            frames: asyncio.Queue[JsonObject] = asyncio.Queue()
-            try:
-                session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
-            except PlaywrightError:
-                await asyncio.sleep(_CAST_POLL_S)
-                yield None
-                continue
-            try:
-                session.on("Page.screencastFrame", frames.put_nowait)
-                await session.send(
-                    "Page.startScreencast",
-                    {
-                        "format": "jpeg",
-                        "quality": _CAST_QUALITY,
-                        "maxWidth": _CAST_MAX_EDGE,
-                        "maxHeight": _CAST_MAX_EDGE,
-                        "everyNthFrame": 1,
-                    },
-                )
-                while self._tab_of(thread_id) is tab:
-                    try:
-                        frame: JsonObject = await asyncio.wait_for(frames.get(), _CAST_POLL_S)
-                    except TimeoutError:
-                        yield None
-                        continue
-                    await session.send("Page.screencastFrameAck", {"sessionId": frame["sessionId"]})
-                    yield Frame(url=tab.page.url, data=base64.b64decode(str(frame["data"])))
-            except PlaywrightError:
-                # The tab went away under the cast; the loop attaches to whatever tab is current now.
-                pass
-            finally:
-                with contextlib.suppress(PlaywrightError):
-                    await session.send("Page.stopScreencast")
-                    await session.detach()
+        # The owner watches the tab: a use of Chrome the idle close waits for (item 454).
+        with self._in_use():
+            while not self._closed:
+                tab: Tab | None = self._tab_of(thread_id)
+                if tab is None:
+                    await asyncio.sleep(_CAST_POLL_S)
+                    yield None
+                    continue
+                frames: asyncio.Queue[JsonObject] = asyncio.Queue()
+                try:
+                    session: CDPSession = await tab.page.context.new_cdp_session(tab.page)
+                except PlaywrightError:
+                    await asyncio.sleep(_CAST_POLL_S)
+                    yield None
+                    continue
+                try:
+                    session.on("Page.screencastFrame", frames.put_nowait)
+                    await session.send(
+                        "Page.startScreencast",
+                        {
+                            "format": "jpeg",
+                            "quality": _CAST_QUALITY,
+                            "maxWidth": _CAST_MAX_EDGE,
+                            "maxHeight": _CAST_MAX_EDGE,
+                            "everyNthFrame": 1,
+                        },
+                    )
+                    while self._tab_of(thread_id) is tab:
+                        try:
+                            frame: JsonObject = await asyncio.wait_for(frames.get(), _CAST_POLL_S)
+                        except TimeoutError:
+                            yield None
+                            continue
+                        await session.send("Page.screencastFrameAck", {"sessionId": frame["sessionId"]})
+                        yield Frame(url=tab.page.url, data=base64.b64decode(str(frame["data"])))
+                except PlaywrightError:
+                    # The tab went away under the cast; the loop attaches to whatever tab is current now.
+                    pass
+                finally:
+                    with contextlib.suppress(PlaywrightError):
+                        await session.send("Page.stopScreencast")
+                        await session.detach()
 
     async def _run_steps(
         self, thread: ThreadTabs, tab: Tab, steps: Sequence[Step], secret_field: SecretFieldCheck
