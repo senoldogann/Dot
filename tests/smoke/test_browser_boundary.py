@@ -314,6 +314,15 @@ async def test_a_resource_a_fetch_and_a_script_of_the_page_are_refused(
         "resource", f"fetch('{inside}/api/status').then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)", 10.0
     )
     assert "failed" in fetched.text, fetched
+    # The owner's input to a held run's page (item 470): a page cannot post it either.
+    posted: ScriptRun = await browser.run_script(
+        "resource",
+        f"fetch('{inside}/api/runs/run-1/input', {{method: 'POST', headers: {{'Content-Type': 'application/json'}}, "
+        "body: JSON.stringify({events: [{kind: 'text', text: 'from the page'}]})})"
+        ".then((r) => 'status ' + r.status, (e) => 'failed: ' + e.name)",
+        10.0,
+    )
+    assert "failed" in posted.text, posted
     # A script that sends the tab there: the request is refused, and the tab is reset as after a redirect there.
     with pytest.raises(ForbiddenUrlError) as refused:
         await browser.run_script("resource", f"() => {{ location.href = '{inside}/script'; }}", 10.0)

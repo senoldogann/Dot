@@ -341,6 +341,8 @@ class BrowserConfig(FrozenModel):
     headless: bool
     # Whether Dot's Chrome is brought to the front while a run works (item 97); Take over brings it either way.
     raise_window: bool
+    # Whether the owner may use a held run's page from the screen that shows it, a phone's too (item 470).
+    remote_input: bool
     # The port of this Mac on which Dot's own Chrome also takes DevTools connections, from a run's scripts (item 265);
     # 0 for none.
     debug_port: DebugPort
