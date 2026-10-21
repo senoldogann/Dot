@@ -26,10 +26,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: dtolnay/rust-toolchain@686976e191b89faba57d3206551f0f330d8cb249 # stable
         with:
-          toolchain: stable
-          components: rustfmt, clippy
+          # The job pushes nothing: the checkout's token is not left in .git/config (item 487).
+          persist-credentials: false
+      # The runner's own rustup, rather than an action: the branch the action was pinned by is rewritten, so the commit
+      # it named belongs to no branch of its repository any more (zizmor's impostor-commit, item 487).
+      - name: Rust
+        run: rustup toolchain install stable --profile minimal --component rustfmt,clippy && rustup default stable
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           workspaces: desktop/src-tauri
