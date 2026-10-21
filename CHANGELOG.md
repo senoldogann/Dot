@@ -1,7 +1,8 @@
 # Changelog
 
-Each release of Dot lists here what it changes, the newest first. A change not released yet goes under **Unreleased**,
-at the top, until a release names it; how a release is made is in [Releasing](docs/development.md#releasing).
+Each release of Dot lists here what it changes, the newest first. A change not released yet is a file of its own in
+[changes/](changes/) (those from before item 459 stand under **Unreleased**), and a release gathers them into its
+section; how a release is made is in [Releasing](docs/development.md#releasing).
 
 ## Unreleased
 

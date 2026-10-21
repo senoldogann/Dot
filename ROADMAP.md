@@ -2,8 +2,9 @@
 
 The owner asked for Dot's autonomy to be smarter, steadier and sturdier **whatever model runs it**. This file is the
 handoff for that work: what is planned, why, in which order, what is done and how it was checked. If you continue the
-work, read it first, and keep the status table, the item sections and the log at the bottom true. It is the only record
-of where the work stands. Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
+work, read it first, and keep the status table, the item sections and the log at the bottom true. With
+[roadmap/](roadmap/), which holds the items from 459 on, it is the only record of where the work stands.
+Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
 questions, faster steps, helper models) was planned on 2026-10-09 and has its own status table below. Part 3 (items 22 to 41: fewer steps, evidence, learned playbooks, the owner's own channels, an own crawler) was planned on 2026-10-10 from the competitive research in `reports/Dot ajanı rekabet yol haritası.md`; its status table and handoff prompt are under "Part 3".
 
 Items from 459 on are files of their own in [roadmap/](roadmap/), one per item, with their lines of the log

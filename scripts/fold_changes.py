@@ -15,7 +15,8 @@ from pathlib import Path
 
 ROOT: Path = Path(__file__).resolve().parent.parent
 _UNRELEASED: str = "## Unreleased\n"
-_ENTRY_FILE: re.Pattern[str] = re.compile(r"^(\d+)\.md$")
+# An item's number as ROADMAP.md writes it: no leading zero, so that the file a fold removes is the one it read.
+_ENTRY_FILE: re.Pattern[str] = re.compile(r"^([1-9]\d*)\.md$")
 _VERSION: re.Pattern[str] = re.compile(r"^\d+\.\d+\.\d+$")
 _DATE: re.Pattern[str] = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 

@@ -61,7 +61,8 @@ against the public advisories (pip-audit for `uv.lock`, cargo audit for the desk
 known vulnerability (item 217).
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
-planned and tracked in [ROADMAP.md](../ROADMAP.md); read it before continuing that work.
+planned and tracked in [ROADMAP.md](../ROADMAP.md) and, from item 459 on, in [roadmap/](../roadmap/); read them before
+continuing that work.
 
 ```
 src/dotagent/

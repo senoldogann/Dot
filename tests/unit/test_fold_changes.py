@@ -60,9 +60,11 @@ def test_a_file_that_is_not_a_list_or_not_named_for_its_item_is_refused(tmp_path
     with pytest.raises(fold_changes.FoldError, match=r"461\.md is not a list"):
         fold_changes.read_entries(tmp_path)
     (tmp_path / "461.md").unlink()
-    (tmp_path / "notes.md").write_text("- An entry.\n", encoding="utf-8")
-    with pytest.raises(fold_changes.FoldError, match="not named"):
-        fold_changes.read_entries(tmp_path)
+    for name in ("notes.md", "0461.md"):
+        (tmp_path / name).write_text("- An entry.\n", encoding="utf-8")
+        with pytest.raises(fold_changes.FoldError, match="not named"):
+            fold_changes.read_entries(tmp_path)
+        (tmp_path / name).unlink()
 
 
 def test_a_version_released_already_or_nothing_to_release_is_refused() -> None:
