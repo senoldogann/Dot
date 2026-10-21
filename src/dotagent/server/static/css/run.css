@@ -122,6 +122,193 @@
   margin-top: 16px;
 }
 
+/* ---------- the chat while it is read ---------- */
+
+/* What stands in a chat's place while its run is read (item 502): the shape of the conversation to come, a message of
+   yours and the answer under it, lit by a band of light that crosses it, under Dot's mark and the line that say the chat
+   is opening. It is centred in the room under the bar and fades in as a page does; the page draws the conversation over
+   it as soon as the run is read, so nothing here is meant to be read. */
+.chat-loading {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: var(--space-6);
+  width: 100%;
+  max-width: var(--lane-w);
+  min-height: calc(100dvh - var(--stagebar-h) - 104px);
+  margin-inline: auto;
+  animation: page-in var(--motion-base) var(--ease);
+}
+
+.chat-loading-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* Dot's mark: a ring of the look's ink turning slowly around a dot of Dot's own yellow, which breathes as the idle face
+   does. */
+.chat-loading-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+}
+
+/* A breath of Dot's yellow behind the mark, so the mark sits in a light of its own rather than on the page's ground. */
+.chat-loading-mark::before {
+  content: "";
+  position: absolute;
+  inset: -16px;
+  border-radius: var(--radius-pill);
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--brand) 20%, transparent), transparent);
+  animation: chat-glow var(--motion-breath) ease-in-out infinite;
+}
+
+.chat-loading-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-pill);
+  background: conic-gradient(from 0deg, transparent, var(--accent), transparent 70%);
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), currentColor calc(100% - 1px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), currentColor calc(100% - 1px));
+  animation: chat-turn var(--motion-turn) linear infinite;
+}
+
+.chat-loading-core {
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-pill);
+  background: var(--brand);
+  box-shadow: 0 0 0 6px color-mix(in srgb, var(--brand) 12%, transparent);
+  animation: chat-breathe var(--motion-breath) ease-in-out infinite;
+}
+
+/* The words take the light as a live thought's label does (item 374). */
+.chat-loading-label {
+  font-size: var(--text-md);
+  font-weight: var(--weight-label);
+  line-height: var(--leading-md);
+  background-image: linear-gradient(100deg, var(--muted) 35%, var(--text) 50%, var(--muted) 65%);
+  background-size: 260% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: sunshine var(--motion-moment) linear infinite;
+}
+
+/* The conversation to come: your message at the right in the tint of a bubble, Dot's answer as three lines under it. */
+.chat-loading-lines {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+  width: 100%;
+  max-width: 640px;
+  padding-inline: var(--space-5);
+}
+
+.chat-loading-block {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 12px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.chat-loading-block.owner {
+  justify-self: end;
+  width: 46%;
+  height: 32px;
+  border-radius: var(--radius-lg);
+  background: color-mix(in srgb, var(--bubble) 30%, var(--surface-2));
+}
+
+.chat-loading-block:nth-child(3) {
+  width: 86%;
+}
+
+.chat-loading-block:nth-child(4) {
+  width: 52%;
+}
+
+/* The band of light: the ink of the look at a breath, crossing each block in its turn. */
+.chat-loading-block::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 25%, color-mix(in srgb, var(--accent) 8%, transparent) 50%, transparent 75%);
+  transform: translateX(-100%);
+  animation: chat-shine var(--motion-shine) var(--ease) infinite;
+}
+
+.chat-loading-block:nth-child(2)::after {
+  animation-delay: calc(var(--motion-shine) * 0.12);
+}
+
+.chat-loading-block:nth-child(3)::after {
+  animation-delay: calc(var(--motion-shine) * 0.24);
+}
+
+.chat-loading-block:nth-child(4)::after {
+  animation-delay: calc(var(--motion-shine) * 0.36);
+}
+
+@keyframes chat-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes chat-breathe {
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+@keyframes chat-glow {
+  50% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes chat-shine {
+  from {
+    transform: translateX(-100%);
+  }
+
+  to {
+    transform: translateX(100%);
+  }
+}
+
+/* Reduced motion (item 73): the mark and the blocks stand still, and the band of light is not drawn at all, so the shape
+   of the chat is still seen and the line still read; the composition still fades in, as a page's fade stays. */
+@media (prefers-reduced-motion: reduce) {
+  .chat-loading {
+    animation-name: fade-in;
+  }
+
+  .chat-loading-ring,
+  .chat-loading-core,
+  .chat-loading-mark::before {
+    animation: none;
+  }
+
+  .chat-loading-block::after {
+    display: none;
+  }
+
+  .chat-loading-label {
+    animation: none;
+    background-image: none;
+    color: var(--muted);
+  }
+}
+
 /* The line over the composer is one bar (item 401): how the run works, how its helpers stand and how many messages wait
    at its left, the way down at its right end. It is a pane of glass, the look of the composer under it on a phone. */
 .status-bar {

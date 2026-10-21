@@ -25,7 +25,7 @@ import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.j
 import { createQueue } from "../queue.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
-import { emptyPanel, errorPanel, loadingPanel, panelFold, panelSection } from "../panels.js";
+import { chatLoading, emptyPanel, errorPanel, panelFold, panelSection } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { changesSection } from "../changes.js";
@@ -1716,7 +1716,7 @@ export function mount(root, ctx) {
     // the error it failed with) stays until this one is drawn over it, only to be seen: a word typed into it or a click
     // on it would reach a page that is gone.
     if (root.firstChild === null) {
-      root.replaceChildren(loadingPanel());
+      root.replaceChildren(chatLoading());
     }
     for (const child of root.children) {
       child.inert = true;

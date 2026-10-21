@@ -55,6 +55,30 @@ export function loadingPanel() {
   return el("div", { class: "card" }, inlineLoading());
 }
 
+/** What stands in a chat's place while its run is read (item 502): the shape of the conversation to come, a message of
+ * yours and the answer under it, under Dot's mark and the line that say the chat is opening. The page draws the
+ * conversation over it as soon as the run is read; with reduced motion it stands still. */
+export function chatLoading() {
+  return el(
+    "div",
+    { class: "chat-loading", role: "status", "aria-label": "Opening this chat" },
+    el(
+      "div",
+      { class: "chat-loading-head", "aria-hidden": "true" },
+      el("span", { class: "chat-loading-mark" }, el("span", { class: "chat-loading-ring" }), el("span", { class: "chat-loading-core" })),
+      el("span", { class: "chat-loading-label" }, "Opening this chat"),
+    ),
+    el(
+      "div",
+      { class: "chat-loading-lines", "aria-hidden": "true" },
+      el("span", { class: "chat-loading-block owner" }),
+      el("span", { class: "chat-loading-block" }),
+      el("span", { class: "chat-loading-block" }),
+      el("span", { class: "chat-loading-block" }),
+    ),
+  );
+}
+
 /** The empty state of a page or a list (item 407): `mark` (an icon's name) in a quiet ring, `title` and the line `text`
  * that says what brings something here; "" for no line. */
 export function emptyPanel(mark, title, text) {
