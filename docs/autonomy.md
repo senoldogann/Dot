@@ -158,19 +158,21 @@ chat's last run, ended tainted. These words are Dot's, not yours: they restore n
 counts among your instructions (the new run's goal is the goal it goes on from, with your note under it). Skip this step
 only closes it, and one past its time closes as expired (the daemon looks every half minute) and can no longer be
 answered. A kept step gives the run no authority: a hand-off is yours to do. A question that asks your yes is kept as
-well (item 483) when its card shows all of the step and the step reaches nobody: a command, a read, a request, a
-schedule or a note (not a page, a screen, a message, an MCP call or delegated work), sending, posting or uploading
-nothing; never a question that what the run read raised (the policy's stop for untrusted content), nor one about Dot's
-own files. Its card says "Kept for you" with **Allow once** and **Skip**. Allow once stores your yes, which holds for
-`[policy] permit_hours` (24), and tells the conversation, as I did it does, "The user allowed the step that waited for
-their yes (…): do it now, exactly as it was, once"; when the run does that exact step in that conversation (the same
-fingerprint), the policy decides it again first, and only where it would ask you does your yes let it through, once,
-recorded as "You allowed it earlier": a rule that now refuses or hands it to you, or the run's untrusted reading, still
-stops it. A yes that cannot reach the conversation (a `dotx` run works there) is taken back and the card stays. Skip on
-a kept step, either kind, holds in that conversation: the same step is refused at once, with no card, until you write
-there again (a message of yours, or a run you start). Any other question still counts as a refusal when nobody answers,
-and nothing is kept in `yolo`, which asks nothing, in a delegated run, whose parent decides, in a session of a campaign
-or in an eval.
+well (item 483) when its card shows all of the step and the step reaches nobody: a command (with the folder it runs in,
+when the call names one), a file read or a folder listing, a page read or a web search, sending, posting or uploading
+nothing (not a page's or a screen's step, a terminal session, a message, an MCP call, delegated work, a search's
+pattern, an extract, a schedule or a note, whose cards show less than they do); never a question that what the run read
+raised (the policy's stop for untrusted content), nor one about Dot's own files. Its card says "Kept for you" with
+**Allow once** and **Skip**. Allow once stores your yes, which holds for `[policy] permit_hours` (24), and tells the
+conversation, as I did it does, "The user allowed the step that waited for their yes (…): do it now, exactly as it was,
+once"; when the run does that exact step in that conversation (the same fingerprint), the policy decides it again first,
+and only where it would ask you does your yes let it through, once, recorded as "You allowed it earlier": a rule that
+now refuses or hands it to you, or the run's untrusted reading, still stops it. A yes that cannot reach the conversation
+(a `dotx` run works there) is taken back and the card stays. Rewinding the chat to before the run that kept it takes an
+unused yes back too. Skip on a kept step, either kind, holds in that conversation: the same step is refused at once,
+with no card, until you write there again (a message of yours, or a run you start). Any other question still counts as a
+refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, in a delegated run, whose parent
+decides, in a session of a campaign or in an eval.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries and the wait for a model out of reach (see [Models and providers](models.md#models-and-providers));

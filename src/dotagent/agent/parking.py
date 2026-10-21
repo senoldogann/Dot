@@ -9,6 +9,7 @@ is kept too when its card shows all of the step and nothing of it reaches other 
 gate and the manager do the rest."""
 
 import hashlib
+from collections.abc import Mapping
 
 from dotagent.agent.declined import declined_key
 from dotagent.config import PolicyConfig
@@ -22,12 +23,18 @@ KEPT_HERE: int = 20
 KEPT_OVERALL: int = 50
 # Who let a step through on the owner's yes given when it was kept for them (item 483).
 PERMIT_DECIDER: str = "permit"
-# The kinds of step whose question may wait for a yes given later: a command, a read, a request, a schedule, a note. A
-# page, a screen or an application's window will not be as the card showed them when the owner answers, and a message,
-# an MCP call or work handed to another run says on its card less than it does.
-_PERMIT_KINDS: frozenset[ActionKind] = frozenset(
-    {"shell", "read", "network", "schedule", "memory_write", "notes_write"}
-)
+# The tools whose question may wait for a yes given later, each with the kind of its steps: a command (where it runs on
+# its card when the call names it), a file read and a folder listing, a page read and a web search, whose cards show all
+# of the step. Every other tool is left out: a page, a screen, a terminal session or an application's window will not be
+# as the card showed them when the owner answers, and a message, an MCP call, work handed to another run, a search's
+# pattern, an extract's sources, a schedule's chat or a note's tags are more than its card says.
+_PERMIT_TOOLS: Mapping[str, ActionKind] = {
+    "shell": "shell",
+    "read_file": "read",
+    "list_dir": "read",
+    "web_fetch": "network",
+    "web_search": "network",
+}
 # What a yes given later never covers: a step that reaches other people, or takes data off the Mac.
 _UNPERMITTED_FLAGS: frozenset[Flag] = frozenset(
     {"external_send", "message_send", "public_post", "social", "upload", "exfiltration"}
@@ -89,11 +96,12 @@ def kept_digest(info: ActionInfo) -> str | None:
 def permit_parkable(info: ActionInfo, decision: Decision) -> bool:
     """Whether a question of the policy about ``info`` may be kept for the owner's yes (item 483): a question (not a
     hand-off, which :func:`kept_text` keeps, nor a refusal), not raised by what the run read nor about Dot's own files,
-    of a kind whose card the owner can weigh later, reaching nobody, and whose card shows all of the step."""
+    of a tool whose card the owner can weigh later (:data:`_PERMIT_TOOLS`), reaching nobody, and whose card shows all of
+    the step."""
     return (
         decision.verdict == "ask"
         and decision.source not in _UNPERMITTED_SOURCES
-        and info.kind in _PERMIT_KINDS
+        and _PERMIT_TOOLS.get(info.tool) == info.kind
         and not _UNPERMITTED_FLAGS.intersection(info.flags)
         and kept_digest(info) is not None
     )

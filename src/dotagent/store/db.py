@@ -1812,6 +1812,14 @@ class Store:
                 " WHERE status = 'left' AND run_id IN (SELECT id FROM family)",
                 (*ids, now, "the chat was rewound to before the run that asked"),
             )
+            # The owner's yes to a step those runs kept goes with them, unused (item 483).
+            await self._db.execute(
+                f"WITH RECURSIVE family(id) AS (SELECT id FROM runs WHERE id IN ({marks})"
+                " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
+                " UPDATE approvals SET permit_until = NULL WHERE status = 'approved' AND used_at IS NULL"
+                " AND permit_until IS NOT NULL AND run_id IN (SELECT id FROM family)",
+                ids,
+            )
             version: int = int(row["history_version"])
             place: int = int(row["history_seq"])
             thread: aiosqlite.Row | None = await self._one(
@@ -2663,7 +2671,9 @@ class Store:
         if row is None:
             return None
         spent = await self._db.execute(
-            "UPDATE approvals SET used_at = ? WHERE id = ? AND used_at IS NULL", (now, row["id"])
+            "UPDATE approvals SET used_at = ? WHERE id = ? AND used_at IS NULL AND status = 'approved'"
+            " AND permit_until > ?",
+            (now, row["id"], now),
         )
         await self._db.commit()
         return await self.get_approval(row["id"]) if spent.rowcount == 1 else None
