@@ -11,6 +11,7 @@ produced here as value types (``PageView``, ``ActOutcome``, ``TextView``); rende
 import asyncio
 import base64
 import contextlib
+import math
 import re
 import secrets
 import time
@@ -20,7 +21,7 @@ from dataclasses import dataclass
 from functools import partial
 from pathlib import Path
 from typing import Literal
-from urllib.parse import urldefrag
+from urllib.parse import urldefrag, urlsplit
 
 from playwright.async_api import (
     Browser,
@@ -44,6 +45,7 @@ from dotagent.browser.devtools import devtools_switches, port_is_taken, port_tak
 from dotagent.browser.driver import (
     bring_to_front,
     capture_lines,
+    fill_login_field,
     go_back,
     install_consent_handler,
     keep_focused,
@@ -104,6 +106,8 @@ from dotagent.browser.types import (
     TabSummary,
     TextView,
     TextWait,
+    VaultFieldKind,
+    VaultFill,
     Viewport,
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
@@ -124,6 +128,7 @@ from dotagent.core.text import truncate_middle
 from dotagent.core.types import JsonObject
 from dotagent.desktop.types import AppInfo
 from dotagent.store.models import BrowserMode
+from dotagent.vault.masking import in_address, masked
 
 _log = get_logger("dotagent.browser.session")
 
@@ -190,6 +195,11 @@ _FAIL_REASON: str = "BlockedByClient"
 # What Chrome answers to a verdict for a request the page cancelled or finished while the verdict was being made.
 _REQUEST_GONE: str = "Invalid InterceptionId"
 _FORBIDDEN_MESSAGE: str = "this URL may not be opened"
+# A request whose address carries a password or a one-time code filled from the password manager (item 493): an
+# address is written into the views of the page, Chrome's history and Dot's log, and shortened where it is long.
+_CARRIES_SECRET: str = "its address would carry a password or a code filled from your password manager"
+# How long after it went in a one-time code is kept out of addresses: past its few minutes it opens nothing.
+_CODE_HELD_S: float = 300.0
 # Chrome exits by itself a few seconds after the driver that started it died.
 _CHROME_EXIT_WAIT_S: float = 10.0
 _CHROME_EXIT_POLL_S: float = 0.2
@@ -454,6 +464,13 @@ class BrowserSession:
         self._launch_lock: asyncio.Lock = asyncio.Lock()
         self._tab_lock: asyncio.Lock = asyncio.Lock()
         self._threads: dict[str, ThreadTabs] = {}
+        # The values filled into each thread's pages from the password manager (item 493), which no result of the
+        # browser tools of the thread shows: kept apart from its tabs, which an idle thread lets go of while its chat
+        # goes on, and for as long as the daemon runs.
+        self._vault_values: dict[str, set[str]] = {}
+        # The passwords and one-time codes among them, which no request of Dot's own Chrome carries in its address, with
+        # the moment each stops being kept out (a password's never comes while the daemon runs).
+        self._vault_secrets: dict[str, float] = {}
         self._initial_pages: list[Page] = []
         self._adopting: set[asyncio.Task[None]] = set()
         # The answers under way to requests Chrome holds (:meth:`_guard_hops`), and by page the navigation of its main
@@ -1355,23 +1372,61 @@ class BrowserSession:
         """The rules on one request Chrome is about to send; ``page`` the page whose main frame it navigates, when it
         is one, so that the error page it then shows can be told from a page that failed to load. A rule that fails on
         an address refuses it: the request must be answered either way, or Chrome holds it for good."""
-        try:
-            verdict: UrlVerdict = request_verdict(
-                url, navigation, self._config.allowed_hosts, self._config.blocked_hosts, self._server
-            )
-        except Exception:  # noqa: BLE001 - logged with its traceback, and the request is refused
-            _log.exception("browser_request_unjudged", url=truncate_middle(url, _LAUNCH_ERROR_CHARS))
-            verdict = UrlVerdict(allowed=False, reason="the URL rules could not read this address")
+        live: tuple[str, ...] = self._live_secrets()
+        carries: bool = bool(live) and in_address(url, live)
+        shown: str = self._named(url, live, carries)
+        if carries:
+            verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
+        else:
+            try:
+                verdict = request_verdict(
+                    url, navigation, self._config.allowed_hosts, self._config.blocked_hosts, self._server
+                )
+            except Exception:  # noqa: BLE001 - logged with its traceback, and the request is refused
+                _log.exception("browser_request_unjudged", url=truncate_middle(url, _LAUNCH_ERROR_CHARS))
+                verdict = UrlVerdict(allowed=False, reason="the URL rules could not read this address")
         if not verdict.allowed:
             if page is not None:
-                self._refusals[page] = _Refusal(url=url, reason=verdict.reason)
+                self._refusals[page] = _Refusal(url=shown, reason=verdict.reason)
             _log.info(
                 "browser_request_refused",
-                url=truncate_middle(url, _LAUNCH_ERROR_CHARS),
+                url=truncate_middle(shown, _LAUNCH_ERROR_CHARS),
                 resource_type=resource_type,
                 reason=verdict.reason,
             )
         return verdict
+
+    def _live_secrets(self) -> tuple[str, ...]:
+        """The passwords and one-time codes no request may carry in its address now (item 493)."""
+        now: float = time.monotonic()
+        return tuple(value for value, until in self._vault_secrets.items() if until > now)
+
+    def _shown(self, url: str) -> str:
+        """``url`` as Dot shows it in a refusal and writes it in its log (item 493): :meth:`_named` with the passwords
+        and codes no request may carry now."""
+        live: tuple[str, ...] = self._live_secrets()
+        return self._named(url, live, bool(live) and in_address(url, live))
+
+    @staticmethod
+    def _named(url: str, live: tuple[str, ...], carries: bool) -> str:
+        """``url`` named for a refusal or a log line. One that ``carries`` one of ``live``, however its escapes write it
+        (:func:`in_address`), is named by its host alone, or by its scheme when the value is in the host: a form of the
+        value masking does not know may be anywhere in it. Any other has the forms masking knows masked. Naming never
+        fails: the request it is for is answered either way."""
+        if not live:
+            return url
+        if not carries:
+            return masked(url, live)
+        try:
+            parts = urlsplit(url)
+        except ValueError as error:
+            # An address of a host Python cannot split (unbalanced brackets) is named alone, and why is logged.
+            _log.info("browser_address_unnamed", error=type(error).__name__)
+            return "[an address that carries a filled value]"
+        host: str = parts.hostname or ""
+        if in_address(host, live):
+            return f"{parts.scheme}://[a host that carries a filled value]"
+        return f"{parts.scheme}://{host}/[an address that carries a filled value]"
 
     async def _on_request(self, route: Route, request: Request) -> None:
         """The route of Dot's own Chrome: a request the rules refuse fails in the page as blocked by the client; the
@@ -1387,7 +1442,7 @@ class BrowserSession:
         except PlaywrightError as error:
             _log.info(
                 "browser_request_unanswered",
-                url=truncate_middle(request.url, _LAUNCH_ERROR_CHARS),
+                url=truncate_middle(self._shown(request.url), _LAUNCH_ERROR_CHARS),
                 error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
             )
 
@@ -1472,11 +1527,13 @@ class BrowserSession:
             if page.is_closed():
                 return
             if _REQUEST_GONE in str(error):
-                _log.debug("browser_hop_gone", url=truncate_middle(url, _LAUNCH_ERROR_CHARS), allowed=allowed)
+                _log.debug(
+                    "browser_hop_gone", url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS), allowed=allowed
+                )
                 return
             _log.warning(
                 "browser_hop_unanswered",
-                url=truncate_middle(url, _LAUNCH_ERROR_CHARS),
+                url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS),
                 error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
             )
 
@@ -1738,7 +1795,9 @@ class BrowserSession:
     async def read_text(self, thread_id: str, ref: str | None, offset: int, max_chars: int) -> TextView:
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
-            text: str = squeeze_text(await visible_text(tab.page, ref, _ms(self._config.action_timeout_s)))
+            # Masked before it is cut into slices, so that no slice holds a part of a value (item 493).
+            page_text: str = await visible_text(tab.page, ref, _ms(self._config.action_timeout_s))
+            text: str = squeeze_text(masked(page_text, self.vault_values(thread_id)))
             return TextView(
                 url=tab.page.url, text=text[offset : offset + max_chars], offset=offset, total_chars=len(text)
             )
@@ -2180,6 +2239,63 @@ class BrowserSession:
             await self._enforce_landing(tab)
             return TextWait(appeared=appeared, waited_s=waited_s, view=view)
 
+    async def fill_from_vault(
+        self, thread_id: str, fills: Sequence[VaultFill], fills_on: Callable[[str], bool]
+    ) -> PageView:
+        """Fill a login of the owner's password manager into the thread's current tab (item 493), each part into its
+        field, once the page is one of the login's sites (``fills_on`` of its address) and each field one its part may
+        go into, in a document of those sites (:func:`fill_login_field`). A thread a script of the run ran in is
+        refused while it has a tab open: the script may have left a listener that copies what is typed. The values
+        are the thread's to mask from the moment one may be in the page, so that a fill that fails half way leaves
+        masked what went in, and no script runs in the thread's tabs while the tab stays open; a field refused before
+        anything went in leaves neither. What changed on the page is shown with its
+        secret fields hidden, in every mode."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+            if not fills_on(tab.page.url):
+                raise BrowserError(
+                    "this page is not one of the login's sites: Dot fills a login only on its own site",
+                    {"url": tab.page.url},
+                )
+            if self._config.mode == "attach" and any(fill.kind != "username" for fill in fills):
+                # The owner's Chrome sends its requests unguarded: nothing would keep a value out of an address.
+                raise BrowserError(
+                    "in your own Chrome Dot fills no password or code, since it does not guard what that Chrome sends: "
+                    "your password manager fills them there, or switch to Dot's own Chrome in Settings › Browser",
+                    {"url": tab.page.url},
+                )
+            if thread.scripted:
+                # A script may have left a listener that copies what is typed: in its page, in a tab it opened, in a
+                # page Chrome brings back from its cache.
+                raise BrowserError(
+                    "a script of this run ran in a tab of this chat: Dot fills a login only where none ran. Close the "
+                    "chat's tabs (browser_close_tab), then open the page again",
+                    {"url": tab.page.url, "tabs": len(thread.tabs)},
+                )
+            for fill in fills:
+                value: str = fill.value.get_secret_value()
+
+                def typing(typed: str = value, kind: VaultFieldKind = fill.kind) -> None:
+                    # From here the value may be in the page: masked, no script runs while the tab is open, and no
+                    # request carries a password or a code in its address.
+                    self._vault_values.setdefault(thread_id, set()).add(typed)
+                    if kind != "username":
+                        held: float = math.inf if kind == "password" else time.monotonic() + _CODE_HELD_S
+                        self._vault_secrets[typed] = max(held, self._vault_secrets.get(typed, held))
+                    tab.vault_held = True
+
+                await fill_login_field(
+                    tab.page, fill.ref, fill.kind, value, fills_on, typing, _ms(self._config.action_timeout_s)
+                )
+            await self._settle(tab)
+            await self._enforce_landing(tab)
+            return await self._changes_view(thread, tab, True)
+
+    def vault_values(self, thread_id: str) -> frozenset[str]:
+        """The values filled into the thread's pages from the password manager (item 493), which no result of the
+        browser tools shows."""
+        return frozenset(self._vault_values.get(thread_id, ()))
+
     async def run_script(self, thread_id: str, script: str, timeout_s: float) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
         263). What the script led to is waited for as after a step (a tab it opened, a dialog), and the page is settled
@@ -2188,7 +2304,17 @@ class BrowserSession:
         they forbid is reset to a blank page and the call fails. After a script still running when the wait ended, only
         a navigation under way is let commit: the page cannot tell its DOM is quiet while the script holds it."""
         async with self._locked(thread_id) as thread:
+            # A script can read a field a login was filled into, and send it anywhere; a tab of the same thread can
+            # reach that page as its opener does (item 493).
+            if any(one.vault_held for one in thread.tabs):
+                raise BrowserError(
+                    "a login from the password manager was filled into a tab of this chat: scripts stay off in its "
+                    "tabs while that tab is open. Close it (browser_close_tab) and go on in a new one, where the "
+                    "sign-in holds",
+                    {"tabs": len([one for one in thread.tabs if one.vault_held])},
+                )
             tab: Tab = await self._current_tab(thread)
+            thread.scripted = True
             before: _Watch = self._watch(thread, tab)
             started: float = time.monotonic()
             end, text = await run_script(tab.page, script, timeout_s)

@@ -3,7 +3,7 @@
 from collections.abc import Awaitable, Callable
 from typing import Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, SecretStr, model_validator
 
 from dotagent.core.types import FrozenModel
 
@@ -214,6 +214,19 @@ SecretKind = Literal[
     "cc-exp-month",
     "cc-exp-year",
 ]
+
+
+# The part of a login a field of a page takes when Dot fills it from the owner's password manager (item 493).
+VaultFieldKind = Literal["username", "password", "otp"]
+
+
+class VaultFill(FrozenModel):
+    """One field of a page to fill from the password manager: its ref in the latest snapshot, what of the login it
+    takes, and the value, which no record and no model ever reads (``SecretStr``: its repr and its dump hide it)."""
+
+    ref: str
+    kind: VaultFieldKind
+    value: SecretStr
 
 
 class SecretField(FrozenModel):

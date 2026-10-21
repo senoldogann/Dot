@@ -6,8 +6,8 @@
 works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
 leads to Plugins.
 
-**Plugins** lists 65 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
-Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
+**Plugins** lists 66 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
+Password managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
 service's own page: each way it connects, with where it stands and its step, the tools of its MCP server once it is
@@ -39,6 +39,25 @@ there, beside where to get one. **Customize** in the dialog leads to the page, w
 the accounts, your own MCP servers and the skills. On a phone the dialog takes the screen, and the button is a round
 one at the foot of the list of chats. The services, where they stand and their steps are the same code on both
 (`static/js/catalogue.js`).
+
+### 1Password
+
+**1Password** (item 493), under Password managers, lets a run sign in with your logins without its model ever seeing
+a password or a one-time code (see [Secrets](safety.md)). Dot reads 1Password through `op`, its command line (`brew install 1password-cli`),
+and through a service account, which reads only the vaults shared with it, as 1Password's own guidance has an agent
+work:
+
+- **Connect 1Password** makes the vault "Shared with Dot" and a service account that only reads it, with your own
+  `op` signed in through the 1Password app (Settings › Developer › Integrate with 1Password CLI), which asks you first.
+- **Use a service account token instead** takes one you made at 1password.com.
+
+Either way Dot keeps the token in its `.env` (`DOT_ONEPASSWORD_TOKEN`), and the page says how many logins the vaults
+hold. Move the logins a run may use into the vault; your other vaults stay out of its reach. **Disconnect** forgets the
+token; the vault and the service account stay in 1Password, whose page removes them.
+
+While it is connected, a run that may act gets `browser_logins`, the logins' titles and websites, and
+`browser_fill_login`, which fills one into the current page. Dot fills only on the login's own site, asks you before
+each fill in every mode but `yolo`, and masks the values in everything the browser and web tools give back.
 
 A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel and Canva (their MCP servers
 let in approved clients only; Canva refused Dot's on 2026-10-19), and Asana and Box (clients registered by hand). Figma

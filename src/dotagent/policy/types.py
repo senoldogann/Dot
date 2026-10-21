@@ -49,6 +49,9 @@ Flag = Literal[
     "upload",
     # The action changes Dot's own files: what it loads and runs, or its emergency stop (item 398).
     "self_change",
+    # The action fills a login of the owner's password manager into a page (item 493): the values never reach the
+    # model, and the owner says yes to each fill in every mode but yolo (``policy.engine.vault_guard``).
+    "vault_fill",
 ]
 
 Preset = Literal["aggressive", "balanced", "cautious"]
@@ -56,7 +59,18 @@ Preset = Literal["aggressive", "balanced", "cautious"]
 PaceClass = Literal["public", "social"]
 Verdict = Literal["allow", "ask", "handoff", "deny"]
 DecisionSource = Literal[
-    "auto_review", "mode", "own_files", "hard_stop", "guard", "rule", "taint", "preset", "supervised", "pace", "spend"
+    "auto_review",
+    "mode",
+    "own_files",
+    "hard_stop",
+    "guard",
+    "vault",
+    "rule",
+    "taint",
+    "preset",
+    "supervised",
+    "pace",
+    "spend",
 ]
 
 # Who answers a question the policy raised, strictest first: ``supervised`` the user, who is also asked before every

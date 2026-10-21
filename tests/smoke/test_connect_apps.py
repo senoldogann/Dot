@@ -41,6 +41,7 @@ _AS_SERVICE: str = "sentry"
 # The sections as the dialog titles them (views/plugins.js), the popular ones leading as Suggested for you.
 _TITLES: dict[str, str] = {
     "popular": "Suggested for you",
+    "passwords": "Password managers",
     "code": "Code",
     "design": "Design",
     "data": "Data",

@@ -38,7 +38,7 @@ from dotagent.tools.base import (
     mark_untrusted,
     ok,
 )
-from dotagent.tools.browser import checked_url
+from dotagent.tools.browser import checked_url, masked_tool
 from dotagent.tools.context import ToolContext
 from dotagent.tools.files import read_flags, resolve_path
 from dotagent.tools.third_party import CRAWL_FOLDER
@@ -845,4 +845,5 @@ def _extract_tool() -> RegisteredTool:
 
 
 def build_web_tools() -> tuple[RegisteredTool, ...]:
-    return (_search_tool(), _fetch_tool(), _crawl_tool(), _extract_tool())
+    # Each may read a page in Dot's Chrome, signed in once a login of the password manager was filled (item 493).
+    return tuple(masked_tool(tool) for tool in (_search_tool(), _fetch_tool(), _crawl_tool(), _extract_tool()))

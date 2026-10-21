@@ -51,6 +51,10 @@ class Tab:
     target_id: str = ""
     born: set[str] = field(default_factory=set)
     born_changed: asyncio.Event = field(default_factory=asyncio.Event)
+    # A login of the password manager was filled into a page of the tab (item 493): no script runs in the tabs of its
+    # thread while the tab is open. Going on to another page does not end it: going back can bring the filled page
+    # back whole, from Chrome's cache of pages, without loading it again.
+    vault_held: bool = False
 
 
 @dataclass(slots=True)
@@ -61,6 +65,10 @@ class ThreadTabs:
     active: int = 0
     last_used: float = 0.0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # A script of the run ran in a tab of the thread (item 493): no login is filled into any of its tabs while one is
+    # open, since the script may have left a listener that copies what is typed, in its page, in a tab it opened, or
+    # in a page Chrome brings back from its cache. Once the thread has no tab left, nothing it touched is left either.
+    scripted: bool = False
 
     def remove(self, tab: Tab) -> None:
         """Forget ``tab``; the active index keeps pointing at the same tab, or at its neighbour when it was active."""
@@ -69,6 +77,8 @@ class ThreadTabs:
         if index < self.active:
             self.active -= 1
         self.active = max(0, min(self.active, len(self.tabs) - 1))
+        if not self.tabs:
+            self.scripted = False
 
 
 def add_note(tab: Tab, text: str) -> None:

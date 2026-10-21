@@ -2606,6 +2606,10 @@ def _assess_command(command: str, args: list[str], scope: ShellScope, given: _In
         return _assess_osascript(args, scope, given)
     if command == "security":
         return [_finding("high", ("secret_access",), "uses the macOS keychain command line")]
+    if command == "op":
+        # 1Password's command line reads the owner's vaults (item 493): a run fills a login through Dot, which shows
+        # its model none of it, and never reads one itself.
+        return [_finding("high", ("secret_access",), "uses 1Password's command line")]
     if command in _POWER:
         return [_finding("high", ("system_settings",), f"{command} changes the machine power state")]
     if command in _DISK_DESTROYERS or command.startswith("mkfs"):

@@ -22,7 +22,16 @@ from dotagent.browser.snapshot import (
     parse_snapshot,
     render_options,
 )
-from dotagent.browser.types import Dropdown, ScriptEnd, SecretField, SecretFieldCheck, SecretKind, Step, Viewport
+from dotagent.browser.types import (
+    Dropdown,
+    ScriptEnd,
+    SecretField,
+    SecretFieldCheck,
+    SecretKind,
+    Step,
+    VaultFieldKind,
+    Viewport,
+)
 from dotagent.core.errors import BrowserError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -149,6 +158,25 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
   const marking = field.getAttribute('autocomplete') || '';
   return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
 }"""
+# The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
+# no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
+_PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
+# Whether the form a field is in names GET as the way it sends what is typed (item 493), in the page's address: its
+# method, or one its submit buttons name, is GET or a word no browser knows, which a browser reads as GET. A form that
+# names none, as a page whose script sends it writes, is left to the guard of Dot's Chrome, which refuses a request
+# whose address carries a password or a code.
+_SENDS_BY_GET_SCRIPT: str = """(field) => {
+  const form = field.form;
+  if (!form) return false;
+  return (form.hasAttribute('method') && form.method === 'get')
+    || [...form.elements].some((control) => ['submit', 'image'].includes(control.type)
+      && control.hasAttribute('formmethod') && control.formMethod === 'get');
+}"""
+# The mark of a field a login was filled into (item 493), which every screenshot covers, in every mode: the field shows
+# the username, and a password once the page shows it.
+_FILLED_SELECTOR: str = "[data-dot-vault]"
+_MARK_FILLED_SCRIPT: str = "(element) => element.setAttribute('data-dot-vault', '')"
+
 # Whether the element has the keyboard focus and takes typed text: a text input or a textarea, not disabled or
 # read-only.
 _TAKES_TEXT_SCRIPT: str = """(element) => element.getRootNode().activeElement === element
@@ -576,6 +604,82 @@ async def _into_editor(
     return True
 
 
+def _takes(kind: VaultFieldKind, field: SecretKind | None) -> bool:
+    """Whether a field marked ``field`` may take the part ``kind`` of a login."""
+    if kind == "password":
+        return field in _PASSWORD_KINDS
+    if kind == "otp":
+        return field is None or field == "one-time-code"
+    return field not in _PASSWORD_KINDS
+
+
+async def fill_login_field(
+    page: Page,
+    ref: str,
+    kind: VaultFieldKind,
+    value: str,
+    fills_on: Callable[[str], bool],
+    typing: Callable[[], None],
+    timeout_ms: int,
+) -> None:
+    """Fill the field ``ref`` with ``value``, the part ``kind`` of a login of the password manager (item 493), once the
+    field is one that part may go into and the document that holds it is one of the login's sites (``fills_on`` of the
+    address of its frame): a password into a password field alone, nothing into a frame of another site. The frame and
+    its address are the browser's: a script of the frame can make the element itself name another document.
+    ``typing()`` runs once the field passed, just before the value goes into the element that passed. Neither the
+    value nor Playwright's log of the call is in what it raises."""
+    locator: Locator = await live_locator(page, ref, "fill")
+    try:
+        element: ElementHandle = await locator.element_handle(timeout=timeout_ms)
+    except PlaywrightError as error:
+        raise BrowserError(
+            "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
+        ) from error
+    try:
+        try:
+            frame: Frame | None = await element.owner_frame()
+            marking: object = await element.evaluate(_FIELD_MARKING_SCRIPT)
+            by_get: object = await element.evaluate(_SENDS_BY_GET_SCRIPT)
+        except PlaywrightError as error:
+            raise BrowserError(
+                "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
+            ) from error
+        if frame is None or not fills_on(frame.url):
+            raise BrowserError(
+                "the field is in a frame of another site: Dot fills a login only on its own site",
+                {
+                    "ref": ref,
+                    "url": page.url,
+                    "frame": None if frame is None else truncate_middle(frame.url, _ERROR_CHARS),
+                },
+            )
+        field: SecretKind | None = secret_kind(marking)
+        if not _takes(kind, field):
+            raise BrowserError(
+                f"the field {ref} does not take the login's {kind}: a password goes only into a password field, so "
+                "that it shows in no text",
+                {"ref": ref, "url": page.url, "part": kind, "field": field},
+            )
+        if kind != "username" and by_get is True:
+            # An address is written into the page's views, its history and logs, and shortened where it is long.
+            raise BrowserError(
+                f"the form of the field {ref} sends what is typed in the page's address (its method is GET): Dot fills "
+                f"a login's {kind} only into a form that keeps it out of the address",
+                {"ref": ref, "url": page.url, "part": kind},
+            )
+        typing()
+        try:
+            await element.evaluate(_MARK_FILLED_SCRIPT)
+            await element.fill(value, timeout=timeout_ms)
+        except PlaywrightError:
+            # Playwright's log of the call is left out, here and in the chain of the error: it may name what was typed.
+            raise BrowserError(
+                "the field did not take the login", {"ref": ref, "url": page.url, "part": kind}
+            ) from None
+    finally:
+        await element.dispose()
+
+
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:
     """Perform one step against the latest snapshot. A field that takes a secret goes to ``secret_field`` first, which
     raises to refuse the step: the field ``fill`` writes into, the one ``drag`` drops onto, and the one that has the
@@ -705,11 +809,11 @@ async def scroll_page(
 
 
 async def screenshot_jpeg(page: Page, quality: int, timeout_ms: int, hide_secrets: bool) -> bytes:
-    """Viewport screenshot in CSS pixels (so a pixel in the picture is a pixel for ``click_at``, also on Retina). With
-    ``hide_secrets`` (every mode but yolo, item 467) the fields the page marks secret are covered, in every frame."""
-    mask: list[Locator] = (
-        [frame.locator(secret_selector()) for frame in page.frames if not frame.is_detached()] if hide_secrets else []
-    )
+    """Viewport screenshot in CSS pixels (so a pixel in the picture is a pixel for ``click_at``, also on Retina). The
+    fields a login of the password manager was filled into are covered in every mode (item 493), and with
+    ``hide_secrets`` (every mode but yolo, item 467) the fields the page marks secret too, in every frame."""
+    covered: str = f"{secret_selector()}, {_FILLED_SELECTOR}" if hide_secrets else _FILLED_SELECTOR
+    mask: list[Locator] = [frame.locator(covered) for frame in page.frames if not frame.is_detached()]
     try:
         return await page.screenshot(
             type="jpeg",

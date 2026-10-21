@@ -91,7 +91,9 @@ currency, so list sites that bill in one currency. Empty by default.
    forward, through AppleScript, a messaging app, a Send button, an MCP tool whose name says it sends or posts, or a
    mailer of the command line) and a post in your name (`public_post`) wait for your yes, in every mode that asks,
    whatever your rules say; only a rule that hands the step to you is stricter. A rule that allows it does not answer for
-   you. A `yolo` run asks nothing and makes the step, its record keeping the reason it would have asked for (item 443).
+   you. A login filled from your 1Password (`vault_fill`, item 493, below) is guarded the same way, and in `auto` you
+   answer it, not the review model. A `yolo` run asks nothing and makes the step, its record keeping the reason it would
+   have asked for (item 443).
    What the policy cannot tell for a message is not guarded: a key that sends in a web page's chat box, a page's own script
    (`browser_eval`), a program of the shell that talks to a mail server or a chat's API itself (`curl`, a script).
 6. *Your rules* come next. The first enabled rule, in order, whose tool pattern and regular expression match the action
@@ -122,8 +124,9 @@ currency, so list sites that bill in one currency. Empty by default.
    past runs, as the policy matches rules, and writes nothing. It says how many steps it fits and which earlier rules
    decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing whatever the rules
    say, and those settled before any rule is read, by the checks above that no rule changes (money, credentials,
-   messages and posts, Dot's own files, the always-on review, a research run, a spend within its caps; a rule that hands
-   the step to you does take the place of the question about a message, a post or a spend). The steps it would decide it
+   messages and posts, a login from your 1Password, Dot's own files, the always-on review, a research run, a spend
+   within its caps; a rule that hands the step to you does take the place of the question about a message, a post, a
+   login or a spend). The steps it would decide it
    compares with what was decided then: the decision a step's record keeps since item 468, or for a step the gate did
    not let through (refused, declined, handed to you), what the policy said of it before, in the `policy` event of its
    call. It says how many would ask more, how many less and how many the same, with the taint the gate weighed then
@@ -209,6 +212,47 @@ a note that it was saved while reading outside content.
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
   title is refused as well). Desktop screenshots black out the password managers' windows; their secure fields are not
   masked.
+- A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password
+  (Customize › Plugins › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
+  account token of yours), a run sees the logins' titles and websites (`browser_logins`) and names one with the refs
+  of its fields (`browser_fill_login`); the daemon reads the values with `op`, 1Password's command line, and types them
+  itself:
+  - The values are in no argument of the model. Every result of the browser and web tools of the chat masks them
+    from then on, for as long as Dot runs, as typed and as an address or a JSON string writes them: an error's words
+    and context, a script's value, and the step's summary and target, which the approvals, the policy's events and
+    the review model read (a form sent by GET puts them in the address). The judge of clicks and checks gets them
+    masked too, in a button's words and a page's address, title and text. A screenshot of the browser covers the
+    fields they were filled into, in every mode.
+  - What is kept from the model is the password and the one-time code (your word of 2026-10-21). The username is no
+    secret: a site shows it once you are signed in, and what the browser and web tools do not answer shows it as it
+    is (the files a crawl writes, an MCP tool). The desktop tools are not wrapped: their screenshots show Dot's Chrome
+    as the screen does, and they read Chrome's values of a plain field, a code there, or a password a page shows as
+    plain text ("show password").
+  - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
+    going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
+    gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
+    page, in a tab it opened, or in a page Chrome brings back from its cache.
+  - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
+    (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
+    document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
+    so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text.
+  - No address holds a password or a code: an address is written into the views of the page, Chrome's history and
+    Dot's log, and shortened where it is long. A form that names GET as its method, or a word no browser knows, gets
+    neither. Dot's own Chrome refuses every request whose address carries one, as it is or once its escapes are read
+    back (as UTF-8, and as a page of Western European text writes them), as a form that names no method sends it, or a
+    script: a password for as long as Dot runs, a code for five minutes after it went in. The refusal and Dot's log
+    name such a request by its host alone, or by its scheme when the value is in the host. A page in another legacy
+    charset (Shift_JIS, KOI8-R and the like) can write a value Dot does not read back. Your own Chrome (Settings ›
+    Browser › My Chrome) sends its requests unguarded, so there Dot fills a username alone; your password manager
+    fills the rest. A page can still write them into its own words, which Dot masks where it shows them whole; only
+    the login's own site, which has them anyway, can do that.
+  - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
+    stricter), and in `auto` you answer it, not the review model.
+  - The token is kept in Dot's `.env`, which no tool of a run may read, under a name `op` does not read. The shell
+    refuses `op` as a reading of a secret store.
+
+  As every refusal of the review, that one is waived in `yolo`, which may read any file: the fill itself still shows
+  the model no value.
 - What a run reads of a web page never carries the value of a password, one-time-code or card field, outside `yolo`
   (item 467): the page's lines show `[hidden]` in its place, in the view of the page, in a search of it and in what
   changed after a step, and a screenshot covers the field in every frame, a payment provider's too. The fields are the

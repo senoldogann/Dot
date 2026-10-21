@@ -20,6 +20,7 @@ _LOGOS: Path = _STATIC / "icons" / "plugins"
 _SVG: str = "{http://www.w3.org/2000/svg}"
 _SECTIONS: tuple[str, ...] = (
     "popular",
+    "passwords",
     "code",
     "design",
     "data",

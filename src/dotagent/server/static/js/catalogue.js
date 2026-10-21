@@ -29,7 +29,9 @@ export const STEP_LABELS = { ask: "Allow", settings: "Open System Settings", sig
 export const MCP_STATE_WORDS = { ready: "Ready", left_out: "Left out", disabled: "Off", trying: "Trying…", signing_in: "Waiting for your sign-in" };
 export const MCP_STATE_TONES = { ready: "b-ok", left_out: "b-bad", trying: "b-info", signing_in: "b-warn" };
 // What each way is called on a service's page, and on its tile when it is the service's first.
-export const WAY_NAMES = { mcp: "MCP server", mac: "AppleScript", web: "Dot's browser", folder: "Synced folder", untried: "Not tried yet" };
+export const WAY_NAMES = { mcp: "MCP server", mac: "AppleScript", web: "Dot's browser", folder: "Synced folder", vault: "1Password's op", untried: "Not tried yet" };
+// Where a service account token for 1Password is made (item 493), at 1password.com.
+const VAULT_TOKEN_HELP = "https://start.1password.com/developer-tools/infrastructure-secrets/serviceaccount/";
 // While Dot tries a server or waits for a sign-in, the page asks how it stands this often.
 const MCP_POLL_MS = 2000;
 
@@ -154,6 +156,8 @@ export function createCatalogue(onChange) {
   let plugins = null;
   let listing = null;
   let servers = null;
+  // Where the owner's 1Password stands (item 493, `GET /vault`).
+  let vault = null;
   let polling = null;
   // The steps under way, by what they act on (`app:<id>`, `mcp:<service or name>`, `server:<name>`): their buttons stay
   // off while the page paints again, and an application's says that macOS asks.
@@ -200,6 +204,9 @@ export function createCatalogue(onChange) {
     if (way.kind === "untried") {
       return {};
     }
+    if (way.kind === "vault") {
+      return { vault };
+    }
     return { app: listing.apps.find((one) => one.id === way.ref) ?? null };
   }
 
@@ -208,7 +215,15 @@ export function createCatalogue(onChange) {
     if (way.kind === "mcp") {
       return now.server !== null && now.server.state === "ready";
     }
+    if (way.kind === "vault") {
+      return vaultReady();
+    }
     return now.app !== undefined && now.app !== null && CONNECTED_STATES.has(now.app.state);
+  }
+
+  /** Whether 1Password is connected and its vaults were read (item 493). */
+  function vaultReady() {
+    return vault !== null && vault.connected && vault.error === null && vault.vaults.length > 0;
   }
 
   function connected(plugin) {
@@ -218,10 +233,18 @@ export function createCatalogue(onChange) {
   /** The first step `plugin` offers, by its ways in order: `{ label, take }` for a button, `{ label, link }` for the
    * sign-in page an MCP server waits on, or null when it has none to take, as while Dot tries its server. A service
    * whose name a server of the config or of a plugin holds already is not added again. A service that takes a key
-   * (item 408) asks for it first (`keyed`): its step opens the form that takes it. */
+   * (item 408) asks for it first (`keyed`): its step opens the form that takes it. 1Password's step is its page
+   * (`page`, item 493), which offers its two ways to connect. */
   function firstStep(plugin) {
     for (const way of plugin.ways) {
       const now = wayNow(way);
+      if (way.kind === "vault") {
+        // Its page says what Connect makes and offers a token instead (item 493): the step is that page (`page`).
+        if (vault !== null && !vault.connected) {
+          return { label: "Connect", key: "vault", keyed: true, page: true, take: async () => undefined };
+        }
+        continue;
+      }
       if (way.kind === "mcp") {
         if (now.server === null) {
           if (now.service?.added) {
@@ -262,6 +285,9 @@ export function createCatalogue(onChange) {
       return null;
     }
     const now = wayNow(shown);
+    if (shown.kind === "vault") {
+      return vaultBadge();
+    }
     if (shown.kind === "mcp") {
       return now.server === null ? null : el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
     }
@@ -270,6 +296,91 @@ export function createCatalogue(onChange) {
     }
     const tone = CONNECTED_STATES.has(now.app.state) ? "b-ok" : now.app.state === "refused" ? "b-bad" : "b-muted";
     return el("span", { class: `badge ${tone}` }, STATE_WORDS[now.app.state] ?? now.app.state);
+  }
+
+  /** Where 1Password stands, in a badge (item 493). */
+  function vaultBadge() {
+    if (vault === null) {
+      return null;
+    }
+    if (!vault.connected) {
+      return el("span", { class: "badge b-muted" }, vault.cli === null ? "op not installed" : "Not connected");
+    }
+    if (vault.error !== null) {
+      return el("span", { class: "badge b-bad" }, "Cannot read");
+    }
+    const logins = vault.vaults.reduce((sum, one) => sum + one.logins, 0);
+    return el("span", { class: "badge b-ok" }, plural(logins, "login", "logins"));
+  }
+
+  /** Open the form that takes a service account token for 1Password, on its page (item 493). */
+  function askVault() {
+    asking = "vault";
+    changed();
+  }
+
+  /** The form under 1Password's way that takes a service account token the owner made (item 493): a password field,
+   * where to make one, Connect and Cancel. The token goes to the daemon once, which keeps it in its .env. */
+  function vaultForm() {
+    let input = secretFields.get("vault")?.get("token");
+    if (input === undefined) {
+      input = el("input", { class: "input mono", type: "password", autocomplete: "off", autocapitalize: "off", spellcheck: "false", "aria-label": "1Password: service account token" });
+      secretFields.set("vault", new Map([["token", input]]));
+    }
+    const kept = input;
+    const connect = el("button", { class: "btn primary sm", type: "button", disabled: busy.has("vault") }, "Connect");
+    connect.addEventListener("click", () =>
+      attempt(async () => {
+        await pasteVaultToken(kept.value.trim());
+        kept.value = "";
+        asking = null;
+        changed();
+      }),
+    );
+    const cancel = el("button", { class: "btn sm", type: "button", onclick: () => stopAsking() }, "Cancel");
+    return el(
+      "div",
+      { class: "connect-add plugin-secrets" },
+      field("Service account token", kept, el("a", { href: VAULT_TOKEN_HELP, target: "_blank", rel: "noopener noreferrer" }, "Make one that reads a vault of yours")),
+      el("div", { class: "connect-add-actions" }, connect, cancel),
+    );
+  }
+
+  /** Connect 1Password with the owner's op, through the 1Password app, which asks them first (item 493). */
+  function connectVault() {
+    return busyWith("vault", async () => {
+      const now = await api.post("/vault/connect", {});
+      if (!disposed) {
+        vault = now;
+      }
+    });
+  }
+
+  function pasteVaultToken(token) {
+    return busyWith("vault", async () => {
+      const now = await api.post("/vault/token", { token });
+      if (!disposed) {
+        vault = now;
+      }
+    });
+  }
+
+  async function disconnectVault() {
+    const sure = await confirmDialog({
+      title: "Disconnect 1Password from Dot?",
+      message: "Runs fill no login from it any more, and Dot forgets the service account's token. The vault and the service account stay in 1Password, whose page removes them.",
+      confirmLabel: "Disconnect",
+      focusCancel: true,
+    });
+    if (!sure) {
+      return;
+    }
+    await busyWith("vault", async () => {
+      const now = await api.del("/vault");
+      if (!disposed) {
+        vault = now;
+      }
+    });
   }
 
   /** How `plugin` connects, in a chip: its first tried way, an MCP server's sign-in with it; else Not tried yet. */
@@ -465,13 +576,13 @@ export function createCatalogue(onChange) {
     }
   }
 
-  /** Read the services, the applications and the servers; it throws when the daemon could not be asked. */
+  /** Read the services, the applications, the servers and 1Password; it throws when the daemon could not be asked. */
   async function load() {
-    const found = await Promise.all([api.get("/plugins"), api.get("/connections"), api.get("/mcp/servers")]);
+    const found = await Promise.all([api.get("/plugins"), api.get("/connections"), api.get("/mcp/servers"), api.get("/vault")]);
     if (disposed) {
       return;
     }
-    [{ plugins }, listing, servers] = found;
+    [{ plugins }, listing, servers, vault] = found;
     changed();
     keepPolling();
   }
@@ -486,6 +597,9 @@ export function createCatalogue(onChange) {
     get servers() {
       return servers;
     },
+    get vault() {
+      return vault;
+    },
     /** Whether the step that acts on `key` is under way. */
     busy: (key) => busy.has(key),
     /** The service whose key is being asked for, or null. */
@@ -499,6 +613,11 @@ export function createCatalogue(onChange) {
     askSecrets,
     stopAsking,
     secretsForm,
+    askVault,
+    vaultBadge,
+    vaultForm,
+    connectVault,
+    disconnectVault,
     takeStep,
     add,
     connectAgain,
