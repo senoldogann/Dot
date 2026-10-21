@@ -83,13 +83,14 @@ jobs:
 
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
-  # and the face. Three workers: the browser tests are steady at that count, more is what item 437 found flaky.
+  # and the face. Two workers: the runner has three cores and each worker drives a Chrome and a daemon of its own; at
+  # three, pages ran out of their time.
   browser:
     # The release runs every browser test itself (browser.yml) beside this gate, so the core is not run twice there: a
     # workflow a release calls takes the release's context, whose workflow is "release".
     if: github.workflow != 'release'
     runs-on: macos-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
@@ -115,7 +116,7 @@ jobs:
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Core browser tests
         run: >
-          uv run pytest -q -n 3 -p no:cacheprovider --durations=10
+          uv run pytest -q -n 2 -p no:cacheprovider --durations=10
           -m "browser and not live and not internet and not hosted and not desktop"
           tests/smoke/test_browser_*.py tests/smoke/test_phone_*.py tests/smoke/test_secret_fields.py
           tests/smoke/test_page_guards.py tests/smoke/test_face.py

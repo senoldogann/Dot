@@ -101,7 +101,9 @@ async def _served(home: Path) -> AsyncIterator[str]:
     """A daemon on the Dot home ``home`` whose main model is the scripted one, with the notes: the
     address it is at."""
     (home / "config.toml").write_text(
-        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n', encoding="utf-8"
+        # The note the Memory page shows is saved with no embedding: no Ollama server is asked (item 486).
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{SCRIPTED_MODEL}"\n\n[memory]\nembed_enabled = false\n',
+        encoding="utf-8",
     )
     runtime: Runtime = await build_runtime(load_config(home / "config.toml"))
     await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, []))

@@ -24,7 +24,8 @@ concurrency:
 jobs:
   browser:
     runs-on: macos-latest
-    timeout-minutes: 60
+    # Every browser test on two workers, as the gate's core runs (gate.yml says why two).
+    timeout-minutes: 150
     env:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
@@ -50,5 +51,5 @@ jobs:
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Browser tests
         run: >
-          uv run pytest tests/smoke -q -n 3 -p no:cacheprovider --durations=20
+          uv run pytest tests/smoke -q -n 2 -p no:cacheprovider --durations=20
           -m "browser and not live and not internet and not hosted and not desktop"
