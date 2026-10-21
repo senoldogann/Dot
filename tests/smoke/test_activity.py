@@ -191,7 +191,7 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
     gate: Path = tmp_path / "work-gate"
     waiting: str = f"while [ ! -f '{gate}' ]; do sleep 0.2; done"
     MODEL.scripts.clear()
-    MODEL.for_goal("Pick a colour", [_turn(ASK_USER_TOOL, {"question": "Which colour?"}), _FINISH])
+    MODEL.for_goal("Pick a colour", [_turn(ASK_USER_TOOL, {"question": "Which colour?", "wait": True}), _FINISH])
     for goal in ("Count to twelve", "Scan the catalogue", "Find ten leads"):
         MODEL.for_goal(goal, [_turn("shell", {"command": waiting, "timeout_s": _GATE_WAIT_S}), _FINISH, _FINISH])
     asking: RunRecord = await manager.start(

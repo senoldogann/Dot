@@ -735,7 +735,9 @@ async def _tool_context(agent: AgentRun, ref: ModelRef, info: ModelInfo) -> Tool
         mode=run.mode,
         approvals=run.approvals,
         questions=question_mode(
-            runtime.config.agent.questions, can_ask_user(run.source, run.parent_run_id, run.approvals)
+            runtime.config.agent.questions,
+            can_ask_user(run.source, run.parent_run_id, run.approvals),
+            agent.spawner.answers_reach_runs,
         ),
         workspace=runtime.workspace,
         gate=agent.gate,

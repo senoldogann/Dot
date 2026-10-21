@@ -41,7 +41,7 @@ def _script(path: Path) -> list[ScriptedTurn]:
     writes without reading, reads, writes and finishes; the first, answered, finishes."""
     return [
         _turn("write_file", {"path": str(path), "content": _FIRST}),
-        _turn(ASK_USER_TOOL, {"question": "Shall I send the report?"}),
+        _turn(ASK_USER_TOOL, {"question": "Shall I send the report?", "wait": True}),
         _turn("write_file", {"path": str(path), "content": "Overwritten by the second run.\n"}),
         _turn("read_file", {"path": str(path)}),
         _turn("write_file", {"path": str(path), "content": _BOTH}),

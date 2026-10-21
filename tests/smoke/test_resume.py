@@ -122,7 +122,8 @@ async def test_a_run_a_shutdown_cut_off_while_it_asked_goes_on_by_itself_with_it
         },
     )
     ask: ScriptedCall = ScriptedCall(
-        tool=ASK_USER_TOOL, arguments={"question": "Which title should the report have?", "options": ["Report", "Data"]}
+        tool=ASK_USER_TOOL,
+        arguments={"question": "Which title should the report have?", "options": ["Report", "Data"], "wait": True},
     )
     close_step: ScriptedCall = ScriptedCall(
         tool=MARK_PLAN_STEP_TOOL, arguments={"step": 2, "status": "done", "evidence": "write_file wrote report.md"}

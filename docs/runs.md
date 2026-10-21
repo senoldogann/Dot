@@ -385,23 +385,23 @@ sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` with
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 A command that runs long and ends by itself, as an eval or a long build, past the 30 minutes that `shell` may wait
-(`[shell] max_timeout_s`), goes to a terminal session in the background (`terminal_open` with `background`, item 229):
-it is not closed while it runs for being left unread, and the run that started it can
-end. When it ends by itself, its chat is told once (item 437), and never in a message of its queue: the Queued list of
-the composer does not show it, and a stopped chat is not left paused with it. A run at work on the chat is told at its
-next step, in a system note that says which command ended, with its exit status and how long it ran, and nothing it
-printed, which the run reads with `terminal_read`, as untrusted; it is Dot's note, so it clears no untrusted mark and is
-no instruction of the owner. When no run works on the chat, a run is started to tell it, with the chat's choices, as
-the end of a run starts its queue's next message; its goal says the same words, Dot wrote them, so it opens as a note
-and starts as untrusted as the chat's last run ended. That run starts only when nothing waits in the chat's queue and
-the queue is not held; otherwise the run that starts next, a queued message's, or yours after a stop or a failed run,
-is told at its first step, so your queued messages and their order stay as they were. Right above the composer, the
-chat's page shows each of its commands at work, with the time it has run and a Stop; the dot of a command in the
-background pulses, as its end will wake Dot. A command stopped there, closed by the run or ended by the daemon's stop
-tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item 427):
-a run that waited for its command and saw it end is not told the same again. A delegated
-run or a campaign's session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends
-with its run: a command in the background lives as long as the daemon.
+(`[shell] max_timeout_s`), or for minutes while the run has other work to do (item 506), goes to a terminal session in
+the background (`terminal_open` with `background`, item 229): it is not closed while it runs for being left unread, and
+the run that started it can end. When it ends by itself, its chat is told once (item 437), and never in a message of its
+queue: the Queued list of the composer does not show it, and a stopped chat is not left paused with it. A run at work on
+the chat is told at its next step, in a system note that says which command ended, with its exit status and how long it
+ran, and nothing it printed, which the run reads with `terminal_read`, as untrusted; it is Dot's note, so it clears no
+untrusted mark and is no instruction of the owner. When no run works on the chat, a run is started to tell it, with the
+chat's choices, as the end of a run starts its queue's next message; its goal says the same words, Dot wrote them, so it
+opens as a note and starts as untrusted as the chat's last run ended. That run starts only when nothing waits in the
+chat's queue and the queue is not held; otherwise the run that starts next, a queued message's, or yours after a stop or
+a failed run, is told at its first step, so your queued messages and their order stay as they were. Right above the
+composer, the chat's page shows each of its commands at work, with the time it has run and a Stop; the dot of a command
+in the background pulses, as its end will wake Dot. A command stopped there, closed by the run or ended by the daemon's
+stop tells nothing, and neither does one whose end a run has read itself with `terminal_read` before it was told (item
+427): a run that waited for its command and saw it end is not told the same again. A delegated run or a campaign's
+session opens none, having no chat of its own to tell, and neither does a `dotx` command, which ends with its run: a
+command in the background lives as long as the daemon.
 
 ### Drafts
 

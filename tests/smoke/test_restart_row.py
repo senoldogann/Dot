@@ -44,7 +44,11 @@ _SETTLE_S: float = 30.0
 _GOALS: tuple[str, str] = ("Book a table for Friday", "Order the printer paper")
 _ASK: ScriptedTurn = ScriptedTurn(
     text="",
-    calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Which time suits you?", "options": ["19", "20"]}),),
+    calls=(
+        ScriptedCall(
+            tool=ASK_USER_TOOL, arguments={"question": "Which time suits you?", "options": ["19", "20"], "wait": True}
+        ),
+    ),
 )
 _FINISH: ScriptedTurn = ScriptedTurn(
     text="", calls=(ScriptedCall(tool=FINISH_TOOL, arguments={"answer": "It is done.", "success": True}),)

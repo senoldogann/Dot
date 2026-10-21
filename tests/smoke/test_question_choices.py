@@ -60,7 +60,7 @@ _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
 
 def _asking(question: str, options: list[JsonObject], multiple: bool) -> ScriptedTurn:
     call: ScriptedCall = ScriptedCall(
-        tool=ASK_USER_TOOL, arguments={"question": question, "options": options, "multiple": multiple}
+        tool=ASK_USER_TOOL, arguments={"question": question, "options": options, "multiple": multiple, "wait": True}
     )
     return ScriptedTurn(text="", calls=(call,))
 

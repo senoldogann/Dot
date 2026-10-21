@@ -182,7 +182,7 @@ async def test_the_face_tells_the_state_through_a_runs_life_and_wears_the_name(
     MODEL.script = ScriptedProvider(
         _PROVIDER,
         [
-            _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
+            _turn(ASK_USER_TOOL, {"question": "Which colour?", "wait": True}),
             _turn("shell", {"command": f"sleep {_WORK_S}"}),
             _turn(FINISH_TOOL, {"answer": "Done.", "success": True}),
         ],

@@ -1,6 +1,7 @@
 """Questions in the real loop with a scripted model: a yolo or scheduled run leaves its question and goes on, and the
 answer carries the work on in the thread, into the run that works there or into a new one; a run the user watches waits
-as before. And the end of a task run: only text replies in a row end it, so a status line between tool steps does not.
+for a question asked with wait, and goes on past one asked without it, whose answer reaches it while it works (item
+506). And the end of a task run: only text replies in a row end it, so a status line between tool steps does not.
 
 No network and no model service is used: the scripted model plays the runs.
 """
@@ -96,6 +97,9 @@ def _finish(answer: str, success: bool, needs: str) -> ScriptedTurn:
 
 
 ASK: ScriptedTurn = _turn(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": QUESTION, "options": [ANSWER]}))
+ASK_WAITING: ScriptedTurn = _turn(
+    ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": QUESTION, "options": [ANSWER], "wait": True})
+)
 READ: ScriptedCall = ScriptedCall(tool="read_file", arguments={"path": NOTES.path})
 
 
@@ -270,8 +274,10 @@ async def test_an_answer_a_stopped_run_did_not_read_stays_in_its_thread(login_en
         assert (kept[-1].role, kept[-1].content) == ("user", CARRIED)
 
 
-async def test_a_run_the_user_watches_waits_for_the_answer(login_env: dict[str, str]) -> None:
-    model: ScriptedProvider = ScriptedProvider(_PROVIDER, [ASK, _finish("port.txt holds 8431.", True, "")])
+async def test_a_question_asked_with_wait_in_a_run_the_user_watches_waits_for_its_answer(
+    login_env: dict[str, str],
+) -> None:
+    model: ScriptedProvider = ScriptedProvider(_PROVIDER, [ASK_WAITING, _finish("port.txt holds 8431.", True, "")])
     async with _session(login_env, model) as (runtime, manager):
         async with runtime.bus.subscribe(None) as subscription:
             run: RunRecord = await _start(manager, UI_SOURCE, "ask")
@@ -286,6 +292,37 @@ async def test_a_run_the_user_watches_waits_for_the_answer(login_env: dict[str, 
         assert [record.id for record in await runtime.store.list_runs(5, run.thread_id)] == [run.id]
 
 
+async def test_a_question_asked_without_wait_in_a_run_the_user_watches_goes_on_and_its_answer_reaches_the_run(
+    login_env: dict[str, str],
+) -> None:
+    """Item 506: the run is never blocked; it is told that the question is on the chat and goes on; the owner answers
+    while it works, and the answer comes to it as their message at its next step, in the same run."""
+    turns: list[ScriptedTurn] = [
+        ASK,
+        _turn(READ),
+        _finish("port.txt holds 8431.", True, ""),
+    ]
+    model: _HeldModel = _HeldModel(turns, 2)
+    async with _session(login_env, model) as (runtime, manager):
+        async with runtime.bus.subscribe(None) as subscription:
+            run: RunRecord = await _start(manager, UI_SOURCE, "ask")
+            left: EventRecord = await _next(subscription, QUESTION_LEFT_EVENT)
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await model.entered.wait()
+        # The run works on while the question waits on the chat.
+        assert (await runtime.store.get_run(run.id)).status == "running"
+        await manager.decide(str(left.data["approval_id"]), True, UI_SOURCE, ANSWER)
+        model.release.set()
+        ended: RunRecord = await _ended(manager, run)
+        events: list[EventRecord] = await _events(runtime, run)
+        on_thread: list[RunRecord] = await runtime.store.list_runs(5, run.thread_id)
+    assert (ended.status, ended.result) == ("done", "port.txt holds 8431.")
+    assert "approval_requested" not in [event.kind for event in events]
+    assert "on the chat for the user, and you go on" in _result_of(events, ASK_USER_TOOL)
+    assert [event.data["text"] for event in events if event.kind == "steer"] == [CARRIED]
+    assert [record.id for record in on_thread] == [run.id]
+
+
 async def test_text_between_tool_steps_does_not_end_a_task_run(login_env: dict[str, str]) -> None:
     # One text reply more than the nudges a run gets, each after a tool step: only replies in a row would end the run.
     nudges: int = load_default_config().agent.finish_nudges
@@ -297,8 +334,12 @@ async def test_text_between_tool_steps_does_not_end_a_task_run(login_env: dict[s
     assert ended.steps == len(turns)
 
 
-async def test_a_run_that_only_leaves_questions_between_text_replies_still_ends(login_env: dict[str, str]) -> None:
-    # A left question changes nothing until someone answers it, so it does not start the count of text replies again.
+@pytest.mark.parametrize("approvals", ["yolo", "ask"])
+async def test_a_run_that_only_leaves_questions_between_text_replies_still_ends(
+    login_env: dict[str, str], approvals: ApprovalMode
+) -> None:
+    # A left question changes nothing until someone answers it, so it does not start the count of text replies again:
+    # in a run nobody answers (yolo), nor where the run chooses and asks without wait (item 506).
     nudges: int = load_default_config().agent.finish_nudges
     waiting: ScriptedTurn = ScriptedTurn(text="I need the port to go on.", calls=())
     turns: list[ScriptedTurn] = [
@@ -310,7 +351,7 @@ async def test_a_run_that_only_leaves_questions_between_text_replies_still_ends(
         )
     ]
     async with _session(login_env, ScriptedProvider(_PROVIDER, turns)) as (_, manager):
-        ended: RunRecord = await _ended(manager, await _start(manager, UI_SOURCE, "yolo"))
+        ended: RunRecord = await _ended(manager, await _start(manager, UI_SOURCE, approvals))
     assert (ended.status, ended.result, ended.steps) == ("done", waiting.text, len(turns))
 
 

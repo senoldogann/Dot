@@ -11,13 +11,14 @@ from typing import Literal
 from dotagent.config import PromptStyle
 from dotagent.core.types import FrozenModel
 from dotagent.harness.components import HarnessText
-from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
+from dotagent.policy.types import ApprovalMode, Preset
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
 from dotagent.tools.browser import FILL_LOGIN_TOOL
 from dotagent.tools.consult import CONSULT_TOOL
+from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import ACCOUNTS_GROUP, group_lines, tools_in
 from dotagent.tools.help import FIND_HELP_TOOL
@@ -41,7 +42,7 @@ class PromptInputs(FrozenModel):
     source: str
     preset: Preset
     approvals: ApprovalMode
-    questions: QuestionMode
+    questions: AskMode
     goal_mode: bool
     # The owner asked for the goal's independent parts to run at the same time on delegated runs (Ultracode, item 251).
     split: bool
@@ -454,6 +455,12 @@ _LEFT_QUESTIONS: str = (
     "need: the user's answer carries the work on later."
 )
 
+_QUESTIONS_GO_ON: str = (
+    "Questions: the user can answer while you work. Ask without wait when there is work that does not depend on the "
+    "answer: the question stays on the chat for them, you go on, and their answer comes to you as their message. Ask "
+    "with wait only when nothing useful can be done until they answer."
+)
+
 _DELEGATED: str = (
     "This run was started by another run (its parent) for one self-contained part of the parent's work, and the "
     "parent is waiting for your final answer. You cannot ask the user questions: decide, and put everything the "
@@ -579,6 +586,9 @@ def _environment(inputs: PromptInputs) -> str:
     # A delegated run has no ask_user, so it has no questions to leave.
     if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_LEFT_QUESTIONS}")
+    # Where the user can answer while the run works, the run chooses for each question whether to wait (item 506).
+    if inputs.questions == "choose" and ASK_USER_TOOL in inputs.tool_names:
+        lines.append(f"- {_QUESTIONS_GO_ON}")
     if inputs.devtools is not None and not _SCRIPT_TOOLS.isdisjoint(inputs.tool_names):
         lines.append(f"- {_DEVTOOLS.format(address=inputs.devtools)}")
     return "\n".join(lines)
@@ -862,7 +872,7 @@ def collect_prompt_inputs(
     source: str,
     preset: Preset,
     approvals: ApprovalMode,
-    questions: QuestionMode,
+    questions: AskMode,
     goal_mode: bool,
     split: bool,
     workspace: Path,

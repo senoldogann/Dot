@@ -426,7 +426,8 @@ among them), told a text by its length (`(42 chars)`) or masked a secret (`***`)
 tell apart are not one. This is the default approval mode, `ask`, and `supervised` asks before every change as well; in
 `auto` the questions of the policy are answered for you, and a `yolo` run asks nothing at all (item 443). What is yours
 in every mode that asks (item 429) — money, credentials, messages and posts in your name — is a card in the chat there.
-A question of the agent itself (`ask_user`) waits the same way, except in a run nobody can answer during it (see
+A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer; one it can
+go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
 what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
 ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by

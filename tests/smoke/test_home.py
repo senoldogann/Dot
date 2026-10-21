@@ -201,7 +201,7 @@ async def test_the_home_greets_says_what_is_going_on_and_follows_the_day(
     MODEL.script = ScriptedProvider(
         _PROVIDER,
         [
-            _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
+            _turn(ASK_USER_TOOL, {"question": "Which colour?", "wait": True}),
             _turn("shell", {"command": work}),
             _turn(FINISH_TOOL, {"answer": "Blue it is.", "success": True}),
             _turn(FINISH_TOOL, {"answer": "Slept.", "success": True}),

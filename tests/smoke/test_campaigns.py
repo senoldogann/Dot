@@ -483,7 +483,7 @@ async def test_an_answer_to_a_question_an_ended_session_left_goes_to_no_other_ru
                     )
                 ),
                 # The owner's next message in the campaign's conversation: a run that waits for its own question.
-                _turn(_call(ASK_USER_TOOL, {"question": "Which CRM do you use?"})),
+                _turn(_call(ASK_USER_TOOL, {"question": "Which CRM do you use?", "wait": True})),
             ],
         )
     )

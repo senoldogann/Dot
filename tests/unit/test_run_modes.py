@@ -29,11 +29,13 @@ from dotagent.core.errors import ConfigError
 from dotagent.harness.components import NO_HARNESS
 from dotagent.llm.types import ImageData, Message, assistant_message, user_message
 from dotagent.policy.engine import route_for
-from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, QuestionMode, Route
+from dotagent.policy.types import ApprovalMode, Decision, DecisionSource, Route
 from dotagent.scheduler import SCHEDULE_SOURCE
+from dotagent.server import UI_SOURCE
 from dotagent.skills.types import Skill
 from dotagent.store.db import Store
 from dotagent.store.models import RunMode, RunRecord
+from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL
 
@@ -270,7 +272,7 @@ def test_yolo_changes_the_approvals_line_and_what_a_secret_field_takes() -> None
     assert _lines("auto") - _lines("ask") == {line for line in _lines("auto") if line.startswith("- Approvals: auto")}
 
 
-def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
+def _asking(source: str, questions: AskMode, tool_names: list[str]) -> str:
     return build_system_prompt(
         collect_prompt_inputs(
             "task",
@@ -296,6 +298,15 @@ def _asking(source: str, questions: QuestionMode, tool_names: list[str]) -> str:
             NO_HARNESS,
         )
     )
+
+
+def test_the_prompt_says_that_a_run_that_chooses_asks_without_wait_when_it_can_go_on() -> None:
+    """Item 506: where the user can answer while the run works, the prompt says when to wait for the answer."""
+    going_on: str = "Ask without wait when there is work that does not depend on the answer"
+    assert going_on in _asking(UI_SOURCE, "choose", [ASK_USER_TOOL])
+    assert going_on not in _asking("cli", "wait", [ASK_USER_TOOL])
+    assert going_on not in _asking(UI_SOURCE, "leave", [ASK_USER_TOOL])
+    assert going_on not in _asking(UI_SOURCE, "choose", [])
 
 
 def test_the_prompt_says_that_questions_are_left_only_in_a_run_that_leaves_them() -> None:

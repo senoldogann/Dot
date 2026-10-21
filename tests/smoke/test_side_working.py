@@ -65,7 +65,7 @@ def _script() -> list[ScriptedTurn]:
         wait,
         _turn(ScriptedCall(tool="delegate", arguments={"goal": "Count the first box"})),
         wait,
-        _turn(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Which shelf?"})),
+        _turn(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Which shelf?", "wait": True})),
     ]
 
 

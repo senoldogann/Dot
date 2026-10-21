@@ -560,6 +560,13 @@ class RunManager:
         process relays them (:meth:`relay_elsewhere`)."""
         return sorted(self._elsewhere)
 
+    @property
+    def answers_reach_runs(self) -> bool:
+        """Whether the answer to a question a run of this process left reaches it while it works (item 506): in the
+        daemon, which steers it into the run; not in a ``dotx`` command, which leaves its chats' queues to the daemon
+        (:meth:`leave_queues`) and whose runs the daemon cannot steer."""
+        return not self._leaves_queues
+
     def leave_queues(self) -> None:
         """Leave the queues of the chats whose runs this process ends to the daemon, which moves each as it sees the
         end (:meth:`relay_elsewhere`): a ``dotx`` command ends with its run, and a queued message started there would

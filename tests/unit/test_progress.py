@@ -21,6 +21,7 @@ from dotagent.agent.progress import (
     ladder_for,
     limits_for,
     new_watch,
+    question_mode,
     restriction_for,
     single_action,
     single_action_steer,
@@ -189,6 +190,15 @@ def test_only_a_watched_run_whose_user_wants_questions_can_ask(
     source: str, parent: str | None, approvals: ApprovalMode, asks: bool
 ) -> None:
     assert can_ask_user(source, parent, approvals) is asks
+
+
+def test_a_run_of_the_daemon_a_person_answers_chooses_for_each_question_whether_to_wait() -> None:
+    """Item 506: where the answer reaches the run while it works, the run chooses; a dotx command's run waits; a run
+    nobody answers during it does what ``[agent] questions`` says."""
+    assert question_mode("leave", True, True) == "choose"
+    assert question_mode("leave", True, False) == "wait"
+    assert question_mode("leave", False, True) == "leave"
+    assert question_mode("wait", False, False) == "wait"
 
 
 def test_a_stopped_run_says_what_it_tried_with_secrets_masked_and_counts_as_stalled() -> None:

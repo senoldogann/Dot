@@ -333,7 +333,9 @@ async def test_settings_browser_sets_the_browser_rows_and_keeps_them(tmp_path: P
 async def test_a_run_that_opens_its_browser_shows_its_page_beside_the_chat(site: str, tmp_path: Path) -> None:
     turns: tuple[ScriptedTurn, ...] = (
         ScriptedTurn(text="", calls=(ScriptedCall(tool="browser_open", arguments={"url": site}),)),
-        ScriptedTurn(text="", calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Go on?"}),)),
+        ScriptedTurn(
+            text="", calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": "Go on?", "wait": True}),)
+        ),
     )
     async with _daemon(turns) as (manager, address), async_playwright() as playwright:
         run: RunRecord = await manager.start(

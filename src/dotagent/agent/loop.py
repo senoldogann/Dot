@@ -224,7 +224,6 @@ from dotagent.memory.service import (
     words_only,
 )
 from dotagent.oauth.tokens import Account
-from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -246,7 +245,7 @@ from dotagent.terminal.session import TerminalSession, ended_notices
 from dotagent.tools.browser import VAULT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
-from dotagent.tools.context import Spawner, ToolContext
+from dotagent.tools.context import AskMode, Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL, closing_step, delegated_evidence
 from dotagent.tools.groups import (
     ACCOUNTS_GROUP,
@@ -419,10 +418,16 @@ async def _discard(delta: StreamDelta) -> None:
     return None
 
 
-def _acts(calls: Sequence[ToolCall], questions: QuestionMode) -> bool:
-    """Whether a step does something: a question left for the user does not, since it changes nothing until someone
-    answers it, so a run that only leaves questions between text replies still ends."""
-    return questions == "wait" or any(call.name != ASK_USER_TOOL for call in calls)
+def _acts(calls: Sequence[ToolCall], questions: AskMode) -> bool:
+    """Whether a step does something: a question left for the user does not (every question where the run leaves them,
+    one asked without ``wait`` where the run chooses, item 506), since it changes nothing until someone answers it, so a
+    run that only leaves questions between text replies still ends."""
+    return any(call.name != ASK_USER_TOOL or _waits(call, questions) for call in calls)
+
+
+def _waits(call: ToolCall, questions: AskMode) -> bool:
+    """Whether the question ``call`` asks waits for its answer."""
+    return questions == "wait" or (questions == "choose" and call.arguments.get("wait") is True)
 
 
 def _drain(inbox: asyncio.Queue[UserInput]) -> list[UserInput]:
@@ -1709,7 +1714,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             True,
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
-    questions: QuestionMode = question_mode(config.questions, can_ask)
+    questions: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
     # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
     # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
     # the provider's cache of the instructions and the history holds from message to message (item 404). More skills
