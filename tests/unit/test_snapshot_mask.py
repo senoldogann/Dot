@@ -8,7 +8,7 @@ from typing import get_args
 import pytest
 from playwright.async_api import Error as PlaywrightError
 
-from dotagent.browser.driver import secret_refs
+from dotagent.browser.driver import capture_lines, secret_refs
 from dotagent.browser.safety import hides_secrets, secret_selector
 from dotagent.browser.snapshot import (
     HIDDEN_VALUE,
@@ -109,9 +109,10 @@ class _Locator:
 @dataclass
 class _Frame:
     secret_count: int
+    detached: bool
 
     def is_detached(self) -> bool:
-        return False
+        return self.detached
 
     @property
     def url(self) -> str:
@@ -123,13 +124,18 @@ class _Frame:
 
 @dataclass
 class _Page:
-    """The one stub of these tests: a page that has a secret field and cannot say which of its fields it is."""
+    """The one stub of these tests: a page whose frames say whether they hold a marked field, and that cannot say
+    which of its fields is one."""
 
-    frames: list[_Frame] = field(default_factory=lambda: [_Frame(secret_count=1)])
+    frames: list[_Frame] = field(default_factory=lambda: [_Frame(secret_count=1, detached=False)])
     url: str = "https://example.com/login"
+    snapshot: str = '- textbox "Name" [ref=e5]: Ada\n'
 
     def locator(self, selector: str) -> _Locator:
         return _Locator(1)
+
+    async def aria_snapshot(self, mode: str, boxes: bool, **options: float) -> str:
+        return self.snapshot
 
 
 async def test_a_field_that_cannot_be_asked_is_hidden_and_a_ref_of_another_shape_too() -> None:
@@ -139,8 +145,12 @@ async def test_a_field_that_cannot_be_asked_is_hidden_and_a_ref_of_another_shape
     assert await secret_refs(_Page(), filled_fields(lines)) == frozenset({"e5", "x9"})  # type: ignore[arg-type]
 
 
-async def test_a_page_without_secret_fields_hides_nothing_and_asks_no_field() -> None:
-    lines: tuple[SnapshotLine, ...] = parse_snapshot('- textbox "Name" [ref=e5]: Ada\n')
-    plain: _Page = _Page(frames=[_Frame(secret_count=0)])
-    assert await secret_refs(plain, filled_fields(lines)) == frozenset()  # type: ignore[arg-type]
-    assert HIDDEN_VALUE == "[hidden]"
+async def test_a_page_without_secret_fields_asks_no_field_and_a_frame_that_went_counts_as_one() -> None:
+    # Nothing marked: no field is asked (asking would fail and hide), and the value stays.
+    plain: _Page = _Page(frames=[_Frame(secret_count=0, detached=False)])
+    assert render_lines(await capture_lines(plain, 1000, True)) == '- textbox "Name" [ref=e5]: Ada'  # type: ignore[arg-type]
+    # A frame that went may have had one in the snapshot: the fields are asked, and one that cannot say is hidden.
+    gone: _Page = _Page(frames=[_Frame(secret_count=0, detached=False), _Frame(secret_count=0, detached=True)])
+    assert HIDDEN_VALUE in render_lines(await capture_lines(gone, 1000, True))  # type: ignore[arg-type]
+    # Yolo asks nothing and hides nothing.
+    assert "Ada" in render_lines(await capture_lines(gone, 1000, False))  # type: ignore[arg-type]

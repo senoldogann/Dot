@@ -285,9 +285,15 @@ def hides_secrets(approvals: ApprovalMode) -> bool:
 
 
 def secret_selector() -> str:
-    """The CSS selector of the fields :func:`secret_kind` takes for secret (item 467): password inputs and the fields
-    whose autocomplete names a secret among its tokens (``section-pay shipping cc-number`` too), whatever their case."""
-    return ", ".join(['input[type="password" i]', *(f'[autocomplete~="{kind}" i]' for kind in _SECRET_KINDS)])
+    """The CSS selector of the fields :func:`secret_kind` takes for secret (item 467), as the driver's field marking
+    reads them: password inputs, and the inputs and text areas whose autocomplete names a secret among its tokens
+    (``section-pay shipping cc-number`` too), whatever their case."""
+    return ", ".join(
+        [
+            'input[type="password" i]',
+            *(f'{tag}[autocomplete~="{kind}" i]' for kind in _SECRET_KINDS for tag in ("input", "textarea")),
+        ]
+    )
 
 
 def secret_field_label(kind: SecretKind) -> str:
