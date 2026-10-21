@@ -13,7 +13,7 @@ import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
-import { CHAT_BOX_PX, composerFrame, keepDraft, NEW_CHAT_DRAFT, readDraft } from "../composer.js";
+import { CHAT_BOX_PX, composerFrame, keepDraft, moveDraft, NEW_CHAT_DRAFT } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { clip, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
@@ -1125,20 +1125,19 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   }
 
   // A message sent to this chat from another screen (a phone, another window) starts its next run there, which this
-  // page did not know of until it was opened again (item 451). A page that shows the chat goes on at the newer run, as
-  // the screen it was sent from does: when a run of the chat is queued, once the lifecycle stream is back after a break
-  // (it replays nothing), and as it opens, a phone's page that the browser loaded again included. What was typed here and
-  // not sent goes with it, as the newer run's draft. A page shows the chat unless a link led to its run (main.js keeps
-  // that in the history's state, item 338) and the run was not the chat's newest when the page first read it: an earlier
-  // run opened from a link, or a delegated one, stays where it is. `newestKnown` is the chat's newest run as the page
-  // last read it; a page that shows the chat starts at its own run.
-  // `history` here is the conversation's earlier runs: the browser's history is the window's.
-  const entry = window.history.state;
-  const reachedByLink = entry !== null && typeof entry === "object" && entry.dotLinked === true && entry.dotPath === `/runs/${runId}`;
-  let newestKnown = reachedByLink ? null : runId;
+  // page did not know of until it was opened again (item 451). A page that shows the chat's newest run goes on at the
+  // newer one, as the screen it was sent from does: when a run of the chat is queued, and once the lifecycle stream is
+  // back after a break (it replays nothing: a phone put away). What was typed here and not sent goes with it, as the
+  // newer run's draft. A page whose run was not the chat's newest when it first read the chat stays where it is: an
+  // earlier run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its
+  // address, or a delegated run. `newestKnown` is the chat's newest run as the page last read it, null until then;
+  // `shownKey` keeps, in this tab, the run the page showed as the chat's newest until it leaves it, so that a page the
+  // browser loads again (a phone's, put away) goes on from where it stood.
+  const shownKey = `dot.chatShown.${run.thread_id}`;
+  let newestKnown = sessionStorage.getItem(shownKey) === runId ? runId : null;
 
   async function catchUp() {
-    if (run.parent_run_id !== null || sending) {
+    if (run.parent_run_id !== null || sending || (newestKnown !== null && newestKnown !== runId)) {
       return;
     }
     let runs;
@@ -1153,14 +1152,14 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       return;
     }
     if (newestKnown === runId && newest.id !== runId) {
-      const draft = readDraft(runId);
-      if (draft !== null) {
-        keepDraft(newest.id, draft);
-      }
+      moveDraft(runId, newest.id);
       goOn(`/runs/${newest.id}`);
       return;
     }
     newestKnown = newest.id;
+    if (newestKnown === runId) {
+      sessionStorage.setItem(shownKey, runId);
+    }
   }
 
   function onRunStatus(update) {
@@ -1584,6 +1583,9 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   });
 
   return () => {
+    if (sessionStorage.getItem(shownKey) === runId) {
+      sessionStorage.removeItem(shownKey);
+    }
     window.removeEventListener("scroll", onScroll);
     thread.removeEventListener("scroll", onScroll);
     document.documentElement.classList.remove("chat-shell");

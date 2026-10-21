@@ -30,7 +30,7 @@ export const CHAT_BOX_PX = 160;
 
 /** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
  * there is none or it is not one. */
-export function readDraft(key) {
+function readDraft(key) {
   const stored = readPref(`${DRAFT_PREFIX}${key}`);
   if (stored === null) {
     return null;
@@ -51,6 +51,17 @@ export function readDraft(key) {
  * takes it up when it is next made: a message a rewind gave back (item 282). */
 export function keepDraft(draftKey, draft) {
   writePref(`${DRAFT_PREFIX}${draftKey}`, JSON.stringify(draft));
+}
+
+/** Move the draft of the composer of `fromKey` to the composer of `toKey`: what was typed for a run goes with its chat
+ * to the next run (item 451). Nothing when there is none. */
+export function moveDraft(fromKey, toKey) {
+  const draft = readDraft(fromKey);
+  if (draft === null) {
+    return;
+  }
+  keepDraft(toKey, draft);
+  clearPref(`${DRAFT_PREFIX}${fromKey}`);
 }
 
 // The skills and the MCP tools, asked for once per page and kept; a failure is kept too, so the menu says so.

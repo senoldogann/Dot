@@ -283,10 +283,11 @@ something to say and goes when none has. It does not say what the run does now, 
 the commands at work in the chat, which stand right under it. When the run ends done, the next message starts and the
 page follows it; every open page shows the queue as it changes, and only your messages wait in it: the end of a command
 in the background is never queued (see [Runs and tools](runs.md#tools)). A message sent to the chat on another screen
-(the phone, another window) starts its run there, and every page that shows the chat goes on at it at once, as the
-screen it was sent from does: when the run is queued, once the page's stream is back after a break, and as a page the
-browser loads again opens; what was typed there and not sent goes with it. A page that a link led to an earlier run of
-the chat stays where it is (item 451). In a campaign's chat the message steers the
+(the phone, another window) starts its run there, and every page that shows the chat's newest run goes on at it at
+once, as the screen it was sent from does: when the run is queued, once the page's stream is back after a break, and as
+a phone's page that the browser loads again opens; what was typed there and not sent goes with it. A page of an earlier
+run of the chat (opened from the sidebar's Activity, a link or its address) stays where it is (item 451). In a
+campaign's chat the message steers the
 session. The box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal
 mode) of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same
 agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and

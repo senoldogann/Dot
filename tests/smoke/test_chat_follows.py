@@ -1,8 +1,8 @@
 """A chat open on two screens goes on together (item 451): a message sent on the phone shows at once on the wide
 window, and one sent on the wide window at once on the phone, without leaving the chat and coming back; what was typed
-and not sent on the other screen goes with it; a page that a link led to an earlier run stays where it is, and a page
-the browser loads again at the run the chat stood at opens where it is now. A real server on a scripted model, Chrome
-wide and WebKit as a phone."""
+and not sent on the other screen goes with it; a page of an earlier run, opened by its address as the sidebar's
+Activity opens one, stays where it is; and a phone's page that the browser loads again after it showed the chat opens
+where the chat is now. A real server on a scripted model, Chrome wide and WebKit as a phone."""
 
 import asyncio
 import time
@@ -115,25 +115,17 @@ async def _screen(browser: Browser, address: str, path: str, phone: bool) -> Pag
     return page
 
 
-async def _linked_screen(browser: Browser, address: str, path: str) -> Page:
-    """A wide screen that a link inside the app led to ``path``: a link clicked on the home, which main.js marks in the
-    history's state (item 338)."""
-    context: BrowserContext = await browser.new_context(viewport={"width": 1280, "height": 800})
+async def _reloaded_screen(browser: Browser, address: str, run: RunRecord) -> Page:
+    """A phone's page at ``run`` that the browser loaded again after it had shown it as its chat's newest run: the tab
+    kept that it did (``dot.chatShown.<thread>`` in its session storage)."""
+    context: BrowserContext = await browser.new_context(
+        viewport={"width": 390, "height": 800}, is_mobile=True, has_touch=True
+    )
     page: Page = await context.new_page()
     await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+    await page.add_init_script(f"sessionStorage.setItem('dot.chatShown.{run.thread_id}', '{run.id}')")
     await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
-    await page.wait_for_selector(".page", timeout=15000)
-    await page.evaluate(
-        """path => {
-          const link = document.createElement("a");
-          link.href = `#${path}`;
-          link.id = "to-the-run";
-          link.textContent = "Open the run";
-          document.querySelector(".page").append(link);
-        }""",
-        path,
-    )
-    await page.locator("#to-the-run").click()
+    await page.goto(f"{address}/#/runs/{run.id}")
     await page.wait_for_selector(".run-main", timeout=15000)
     return page
 
@@ -190,20 +182,21 @@ async def test_a_message_sent_on_one_screen_shows_at_once_on_the_other(
             # What was typed on the wide window went with the chat.
             await expect(wide.locator(".dock textarea")).to_have_value(_DRAFT)
 
-            # A link led this page to the first run, an earlier one now: it stays there as the chat goes on.
-            linked: Page = await _linked_screen(chromium, address, f"/runs/{first.id}")
-            await linked.wait_for_timeout(1000)
-            assert await linked.evaluate("() => location.hash") == f"#/runs/{first.id}"
+            # The first run, an earlier one now, opened by its address as the sidebar's Activity opens a run that left a
+            # question: it stays there, and as the chat goes on.
+            earlier: Page = await _screen(chromium, address, f"/runs/{first.id}", False)
+            await earlier.wait_for_timeout(1000)
+            assert await earlier.evaluate("() => location.hash") == f"#/runs/{first.id}"
 
             await _send(wide, _FROM_WIDE)
             west: RunRecord = await _newest(runtime, first.thread_id, known)
             await _shows(wide, west, _FROM_WIDE)
             await _shows(phone, west, _FROM_WIDE)
 
-            assert await linked.evaluate("() => location.hash") == f"#/runs/{first.id}"
-            # A phone's page that the browser loaded again, at the run the chat stood at before: it opens where the chat
-            # is now.
-            reloaded: Page = await _screen(webkit, address, f"/runs/{first.id}", True)
+            assert await earlier.evaluate("() => location.hash") == f"#/runs/{first.id}"
+            # A phone's page put away while it showed the chat at the run before, loaded again by the browser: it opens
+            # where the chat is now.
+            reloaded: Page = await _reloaded_screen(webkit, address, south)
             await _shows(reloaded, west, _FROM_WIDE)
         finally:
             await chromium.close()
