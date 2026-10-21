@@ -1419,7 +1419,9 @@ class BrowserSession:
             return masked(url, live)
         try:
             parts = urlsplit(url)
-        except ValueError:
+        except ValueError as error:
+            # An address of a host Python cannot split (unbalanced brackets) is named alone, and why is logged.
+            _log.info("browser_address_unnamed", error=type(error).__name__)
             return "[an address that carries a filled value]"
         host: str = parts.hostname or ""
         if in_address(host, live):

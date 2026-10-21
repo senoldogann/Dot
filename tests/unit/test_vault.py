@@ -7,6 +7,7 @@ from pathlib import Path
 
 import pytest
 
+from dotagent.browser.session import BrowserSession
 from dotagent.policy.engine import decide, route_for
 from dotagent.policy.shell import assess_shell
 from dotagent.policy.types import ActionInfo
@@ -122,3 +123,15 @@ def test_a_value_is_masked_as_an_address_and_a_json_string_write_it_too() -> Non
 )
 def test_an_address_carries_a_value_however_its_escapes_write_it(address: str, carries: bool) -> None:
     assert in_address(address, ["Pässwort1", "pa%s word", "482913", "abcd"]) == carries
+
+
+def test_an_address_that_carries_a_value_is_named_by_its_host_its_scheme_or_alone() -> None:
+    live: tuple[str, ...] = ("secret-value",)
+    assert BrowserSession._named("https://example.com/x?p=secret-value", live, True) == (
+        "https://example.com/[an address that carries a filled value]"
+    )
+    assert BrowserSession._named("https://secret-value.example/x", live, True) == (
+        "https://[a host that carries a filled value]"
+    )
+    assert BrowserSession._named("http://[secret-value/x", live, True) == "[an address that carries a filled value]"
+    assert BrowserSession._named("https://example.com/x", live, False) == "https://example.com/x"
