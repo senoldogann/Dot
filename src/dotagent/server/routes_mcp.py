@@ -369,8 +369,8 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         except DotError as error:
             attempt.error = error.message
             attempt.too_many = "limit" in error.context and not config.allow
-            # A try left out for its tools signed in on the way: Choose tools lists them and connects the chosen with
-            # that sign-in, as a try that succeeds is kept with it (item 499).
+            # A try that failed after signing in keeps the sign-in, as one that succeeds is kept with it: Choose tools
+            # (a try left out for its tools) and Try again connect with it (item 499).
             if not config.oauth and await asyncio.to_thread(signed_in, sign_in_path(config.name)):
                 attempt.config = config.model_copy(update={"oauth": True})
             log.warning("mcp_server_not_added", server=config.name, error=error.message, context=error.context)
