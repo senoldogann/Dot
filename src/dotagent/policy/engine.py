@@ -2,6 +2,7 @@
 escalation; Supervised's question before a change; and the route a question takes to its answerer."""
 
 import fnmatch
+from collections.abc import Sequence
 
 import regex
 
@@ -136,34 +137,48 @@ def guard(info: ActionInfo) -> Decision | None:
     )
 
 
-def match_rule(info: ActionInfo, rules: list[RuleRecord]) -> RuleRecord | None:
-    """First enabled rule (by position) whose tool glob and regex match the action."""
-    haystack: str = f"{info.summary}\n{info.target}"
+def haystack_of(info: ActionInfo) -> str:
+    """What a rule's regular expression is searched in for the action: its summary, a line break and its target."""
+    return f"{info.summary}\n{info.target}"
+
+
+def rule_fits(rule: RuleRecord, tool: str, haystack: str) -> bool:
+    """Whether ``rule`` fits a call of ``tool`` whose summary and target are ``haystack`` (:func:`haystack_of`): it is
+    enabled, its tool pattern matches the tool, and its expression, when it has one, is found in the haystack. An
+    expression that cannot be read, or takes longer than :data:`RULE_MATCH_TIMEOUT_S`, is a :class:`ConfigError`."""
+    if not rule.enabled or not fnmatch.fnmatchcase(tool, rule.tool_glob):
+        return False
+    if rule.match_regex == "":
+        return True
+    try:
+        return regex.search(rule.match_regex, haystack, regex.IGNORECASE, timeout=RULE_MATCH_TIMEOUT_S) is not None
+    except regex.error as exc:
+        raise ConfigError(
+            "stored rule has an invalid regular expression",
+            {"rule_id": rule.id, "regex": rule.match_regex, "error": str(exc)},
+        ) from exc
+    except TimeoutError as exc:
+        # A pattern that backtracks for long would hold the daemon's event loop, and every page and stream with it, as
+        # long as it runs (item 387): it is stopped and the action refused as for a rule that cannot be read, rather
+        # than passed over, which could let an action through that the rule stops.
+        raise ConfigError(
+            "stored rule's regular expression takes too long to match",
+            {"rule_id": rule.id, "regex": rule.match_regex, "timeout_s": RULE_MATCH_TIMEOUT_S},
+        ) from exc
+
+
+def ruling_rule(tool: str, haystack: str, rules: Sequence[RuleRecord]) -> RuleRecord | None:
+    """The rule of ``rules`` that decides a call of ``tool`` whose summary and target are ``haystack``: the first, by
+    position, that fits it (:func:`rule_fits`); the ones after it are not read."""
     for rule in sorted(rules, key=lambda candidate: candidate.position):
-        if not rule.enabled or not fnmatch.fnmatchcase(info.tool, rule.tool_glob):
-            continue
-        if rule.match_regex == "":
-            return rule
-        try:
-            matched: bool = (
-                regex.search(rule.match_regex, haystack, regex.IGNORECASE, timeout=RULE_MATCH_TIMEOUT_S) is not None
-            )
-        except regex.error as exc:
-            raise ConfigError(
-                "stored rule has an invalid regular expression",
-                {"rule_id": rule.id, "regex": rule.match_regex, "error": str(exc)},
-            ) from exc
-        except TimeoutError as exc:
-            # A pattern that backtracks for long would hold the daemon's event loop, and every page and stream with it,
-            # as long as it runs (item 387): it is stopped and the action refused as for a rule that cannot be read,
-            # rather than passed over, which could let an action through that the rule stops.
-            raise ConfigError(
-                "stored rule's regular expression takes too long to match",
-                {"rule_id": rule.id, "regex": rule.match_regex, "timeout_s": RULE_MATCH_TIMEOUT_S},
-            ) from exc
-        if matched:
+        if rule_fits(rule, tool, haystack):
             return rule
     return None
+
+
+def match_rule(info: ActionInfo, rules: Sequence[RuleRecord]) -> RuleRecord | None:
+    """The rule of the owner's that decides the action (:func:`ruling_rule`), None when none fits it."""
+    return ruling_rule(info.tool, haystack_of(info), rules)
 
 
 def _handed_off(rule: RuleRecord) -> Decision:
