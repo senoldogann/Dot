@@ -60,6 +60,16 @@ opened again or the page comes back into view, and **Mark read** clears it. The 
 seen, so the phone and the desktop agree; the chats there when Dot learnt this are taken as seen, and a run that ends
 while nobody watches, a scheduled one too, leaves its chat unread.
 
+Over the home's **Today** strip, **While you were away** (item 466, `GET /api/away?since=`) says what your schedules
+and campaigns did since this browser last marked it read: how many of their runs ended done, failed or stopped, how
+many work and how many were campaign sessions; their newest runs, two then **Show N more**, each with its schedule's or
+campaign's name, how it ended, when, and the first line of its answer with its secrets masked; the approvals the review
+model and YOLO answered for you in those runs and their helpers, by who and how many were denied, with the runs that
+had the most; and the drafts they wrote that wait for you. It carries no summary and no arguments of an approval.
+**Mark as read** moves the moment on, kept in this browser (each device has its own); the first visit marks it and
+shows nothing, so the card never pours out the past, and the server reads a week back at most. A run started with
+**Run now** is one of them.
+
 Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
 for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run delegated
 by another, and a schedule that fires within the hour), each row with its state dot, the first words of its title on one
