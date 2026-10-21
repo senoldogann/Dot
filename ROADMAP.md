@@ -16116,6 +16116,33 @@ wherever it stands, and approvals a run nobody watches keeps for the owner to an
 yolo, where nothing is asked; not for a message, a post, an MCP call or an upload, whose words a later yes would not
 bind; and never by running the kept call outside its run).
 
+### 453. Dot's own Chrome keeps its session cookies when it starts again
+
+**Status: done (2026-10-21).** Part of the ninth of the nine ideas taken from OpenBot (item 449 has the plan), and the
+owner's word of 2026-10-21, corrected after a first reading the wrong way round: "Hayır sen yanlış anladın silmesin" —
+Dot's Chrome must keep cookies, sessions and history like a real browser, for Default and the profiles the owner added,
+not for Incognito. Cookies with an expiry and the history already stayed; the cookies a site gives no expiry, where many
+sites keep a sign-in, were gone after every restart of Dot's Chrome (the daemon's, the Mac's, an idle close). **Measured
+first.** The design would have kept them in a file of its own (a 0600 copy of the jar, saved every 30 s and put back
+before the first page), and the critique asked to try Chrome's own way before that: Chrome writes session cookies into
+the profile while it runs and deletes them as it starts, unless its last run crashed, when it gives them back. On a
+scratch profile (Chrome 155, Playwright 1.63, Dot's switches): a normal restart dropped the session cookie; with
+`profile.exit_type` set to `Crashed` in the profile's preferences and `--hide-crash-restore-bubble` the cookie came
+back, headless and with a window, after each of five restarts in a row, and no page of the last run was opened. **As
+built.** `browser.profiles.keep_session_cookies` writes that word into the preferences of the profile (`exit_type`
+`Crashed`, `exited_cleanly` false; the other preferences kept, written only when they say otherwise, and not for
+Incognito nor a profile whose preferences hold nothing yet; a new profile whose zoom was just written gets it too, with
+nothing to give back) before Dot's own Chrome starts (after the zoom, item 358) and before Sign in… and `dotx browser
+login` open their window (`browser.login`), so a session cookie set in either survives the other; both start Chrome with
+the switch. No copy of a cookie leaves Chrome's own store, which keeps them under the key it always used, so an imported
+profile keeps them too. **Clear** still deletes them. Item 447 of another session (Dot's Chrome closed once unused)
+ships with that close off; with this item in, the close loses no sign-in and its default can be 300 s, the owner's call.
+Yolo and every approval mode are untouched. Tests: `tests/unit/test_browser_profiles.py` (the word written, the rest
+kept, Incognito and a fresh profile left alone, a state Dot does not know refused),
+`tests/smoke/test_browser_session_cookies.py` (a real Chrome on a throwaway profile: a cookie without an expiry is still
+sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
+`docs/browser-and-computer-use.md`.
+
 ### 455. A schedule runs now, by hand, and lists its firings
 
 **Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its first part:
@@ -17106,5 +17133,7 @@ the button's title, the run's page, the list). The scheduler's own tests pass un
 - 2026-10-21 (Opus 5.5): item 449 on `item-449-rule-order` from `main`: a rule's arrows move it up or down the order, a
   rule that an earlier rule fits wherever it fits says it never decides, and the plan of the nine ideas taken from
   OpenBot is written down.
+- 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
+  of its last run when it starts again, as Chrome does after a crash, without a page of that run.
 - 2026-10-21 (Opus 5.5): item 455 on `item-455-run-now` from `main`: a schedule runs now by hand, as its firing would,
   its time and switch kept, and its Firings list its last runs.

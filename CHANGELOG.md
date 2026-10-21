@@ -11,6 +11,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
   rule fits wherever it fits says it never decides, with the number of the rule that decides in its place. The note
   above the rules now says what a yolo run keeps of the protections that are always on: only a research run's limit
   (item 449).
+- Dot's own Chrome no longer signs you out of sites that keep their sign-in in a session cookie whenever it starts
+  again: Default and the profiles you added keep those cookies across restarts, as a real browser keeps a sign-in;
+  Incognito still keeps nothing (item 453).
 - In `yolo`, Dot asks you nothing (items 433 and 443): not about what every other mode refuses (a read of where your
   secrets are kept, data sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own
   files outside the undo journal), nor about money, a credential, a message or a post in your name: the step runs and
