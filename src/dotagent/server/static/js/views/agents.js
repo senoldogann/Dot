@@ -10,7 +10,7 @@ import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
-import { ago, clip, el, modelName, plural } from "../dom.js";
+import { ago, clip, el, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
@@ -100,9 +100,11 @@ function templateTools(template, known) {
     tools its agent may use. One that suggests a schedule offers to add it with the agent (item 464), switched off until
     the owner has read its goal; `onUse(template, alsoSchedule)` makes them. */
 function templateCard(template, onUse, known) {
-  const also = template.cron === "" ? null : el("input", { type: "checkbox" });
-  const alsoRow =
-    also === null ? null : el("label", { class: "template-also" }, also, el("span", null, "Also add this schedule, switched off until you read its goal"));
+  // The app's own switch, which a finger finds on a phone (item 488), as every other on and off of the pages.
+  const alsoWords = "Also add this schedule, switched off until you read its goal";
+  const also = template.cron === "" ? null : el("button", { class: "switch", type: "button", role: "switch", "aria-checked": "false", "aria-label": alsoWords });
+  also?.addEventListener("click", () => also.setAttribute("aria-checked", String(also.getAttribute("aria-checked") !== "true")));
+  const alsoRow = also === null ? null : switchRow(el("div", { class: "template-also" }, also, el("span", null, alsoWords)), also);
   const use = el(
     "button",
     { class: "btn sm template-use", type: "button", "aria-label": `Use the template ${template.name}` },
@@ -113,7 +115,7 @@ function templateCard(template, onUse, known) {
   use.addEventListener("click", async () => {
     use.disabled = true;
     try {
-      await attempt(() => onUse(template, also !== null && also.checked));
+      await attempt(() => onUse(template, also !== null && also.getAttribute("aria-checked") === "true"));
     } finally {
       use.disabled = false;
     }

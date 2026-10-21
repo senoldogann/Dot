@@ -50,9 +50,9 @@ Manager adds it with `shell` for the folders the receipts sit in; Bug Reproducti
 name the shell and the terminal's tools, and the Reviewer names no web at all. Ten templates suggest a schedule
 (item 464): Sales Outbound and Account Health on weekdays at 9:00 and 8:30, Chief of Staff on weekdays at 7:30, Paid
 Media every day at 8:00, Talent Scout on Mondays at 10:00, Product Performance and Competitor Watch on Mondays at 9:00
-and 8:00, and Expense Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers **Also
-add this schedule, switched off until you read its goal**: ticked, **Use template** makes the agent and a schedule
-of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the agent's
+and 8:00, and Expense Manager, Release QA and Reviewer on Fridays at 16:00, 15:00 and 17:00. Their card offers a
+switch, **Also add this schedule, switched off until you read its goal**: on, **Use template** makes the agent and a
+schedule of it with the template's time (in your time zone) and its goal, the whole goal of one run, which the agent's
 instructions then guide; the schedule is added switched off, so nothing runs before you have read what it will do, and
 a schedule that could not be added leaves the agent made and says why. An agent's page lists the schedules its runs
 run as under **Schedules**, each with its goal in full, when it runs and its switch, and **Edit** on the Schedules
