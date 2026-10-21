@@ -51,7 +51,7 @@ def _address(recording: Recording) -> str:
 
 
 def teach_router(ctx: ServerContext) -> APIRouter:
-    router = APIRouter()
+    router: APIRouter = APIRouter(prefix="/api")
     # The recordings stopped and not yet saved or discarded, by the chat they belong to: a draft reads its steps once.
     stopped: dict[str, Recording] = {}
 
