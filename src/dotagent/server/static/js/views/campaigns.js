@@ -218,7 +218,7 @@ function outline(detail) {
   const { record } = detail;
   const approvals = el(
     "span",
-    { class: record.approvals === "yolo" ? "badge b-warn" : "chip", title: "Who answers the safety policy's questions in its sessions" },
+    { class: "chip", title: "Who answers the safety policy's questions in its sessions" },
     `Approvals: ${approvalLabel(record.approvals)}`,
   );
   return el(

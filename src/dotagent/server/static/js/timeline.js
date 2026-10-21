@@ -1097,12 +1097,16 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       }
     },
 
-    // An action that nobody was asked about (YOLO) or that the review model answered. The line goes into the group of the call
-    // it belongs to, so a run in YOLO mode keeps its steps together; the stored approval has the same facts. The action and
-    // the reason read once each: a record kept before item 253 ended its summary with its note, which is not said again.
+    // An action that nobody was asked about (yolo) or that the review model answered. A yolo step draws nothing (item
+    // 500): the record and the event keep it, and the chat does not warn about the mode. A review model's line goes into
+    // the group of the call it belongs to, so a run keeps its steps together; the stored approval has the same facts. The
+    // action and the reason read once each: a record kept before item 253 ended its summary with its note, which is not
+    // said again.
     approval_auto(scope, record) {
       const data = record.data;
-      const yolo = data.decided_by === "yolo";
+      if (data.decided_by === "yolo") {
+        return;
+      }
       // A step the owner allowed when it was kept for them (item 483), which the run did now.
       const permit = data.decided_by === "permit";
       const denied = data.status === "denied";
@@ -1110,12 +1114,12 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       if (!denied && settingValue(AUTO_LINES) === "hidden") {
         return;
       }
-      const verdict = yolo ? "YOLO, not asked" : permit ? "You allowed it earlier" : denied ? "Reviewer denied" : "Reviewer approved";
+      const verdict = permit ? "You allowed it earlier" : denied ? "Reviewer denied" : "Reviewer approved";
       const said = data.note === "" || data.summary.endsWith(data.note);
       const reason = said ? "" : ` — ${clip(data.note, 240)}`;
       const text = `${verdict}: ${clip(data.summary, 200)}${reason}`;
-      const tone = denied ? "auto-decision denied" : yolo ? "auto-decision yolo" : "auto-decision";
-      callGroup(scope).body.append(el("div", { class: tone }, icon(yolo ? "bolt" : "shield"), el("span", null, text)));
+      const tone = denied ? "auto-decision denied" : "auto-decision";
+      callGroup(scope).body.append(el("div", { class: tone }, icon("shield"), el("span", null, text)));
     },
 
     // The checker of goal mode compared the answer with the goal: `final` says whether the run ends with this verdict,

@@ -1,7 +1,9 @@
-"""The line of an action a yolo run did without asking (item 253), on a run's page in Chrome: the action and the
-policy's reason read once each, for a record the gate keeps now and for one kept before, whose summary ended with its
-note. Wide and on a phone, light and dark. Before, the line said the reason twice. Such lines are out of the chat until
-Settings › General brings them in, and it takes them out again (items 346 and 362).
+"""What a run's page draws of the actions nobody was asked about, on a run's page in Chrome, wide and on a phone, light
+and dark. A yolo run asks nothing (item 443) and its steps draw no line at all (item 500): the records and the events
+keep what it did and why it would have asked, and the chat does not warn about the mode. The review model's line reads
+the action and the reason once each, for a record kept now and for one kept before item 253, whose summary ended with
+its note. Such lines are out of the chat until Settings › General brings them in, and it takes them out again (items 346
+and 362).
 
 No network and no model service is used: the scripted model plays the runs of a daemon served by a real server.
 """
@@ -17,7 +19,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
-from dotagent.agent.gate import YOLO_DECIDER
+from dotagent.agent.gate import REVIEWER_DECIDER, YOLO_DECIDER
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -29,7 +31,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import ApprovalRecord, RunRecord
+from dotagent.store.models import RunRecord
 from dotagent.tools.meta import FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -40,6 +42,8 @@ WAIT_S: float = 30.0
 COMMAND: str = "touch shelf.txt"
 OLD_SUMMARY: str = "Run: touch old-shelf.txt"
 OLD_REASON: str = "the cautious preset asks before any command"
+REVIEW_SUMMARY: str = "Write the shelf"
+REVIEW_REASON: str = "the cautious preset asks before a write"
 _PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
 _SHOTS: tuple[tuple[int, Literal["light", "dark"]], ...] = (
     (1280, "light"),
@@ -97,36 +101,35 @@ async def _daemon(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, Run
         await close_runtime(runtime)
 
 
-async def _waived(runtime: Runtime, manager: RunManager, goal: str) -> tuple[RunRecord, ApprovalRecord]:
-    """A yolo run started for ``goal``, ended, and the record of the command it did without asking."""
+async def _waived(runtime: Runtime, manager: RunManager, goal: str) -> RunRecord:
+    """A yolo run started for ``goal`` and ended; it did a command it was never asked about, and the review model
+    answered two questions it kept, one of them in the shape of item 253's records."""
     run: RunRecord = await manager.start(
         goal, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
     )
-    # A record kept before item 253 ended its summary with its note; it goes in before the run's own.
+    # Records kept before item 253 ended their summary with their note; they go in before the run's own.
     await runtime.approvals.record_automatic(
-        run.id, "shell", f"{OLD_SUMMARY} — {OLD_REASON}", "medium", {}, "approved", YOLO_DECIDER, OLD_REASON
+        run.id, "shell", f"{OLD_SUMMARY} — {OLD_REASON}", "medium", {}, "approved", REVIEWER_DECIDER, OLD_REASON
+    )
+    await runtime.approvals.record_automatic(
+        run.id, "write_file", REVIEW_SUMMARY, "medium", {}, "approved", REVIEWER_DECIDER, REVIEW_REASON
     )
     deadline: float = time.monotonic() + WAIT_S
     while (await runtime.store.get_run(run.id)).status not in ("done", "failed"):
         assert time.monotonic() < deadline, f"the run {run.id} did not end in {WAIT_S} s"
         await asyncio.sleep(0.05)
     assert (await runtime.store.get_run(run.id)).status == "done"
-    (record,) = [
-        record
-        for record in await runtime.store.list_approvals(None, 50)
-        if record.run_id == run.id and record.decided_by == YOLO_DECIDER and record.note != OLD_REASON
-    ]
-    return run, record
+    return run
 
 
 async def _lines(page: Page, count: int) -> list[str]:
-    """The texts of the yolo lines of the page once ``count`` of them are there, their folded group opened, so that
+    """The texts of the decision lines of the page once ``count`` of them are there, their folded group opened, so that
     the lines are in sight."""
-    lines: Locator = page.locator(".auto-decision.yolo")
+    lines: Locator = page.locator(".auto-decision")
     deadline: float = time.monotonic() + WAIT_S
     while await lines.count() < count:
         assert time.monotonic() < deadline, (
-            f"{await lines.count()} yolo lines, not {count}: {await lines.all_text_contents()}"
+            f"{await lines.count()} lines, not {count}: {await lines.all_text_contents()}"
         )
         await asyncio.sleep(0.1)
     for head in await page.locator("details.steps:not([open]) > summary.steps-head").all():
@@ -137,9 +140,11 @@ async def _lines(page: Page, count: int) -> list[str]:
 
 
 @pytest.mark.browser
-async def test_the_line_of_an_action_done_without_asking_says_the_reason_once(
+async def test_a_yolo_step_draws_no_line_and_a_reviewed_one_says_the_reason_once(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
+    """Item 500: the command a yolo run did without asking draws no line, and no line of the page says the mode; the
+    review model's lines show, as the switch under test is turned on, and each says the reason once."""
     with scratch_home() as home, eval_environment(home, {}):
         async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
@@ -152,16 +157,22 @@ async def test_the_line_of_an_action_done_without_asking_says_the_reason_once(
                     await page.goto(ui_url(host, port, TOKEN))
                     # The lines show only once they are turned on (item 362).
                     await page.evaluate("localStorage.setItem('dot.autoLines', 'shown')")
-                    run, record = await _waived(runtime, manager, f"Touch the shelf ({width}, {scheme})")
-                    # The record keeps the action and the reason apart, each once.
-                    assert record.summary.startswith(f"Run: {COMMAND}") and record.note != ""
-                    assert record.note not in record.summary
+                    run: RunRecord = await _waived(runtime, manager, f"Touch the shelf ({width}, {scheme})")
                     await page.goto(f"{address}/#/runs/{run.id}")
                     texts: list[str] = await _lines(page, 2)
                     assert texts == [
-                        f"YOLO, not asked: {OLD_SUMMARY} — {OLD_REASON}",
-                        f"YOLO, not asked: {record.summary} — {record.note}",
+                        f"Reviewer approved: {OLD_SUMMARY} — {OLD_REASON}",
+                        f"Reviewer approved: {REVIEW_SUMMARY} — {REVIEW_REASON}",
                     ]
+                    # The step the run did without asking has its record, and no line of the chat says so (item 500).
+                    waivers = [
+                        record
+                        for record in await runtime.store.list_approvals(None, 50)
+                        if record.run_id == run.id and record.decided_by == YOLO_DECIDER
+                    ]
+                    assert [record.status for record in waivers] == ["approved"], waivers
+                    await expect(page.locator(".auto-decision.yolo")).to_have_count(0)
+                    assert "YOLO" not in await page.locator(".run-thread").inner_text()
                     await page.screenshot(path=tmp_path / f"yolo-line-{width}-{scheme}.png")
                     await page.close()
             finally:
@@ -169,11 +180,11 @@ async def test_the_line_of_an_action_done_without_asking_says_the_reason_once(
 
 
 @pytest.mark.browser
-async def test_settings_keep_the_lines_of_what_ran_without_asking_out_of_the_chat(
+async def test_settings_keep_the_lines_of_the_review_models_decisions_out_of_the_chat(
     login_env: dict[str, str], tmp_path: Path
 ) -> None:
-    """Items 346 and 362: the lines are out of a chat until the switch of Settings › General brings them in, and it
-    takes them out again. Before item 346 they always showed, and before item 362 until the switch was turned off."""
+    """Items 346 and 362: the review model's lines are out of a chat until the switch of Settings › General brings them
+    in, and it takes them out again; a yolo run's step draws none either way (item 500)."""
     with scratch_home() as home, eval_environment(home, {}):
         async with _daemon(login_env) as (runtime, manager, address), async_playwright() as playwright:
             host, port = "127.0.0.1", int(address.rpartition(":")[2])
@@ -184,7 +195,7 @@ async def test_settings_keep_the_lines_of_what_ran_without_asking_out_of_the_cha
                         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
                     )
                     await page.goto(ui_url(host, port, TOKEN))
-                    run, _ = await _waived(runtime, manager, f"Touch the shelf again ({width}, {scheme})")
+                    run: RunRecord = await _waived(runtime, manager, f"Touch the shelf again ({width}, {scheme})")
                     # Off as it starts: the chat leaves the lines out.
                     await page.goto(f"{address}/#/runs/{run.id}")
                     await expect(page.locator(".answer").last).to_be_visible()
@@ -198,6 +209,7 @@ async def test_settings_keep_the_lines_of_what_ran_without_asking_out_of_the_cha
                     await expect(shown).to_have_attribute("aria-checked", "true")
                     await page.goto(f"{address}/#/runs/{run.id}")
                     assert len(await _lines(page, 2)) == 2
+                    await expect(page.locator(".auto-decision.yolo")).to_have_count(0)
                     await page.goto(f"{address}/#/settings/general")
                     await shown.click()
                     await expect(shown).to_have_attribute("aria-checked", "false")

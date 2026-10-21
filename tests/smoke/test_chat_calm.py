@@ -26,7 +26,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
-from dotagent.agent.gate import YOLO_DECIDER
+from dotagent.agent.gate import REVIEWER_DECIDER
 from dotagent.agent.manager import RunManager
 from dotagent.config import AppConfig, load_default_config
 from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
@@ -306,8 +306,8 @@ async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dic
                     )
                     page: Page = await context.new_page()
                     await page.goto(ui_url(host, port, TOKEN))
-                    # The yolo line shows only once such lines are turned on (item 362); here it is one of what must
-                    # not widen the chat.
+                    # The review model's line shows only once such lines are turned on (item 362); here it is one of
+                    # what must not widen the chat.
                     await page.evaluate("localStorage.setItem('dot.autoLines', 'shown')")
                     started: RunRecord = await manager.start(
                         f"{_GOAL} in a table ({scheme})",
@@ -324,14 +324,14 @@ async def test_on_a_phone_the_conversation_never_scrolls_sideways(login_env: dic
                         (),
                     )
                     await runtime.approvals.record_automatic(
-                        started.id, "shell", _LONG_COMMAND, "medium", {}, "approved", YOLO_DECIDER, _LONG_REASON
+                        started.id, "shell", _LONG_COMMAND, "medium", {}, "approved", REVIEWER_DECIDER, _LONG_REASON
                     )
                     run: RunRecord = await _done(runtime, started)
                     await page.goto(f"{address}/#/runs/{run.id}")
                     await expect(page.locator(".answer").last).to_contain_text("Three invoices")
                     for head in await page.locator("details.steps:not([open]) > summary.steps-head").all():
                         await head.click()
-                    await expect(page.locator(".auto-decision.yolo")).to_contain_text("Paid_in_full")
+                    await expect(page.locator(".auto-decision")).to_contain_text("Paid_in_full")
                     await expect(page.locator(".tool-name").filter(has_text=_LONG_TOOL)).to_be_visible()
                     await expect(page.locator(".user-message .message-foot")).to_be_visible()
                     # Nothing reaches past the conversation's box, and the box scrolls up and down only.

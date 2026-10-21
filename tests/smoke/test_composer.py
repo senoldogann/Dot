@@ -331,9 +331,10 @@ async def test_the_pills_open_their_menus_and_a_draft_survives_a_navigation(
                 )
                 await popover.locator(".pop-option[data-mode='yolo']").click()
                 await expect(options_pill).to_contain_text("YOLO")
-                await expect(options_pill).to_have_attribute("data-tone", "warn")
-                # The four modes and YOLO's warning show whole, with no scroll, where the window has the room.
-                await expect(popover.locator(".note.warn")).to_be_visible()
+                # YOLO warns of nothing (item 500): the pill wears no tint and the menu carries no note.
+                await expect(options_pill).not_to_have_attribute("data-tone", "warn")
+                await expect(popover.locator(".note.warn")).to_have_count(0)
+                # The four modes show whole, with no scroll, where the window has the room.
                 assert await popover.evaluate("(menu) => menu.scrollHeight <= menu.clientHeight")
                 await expect(options_pill.locator("[data-icon='lockOpen']")).to_have_count(1)
                 await popover.locator(".pop-option[data-mode='supervised']").click()
@@ -451,9 +452,10 @@ async def test_the_bar_keeps_one_line_from_the_desk_to_the_phone(
                     assert abs(float(plus[0]) - float(send[0])) <= 1, (width, bar)
                     assert float(pills[0][2]) > float(plus[3]) - 1, (width, bar)
                     assert abs(float(field[3]) - float(plus[3])) <= 2, (width, bar)
-                # On Auto (item 495) the mode has no pill at any width.
+                # On Auto (item 495) the mode has no pill at any width, and the Options pill shows YOLO with no tint
+                # (item 500).
                 await expect(page.locator(".composer-pill[data-pill='mode']")).to_be_hidden()
-                await expect(options_pill).to_have_attribute("data-tone", "warn")
+                await expect(options_pill).not_to_have_attribute("data-tone", "warn")
                 # Closed, the pill rests with no fill; its colour fades there, so the check waits for it to settle.
                 await expect(options_pill).to_have_css("background-color", "rgba(0, 0, 0, 0)")
                 await page.locator(".composer-stack").screenshot(path=str(tmp_path / f"bar-{width}.png"))
