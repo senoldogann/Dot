@@ -58,22 +58,22 @@ tests (item 486) in two parts, the pages and the phone, each on a runner of its 
 cores and a worker drives a Chrome and a daemon; at two or three workers pages ran out of their time): the files whose
 names start `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the
 face, in Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of
-the gate's. `.github/workflows/browser.yml` runs every browser test every night, when asked (`gh workflow run
-browser.yml --ref <branch>`) and before a release; a red night is GitHub's to show. A browser test that leans on another
-test's state fails there, as the browser tests run without the others: each makes what it needs; and one that saves a
-note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama server runs there. When something under
-`desktop/` changes, `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop
-shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
-runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
-`.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
-cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). When something under
-`.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
-with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout that keeps its
-token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read by a release,
-Dependabot taking a release the day it is out (it waits a week, `cooldown` in `dependabot.yml`). Any finding fails the
-job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned by its version in the workflow, as
-pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .`
-first, on your Mac).
+the gate's. `.github/workflows/browser.yml` runs every browser test every night and when asked (`gh workflow run
+browser.yml --ref <branch>`), on one worker, for hours; a red night is GitHub's to show, and blocks nothing. A browser
+test that leans on another test's state fails there, as the browser tests run without the others: each makes what it
+needs; and one that saves a note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama server runs
+there. When something under `desktop/` changes, `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and
+`cargo test` for the desktop shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved
+later cannot change what runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and
+when asked, `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for
+`uv.lock`, cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). When
+something under `.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and
+Dependabot's file with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout
+that keeps its token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read
+by a release, Dependabot taking a release the day it is out (it waits a week, `cooldown` in `dependabot.yml`). Any
+finding fails the job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned by its version in the
+workflow, as pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version>
+--min-severity low .` first, on your Mac).
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](../ROADMAP.md) and, from item 459 on, in [roadmap/](../roadmap/); read them before
@@ -178,17 +178,16 @@ git push origin v0.1.0
 
 The workflow publishes only what the gate passed again (item 457): a first job checks that the tagged commit is a commit
 of `main` and that the tag and the version agree, the whole gate then runs again on that commit (`gate.yml` is called,
-whatever the change), and every browser test with it (`browser.yml`, item 486), and only when all of them passed does
-the last job build the source distribution and the wheel with `uv build` and upload them with `uv publish`; a failed or
-cancelled job before it skips it, and nothing reaches PyPI. A tag to publish is about eight minutes from PyPI; the
-GitHub release made with it, which the desktop shell's updater reads, is out at once. When the run is red, fix it on
-`main` and make the release again with the next version: PyPI takes a version once, and the tag that failed published
-nothing. These checks stop a mistake, not someone who holds a token that can push tags (a leaked one, or an agent
-working under your login): the workflow that runs is the tagged commit's own, which such a token can write too. Two
-settings of the repository, yours to set, close that: yourself as the required reviewer of the environment `pypi`
-(Settings › Environments › pypi), so that every publish waits for your click, and a ruleset that lets only you create
-tags `v*` (Settings › Rules › Rulesets). Installed from PyPI, Dot runs as from a clone: `uv tool install
-dotagent-macos`, then `dotx setup`.
+whatever the change), the core of the browser tests with it (item 486), and only when both passed does the last job
+build the source distribution and the wheel with `uv build` and upload them with `uv publish`; a failed or cancelled job
+before it skips it, and nothing reaches PyPI. A tag to publish is about eight minutes from PyPI; the GitHub release made
+with it, which the desktop shell's updater reads, is out at once. When the run is red, fix it on `main` and make the
+release again with the next version: PyPI takes a version once, and the tag that failed published nothing. These checks
+stop a mistake, not someone who holds a token that can push tags (a leaked one, or an agent working under your login):
+the workflow that runs is the tagged commit's own, which such a token can write too. Two settings of the repository,
+yours to set, close that: yourself as the required reviewer of the environment `pypi` (Settings › Environments › pypi),
+so that every publish waits for your click, and a ruleset that lets only you create tags `v*` (Settings › Rules ›
+Rulesets). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`, then `dotx setup`.
 
 ## Measuring the agent
 

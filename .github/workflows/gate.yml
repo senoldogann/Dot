@@ -15,9 +15,8 @@ on:
   push:
     branches: [main]
     paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
-  # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457); a call
-  # ignores the paths above, so the gate always runs whole there; its browser job steps aside, as the release runs
-  # every browser test itself (item 486).
+  # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457), the core
+  # of the browser tests with it (item 486); a call ignores the paths above, so the gate always runs whole there.
   workflow_call:
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
@@ -86,9 +85,6 @@ jobs:
   # and the face. In two parts, on runners of their own, each on one worker: a runner has three cores and a worker
   # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time.
   browser:
-    # The release runs every browser test itself (browser.yml) beside this gate, so the core is not run twice there: a
-    # workflow a release calls takes the release's context, whose workflow is "release".
-    if: github.workflow != 'release'
     name: browser (${{ matrix.part.name }})
     strategy:
       fail-fast: false

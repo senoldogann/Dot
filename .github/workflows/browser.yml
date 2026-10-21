@@ -1,15 +1,13 @@
 # Every browser test (item 486): the smoke tests marked browser, against local pages and a local daemon, in Google
-# Chrome (on the runner's image), Playwright's headless shell and WebKit (the phone's engine). Every night, on demand
-# (`gh workflow run browser.yml --ref <branch>` runs them on a branch) and before a release (release.yml calls it). The
-# core of them runs on every change beside the gate (gate.yml). Nothing is changed or opened here: a red night is
-# GitHub's to show.
+# Chrome (on the runner's image), Playwright's headless shell and WebKit (the phone's engine). Every night and on demand
+# (`gh workflow run browser.yml --ref <branch>` runs them on a branch); the core of them runs on every change and before
+# a release, beside the gate (gate.yml). Nothing is changed or opened here: a red night is GitHub's to show.
 name: browser
 
 on:
   schedule:
     - cron: "43 1 * * *"
   workflow_dispatch:
-  workflow_call:
 
 # The job only reads the code: the token GitHub hands it can do nothing more.
 permissions:
@@ -24,8 +22,8 @@ concurrency:
 jobs:
   browser:
     runs-on: macos-latest
-    # Every browser test on two workers, as the gate's core runs (gate.yml says why two).
-    timeout-minutes: 150
+    # Every browser test on one worker, as each part of the gate's core runs (gate.yml says why): hours, at night.
+    timeout-minutes: 330
     env:
       DOT_HOME: ${{ github.workspace }}/.ci/home
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
@@ -51,5 +49,5 @@ jobs:
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Browser tests
         run: >
-          uv run pytest tests/smoke -q -n 2 -p no:cacheprovider --durations=20
+          uv run pytest tests/smoke -q -p no:cacheprovider --durations=20
           -m "browser and not live and not internet and not hosted and not desktop"
