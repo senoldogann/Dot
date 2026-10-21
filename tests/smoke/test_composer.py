@@ -499,6 +499,8 @@ async def test_a_photo_in_the_box_shows_its_picture_beside_the_files_it_came_wit
             first: Locator = photos.first
             await expect(first).to_have_attribute("title", "sunset.png")
             assert (await first.text_content() or "").strip() == ""
+            # The thumbnail has an address once its file is read; it is measured once it has one and is decoded.
+            await expect(first.locator("img.attach-thumb")).to_have_attribute("src", re.compile(r"."))
             drawn: dict[str, object] = await first.locator("img.attach-thumb").evaluate(
                 "async (image) => { await image.decode(); const r = image.getBoundingClientRect();"
                 " const style = getComputedStyle(image);"
