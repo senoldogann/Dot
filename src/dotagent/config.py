@@ -15,7 +15,7 @@ from dotagent.core.paths import config_path
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.types import KNOWN_PROVIDERS, Effort, split_model_ref
 from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
-from dotagent.store.models import BrowserMode
+from dotagent.store.models import BrowserMode, NotifyLevel
 
 
 def _service_address(value: str) -> str:
@@ -564,6 +564,8 @@ class SchedulerConfig(FrozenModel):
     same_chat: bool
     # Item 458: how many failed runs in a row switch a repeating schedule off (0: never); a schedule may choose its own.
     stop_after_failures: int = Field(ge=0, le=50)
+    # Item 461: how the end of a schedule's run is told; a schedule may choose its own.
+    notify: NotifyLevel
 
 
 type McpTransport = Literal["stdio", "http", "sse"]

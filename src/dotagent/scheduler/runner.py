@@ -27,9 +27,11 @@ from dotagent.harness.step import run_step
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
+    SCHEDULE_RUN_ENDED_EVENT,
     SCHEDULE_SOURCE,
     SCHEDULE_STOPPED_EVENT,
     ScheduleMissed,
+    ScheduleRunEnded,
     ScheduleStopped,
     stop_limit,
     switches_off,
@@ -42,10 +44,11 @@ from dotagent.scheduler.failures import (
     retry_after,
 )
 from dotagent.scheduler.history import NO_DIGEST, Digest, firing_opening, history_digest
+from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, tells
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
 from dotagent.store.db import Store
-from dotagent.store.models import HarnessStep, RunRecord, ScheduleRecord, ThreadRecord
+from dotagent.store.models import EventRecord, HarnessStep, NotifyLevel, RunRecord, ScheduleRecord, ThreadRecord
 
 log = get_logger(__name__)
 
@@ -444,7 +447,7 @@ class Scheduler:
             if started is None and one_time:
                 await store.keep_schedule_due(record.id, due, now)
         run: RunRecord = started
-        await self._track(record.id, run)
+        await self._track(record.id, run, self._level(record))
         try:
             await store.set_schedule_status(record.id, "running")
             await record_firing_started(store, record.id)
@@ -504,7 +507,7 @@ class Scheduler:
                 if started is None and made:
                     await self._drop_chat(record.id, thread_id)
             run: RunRecord = started
-            await self._track(record.id, run)
+            await self._track(record.id, run, BY_HAND_LEVEL)
             try:
                 await store.record_schedule_hand_run(record.id, now, thread_id)
             except DotError as exc:
@@ -565,15 +568,22 @@ class Scheduler:
             carried,
         )
 
-    async def _track(self, schedule_id: str, run: RunRecord) -> None:
+    def _level(self, record: ScheduleRecord) -> NotifyLevel:
+        """How the ends of ``record``'s runs are told (item 461): its own level, else the configured one."""
+        return notify_level(record.options.notify, self._runtime.config.scheduler.notify)
+
+    async def _track(self, schedule_id: str, run: RunRecord, level: NotifyLevel) -> None:
         """Keep ``run`` as the schedule's run at work until it ends; its watch, which starts first, frees the schedule
-        and writes the end even when the store fails a write after this. An emergency stop engaged while it was being
+        and writes the end even when the store fails a write after this, and tells the end at ``level``, read when
+        the run started, so a schedule deleted meanwhile still tells it. An emergency stop engaged while it was being
         started ends it as one."""
         if await _emergency_stop_engaged():
             log.warning("schedule_run_stopped_emergency_stop", schedule_id=schedule_id, run_id=run.id)
             self._manager.end_by_emergency_stop(run.id)
         self._in_flight[schedule_id] = run.id
-        watcher: asyncio.Task[None] = asyncio.create_task(self._watch(schedule_id, run.id), name=f"watch-{run.id}")
+        watcher: asyncio.Task[None] = asyncio.create_task(
+            self._watch(schedule_id, run.id, level), name=f"watch-{run.id}"
+        )
         self._watchers.add(watcher)
         watcher.add_done_callback(self._watcher_done)
 
@@ -604,8 +614,9 @@ class Scheduler:
 
     async def _tell_missed(self, record: ScheduleRecord, status: str) -> None:
         """Tell the owner that the schedule ``record`` (as it was before this firing) missed it, with ``status`` saying
-        why; not again when its status said so already, so a schedule that keeps failing the same way is told once."""
-        if record.last_status == status:
+        why; not again when its status said so already, so a schedule that keeps failing the same way is told once,
+        and not at all when its level tells nothing (item 461)."""
+        if record.last_status == status or self._level(record) == "never":
             return
         missed: ScheduleMissed = ScheduleMissed(schedule_id=record.id, name=record.name, status=status)
         await self._runtime.bus.emit(SYSTEM_RUN_ID, SCHEDULE_MISSED_EVENT, missed.model_dump(), False)
@@ -616,16 +627,42 @@ class Scheduler:
         except DotError as exc:
             log.error("campaign_session_start_failed", campaign_id=campaign_id, error=exc.message, context=exc.context)
 
-    async def _watch(self, schedule_id: str, run_id: str) -> None:
-        """Write the outcome of a run to its schedule once the run is over, with its row of failed runs (item 458); a
-        repeating schedule whose runs failed so many times in a row is switched off, and the owner told once."""
+    async def _watch(self, schedule_id: str, run_id: str, level: NotifyLevel) -> None:
+        """Write the outcome of a run to its schedule once the run is over, with its row of failed runs (item 458), and
+        tell its end at ``level`` (item 461), even when that write failed; a repeating schedule whose runs failed so
+        many times in a row is switched off, and the owner told once."""
         try:
             finished: RunRecord = await self._manager.wait(run_id)
-            failed_in_row: int | None = await self._runtime.store.record_schedule_outcome(schedule_id, finished.status)
+            failed_in_row: int | None = None
+            try:
+                failed_in_row = await self._runtime.store.record_schedule_outcome(schedule_id, finished.status)
+            except DotError as exc:
+                log.error(
+                    "schedule_outcome_not_written",
+                    schedule_id=schedule_id,
+                    run_id=run_id,
+                    error=exc.message,
+                    context=exc.context,
+                )
+            await self._tell_end(schedule_id, finished, level, failed_in_row)
             if finished.status == "failed" and failed_in_row is not None:
                 await self._stop_if_failing(schedule_id, failed_in_row)
         finally:
             self._in_flight.pop(schedule_id, None)
+
+    async def _tell_end(
+        self, schedule_id: str, finished: RunRecord, level: NotifyLevel, failed_in_row: int | None
+    ) -> None:
+        """Tell the end of a schedule's run when ``level`` tells it: what it needs from the owner is in its last
+        ``run_finished`` event."""
+        ended: EventRecord | None = await self._runtime.store.last_event(finished.id, "run_finished")
+        needs: object = None if ended is None else ended.data.get("needs")
+        if not tells(level, finished.status, needs if isinstance(needs, str) else "", failed_in_row):
+            return
+        told: ScheduleRunEnded = ScheduleRunEnded(
+            schedule_id=schedule_id, run_id=finished.id, status=finished.status, result=finished.result
+        )
+        await self._runtime.bus.emit(SYSTEM_RUN_ID, SCHEDULE_RUN_ENDED_EVENT, told.model_dump(), False)
 
     async def _stop_if_failing(self, schedule_id: str, failed_in_row: int) -> None:
         """Switch the schedule off when its runs failed its limit of times in a row, and tell the owner; a schedule

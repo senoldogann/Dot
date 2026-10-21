@@ -5,6 +5,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- Schedules: **Notifications** in a schedule's form says how the end of its runs is told on your phone and desktop:
+  always (as before, else `[scheduler] notify`), only when it fails or needs you, or never; a run you start with
+  **Run now** is always told (item 461).
 - Schedules: a repeating schedule whose runs fail so many times in a row (its **Switch off after**, or `[scheduler]
   stop_after_failures`; never by default) is switched off and you are told once; its row says how many failed in a
   row (item 458).

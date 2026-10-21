@@ -727,6 +727,10 @@ same_chat = false
 # How many of a repeating schedule's runs in a row may end failed before it is switched off and you are told (item 458;
 # 0 = never, as before; a schedule may choose its own). A run cancelled counts neither way, and one done starts again.
 stop_after_failures = 0
+# How the end of a schedule's run is told on the phone and the desktop (item 461): "always" (every end, as before),
+# "problems" (a failure after a run that went well, and an end that needs you) or "never" (the run's page and the
+# Schedules row still say it); a schedule may choose its own, and a run you start by hand is always told.
+notify = "always"
 
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML

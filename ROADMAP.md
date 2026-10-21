@@ -16198,6 +16198,34 @@ with one event, switching it on again; a one-time schedule and one without a lim
 390 px as a touch screen: the row's note and the form's limit). Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`,
 `defaults.toml`.
 
+### 461. A schedule says how the end of its runs is told
+
+**Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its third part:
+"a notification level per schedule". Until now the end of every run was told on the phone and the desktop, a
+schedule's as any other's, so a schedule that runs every hour told every hour. **As built.** A schedule has a level
+(`ScheduleOptions.notify`, a column; its form's **Notifications**: Always, Only when it fails or needs me, Never; else
+`[scheduler] notify`, `always`, which is how Dot worked). The level is read when its run starts and given to the run's
+watch (`Scheduler._track`, `_watch`), so a schedule changed or deleted while its run works tells that run's end at the
+level it had: never no notice, never two (the critique). At the end the watch writes the outcome and the row of failed
+runs (item 458) and, when the level tells it (`scheduler/notices.py` `tells`: `always` every end; `problems` the failed
+run that starts a row of failures, and a run not cancelled that ends with something it needs from the owner; `never`
+none), sends the live event `schedule_run_ended` (the run, how it ended, its answer), which the phone
+(`notify/push.py` `finished_message`) and the desktop (attention.js) word as every run's end; they no longer tell the
+plain end (`run_finished`) of a run a schedule started, while a campaign's session, also started by the scheduler, is
+told as before. A run started by hand (**Run now**) is told at every level (`BY_HAND_LEVEL`): the owner asked for it. At
+`never` a missed firing is not told either; a question, an approval, a draft and item 458's switch-off are told at
+every level, and a failure whose row cannot be read (the write failed, the schedule is gone) is told at `problems`. The
+row shows a schedule's own level as a chip, and the form's default names the configured one
+(`StatusView.schedule_notify`). Item 458's last nit taken: the chip of the switch-off limit shows only on a repeating
+schedule. Yolo is untouched: the level changes what is told, never what a run does or asks, and a yolo schedule's run
+is told as any other's. Tests: `tests/unit/test_schedule_notices.py` (the level, the rule),
+`tests/unit/test_push.py` (the phone's message for `schedule_run_ended`; a schedule's run left to its schedule, a
+campaign's session told), `tests/smoke/test_schedule_notify.py` (a real scheduler and the routes: one notice at
+`always` for a yolo schedule; at `problems` the first failure, not the second, not a run done, but a run done that
+needs the owner; none at `never`, one for its run by hand; a schedule deleted while its run works tells once; the page
+at 1280 px light and at 390 px dark as a touch screen: the row's chip, the form's levels, no limit chip on a one-time
+schedule, checked to fail without the fix). Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`, `defaults.toml`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -17167,3 +17195,5 @@ with one event, switching it on again; a one-time schedule and one without a lim
   its time and switch kept, and its Firings list its last runs.
 - 2026-10-21 (Opus 5.5): item 458 on `item-458-stop-after-failures` from `main`: a repeating schedule whose runs failed
   so many times in a row is switched off and you are told once; its row counts them.
+- 2026-10-21 (Opus 5.5): item 461 on `item-461-notify-level` from `main`: a schedule says how the end of its runs is
+  told (always, only when it fails or needs you, never); a run started by hand is always told.

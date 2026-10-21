@@ -165,18 +165,26 @@ function firstLine(text) {
   return text.split(LINE_BREAK).find((line) => line.trim() !== "") ?? "";
 }
 
+/** The notification of a run's end: how it ended and the first line of its answer. */
+function endNote(runId, status, result) {
+  return {
+    title: FINISHED_TITLE[status] ?? "A run has ended",
+    body: shorten(firstLine(typeof result === "string" ? result : "")),
+    tag: `run-${runId}`,
+    route: `#/runs/${runId}`,
+    state: FINISHED_FACE[status] ?? "idle",
+  };
+}
+
 async function tellAboutEnd(event) {
   const { run } = await api.get(`/runs/${event.run_id}`);
-  if (run.parent_run_id !== null || !worthATell(run.id)) {
+  // A schedule's run is told by its schedule, at the level it has (item 461, `schedule_run_ended`); a campaign's
+  // session carries the same source and is told here.
+  const toldByItsSchedule = run.source === "schedule" && run.campaign_id === null;
+  if (run.parent_run_id !== null || toldByItsSchedule || !worthATell(run.id)) {
     return;
   }
-  tell({
-    title: FINISHED_TITLE[event.data.status] ?? "A run has ended",
-    body: shorten(firstLine(typeof event.data.result === "string" ? event.data.result : "")),
-    tag: `run-${run.id}`,
-    route: `#/runs/${run.id}`,
-    state: FINISHED_FACE[event.data.status] ?? "idle",
-  });
+  tell(endNote(run.id, event.data.status, event.data.result));
 }
 
 /** A draft a run wrote for the owner to send (item 314), in the words the phone hears (`notify/push.py`). */
@@ -206,6 +214,15 @@ function tellAboutCampaign(event) {
 function tellAboutMissedFiring(event) {
   const { schedule_id: id, name, status } = event.data;
   tell({ title: "A schedule did not run", body: shorten(`${name}: ${status}`), tag: `schedule-${id}`, route: "#/schedules", state: "failed" });
+}
+
+/** The end of a schedule's run that its level tells (item 461), in the words of every run's end. */
+function tellAboutScheduledEnd(event) {
+  const { run_id: runId, status, result } = event.data;
+  if (!worthATell(runId)) {
+    return;
+  }
+  tell(endNote(runId, status, result));
 }
 
 function tellAboutStoppedSchedule(event) {
@@ -241,6 +258,8 @@ function onLifecycleEvent(event) {
       tellAboutMissedFiring(event);
     } else if (event.kind === "schedule_stopped") {
       tellAboutStoppedSchedule(event);
+    } else if (event.kind === "schedule_run_ended") {
+      tellAboutScheduledEnd(event);
     } else if (event.kind === "learning_stalled") {
       tellAboutLearningStalled(event);
     }

@@ -162,10 +162,11 @@ composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the 
 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
-level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat and whether it is on
-(`history_runs`, `same_chat`, `stop_after_failures` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
-configured ones and the standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
-creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
+level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat, when its failures switch it
+off, how the end of its runs is told and whether it is on (`history_runs`, `same_chat`, `stop_after_failures`,
+`notify` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the standard speed).
+Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
+chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
 the form is open, **New schedule** reads **Close**, with a cross.
 
 **Run now** (the play button of a schedule's row, `POST /api/schedules/<id>/run`, item 455) starts one of its runs at
@@ -199,4 +200,10 @@ earlier runs.
   the row to 0, a run cancelled (stopped by you, the emergency stop or the daemon) counts neither way, a run started
   by hand counts as one at its time, and a firing that started no run counts not at all. A one-time schedule is never
   switched off by it. Switching a schedule on again, or changing it, starts its row afresh.
+- How the end of a schedule's run is told on your phone and desktop (item 461): **Notifications** in its form, else
+  `[scheduler] notify` (`always`, every end, by default). **Only when it fails or needs me** (`problems`) tells the
+  failed run that starts a row of failures, not the ones after it, and a run that ends with something it needs from
+  you; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **Firings** and the run's
+  page still show. A run started with **Run now** is told at every level, as are a question, an approval, a draft and
+  the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

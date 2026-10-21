@@ -33,6 +33,7 @@ UNSET_OPTIONS: ScheduleOptions = ScheduleOptions(
     history_runs=None,
     same_chat=None,
     stop_after_failures=None,
+    notify=None,
 )
 
 

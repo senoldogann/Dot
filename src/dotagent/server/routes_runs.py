@@ -110,6 +110,7 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
         history_runs=None,
         same_chat=True,
         stop_after_failures=None,
+        notify=None,
     )
 
 

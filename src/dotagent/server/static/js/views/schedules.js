@@ -64,11 +64,23 @@ function defaultsNow() {
     historyRuns: status === null ? null : status.schedule_history_runs,
     sameChat: status === null ? null : status.schedule_same_chat,
     stopAfterFailures: status === null ? null : status.schedule_stop_after_failures,
+    notify: status === null ? null : status.schedule_notify,
   };
 }
 
 // How many earlier runs a schedule's firing may know (item 257); a count saved over the API joins them in the menu.
 const HISTORY_COUNTS = [0, 1, 3, 5, 10];
+// How the end of a schedule's run is told on the phone and the desktop (item 461).
+const NOTIFY_LEVELS = [
+  { id: "always", label: "Always" },
+  { id: "problems", label: "Only when it fails or needs me" },
+  { id: "never", label: "Never" },
+];
+
+function notifyLabel(level) {
+  return NOTIFY_LEVELS.find((entry) => entry.id === level)?.label ?? level;
+}
+
 // How many failed runs in a row switch a repeating schedule off (item 458); 0 is never.
 const STOP_COUNTS = [0, 3, 5, 10, 20];
 
@@ -140,9 +152,13 @@ function optionChips(record) {
     options.speed === "fast" ? el("span", { class: "chip", title: "Its runs start in fast mode" }, "Fast") : null,
     options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
     options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
-    options.stop_after_failures === null
+    // Only a repeating schedule is switched off by its failures (item 458).
+    options.stop_after_failures === null || record.cron === null
       ? null
       : el("span", { class: "chip", title: "When it switches itself off" }, `Switch off: ${stopLabel(options.stop_after_failures).toLowerCase()}`),
+    options.notify === null
+      ? null
+      : el("span", { class: "chip", title: "How the end of its runs is told" }, `Notifications: ${notifyLabel(options.notify).toLowerCase()}`),
   ];
 }
 
@@ -316,6 +332,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
           history_runs: null,
           same_chat: null,
           stop_after_failures: null,
+          notify: null,
         }
       : record.options;
   const now = defaultsNow();
@@ -362,6 +379,14 @@ function scheduleForm({ view, onSaved, onCancel }) {
       ...stops.map((count) => ({ id: String(count), label: stopLabel(count) })),
     ],
     options.stop_after_failures === null ? "" : String(options.stop_after_failures),
+  );
+  const notify = select(
+    "Notifications",
+    [
+      { id: "", label: now.notify === null ? "Default" : `Default (${notifyLabel(now.notify)})` },
+      ...NOTIFY_LEVELS.map(({ id, label }) => ({ id, label })),
+    ],
+    options.notify ?? "",
   );
   const chat = select(
     "Chat",
@@ -514,6 +539,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       history_runs: history.value === "" ? null : Number(history.value),
       same_chat: chat.value === "" ? null : chat.value === "same",
       stop_after_failures: stopAfter.value === "" ? null : Number(stopAfter.value),
+      notify: notify.value === "" ? null : notify.value,
       // The form has no speed of its own: a schedule keeps the one its chat gave it (item 291).
       speed: options.speed,
     };
@@ -554,6 +580,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       field("Earlier runs it knows", history, "Each run starts with the dated answers of the last runs, to build on them instead of doing the same work again."),
       field("Chat", chat, "In the same chat each run reads the conversation of the runs before it instead."),
       field("Switch off after", stopAfter, "A repeating schedule whose runs fail so many times in a row is switched off, and you are told; a run cancelled counts neither way."),
+      field("Notifications", notify, "How the end of its runs is told on your phone and desktop; a question, a draft and a switch-off are told always, and a run you start by hand too."),
       record === null ? null : switchRow(el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled), enabled),
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Runs"), el("div", { class: "cluster" }, repeats.element)),
       cronField,

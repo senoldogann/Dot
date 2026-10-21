@@ -26,7 +26,15 @@ from dotagent.core.types import FrozenModel
 from dotagent.drafts.service import DRAFT_CREATED_EVENT
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
 from dotagent.notify.keys import keys_problem
-from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_STOPPED_EVENT, ScheduleMissed, ScheduleStopped
+from dotagent.scheduler import (
+    SCHEDULE_MISSED_EVENT,
+    SCHEDULE_RUN_ENDED_EVENT,
+    SCHEDULE_SOURCE,
+    SCHEDULE_STOPPED_EVENT,
+    ScheduleMissed,
+    ScheduleRunEnded,
+    ScheduleStopped,
+)
 from dotagent.store.db import Store
 from dotagent.store.models import DraftRecord, EventRecord, PushSubscription, RunRecord
 
@@ -59,6 +67,7 @@ PUSH_KINDS: frozenset[str] = frozenset(
         CAMPAIGN_ENDED_EVENT,
         SCHEDULE_MISSED_EVENT,
         SCHEDULE_STOPPED_EVENT,
+        SCHEDULE_RUN_ENDED_EVENT,
         DAEMON_RESTARTED_EVENT,
         LEARNING_STALLED_EVENT,
     }
@@ -123,10 +132,28 @@ def _cut_off(runs: int) -> str:
     return "1 run was cut off." if runs == 1 else f"{runs} runs were cut off."
 
 
+def finished_message(status: str, result: str, run_id: str) -> PushMessage:
+    """The message of the end of a run: how it ended, and the first line of its answer. A schedule's run is told in
+    these words too, when its level tells it (``dotagent.scheduler.notices``)."""
+    return PushMessage(
+        title=_FINISHED_TITLE.get(status, "A run has ended"),
+        body=_shorten(_first_line(result)),
+        route=f"#/runs/{run_id}",
+        state=_FINISHED_STATE.get(status, "idle"),
+    )
+
+
+def _told_by_its_schedule(run: RunRecord) -> bool:
+    """Whether the end of ``run`` is its schedule's to tell (item 461): a run a schedule started, at its time or by
+    hand, and not a campaign's session, which carries the same source."""
+    return run.source == SCHEDULE_SOURCE and run.campaign_id is None
+
+
 def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
     """The message an event of a run is worth, or ``None``: an approval or a question asked or left; a draft written
     for the owner to send (item 314); the end of a run of its own (the sub-runs of a run stay quiet, as in the web UI),
-    with the first line of its result; the end of a campaign by itself."""
+    with the first line of its result, but for a schedule's run, which its schedule tells at its level (item 461); the
+    end of a campaign by itself."""
     if event.kind in _ASKED_KINDS:
         severity: object = event.data.get("severity")
         args: object = event.data.get("args")
@@ -144,15 +171,9 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
             route=f"#/runs/{run.id}",
             state="waiting",
         )
-    if event.kind == "run_finished" and run.parent_run_id is None:
-        status: str = str(event.data.get("status", ""))
+    if event.kind == "run_finished" and run.parent_run_id is None and not _told_by_its_schedule(run):
         result: object = event.data.get("result")
-        return PushMessage(
-            title=_FINISHED_TITLE.get(status, "A run has ended"),
-            body=_shorten(_first_line(result if isinstance(result, str) else "")),
-            route=f"#/runs/{run.id}",
-            state=_FINISHED_STATE.get(status, "idle"),
-        )
+        return finished_message(str(event.data.get("status", "")), result if isinstance(result, str) else "", run.id)
     if event.kind == CAMPAIGN_ENDED_EVENT:
         ended: CampaignEnded = CampaignEnded.model_validate(event.data)
         achieved: bool = ended.status == "achieved"
@@ -182,6 +203,9 @@ def notice_message(event: EventRecord) -> PushMessage | None:
             route="#/schedules",
             state="failed",
         )
+    if event.kind == SCHEDULE_RUN_ENDED_EVENT:
+        ended: ScheduleRunEnded = ScheduleRunEnded.model_validate(event.data)
+        return finished_message(ended.status, ended.result, ended.run_id)
     if event.kind == SCHEDULE_STOPPED_EVENT:
         stopped: ScheduleStopped = ScheduleStopped.model_validate(event.data)
         return PushMessage(

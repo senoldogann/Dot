@@ -112,6 +112,7 @@ def chat_options(run: RunRecord, choices: ChatChoices | None) -> ScheduleOptions
             history_runs=None,
             same_chat=True,
             stop_after_failures=None,
+            notify=None,
         )
     return ScheduleOptions(
         model=choices.model,
@@ -123,6 +124,7 @@ def chat_options(run: RunRecord, choices: ChatChoices | None) -> ScheduleOptions
         history_runs=None,
         same_chat=True,
         stop_after_failures=None,
+        notify=None,
     )
 
 
