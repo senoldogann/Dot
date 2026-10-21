@@ -307,6 +307,13 @@ class _Call:
     waited_s: float = 0.0
     decision: StepDecision | None = None
 
+    def asked(self, action: ActionInfo) -> None:
+        """The agent asks to act for this call. OpenCode may ask twice for one call (a folder outside the workspace,
+        then the edit itself): the call's action and decision are those of its last ask, the decision only once the
+        gate lets it through."""
+        self.action = action
+        self.decision = None
+
 
 def step_result(event: ToolSeen, name: str, call: _Call, text: str, seconds: float, tainted: bool) -> JsonObject:
     """The ``tool_result`` event of one of OpenCode's calls, as the executor writes one of Dot's own: a call that asked
@@ -571,7 +578,7 @@ class _Follow:
             await self.server.reply(event.request_id, self.directory, "reject", NO_SUBAGENT_NOTE)
             return
         action: ActionInfo = permission_action(event, self.directory, runtime.protected, runtime.dot_paths)
-        call.action = action
+        call.asked(action)
         # An edit that would step on another run at work is refused, as a call of Dot's own tools is (item 301).
         held: str | None = runtime.peers.conflict(self.agent.run.id, action.tool, action)
         if held is not None:
