@@ -48,12 +48,12 @@ A browser test that waits for something only an async function of the page can t
 polls it with `page.evaluate`: Playwright's `wait_for_function` takes the promise such a function returns for true at
 once, and waits for nothing (item 359).
 
-The gate runs on every pull request and every push to `main` that changes more than prose (`.github/workflows/gate.yml`,
-on macOS because the package depends on PyObjC; a change to the Markdown at the root, `docs/` or the issue and pull
-request templates alone skips it): the format check, the lint, mypy, the checks of the interface (`npm run check`), the
-unit tests, `dotx eval check` and every smoke
-test that needs no service (the release calls it too, on the tagged commit), chosen by its marks (`-m "not live and not browser and not internet and not desktop and not
-hosted"`). The tests run spread over the cores with `-n auto` (pytest-xdist). When something under `desktop/` changes,
+The gate runs on every pull request and every push to `main` that changes more than prose, and, called by the release,
+on the tagged commit (`.github/workflows/gate.yml`, on macOS because the package depends on PyObjC; a change to the
+Markdown at the root, `docs/` or the issue and pull request templates alone skips it): the format check, the lint, mypy,
+the checks of the interface (`npm run check`), the unit tests, `dotx eval check` and every smoke test that needs no
+service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not hosted"`). The
+tests run spread over the cores with `-n auto` (pytest-xdist). When something under `desktop/` changes,
 `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop shell. Each action the
 workflows use is pinned by the commit its tag named, so a tag moved later cannot change what runs. The tests marked
 above stay on your Mac. Once a week, and when asked, `.github/workflows/audit.yml` checks the dependencies as locked
@@ -158,18 +158,18 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-The workflow publishes only what the gate passed again (item 457): a first job checks that the tagged commit is a
-commit of `main` and that the tag and the version agree, the whole gate then runs again on that commit
-(`gate.yml` is called, whatever the change), and only when both passed does the last job build the source distribution
-and the wheel with `uv build` and upload them with `uv publish`; a failed or cancelled job before it skips it, and
-nothing reaches PyPI. A tag to publish is about eight minutes from PyPI; the GitHub release made with it, which the
-desktop shell's updater reads, is out at once. When the run is red, fix it on `main` and make the release again with
-the next version: PyPI takes a version once, and the tag that failed published nothing. These checks stop a mistake,
-not someone who holds a token that can push tags (a leaked one, or an agent working under your login): the workflow
-that runs is the tagged commit's own, which such a token can write too. Two settings of the repository, yours to set,
-close that: yourself as the required reviewer of the environment `pypi` (Settings › Environments › pypi), so that
-every publish waits for your click, and a ruleset that lets only you create tags `v*` (Settings › Rules › Rulesets). Installed from PyPI, Dot runs as from a clone: `uv tool install dotagent-macos`,
-then `dotx setup`.
+The workflow publishes only what the gate passed again (item 457): a first job checks that the tagged commit is a commit
+of `main` and that the tag and the version agree, the whole gate then runs again on that commit (`gate.yml` is called,
+whatever the change), and only when both passed does the last job build the source distribution and the wheel with `uv
+build` and upload them with `uv publish`; a failed or cancelled job before it skips it, and nothing reaches PyPI. A tag
+to publish is about eight minutes from PyPI; the GitHub release made with it, which the desktop shell's updater reads,
+is out at once. When the run is red, fix it on `main` and make the release again with the next version: PyPI takes a
+version once, and the tag that failed published nothing. These checks stop a mistake, not someone who holds a token that
+can push tags (a leaked one, or an agent working under your login): the workflow that runs is the tagged commit's own,
+which such a token can write too. Two settings of the repository, yours to set, close that: yourself as the required
+reviewer of the environment `pypi` (Settings › Environments › pypi), so that every publish waits for your click, and a
+ruleset that lets only you create tags `v*` (Settings › Rules › Rulesets). Installed from PyPI, Dot runs as from a
+clone: `uv tool install dotagent-macos`, then `dotx setup`.
 
 ## Measuring the agent
 
