@@ -1,8 +1,8 @@
-"""The sidebar says what works (item 122): a chat whose latest run works, and every run of the Working section, a
-delegated run under its parent too, shows a dashed circle, Working and how long since the run was asked for where the
-row's time sits at rest, read again every second; a chat whose run waits for an answer keeps its amber dot and its age,
-and once the runs end every row shows its age again. Scripted runs wait in a shell command or on a question, served by
-a real server, wide and on a phone, light and dark."""
+"""The sidebar says what works (item 122): every row of the Working section shows a dashed circle, Working and how long
+since the run was asked for where the row's time sits at rest, read again every second; a chat wears the face of the run
+it delegated instead of a row of its own (item 507); a chat whose run waits for an answer keeps its amber dot and its
+age, and once the runs end every row shows its age again. Scripted runs wait in a shell command or on a question, served
+by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import re

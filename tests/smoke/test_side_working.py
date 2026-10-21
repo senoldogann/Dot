@@ -1,6 +1,6 @@
 """The side menu shows each chat once (item 202): a chat at work stands in Working, as a chat with its menu, its time
-and the runs it delegated folded under it, and not again among the days; a pinned chat at work stays among the pinned
-ones, its delegated runs under it there; what waits for an answer stays above, and its chat keeps its place. Folded,
+and the faces of the runs it delegated (item 507), and not again among the days; a pinned chat at work stays among the
+pinned ones, wearing the same faces there; what waits for an answer stays above, and its chat keeps its place. Folded,
 Working keeps the open chat in sight; the search finds the chats at work too; once the runs end, the chats are back
 among the days. Scripted runs, served by a real server, wide and on a phone, light and dark."""
 
@@ -174,7 +174,7 @@ async def _open_sidebar(browser: Browser, address: str, width: int, scheme: Lite
 
 
 def _titles(place: Locator) -> Locator:
-    """The titles of the chats in ``place``, the delegated runs under them left out."""
+    """The titles of the chats in ``place``."""
     return place.locator(".side-chat > a.side-run .side-run-goal")
 
 
