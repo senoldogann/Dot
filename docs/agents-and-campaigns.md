@@ -23,8 +23,9 @@ bounds for that chat; a server the model only called does not. The run's page we
 with a chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. A schedule can run
 as one of your agents (its **Agent** on Schedules, item 462; see [Memory and schedules](memory-and-schedules.md)).
 Deleting an agent leaves its chats, its lessons and its learned skills to Dot, and switches its schedules off ("switched
-off: its agent was deleted"), as Dot's with no agent named, so that none goes on firing with every tool; the dialog
-says how many. The bar of an agent's page names the agent as the page's
+off: its agent was deleted"), as Dot's with no agent named, so that none goes on firing with every tool; one you switch
+on again runs as Dot, or as the agent you then pick in its form. The dialog says how many of them it switches off: the
+ones on. The bar of an agent's page names the agent as the page's
 heading, as the tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not where the
 greeting stood.
 
