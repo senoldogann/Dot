@@ -61,7 +61,7 @@ export function loadingPanel() {
 export function chatLoading() {
   return el(
     "div",
-    { class: "chat-loading", role: "status", "aria-label": "Opening the chat" },
+    { class: "chat-loading", role: "status", "aria-label": "Opening this chat" },
     el(
       "div",
       { class: "chat-loading-head", "aria-hidden": "true" },

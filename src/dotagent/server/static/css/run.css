@@ -294,8 +294,7 @@
 
   .chat-loading-ring,
   .chat-loading-core,
-  .chat-loading-mark::before,
-  .chat-loading-block::after {
+  .chat-loading-mark::before {
     animation: none;
   }
 
