@@ -187,7 +187,12 @@ function drawFlow(past, flow, asked, events) {
       picks = event.data;
     } else if (event.kind === "steer") {
       batch = null;
-      blocks.push({ steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } });
+      // Dot's words that you did a step kept for you (item 482) are no message of yours.
+      blocks.push(
+        event.data.vouches === false
+          ? { kept: event.data.text }
+          : { steer: { text: event.data.text, files: event.data.files ?? [], sentAt: event.ts } },
+      );
     } else if (event.kind === "page_shown") {
       // A page the run showed (`show_page`, item 193) stands where it came, in its frame, as on the run's own page.
       batch = null;
@@ -225,6 +230,8 @@ function drawFlow(past, flow, asked, events) {
       ? pageCard(block.page.id, block.page.title)
       : block.steer !== undefined
       ? userMessage({ text: block.steer.text, sentAt: block.steer.sentAt, files: block.steer.files, editFromHere: null })
+      : block.kept !== undefined
+      ? el("div", { class: "note" }, icon("hand"), el("span", null, block.kept))
       : block.say === undefined
         ? stepsBlock(block)
         : el("div", { class: "turn-say" }, prose(block.say)),

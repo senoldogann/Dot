@@ -124,6 +124,8 @@ class ApprovalPayload(Payload):
     summary: str
     severity: str
     args: JsonObject
+    # When a step kept for the owner lapses (item 482); None for every other question.
+    kept_until: float | None = None
 
 
 class AutoApprovalPayload(Payload):
@@ -369,7 +371,8 @@ class TerminalUi:
         if needs:
             self._line(self._paint(f"  ✋ what Dot needs from you: {needs}", "1;33"))
         for question in questions:
-            self._line(self._paint(f"  ? left for you: {question.summary}", "35"))
+            said: str = "left for you" if question.kept_until is None else "kept for you"
+            self._line(self._paint(f"  ? {said}: {question.summary}", "35"))
         if questions:
             self._line(self._paint("    answer on the run's page in the web UI; the answer carries the work on", "2"))
 
@@ -621,6 +624,10 @@ class TerminalUi:
             self._line(self._paint(f"    answer with {numbers}, or in your own words", "2"))
 
     def _on_left_question(self, question: ApprovalPayload) -> None:
+        if question.kept_until is not None:
+            self._line(self._paint(f"  ✋ {question.summary}", "1;35"))
+            self._line(self._paint("    kept for you: nobody answered in time, and the run goes on without it", "2"))
+            return
         self._line(self._paint(f"  ? {question.summary}", "1;35"))
         self._show_options(stored_options(question.args), takes_several(question.args))
         self._line(self._paint("    left for you: the run goes on without the answer", "2"))

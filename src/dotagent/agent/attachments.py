@@ -26,7 +26,7 @@ from dotagent.core.errors import InvalidValueError, NotFoundError, WebError
 from dotagent.core.ids import new_id
 from dotagent.core.images import EncodedImage, encode_image
 from dotagent.core.text import truncate_middle, unclosing
-from dotagent.core.types import FrozenModel
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.llm.calls import CallOrigin
 from dotagent.llm.types import ImageData, Message, user_message
 from dotagent.office import OFFICE_MEDIA_TYPES, OfficeKind, office_kind, office_text, unreadable_office_file
@@ -74,11 +74,17 @@ class StoredAttachment(FrozenModel):
 
 class UserInput(FrozenModel):
     """What the user sends to a running run: an instruction and the files that came with it. ``question_id`` names the
-    question a run left when the text answers it, else it is ``None``."""
+    question a run left when the text answers it, else it is ``None``. ``vouches`` says whether the text is the owner's
+    own words, which restore trust in what follows (the run's taint is cleared); ``said`` is what of it the owner said
+    themselves, the instruction the review model reads: all of it when it vouches. Dot's words that the owner did a
+    step kept for them themselves (item 482) vouch for nothing, as an "I did it" during the run does not, and only the
+    note the owner wrote with them, if any, is said."""
 
     text: str
     files: tuple[StoredAttachment, ...]
     question_id: str | None
+    vouches: bool
+    said: str
 
 
 def attachments_root(workspace: Path) -> Path:
@@ -280,3 +286,13 @@ class AttachedFile(FrozenModel):
 def attachment_summary(files: Sequence[StoredAttachment]) -> list[JsonValue]:
     """What the timeline shows of the attachments of a message."""
     return [{"id": file.id, "name": file.name, "kind": file.kind, "size": file.size} for file in files]
+
+
+def steer_event(sent: UserInput, tainted: bool) -> JsonObject:
+    """The ``steer`` event of ``sent``, a message that reached a run: its text and the attachments it came with. A
+    message of the owner clears the run's taint (:func:`dotagent.agent.gate.tainted_after`); one that vouches for
+    nothing (item 482) says so, with whether the run is ``tainted``, as it was before it."""
+    data: JsonObject = {"text": sent.text, "files": attachment_summary(sent.files)}
+    if sent.vouches:
+        return data
+    return {**data, "vouches": False, "tainted": tainted}

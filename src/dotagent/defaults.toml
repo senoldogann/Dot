@@ -367,6 +367,14 @@ preset = "aggressive"
 # site holds (a rule of yours cannot refuse: its behaviours are allow, preapproved, ask and hand off).
 approvals = "ask"
 approval_timeout_s = 900.0
+# What a question nobody answers within approval_timeout_s comes to (item 482): "refuse" (the run is told no, as
+# always) or "park": a step the run hands to you (money, a credential, a rule of yours that hands it off) is kept for
+# you instead, and the run goes on without it; its later hand-offs are kept at once, until you write to it. A kept step
+# waits on its card, in the list of what Dot asked you, for parked_hours; your "I did it" carries the work on in the
+# same conversation (the run is told, its taint unchanged), and Skip closes it. Nothing is ever done for you by it.
+# Never in yolo, which asks nothing; a delegated run, a campaign's session and an eval refuse as before.
+unanswered = "refuse"
+parked_hours = 72.0
 protected_paths = [
   "~/.ssh",
   "~/.gnupg",

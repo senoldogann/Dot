@@ -138,6 +138,11 @@ class ApprovalRejected(DotError):
     """A human rejected, or let expire, an approval request."""
 
 
+class ApprovalParked(ApprovalRejected):
+    """A step kept for the owner (item 482): nobody answered its question in time, so it did not happen and waits for
+    them; its message is what the run is told. Every handler of a refusal handles it too."""
+
+
 class HandedOff(DotError):
     """The user took over an action themselves; the agent must not perform it."""
 

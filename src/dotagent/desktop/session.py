@@ -18,6 +18,7 @@ from pathlib import Path
 
 from dotagent.config import DesktopConfig
 from dotagent.core.errors import (
+    ApprovalParked,
     ApprovalRejected,
     DesktopError,
     FailSafeTriggered,
@@ -671,6 +672,11 @@ class DesktopSession:
                 continue
             try:
                 effect: Effect = await self._run_step(env, step, index, reviewer)
+            except ApprovalParked as error:
+                # Kept for the owner (item 482): its words say that it did not happen and waits for them.
+                reports.append(StepReport(index=index, description=description, outcome="failed", detail=error.message))
+                stopped = "a step waits for the user"
+                continue
             except (PolicyDenied, ApprovalRejected) as error:
                 detail: str = f"Not allowed: {error.message}. Do not retry this step or look for a way around it."
                 reports.append(StepReport(index=index, description=description, outcome="failed", detail=detail))

@@ -2,7 +2,7 @@
 // run waits for (`pending`) or left for the user and went on without (`left`).
 
 import { api } from "./api.js";
-import { clip, el } from "./dom.js";
+import { clip, dateTime, el } from "./dom.js";
 import { icon } from "./icons.js";
 import { toast } from "./ui.js";
 
@@ -12,6 +12,8 @@ const STATUS_LABEL = { approved: "Approved", denied: "Denied", expired: "Expired
 // conversation, or, for a session of a campaign, reaches the session while it works and the next session after that.
 export const LEFT_IN_RUN = "The run went on without your answer. Your answer goes to this conversation and carries the work on.";
 export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While it works, your answer reaches it; after that, the campaign's next session reads it, and starts right away while the campaign is active.";
+// What a step kept for the owner (item 482) says: nobody answered it in time, so the run went on without it.
+const KEPT_NOTE = "Nobody answered in time, so the run went on without this step. Once you have done it yourself, I did it carries the work on in this conversation.";
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {
@@ -24,6 +26,7 @@ export function fromRecord(record) {
     args: record.args,
     status: record.status,
     note: record.note,
+    keptUntil: record.kept_until ?? null,
   };
 }
 
@@ -38,6 +41,7 @@ export function fromEvent(runId, data) {
     args: data.args,
     status: "pending",
     note: "",
+    keptUntil: null,
   };
 }
 
@@ -181,6 +185,11 @@ function technicalDetails(args) {
   );
 }
 
+/** What a kept step's card says of it: what I did it does, and until when the step waits. */
+function keptNote(keptUntil) {
+  return `${KEPT_NOTE} It waits until ${dateTime(keptUntil)}.`;
+}
+
 /**
  * A card for one approval. `onSettled(decided)` runs once the daemon answered a decision: `decided` is the decided
  * record when it took the decision, null when it refused it (made already, or not possible now). `leftNote` says what
@@ -194,6 +203,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
   const isHandoff = approval.severity === "handoff";
   // An answer to a question the run left goes on with the work in the run's conversation, so it needs words.
   const isLeft = approval.status === "left";
+  // A step handed to the owner that nobody answered in time, kept for them until it lapses (item 482).
+  const isKept = isLeft && approval.keptUntil !== null;
   let busy = false;
 
   async function decide(approve, note) {
@@ -284,14 +295,14 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
           "div",
           { class: "approval-head" },
           icon(iconOf(approval.severity)),
-          el("span", null, isLeft ? "Dot asked you" : titleOf(approval.severity)),
+          el("span", null, isKept ? "Kept for you" : isLeft ? "Dot asked you" : titleOf(approval.severity)),
           isQuestion || isHandoff ? null : el("span", { class: `badge ${approval.severity === "high" ? "b-bad" : "b-warn"}` }, approval.severity),
           el("span", { class: "spacer" }),
           heading,
         ),
         el("div", { class: "approval-text" }, text),
         several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
-        isLeft ? el("div", { class: "small muted" }, leftNote) : null,
+        isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(approval.keptUntil) : leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
         isQuestion || isHandoff
           ? null

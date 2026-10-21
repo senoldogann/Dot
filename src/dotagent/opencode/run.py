@@ -30,6 +30,7 @@ from dotagent.agent.attachments import (
     UserInput,
     attachment_summary,
     message_with_attachments,
+    steer_event,
 )
 from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.executor import ToolOutcome, execute_calls
@@ -622,11 +623,14 @@ class _Follow:
         note: Message = await message_with_attachments(
             runtime, self.agent.run.thread_id, run_id, sent.text, sent.files, self.vision
         )
-        self.agent.gate.clear_taint()
-        self.agent.gate.add_instruction(sent.text)
+        self.agent.gate.heard_from_owner()
+        if sent.vouches:
+            self.agent.gate.clear_taint()
+        if sent.said != "":
+            self.agent.gate.add_instruction(sent.said)
         await runtime.store.append_messages(self.agent.run.thread_id, [note])
         self.added += 1
-        await self.emit("steer", {"text": sent.text, "files": attachment_summary(sent.files)}, True)
+        await self.emit("steer", steer_event(sent, self.agent.gate.tainted), True)
         await self.prompt(note.content, _prompt_files(sent.files, self.vision))
 
 

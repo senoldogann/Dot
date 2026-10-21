@@ -110,6 +110,7 @@ from dotagent.browser.upstream import ignore_repeated_frame_detach
 from dotagent.browser.window import chrome_to_watch, focused_app, front_pid, give_focus_back, return_front
 from dotagent.config import BrowserConfig, ServerConfig
 from dotagent.core.errors import (
+    ApprovalParked,
     ApprovalRejected,
     BrowserError,
     ForbiddenUrlError,
@@ -2052,6 +2053,11 @@ class BrowserSession:
                     StepReport(index=index, description=description, outcome="failed", detail=_error_detail(error))
                 )
                 stopped = f"step {index} failed"
+                continue
+            except ApprovalParked as error:
+                # Kept for the owner (item 482): its words say that it did not happen and waits for them.
+                reports.append(StepReport(index=index, description=description, outcome="failed", detail=error.message))
+                stopped = "a step waits for the user"
                 continue
             except (PolicyDenied, ApprovalRejected) as error:
                 # The gate refused the step at a field that takes a secret.

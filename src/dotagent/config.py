@@ -319,13 +319,22 @@ class SpendCap(FrozenModel):
     per_day: float = Field(gt=0, allow_inf_nan=False)
 
 
+# What a question of the policy that nobody answers in time comes to (item 482): a refusal, as it always was, or, for a
+# step the run hands to the owner, a step kept for them while the run goes on.
+type Unanswered = Literal["refuse", "park"]
+
+
 class PolicyConfig(FrozenModel):
     """``code_sources`` lists the applications ``code_fetch`` may read one-time codes from (``mail``, ``messages``);
-    empty, the tool does not exist. ``spend`` maps a site (its host without ``www.``) to its pre-approved caps."""
+    empty, the tool does not exist. ``spend`` maps a site (its host without ``www.``) to its pre-approved caps.
+    ``unanswered`` is what a question nobody answers within ``approval_timeout_s`` comes to, and ``parked_hours`` how
+    long a step kept for the owner waits before it lapses (item 482)."""
 
     preset: Preset
     approvals: ApprovalMode
     approval_timeout_s: float = Field(gt=0, allow_inf_nan=False)
+    unanswered: Unanswered
+    parked_hours: float = Field(gt=0, le=24 * 30, allow_inf_nan=False)
     protected_paths: list[str]
     code_sources: list[Literal["mail", "messages"]]
     spend: dict[SpendSite, SpendCap]
