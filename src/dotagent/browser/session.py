@@ -11,6 +11,7 @@ produced here as value types (``PageView``, ``ActOutcome``, ``TextView``); rende
 import asyncio
 import base64
 import contextlib
+import math
 import re
 import secrets
 import time
@@ -105,6 +106,7 @@ from dotagent.browser.types import (
     TabSummary,
     TextView,
     TextWait,
+    VaultFieldKind,
     VaultFill,
     Viewport,
 )
@@ -193,6 +195,11 @@ _FAIL_REASON: str = "BlockedByClient"
 # What Chrome answers to a verdict for a request the page cancelled or finished while the verdict was being made.
 _REQUEST_GONE: str = "Invalid InterceptionId"
 _FORBIDDEN_MESSAGE: str = "this URL may not be opened"
+# A request whose address carries a password or a one-time code filled from the password manager (item 493): an
+# address is written into the views of the page, Chrome's history and Dot's log, and shortened where it is long.
+_CARRIES_SECRET: str = "its address would carry a password or a code filled from your password manager"
+# How long after it went in a one-time code is kept out of addresses: past its few minutes it opens nothing.
+_CODE_HELD_S: float = 300.0
 # Chrome exits by itself a few seconds after the driver that started it died.
 _CHROME_EXIT_WAIT_S: float = 10.0
 _CHROME_EXIT_POLL_S: float = 0.2
@@ -461,6 +468,9 @@ class BrowserSession:
         # browser tools of the thread shows: kept apart from its tabs, which an idle thread lets go of while its chat
         # goes on, and for as long as the daemon runs.
         self._vault_values: dict[str, set[str]] = {}
+        # The passwords and one-time codes among them, which no request of Dot's own Chrome carries in its address, with
+        # the moment each stops being kept out (a password's never comes while the daemon runs).
+        self._vault_secrets: dict[str, float] = {}
         self._initial_pages: list[Page] = []
         self._adopting: set[asyncio.Task[None]] = set()
         # The answers under way to requests Chrome holds (:meth:`_guard_hops`), and by page the navigation of its main
@@ -1362,23 +1372,32 @@ class BrowserSession:
         """The rules on one request Chrome is about to send; ``page`` the page whose main frame it navigates, when it
         is one, so that the error page it then shows can be told from a page that failed to load. A rule that fails on
         an address refuses it: the request must be answered either way, or Chrome holds it for good."""
-        try:
-            verdict: UrlVerdict = request_verdict(
-                url, navigation, self._config.allowed_hosts, self._config.blocked_hosts, self._server
-            )
-        except Exception:  # noqa: BLE001 - logged with its traceback, and the request is refused
-            _log.exception("browser_request_unjudged", url=truncate_middle(url, _LAUNCH_ERROR_CHARS))
-            verdict = UrlVerdict(allowed=False, reason="the URL rules could not read this address")
+        shown: str = self._shown(url)
+        if shown != url:
+            verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
+        else:
+            try:
+                verdict = request_verdict(
+                    url, navigation, self._config.allowed_hosts, self._config.blocked_hosts, self._server
+                )
+            except Exception:  # noqa: BLE001 - logged with its traceback, and the request is refused
+                _log.exception("browser_request_unjudged", url=truncate_middle(url, _LAUNCH_ERROR_CHARS))
+                verdict = UrlVerdict(allowed=False, reason="the URL rules could not read this address")
         if not verdict.allowed:
             if page is not None:
-                self._refusals[page] = _Refusal(url=url, reason=verdict.reason)
+                self._refusals[page] = _Refusal(url=shown, reason=verdict.reason)
             _log.info(
                 "browser_request_refused",
-                url=truncate_middle(url, _LAUNCH_ERROR_CHARS),
+                url=truncate_middle(shown, _LAUNCH_ERROR_CHARS),
                 resource_type=resource_type,
                 reason=verdict.reason,
             )
         return verdict
+
+    def _shown(self, url: str) -> str:
+        """``url`` as Dot shows and logs it: with the passwords and codes no request may carry masked (item 493)."""
+        now: float = time.monotonic()
+        return masked(url, [value for value, until in self._vault_secrets.items() if until > now])
 
     async def _on_request(self, route: Route, request: Request) -> None:
         """The route of Dot's own Chrome: a request the rules refuse fails in the page as blocked by the client; the
@@ -1394,7 +1413,7 @@ class BrowserSession:
         except PlaywrightError as error:
             _log.info(
                 "browser_request_unanswered",
-                url=truncate_middle(request.url, _LAUNCH_ERROR_CHARS),
+                url=truncate_middle(self._shown(request.url), _LAUNCH_ERROR_CHARS),
                 error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
             )
 
@@ -1479,11 +1498,13 @@ class BrowserSession:
             if page.is_closed():
                 return
             if _REQUEST_GONE in str(error):
-                _log.debug("browser_hop_gone", url=truncate_middle(url, _LAUNCH_ERROR_CHARS), allowed=allowed)
+                _log.debug(
+                    "browser_hop_gone", url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS), allowed=allowed
+                )
                 return
             _log.warning(
                 "browser_hop_unanswered",
-                url=truncate_middle(url, _LAUNCH_ERROR_CHARS),
+                url=truncate_middle(self._shown(url), _LAUNCH_ERROR_CHARS),
                 error=truncate_middle(str(error), _LAUNCH_ERROR_CHARS),
             )
 
@@ -2207,6 +2228,13 @@ class BrowserSession:
                     "this page is not one of the login's sites: Dot fills a login only on its own site",
                     {"url": tab.page.url},
                 )
+            if self._config.mode == "attach" and any(fill.kind != "username" for fill in fills):
+                # The owner's Chrome sends its requests unguarded: nothing would keep a value out of an address.
+                raise BrowserError(
+                    "in your own Chrome Dot fills no password or code, since it does not guard what that Chrome sends: "
+                    "your password manager fills them there, or switch to Dot's own Chrome in Settings › Browser",
+                    {"url": tab.page.url},
+                )
             if thread.scripted:
                 # A script may have left a listener that copies what is typed: in its page, in a tab it opened, in a
                 # page Chrome brings back from its cache.
@@ -2218,9 +2246,13 @@ class BrowserSession:
             for fill in fills:
                 value: str = fill.value.get_secret_value()
 
-                def typing(typed: str = value) -> None:
-                    # From here the value may be in the page: masked, and no script runs while the tab is open.
+                def typing(typed: str = value, kind: VaultFieldKind = fill.kind) -> None:
+                    # From here the value may be in the page: masked, no script runs while the tab is open, and no
+                    # request carries a password or a code in its address.
                     self._vault_values.setdefault(thread_id, set()).add(typed)
+                    if kind != "username":
+                        held: float = math.inf if kind == "password" else time.monotonic() + _CODE_HELD_S
+                        self._vault_secrets[typed] = max(held, self._vault_secrets.get(typed, held))
                     tab.vault_held = True
 
                 await fill_login_field(

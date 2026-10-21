@@ -55,12 +55,13 @@ _POLL_S: float = 0.05
 
 class _Site(ThreadingHTTPServer):
     """The login form, its frame of another host (``localhost``, where the page is ``127.0.0.1``), whose script makes
-    its field say it is in the login's page, and the page the form goes to, which keeps the address of each
-    submission."""
+    its field say it is in the login's page, two forms sent by GET (one names the method, one names none), and the
+    page the forms go to, which keeps what each POST sent and the address of each GET that reached it."""
 
     def __init__(self) -> None:
         super().__init__(("127.0.0.1", 0), _Handler)
         self.submissions: list[str] = []
+        self.addresses: list[str] = []
 
     @property
     def port(self) -> int:
@@ -91,8 +92,12 @@ Object.defineProperty(document.querySelector("input"), "ownerDocument", {{ get: 
 </script>""",
             "/get-login": """<!doctype html><title>Search sign in</title>
 <form action="/home" method="get"><label>Password <input name="pass" type="password"></label></form>""",
+            "/plain-login": """<!doctype html><title>Plain sign in</title>
+<form action="/home"><label>Password <input name="pass" type="password"></label></form>""",
             "/home": _HOME,
         }
+        if path == "/home" and "?" in self.path:
+            self.server.addresses.append(self.path)
         body: bytes = pages.get(path, "not found").encode()
         self.send_response(200 if path in pages else 404)
         self.send_header("Content-Type", "text/html; charset=utf-8")
@@ -344,6 +349,15 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
     assert field is not None, shown.text
     with pytest.raises(BrowserError, match="its method is GET"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": field.group(1)})
+    # A form that names no method goes by GET as well: Dot's Chrome refuses the request that would carry the password.
+    plain: ToolResult = await _call(ctx, gate, "browser_open", {"url": f"http://127.0.0.1:{site.port}/plain-login"})
+    bare: re.Match[str] | None = re.search(r'"Password"[^\n]*?\[ref=([^\]]+)\]', plain.text)
+    assert bare is not None, plain.text
+    await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": bare.group(1)})
+    with pytest.raises(BrowserError) as refused:
+        await _call(ctx, gate, "browser_act", {"steps": [{"action": "press", "ref": bare.group(1), "key": "Enter"}]})
+    _unseen(str(refused.value))
+    assert not any(quote_plus(PASSWORD) in address for address in site.addresses), site.addresses
 
 
 async def test_in_auto_the_owner_answers_the_fill_and_not_the_review_model(runtime: Runtime, site: _Site) -> None:

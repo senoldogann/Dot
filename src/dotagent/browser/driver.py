@@ -161,14 +161,16 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
 # The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
 # no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
 _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
-# Whether the form a field is in sends what is typed in the page's address (item 493): its method, or one its submit
-# buttons name, is GET. A field in no form goes with the page's own script, which keeps it out of the address as a rule.
+# Whether the form a field is in names GET as the way it sends what is typed (item 493), in the page's address: its
+# method, or one its submit buttons name, is GET or a word no browser knows, which a browser reads as GET. A form that
+# names none, as a page whose script sends it writes, is left to the guard of Dot's Chrome, which refuses a request
+# whose address carries a password or a code.
 _SENDS_BY_GET_SCRIPT: str = """(field) => {
   const form = field.form;
   if (!form) return false;
-  const get = (method) => (method || '').trim().toLowerCase() === 'get';
-  return get(form.getAttribute('method')) || [...form.querySelectorAll('button, input[type=submit], input[type=image]')]
-    .some((button) => get(button.getAttribute('formmethod')));
+  return (form.hasAttribute('method') && form.method === 'get')
+    || [...form.querySelectorAll('button, input[type=submit], input[type=image]')]
+      .some((button) => button.hasAttribute('formmethod') && button.formMethod === 'get');
 }"""
 # The mark of a field a login was filled into (item 493), which every screenshot covers, in every mode: the field shows
 # the username, and a password once the page shows it.

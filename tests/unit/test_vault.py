@@ -100,3 +100,8 @@ def test_a_value_is_masked_as_an_address_and_a_json_string_write_it_too() -> Non
     value: str = 'S3cret Passw0rd!"'
     text: str = 'at /home?pass=S3cret+Passw0rd%21%22 and /x/S3cret%20Passw0rd%21%22 and {"v": "S3cret Passw0rd!\\""}'
     assert masked(text, [value]) == f'at /home?pass={MASK} and /x/{MASK} and {{"v": "{MASK}"}}'
+    # A browser writes a form's field with "*" kept and "~" encoded; a script's encodeURIComponent keeps both.
+    starred: str = "S3cret*Pass~w0rd!"
+    assert (
+        masked("/home?pass=S3cret*Pass%7Ew0rd%21 /s?q=S3cret*Pass~w0rd!", [starred]) == f"/home?pass={MASK} /s?q={MASK}"
+    )
