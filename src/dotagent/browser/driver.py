@@ -32,6 +32,9 @@ _log = get_logger("dotagent.browser.driver")
 _REF_FORMAT: re.Pattern[str] = re.compile(r"^(f\d+)?e\d+$")
 # How long a page may take to say whether a filled field is secret (item 467): short, as every view waits on it.
 _FIELD_PROBE_TIMEOUT_MS: int = 1500
+# How long a page may take to count the elements a locator names (item 471): Playwright's count takes no timeout, and
+# a frame whose script holds its main thread never answers.
+_COUNT_TIMEOUT_S: float = 2.0
 # What a screenshot shows over a secret field (item 467).
 _MASK_COLOUR: str = "#333333"
 # Playwright's text for a ref whose frame generation died with a navigation.
@@ -272,6 +275,12 @@ async def capture_lines(page: Page, timeout_ms: int, hide_secrets: bool) -> tupl
     return fold_options(lines)
 
 
+async def _count(locator: Locator) -> int:
+    """How many elements ``locator`` names; ``TimeoutError`` when the page does not say within ``_COUNT_TIMEOUT_S``."""
+    async with asyncio.timeout(_COUNT_TIMEOUT_S):
+        return await locator.count()
+
+
 async def _is_secret(page: Page, ref: str) -> bool:
     """Whether the field ``ref`` is marked secret. A ref of another shape is never put into a selector, and a field
     that cannot be asked (gone since the snapshot, its frame closed, too slow) counts as secret: a value is never shown
@@ -280,10 +289,13 @@ async def _is_secret(page: Page, ref: str) -> bool:
         return True
     locator: Locator = page.locator(f"aria-ref={ref}")
     try:
-        if await locator.count() == 0:
+        if await _count(locator) == 0:
             _log.warning("browser_field_unreadable", ref=ref, url=page.url, error="gone since the snapshot")
             return True
         marking: object = await locator.evaluate(_FIELD_MARKING_SCRIPT, timeout=_FIELD_PROBE_TIMEOUT_MS)
+    except TimeoutError:
+        _log.warning("browser_field_unreadable", ref=ref, url=page.url, error="the page did not answer in time")
+        return True
     except PlaywrightError as error:
         _log.warning("browser_field_unreadable", ref=ref, url=page.url, error=str(error))
         return True
@@ -409,7 +421,12 @@ async def live_locator(page: Page, ref: str, action: str) -> Locator:
         )
     locator: Locator = page.locator(f"aria-ref={ref}")
     try:
-        match_count: int = await locator.count()
+        match_count: int = await _count(locator)
+    except TimeoutError as error:
+        raise BrowserError(
+            "the page did not answer in time (a script may be holding it); wait, then take a new snapshot",
+            {"action": action, "ref": ref, "url": page.url, "waited_s": _COUNT_TIMEOUT_S},
+        ) from error
     except PlaywrightError as error:
         if _STALE_GENERATION in str(error):
             raise BrowserError(
@@ -812,6 +829,14 @@ async def upload_files(page: Page, ref: str, paths: list[str], timeout_ms: int) 
         raise _failure("uploading the files failed", page, {"ref": ref}, error) from error
 
 
+async def _banner_gone(banner: Locator) -> bool:
+    """Whether the banner left the page; one that cannot be counted, or not in time, is taken as still there."""
+    try:
+        return await _count(banner) == 0
+    except (TimeoutError, PlaywrightError):
+        return False
+
+
 async def install_consent_handler(page: Page) -> None:
     """Decline cookie banners whenever one blocks an action; banners without a decline button are left alone. A click
     that fails because the banner went away under it (it closed, or the page did) is the outcome the handler is after;
@@ -823,7 +848,7 @@ async def install_consent_handler(page: Page) -> None:
         try:
             await banner.get_by_role("button", name=_DECLINE_BUTTON).first.click(timeout=_CONSENT_CLICK_TIMEOUT_MS)
         except PlaywrightError as error:
-            if page.is_closed() or await banner.count() == 0:
+            if page.is_closed() or await _banner_gone(banner):
                 return
             _log.warning(
                 "consent_decline_failed",

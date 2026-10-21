@@ -177,7 +177,9 @@ Both modes share what follows.
   call fails and still shows the page, as what changed since the last view, so no snapshot is needed to decide.
 - A dialog, or a cookie consent banner, open in the viewport is listed first, under "in front of the page",
   and the line above the page says how many are open. A click that another element takes fails with the name of that
-  element and what to do about it (close or answer the box, or press Escape).
+  element and what to do about it (close or answer the box, or press Escape). A page whose script holds it, so that it
+  answers nothing, fails a step within two seconds, saying so, and a view of it hides a filled field it could not ask
+  about (item 471).
 - Password, one-time-code and card fields are never filled by Dot outside `yolo`: there the step is refused, and the
   browser is yours to take over; in `yolo` the run fills the field itself and the record of the step says why it would
   have asked (items 429 and 443, see [Safety](safety.md#safety)). Outside `yolo` the run never reads such a field's
