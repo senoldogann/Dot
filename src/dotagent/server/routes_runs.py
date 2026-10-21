@@ -171,7 +171,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         if request.model is not None:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
-        picks: RunPicks = picks_of(request.plugins, request.skills, request.plan_first)
+        picks: RunPicks = picks_of(request.plugins, request.skills, request.accounts, request.plan_first)
 
         async def start() -> str:
             if request.loop is not None:

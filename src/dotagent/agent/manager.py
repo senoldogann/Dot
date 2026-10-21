@@ -1854,13 +1854,19 @@ class RunManager:
             mode,
             frozenset(groups_of(names)),
             runtime.mcp.connected(),
+            [account.address for account in await runtime.accounts.accounts()],
             [skill.name for skill in offered],
             can_ask_user(source, None, approvals),
         )
         if problems:
             raise InvalidValueError(
                 f"the message cannot start with what was picked for it: {'; '.join(problems)}",
-                {"plugins": list(picks.plugins), "skills": list(picks.skills), "plan_first": picks.plan_first},
+                {
+                    "plugins": list(picks.plugins),
+                    "skills": list(picks.skills),
+                    "accounts": list(picks.accounts),
+                    "plan_first": picks.plan_first,
+                },
             )
 
     def _owner_id(self) -> str:

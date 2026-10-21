@@ -172,10 +172,12 @@ refused, it stays and says so, and a question keeps its answer.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
 screenshots alike; a phone opens its own sheet). The slash menu picks **Plugins** (the MCP servers with tools) and
-**Skills**, as `GET /api/palette` lists them; the at menu picks the plugins alone (item 447). A plugin or a skill picked is a chip under the box in a colour of
+**Skills**, as `GET /api/palette` lists them; the at menu picks the plugins and the Google and Microsoft accounts signed
+in (items 447 and 496: an account picked starts the run with the mail and calendar tools and names the account to its
+model; one that is no longer signed in is refused). A plugin, an account or a skill picked is a chip under the box in a colour of
 its name, which its × takes away; Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all
 three switches stand in the **Options** menu's Execution group, under the approvals (item 353). The picks go with the
-message (`plugins`, `skills` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
+message (`plugins`, `skills`, `accounts` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
 sent they stand under it as chips (the run's `picks` event); a message that steers the run under way leaves them for the
 next one, and the page says so, and a queued message with picks is not steered into the run at work: it stays queued to
 start a run of its own. A run sent with picks starts with each picked server's tool group on from its first step when

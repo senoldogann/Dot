@@ -80,7 +80,7 @@ def queue_router(ctx: ServerContext) -> APIRouter:
                 request.effort,
                 request.speed,
                 request.once,
-                picks_of(request.plugins, request.skills, request.plan_first),
+                picks_of(request.plugins, request.skills, request.accounts, request.plan_first),
                 request.approvals,
                 request.goal_mode,
                 request.agent_id,

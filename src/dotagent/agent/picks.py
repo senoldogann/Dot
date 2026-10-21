@@ -1,13 +1,15 @@
 """What the owner picks in the composer for one message (item 318), held as a :class:`~dotagent.store.models.RunPicks`:
-the MCP servers whose tools the run starts with, the skills whose instructions it starts with, and whether it writes
-its plan and asks before it changes anything. Here they are checked against what the run may use and worded for its
-model, after the owner's own words."""
+the MCP servers whose tools the run starts with, the accounts signed in whose mail and calendar it starts with (item
+496), the skills whose instructions it starts with, and whether it writes its plan and asks before it changes anything.
+Here they are checked against what the run may use and worded for its model, after the owner's own words."""
 
 from collections.abc import Sequence
 
 from dotagent.core.types import JsonObject
 from dotagent.mcp.naming import PREFIX
 from dotagent.store.models import NO_PICKS, RunMode, RunPicks
+from dotagent.tools.groups import ACCOUNTS_GROUP
+from dotagent.tools.mail_calendar import CALENDAR_EVENTS_TOOL, MAIL_READ_TOOL, MAIL_SEARCH_TOOL
 
 # The event that tells the conversation what a message was sent with, to show under it.
 PICKS_EVENT: str = "picks"
@@ -20,8 +22,9 @@ def plugin_group(server: str) -> str:
 
 
 def picked_groups(picks: RunPicks) -> frozenset[str]:
-    """The tool groups of the servers in ``picks``."""
-    return frozenset(plugin_group(server) for server in picks.plugins)
+    """The tool groups of the servers in ``picks``, and the accounts' group when it picks an account (item 496)."""
+    accounts: frozenset[str] = frozenset({ACCOUNTS_GROUP}) if picks.accounts else frozenset()
+    return frozenset(plugin_group(server) for server in picks.plugins) | accounts
 
 
 def owner_server_groups(picks: RunPicks, picked_before: frozenset[str]) -> frozenset[str]:
@@ -37,14 +40,16 @@ def picks_problems(
     mode: RunMode,
     groups: frozenset[str],
     connected: Sequence[str],
+    signed_in: Sequence[str],
     offered: Sequence[str],
     can_ask: bool,
 ) -> list[str]:
     """Why a run of ``mode`` cannot start with ``picks``, one reason each, none when it can. ``groups`` are the tool
     groups of the tools it may use (its mode's; an agent's bounds take in the servers picked, item 415), ``connected``
     the servers connected now, so a server that is not connected, or none of whose tools a run of ``mode`` may use,
-    is refused, each with its own words; ``offered`` names the skills it is offered; ``can_ask`` is whether it can
-    put a question to the owner, which a plan first needs (a yolo run's owner chose not to be asked)."""
+    is refused, each with its own words; ``signed_in`` the addresses of the accounts signed in, so an account that is
+    not is refused too (item 496); ``offered`` names the skills it is offered; ``can_ask`` is whether it can put a
+    question to the owner, which a plan first needs (a yolo run's owner chose not to be asked)."""
     problems: list[str] = []
     for server in picks.plugins:
         if server not in connected:
@@ -57,6 +62,14 @@ def picks_problems(
                 f"the MCP server {server} has no tool a {mode} run may use"
                 + ("; send the message as a task" if mode == "chat" else "")
             )
+    for address in picks.accounts:
+        if address not in signed_in:
+            problems.append(
+                f"no account {address} is signed in (the accounts signed in now: "
+                f"{', '.join(sorted(signed_in)) or 'none'}); Customize › Plugins › Accounts signs one in"
+            )
+    if picks.accounts and ACCOUNTS_GROUP not in groups:
+        problems.append(f"a {mode} run of this agent has no mail or calendar tool for the accounts picked")
     problems.extend(f"no skill offered to this run is called {skill}" for skill in picks.skills if skill not in offered)
     if picks.plan_first and mode == "chat":
         problems.append("Plan first is for task and research runs: a chat changes nothing")
@@ -80,6 +93,12 @@ def with_picks(text: str, picks: RunPicks, skills: Sequence[str]) -> str:
             f"{_HEAD} The owner picked the MCP servers {', '.join(picks.plugins)} for this message: use their tools "
             f"({tools}) for it where they fit."
         )
+    if picks.accounts:
+        lines.append(
+            f"{_HEAD} The owner picked the accounts {', '.join(picks.accounts)} for this message: read their mail and "
+            f"calendars with {MAIL_SEARCH_TOOL}, {MAIL_READ_TOOL} and {CALENDAR_EVENTS_TOOL}, the account set to each, "
+            "where they fit."
+        )
     if picks.plan_first:
         lines.append(
             f"{_HEAD} Plan first: before you change anything, write your plan with update_plan, then ask the owner "
@@ -93,4 +112,9 @@ def with_picks(text: str, picks: RunPicks, skills: Sequence[str]) -> str:
 
 def picks_event_data(picks: RunPicks) -> JsonObject:
     """The data of :data:`PICKS_EVENT`."""
-    return {"plugins": list(picks.plugins), "skills": list(picks.skills), "plan_first": picks.plan_first}
+    return {
+        "plugins": list(picks.plugins),
+        "skills": list(picks.skills),
+        "plan_first": picks.plan_first,
+        "accounts": list(picks.accounts),
+    }

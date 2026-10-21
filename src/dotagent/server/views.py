@@ -67,6 +67,8 @@ _NAME_CHARS: int = 120
 # What the composer picks for one message (item 318): at most this many servers and skills, each by its name.
 MAX_PICKED_PLUGINS: int = 8
 MAX_PICKED_SKILLS: int = 4
+# The accounts signed in that one message may pick (item 496): Google's and Microsoft's, a few of each at most.
+MAX_PICKED_ACCOUNTS: int = 4
 PickedName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=_NAME_CHARS)]
 _KEY_CHARS: int = 1000
 # Base64 takes four characters for every three bytes.
@@ -289,6 +291,7 @@ class StartRunRequest(FrozenModel):
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
     skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
+    accounts: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_ACCOUNTS)
     plan_first: bool = False
     # How often the goal is asked again in the run's chat (LoopRequest.every); None for no loop. Not with standing.
     loop: str | None = Field(default=None, min_length=2, max_length=8)
@@ -298,8 +301,10 @@ class StartRunRequest(FrozenModel):
     def _fits_standing(self) -> Self:
         if self.standing and self.agent_id is not None:
             raise ValueError("a campaign (standing) is Dot's own: it cannot be started for an agent")
-        if self.standing and (self.plugins or self.skills or self.plan_first):
-            raise ValueError("plugins, skills and Plan first go with a message, not with a campaign (standing)")
+        if self.standing and (self.plugins or self.skills or self.accounts or self.plan_first):
+            raise ValueError(
+                "plugins, skills, accounts and Plan first go with a message, not with a campaign (standing)"
+            )
         if self.standing and self.loop is not None:
             raise ValueError("a loop asks again in a chat; a campaign (standing) goes on by itself")
         if self.browser is not None and not self.standing:
@@ -351,13 +356,19 @@ class QueueMessageRequest(FrozenModel):
     attachments: list[str] = Field(default_factory=list, max_length=MAX_ATTACHMENTS)
     plugins: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_PLUGINS)
     skills: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_SKILLS)
+    accounts: list[PickedName] = Field(default_factory=list, max_length=MAX_PICKED_ACCOUNTS)
     plan_first: bool = False
     key: MessageKey | None = None
 
 
-def picks_of(plugins: Sequence[str], skills: Sequence[str], plan_first: bool) -> RunPicks:
-    """The picks a message names (item 318), each name once, in the order they were picked."""
-    return RunPicks(plugins=tuple(dict.fromkeys(plugins)), skills=tuple(dict.fromkeys(skills)), plan_first=plan_first)
+def picks_of(plugins: Sequence[str], skills: Sequence[str], accounts: Sequence[str], plan_first: bool) -> RunPicks:
+    """The picks a message names (items 318 and 496), each name once, in the order they were picked."""
+    return RunPicks(
+        plugins=tuple(dict.fromkeys(plugins)),
+        skills=tuple(dict.fromkeys(skills)),
+        plan_first=plan_first,
+        accounts=tuple(dict.fromkeys(accounts)),
+    )
 
 
 class SavedSkill(FrozenModel):
@@ -1100,12 +1111,23 @@ class PaletteServer(FrozenModel):
     mark: ServiceMark | None
 
 
+class PaletteAccount(FrozenModel):
+    """An account signed in, as the at menu offers it (item 496): its address, its provider, what of it a run reads
+    (its mail and calendar, by the provider's names), and the mark of the provider as the Accounts card wears it."""
+
+    address: str
+    provider: str
+    reads: str
+    mark: ServiceMark
+
+
 class PaletteView(FrozenModel):
-    """What the composer's slash menu offers besides its own commands: the skills a run can use and the MCP servers
-    with the tools the model calls."""
+    """What the composer's menus offer besides their own commands: the skills a run can use, the MCP servers with the
+    tools the model calls, and the accounts signed in (item 496)."""
 
     skills: tuple[PaletteSkill, ...]
     servers: tuple[PaletteServer, ...]
+    accounts: tuple[PaletteAccount, ...]
 
 
 class PermissionsView(FrozenModel):

@@ -70,14 +70,17 @@ class ChatChoices(FrozenModel):
 class RunPicks(FrozenModel):
     """What the owner picked in the composer for one message (item 318): ``plugins``, the MCP servers whose tools the
     run starts with (by the server's name, a connected app's among them); ``skills``, the skills whose instructions it
-    starts with (by name); ``plan_first``, that it writes its plan and asks before it changes anything."""
+    starts with (by name); ``plan_first``, that it writes its plan and asks before it changes anything; ``accounts``,
+    the Google and Microsoft accounts signed in whose mail and calendar the run starts with (by address, item 496; the
+    picks kept before it name none)."""
 
     plugins: tuple[str, ...]
     skills: tuple[str, ...]
     plan_first: bool
+    accounts: tuple[str, ...] = ()
 
 
-NO_PICKS: RunPicks = RunPicks(plugins=(), skills=(), plan_first=False)
+NO_PICKS: RunPicks = RunPicks(plugins=(), skills=(), plan_first=False, accounts=())
 
 
 class ThreadSummary(FrozenModel):
