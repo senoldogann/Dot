@@ -7,7 +7,7 @@ import importlib.util
 import os
 import socket
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from dataclasses import dataclass
 from pathlib import Path
 from types import ModuleType
@@ -15,13 +15,16 @@ from types import ModuleType
 import pytest
 import pytest_asyncio
 import uvicorn
+from mcp import Client, MCPError
 from mcp.server.mcpserver import MCPServer
-from mcp.types import CallToolResult, TextContent
+from mcp.types import CONNECTION_CLOSED, CallToolResult, EmptyResult, RequestParamsMeta, TextContent
 from starlette.datastructures import Headers
 from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
+from structlog.testing import capture_logs
 
 from dotagent.config import McpServerConfig
+from dotagent.mcp import connection as connection_module
 from dotagent.mcp.hub import McpHub, ServerReport, inspect_servers, open_hub
 from dotagent.mcp.types import McpTool
 
@@ -65,7 +68,11 @@ class _Served:
 
 
 async def _serve(app: ASGIApp) -> _Served:
-    server: uvicorn.Server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=0, log_level="warning"))
+    return await _serve_on(app, 0)
+
+
+async def _serve_on(app: ASGIApp, port: int) -> _Served:
+    server: uvicorn.Server = uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=port, log_level="warning"))
     task: asyncio.Task[None] = asyncio.create_task(server.serve())
     deadline: float = time.monotonic() + START_TIMEOUT_S
     while not server.started:
@@ -192,3 +199,37 @@ async def test_a_closed_port_is_reported_as_unreachable_quickly() -> None:
     assert report.error is not None and "could not be reached" in report.error, report
     assert report.detail["transport"] == "http"
     assert "stderr_tail" not in report.detail
+
+
+async def test_a_quiet_session_that_does_not_answer_is_connected_again_before_the_call(
+    http_port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 513: Tavily's session went quiet for 17 minutes, its connection broke, and the four searches sent on it
+    failed at once. A session quiet for a while (here, any) is pinged before it is used; one whose ping finds the
+    connection gone (the library's own error, raised here once) is connected again, and the call goes on the new one.
+    The call is of wipe, which declares no hints and so is never called twice: the ping is what saves it."""
+    monkeypatch.setattr(connection_module, "_QUIET_CHECK_S", 0.0)
+    pinged: list[Client] = []
+    ping: Callable[..., Awaitable[EmptyResult]] = Client.send_ping
+
+    async def gone_once(self: Client, *, meta: RequestParamsMeta | None = None) -> EmptyResult:
+        pinged.append(self)
+        if len(pinged) == 1:
+            raise MCPError(CONNECTION_CLOSED, "Connection closed")
+        return await ping(self, meta=meta)
+
+    monkeypatch.setattr(Client, "send_ping", gone_once)
+    hub: McpHub = await open_hub([_http("docs", http_port, f"Bearer ${{{TOKEN_VARIABLE}}}")], _login_env())
+    try:
+        wipe: McpTool = next(tool for tool in hub.tools if tool.server == "docs" and tool.remote_name == "wipe")
+        with capture_logs() as logs:
+            result: CallToolResult = await hub.call(wipe, {"target": "the cache"})
+        assert not result.is_error, result
+        (block,) = result.content
+        assert isinstance(block, TextContent) and block.text == "wiped the cache"
+        events: list[object] = [entry["event"] for entry in logs]
+        assert events[:2] == ["mcp_server_quiet_session_gone", "mcp_server_restart"], events
+        # The new session, just made, is used without a ping.
+        assert len(pinged) == 1
+    finally:
+        await hub.close()

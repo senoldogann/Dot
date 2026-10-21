@@ -4499,10 +4499,10 @@ dialog.modal.connect-apps[open] {
   color: var(--warn);
 }
 
-/* A name too long for the row, as an MCP tool's can be, gives way with an ellipsis rather than widen the chat (item
-   360) or take a second line (item 512): its row is one line, the name at most half of it, the whole name its title. */
+/* What a tool is, in words (item 513): "Edit file", "Tavily · Search". Words too long for the row give way with an
+   ellipsis rather than widen the chat (item 360) or take a second line (item 512): its row is one line, the words at
+   most half of it, the tool's own name their title. */
 .tool-name {
-  font-family: var(--mono);
   font-weight: var(--weight-title);
   font-size: var(--text-sm);
   flex: 0 1 auto;

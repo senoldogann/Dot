@@ -8,6 +8,7 @@ next to Dot's own logs, never to the terminal.
 
 import asyncio
 import os
+import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TextIO
@@ -41,6 +42,10 @@ _SHOWN_ARGUMENT_CHARS: int = 500
 # a tool call is answered on a stream that stays silent while the tool works.
 _HTTP_TIMEOUT_S: float = 30.0
 _HTTP_READ_TIMEOUT_S: float = 300.0
+# A session reached at a URL that was quiet this long is asked whether it is still there before it is used (item 513):
+# the server or the network may have dropped it meanwhile, and the calls sent on it would all fail at once.
+_QUIET_CHECK_S: float = 60.0
+_PING_TIMEOUT_S: float = 10.0
 
 
 class _Slot:
@@ -54,12 +59,18 @@ class _Slot:
 
 @dataclass
 class _Live:
-    """A running server: its session, the task that holds the session open, and whether the connection broke."""
+    """A running server: its session, the task that holds the session open, whether the connection broke, and when
+    (monotonic seconds) the session last answered."""
 
     client: Client
     owner: asyncio.Task[None]
     stop: asyncio.Event
     broken: bool
+    answered_at: float
+
+
+class _ConnectionLost(McpError):
+    """The connection to the server broke while a request was out: the next request connects again."""
 
 
 def _prepare_log(path: Path) -> int:
@@ -205,12 +216,10 @@ class McpConnection:
 
     def _context(self) -> JsonObject:
         """What identifies the server in an error: never its environment or its headers, which may hold secrets."""
-        context: JsonObject = {
-            "server": self._config.name,
-            "transport": self._config.transport_kind(),
-            "log": str(self._log_path),
-        }
+        context: JsonObject = {"server": self._config.name, "transport": self._config.transport_kind()}
+        # A server reached at a URL writes no log of Dot's: only a server Dot starts has one to name.
         if self._config.command is not None:
+            context["log"] = str(self._log_path)
             context["command"] = self._config.command
             context["args"] = list(self._config.args)
         if self._config.url is not None:
@@ -278,7 +287,7 @@ class McpConnection:
         await asyncio.wait(waiting, timeout=self._config.startup_timeout_s, return_when=asyncio.FIRST_COMPLETED)
         if slot.client is not None:
             log.info("mcp_server_started", server=self.name, protocol=slot.client.protocol_version)
-            return _Live(client=slot.client, owner=owner, stop=slot.stop, broken=False)
+            return _Live(client=slot.client, owner=owner, stop=slot.stop, broken=False, answered_at=time.monotonic())
         if not owner.done():
             owner.cancel()
             await asyncio.wait({owner})
@@ -325,7 +334,7 @@ class McpConnection:
     async def _ensure_live(self) -> _Live:
         async with self._lock:
             current: _Live | None = self._live
-            if current is not None and not current.broken and not current.owner.done():
+            if current is not None and not current.broken and not current.owner.done() and await self._answers(current):
                 return current
             if current is not None:
                 log.warning("mcp_server_restart", server=self.name)
@@ -335,11 +344,27 @@ class McpConnection:
             self._live = started
             return started
 
-    async def _lost(self, live: _Live, step: str, error: MCPError) -> McpError:
+    async def _answers(self, live: _Live) -> bool:
+        """Whether a session can be used: a server Dot started holds its session while it runs, and one reached at a URL
+        that was quiet for :data:`_QUIET_CHECK_S` is pinged first (item 513). One that does not answer is connected
+        again, so that the calls that come wait for the new session rather than fail on the old one."""
+        if self._config.command is not None or time.monotonic() - live.answered_at < _QUIET_CHECK_S:
+            return True
+        try:
+            async with asyncio.timeout(_PING_TIMEOUT_S):
+                await live.client.send_ping()
+        except (MCPError, TimeoutError) as exc:
+            log.warning("mcp_server_quiet_session_gone", server=self.name, error=truncate_middle(repr(exc), 200))
+            live.broken = True
+            return False
+        live.answered_at = time.monotonic()
+        return True
+
+    async def _lost(self, live: _Live, step: str, error: MCPError) -> _ConnectionLost:
         """Remember that the connection broke so the next call starts the server again."""
         live.broken = True
         log.warning("mcp_server_connection_lost", server=self.name, step=step)
-        return McpError(
+        return _ConnectionLost(
             f"the MCP server closed the connection while {step}; the next call {self._again()}",
             {**self._context(), "code": error.code, **await self._tail_since(0)},
         )
@@ -365,6 +390,7 @@ class McpConnection:
                     "the MCP server could not list its tools",
                     {**self._context(), "code": exc.code, "error": exc.message},
                 ) from exc
+            live.answered_at = time.monotonic()
             listed.extend(page.tools)
             if page.next_cursor is None:
                 return tuple(_to_tool(self._config, tool) for tool in listed)
@@ -373,11 +399,24 @@ class McpConnection:
             "the MCP server lists more pages of tools than supported", {**self._context(), "pages": _MAX_LIST_PAGES}
         )
 
-    async def call_tool(self, name: str, arguments: JsonObject) -> CallToolResult:
-        """Run a tool. A call that failed is never repeated: the tool may already have done part of its work."""
+    async def call_tool(self, name: str, arguments: JsonObject, read_only: bool) -> CallToolResult:
+        """Run a tool. A call that failed is not repeated, since the tool may already have done part of its work, but
+        for one the server declares ``read_only`` whose connection broke while it was out (item 513): it reads and
+        changes nothing, so it is called once more, on a new connection, with a warning."""
+        try:
+            return await self._call_once(name, arguments)
+        except _ConnectionLost as lost:
+            if not read_only:
+                raise
+            log.warning("mcp_call_repeated", server=self.name, tool=name, error=lost.message)
+            return await self._call_once(name, arguments)
+
+    async def _call_once(self, name: str, arguments: JsonObject) -> CallToolResult:
         live: _Live = await self._ensure_live()
         try:
-            return await live.client.call_tool(name, arguments, read_timeout_seconds=self._config.call_timeout_s)
+            result: CallToolResult = await live.client.call_tool(
+                name, arguments, read_timeout_seconds=self._config.call_timeout_s
+            )
         except MCPError as exc:
             if exc.code == REQUEST_TIMEOUT:
                 raise McpError(
@@ -391,6 +430,8 @@ class McpConnection:
                 "the MCP server rejected the call",
                 {**self._context(), "tool": name, "code": exc.code, "error": exc.message, "arguments": shown},
             ) from exc
+        live.answered_at = time.monotonic()
+        return result
 
     async def close(self) -> None:
         async with self._lock:

@@ -245,19 +245,25 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                     today.locator(f"a.side-run[href='#/runs/{asking.id}'] .avatar[data-state='waiting']")
                 ).to_have_count(1)
                 if index == 0:
-                    # Folded, Working keeps the chat that is open in sight, and only while it is open.
+                    # Folded, Working hides every row, the open chat's too (item 513), and keeps its count; a search
+                    # shows the chats at work it finds, folded or not.
                     await row.locator("a.side-run").click()
                     await expect(page).to_have_url(re.compile(f"#/runs/{shelves.id}$"))
                     fold: Locator = working.locator(".side-label button")
                     await fold.click()
                     await expect(fold).to_have_attribute("aria-expanded", "false")
-                    await expect(row.locator("a.side-run")).to_have_attribute("aria-current", "page")
+                    await expect(row).to_be_hidden()
                     await expect(working.locator(".side-label")).to_have_text("Working 1")
                     await page.screenshot(path=str(tmp_path / f"side-folded-{width}-{scheme}.png"))
+                    finder: Locator = page.get_by_role("searchbox", name="Search chats")
+                    await finder.fill("shel")
+                    await expect(row).to_be_visible()
+                    await finder.fill("")
+                    await expect(row).to_be_hidden()
                     await today.locator("a.side-run", has_text="Plan the garden").click()
                     await expect(page).to_have_url(re.compile(f"#/runs/{garden.id}$"))
-                    await expect(row).to_be_hidden()
                     await fold.click()
+                    await expect(fold).to_have_attribute("aria-expanded", "true")
                     await expect(row).to_be_visible()
                     # The search finds the chats at work too, and Enter opens the first chat it found.
                     search: Locator = page.get_by_role("searchbox", name="Search chats")

@@ -25,9 +25,8 @@ work and those that ended: three at most, laid over one another as the marks of 
 rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. Working lists too what is no chat's: a schedule about to fire, the
 session of a campaign (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
-its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open
-chat in sight, and the search finds the chats at work
-too. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
+its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working hides its rows,
+the open chat's too, and keeps its count (item 513), and the search finds the chats at work, folded or not. Above the list: a search over the titles (⌘K or `/`), **New chat** (⇧⌘O) and the ways to **Agents**, **Campaigns**
 and **Schedules** (a page of its own since item 401); in the foot, the cog of **Settings**, **Connect apps** beside it
 ([Connect apps](extending.md#connect-apps), item 492), which leads to
 [Customize › Plugins](extending.md#customize--plugins), and
@@ -250,7 +249,9 @@ work names the command that runs right
 after "Working…", in place of how much it did so far, which the open group keeps (item 430). Open, it shows every call, result and screenshot, each call one
 line in line with the group's head (item 402): its mark (a spinner while it runs, then the mark of its kind, in the
 failure's colour when it failed; item 403), what it did (a command is the command itself, the policy's words its
-tooltip; another call, whose mark several tools share, keeps its tool's name and the policy's words, "Read notes.txt")
+tooltip; another call, whose mark several tools share, keeps its tool's name and the policy's words, "Read notes.txt";
+the name reads in words, item 513: one of Dot's as what it does, "Edit file", "Update plan", "Web search", an MCP tool
+as its server and what it does, "Tavily · Search", the tool's own name their tooltip)
 and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened, with **Why it
 ran** for a step that acted, or that more than the preset decided: the rule of yours, the preset, or who answered and
 why the policy asked (item 468); a group that is
