@@ -362,7 +362,8 @@ class ScheduleOptions(FrozenModel):
     """How the runs of a schedule are started. ``None`` takes what the configuration says when the schedule fires:
     the main model, its default reasoning level, the standard speed, the configured approvals, no goal mode, the
     configured time zone, ``[scheduler] history_runs`` earlier runs' answers in front of the goal and ``[scheduler]
-    same_chat`` (item 257). A schedule a run makes keeps that run's choices and its chat (item 291)."""
+    same_chat`` (item 257), and ``[scheduler] stop_after_failures`` for how many failed runs in a row switch a
+    repeating schedule off (item 458). A schedule a run makes keeps that run's choices and its chat (item 291)."""
 
     model: str | None
     effort: Effort | None
@@ -372,6 +373,7 @@ class ScheduleOptions(FrozenModel):
     timezone: str | None
     history_runs: int | None
     same_chat: bool | None
+    stop_after_failures: int | None
 
 
 class ScheduleRecord(FrozenModel):
@@ -388,6 +390,9 @@ class ScheduleRecord(FrozenModel):
     thread_id: str | None
     last_status: str
     options: ScheduleOptions
+    # How many of its runs in a row ended failed (item 458): a run that ends done sets it to 0, one cancelled leaves it,
+    # and switching the schedule on again or changing it starts it afresh.
+    runs_failed_in_row: int
 
 
 class ScheduleFiring(FrozenModel):

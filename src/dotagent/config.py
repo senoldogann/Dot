@@ -562,6 +562,8 @@ class SchedulerConfig(FrozenModel):
     history_runs: int = Field(ge=0, le=20)
     history_chars: int = Field(ge=500, le=20_000)
     same_chat: bool
+    # Item 458: how many failed runs in a row switch a repeating schedule off (0: never); a schedule may choose its own.
+    stop_after_failures: int = Field(ge=0, le=50)
 
 
 type McpTransport = Literal["stdio", "http", "sse"]

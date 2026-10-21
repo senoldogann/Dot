@@ -109,6 +109,7 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
         timezone=None,
         history_runs=None,
         same_chat=True,
+        stop_after_failures=None,
     )
 
 

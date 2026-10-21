@@ -13,7 +13,8 @@ import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
 import { getSnapshot, loadModels, onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
-const LIFECYCLE_KINDS = new Set(["run_started", "run_finished"]);
+// A run starting or ending, and a schedule switched off after its runs failed in a row (item 458), paint the list again.
+const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "schedule_stopped"]);
 const RELOAD_DELAY_MS = 400;
 const GOAL_PREVIEW_CHARS = 220;
 // A firing's answer is shown by its first line, cut to this.
@@ -43,7 +44,7 @@ function lastStatusBadge(status) {
   let tone = "b-muted";
   if (status === "done") {
     tone = "b-ok";
-  } else if (status === "failed") {
+  } else if (status === "failed" || status.startsWith("switched off")) {
     tone = "b-bad";
   } else if (status === "starting" || status === "running") {
     tone = "b-info";
@@ -62,11 +63,32 @@ function defaultsNow() {
     goalMode: status === null ? null : status.goal_mode,
     historyRuns: status === null ? null : status.schedule_history_runs,
     sameChat: status === null ? null : status.schedule_same_chat,
+    stopAfterFailures: status === null ? null : status.schedule_stop_after_failures,
   };
 }
 
 // How many earlier runs a schedule's firing may know (item 257); a count saved over the API joins them in the menu.
 const HISTORY_COUNTS = [0, 1, 3, 5, 10];
+// How many failed runs in a row switch a repeating schedule off (item 458); 0 is never.
+const STOP_COUNTS = [0, 3, 5, 10, 20];
+
+function stopLabel(count) {
+  return count === 0 ? "Never" : `After ${count} failed runs in a row`;
+}
+
+/** The row's note of runs that failed in a row, with when the schedule switches itself off, or null. */
+function failedInRow(record) {
+  if (record.runs_failed_in_row === 0) {
+    return null;
+  }
+  const limit = record.options.stop_after_failures ?? defaultsNow().stopAfterFailures;
+  // A schedule switched off, by you or by its failures, switches nothing off again.
+  const title =
+    record.enabled && record.cron !== null && limit !== null && limit > 0
+      ? `It switches itself off at ${limit} failed runs in a row`
+      : "Its last runs failed one after the other";
+  return el("span", { class: "badge b-bad", title }, `${record.runs_failed_in_row} failed in a row`);
+}
 
 function historyLabel(count) {
   return count === 0 ? "None" : count === 1 ? "The last run" : `The last ${count} runs`;
@@ -118,6 +140,9 @@ function optionChips(record) {
     options.speed === "fast" ? el("span", { class: "chip", title: "Its runs start in fast mode" }, "Fast") : null,
     options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
     options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
+    options.stop_after_failures === null
+      ? null
+      : el("span", { class: "chip", title: "When it switches itself off" }, `Switch off: ${stopLabel(options.stop_after_failures).toLowerCase()}`),
   ];
 }
 
@@ -239,6 +264,7 @@ function scheduleRow(view, handlers) {
           next,
           last,
           lastStatusBadge(record.last_status),
+          failedInRow(record),
           view.zone === localZone()
             ? null
             : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
@@ -280,7 +306,17 @@ function scheduleForm({ view, onSaved, onCancel }) {
   const record = view === null ? null : view.record;
   const options =
     record === null
-      ? { model: null, effort: null, speed: null, approvals: null, goal_mode: null, timezone: null, history_runs: null, same_chat: null }
+      ? {
+          model: null,
+          effort: null,
+          speed: null,
+          approvals: null,
+          goal_mode: null,
+          timezone: null,
+          history_runs: null,
+          same_chat: null,
+          stop_after_failures: null,
+        }
       : record.options;
   const now = defaultsNow();
   const id = ++formCount;
@@ -315,6 +351,17 @@ function scheduleForm({ view, onSaved, onCancel }) {
       ...counts.map((count) => ({ id: String(count), label: historyLabel(count) })),
     ],
     options.history_runs === null ? "" : String(options.history_runs),
+  );
+  const stops = [...new Set([...STOP_COUNTS, ...(options.stop_after_failures === null ? [] : [options.stop_after_failures])])].sort(
+    (a, b) => a - b,
+  );
+  const stopAfter = select(
+    "Switch off after",
+    [
+      { id: "", label: now.stopAfterFailures === null ? "Default" : `Default (${stopLabel(now.stopAfterFailures)})` },
+      ...stops.map((count) => ({ id: String(count), label: stopLabel(count) })),
+    ],
+    options.stop_after_failures === null ? "" : String(options.stop_after_failures),
   );
   const chat = select(
     "Chat",
@@ -466,6 +513,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       timezone: zone.value.trim() === "" ? null : zone.value.trim(),
       history_runs: history.value === "" ? null : Number(history.value),
       same_chat: chat.value === "" ? null : chat.value === "same",
+      stop_after_failures: stopAfter.value === "" ? null : Number(stopAfter.value),
       // The form has no speed of its own: a schedule keeps the one its chat gave it (item 291).
       speed: options.speed,
     };
@@ -505,6 +553,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       field("Time zone", zone, "A name such as Europe/Istanbul; empty uses the configured zone."),
       field("Earlier runs it knows", history, "Each run starts with the dated answers of the last runs, to build on them instead of doing the same work again."),
       field("Chat", chat, "In the same chat each run reads the conversation of the runs before it instead."),
+      field("Switch off after", stopAfter, "A repeating schedule whose runs fail so many times in a row is switched off, and you are told; a run cancelled counts neither way."),
       record === null ? null : switchRow(el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled), enabled),
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Runs"), el("div", { class: "cluster" }, repeats.element)),
       cronField,

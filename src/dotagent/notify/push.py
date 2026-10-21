@@ -26,7 +26,7 @@ from dotagent.core.types import FrozenModel
 from dotagent.drafts.service import DRAFT_CREATED_EVENT
 from dotagent.events import DAEMON_RESTARTED_EVENT, SYSTEM_RUN_ID, DaemonRestarted, Subscription
 from dotagent.notify.keys import keys_problem
-from dotagent.scheduler import SCHEDULE_MISSED_EVENT, ScheduleMissed
+from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_STOPPED_EVENT, ScheduleMissed, ScheduleStopped
 from dotagent.store.db import Store
 from dotagent.store.models import DraftRecord, EventRecord, PushSubscription, RunRecord
 
@@ -58,6 +58,7 @@ PUSH_KINDS: frozenset[str] = frozenset(
         "run_finished",
         CAMPAIGN_ENDED_EVENT,
         SCHEDULE_MISSED_EVENT,
+        SCHEDULE_STOPPED_EVENT,
         DAEMON_RESTARTED_EVENT,
         LEARNING_STALLED_EVENT,
     }
@@ -166,7 +167,8 @@ def push_message(event: EventRecord, run: RunRecord) -> PushMessage | None:
 
 def notice_message(event: EventRecord) -> PushMessage | None:
     """The message an event of Dot itself (``SYSTEM_RUN_ID``) is worth, or ``None``: a firing a schedule missed, a
-    start of the daemon after the one before it did not end cleanly, and learning that has stopped."""
+    schedule switched off after its runs failed in a row, a start of the daemon after the one before it did not end
+    cleanly, and learning that has stopped."""
     if event.kind == LEARNING_STALLED_EVENT:
         stalled: LearningStalled = LearningStalled.model_validate(event.data)
         return PushMessage(
@@ -177,6 +179,14 @@ def notice_message(event: EventRecord) -> PushMessage | None:
         return PushMessage(
             title="A schedule did not run",
             body=_shorten(f"{missed.name}: {missed.status}"),
+            route="#/schedules",
+            state="failed",
+        )
+    if event.kind == SCHEDULE_STOPPED_EVENT:
+        stopped: ScheduleStopped = ScheduleStopped.model_validate(event.data)
+        return PushMessage(
+            title="A schedule was switched off",
+            body=_shorten(f"{stopped.name}: its last {stopped.failures} runs failed"),
             route="#/schedules",
             state="failed",
         )
