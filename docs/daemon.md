@@ -531,8 +531,9 @@ desktop notifications (off until you switch them on; the browser asks for its pe
 when it asks for an approval, a question or your help, and when it leaves you a question that a run could not wait for
 (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or stopped, with the
 first line of its answer; the sub-runs of a run stay quiet); when a campaign ends by itself (achieved, or stopped by
-the emergency stop or by `campaign_max_sessions`); and when a schedule misses a firing that nobody saw (overdue, or
-its run could not start; told once while the reason stays the same). It says nothing while you are looking at that
+the emergency stop or by `campaign_max_sessions`); when a schedule misses a firing that nobody saw (overdue, or its
+run could not start; told once while the reason stays the same); and when a repeating schedule is switched off
+because its runs failed so many times in a row (item 458, once). It says nothing while you are looking at that
 run: its page open, the tab visible and the window active. On another
 page, in a background tab or in an inactive window you are told; "Tell me even when I am looking" under the same
 setting turns the rule off. Clicking a notification opens what it tells of. The tab's

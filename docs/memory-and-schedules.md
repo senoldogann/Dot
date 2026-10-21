@@ -163,8 +163,8 @@ composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat and whether it is on
-(`history_runs`, `same_chat` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the
-standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
+(`history_runs`, `same_chat`, `stop_after_failures` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
+configured ones and the standard speed). Options left on "default" take the configured value when the schedule fires. A schedule the agent
 creates takes its chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
 the form is open, **New schedule** reads **Close**, with a cross.
 
@@ -193,4 +193,10 @@ earlier runs.
   their own at every tick, one that fails (the store, a campaign's start) is logged, and the next tick tries again. Only
   20 failed ticks in a row (five minutes at the default `tick_s`) end the scheduler, and the daemon with it, with an
   error, so that schedules never stop firing unseen; the service that `dotx service install` sets up starts it again.
+- A repeating schedule whose runs end failed so many times in a row is switched off, says so as its status ("switched
+  off: its last 3 runs failed") and tells you once (item 458): **Switch off after** in its form (3, 5, 10, 20, never),
+  else `[scheduler] stop_after_failures` (0, never, by default). Its row says how many failed in a row. A run done sets
+  the row to 0, a run cancelled (stopped by you, the emergency stop or the daemon) counts neither way, a run started
+  by hand counts as one at its time, and a firing that started no run counts not at all. A one-time schedule is never
+  switched off by it. Switching a schedule on again, or changing it, starts its row afresh.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.

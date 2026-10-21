@@ -138,6 +138,7 @@ def _options(same_chat: bool | None) -> ScheduleOptions:
         timezone=None,
         history_runs=None,
         same_chat=same_chat,
+        stop_after_failures=None,
     )
 
 

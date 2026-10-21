@@ -731,6 +731,9 @@ history_chars = 4000
 # Whether a firing goes on in the chat of the one before (its run reads their conversation, not the digest)
 # instead of a new chat; a schedule may choose its own.
 same_chat = false
+# How many of a repeating schedule's runs in a row may end failed before it is switched off and you are told (item 458;
+# 0 = never, as before; a schedule may choose its own). A run cancelled counts neither way, and one done starts again.
+stop_after_failures = 0
 
 [skills]
 # Skills are folders of instructions for one kind of work, in the Agent Skills layout: <name>/SKILL.md with a YAML

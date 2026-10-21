@@ -482,6 +482,7 @@ class ScheduleCreateRequest(FrozenModel):
     # Item 257: how many earlier runs' answers a firing carries, and whether it goes on in the same chat.
     history_runs: int | None = Field(default=None, ge=0, le=20)
     same_chat: bool | None = None
+    stop_after_failures: int | None = Field(default=None, ge=0, le=50)
 
 
 class ScheduleUpdateRequest(FrozenModel):
@@ -501,6 +502,7 @@ class ScheduleUpdateRequest(FrozenModel):
     timezone: str | None = Field(max_length=64)
     history_runs: int | None = Field(default=None, ge=0, le=20)
     same_chat: bool | None = None
+    stop_after_failures: int | None = Field(default=None, ge=0, le=50)
     speed: Speed | None = None
     enabled: bool
 
@@ -1280,6 +1282,7 @@ class StatusView(FrozenModel):
     # What a schedule that leaves them open does (item 257): the earlier runs it knows, and whether it keeps its chat.
     schedule_history_runs: int
     schedule_same_chat: bool
+    schedule_stop_after_failures: int
     browser_mode: BrowserMode
     desktop_enabled: bool
     mcp_tools: int

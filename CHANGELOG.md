@@ -5,6 +5,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- Schedules: a repeating schedule whose runs fail so many times in a row (its **Switch off after**, or `[scheduler]
+  stop_after_failures`; never by default) is switched off and you are told once; its row says how many failed in a
+  row (item 458).
 - Schedules: **Run now** starts a schedule's run at once, switched on or off, as its firing would run, without
   changing when it fires next; **Firings** lists its last runs, at its time and by hand (item 455).
 - Settings › Rules: a rule's arrows move it up or down the order the rules are checked in, and a rule that an earlier

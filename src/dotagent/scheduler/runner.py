@@ -25,7 +25,15 @@ from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.probe import probe_apart
 from dotagent.harness.step import run_step
 from dotagent.runtime import Runtime
-from dotagent.scheduler import SCHEDULE_MISSED_EVENT, SCHEDULE_SOURCE, ScheduleMissed
+from dotagent.scheduler import (
+    SCHEDULE_MISSED_EVENT,
+    SCHEDULE_SOURCE,
+    SCHEDULE_STOPPED_EVENT,
+    ScheduleMissed,
+    ScheduleStopped,
+    stop_limit,
+    switches_off,
+)
 from dotagent.scheduler.failures import (
     FiringFailure,
     firing_failure,
@@ -609,12 +617,33 @@ class Scheduler:
             log.error("campaign_session_start_failed", campaign_id=campaign_id, error=exc.message, context=exc.context)
 
     async def _watch(self, schedule_id: str, run_id: str) -> None:
-        """Write the outcome of a run to its schedule once the run is over."""
+        """Write the outcome of a run to its schedule once the run is over, with its row of failed runs (item 458); a
+        repeating schedule whose runs failed so many times in a row is switched off, and the owner told once."""
         try:
             finished: RunRecord = await self._manager.wait(run_id)
-            await self._runtime.store.set_schedule_status(schedule_id, finished.status)
+            failed_in_row: int | None = await self._runtime.store.record_schedule_outcome(schedule_id, finished.status)
+            if finished.status == "failed" and failed_in_row is not None:
+                await self._stop_if_failing(schedule_id, failed_in_row)
         finally:
             self._in_flight.pop(schedule_id, None)
+
+    async def _stop_if_failing(self, schedule_id: str, failed_in_row: int) -> None:
+        """Switch the schedule off when its runs failed its limit of times in a row, and tell the owner; a schedule
+        switched off or deleted meanwhile is left as it is."""
+        store: Store = self._runtime.store
+        try:
+            record: ScheduleRecord = await store.get_schedule(schedule_id)
+        except NotFoundError:
+            return
+        limit: int = stop_limit(record.options.stop_after_failures, self._runtime.config.scheduler.stop_after_failures)
+        if not switches_off(record.cron is not None, record.enabled, failed_in_row, limit):
+            return
+        status: str = f"switched off: its last {failed_in_row} runs failed"
+        if not await store.switch_off_schedule(schedule_id, status):
+            return
+        log.warning("schedule_switched_off", schedule_id=schedule_id, failures=failed_in_row, limit=limit)
+        stopped: ScheduleStopped = ScheduleStopped(schedule_id=schedule_id, name=record.name, failures=failed_in_row)
+        await self._runtime.bus.emit(SYSTEM_RUN_ID, SCHEDULE_STOPPED_EVENT, stopped.model_dump(), False)
 
     def _watcher_done(self, watcher: asyncio.Task[None]) -> None:
         self._watchers.discard(watcher)
