@@ -92,7 +92,10 @@ class _Recorder:
 def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("home")
     (path / "config.toml").write_text(
-        f'[models]\nmain = "ollama:{MODEL}"\n\n[scheduler]\ntick_s = 0.2\n', encoding="utf-8"
+        f'[models]\nmain = "ollama:{MODEL}"\n\n[scheduler]\ntick_s = 0.2\n\n'
+        # A tick past the nightly reflection's time would start it, and drain() would wait on a model the test lacks.
+        '[agent]\nreflection_time = "off"\n',
+        encoding="utf-8",
     )
     return path
 
