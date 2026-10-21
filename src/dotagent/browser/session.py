@@ -1373,8 +1373,9 @@ class BrowserSession:
         is one, so that the error page it then shows can be told from a page that failed to load. A rule that fails on
         an address refuses it: the request must be answered either way, or Chrome holds it for good."""
         live: tuple[str, ...] = self._live_secrets()
-        shown: str = self._shown(url)
-        if live and in_address(url, live):
+        carries: bool = bool(live) and in_address(url, live)
+        shown: str = self._named(url, live, carries)
+        if carries:
             verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
         else:
             try:
@@ -1401,16 +1402,25 @@ class BrowserSession:
         return tuple(value for value, until in self._vault_secrets.items() if until > now)
 
     def _shown(self, url: str) -> str:
-        """``url`` as Dot shows it in a refusal and writes it in its log (item 493). One that carries a password or a
-        code no request may carry, however its escapes write it (:func:`in_address`), is named by its host alone, or
-        by its scheme when the value is in the host: a form of the value masking does not know may be anywhere in it.
-        Any other has the forms masking knows masked."""
+        """``url`` as Dot shows it in a refusal and writes it in its log (item 493): :meth:`_named` with the passwords
+        and codes no request may carry now."""
         live: tuple[str, ...] = self._live_secrets()
+        return self._named(url, live, bool(live) and in_address(url, live))
+
+    @staticmethod
+    def _named(url: str, live: tuple[str, ...], carries: bool) -> str:
+        """``url`` named for a refusal or a log line. One that ``carries`` one of ``live``, however its escapes write it
+        (:func:`in_address`), is named by its host alone, or by its scheme when the value is in the host: a form of the
+        value masking does not know may be anywhere in it. Any other has the forms masking knows masked. Naming never
+        fails: the request it is for is answered either way."""
         if not live:
             return url
-        if not in_address(url, live):
+        if not carries:
             return masked(url, live)
-        parts = urlsplit(url)
+        try:
+            parts = urlsplit(url)
+        except ValueError:
+            return "[an address that carries a filled value]"
         host: str = parts.hostname or ""
         if in_address(host, live):
             return f"{parts.scheme}://[a host that carries a filled value]"
