@@ -8,7 +8,15 @@ from collections.abc import Mapping, Sequence
 from dotagent.agent.approvals import TIMEOUT_DECIDER, ApprovalBroker, ApprovalOutcome, Kept
 from dotagent.agent.authorization import Answerer, Authorization, step_decision
 from dotagent.agent.declined import OWNER_DECIDERS, Declined, declined_key, refusal_text, still_declined
-from dotagent.agent.parking import Parking, kept_digest, kept_text
+from dotagent.agent.parking import (
+    PERMIT_DECIDER,
+    Parking,
+    kept_ask_text,
+    kept_digest,
+    kept_text,
+    permit_parkable,
+    skipped_text,
+)
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalParked, ApprovalRejected, HandedOff, PolicyDenied, RunConflict
@@ -27,7 +35,7 @@ from dotagent.policy.pace import DAY_S, PacedAction, pace_refusal, paced_action,
 from dotagent.policy.spend import SpendState, render_amount, spend_allowance, spend_host, spend_state
 from dotagent.policy.types import TAINTING_KINDS, ActionInfo, ApprovalMode, Decision, Preset, Route
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, RuleRecord, RunMode
+from dotagent.store.models import ApprovalRecord, EventRecord, RuleRecord, RunMode
 
 log = get_logger(__name__)
 
@@ -349,6 +357,9 @@ class RunGate:
             await self._emit_policy(info, decision, tainted)
             log.warning("declined_again_refused", run_id=self._run_id, tool=info.tool)
             raise ApprovalRejected(refusal_text(earlier), {"action": _describe(info), "note": earlier.note})
+        allowed: ApprovalRecord | None = await self._kept_answer(info, decision, tainted)
+        if allowed is not None:
+            return allowed.note.strip(), "user"
         route: Route = route_for(decision, self._approval_mode)
         if route == "waived":
             return await self._waive(info, decision), "yolo"
@@ -356,9 +367,45 @@ class RunGate:
             return await self._review(info, decision, tainted)
         return await self._ask_user(info, decision, "", tainted), "user"
 
-    async def _keep(self, info: ActionInfo, summary: str) -> ApprovalRejected:
-        """Keep the hand-off ``info`` for the owner (item 482), and what the run is told of it: that it did not happen
-        and waits for them, or, past the caps of the kept steps, a refusal as before."""
+    async def _kept_answer(self, info: ActionInfo, decision: Decision, tainted: bool) -> ApprovalRecord | None:
+        """What the owner answered to this step when it was kept for them in this chat (items 482, 483): a Skip they
+        have not taken back by writing here since refuses it at once, with no card; their yes to a kept question,
+        unused and in time, lets this question through once, and is returned (None: neither). Only a run that keeps
+        steps reads them, and only for a step it would keep: a refusal, a question the run's reading raised and yolo,
+        which asks nothing, never come here."""
+        parking: Parking | None = self._parking
+        if parking is None:
+            return None
+        asks: bool = permit_parkable(info, decision)
+        digest: str | None = kept_digest(info)
+        if digest is None or not (asks or decision.verdict == "handoff"):
+            return None
+        skipped: ApprovalRecord | None = await self._approvals.skipped(digest, parking.thread_id)
+        if skipped is not None:
+            await self._emit_policy(info, decision, tainted)
+            log.warning("skipped_step_refused", run_id=self._run_id, tool=info.tool, approval_id=skipped.id)
+            raise ApprovalRejected(skipped_text(skipped.id), {"action": _describe(info), "approval_id": skipped.id})
+        if not asks:
+            return None
+        allowed: ApprovalRecord | None = await self._approvals.take_permit(digest, parking.thread_id, time.time())
+        if allowed is None:
+            return None
+        await self._approvals.record_automatic(
+            self._run_id,
+            info.tool,
+            f"{info.summary} — {decision.reason}",
+            approval_severity(info),
+            _describe(info),
+            "approved",
+            PERMIT_DECIDER,
+            f"the user allowed it when it was kept for them ({allowed.id})",
+        )
+        log.info("permit_used", run_id=self._run_id, tool=info.tool, approval_id=allowed.id)
+        return allowed
+
+    async def _keep(self, info: ActionInfo, decision: Decision, summary: str, severity: str) -> ApprovalRejected:
+        """Keep the step ``info`` for the owner (items 482, 483), and what the run is told of it: that it did not happen
+        and waits for them to do it, or for their yes, or, past the caps of the kept steps, a refusal as before."""
         parking: Parking | None = self._parking
         if parking is None:
             raise RunConflict("this run keeps no step for the owner", {"run_id": self._run_id})
@@ -366,7 +413,7 @@ class RunGate:
             self._run_id,
             info.tool,
             summary,
-            "handoff",
+            severity,
             _describe(info),
             kept_digest(info),
             parking.keep_s,
@@ -379,9 +426,12 @@ class RunGate:
                 {"action": _describe(info)},
             )
         log.info("step_kept", run_id=self._run_id, tool=info.tool, approval_id=kept.record.id, created=kept.created)
-        return ApprovalParked(
-            kept_text(kept.record.id, kept.created), {"action": _describe(info), "approval_id": kept.record.id}
+        told: str = (
+            kept_text(kept.record.id, kept.created)
+            if decision.verdict == "handoff"
+            else kept_ask_text(kept.record.id, kept.created)
         )
+        return ApprovalParked(told, {"action": _describe(info), "approval_id": kept.record.id})
 
     async def _emit_policy(self, info: ActionInfo, decision: Decision, tainted: bool) -> None:
         """The event of a step the policy asks about, hands off or refuses, with whether the run was tainted when it
@@ -446,11 +496,12 @@ class RunGate:
         await self._emit_policy(info, decision, tainted)
         severity: str = "handoff" if decision.verdict == "handoff" else approval_severity(info)
         summary: str = f"{info.summary} — {decision.reason}" + (f". {passed_on}" if passed_on else "")
-        # A step handed to the owner is kept for them when nobody answers it (item 482): at once while the owner has
-        # left the run's last hand-off unanswered and written nothing since, else once its question expires.
-        keeps: bool = self._parking is not None and decision.verdict == "handoff"
+        # A step handed to the owner, or a question whose card shows all of the step and reaches nobody, is kept for
+        # them when nobody answers it (items 482, 483): at once while the owner has left the run's last kept step
+        # unanswered and written nothing since, else once its question expires.
+        keeps: bool = self._parking is not None and (decision.verdict == "handoff" or permit_parkable(info, decision))
         if keeps and self._owner_away:
-            at_once: ApprovalRejected = await self._keep(info, summary)
+            at_once: ApprovalRejected = await self._keep(info, decision, summary, severity)
             if isinstance(at_once, ApprovalParked):
                 raise at_once
             # Past the caps of the kept steps it is asked as before, and refused if nobody answers it.
@@ -459,7 +510,7 @@ class RunGate:
             self._run_id, info.tool, summary, severity, _describe(info)
         )
         if keeps and outcome.status == "expired" and outcome.decided_by == TIMEOUT_DECIDER:
-            unanswered: ApprovalRejected = await self._keep(info, summary)
+            unanswered: ApprovalRejected = await self._keep(info, decision, summary, severity)
             self._owner_away = isinstance(unanswered, ApprovalParked)
             raise unanswered
         if outcome.status != "approved":

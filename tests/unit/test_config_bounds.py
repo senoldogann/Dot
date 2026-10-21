@@ -30,6 +30,7 @@ def _with(path: tuple[str, ...], value: JsonValue) -> JsonObject:
         ("scheduler", "tick_s"),
         ("policy", "approval_timeout_s"),
         ("policy", "parked_hours"),
+        ("policy", "permit_hours"),
         ("server", "port"),
         ("providers", "ollama", "max_concurrent"),
         ("providers", "anthropic", "attempts"),

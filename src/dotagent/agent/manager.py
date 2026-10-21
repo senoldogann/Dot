@@ -36,7 +36,7 @@ from dotagent.agent.learning_health import (
 from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
-from dotagent.agent.parking import handed_back_text, parking_for
+from dotagent.agent.parking import allowed_text, handed_back_text, parking_for
 from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, offered_to_run, playbook_case
@@ -1553,23 +1553,37 @@ class RunManager:
             )
 
     async def _decide_kept(self, record: ApprovalRecord, approve: bool, source: str, note: str) -> ApprovalRecord:
-        """The owner's answer to a step a run kept for them (item 482): "I did it" carries the work on in the step's
-        chat (:meth:`_hand_back_kept`), delivered before the step is decided, so one that cannot be delivered leaves it
-        open; Skip only closes it. A step past its time has lapsed, and is closed so."""
-        if record.kept_until is not None and record.kept_until <= time.time():
+        """The owner's answer to a step a run kept for them (items 482, 483). "I did it" carries the work on in the
+        step's chat (:meth:`_carry_kept`), delivered before the step is decided, so one that cannot be delivered leaves
+        it open. "Allow once" stores the yes first, unused and told to no page, so that the step the run does again
+        finds it; it is told once the work was carried on, and taken back when it could not be, the card as it was.
+        Skip only closes it. A step past its time has lapsed, and is closed so."""
+        now: float = time.time()
+        if record.kept_until is not None and record.kept_until <= now:
             await self._runtime.approvals.lapse(record)
             raise RunConflict("this step was kept for you too long and has lapsed", {"approval_id": record.id})
-        if approve:
-            await self._hand_back_kept(record, source, note)
-        return await self._runtime.approvals.resolve(record.id, approve, source, note)
+        if not approve:
+            return await self._runtime.approvals.resolve(record.id, False, source, note)
+        if record.severity == "handoff":
+            await self._carry_kept(record, source, handed_back_text(record.id, note), note)
+            return await self._runtime.approvals.resolve(record.id, True, source, note)
+        hours: float = self._runtime.config.policy.permit_hours
+        granted: ApprovalRecord = await self._runtime.approvals.grant(record, source, note, now + hours * 3600.0)
+        try:
+            await self._carry_kept(record, source, allowed_text(record.id, note), note)
+        except DotError:
+            await self._runtime.approvals.reopen(granted)
+            raise
+        await self._runtime.approvals.announce(granted)
+        return granted
 
-    async def _hand_back_kept(self, record: ApprovalRecord, source: str, note: str) -> None:
-        """Tell the step's chat that the owner did a step kept for them (item 482): the run working there reads it as
-        the next thing it is told, and otherwise a new run goes on from the goal of the run that kept it, starting
-        tainted when that run ended tainted. The words are Dot's: they clear no taint, and only the note the owner wrote
-        is their instruction, which is all the new run's goal adds to the goal it goes on from."""
+    async def _carry_kept(self, record: ApprovalRecord, source: str, text: str, note: str) -> None:
+        """Tell the step's chat what the owner answered to a step kept for them (items 482, 483), in Dot's words
+        ``text``: the run working there reads them as the next thing it is told, and otherwise a new run goes on from
+        the goal of the run that kept it, starting tainted when that run ended tainted. The words are Dot's: they clear
+        no taint, and only the ``note`` the owner wrote is their instruction, which is all the new run's goal adds to
+        the goal it goes on from."""
         asked: RunRecord = await self._runtime.store.get_run(record.run_id)
-        text: str = handed_back_text(record.id, note)
         said: str = note.strip()
         active: RunHandle | None = self._active_on(asked.thread_id)
         if active is not None:
@@ -1577,7 +1591,7 @@ class RunManager:
                 active.inbox.put_nowait(UserInput(text=text, files=(), question_id=record.id, vouches=False, said=said))
             except asyncio.QueueShutDown:
                 await active.finished.wait()
-                await self._hand_back_kept(record, source, note)
+                await self._carry_kept(record, source, text, note)
                 return
             log.info("kept_step_handed_back", approval_id=record.id, run_id=active.run_id, delivered="steer")
             return

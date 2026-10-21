@@ -1,13 +1,23 @@
-"""Steps kept for the owner (item 482), the pure part: which runs keep a hand-off nobody answers, the fingerprint that
-keeps the same step once in a chat, and what the run is told of it."""
+"""Steps kept for the owner (items 482, 483), the pure part: which runs keep a hand-off nobody answers, which questions
+may wait for the owner's yes, the fingerprint that keeps the same step once in a chat, and what the run is told."""
 
 from typing import Literal
 
 import pytest
 
-from dotagent.agent.parking import Parking, handed_back_text, kept_digest, kept_text, parking_for
+from dotagent.agent.parking import (
+    Parking,
+    allowed_text,
+    handed_back_text,
+    kept_ask_text,
+    kept_digest,
+    kept_text,
+    parking_for,
+    permit_parkable,
+    skipped_text,
+)
 from dotagent.config import PolicyConfig, load_default_config
-from dotagent.policy.types import ActionInfo, Amount, ApprovalMode
+from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Decision, DecisionSource, Verdict
 
 _PAY: ActionInfo = ActionInfo(
     tool="shell",
@@ -74,3 +84,56 @@ def test_what_the_run_is_told_of_a_kept_step_and_of_the_owner_doing_it() -> None
     said: str = "The user did the step that waited for them (apr-1) themselves; go on from there."
     assert handed_back_text("apr-1", "  ") == said
     assert handed_back_text("apr-1", " Paid by card. ") == f"{said} They wrote: Paid by card."
+
+
+def _asked(verdict: Verdict, source: DecisionSource) -> Decision:
+    return Decision(verdict=verdict, source=source, reason="asked", rule_id=None)
+
+
+_REPORT: ActionInfo = ActionInfo(
+    tool="shell",
+    kind="shell",
+    risk="medium",
+    summary="Run: ./report.sh (writes a file)",
+    target="./report.sh",
+    flags=(),
+)
+
+
+@pytest.mark.parametrize("source", ["rule", "preset", "supervised", "mode"])
+def test_a_question_whose_card_shows_all_of_a_step_that_reaches_nobody_may_wait_for_a_yes(
+    source: DecisionSource,
+) -> None:
+    assert permit_parkable(_REPORT, _asked("ask", source))
+
+
+@pytest.mark.parametrize(
+    ("changed", "decision"),
+    [
+        # A hand-off is the owner's to do, a refusal is no question; the run's untrusted reading and Dot's own files.
+        ({}, _asked("handoff", "rule")),
+        ({}, _asked("deny", "hard_stop")),
+        ({}, _asked("ask", "taint")),
+        ({}, _asked("ask", "own_files")),
+        # A page, a message, an MCP call; a step that reaches other people; a card that shows less than all of it.
+        ({"kind": "browser_click"}, _asked("ask", "rule")),
+        ({"kind": "message"}, _asked("ask", "rule")),
+        ({"kind": "mcp"}, _asked("ask", "rule")),
+        ({"flags": ("external_send",)}, _asked("ask", "rule")),
+        ({"flags": ("upload",)}, _asked("ask", "rule")),
+        ({"summary": "Run: ./report.sh --to …"}, _asked("ask", "rule")),
+    ],
+)
+def test_no_other_question_waits_for_a_yes(changed: dict[str, object], decision: Decision) -> None:
+    assert not permit_parkable(_REPORT.model_copy(update=changed), decision)
+
+
+def test_what_the_run_is_told_of_a_question_kept_allowed_or_skipped() -> None:
+    assert "kept for the user to allow (apr-2)" in kept_ask_text("apr-2", True)
+    assert "waits for the user's yes already (apr-2)" in kept_ask_text("apr-2", False)
+    assert allowed_text("apr-2", "") == (
+        "The user allowed the step that waited for their yes (apr-2): do it now, exactly as it was, once; it is not "
+        "allowed again."
+    )
+    assert allowed_text("apr-2", " Go ahead. ").endswith(" They wrote: Go ahead.")
+    assert "skipped this exact step when it was kept for them (apr-2)" in skipped_text("apr-2")

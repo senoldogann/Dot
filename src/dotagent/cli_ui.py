@@ -16,6 +16,7 @@ from dotagent.agent.gate import YOLO_DECIDER
 from dotagent.agent.helpers import Unavailable, unavailable_text
 from dotagent.agent.lessons import LessonView, RunLessons
 from dotagent.agent.limits import LimitReached, RunLimits, limit_spent
+from dotagent.agent.parking import PERMIT_DECIDER
 from dotagent.agent.plan import StepStatus
 from dotagent.agent.progress import Rung
 from dotagent.agent.questions import QuestionOption, stored_options, takes_several, typed_answer
@@ -564,6 +565,10 @@ class TerminalUi:
     def _on_auto_approval(self, decided: AutoApprovalPayload) -> None:
         if decided.decided_by == YOLO_DECIDER:
             self._line(self._paint(f"  ⚡ yolo: {decided.summary}", "33"))
+            return
+        if decided.decided_by == PERMIT_DECIDER:
+            # A step the owner allowed when it was kept for them (item 483).
+            self._line(self._paint(f"  ✓ allowed by you earlier: {decided.summary}", "32"))
             return
         verdict: str = "approved" if decided.status == "approved" else "denied"
         code: str = "32" if decided.status == "approved" else "31"

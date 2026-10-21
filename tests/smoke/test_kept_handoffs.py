@@ -6,6 +6,11 @@ that kept it ended, or a steer of the run working there that leaves its taint as
 step past its time lapses. Past the caps a hand-off is asked as before. A question that asks the owner's yes is refused
 as before, and so is every hand-off with ``"refuse"``, the default; a yolo run asks nothing. No network and no model
 service is used; the commands handed over never run, and a yolo run's writes a file of the throw-away workspace.
+
+A question whose card shows all of the step is kept for the owner's yes (item 483): "Allow once" that cannot reach the
+conversation is taken back; one that does lets the run do that exact step once, the next time asks again; a Skip
+refuses the step at once in that chat until the owner writes there; and what the policy decides now beats a yes given
+earlier.
 """
 
 import asyncio
@@ -85,7 +90,9 @@ async def _session(
         try:
             await runtime.router.register(_PROVIDER, model)
             await runtime.store.add_rule("handoff", "shell", "invoice", "You file the invoices yourself")
-            await runtime.store.add_rule("ask", "shell", "summary", "")
+            # A question whose card shows all of the step (a command), and one whose card does not (a write's text).
+            await runtime.store.add_rule("ask", "shell", "report", "")
+            await runtime.store.add_rule("ask", "write_file", "summary", "")
             manager: RunManager = RunManager(runtime)
             try:
                 yield runtime, manager
@@ -102,6 +109,11 @@ def _turn(*calls: ScriptedCall) -> ScriptedTurn:
 def _file(name: str) -> ScriptedTurn:
     """A command that writes ``name`` in the workspace: the card shows all of it, so the same one is one step."""
     return _turn(ScriptedCall(tool="shell", arguments={"command": f"echo filed > {name}"}))
+
+
+def _write(name: str) -> ScriptedTurn:
+    """A write of ``name`` in the workspace: its card says where, not what, so it is never kept."""
+    return _turn(ScriptedCall(tool="write_file", arguments={"path": name, "content": "filed"}))
 
 
 def _finish(answer: str) -> ScriptedTurn:
@@ -153,7 +165,7 @@ async def test_a_hand_off_nobody_answers_is_kept_and_i_did_it_carries_the_work_o
             _file("invoice-1.txt"),
             _file("invoice-2.txt"),
             _file("invoice-1.txt"),
-            _file("summary.txt"),
+            _write("summary.txt"),
             _finish("The invoices wait for you."),
             # The run that goes on once the first one is done by hand: a step of its own kept, then done during its
             # last step, which it reads before it ends.
@@ -170,7 +182,7 @@ async def test_a_hand_off_nobody_answers_is_kept_and_i_did_it_carries_the_work_o
         events: list[EventRecord] = await _events(runtime, run.id)
         records: list[ApprovalRecord] = await _approvals(runtime, run.id)
         # The first hand-off waited and expired, then was kept; the second was kept at once; the same step was not
-        # kept twice; the question that asks a yes was refused as before.
+        # kept twice; a question whose card shows less than all of the step was refused as before.
         assert [(record.status, record.decided_by, record.digest is not None) for record in records] == [
             ("expired", "timeout", False),
             ("left", None, True),
@@ -184,7 +196,7 @@ async def test_a_hand_off_nobody_answers_is_kept_and_i_did_it_carries_the_work_o
         assert f"so this step was kept for the user ({kept_first.id})" in ran[0], ran
         assert f"so this step was kept for the user ({kept_second.id})" in ran[1], ran
         assert f"This step waits for the user already ({kept_first.id})" in ran[2], ran
-        assert ran[3].startswith("Not allowed:"), ran
+        assert _results(events, "write_file")[0].startswith("Not allowed:")
         assert [event.data["approval_id"] for event in events if event.kind == QUESTION_LEFT_EVENT] == [
             kept_first.id,
             kept_second.id,
@@ -271,6 +283,127 @@ async def test_the_run_that_goes_on_from_a_kept_step_is_of_the_agent_that_kept_i
         follow: RunRecord = (await runtime.store.list_runs(1, run.thread_id))[0]
         assert (follow.id != run.id, follow.agent_id) == (True, clerk.id)
         assert (await _ended(manager, follow.id)).status == "done"
+
+
+def _report() -> ScriptedTurn:
+    """A command the owner is asked about: its card shows all of it and it reaches nobody, so it waits for their yes."""
+    return _file("report.txt")
+
+
+async def test_a_question_nobody_answers_is_kept_and_allow_once_lets_that_step_through_once(
+    login_env: dict[str, str],
+) -> None:
+    model: ScriptedProvider = ScriptedProvider(
+        _PROVIDER,
+        [
+            _report(),
+            _finish("The report waits for your yes."),
+            # The run Allow once starts: the step on the owner's yes, then again, which asks again.
+            _report(),
+            _report(),
+            _finish("Reported once."),
+            # A firing in the same chat after the Skip, then a run the owner starts there.
+            _report(),
+            _finish("Skipped."),
+            _report(),
+            _finish("It waits again."),
+        ],
+    )
+    async with _session(login_env, model, "park") as (runtime, manager):
+        run: RunRecord = await _start(manager, SCHEDULE_SOURCE, "ask")
+        assert (await _ended(manager, run.id)).status == "done"
+        records: list[ApprovalRecord] = await _approvals(runtime, run.id)
+        assert [(record.status, record.decided_by, record.digest is not None) for record in records] == [
+            ("expired", "timeout", False),
+            ("left", None, True),
+        ], records
+        kept: ApprovalRecord = records[1]
+        assert kept.severity != "handoff"
+        assert f"kept for the user to allow ({kept.id})" in _results(await _events(runtime, run.id), "shell")[0]
+
+        # A yes that cannot reach the conversation (a run of another process works there) is taken back.
+        other: RunRecord = await runtime.store.create_run(
+            run.thread_id,
+            GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            "cli",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        with pytest.raises(RunConflict):
+            await manager.decide(kept.id, True, UI_SOURCE, "Go ahead.")
+        back: ApprovalRecord = await runtime.store.get_approval(kept.id)
+        assert (back.status, back.decided_by, back.permit_until) == ("left", None, None)
+        await runtime.store.set_run_status(other.id, "done")
+
+        allowed: ApprovalRecord = await manager.decide(kept.id, True, UI_SOURCE, "Go ahead.")
+        assert (allowed.status, allowed.used_at) == ("approved", None) and allowed.permit_until is not None
+        assert allowed.permit_until > time.time() + 23 * 3600
+        follow: RunRecord = (await runtime.store.list_runs(1, run.thread_id))[0]
+        assert follow.goal == f"{GOAL}\n\nGo ahead."
+        assert (await _ended(manager, follow.id)).status == "done"
+        # The step went through once on the owner's yes, which is spent; the same step again asked again.
+        auto: list[EventRecord] = [
+            event for event in await _events(runtime, follow.id) if event.kind == "approval_auto"
+        ]
+        assert [(event.data["decided_by"], event.data["status"]) for event in auto] == [("permit", "approved")]
+        assert (runtime.workspace / "report.txt").read_text() == "filed\n"
+        assert (await runtime.store.get_approval(kept.id)).used_at is not None
+        again: list[ApprovalRecord] = await _approvals(runtime, follow.id)
+        assert [(record.status, record.decided_by) for record in again] == [
+            ("approved", "permit"),
+            ("expired", "timeout"),
+            ("left", None),
+        ]
+
+        # Skipped, the step is refused at once in this chat, with no card...
+        await manager.decide(again[2].id, False, UI_SOURCE, "")
+        firing: RunRecord = await manager.start(
+            GOAL, "task", SCRIPTED_MODEL, run.thread_id, SCHEDULE_SOURCE, None, None, "standard", None, "ask", False, ()
+        )
+        assert (await _ended(manager, firing.id)).status == "done"
+        assert await _approvals(runtime, firing.id) == []
+        refused: str = _results(await _events(runtime, firing.id), "shell")[0]
+        assert f"the user skipped this exact step when it was kept for them ({again[2].id})" in refused, refused
+        # ...until the owner writes there: a run of theirs is asked again.
+        theirs: RunRecord = await manager.start(
+            GOAL, "task", SCRIPTED_MODEL, run.thread_id, UI_SOURCE, None, None, "standard", None, "ask", False, ()
+        )
+        assert (await _ended(manager, theirs.id)).status == "done"
+        assert [(record.status, record.decided_by) for record in await _approvals(runtime, theirs.id)] == [
+            ("expired", "timeout"),
+            ("left", None),
+        ]
+
+
+async def test_what_the_policy_decides_now_beats_a_yes_given_earlier(login_env: dict[str, str]) -> None:
+    model: _HeldModel = _HeldModel([_report(), _finish("It waits."), _report(), _finish("Handed over.")], held=3)
+    async with _session(login_env, model, "park") as (runtime, manager):
+        run: RunRecord = await _start(manager, SCHEDULE_SOURCE, "ask")
+        await _ended(manager, run.id)
+        kept: ApprovalRecord = next(record for record in await _approvals(runtime, run.id) if record.status == "left")
+        await manager.decide(kept.id, True, UI_SOURCE, "")
+        follow: RunRecord = (await runtime.store.list_runs(1, run.thread_id))[0]
+        async with asyncio.timeout(_TIME_LIMIT_S):
+            await model.entered.wait()
+        # A rule that hands the step to the owner, added meanwhile, decides it now: the yes is not spent.
+        await runtime.store.add_rule("handoff", "shell", "report", "You send the report yourself")
+        model.release.set()
+        assert (await _ended(manager, follow.id)).status == "done"
+        assert (await runtime.store.get_approval(kept.id)).used_at is None
+        assert [(record.severity, record.status) for record in await _approvals(runtime, follow.id)] == [
+            ("handoff", "expired"),
+            ("handoff", "left"),
+        ]
+        assert not (runtime.workspace / "report.txt").exists()
 
 
 async def test_past_the_caps_a_hand_off_is_asked_as_before_and_refused_when_nobody_answers(

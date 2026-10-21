@@ -1066,7 +1066,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     question_left(scope, record) {
       const data = record.data;
       if (typeof data.kept_until === "number") {
-        note(scope, record.ts, "hand", `Kept for you: ${clip(data.summary, 300)}. Nobody answered in time, so Dot went on without it`, "warn");
+        const kept = data.severity === "handoff" ? "Kept for you" : "Kept for you to allow";
+        note(scope, record.ts, "hand", `${kept}: ${clip(data.summary, 300)}. Nobody answered in time, so Dot went on without it`, "warn");
       } else {
         const question = typeof data.args.question === "string" ? data.args.question : data.summary;
         note(scope, record.ts, "help", `Dot asked you “${clip(question, 300)}” and went on without the answer`, "warn");
@@ -1102,12 +1103,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
     approval_auto(scope, record) {
       const data = record.data;
       const yolo = data.decided_by === "yolo";
+      // A step the owner allowed when it was kept for them (item 483), which the run did now.
+      const permit = data.decided_by === "permit";
       const denied = data.status === "denied";
       // Settings › General may keep such lines out of the chat (item 346); a refusal stays, as its action did not run.
       if (!denied && settingValue(AUTO_LINES) === "hidden") {
         return;
       }
-      const verdict = yolo ? "YOLO, not asked" : denied ? "Reviewer denied" : "Reviewer approved";
+      const verdict = yolo ? "YOLO, not asked" : permit ? "You allowed it earlier" : denied ? "Reviewer denied" : "Reviewer approved";
       const said = data.note === "" || data.summary.endsWith(data.note);
       const reason = said ? "" : ` — ${clip(data.note, 240)}`;
       const text = `${verdict}: ${clip(data.summary, 200)}${reason}`;

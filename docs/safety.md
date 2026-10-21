@@ -363,15 +363,17 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
 counts as a refusal. With `[policy] unanswered = "park"` a hand-off nobody answers is kept for you instead and the run
 goes on without it (item 482, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)); your **I did
-it** on it gives the run no authority, and the words it sends restore no trust. The note you write with your answer
-reaches the model. Your no stands for the rest of the run (item 456): the same action, as its card showed it, is refused
-at once, with no new card, nor a question to the review model
-in `auto`, until you write to the run again (a steer, the answer to its question); the policy's event records the
-refusal, as it does the first. Only your no is kept, given in the web UI or the terminal: a refusal of the review model,
-of the eval harness and an approval nobody answered are not; and an action whose card shows less than all of it is
-asked again: a kind whose card says not what it writes or types (a file's text, a field's), and a card that cut its
-text (`…`, an MCP call's long arguments among them), told a text by its length (`(42 chars)`) or masked a secret
-(`***`), since two actions such a card cannot tell apart are not one. This is the
+it** on it gives the run no authority, and the words it sends restore no trust. A question whose card shows all of a
+step that reaches nobody (a command, a read, a request; never one the run's untrusted reading raised, nor one about
+Dot's own files) is kept too, and your **Allow once** lets the run do that exact step once in that conversation, within
+`[policy] permit_hours`, after the policy decided it again (item 483). The note you write with your answer reaches the
+model. Your no stands for the rest of the run (item 456): the same action, as its card showed it, is refused at once,
+with no new card, nor a question to the review model in `auto`, until you write to the run again (a steer, the answer to
+its question); the policy's event records the refusal, as it does the first. Only your no is kept, given in the web UI
+or the terminal: a refusal of the review model, of the eval harness and an approval nobody answered are not; and an
+action whose card shows less than all of it is asked again: a kind whose card says not what it writes or types (a file's
+text, a field's), and a card that cut its text (`…`, an MCP call's long arguments among them), told a text by its length
+(`(42 chars)`) or masked a secret (`***`), since two actions such a card cannot tell apart are not one. This is the
 default approval mode, `ask`, and `supervised` asks before every change as well; in `auto` the questions of the policy
 are answered for you, and a `yolo` run asks nothing at all (item 443). What is yours in every mode that asks (item 429)
 — money, credentials, messages and posts in your name — is a card in the chat there. A question of the agent itself
