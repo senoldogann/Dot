@@ -251,7 +251,9 @@ nothing fills in as the stream comes. A message sent from a chat that is over st
 without a jump: the chat stands where it was, at its foot, inert, until the next run's page is drawn in its place,
 never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
 (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
-the run took shows where the pointer rests on it (on a touch screen it always shows). A copy out of the conversation
+the run took shows where the pointer rests on it (on a touch screen it always shows). A message that only says the
+answer again is not shown beside it, wherever it stands in the turn (item 460): a task run that answers in a plain
+reply is told to call finish, thinks once more and finishes with the same words. A copy out of the conversation
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
 it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy alongside for the
 applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its
