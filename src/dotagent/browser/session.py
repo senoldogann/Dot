@@ -1372,18 +1372,9 @@ class BrowserSession:
         """The rules on one request Chrome is about to send; ``page`` the page whose main frame it navigates, when it
         is one, so that the error page it then shows can be told from a page that failed to load. A rule that fails on
         an address refuses it: the request must be answered either way, or Chrome holds it for good."""
-        secrets: tuple[str, ...] = self._live_secrets()
-        shown: str = masked(url, secrets)
-        if secrets and in_address(url, secrets):
-            # Shown and logged by its host alone, or by its scheme when the host is where the value is: a form of the
-            # value masking does not know may be anywhere in it.
-            parts = urlsplit(url)
-            host: str = parts.hostname or ""
-            shown = (
-                f"{parts.scheme}://[a host that carries a filled value]"
-                if in_address(host, secrets)
-                else f"{parts.scheme}://{host}/[an address that carries a filled value]"
-            )
+        live: tuple[str, ...] = self._live_secrets()
+        shown: str = self._shown(url)
+        if live and in_address(url, live):
             verdict: UrlVerdict = UrlVerdict(allowed=False, reason=_CARRIES_SECRET)
         else:
             try:
@@ -1410,8 +1401,20 @@ class BrowserSession:
         return tuple(value for value, until in self._vault_secrets.items() if until > now)
 
     def _shown(self, url: str) -> str:
-        """``url`` as Dot shows and logs it: with the passwords and codes no request may carry masked (item 493)."""
-        return masked(url, self._live_secrets())
+        """``url`` as Dot shows it in a refusal and writes it in its log (item 493). One that carries a password or a
+        code no request may carry, however its escapes write it (:func:`in_address`), is named by its host alone, or
+        by its scheme when the value is in the host: a form of the value masking does not know may be anywhere in it.
+        Any other has the forms masking knows masked."""
+        live: tuple[str, ...] = self._live_secrets()
+        if not live:
+            return url
+        if not in_address(url, live):
+            return masked(url, live)
+        parts = urlsplit(url)
+        host: str = parts.hostname or ""
+        if in_address(host, live):
+            return f"{parts.scheme}://[a host that carries a filled value]"
+        return f"{parts.scheme}://{host}/[an address that carries a filled value]"
 
     async def _on_request(self, route: Route, request: Request) -> None:
         """The route of Dot's own Chrome: a request the rules refuse fails in the page as blocked by the client; the
