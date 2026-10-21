@@ -212,20 +212,23 @@ a note that it was saved while reading outside content.
   account token of yours), a run sees the logins' titles and websites (`browser_logins`) and names one with the refs
   of its fields (`browser_fill_login`); the daemon reads the values with `op`, 1Password's command line, and types them
   itself:
-  - The values are in no argument, no result, no event and no message of the model.
-  - Every result of the browser tools of the chat masks them from then on, for as long as Dot runs, as typed and as
-    an address or a JSON string
-    writes them: an error's words and context, a script's value, and the step's summary and target, which the
-    approvals, the policy's events and the review model read (a form sent by GET puts them in the address). The judge
-    of clicks and checks gets them masked too, in a button's words and a page's address, title and text. A
-    screenshot of the browser covers the fields they were filled into, in every mode; one of the desktop shows Dot's
-    Chrome as the screen does, the username in its field.
+  - The values are in no argument of the model. Every result of the browser and web tools of the chat masks them
+    from then on, for as long as Dot runs, as typed and as an address or a JSON string writes them: an error's words
+    and context, a script's value, and the step's summary and target, which the approvals, the policy's events and
+    the review model read (a form sent by GET puts them in the address). The judge of clicks and checks gets them
+    masked too, in a button's words and a page's address, title and text. A screenshot of the browser covers the
+    fields they were filled into, in every mode.
+  - What is kept from the model is the password and the one-time code (your word of 2026-10-21). The username is no
+    secret: a site shows it once you are signed in, and what the browser and web tools do not answer shows it as it
+    is (the files a crawl writes, an MCP tool). The desktop tools are not wrapped: their screenshots show Dot's Chrome
+    as the screen does, and they read Chrome's values of a plain field, a code there, or a password a page shows as
+    plain text ("show password").
   - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
     going back can bring the filled page back whole. Once a script of the run ran in a tab of the chat, no tab of it
     gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
     page, in a tab it opened, or in a page Chrome brings back from its cache.
-  - A login is filled only on a page of one of its own websites, or a host under one, over https (plain http on this
-    Mac alone). Each field must be in a document of those sites, so a frame of another site gets nothing. A password
+  - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
+    (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a document of those sites, so a frame of another site gets nothing. A password
     goes only into a password field, where it shows in no text.
   - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
     stricter), and in `auto` you answer it, not the review model.

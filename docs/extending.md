@@ -57,7 +57,7 @@ token; the vault and the service account stay in 1Password, whose page removes t
 
 While it is connected, a run that may act gets `browser_logins`, the logins' titles and websites, and
 `browser_fill_login`, which fills one into the current page. Dot fills only on the login's own site, asks you before
-each fill in every mode but `yolo`, and masks the values in everything the browser tools give back.
+each fill in every mode but `yolo`, and masks the values in everything the browser and web tools give back.
 
 A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel and Canva (their MCP servers
 let in approved clients only; Canva refused Dot's on 2026-10-19), and Asana and Box (clients registered by hand). Figma

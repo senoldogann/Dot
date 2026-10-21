@@ -934,11 +934,12 @@ def _mask_error(error: DotError, values: frozenset[str]) -> None:
     error.context = {key: masked_json(value, values) for key, value in error.context.items()}
 
 
-def _masked(tool: RegisteredTool) -> RegisteredTool:
-    """``tool`` with the values filled into its chat's pages from the password manager (item 493) taken out of what it
-    gives back and of what it tells the gate: its result's text, an error it raises (its words and its context), and
-    the action's summary and target, which the approvals, the policy's events and the review model read. A page's
-    address holds them once a form sent by GET put them there."""
+def masked_tool(tool: RegisteredTool) -> RegisteredTool:
+    """``tool``, one that reads pages in Dot's Chrome (the browser tools, the web tools), with the values filled into
+    its chat's pages from the password manager (item 493) taken out of what it gives back and of what it tells the
+    gate: its result's text, an error it raises (its words and its context), and the action's summary and target,
+    which the approvals, the policy's events and the review model read. A page's address holds them once a form sent by
+    GET put them there."""
 
     async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
         try:
@@ -977,7 +978,7 @@ def _masked(tool: RegisteredTool) -> RegisteredTool:
 
 
 def build_browser_tools() -> tuple[RegisteredTool, ...]:
-    return tuple(_masked(tool) for tool in _browser_tools())
+    return tuple(masked_tool(tool) for tool in _browser_tools())
 
 
 def _browser_tools() -> tuple[RegisteredTool, ...]:
