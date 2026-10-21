@@ -703,6 +703,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules; each of `GET`'s names in `never_decided_by` the earlier rule that fits every action it fits, or null (item 449) |
 | `POST /rules/{id}/move` (`{"direction": "up"\|"down"}`)                        | moves a rule one place in the order and numbers the rules 1 to n; answers the list (422 past either end, 404 for no rule) |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
+| `GET /rules/usage?days=` (1–90)                                                  | how each enabled rule was used on the steps of the last days, with today's rules: the steps it fits and decides, those in yolo runs or settled before any rule, the earlier rules that decide first; writes nothing (item 473; 422 without days or past 90) |
 | `POST /rules/preview` (`{"behavior", "tool_glob", "match_regex", "days": 1–90}`) | what the rule would have done on the steps of the last days, before it is added; writes nothing (item 469; 422 for a pattern that is not one) |
 | `GET /memories`, `GET /memories/search`, `POST /memories`, `GET\|PATCH\|DELETE /memories/{id}` | notes                                         |
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |

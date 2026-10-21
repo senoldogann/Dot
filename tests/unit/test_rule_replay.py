@@ -12,8 +12,17 @@ from dotagent.agent.authorization import StepDecision
 from dotagent.core.types import JsonObject
 from dotagent.policy import engine
 from dotagent.policy.types import ActionInfo, Decision, DecisionSource, Flag
-from dotagent.server.rule_replay import CANDIDATE_ID, Tally, candidate_rule, preview_of, tally_steps
-from dotagent.server.views import RulePreview
+from dotagent.server.rule_replay import (
+    CANDIDATE_ID,
+    Tally,
+    UsageTally,
+    candidate_rule,
+    preview_of,
+    tally_steps,
+    tally_usage,
+    usage_of,
+)
+from dotagent.server.views import RulePreview, RulesUsage, RuleUsage
 from dotagent.store.models import Behavior, RuleRecord, StepRow
 
 _TOKEN: str = "ghp_" + "a1B2c3D4e5" * 4
@@ -231,3 +240,72 @@ def test_a_pattern_that_takes_too_long_stops_the_count_and_says_so(monkeypatch: 
     assert tally_steps(tally, [], candidate, steps, _NO_DEADLINE) == 1
     assert tally.problem is not None and "The daemon would refuse such a step" in tally.problem
     assert tally.scanned == 1 and tally.fits == 0
+
+
+def _used(rules: list[RuleRecord], steps: list[StepRow]) -> dict[str, RuleUsage]:
+    tally: UsageTally = UsageTally(rules)
+    assert tally_usage(tally, rules, steps, _NO_DEADLINE) == len(steps)
+    usage: RulesUsage = usage_of(tally, rules, False)
+    assert usage.problem is None and usage.scanned == len(steps)
+    return {used.rule_id: used for used in usage.rules}
+
+
+def test_each_rule_says_what_it_fits_and_decides_with_todays_rules() -> None:
+    """Item 473: a step counts for every rule it fits; the first of them decides it, unless its run was in yolo or a
+    check before every rule settled it; a rule switched off counts nothing."""
+    switched_off: RuleRecord = _rule(3, "handoff", "shell", r"push", "Pushes are mine").model_copy(
+        update={"enabled": False}
+    )
+    rules: list[RuleRecord] = [
+        _rule(1, "allow", "shell", r"\bgit status\b", "Status is fine"),
+        _rule(2, "ask", "shell", r"\bgit\b", "Ask about git"),
+        switched_off,
+    ]
+    steps: list[StepRow] = [
+        _step(6, "Run: git status", _decision("allow", "rule", "policy"), True, False),
+        _step(5, _PUSH, _decision("ask", "rule", "user"), True, False),
+        _step(4, _PUSH, _decision("ask", "rule", "yolo"), True, True),
+        _step(3, _PUSH, _decision("ask", "guard", "user"), True, False),
+        _step(2, "Run: ls", _decision("allow", "preset", "policy"), True, False),
+        _step(1, "Run: git status --short", None, False, False),
+    ]
+    used: dict[str, RuleUsage] = _used(rules, steps)
+    assert set(used) == {"rul_1", "rul_2"}
+    first: RuleUsage = used["rul_1"]
+    assert (first.fits, first.decides, first.in_yolo, first.before_rules, first.last_fit_at) == (
+        2,
+        2,
+        0,
+        0,
+        steps[0].at,
+    )
+    second: RuleUsage = used["rul_2"]
+    assert (second.fits, second.decides, second.in_yolo, second.before_rules) == (5, 1, 1, 1)
+    assert [(shadow.rule_id, shadow.steps) for shadow in second.shadowed_by] == [("rul_1", 2)]
+
+
+def test_the_rule_that_decides_a_step_is_the_one_the_policy_picks() -> None:
+    rules: list[RuleRecord] = [
+        _rule(1, "allow", "shell", r"\bgit status\b", "Status is fine"),
+        _rule(2, "handoff", "shell", r"--force", "Forcing is mine"),
+        _rule(3, "ask", "*", "", "Ask about everything"),
+    ]
+    for summary in ("Run: git status", "Run: git push --force", _PUSH, "Run: ls"):
+        used: dict[str, RuleUsage] = _used(rules, [_step(1, summary, None, False, False)])
+        info: ActionInfo = ActionInfo(
+            tool="shell", kind="shell", risk="medium", summary=summary, target=summary, flags=()
+        )
+        decided: Decision = engine.decide_past_review(info, "task", False, "balanced", rules, None)
+        assert [rule_id for rule_id, use in used.items() if use.decides == 1] == [decided.rule_id], summary
+
+
+def test_a_stored_pattern_that_takes_too_long_stops_the_count_and_says_so(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(engine, "RULE_MATCH_TIMEOUT_S", 0.05)
+    rules: list[RuleRecord] = [_rule(1, "ask", "shell", r"(a|aa)+$", "Slow")]
+    tally: UsageTally = UsageTally(rules)
+    steps: list[StepRow] = [
+        _step(2, "Run: " + "a" * 60 + "b", None, False, False),
+        _step(1, "Run: aaa", None, False, False),
+    ]
+    assert tally_usage(tally, rules, steps, _NO_DEADLINE) == 1
+    assert tally.problem is not None and "The daemon refuses such a step" in tally.problem

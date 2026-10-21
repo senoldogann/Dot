@@ -612,6 +612,12 @@
   margin: 0;
 }
 
+/* How a rule was used on the last days, under its description (item 473). */
+.rule-list .rule-usage {
+  margin-top: var(--space-half);
+  word-break: break-word;
+}
+
 .rule-tryout-problem {
   color: var(--warn);
 }
