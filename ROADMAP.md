@@ -16143,6 +16143,26 @@ kept, Incognito and a fresh profile left alone, a state Dot does not know refuse
 sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
 `docs/browser-and-computer-use.md`.
 
+### 457. A release publishes only what the gate passed again
+
+**Status: done (2026-10-21), waiting for the owner's yes** (`.github/workflows/` is on REVIEW.md's list). The eighth of
+the nine ideas taken from OpenBot (item 449 has the plan), its first part: "the PyPI publish gated on the whole gate".
+Today a tag `v*` publishes the package in about a minute, whatever the tagged commit is and whether any gate passed on
+it, and PyPI takes a version once. **As built.** `release.yml` has three jobs: `tag` (seconds, on Ubuntu: the tagged
+commit is an ancestor of `origin/main`, and the tag says the version, moved unchanged from the publish job), `gate`
+(`gate.yml`, called: the whole gate runs again on the tagged commit, whatever it changes, since a call ignores the paths
+a push or a pull request skips), and `publish`, which needs both: a failed, cancelled or skipped job before it skips it,
+and it keeps its environment `pypi` and the only identity token, so the publisher registered on pypi.org needs no
+change. `gate.yml` gains `workflow_call` and nothing else, so a pull request or a push runs as before.
+`desktop/release.sh` says the tag publishes once the gate passes again, about eight minutes later. Left to the owner, as
+settings of the repository and not files of it: a deployment policy on the environment `pypi` that lets only tags `v*`
+use it, and, if wanted, the owner as its required reviewer. Not done here: the browser tests in CI and the audit of the
+workflows with zizmor, the other two parts of the idea, each its own item. Tests: `tests/unit/test_release_workflow.py`
+reads the two files (publish needs the tag's job and the gate's, keeps `pypi`, is the only job with an identity token;
+the tag's job asks for an ancestor of main; the gate can be called) and fails when the gate is dropped from the
+publish's needs (tried on a copy); `actionlint` passes on every workflow. Docs: `docs/development.md` (Releasing, the
+gate).
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -17108,3 +17128,5 @@ sent after Dot's Chrome starts again, and without the word it is not, while a da
   OpenBot is written down.
 - 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.
+- 2026-10-21 (Opus 5.5): item 457 on `item-457-release-gate` from `main`: a tag publishes to PyPI only once its commit
+  is a commit of main and the whole gate passed again on it.

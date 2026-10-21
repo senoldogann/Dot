@@ -13,6 +13,9 @@ on:
   push:
     branches: [main]
     paths-ignore: ["*.md", "docs/**", ".github/ISSUE_TEMPLATE/**", ".github/pull_request_template.md"]
+  # The release runs the whole gate again on the tagged commit before it publishes (release.yml, item 457); a call
+  # ignores the paths above, so the gate always runs whole there.
+  workflow_call:
 
 # The jobs only read the code: the token GitHub hands them can do nothing more.
 permissions:

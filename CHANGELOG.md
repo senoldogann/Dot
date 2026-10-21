@@ -5,6 +5,8 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- A release tag publishes the Python package only when the tagged commit is a commit of `main` and the whole gate
+  passes again on it, about eight minutes after the tag (item 457).
 - Settings › Rules: a rule's arrows move it up or down the order the rules are checked in, and a rule that an earlier
   rule fits wherever it fits says it never decides, with the number of the rule that decides in its place. The note
   above the rules now says what a yolo run keeps of the protections that are always on: only a research run's limit

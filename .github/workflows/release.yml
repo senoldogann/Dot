@@ -1,20 +1,46 @@
 # Publishes Dot to PyPI as dotagent-macos (item 348): a tag v<version> builds the source distribution and the wheel and
 # uploads them through PyPI's trusted publishing, which needs no token. The project's publisher on pypi.org names this
 # repository, this workflow (release.yml) and the environment "pypi"; the tag must say the version pyproject.toml has.
+# Before anything is published (item 457), the tagged commit must be a commit of main and the whole gate must pass on it
+# again: a version is accepted by PyPI once, so the publish is the one step that cannot be taken back.
 name: release
 
 on:
   push:
     tags: ["v*"]
 
-# The job reads the code; PyPI trusts the identity token GitHub hands it, and nothing else.
+# The jobs read the code; PyPI trusts the identity token GitHub hands the publish job, and nothing else.
 permissions:
   contents: read
 
 # Each action is pinned by the commit its tag named when it was pinned, given in the comment (as in gate.yml).
 
 jobs:
+  tag:
+    # What fails in seconds fails first, before the gate's minutes.
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # The whole history, so that origin/main is there to ask; the job keeps no token in .git/config.
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+      - name: The tagged commit is a commit of main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main ||
+            { echo "::error::$GITHUB_SHA is not a commit of main: a release is made from main"; exit 1; }
+      - name: The tag says the version, as pyproject.toml and the package do
+        run: |
+          test "${GITHUB_REF_NAME#v}" = "$(uv version --short)"
+          grep -qx "__version__ = \"${GITHUB_REF_NAME#v}\"" src/dotagent/__init__.py
+  gate:
+    needs: tag
+    uses: ./.github/workflows/gate.yml
   publish:
+    # A failed, cancelled or skipped job before it skips it: nothing is published unless both passed.
+    needs: [tag, gate]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     environment: pypi
@@ -28,10 +54,6 @@ jobs:
           # The job keeps no token: the checkout's own is not left in .git/config.
           persist-credentials: false
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
-      - name: The tag says the version, as pyproject.toml and the package do
-        run: |
-          test "${GITHUB_REF_NAME#v}" = "$(uv version --short)"
-          grep -qx "__version__ = \"${GITHUB_REF_NAME#v}\"" src/dotagent/__init__.py
       - name: Build
         run: uv build
       - name: Publish
