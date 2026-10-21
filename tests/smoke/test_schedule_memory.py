@@ -140,6 +140,7 @@ def _options(same_chat: bool | None) -> ScheduleOptions:
         same_chat=same_chat,
         stop_after_failures=None,
         notify=None,
+        agent_id=None,
     )
 
 

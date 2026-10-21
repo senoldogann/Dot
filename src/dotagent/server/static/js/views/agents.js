@@ -10,7 +10,7 @@ import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
-import { ago, clip, el, modelName } from "../dom.js";
+import { ago, clip, el, modelName, plural } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
@@ -750,9 +750,13 @@ function mountPage(root, ctx, agentId) {
   }
 
   async function remove(record) {
+    // Its schedules are switched off with it (item 462), and the dialog says how many.
+    const schedules = (await api.get("/schedules")).filter((view) => view.record.options.agent_id === record.id);
+    const switchedOff =
+      schedules.length === 0 ? "" : ` Its ${plural(schedules.length, "schedule is", "schedules are")} switched off.`;
     const confirmed = await confirmDialog({
       title: `Delete ${record.name}?`,
-      message: "Its chats stay, as Dot's. The agent's face, role and instructions are gone.",
+      message: `Its chats stay, as Dot's. The agent's face, role and instructions are gone.${switchedOff}`,
       confirmLabel: "Delete",
       danger: true,
       focusCancel: true,

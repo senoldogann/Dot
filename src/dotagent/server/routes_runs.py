@@ -111,6 +111,7 @@ def _opening_options(request: StartRunRequest) -> ScheduleOptions:
         same_chat=True,
         stop_after_failures=None,
         notify=None,
+        agent_id=None,
     )
 
 

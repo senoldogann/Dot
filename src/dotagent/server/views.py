@@ -467,7 +467,8 @@ class MemoryRequest(FrozenModel):
 
 class ScheduleCreateRequest(FrozenModel):
     """A new schedule. ``model``, ``effort``, ``speed``, ``approvals``, ``goal_mode`` and ``timezone`` left out take the
-    configured ones when the schedule fires (the standard speed for ``speed``)."""
+    configured ones when the schedule fires (the standard speed for ``speed``). ``agent_id`` names the owner's agent its
+    runs run as (item 462); left out, Dot."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -485,12 +486,15 @@ class ScheduleCreateRequest(FrozenModel):
     same_chat: bool | None = None
     stop_after_failures: int | None = Field(default=None, ge=0, le=50)
     notify: NotifyLevel | None = None
+    agent_id: str | None = None
 
 
 class ScheduleUpdateRequest(FrozenModel):
     """The whole new state of a schedule: as for a new one, plus whether it is switched on. ``history_runs``,
     ``same_chat`` and ``speed`` left out take the configured ones, as a client from before item 257 sends none of them
-    (the standard speed for ``speed``, item 291)."""
+    (the standard speed for ``speed``, item 291). ``agent_id`` left out keeps the schedule's agent (item 462), so a
+    client that does not know of it never turns an agent's schedule into Dot's, whose runs have every tool; ``null``
+    makes it Dot's."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -507,6 +511,7 @@ class ScheduleUpdateRequest(FrozenModel):
     stop_after_failures: int | None = Field(default=None, ge=0, le=50)
     notify: NotifyLevel | None = None
     speed: Speed | None = None
+    agent_id: str | None = None
     enabled: bool
 
 
@@ -925,9 +930,20 @@ class MemoryPage(FrozenModel):
     agents: dict[str, str]
 
 
+class ScheduleAgent(FrozenModel):
+    """The agent a schedule's runs run as (item 462), as its row shows it: its name, its face, and the approvals its
+    runs take when the schedule leaves them open (``None``: the configured ones)."""
+
+    id: str
+    name: str
+    look: AgentLook | None
+    approvals: ApprovalMode | None
+
+
 class ScheduleView(FrozenModel):
     """A schedule as the UI shows it; the times are in the schedule's own ``zone``. ``run_at_input`` is the one-time
-    moment as a ``datetime-local`` field takes it (``2026-10-06T09:30``)."""
+    moment as a ``datetime-local`` field takes it (``2026-10-06T09:30``). ``agent`` is the agent its runs run as,
+    ``None`` for Dot."""
 
     record: ScheduleRecord
     when: str
@@ -935,6 +951,7 @@ class ScheduleView(FrozenModel):
     last_local: str | None
     run_at_input: str | None
     zone: str
+    agent: ScheduleAgent | None
 
 
 class ContextChoice(FrozenModel):

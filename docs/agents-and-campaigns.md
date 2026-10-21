@@ -20,8 +20,11 @@ section ("You are Scout, an agent the owner made: ..." and your instructions), a
 its tools are the ones the agent names plus finishing, asking you and turning tool groups on, and the tools of an MCP
 server you pick for its message, or picked for an earlier message of its chat (item 415): your pick widens the agent's
 bounds for that chat; a server the model only called does not. The run's page wears the agent's face and name in the bar
-with a chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. Deleting an agent
-leaves its chats, its lessons and its learned skills to Dot. The bar of an agent's page names the agent as the page's
+with a chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. A schedule can run
+as one of your agents (its **Agent** on Schedules, item 462; see [Memory and schedules](memory-and-schedules.md)).
+Deleting an agent leaves its chats, its lessons and its learned skills to Dot, and switches its schedules off ("switched
+off: its agent was deleted"), as Dot's with no agent named, so that none goes on firing with every tool; the dialog
+says how many. The bar of an agent's page names the agent as the page's
 heading, as the tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not where the
 greeting stood.
 

@@ -718,6 +718,7 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             same_chat=None if row["same_chat"] is None else bool(row["same_chat"]),
             stop_after_failures=row["stop_after_failures"],
             notify=row["notify"],
+            agent_id=row["agent_id"],
         ),
         runs_failed_in_row=row["runs_failed_in_row"],
     )
@@ -734,12 +735,13 @@ type _OptionValues = tuple[
     str | None,
     int | None,
     str | None,
+    str | None,
 ]
 
 
 def _option_values(options: ScheduleOptions) -> _OptionValues:
     """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone,
-    history_runs, same_chat, speed, stop_after_failures, notify."""
+    history_runs, same_chat, speed, stop_after_failures, notify, agent_id."""
     goal_mode: int | None = None if options.goal_mode is None else int(options.goal_mode)
     same_chat: int | None = None if options.same_chat is None else int(options.same_chat)
     return (
@@ -753,6 +755,7 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
         options.speed,
         options.stop_after_failures,
         options.notify,
+        options.agent_id,
     )
 
 
@@ -792,6 +795,9 @@ _ADDED_MEMORY_COLUMNS: tuple[tuple[str, str], ...] = (
     # The note was saved while its run had read content third parties can author; an older note was not.
     ("tainted", "INTEGER NOT NULL DEFAULT 0"),
 )
+# The status of a schedule switched off because the agent its runs ran as was deleted (item 462); switching it on
+# again, as Dot or as another agent, clears it as it clears item 458's.
+AGENT_DELETED_STATUS: str = "switched off: its agent was deleted"
 # Columns of ``schedules`` added later: NULL means "what the configuration says when the schedule fires", which is how
 # the schedules of an older database ran.
 _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
@@ -806,6 +812,7 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("stop_after_failures", "INTEGER"),
     ("runs_failed_in_row", "INTEGER NOT NULL DEFAULT 0"),
     ("notify", "TEXT"),
+    ("agent_id", "TEXT"),
 )
 
 
@@ -3398,7 +3405,8 @@ class Store:
         await self._db.execute(
             "INSERT INTO schedules(id, name, cron, run_at, goal, mode, enabled, created_at, last_run_at, next_run_at,"
             " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed,"
-            " stop_after_failures, notify) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " stop_after_failures, notify, agent_id)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 name,
@@ -3438,7 +3446,7 @@ class Store:
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
             " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
-            " stop_after_failures = ?, notify = ?, enabled = ?, next_run_at = ?, runs_failed_in_row = 0,"
+            " stop_after_failures = ?, notify = ?, agent_id = ?, enabled = ?, next_run_at = ?, runs_failed_in_row = 0,"
             " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
             " WHERE id = ?",
             (name, cron, run_at, goal, mode, *_option_values(options), on, next_run_at, on, schedule_id),
@@ -3835,10 +3843,16 @@ class Store:
 
     @_writing
     async def delete_agent(self, agent_id: str) -> None:
-        """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared)."""
+        """Forget the agent; its runs and its lessons stay, as Dot's (their ``agent_id`` is cleared). Its schedules
+        (item 462) are switched off with :data:`AGENT_DELETED_STATUS` and named for no agent, in the same write: one
+        never goes on firing as Dot, with every tool, nor fails at every tick for an agent that is gone."""
         await self.get_agent(agent_id)
         await self._db.execute("UPDATE runs SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
         await self._db.execute("UPDATE memories SET agent_id = NULL WHERE agent_id = ?", (agent_id,))
+        await self._db.execute(
+            "UPDATE schedules SET enabled = 0, next_run_at = NULL, agent_id = NULL, last_status = ? WHERE agent_id = ?",
+            (AGENT_DELETED_STATUS, agent_id),
+        )
         await self._db.execute("DELETE FROM agents WHERE id = ?", (agent_id,))
         await self._db.commit()
 

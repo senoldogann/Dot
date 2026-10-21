@@ -163,8 +163,10 @@ composer (items 281 and 400; see [Runs](runs.md)). The scheduler also fires the 
 On Schedules the list is the page and **New schedule** opens the form; a schedule is created and edited
 whole: its name, goal, repetition (cron or one moment), time zone, kind of run (task, chat, research), model, reasoning
 level, approval mode, goal mode, the earlier runs it knows, whether it keeps its chat, when its failures switch it
-off, how the end of its runs is told and whether it is on (`history_runs`, `same_chat`, `stop_after_failures`,
-`notify` and `speed` in `POST` and `PATCH /api/schedules`, left out for the configured ones and the standard speed).
+off, how the end of its runs is told, the agent it runs as and whether it is on (`history_runs`, `same_chat`,
+`stop_after_failures`, `notify`, `agent_id` and `speed` in `POST` and `PATCH /api/schedules`, left out for the
+configured ones and the standard speed; a `PATCH` that leaves `agent_id` out keeps the schedule's agent, and `null`
+makes it Dot's).
 Options left on "default" take the configured value when the schedule fires. A schedule the agent creates takes its
 chat's choices, which are yours: the model of a run cannot pick another approval mode for it. While
 the form is open, **New schedule** reads **Close**, with a cross.
@@ -206,4 +208,11 @@ earlier runs.
   ones after it; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **Firings** and
   the run's page still show. A run started with **Run now** is told at every level, as are a question, an approval, a
   draft and the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
+- A schedule runs as Dot or as one of your agents (item 462): **Agent** in its form, Dot by default. Its runs carry the
+  agent, as a chat with it does (see [Agents and campaigns](agents-and-campaigns.md)): its instructions, its tools only,
+  its face on the row with an "As <name>" chip. Its model, reasoning level and approvals are the schedule's own where it
+  chose them, else the agent's, else the configured ones: a yolo schedule of an agent that asks runs yolo, and one left
+  on Default takes the agent's mode, which the form's Default names ("Default (the agent's: …)") and the row shows. An
+  agent that does not exist is refused (404), and Dot is named by no agent (422). Deleting the agent switches its
+  schedules off, as Dot's ("switched off: its agent was deleted").
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.
