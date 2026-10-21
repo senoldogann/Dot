@@ -92,7 +92,7 @@ def _address(config: McpServerConfig) -> str:
     return shlex.join([config.command or "", *config.args])
 
 
-def _service_of(config: McpServerConfig) -> str | None:
+def service_of(config: McpServerConfig) -> str | None:
     """The service of the catalogue ``config`` is a server of: the one at its URL, or the one started by its command
     and first arguments (the package), so that a server added by hand wears the service's mark too (item 408)."""
     for service in MCP_SERVICES:
@@ -115,7 +115,7 @@ def _host_of(url: str) -> str:
 def mcp_subject(name: str, config: McpServerConfig | None) -> Subject:
     """The server a sign-in is for, as the callback page names it: the service of the catalogue it is a server of, with
     its mark and the host it is at, else the server's own name (and its host)."""
-    service_id: str | None = None if config is None else _service_of(config)
+    service_id: str | None = None if config is None else service_of(config)
     service: McpService | None = next((one for one in MCP_SERVICES if one.id == service_id), None)
     return Subject(
         name=name if service is None else service.name,
@@ -265,7 +265,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             state = "left_out"
             fallback: str = _TAKEN_NAME if origin == "connected" else "Dot did not start it"
             error = attempt.error if attempt is not None and attempt.error is not None else failure or fallback
-        service: str | None = _service_of(config)
+        service: str | None = service_of(config)
         return McpServerView(
             name=config.name,
             origin=origin,
@@ -312,7 +312,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
         """The key of a service of the catalogue goes with the service's own server (item 408): the one named as the
         service, not one added by hand at the same address, which may stand beside it."""
         service: McpService | None = next((one for one in MCP_SERVICES if one.id == config.name), None)
-        if service is None or not service.secrets or _service_of(config) != service.id:
+        if service is None or not service.secrets or service_of(config) != service.id:
             return
         for kept_name in kept_secret_names(service).values():
             await asyncio.to_thread(remove_env_value, env_file_path(), kept_name)

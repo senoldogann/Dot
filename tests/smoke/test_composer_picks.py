@@ -521,13 +521,13 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
                     await expect(chips).to_have_count(0)
                     # The "+" opens the file picker directly.
                     await expect(composer.get_by_role("button", name="Add files")).to_be_visible()
-                    # The "@" menu picks servers and skills.
+                    # The "@" menu picks a server, and the "/" menu the skills (item 447).
                     await goal.click()
                     await goal.type(f"@{SERVER}")
                     await expect(composer.locator(".slash-menu [role=option]").first).to_contain_text(SERVER)
                     await goal.press("Enter")
                     for name in skills:
-                        await goal.type(f"@{name}")
+                        await goal.type(f"/{name}")
                         await expect(composer.locator(".slash-menu [role=option]").first).to_contain_text(name)
                         await goal.press("Enter")
                     # Options holds Goal mode and Plan first.
@@ -586,10 +586,14 @@ async def test_the_menus_pick_plugins_skills_and_plan_first_as_chips_that_go_wit
 
 
 @pytest.mark.browser
-async def test_an_at_word_picks_a_server_or_a_skill_by_its_name(login_env: dict[str, str], tmp_path: Path) -> None:
-    """`@` at the start of a word opens the menu of the picks alone (item 367): the MCP servers by name with the number
-    of their tools, then the skills and the servers' tools, filtered by the letters after it; Enter makes the chip and
-    takes the at word away, and an `@` inside a word opens nothing. Wide and light, and on a phone and dark."""
+async def test_an_at_word_picks_a_server_and_no_skill_and_the_slash_word_the_skill(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """`@` at the start of a word opens the menu of the picks alone (item 367): the MCP servers and the plugins by name
+    with the number of their tools — and no skills, which the slash menu carries (the owner's word of 2026-10-21, item
+    446) — filtered by the letters after it; Enter makes the chip and takes the at word away, and an `@` inside a word
+    opens nothing. A server wears the logo its Customize tile wears, or the plug where it has none. Wide and light, and
+    on a phone and dark, where the menu keeps inside the room the keyboard leaves."""
     with scratch_home() as home, eval_environment(home, {}):
         _write_skill(home)
         async with (
@@ -614,10 +618,43 @@ async def test_an_at_word_picks_a_server_or_a_skill_by_its_name(login_env: dict[
                     await expect(menu.locator(".slash-group").first).to_have_text("MCP servers")
                     server: Locator = menu.get_by_role("option").filter(has_text=SERVER).first
                     await expect(server.locator(".slash-hint")).to_have_text("10 tools")
-                    await expect(menu.locator(".slash-group", has_text="Skills")).to_have_count(1)
+                    await expect(menu.locator(".slash-group", has_text="Skills")).to_have_count(0)
                     await expect(menu.locator(".slash-group", has_text="Commands")).to_have_count(0)
+                    # A server added by hand has no service behind it: the plug, as its Customize tile has (item 408).
+                    await expect(server.locator("img.plugin-logo")).to_have_count(0)
+                    await expect(server.locator(".slash-mark svg")).to_have_count(1)
+                    # The menu keeps inside the window, its top too; and a phone's keyboard, which pans the page without
+                    # resizing it, leaves it the band `--seen-top`..`--seen-bottom` above the dock (item 447).
                     box: dict[str, float] | None = await menu.bounding_box()
                     assert box is not None and box["x"] >= 0 and box["x"] + box["width"] <= width, box
+                    assert box["y"] >= 0 and box["y"] + box["height"] <= 900, box
+                    if width == 390:
+                        room: int = await page.evaluate(
+                            """() => {
+                              const root = document.documentElement.style;
+                              root.setProperty("--seen-top", "0px");
+                              root.setProperty("--seen-bottom", "600px");
+                              root.setProperty("--dock-h", "96px");
+                              const menu = document.querySelector(".composer .slash-menu");
+                              return Math.round(parseFloat(getComputedStyle(menu).maxHeight));
+                            }"""
+                        )
+                        box_h: int = await page.evaluate(
+                            """() => Math.round(parseFloat(getComputedStyle(
+                              document.querySelector(".composer")).getPropertyValue("--composer-h") || "0"))"""
+                        )
+                        # The window less the 600px the keyboard takes, the dock's 96 and the 16 above the bar — less
+                        # than the 320px a menu may always be, so the room is what the keyboard leaves.
+                        window_h: int = await page.evaluate("() => window.innerHeight")
+                        assert box_h > 0, box_h
+                        assert room == window_h - 600 - box_h - 16, (room, window_h, box_h)
+                        await page.evaluate(
+                            """() => {
+                              for (const name of ["--seen-top", "--seen-bottom", "--dock-h"]) {
+                                document.documentElement.style.removeProperty(name);
+                              }
+                            }"""
+                        )
                     await page.screenshot(path=str(tmp_path / f"at-menu-{width}-{scheme}.png"), animations="disabled")
                     await goal.type(SERVER[:3])
                     await expect(menu.get_by_role("option").first).to_contain_text(SERVER)
@@ -627,18 +664,61 @@ async def test_an_at_word_picks_a_server_or_a_skill_by_its_name(login_env: dict[
                     await expect(composer.locator(".pick-chip[data-kind='plugin']")).to_have_attribute(
                         "data-name", SERVER
                     )
+                    # A skill is the slash menu's, not the at menu's (item 447): `@` finds none of it.
                     await goal.type(f"@{SKILL_NAME[:6]}")
+                    await expect(menu.get_by_role("option")).to_have_count(0)
+                    await goal.fill("")
+                    await goal.type(f"/{SKILL_NAME[:6]}")
+                    await expect(menu).to_be_visible()
+                    await expect(menu.locator(".slash-group", has_text="Skills")).to_have_count(1)
                     await expect(menu.get_by_role("option")).to_have_count(1)
                     await goal.press("Enter")
-                    await expect(goal).to_have_value("Look it up ")
+                    await expect(goal).to_have_value("")
                     await expect(chips).to_have_count(2)
                     # An at inside a word, as in an address, is part of the words.
                     await goal.type("owner@example.org")
                     await expect(menu).to_be_hidden()
-                    await expect(goal).to_have_value("Look it up owner@example.org")
+                    await expect(goal).to_have_value("owner@example.org")
                     await _fits(page, chips, composer)
                     await page.screenshot(path=str(tmp_path / f"at-chips-{width}-{scheme}.png"), animations="disabled")
                     assert refused == [], refused
                     await page.close()
+            finally:
+                await browser.close()
+
+
+@pytest.mark.browser
+async def test_a_server_of_the_at_menu_wears_the_logo_its_customize_tile_wears(
+    login_env: dict[str, str], tmp_path: Path
+) -> None:
+    """Item 446: the @ menu draws a server as the Customize page does — its own logo, from the palette — where a server
+    added by hand wears the plug. The palette is this page's alone here, since no catalogue service answers offline."""
+    with scratch_home() as home, eval_environment(home, {}):
+        _write_skill(home)
+        async with (
+            _daemon(login_env, _config("full"), []) as (runtime, manager, _model),
+            _served(runtime, manager) as address,
+            async_playwright() as playwright,
+        ):
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await _home_page(browser, address, 390, "dark")
+                await page.route(
+                    "**/api/palette",
+                    lambda route: route.fulfill(
+                        json={"skills": [], "servers": [{"name": SERVER, "tools": [], "logo": "context7.svg"}]}
+                    ),
+                )
+                goal: Locator = page.locator("textarea[aria-label='Goal']")
+                menu: Locator = page.locator(".composer .slash-menu")
+                await goal.click()
+                await goal.type("@")
+                await expect(menu).to_be_visible()
+                server: Locator = menu.get_by_role("option").filter(has_text=SERVER).first
+                await expect(server.locator("img.plugin-logo")).to_have_attribute(
+                    "src", re.compile(r"/icons/plugins/context7\.svg$")
+                )
+                await expect(server.locator(".slash-mark svg")).to_have_count(0)
+                await page.close()
             finally:
                 await browser.close()

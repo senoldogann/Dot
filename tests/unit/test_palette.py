@@ -40,6 +40,7 @@ def test_the_palette_lists_skills_by_name_and_tools_under_their_servers_with_one
             _tool("calendar", "today", "The events of today."),
             _tool("notes", "create", "Create a note."),
         ],
+        {},
     )
     assert [skill.name for skill in view.skills] == ["deploy-site", "release-notes"]
     assert view.skills[0].source == "home"
@@ -48,4 +49,18 @@ def test_the_palette_lists_skills_by_name_and_tools_under_their_servers_with_one
         ("notes_create", "Create a note."),
         ("notes_search", "Search the notes."),
     ]
-    assert palette_view([], []) == PaletteView(skills=(), servers=())
+    assert palette_view([], [], {}) == PaletteView(skills=(), servers=())
+
+
+def test_a_server_of_the_palette_wears_the_logo_its_customize_tile_wears() -> None:
+    """Item 446: the @ menu of the composer draws each server as the Customize page does, its own logo — and none for a
+    server added by hand, which the menu draws with the plug."""
+    view: PaletteView = palette_view(
+        [],
+        [_tool("notes", "search", "Search the notes."), _tool("context7", "lookup", "Look a library up.")],
+        {"context7": "context7.svg"},
+    )
+    assert [(server.name, server.logo) for server in view.servers] == [
+        ("context7", "context7.svg"),
+        ("notes", None),
+    ]

@@ -87,7 +87,7 @@ const HOME_KEPT = {
 /** The words in the home's empty box, with the name the owner calls Dot by (item 420); a phone's line holds about thirty
  * characters, so it only says that the at sign and the slash open something. */
 function placeholderFor(name) {
-  return narrowOr(`Message ${name} (@ or /)`, `Message ${name} (@ for skills, / for commands)`);
+  return narrowOr(`Message ${name} (@ or /)`, `Message ${name} (@ for servers, / for skills and commands)`);
 }
 
 /** `listener` is the home's face (presence.js `listen`): it hears the box and the send. */
