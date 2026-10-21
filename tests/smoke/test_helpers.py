@@ -372,6 +372,20 @@ async def test_a_run_whose_provider_cannot_answer_moves_to_its_standby_model_and
     ]
 
 
+async def test_a_standby_model_chosen_while_the_daemon_runs_takes_the_next_run_over(login_env: dict[str, str]) -> None:
+    """Item 478: Settings › Models chooses the standby models while the daemon runs, and the next run whose model cannot
+    answer moves to the one chosen, with no restart, though the config the runtime was built with names none."""
+    spent: SpendingProvider = _spent()
+    standby: RecordingProvider = RecordingProvider(ScriptedProvider("ollama", [_finish("Done on the standby model.")]))
+    async with _session(_config([], [], 5), login_env, {"anthropic": spent, "ollama": standby}) as (runtime, runs):
+        runtime.roles.choose_standby([SCRIPTED_MODEL])
+        played: Played = await _play(runtime, runs, SPENT_MAIN, None)
+    assert (played.record.status, played.record.model) == ("done", SCRIPTED_MODEL), played.record
+    assert played.data(MODEL_SWITCHED_EVENT) == (
+        {"from": SPENT_MAIN, "to": SCRIPTED_MODEL, "reason": "quota exhausted", "step": 1},
+    )
+
+
 async def test_a_run_goes_through_its_standby_models_once_in_order_passing_over_one_that_cannot_take_it(
     login_env: dict[str, str],
 ) -> None:

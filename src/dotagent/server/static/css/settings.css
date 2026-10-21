@@ -65,16 +65,18 @@
   margin-bottom: 16px;
 }
 
-/* The default model (item 199) and those of Dot's own work (item 232), above the providers of the Models card; each
-   select keeps to the room the row leaves. */
+/* The default model (item 199), those of Dot's own work (item 232) and the standby models (item 478), above the
+   providers of the Models card; each select keeps to the room the row leaves. */
 .models-default,
-.models-role {
+.models-role,
+.models-standby {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
 
 .models-default .select,
-.models-role .select {
+.models-role .select,
+.models-standby .select {
   min-width: 0;
   max-width: 60%;
 }
@@ -585,13 +587,41 @@
   line-height: var(--leading-md);
 }
 
-/* A rule's arrows (item 449): the chevron of the icon set, turned to point up or down the order. */
-.rule-move.up .icon {
+/* A rule's arrows (item 449), and a standby model's (item 478): the chevron of the icon set, turned to point up or down
+   the order. */
+.rule-move.up .icon,
+.standby-move.up .icon {
   transform: rotate(-90deg);
 }
 
-.rule-move.down .icon {
+.rule-move.down .icon,
+.standby-move.down .icon {
   transform: rotate(90deg);
+}
+
+/* The standby models (item 478): a list in their order, each row with its arrows and its ×. */
+.standby-list {
+  display: grid;
+  gap: 4px;
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.standby-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.standby-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.standby-none {
+  margin-top: var(--space-2);
 }
 
 .rule-sentence-preview {

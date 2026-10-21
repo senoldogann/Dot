@@ -11,7 +11,7 @@ A model is written `provider:model`. The `[models]` table of the configuration s
 | `review`            | answering the policy's questions in `auto` approvals, checking a run against its goal, and drawing its lessons; Settings › Models sets it | `ollama:minimax-m2.7:cloud` |
 | `effort`            | default reasoning level of a run on `main` (see below)                                    | `medium`                    |
 | `helpers`           | models a run may ask for advice or hand a part of its work to (see below)                 | `[]`                        |
-| `standby`           | models a run moves to when its own model cannot answer (see below)                        | `[]`                        |
+| `standby`           | models a run moves to when its own model cannot answer (see below); Settings › Models sets it | `[]`                    |
 | `helper_cooldown_s` | how long a model that could not answer is left out of `helpers` and `standby`             | `600`                       |
 | `context`           | a model's context size where it is not `[agent] context_tokens` (see below); Settings › Models sets it | `{}`         |
 
@@ -26,6 +26,13 @@ can do its work: those that call tools for `fast` and `review`, those that see f
 next call of that work on, with no restart (a run under way keeps the review model it started with for its goal check,
 its second opinion and its approvals), and the config file keeps it with the rest of the file as it was; a model that
 cannot do the work is refused, and nothing changes (`POST /api/models/roles`).
+
+Under them, **Standby models** (item 478) lists the models a run moves to when its own model cannot answer (below), in
+their order: **Add a model…** puts one of the models that call tools at the end, the arrows move one up or down, and ×
+takes it off; a model whose provider has no key says so, since a run passes it over. The list holds from the next move
+on, with no restart (a run that moved already keeps its model), and the config file keeps it as `standby` with the rest
+of the file as it was; a model named twice, one that cannot call tools and one of Zen's free models are refused, and
+nothing changes (`PUT /api/models/standby`, eight at most). An empty list moves no run: the error ends it.
 
 **Context size.** Beside each model's window, Settings › Models sets the context size of the model's runs (item 250):
 how much of a run each step sends the model before Dot summarizes its older part. The menu offers Dot's default and the
