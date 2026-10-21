@@ -247,9 +247,9 @@ and, while it works, **Stop**. The tool calls of one stretch of work fold into a
 "Worked for 12 s" for a stretch with no call; item 374). A folded group at work names the command that runs right
 after "Working…", in place of how much it did so far, which the open group keeps (item 430). Open, it shows every call, result and screenshot, each call one
 line in line with the group's head (item 402): its mark (a spinner while it runs, then the mark of its kind, in the
-failure's colour when it failed; item 403), what it did (a command is the command itself, the policy's words its
-tooltip; another call, whose mark several tools share, keeps its tool's name and the policy's words, "Read notes.txt")
-and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened, with **Why it
+failure's colour when it failed; item 403), what it did (a command is the command itself in the monospace type, the
+policy's words its tooltip; a read or a write says the policy's words from the start, "Read notes.txt", its mark saying
+which it is, and keeps no tool's name; another call keeps its tool's name beside its words, item 506) and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened, with **Why it
 ran** for a step that acted, or that more than the preset decided: the rule of yours, the preset, or who answered and
 why the policy asked (item 468); a group that is
 over wears the mark of the kind its words start with (the terminal's for "Ran 2 commands"), and the model's thinking is
