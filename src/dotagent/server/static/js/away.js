@@ -71,6 +71,8 @@ export function buildAway() {
   }
 
   function markRead() {
+    // An answer still on its way was asked from the old moment: it is stale, and must not open the card again.
+    ticket += 1;
     if (view !== null) {
       writePref(READ_KEY, String(view.until));
     }
