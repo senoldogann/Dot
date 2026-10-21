@@ -224,7 +224,7 @@
   width: 46%;
   height: 32px;
   border-radius: var(--radius-lg);
-  background: color-mix(in srgb, var(--bubble) 16%, transparent);
+  background: color-mix(in srgb, var(--bubble) 30%, var(--surface-2));
 }
 
 .chat-loading-block:nth-child(3) {
