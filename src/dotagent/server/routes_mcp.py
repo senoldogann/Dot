@@ -20,7 +20,7 @@ from fastapi.responses import HTMLResponse
 from pydantic import JsonValue, ValidationError
 
 from dotagent.config import McpServerConfig
-from dotagent.connections.directory import logo_of_service
+from dotagent.connections.directory import logo_of_service, mark_of_service
 from dotagent.core.errors import ConfigError, DotError, NotFoundError, RunConflict
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import connected_servers_path, env_file_path
@@ -271,7 +271,7 @@ def mcp_router(ctx: ServerContext) -> APIRouter:
             origin=origin,
             address=_address(config),
             service=service if origin == "connected" else None,
-            logo=None if service is None else logo_of_service(service),
+            mark=None if service is None else mark_of_service(service),
             state=state,
             tools=tuple(tool.remote_name for tool in hub.tools if tool.server == config.name)
             if state == "ready"

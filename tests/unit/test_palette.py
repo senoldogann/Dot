@@ -1,7 +1,10 @@
-"""The composer's palette (item 64): the skills by name, the MCP tools under their servers by the model's name."""
+"""The composer's palette (item 64): the skills by name, the MCP tools under their servers by the model's name, each
+server with the mark its Customize tile wears and each skill saying whether it is an imported copy (item 477)."""
 
 from pathlib import Path
 
+from dotagent.connections.directory import ServiceMark, mark_of_service
+from dotagent.help.elsewhere import ADDED_MARKER, SkillCopy, copied_skill_names
 from dotagent.mcp.types import McpTool, ToolHints
 from dotagent.server.palette import palette_view
 from dotagent.server.views import PaletteView
@@ -9,14 +12,11 @@ from dotagent.skills.types import Skill
 
 
 def _skill(name: str, description: str) -> Skill:
-    return Skill(
-        name=name,
-        description=description,
-        root=Path("/tmp/skills") / name,
-        body="# Steps",
-        source="home",
-        icon="sparkle",
-    )
+    return _skill_at(Path("/tmp/skills") / name, name, description, "home")
+
+
+def _skill_at(root: Path, name: str, description: str, source: str) -> Skill:
+    return Skill(name=name, description=description, root=root, body="# Steps", source=source, icon="sparkle")
 
 
 def _tool(server: str, name: str, description: str) -> McpTool:
@@ -35,6 +35,7 @@ def _tool(server: str, name: str, description: str) -> McpTool:
 def test_the_palette_lists_skills_by_name_and_tools_under_their_servers_with_one_line_each() -> None:
     view: PaletteView = palette_view(
         [_skill("release-notes", "Write the release notes."), _skill("deploy-site", "Deploy the site.")],
+        frozenset(),
         [
             _tool("notes", "search", "Search the notes.\nSlow on large vaults."),
             _tool("calendar", "today", "The events of today."),
@@ -49,18 +50,49 @@ def test_the_palette_lists_skills_by_name_and_tools_under_their_servers_with_one
         ("notes_create", "Create a note."),
         ("notes_search", "Search the notes."),
     ]
-    assert palette_view([], [], {}) == PaletteView(skills=(), servers=())
+    assert palette_view([], frozenset(), [], {}) == PaletteView(skills=(), servers=())
 
 
-def test_a_server_of_the_palette_wears_the_logo_its_customize_tile_wears() -> None:
-    """Item 446: the @ menu of the composer draws each server as the Customize page does, its own logo — and none for a
-    server added by hand, which the menu draws with the plug."""
+def test_a_server_of_the_palette_wears_the_mark_its_customize_tile_wears() -> None:
+    """Items 447 and 477: the composer's menus draw each server as the Customize page draws its service's tile — its
+    logo, else its icon, else its letters — and a server of no service with the plug (no mark)."""
+    marks: dict[str, ServiceMark | None] = {
+        name: mark_of_service(name) for name in ("deepwiki", "context7", "microsoft-learn")
+    } | {"notes": None}
     view: PaletteView = palette_view(
         [],
-        [_tool("notes", "search", "Search the notes."), _tool("context7", "lookup", "Look a library up.")],
-        {"context7": "context7.svg"},
+        frozenset(),
+        [_tool(name, "lookup", "Look something up.") for name in ("notes", "deepwiki", "context7", "microsoft-learn")],
+        marks,
     )
-    assert [(server.name, server.logo) for server in view.servers] == [
-        ("context7", "context7.svg"),
+    assert [(server.name, server.mark) for server in view.servers] == [
+        ("context7", ServiceMark(logo=None, glyph=None, monogram="C7", colour=None)),
+        ("deepwiki", ServiceMark(logo=None, glyph="search", monogram=None, colour=None)),
+        ("microsoft-learn", ServiceMark(logo="microsoft-icon.svg", glyph=None, monogram=None, colour=None)),
         ("notes", None),
+    ]
+
+
+def test_a_skill_dot_copied_from_another_agent_is_marked_imported_and_no_other(tmp_path: Path) -> None:
+    """Item 477: the slash menu marks an imported skill as its Customize card does, so the palette says which skills
+    are Dot's copies: those of its own folder whose marker says so — not one of the folder without it, nor one found
+    elsewhere with a marker in its folder."""
+    copied, own, elsewhere = tmp_path / "copied", tmp_path / "own", tmp_path / "elsewhere"
+    for folder in (copied, own, elsewhere):
+        folder.mkdir()
+    marker: str = SkillCopy(agent="Claude Code", name="copied", folder=tmp_path / "theirs").model_dump_json()
+    (copied / ADDED_MARKER).write_text(marker, encoding="utf-8")
+    (elsewhere / ADDED_MARKER).write_text(marker, encoding="utf-8")
+    skills: list[Skill] = [
+        _skill_at(copied, "copied", "A copy.", "home"),
+        _skill_at(own, "own", "The owner's.", "home"),
+        _skill_at(elsewhere, "elsewhere", "From a folder of the config.", "config"),
+    ]
+    imported: frozenset[str] = copied_skill_names(skills)
+    assert imported == frozenset({"copied"})
+    view: PaletteView = palette_view(skills, imported, [], {})
+    assert [(skill.name, skill.imported) for skill in view.skills] == [
+        ("copied", True),
+        ("elsewhere", False),
+        ("own", False),
     ]
