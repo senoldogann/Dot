@@ -376,7 +376,8 @@ approval_timeout_s = 900.0
 # (a command, a file read or a folder listing, a page read or a web search; item 483): "Allow once" carries the work on,
 # and the run may do that exact step once in that conversation within permit_hours; never a question raised by what the
 # run read, nor one about Dot's own files. A campaign's sessions keep theirs for the campaign, and an answer brings its
-# next session forward (item 484). Never in yolo, which asks nothing; a delegated run and an eval refuse as before.
+# next session forward (item 484); a delegated run keeps them where the run that delegated it does, which the answer
+# reaches (item 485). Never in yolo, which asks nothing; an eval refuses as before.
 unanswered = "refuse"
 parked_hours = 72.0
 permit_hours = 24.0
