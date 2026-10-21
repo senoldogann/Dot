@@ -2,8 +2,9 @@
 // sentence: "When Dot would use {tool}, matching {pattern}: {answer}", and the answer is one of four. A rule can be
 // said in your own words (item 110): the review model drafts its parts, the daemon writes the pattern from them, and
 // the draft fills the form, its description the sentence the rule reads back as, to be checked and added;
-// `#/settings/rules?sentence=…` (an approval card's "Make a rule of this") puts a sentence in the box. Above the rules,
-// the switch of the macOS sandbox of a run's commands (item 262).
+// `#/settings/rules?sentence=…` (an approval card's "Make a rule of this") puts a sentence in the box. A rule's arrows
+// move it up or down the order, and a rule that an earlier one fits wherever it fits says it never decides (item 449).
+// Above the rules, the switch of the macOS sandbox of a run's commands (item 262).
 
 import { api } from "../api.js";
 import { clip, el, plural } from "../dom.js";
@@ -61,7 +62,42 @@ function sentence(toolGlob, matchRegex) {
   return parts;
 }
 
-function ruleRow(record, index, handlers) {
+/** One of a rule's two arrows: up toward the first rule, down toward the last; at its end of the order it is off. */
+function moveButton(record, index, total, direction, onMove) {
+  const up = direction === "up";
+  return el(
+    "button",
+    {
+      class: `btn ghost sm icon-only rule-move ${up ? "up" : "down"}`,
+      type: "button",
+      title: up ? "Move this rule up: it is checked earlier" : "Move this rule down: it is checked later",
+      "aria-label": `Move rule ${index + 1} ${direction}`,
+      "data-rule": record.id,
+      "data-move": direction,
+      disabled: up ? index === 0 : index === total - 1,
+      onclick: () => onMove(record, direction),
+    },
+    icon("chevron"),
+  );
+}
+
+/** The note on a rule that an earlier rule fits wherever it fits (`never_decided_by`, item 449), or null. */
+function neverDecides(record, numberOf) {
+  if (record.never_decided_by === null) {
+    return null;
+  }
+  const first = numberOf(record.never_decided_by);
+  return el(
+    "span",
+    {
+      class: "badge b-warn",
+      title: `Rule #${first} fits every action this rule fits and is checked first, so this rule never decides. Move it above rule #${first}, or delete one of them.`,
+    },
+    "Never decides",
+  );
+}
+
+function ruleRow(record, index, total, numberOf, handlers) {
   const answer = answerOf(record.behavior);
   const toggle = el("button", {
     class: "switch",
@@ -96,10 +132,17 @@ function ruleRow(record, index, handlers) {
         el("span", { class: "chip", title: "Rules are checked in this order" }, `#${index + 1}`),
         el("span", null, ...sentence(record.tool_glob, record.match_regex)),
         el("span", { class: `badge ${answer.tone}`, title: answer.text }, answer.label),
+        neverDecides(record, numberOf),
       ),
       record.description === "" ? null : el("div", { class: "row-text muted" }, record.description),
     ),
-    el("div", { class: "row-actions" }, remove),
+    el(
+      "div",
+      { class: "row-actions" },
+      moveButton(record, index, total, "up", handlers.onMove),
+      moveButton(record, index, total, "down", handlers.onMove),
+      remove,
+    ),
   );
 }
 
@@ -377,8 +420,12 @@ export function mount(root, _ctx) {
     const handlers = {
       onToggle: (record) => attempt(() => toggle(record)),
       onDelete: (record) => attempt(() => remove(record)),
+      onMove: (record, direction) => attempt(() => move(record, direction)),
     };
-    holder.replaceChildren(el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, handlers))));
+    const numberOf = (id) => rules.findIndex((record) => record.id === id) + 1;
+    holder.replaceChildren(
+      el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, handlers))),
+    );
     count.textContent = plural(rules.length, "rule", "rules");
   }
 
@@ -410,6 +457,15 @@ export function mount(root, _ctx) {
   async function toggle(record) {
     await api.patch(`/rules/${record.id}`, { enabled: !record.enabled });
     await reload();
+  }
+
+  async function move(record, direction) {
+    await api.post(`/rules/${record.id}/move`, { direction });
+    await reload();
+    // The arrow pressed keeps the focus as its rule moves; once the rule has reached an end, the other arrow takes it.
+    const arrows = [...holder.querySelectorAll(`[data-rule="${CSS.escape(record.id)}"]`)];
+    const pressed = arrows.find((arrow) => arrow.dataset.move === direction);
+    (pressed !== undefined && !pressed.disabled ? pressed : arrows.find((arrow) => !arrow.disabled))?.focus();
   }
 
   async function remove(record) {
@@ -468,7 +524,7 @@ export function mount(root, _ctx) {
       el(
         "span",
         null,
-        "Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, money or credentials are handed to you, and a message or a post in your name waits for your yes. A yolo run keeps all of these but the first: it reads secrets and sends them out without asking.",
+        "Rules cannot lift the protections that are always on: reading secrets and sending them out is refused, research runs stay read-only, money or credentials are handed to you, and a message or a post in your name waits for your yes. A yolo run keeps only the second: it asks about none of the others, does the step and records why it would have asked.",
       ),
     ),
     sandbox.element,
@@ -484,7 +540,11 @@ export function mount(root, _ctx) {
         el("span", { class: "spacer" }),
         addButton,
       ),
-      el("div", { class: "panel-note" }, "The first enabled rule that fits an action decides it; a new rule goes to the end."),
+      el(
+        "div",
+        { class: "panel-note" },
+        "The first enabled rule that fits an action decides it; a new rule goes to the end, and a rule's arrows move it up or down.",
+      ),
       holder,
     ),
   );

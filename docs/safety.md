@@ -102,8 +102,12 @@ currency, so list sites that bill in one currency. Empty by default.
    takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so that a
    pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
-   is managed there or through `/api/rules`; the page lists the rules in the order they are checked and **New rule**
-   opens the two ways to write one. It can also be said in your own words ("let Dot run git status and git
+   is managed there or through `/api/rules`; the page lists the rules in the order they are checked, a rule's arrows
+   move it one place up or down that order, and **New rule** opens the two ways to write one. A rule that an earlier
+   enabled rule fits wherever it fits (no expression, or the same one, on a tool pattern that takes in its own: `*`,
+   the same pattern, or one that matches its plain tool name) never decides, and the page says so with the number of
+   the rule that decides in its place (item 449); whether two different expressions overlap it does not tell. It can
+   also be said in your own words ("let Dot run git status and git
    diff without asking me"): the review model drafts its parts, the tool, the answer and the commands or words the
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it
    run alone with plain arguments (after a `cd` at most; nothing chained to it, substituted into it or sent on with

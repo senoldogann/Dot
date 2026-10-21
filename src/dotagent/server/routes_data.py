@@ -41,6 +41,7 @@ from dotagent.scheduler.plans import (
 )
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
+from dotagent.server.rule_shadow import rule_views
 from dotagent.server.views import (
     LearningHealthView,
     MemoriesQuery,
@@ -49,7 +50,9 @@ from dotagent.server.views import (
     OwnerLinesRequest,
     RuleDraftRequest,
     RuleEnabledRequest,
+    RuleMoveRequest,
     RuleRequest,
+    RuleView,
     ScheduleCreateRequest,
     ScheduleUpdateRequest,
     ScheduleView,
@@ -104,8 +107,8 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         await ctx.runtime.bus.emit(SYSTEM_RUN_ID, RULES_CHANGED_EVENT, {}, False)
 
     @router.get("/rules")
-    async def list_rules() -> list[RuleRecord]:
-        return await store.list_rules()
+    async def list_rules() -> list[RuleView]:
+        return rule_views(await store.list_rules())
 
     @router.post("/rules", status_code=201)
     async def add_rule(request: RuleRequest) -> RuleRecord:
@@ -140,6 +143,17 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         await store.set_rule_enabled(rule_id, request.enabled)
         await tell_rules_changed()
         return await _rule(store, rule_id)
+
+    @router.post("/rules/{rule_id}/move")
+    async def move_rule(rule_id: str, request: RuleMoveRequest) -> list[RuleView]:
+        """Move a rule one place up or down the order the policy reads the rules in (item 449); 422 past either end."""
+        rules: list[RuleRecord] = await store.list_rules()
+        index: int | None = next((at for at, rule in enumerate(rules) if rule.id == rule_id), None)
+        if index is None:
+            raise NotFoundError("rule not found", {"rule_id": rule_id})
+        await store.move_rule(rule_id, index - 1 if request.direction == "up" else index + 1)
+        await tell_rules_changed()
+        return rule_views(await store.list_rules())
 
     @router.delete("/rules/{rule_id}")
     async def delete_rule(rule_id: str) -> RuleRecord:
