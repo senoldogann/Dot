@@ -42,7 +42,7 @@ by what it lets a run do as much as by how it reads.
 
 - `uv.lock`, `desktop/src-tauri/Cargo.lock`, `desktop/package-lock.json`
 - `docs/images/`, `desktop/icons/`, `desktop/src-tauri/icons/`
-- `ROADMAP.md`, `CHANGELOG.md` (check only that the entry matches the change)
+- `ROADMAP.md`, `roadmap/`, `CHANGELOG.md`, `changes/` (check only that the entry matches the change)
 
 ## Always needs a human
 

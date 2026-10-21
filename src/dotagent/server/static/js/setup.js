@@ -1,7 +1,7 @@
 // How a run was set up (item 365): the notes and the skills it was handed and how they were found, its context budget,
 // its tool groups, the model a step went to. The conversation keeps none of these lines; the side panel's Run tab lists
-// them under Set up, its head naming them in short. A line that warns (the embedding service failed, so the notes were
-// found by their words alone) keeps its tone there.
+// them under Set up, in its More (item 452), its head naming them in short. A line that warns (the embedding service
+// failed, so the notes were found by their words alone) keeps its tone there, and More counts it beside its title.
 
 import { el } from "./dom.js";
 import { icon } from "./icons.js";
@@ -49,7 +49,7 @@ export function setupSummary(lines) {
 
 /**
  * The Set up section of the Run tab, hidden until the run's first line of how it was set up. `add(line)` lists one
- * more: `{ kind, short, iconName, text, tone }`, `tone` "" or "warn" or "bad".
+ * more: `{ kind, short, iconName, text, tone }`, `tone` "" or "warn" or "bad"; `warnings()` counts the lines that warn.
  */
 export function setupSection() {
   const body = el("div", { class: "setup-lines" });
@@ -64,5 +64,5 @@ export function setupSection() {
     section.element.hidden = false;
   }
 
-  return { element: section.element, add };
+  return { element: section.element, add, warnings: () => lines.filter((line) => line.tone !== "").length };
 }

@@ -2,9 +2,13 @@
 
 The owner asked for Dot's autonomy to be smarter, steadier and sturdier **whatever model runs it**. This file is the
 handoff for that work: what is planned, why, in which order, what is done and how it was checked. If you continue the
-work, read it first, and keep the status table, the item sections and the log at the bottom true. It is the only record
-of where the work stands. Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
+work, read it first, and keep the status table, the item sections and the log at the bottom true. With
+[roadmap/](roadmap/), which holds the items from 459 on, it is the only record of where the work stands.
+Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
 questions, faster steps, helper models) was planned on 2026-10-09 and has its own status table below. Part 3 (items 22 to 41: fewer steps, evidence, learned playbooks, the owner's own channels, an own crawler) was planned on 2026-10-10 from the competitive research in `reports/Dot ajanı rekabet yol haritası.md`; its status table and handoff prompt are under "Part 3".
+
+Items from 459 on are files of their own in [roadmap/](roadmap/), one per item, with their lines of the log
+([roadmap/README.md](roadmap/README.md)); this file keeps the items up to 458 and the log up to then.
 
 ## Principle
 
@@ -16070,6 +16074,74 @@ rather than running off the top.
 Tests: `tests/smoke/test_composer_picks.py` (`@` lists no Skills and no Commands, a hand-added server draws the plug, the
 menu's box stays inside the window on a phone, and `/` carries the skill and picks it); `tests/unit/test_palette.py`
 (a catalogued server's logo reaches the palette, a hand-added one has none).
+### 451. A message sent on one screen shows at once on the other
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent on the phone did not show on the desktop
+until the chat was left and opened again, and the same the other way round; fix that alone. **Cause.** A message sent to
+a chat at rest starts the chat's next run (`POST /runs` with its thread); the screen it was sent from goes on at that
+run, but a page of the same chat elsewhere follows only its own run's stream and was never told: the lifecycle stream's
+`run_queued` carries no thread, and nothing read the chat again. A message queued while a run works already showed
+everywhere (`queue_changed`), and a steer on the run's own stream. **As built** (`views/run.js`). A page that shows the
+chat's newest run goes on at the newer one, as the screen it was sent from does: when a run of the chat is queued (it
+reads the chat's newest runs once on a root `run_queued`), and once the lifecycle stream is back after a break, which
+replays nothing (a phone put away). What was typed there and not sent goes with it as the newer run's draft (`moveDraft`
+of `composer.js`). A page whose run was not the chat's newest when it first read the chat stays where it is: an earlier
+run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its address, or a
+delegated run; such a page reads the chat once. The tab keeps the run it showed as the chat's newest
+(`dot.chatShown.<thread>` in its session storage) until the page leaves it, so a phone's page that the browser loads
+again goes on from where it stood. Every way the page goes on (a message sent there, the queue's next one, an answer,
+Continue, a rewind) takes one guard, so two of them at once open the run once. The pre-push review's first pass stopped
+a page that took every page not reached by a link (main.js's history state) for the chat: the sidebar's Activity rows
+count as no link, and a question left on an earlier run could no longer be answered there. Its second and third passes
+found the same of questions: a page whose run left questions open stays for them, and once the last one closes, answered
+there or on another screen or skipped, it looks again whether the chat went on (`paintQuestions`). Tests:
+`tests/smoke/test_chat_follows.py` (Chrome wide and WebKit as a phone on one chat: the phone's message shows on the wide
+window and the wide window's on the phone, the wide window's unsent words go with it, a page of the earlier run opened
+by its address stays, and a phone's page loaded again after it showed the chat opens where the chat is; a run that left
+two questions, open on both screens: the first answer keeps both pages there, the last, sent on the phone, opens the
+chat's newest run on both; on main the wide window never moves). Docs: `docs/daemon.md`.
+
+### 452. The Run tab of the side panel, plain
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: the side panel's Run tab is crowded with what is not
+needed; make it plain and show what is really useful. It held Details with up to seventeen rows and Cost with ten, the
+steps, the tokens, the compactions and the time said twice, and Cost no money at all, its rows mostly "None". **As
+built.** Details keep what a glance needs: the status, the agent, the model, the reasoning level, the speed when it is
+fast, the approval mode, goal mode only when it is on, the campaign, the tool calls with the failed ones, the tokens,
+the compactions only once there is one (or a flagged check), the duration and the run that delegated it (`details.js`).
+The conversation's Files follow. The rest folds under **More**, closed the first time and kept as the browser last left
+it (`panelFold` of `panels.js`, which `panelSection`'s fold of item 426 now is): the run's mode, its start and its id
+with its copy button, how the run was Set up and its Cost, whose figures of none have no line (`cost.js`). A line of the
+set-up that warns is counted beside More's title ("1 warning", `setup.js`), so a warning is not hidden by the fold. The
+model turns are said once, as Cost's steps. Tests: `tests/smoke/test_side_panel.py` (the tab's sections are Details and
+More, closed the first time, the run id under it, the bill visible once it is opened), `test_activity.py`,
+`test_chat_calm.py` (the warning counted beside More), `test_context_meter.py`, `test_embedding_failure.py` (Set up
+under More). Docs: `docs/daemon.md`.
+
+### 454. A chat that goes on without a jump, a finished chat drawn whole, and Dot's Chrome closed once unused
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent scrolls the chat up and down before it
+lands at its foot; a chat whose run is over streams its messages in again when opened; with Dot working in Chrome a lot,
+a click on their own Chrome opens nothing after a while; and what Dot opens should close once the work is done. **As
+built.** *The jump:* a message sent from a chat that is over starts a run, and the chat went on at that run's address
+through the router's full page change, which emptied the page, scrolled the window to its top and drew a loading panel
+before the next run's page scrolled to its foot. `goOnAt` now leaves the page standing, inert (`main.js`'s `goOn`), and
+the run's page draws over what it finds; the phone's one-screen frame (`html.chat-shell`) stays across, and the turn
+before the new run, read before the page is drawn (`history.js`'s `READ_FIRST`), stands whole instead of growing in.
+*The finished chat:* a run opened after it ended was drawn from its SSE stream frame by frame; `mount` now reads the
+stored events of a run that is over whole (the stream, which ends after them) before it draws the page. A run kept while
+it worked and ended meanwhile is item 446's, left as it built it. *Chrome:* Dot's own Chrome is the installed Google
+Chrome app on a profile of its own, and it ran until the daemon stopped. Measured with a Chrome started as Dot starts
+it: `open -b com.google.Chrome`, which a Dock click amounts to, starts no Chrome of the owner's but goes to Dot's. It
+can now close with its Playwright driver after `[browser] idle_close_s` unused: no chat's step under way, no run at work
+holding tabs in it, no page read in it for the web tools or watched under "Dot's computer" (`_in_use`), no task taught
+in it, its window not in front (`BrowserSession._close_unused`, run by the tab reaper). It is off (0) by default, the
+owner's to set; since item 453 a close loses no session cookie, and 300 s is the value measured against. Also measured:
+a Chrome whose driver is killed exits with it, so a crashed daemon leaves no Chrome behind. Left as it was: background
+terminal commands still run until closed (`terminal_idle_s` closes idle sessions), by design for a server a run starts
+for the owner; while a run works in Dot's Chrome the Dock still brings it forward (`attach` mode avoids it). Measured in
+`tests/smoke/test_chat_scroll.py` (the window falls from 789 px to 0 on the code before; a finished chat's answer is
+there with its page) and `tests/smoke/test_browser.py`.
 
 ### 449. The rules move with arrows, and a rule that never decides says so
 
@@ -17167,3 +17239,8 @@ with one event, switching it on again; a one-time schedule and one without a lim
   its time and switch kept, and its Firings list its last runs.
 - 2026-10-21 (Opus 5.5): item 458 on `item-458-stop-after-failures` from `main`: a repeating schedule whose runs failed
   so many times in a row is switched off and you are told once; its row counts them.
+- 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat's
+  newest run goes on at the run a message from another screen started, at once, after a break of its stream, and as a
+  phone loads it again; a page of an earlier run stays.
+- 2026-10-21 (Opus 5.5): item 452 on `item-452-run-panel-plain` from `main`: the Run tab says what a glance needs; the
+  run's mode, start and id, its set-up and its cost fold under More, closed the first time.

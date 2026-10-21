@@ -364,6 +364,8 @@ class BrowserConfig(FrozenModel):
     navigation_backoff_ms: int
     max_tabs: int = Field(ge=1)
     tab_idle_s: float = Field(gt=0, allow_inf_nan=False)
+    # Dot's own Chrome closes once unused this long (item 454); 0 keeps it open until the daemon stops.
+    idle_close_s: float = Field(ge=0, allow_inf_nan=False)
     # The JPEG quality Chrome takes a screenshot with.
     screenshot_quality: int = Field(ge=1, le=100)
     max_batch_steps: int

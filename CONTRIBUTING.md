@@ -76,4 +76,7 @@ headless against a local server. A few drive WebKit, the engine of Safari on the
 
 - One change per pull request. Say what it does, why, and how you checked it; the template asks for each.
 - A change in what Dot does changes the page under [docs/](docs/) that describes it, in the same pull request.
+- Its changelog entry is a file of its own, `changes/<item>.md`, and its roadmap item `roadmap/<item>.md`
+  ([changes/README.md](changes/README.md), [roadmap/README.md](roadmap/README.md)): pull requests made side by side then
+  add files instead of conflicting at the top of CHANGELOG.md and the end of ROADMAP.md.
 - Write the commit message as a sentence that says what the change does.

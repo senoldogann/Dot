@@ -22,6 +22,7 @@ import pytest
 import pytest_asyncio
 from playwright.async_api import async_playwright
 
+from dotagent.browser.profile_lock import profile_holder_pid
 from dotagent.browser.render import render_page_view
 from dotagent.browser.safety import parse_element, refuse_secret_field
 from dotagent.browser.session import BrowserSession, no_runs_at_work
@@ -912,3 +913,46 @@ async def test_a_frame_detached_twice_does_not_break_the_next_call() -> None:
             assert await page.locator("iframe").count() == 0
         finally:
             await browser.close()
+
+
+async def _profile_free(profile: Path) -> bool:
+    """Whether no Chrome holds ``profile`` within a few seconds: Chrome lets go of it as it exits."""
+    for _ in range(50):
+        if profile_holder_pid(profile) is None:
+            return True
+        await asyncio.sleep(0.2)
+    return False
+
+
+async def test_dots_own_chrome_closes_once_unused_and_starts_again_for_the_next_call(
+    browser_config: BrowserConfig, site: str, tmp_path: Path
+) -> None:
+    """Dot's own Chrome stays while a run at work holds tabs in it and while a use no chat holds is under way (a page
+    read for the web tools), closes with its driver once nothing used it for ``idle_close_s`` (item 454), and starts
+    again on the same profile for the next call."""
+    config: BrowserConfig = browser_config.model_copy(update={"idle_close_s": 0.2})
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "downloads").mkdir()
+    at_work: set[str] = {"working"}
+    session: BrowserSession = BrowserSession(
+        config, SERVER, tmp_path / "profile", tmp_path / "downloads", lambda: frozenset(at_work)
+    )
+    try:
+        await session.open_url("working", f"{site}/")
+        await asyncio.sleep(0.3)
+        await session._close_unused()
+        assert profile_holder_pid(tmp_path / "profile") is not None
+        at_work.clear()
+        with session._in_use():
+            await asyncio.sleep(0.3)
+            await session._close_unused()
+            assert profile_holder_pid(tmp_path / "profile") is not None
+        await session._close_unused()
+        assert profile_holder_pid(tmp_path / "profile") is not None
+        await asyncio.sleep(0.3)
+        await session._close_unused()
+        assert await _profile_free(tmp_path / "profile")
+        view: PageView = await session.open_url("next", f"{site}/")
+        assert view.title == "Home"
+    finally:
+        await session.aclose()
