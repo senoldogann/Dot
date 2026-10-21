@@ -151,7 +151,10 @@ def agents_router(ctx: ServerContext) -> APIRouter:
         return [dot] + [AgentSummary(record=agent, latest=latest.get(agent.id)) for agent in await store.list_agents()]
 
     async def created(request: AgentRequest) -> AgentRecord:
-        checked: AgentRequest = _checked(request, known)
+        return await saved(_checked(request, known))
+
+    async def saved(checked: AgentRequest) -> AgentRecord:
+        """The agent of a request ``_checked`` passed."""
         return await store.create_agent(
             checked.name,
             checked.role,
@@ -187,7 +190,9 @@ def agents_router(ctx: ServerContext) -> APIRouter:
     async def use_team(team_id: str) -> TeamUse:
         """A team's agents (item 504), each made as its template's Use makes one. A member with the name of an agent
         the owner has, read without regard to case as the team tools read it, is that agent, kept as it is; the others
-        are all checked before any is made, so a team one of whose agents this home cannot make makes none."""
+        are all checked (their model and tools) before any is made, so a team one of whose agents this home cannot make
+        makes none. Past the checks they are made one by one, not in one transaction: a store that fails part way
+        leaves the ones made, and two Uses at once may make an agent twice, as two clicks of a template's Use may."""
         chosen: AgentTeam = find_team(team_id)
         agents: list[AgentRecord] = await store.list_agents()
         kept: list[AgentRecord] = []
@@ -198,7 +203,7 @@ def agents_router(ctx: ServerContext) -> APIRouter:
                 to_make.append(_checked(_template_request(template), known))
             else:
                 kept.append(have)
-        return TeamUse(made=[await created(request) for request in to_make], kept=kept)
+        return TeamUse(made=[await saved(request) for request in to_make], kept=kept)
 
     @router.post("/agents/import", status_code=201)
     async def import_agent(file: AgentFile) -> AgentRecord:

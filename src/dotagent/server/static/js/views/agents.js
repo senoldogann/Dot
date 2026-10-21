@@ -503,7 +503,7 @@ function mountList(root, ctx) {
     if (used.made.length === 0) {
       toast("ok", `You have every agent of the ${team.name} already.`);
     } else if (missed.length > 0) {
-      toast("error", `${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}`);
+      toast("error", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready, but not every schedule was added: ${missed.join("; ")}.${had}`);
     } else {
       const off = scheduled.length === 0 ? "" : " Their schedules are switched off: read their goals, then switch them on.";
       toast("ok", `${team.name}: ${made} ${used.made.length === 1 ? "is" : "are"} ready.${had}${off}`);
