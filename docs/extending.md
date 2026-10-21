@@ -107,7 +107,7 @@ The ways a service connects:
   **Remove** takes the key out of `.env` with the service's own server, and nothing else does (`keep` in `routes_mcp.py`
   says so): a try that fails leaves the key for **Try again**, an add after a failed one writes it anew, and a daemon's
   restart forgets a failed try but not its key. The addresses, keys and commands are as the services' own docs read on
-  2026-10-19 (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools,
+  2026-10-19, and item 505's on 2026-10-21 (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools,
   which go to the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you
   are using: its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own
   page, which sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's

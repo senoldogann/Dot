@@ -489,6 +489,7 @@ MCP_SERVICES: tuple[McpService, ...] = (
         name="Parallel Search",
         does="Search the web with Parallel's index, built for agents; free without a key.",
         url="https://search.parallel.ai/mcp",
+        signs_in=False,
     ),
     McpService(
         id="parallel-task",
