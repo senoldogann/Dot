@@ -84,6 +84,9 @@ jobs:
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
   # and the face. Three workers: the browser tests are steady at that count, more is what item 437 found flaky.
   browser:
+    # The release runs every browser test itself (browser.yml) beside this gate, so the core is not run twice there: a
+    # workflow a release calls takes the release's context, whose workflow is "release".
+    if: github.workflow != 'release'
     runs-on: macos-latest
     timeout-minutes: 30
     env:
