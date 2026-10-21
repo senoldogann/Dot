@@ -7,6 +7,7 @@ import {
   notificationsAvailable,
   notificationsBlocked,
   notificationsOn,
+  homeScreenNeeded,
   setNotifications,
   setTellEvenWhenLooking,
   tellEvenWhenLooking,
@@ -127,10 +128,10 @@ function statusFacts(status) {
   return [groups, el("dl", { class: "kv kv-wide-rows" }, wideEntry("MCP servers left out", leftOutServers(status.mcp_failures)))];
 }
 
-/** Desktop notifications: the one setting that also depends on what the browser allows. */
+/** Notifications, on the desktop and on the phone: the one setting that also depends on what the browser allows. */
 function buildNotifications() {
   const setting = switchSetting({
-    label: "Desktop notifications",
+    label: "Notifications",
     hint: "",
     read: notificationsOn,
     write: setNotifications,
@@ -153,13 +154,16 @@ function buildNotifications() {
     const blocked = notificationsBlocked();
     setting.toggle.disabled = !available || blocked;
     always.toggle.disabled = !notificationsOn();
-    if (!available) {
-      setting.note.textContent = "This browser cannot show desktop notifications.";
+    if (!available && homeScreenNeeded()) {
+      setting.note.textContent =
+        "On an iPhone, notifications come to Dot added to the Home Screen: in Safari, Share › Add to Home Screen, open Dot from there and switch this on. The phone is then told when a run ends or Dot needs you, also when Dot is closed.";
+    } else if (!available) {
+      setting.note.textContent = "This browser cannot show notifications.";
     } else if (blocked) {
       setting.note.textContent = "The browser blocks notifications for this address. Allow them in its site settings, then reload this page.";
     } else {
       setting.note.textContent =
-        "Tell me when Dot needs an answer or a run ends and I am not looking at that run: the tab hidden, the window inactive or another page open. The tab title always counts the approvals that wait.";
+        "Tell me when Dot needs an answer or a run ends and I am not looking at that run: the tab hidden, the window inactive or another page open. On a phone, Dot tells it also when it is closed. The tab title always counts the approvals that wait.";
     }
   }
 

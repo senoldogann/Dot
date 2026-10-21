@@ -238,7 +238,7 @@ async def test_every_theme_reads_in_both_schemes_as_the_browser_paints_it(
 
     # General no longer holds the look: the scheme and the layout are Appearance's.
     await page.goto(f"http://{host}:{port}/#/settings/general")
-    await expect(page.get_by_role("switch", name="Desktop notifications")).to_be_visible()
+    await expect(page.get_by_role("switch", name="Notifications", exact=True)).to_be_visible()
     await expect(page.get_by_role("group", name="Colour scheme")).to_have_count(0)
     await expect(page.get_by_role("group", name="Density")).to_have_count(0)
     await page.close()

@@ -52,6 +52,12 @@ export function notificationsAvailable() {
   return shell() !== null || typeof Notification === "function";
 }
 
+/** Whether this is an iPhone's or an iPad's browser tab, where notifications come only to Dot added to the Home Screen
+ * and opened from there (item 501). */
+export function homeScreenNeeded() {
+  return /iPhone|iPad|iPod/.test(navigator.userAgent) && !window.matchMedia("(display-mode: standalone)").matches;
+}
+
 export function notificationsBlocked() {
   return shell() === null && notificationsAvailable() && Notification.permission === "denied";
 }
