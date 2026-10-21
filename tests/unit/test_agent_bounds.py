@@ -23,6 +23,7 @@ def _agent(model: str, approvals: ApprovalMode | None) -> AgentRecord:
         updated_at=0.0,
         made_by=None,
         look=None,
+        paused_at=None,
     )
 
 

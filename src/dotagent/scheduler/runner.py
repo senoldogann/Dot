@@ -366,12 +366,13 @@ class Scheduler:
         return record
 
     async def _fire(self, record: ScheduleRecord, now: float) -> None:
-        """Start the run of a due schedule; a firing the emergency stop, a run still going or a long absence of the
-        daemon keeps from starting is skipped to the schedule's next time, with the reason as its status. A one-time
-        schedule has no next time and is never dropped: while the emergency stop is engaged, or a run of it started by
-        hand works, it waits, still due, and one overdue fires late, its opening saying when it was due
-        (:func:`late_goal`). An emergency stop engaged while the run was being started ends it as one. A firing missed
-        where nobody saw it, one overdue or one whose run could not start, is told (:meth:`_tell_missed`)."""
+        """Start the run of a due schedule; a firing the emergency stop, the pause of the agent it runs as (item 465), a
+        run still going or a long absence of the daemon keeps from starting is skipped to the schedule's next time, with
+        the reason as its status. A one-time schedule has no next time and is never dropped: while the emergency stop is
+        engaged, its agent is paused, or a run of it started by hand works, it waits, still due, and one overdue fires
+        late, its opening saying when it was due (:func:`late_goal`). An emergency stop engaged while the run was being
+        started ends it as one. A firing missed where nobody saw it, one overdue or one whose run could not start, is
+        told (:meth:`_tell_missed`)."""
         store: Store = self._runtime.store
         if record.next_run_at is None:
             raise StoreError("a due schedule has no next run", {"schedule_id": record.id})
@@ -388,6 +389,17 @@ class Scheduler:
                 return
             log.warning("schedule_skipped_emergency_stop", schedule_id=record.id)
             await store.record_schedule_skip(record.id, following, "skipped: the emergency stop is engaged")
+            return
+        paused: AgentRecord | None = await self._paused_agent(record)
+        if paused is not None:
+            # A pause is the owner's: neither a failure nor a missed firing, so nothing counts it and nobody is told.
+            if one_time:
+                waiting: str = f"waiting: {paused.name} is paused"
+                if record.last_status != waiting:
+                    await store.set_schedule_status(record.id, waiting)
+                return
+            log.info("schedule_skipped_agent_paused", schedule_id=record.id, agent_id=paused.id)
+            await store.record_schedule_skip(record.id, following, f"skipped: {paused.name} is paused")
             return
         if one_time:
             # The wait is that of a try of this time again: a time given since the last failure fires when it comes.
@@ -413,6 +425,14 @@ class Scheduler:
             await self._start_due(record, record.next_run_at, now, zone, following, late, overdue_s)
         finally:
             self._starting.discard(record.id)
+
+    async def _paused_agent(self, record: ScheduleRecord) -> AgentRecord | None:
+        """The agent ``record`` runs as when the owner paused it (item 465), else ``None``. An agent that cannot be read
+        fails the firing: nothing starts for a pause that is not known."""
+        if record.options.agent_id is None:
+            return None
+        agent: AgentRecord = await self._runtime.store.get_agent(record.options.agent_id)
+        return None if agent.paused_at is None else agent
 
     async def _start_due(
         self,

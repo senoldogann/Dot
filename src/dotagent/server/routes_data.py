@@ -112,7 +112,9 @@ def _schedule_view(record: ScheduleRecord, zone: ZoneInfo, agents: dict[str, Age
         zone=zone.key,
         agent=None
         if agent is None
-        else ScheduleAgent(id=agent.id, name=agent.name, look=agent.look, approvals=agent.approvals),
+        else ScheduleAgent(
+            id=agent.id, name=agent.name, look=agent.look, approvals=agent.approvals, paused_at=agent.paused_at
+        ),
     )
 
 
