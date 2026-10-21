@@ -213,6 +213,11 @@ async def test_how_a_run_was_set_up_is_in_the_side_panel_not_the_conversation(
                         await page.screenshot(path=tmp_path / f"setup-chat-{name}-{scheme}.png")
                         if phone:
                             await page.locator("button[aria-label='Run details']").click()
+                        # Set up is under the Run tab's More (item 452), its warning counted beside the title.
+                        more: Locator = page.locator(".inspector").get_by_role("button", name="More")
+                        await expect(page.locator(".inspector .run-more-warning")).to_have_text("1 warning")
+                        if await more.get_attribute("aria-expanded") == "false":
+                            await more.click()
                         setup: Locator = page.locator("#panel-run-setup")
                         await expect(setup).to_be_visible()
                         await expect(setup).to_contain_text("Recalled 1 memory")

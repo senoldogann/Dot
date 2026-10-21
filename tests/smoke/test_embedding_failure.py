@@ -151,6 +151,10 @@ async def _setup_warnings(page: Page, width: int) -> list[str]:
     else:
         await page.evaluate("localStorage.setItem('dot.inspector', 'on')")
         await page.reload()
+    # Set up is under the Run tab's More (item 452), which this browser opens once and keeps open.
+    more: Locator = page.locator(".inspector").get_by_role("button", name="More")
+    if await more.get_attribute("aria-expanded") == "false":
+        await more.click()
     setup: Locator = page.locator("#panel-run-setup")
     await expect(setup).to_be_visible()
     return [text.strip() for text in await setup.locator(".note.warn").all_inner_texts()]
