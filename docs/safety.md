@@ -102,7 +102,8 @@ currency, so list sites that bill in one currency. Empty by default.
    when two fit (item 481): an earlier rule of another answer does not keep it from deciding, so an exception to a
    hand-off goes in the hand-off's own expression (a lookahead such as `(?!.*--dry-run)` works). Once a rule fits, only
    the rules after it that hand off are read. The expression is searched, case-insensitive, in the action's one-line
-   summary (a shell command's starts with `Run: `), a line break and its target (the command, the path, the address);
+   summary (a shell command's starts with `Run: ` and names the folder it runs in when the call names one, item 483,
+   so an expression can fit that folder too), a line break and its target (the command, the path, the address);
    one that takes longer than 0.25 s to match is stopped and the action refused, as for a rule that cannot be read, so
    that a pattern that backtracks for long cannot hold the daemon (item 387). A rule
    reads as a sentence in Settings › Rules, "When Dot would use `shell`, matching `\bgit push\b`: ask me first", and
