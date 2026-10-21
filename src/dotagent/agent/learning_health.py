@@ -39,7 +39,8 @@ WORK_NAMES: dict[LearningWork, str] = {
     "reflection": "The nightly reflection",
     "lessons": "Drawing lessons from runs",
     "playbooks": "Writing skills from runs",
-    "harness": "The harness's nightly step",
+    # The harness's step, in the words of its page (item 503), which the Memory page's list says too.
+    "harness": "The nightly self-improvement",
 }
 
 

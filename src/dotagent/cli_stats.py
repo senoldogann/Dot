@@ -349,7 +349,8 @@ def render_learning_health(
 ) -> list[str]:
     """How learning fares (:mod:`dotagent.agent.learning_health`): when each work last went well, its failures in a
     row since with the last error, and, when learning has stopped, why and whether the owner was told. The harness's
-    step is "off" while ``[harness] step_time`` keeps it from running (``harness_on``) and it has no record yet."""
+    step (the nightly self-improvement) is "off" while ``[harness] step_time`` keeps it from running (``harness_on``)
+    and it has no record yet."""
     if health is None:
         return ["  learning health: nothing recorded yet"]
     lines: list[str] = []

@@ -30,7 +30,7 @@ const TABS = [
   { id: "browser", label: "Browser", icon: "globe", mount: mountBrowser },
   { id: "rules", label: "Rules", icon: "shield", mount: rules.mount },
   { id: "memory", label: "Memory", icon: "database", mount: memory.mount },
-  { id: "harness", label: "Harness", icon: "sparkle", mount: harness.mount },
+  { id: "harness", label: "Self-improvement", icon: "sparkle", mount: harness.mount },
   { id: "phone", label: "Phone", icon: "smartphone", mount: phone.mount },
   { id: "snapshots", label: "SnapShots", icon: "image", mount: snapshots.mount },
   { id: "system", label: "System", icon: "monitor", mount: mountSystem },
@@ -98,7 +98,7 @@ function mountList(root, ctx) {
   });
   attempt(async () => {
     const found = await api.get("/harness");
-    values.get("harness").textContent = found.adopted === null ? "Dot's own" : "in use";
+    values.get("harness").textContent = found.adopted === null ? "built-in" : "changed";
   });
   return () => {
     SYSTEM_DARK.removeEventListener("change", paintTheme);
