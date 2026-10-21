@@ -25,8 +25,10 @@ from pydantic import BaseModel, ConfigDict, SecretStr, ValidationError
 
 from dotagent.core.errors import ToolExecutionError
 from dotagent.core.logs import get_logger
+from dotagent.core.paths import env_file_path
 from dotagent.core.text import redact_secrets, truncate_middle
 from dotagent.core.types import FrozenModel
+from dotagent.secrets import parse_env_file
 
 log = get_logger(__name__)
 
@@ -116,6 +118,15 @@ class LoginSecret(FrozenModel):
     username: SecretStr | None
     password: SecretStr | None
     otp: SecretStr | None
+
+
+def kept_token() -> str | None:
+    """The service account's token Dot keeps, from its .env alone: the token is Dot's to keep and to forget (Disconnect
+    takes it out), not one of the environment or of the Keychain. ``None`` while 1Password is not connected."""
+    path: Path = env_file_path()
+    if not path.exists():
+        return None
+    return parse_env_file(path.read_text(encoding="utf-8")).get(TOKEN_NAME)
 
 
 def find_cli() -> Path | None:

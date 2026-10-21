@@ -605,12 +605,19 @@ def _takes(kind: VaultFieldKind, field: SecretKind | None) -> bool:
 
 
 async def fill_login_field(
-    page: Page, ref: str, kind: VaultFieldKind, value: str, fills_on: Callable[[str], bool], timeout_ms: int
+    page: Page,
+    ref: str,
+    kind: VaultFieldKind,
+    value: str,
+    fills_on: Callable[[str], bool],
+    typing: Callable[[], None],
+    timeout_ms: int,
 ) -> None:
     """Fill the field ``ref`` with ``value``, the part ``kind`` of a login of the password manager (item 493), once the
     field is one that part may go into and the document that holds it is one of the login's sites (``fills_on`` of its
-    address): a password into a password field alone, nothing into a frame of another site. Neither the value nor
-    Playwright's log of the call is in what it raises."""
+    address): a password into a password field alone, nothing into a frame of another site. ``typing()`` runs once the
+    field passed, just before the value goes in. Neither the value nor Playwright's log of the call is in what it
+    raises."""
     locator: Locator = await live_locator(page, ref, "fill")
     try:
         place: object = await locator.evaluate(_FIELD_PLACE_SCRIPT)
@@ -632,6 +639,7 @@ async def fill_login_field(
             "shows in no text",
             {"ref": ref, "url": page.url, "part": kind, "field": field},
         )
+    typing()
     try:
         await locator.fill(value, timeout=timeout_ms)
     except PlaywrightError:

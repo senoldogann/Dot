@@ -14,10 +14,10 @@ from dotagent.core.errors import InvalidValueError, SignInError
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import env_file_path
 from dotagent.core.types import FrozenModel
-from dotagent.secrets import remove_env_value, resolve_secret, write_env_value
+from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_accounts import on_this_mac
-from dotagent.vault.onepassword import TOKEN_NAME, VaultError, VaultView
+from dotagent.vault.onepassword import TOKEN_NAME, VaultError, VaultView, kept_token
 
 log = get_logger(__name__)
 
@@ -47,7 +47,7 @@ def vault_router(ctx: ServerContext) -> APIRouter:
 
     async def state() -> VaultState:
         cli = ctx.runtime.vault.cli()
-        token: str | None = await asyncio.to_thread(resolve_secret, TOKEN_NAME)
+        token: str | None = await asyncio.to_thread(kept_token)
         if token is None:
             return VaultState(cli=None if cli is None else str(cli), connected=False, vaults=(), error=None)
         try:

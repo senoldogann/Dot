@@ -226,7 +226,7 @@ from dotagent.memory.service import (
 from dotagent.oauth.tokens import Account
 from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
-from dotagent.secrets import known_secrets, resolve_secret
+from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
 from dotagent.skills.types import SKILL_TOOL, Skill, SkillCatalog
 from dotagent.store.endings import GOAL_CHECK_MARK, PREFIX_CUT_SHORT, RESULT_EMPTY_REPLIES
@@ -266,7 +266,7 @@ from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import skill_instructions
 from dotagent.tools.team import CREATE_AGENT_TOOL, MESSAGE_AGENT_TOOL
-from dotagent.vault.onepassword import TOKEN_NAME as VAULT_TOKEN_NAME
+from dotagent.vault.onepassword import kept_token
 
 log = get_logger(__name__)
 # The event of a run's start that found its notes or skills by their words alone (item 256).
@@ -1643,7 +1643,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     if not signed_in:
         specs = tuple(spec for spec in specs if group_of(spec.name) != ACCOUNTS_GROUP)
     # The logins of 1Password (item 493) are a run's only while the owner has connected it.
-    if await asyncio.to_thread(resolve_secret, VAULT_TOKEN_NAME) is None:
+    if await asyncio.to_thread(kept_token) is None:
         specs = tuple(spec for spec in specs if spec.name not in VAULT_TOOLS)
     # Without a teammate the message tool goes, unless the run may make one (item 99): then it stays, so a teammate
     # made mid-run can be messaged at once.

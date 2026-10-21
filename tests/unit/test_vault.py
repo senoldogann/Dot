@@ -1,4 +1,5 @@
-"""The owner's 1Password (item 493): which pages a login is filled on, what the browser tools' results mask, and what
+"""The owner's 1Password (item 493): which pages a login is filled on, what the browser tools' results mask (a value as
+typed, as an address writes it and inside a JSON string), and what
 the policy makes of a fill: asked in every mode but yolo whatever the rules say, a rule's hand-off alone stricter, and
 answered by the owner, not the review model; the shell never runs 1Password's command line."""
 
@@ -87,3 +88,9 @@ def test_the_shell_never_runs_1passwords_command_line() -> None:
     home: Path = Path.home()
     for command in ("op read op://Shared/GitHub/password", "/opt/homebrew/bin/op item list", "sh -c 'op vault list'"):
         assert "secret_access" in assess_shell(command, home, home, (), ()).flags, command
+
+
+def test_a_value_is_masked_as_an_address_and_a_json_string_write_it_too() -> None:
+    value: str = 'S3cret Passw0rd!"'
+    text: str = 'at /home?pass=S3cret+Passw0rd%21%22 and /x/S3cret%20Passw0rd%21%22 and {"v": "S3cret Passw0rd!\\""}'
+    assert masked(text, [value]) == f'at /home?pass={MASK} and /x/{MASK} and {{"v": "{MASK}"}}'

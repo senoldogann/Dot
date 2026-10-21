@@ -210,10 +210,12 @@ a note that it was saved while reading outside content.
   of its fields (`browser_fill_login`); the daemon reads the values with `op`, 1Password's command line, and types them
   itself:
   - The values are in no argument, no result, no event and no message of the model.
-  - Every result of the browser tools of the chat masks them from then on, an error's words and a script's value
-    among them.
-  - No script runs in the chat's tabs while the page they were filled into is loaded: a script could read the field
-    and send it anywhere.
+  - Every result of the browser tools of the chat masks them from then on, as typed and as an address or a JSON string
+    writes them: an error's words and context, a script's value, and the step's summary and target, which the
+    approvals, the policy's events and the review model read (a form sent by GET puts them in the address).
+  - No script runs in the chat's tabs while the tab they were filled into is open, whatever page it went on to:
+    going back can bring the filled page back whole. A page a script of the run ran in gets no login: the script
+    could have left a listener that copies what is typed.
   - A login is filled only on a page of one of its own websites, or a host under one, over https (plain http on this
     Mac alone). Each field must be in a document of those sites, so a frame of another site gets nothing. A password
     goes only into a password field, where it shows in no text.

@@ -51,9 +51,13 @@ class Tab:
     target_id: str = ""
     born: set[str] = field(default_factory=set)
     born_changed: asyncio.Event = field(default_factory=asyncio.Event)
-    # A login of the password manager was filled into the page now loaded (item 493): no script runs in the tabs of its
-    # thread until the page loads another document, which reads the fields' values no more.
+    # A login of the password manager was filled into a page of the tab (item 493): no script runs in the tabs of its
+    # thread while the tab is open. Going on to another page does not end it: going back can bring the filled page
+    # back whole, from Chrome's cache of pages, without loading it again.
     vault_held: bool = False
+    # A script of the run ran in the document now loaded (item 493): no login is filled into it, since the script may
+    # have left a listener that copies what is typed. Another document clears it.
+    scripted: bool = False
 
 
 @dataclass(slots=True)
@@ -171,8 +175,8 @@ def _on_request_end(tab: Tab, request: Request) -> None:
 
 
 def _on_document(tab: Tab) -> None:
-    """A document of its own is loaded in the tab: a login filled into the one before is not in it (item 493)."""
-    tab.vault_held = False
+    """A document of its own is loaded in the tab: no script of the run ran in it yet (item 493)."""
+    tab.scripted = False
 
 
 def _on_response(tab: Tab, response: Response) -> None:

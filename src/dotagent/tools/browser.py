@@ -60,7 +60,6 @@ from dotagent.policy.pace import pace_class, paced_in_batch
 from dotagent.policy.paths import PathClass, classify_path, expand_path
 from dotagent.policy.spend import amount_in_label, render_amount, total_on_page
 from dotagent.policy.types import ActionInfo, ActionKind, Amount, Flag, PaceClass, Risk
-from dotagent.secrets import resolve_secret
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
@@ -80,8 +79,8 @@ from dotagent.tools.base import (
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
 from dotagent.vault.hosts import fills_on, website_hosts
-from dotagent.vault.masking import masked
-from dotagent.vault.onepassword import TOKEN_NAME, Login, LoginSecret
+from dotagent.vault.masking import masked, masked_json
+from dotagent.vault.onepassword import Login, LoginSecret, kept_token
 
 _NONCE_BYTES: int = 8
 _HEADROOM_CHARS: int = 3500  # room next to the page body for steps, tabs, notes and the fence lines
@@ -766,18 +765,24 @@ _NOT_CONNECTED: str = (
 async def _vault_token(ctx: ToolContext) -> str:
     """The service account's token, from Dot's .env, which no tool of a run reads; refused while 1Password is not
     connected."""
-    token: str | None = await asyncio.to_thread(resolve_secret, TOKEN_NAME)
+    token: str | None = await asyncio.to_thread(kept_token)
     if token is None:
         raise ToolInputError(_NOT_CONNECTED, {})
     return token
 
 
 async def _login(ctx: ToolContext, token: str, wanted: str) -> Login:
-    """The login ``wanted`` names, by its id or its title (any case); refused for one the vault does not hold."""
+    """The login ``wanted`` names, by its id or its title (any case); refused for one the vault does not hold, and for
+    a title two logins share, which only an id tells apart."""
     logins: tuple[Login, ...] = await ctx.runtime.vault.logins(token)
-    found: Login | None = next(
-        (login for login in logins if login.id == wanted or login.title.lower() == wanted.lower()), None
-    )
+    by_id: Login | None = next((login for login in logins if login.id == wanted), None)
+    titled: list[Login] = [login for login in logins if login.title.lower() == wanted.lower()]
+    if by_id is None and len(titled) > 1:
+        raise ToolInputError(
+            f"{len(titled)} logins of 1Password are called {wanted!r}: name one by its id, as browser_logins lists it",
+            {"login": wanted, "ids": [login.id for login in titled]},
+        )
+    found: Login | None = by_id if by_id is not None else (titled[0] if titled else None)
     if found is None:
         raise ToolInputError(
             f"1Password holds no login {wanted!r} that Dot may fill: browser_logins lists them",
@@ -861,15 +866,15 @@ def _fill_login_tool() -> RegisteredTool:
         token: str = await _vault_token(ctx)
         login: Login = await _login(ctx, token, args.login)
         url: str = ctx.browser.current_url(ctx.thread_id) or ""
+        sites: str = ", ".join(website_hosts(login.websites)) or "no website"
         if not fills_on(url, login.websites):
-            sites: str = ", ".join(website_hosts(login.websites)) or "no website"
             raise ToolInputError(
                 f"the login {login.title} is for {sites}, and this page is {_clip(url, 120) or 'no page'}: Dot fills a "
                 "login only on its own site, over https",
                 {"login": login.id, "url": url},
             )
         parts: str = ", ".join(kind for kind, _ in _parts(args))
-        summary: str = f"Fill your login {login.title} from 1Password into this page: {parts}"
+        summary: str = f"Fill your login {login.title} ({sites}) from 1Password into this page: {parts}"
         return _action("browser_fill_login", "browser_input", "high", summary, url, ("vault_fill",))
 
     async def run(args: FillLoginArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
@@ -885,7 +890,7 @@ def _fill_login_tool() -> RegisteredTool:
         )
         said: str = (
             f"Filled the {', '.join(kind for kind, _ in parts)} of the login {login.title} from 1Password. The values "
-            "were not shown to you and never are; scripts stay off in this chat's tabs until the page loads another."
+            "were not shown to you and never are; scripts stay off in this chat's tabs while this tab is open."
         )
         return ok(f"{said}\n{render_page_view(view, _nonce(), _body_budget(ctx))}")
 
@@ -906,24 +911,40 @@ def _fill_login_tool() -> RegisteredTool:
     )
 
 
+def _mask_error(error: DotError, values: frozenset[str]) -> None:
+    """Mask the values in ``error``'s words and in its context, which the model reads as well (``str`` of the error)."""
+    error.message = masked(error.message, values)
+    error.context = {key: masked_json(value, values) for key, value in error.context.items()}
+
+
 def _masked(tool: RegisteredTool) -> RegisteredTool:
     """``tool`` with the values filled into its chat's pages from the password manager (item 493) taken out of what it
-    gives back, its text and an error it raises alike, whatever page it read."""
+    gives back and of what it tells the gate: its result's text, an error it raises (its words and its context), and
+    the action's summary and target, which the approvals, the policy's events and the review model read. A page's
+    address holds them once a form sent by GET put them there."""
 
     async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
-        call: PreparedCall = await tool.prepare(arguments, ctx)
+        try:
+            call: PreparedCall = await tool.prepare(arguments, ctx)
+        except DotError as error:
+            _mask_error(error, ctx.browser.vault_values(ctx.thread_id))
+            raise
+        values: frozenset[str] = ctx.browser.vault_values(ctx.thread_id)
+        action: ActionInfo = call.action.model_copy(
+            update={"summary": masked(call.action.summary, values), "target": masked(call.action.target, values)}
+        )
 
         async def run(context: ToolContext) -> ToolResult:
             try:
                 result: ToolResult = await call.run(context)
             except DotError as error:
-                error.message = masked(error.message, context.browser.vault_values(context.thread_id))
+                _mask_error(error, context.browser.vault_values(context.thread_id))
                 raise
             return result.model_copy(
                 update={"text": masked(result.text, context.browser.vault_values(context.thread_id))}
             )
 
-        return PreparedCall(action=call.action, run=run)
+        return PreparedCall(action=action, run=run)
 
     return replace(tool, prepare=prepare)
 

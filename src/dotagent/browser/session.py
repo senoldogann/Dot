@@ -2187,9 +2187,12 @@ class BrowserSession:
     ) -> PageView:
         """Fill a login of the owner's password manager into the thread's current tab (item 493), each part into its
         field, once the page is one of the login's sites (``fills_on`` of its address) and each field one its part may
-        go into, in a document of those sites (:func:`fill_login_field`). The values are the thread's to mask from the
-        first one on, so that a fill that fails half way leaves masked what went in, and the tab runs no script until
-        it loads another document. What changed on the page is shown with its secret fields hidden, in every mode."""
+        go into, in a document of those sites (:func:`fill_login_field`). A page a script of the run ran in is
+        refused, in any tab of the thread: the script may have left a listener that copies what is typed. The values
+        are the thread's to mask from the moment one may be in the page, so that a fill that fails half way leaves
+        masked what went in, and no script runs in the thread's tabs while the tab stays open; a field refused before
+        anything went in leaves neither. What changed on the page is shown with its
+        secret fields hidden, in every mode."""
         async with self._locked(thread_id) as thread:
             tab: Tab = await self._current_tab(thread)
             if not fills_on(tab.page.url):
@@ -2197,12 +2200,24 @@ class BrowserSession:
                     "this page is not one of the login's sites: Dot fills a login only on its own site",
                     {"url": tab.page.url},
                 )
+            if any(one.scripted for one in thread.tabs):
+                # A script may have left a listener that copies what is typed, in this page or, from a tab of the same
+                # site, into it.
+                raise BrowserError(
+                    "a script of this run ran in a page of this chat: Dot fills a login only where none ran. Open the "
+                    "page again, in a tab where no script ran",
+                    {"url": tab.page.url},
+                )
             for fill in fills:
                 value: str = fill.value.get_secret_value()
-                thread.vault_values.add(value)
-                tab.vault_held = True
+
+                def typing(typed: str = value) -> None:
+                    # From here the value may be in the page: masked, and no script runs while the tab is open.
+                    thread.vault_values.add(typed)
+                    tab.vault_held = True
+
                 await fill_login_field(
-                    tab.page, fill.ref, fill.kind, value, fills_on, _ms(self._config.action_timeout_s)
+                    tab.page, fill.ref, fill.kind, value, fills_on, typing, _ms(self._config.action_timeout_s)
                 )
             await self._settle(tab)
             await self._enforce_landing(tab)
@@ -2226,11 +2241,13 @@ class BrowserSession:
             # reach that page as its opener does (item 493).
             if any(one.vault_held for one in thread.tabs):
                 raise BrowserError(
-                    "a login from the password manager was filled into a page of this chat: scripts stay off in its "
-                    "tabs until that page loads another one",
-                    {"tabs": [one.page.url for one in thread.tabs if one.vault_held]},
+                    "a login from the password manager was filled into a tab of this chat: scripts stay off in its "
+                    "tabs while that tab is open. Close it (browser_close_tab) and go on in a new one, where the "
+                    "sign-in holds",
+                    {"tabs": len([one for one in thread.tabs if one.vault_held])},
                 )
             tab: Tab = await self._current_tab(thread)
+            tab.scripted = True
             before: _Watch = self._watch(thread, tab)
             started: float = time.monotonic()
             end, text = await run_script(tab.page, script, timeout_s)

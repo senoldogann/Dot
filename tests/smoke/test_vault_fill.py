@@ -1,9 +1,9 @@
 """A login of the owner's 1Password filled into a page (item 493), through the browser tools and the gate, with a
 stand-in for ``op`` and a real headless Chrome; no model is called. A yolo run fills it and no result shows a value:
-not the fill's, not the page it lands on, not a script's read of the address the form went to. Scripts stay off in the
-chat's tabs while the filled page is loaded. A login of another site is refused before anything is asked, a password
-goes into a password field alone, and a frame of another site gets nothing. In auto the owner answers the fill, not the
-review model.
+not the fill's, not the page the form lands on, whose address holds them. Scripts stay off in the chat's tabs while
+the filled tab is open, and run again once it is closed. A login of another site is refused before anything is asked,
+a password goes into a password field alone, a frame of another site gets nothing, and a page a script ran in gets no
+login. In auto the owner answers the fill, not the review model.
 """
 
 import asyncio
@@ -16,6 +16,7 @@ import threading
 from collections.abc import AsyncIterator, Iterator
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.parse import quote, quote_plus
 
 import pytest
 import pytest_asyncio
@@ -234,8 +235,10 @@ async def _form(ctx: ToolContext, gate: RunGate, site: _Site) -> dict[str, str]:
 
 
 def _unseen(*texts: str) -> None:
+    """No value is in ``texts``, as typed or as an address writes it (a form sent by GET puts it there)."""
     for text in texts:
-        assert PASSWORD not in text and CODE not in text and USERNAME not in text, text
+        for value in (PASSWORD, CODE, USERNAME):
+            assert value not in text and quote(value, safe="") not in text and quote_plus(value) not in text, text
 
 
 async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: Runtime, site: _Site) -> None:
@@ -252,19 +255,24 @@ async def test_a_yolo_run_fills_the_login_and_no_result_shows_a_value(runtime: R
     )
     assert "Filled the username, password, otp of the login This site" in filled.text, filled.text
     _unseen(filled.text)
-    # No script runs in the chat's tabs while the filled page is loaded.
+    # No script runs in the chat's tabs while the filled tab is open.
     with pytest.raises(BrowserError, match="scripts stay off"):
         await _call(ctx, gate, "browser_eval", {"script": "document.querySelector('input[type=password]').value"})
-    # The form goes with the values; the page it lands on, and its address, show none of them.
+    # The form goes with the values; the page it lands on and its address, which holds them, show none of them.
     sent: ToolResult = await _call(
         ctx, gate, "browser_act", {"steps": [{"action": "press", "ref": refs["code"], "key": "Enter"}]}
     )
     _unseen(sent.text)
-    assert site.submissions and PASSWORD in site.submissions[-1].replace("%21", "!"), site.submissions
-    # Another document: scripts run again, and what they read of the address is masked.
-    read: ToolResult = await _call(ctx, gate, "browser_eval", {"script": "decodeURIComponent(location.href)"})
-    _unseen(read.text)
-    assert MASK in read.text, read.text
+    assert MASK in sent.text, sent.text
+    assert site.submissions and quote_plus(PASSWORD) in site.submissions[-1], site.submissions
+    # Another page of the same tab: still no script, since going back could bring the filled page back whole.
+    with pytest.raises(BrowserError, match="scripts stay off"):
+        await _call(ctx, gate, "browser_eval", {"script": "location.href"})
+    # Closed, the tab holds them no more: the new one runs scripts again.
+    await _call(ctx, gate, "browser_new_tab", {"url": f"http://127.0.0.1:{site.port}/home"})
+    await _call(ctx, gate, "browser_close_tab", {"index": 1})
+    read: ToolResult = await _call(ctx, gate, "browser_eval", {"script": "document.title"})
+    assert "Home" in read.text, read.text
     # The yolo run's record of the fill says what was filled, never a value.
     records: list[ApprovalRecord] = [
         record for record in await runtime.store.list_approvals(None, 50) if record.run_id == ctx.run_id
@@ -284,6 +292,10 @@ async def test_a_login_of_another_site_a_password_in_a_text_field_and_a_frame_ge
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["user"]})
     with pytest.raises(BrowserError, match="in a frame of another site"):
         await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["frame"]})
+    # A script of the run ran in the page: it may have left a listener that copies what is typed.
+    await _call(ctx, gate, "browser_eval", {"script": "1 + 1"})
+    with pytest.raises(BrowserError, match="Dot fills a login only where none ran"):
+        await _call(ctx, gate, "browser_fill_login", {"login": "i1", "password": refs["pass"]})
 
 
 async def test_in_auto_the_owner_answers_the_fill_and_not_the_review_model(runtime: Runtime, site: _Site) -> None:
@@ -302,7 +314,7 @@ async def test_in_auto_the_owner_answers_the_fill_and_not_the_review_model(runti
             ]
             asked = pending[0] if pending else None
             await asyncio.sleep(_POLL_S)
-    assert "Fill your login This site from 1Password" in asked.summary, asked.summary
+    assert "Fill your login This site (127.0.0.1) from 1Password" in asked.summary, asked.summary
     assert "whatever your rules say" in asked.summary
     await runtime.approvals.resolve(asked.id, True, UI_SOURCE, "")
     filled: ToolResult = await filling

@@ -20,10 +20,9 @@ from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.types import JsonObject
 from dotagent.runtime import Runtime, build_runtime, close_runtime
-from dotagent.secrets import resolve_secret
 from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
-from dotagent.vault.onepassword import TOKEN_NAME, VAULT_NAME
+from dotagent.vault.onepassword import VAULT_NAME, kept_token
 
 pytestmark = pytest.mark.asyncio(loop_scope="module")
 
@@ -96,7 +95,7 @@ async def test_connect_makes_the_vault_and_keeps_its_token_unseen_and_disconnect
     assert connected.status_code == 200, connected.text
     assert [(vault["name"], vault["logins"]) for vault in connected.json()["vaults"]] == [(VAULT_NAME, 0)]
     assert MADE not in connected.text
-    assert resolve_secret(TOKEN_NAME) == MADE
+    assert kept_token() == MADE
     gone: JsonObject = (await client.delete("/api/vault")).raise_for_status().json()
     assert gone["connected"] is False
-    assert resolve_secret(TOKEN_NAME) is None
+    assert kept_token() is None
