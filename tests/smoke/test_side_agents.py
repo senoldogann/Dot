@@ -1,7 +1,7 @@
-"""The side menu shows every agent of a run (item 198): under a run at work, every run it delegated, those at work with
-their time and those that ended with how they ended, behind a button that says how many work and folds them; the fold
-is kept. The side menu counts the chats at work (item 202). Scripted runs, served by a real server, wide and on a phone,
-light and dark."""
+"""The side menu shows every agent of a run (item 198): a chat at work wears the faces of every run it delegated, those
+at work and those that ended, three at most with the rest counted (item 507), and its name for a screen reader says how
+many there are. The side menu counts the chats at work (item 202). Scripted runs, served by a real server, wide and on a
+phone, light and dark."""
 
 import asyncio
 import time
@@ -140,7 +140,7 @@ async def _open_sidebar(browser: Browser, address: str, width: int, scheme: Lite
     return page
 
 
-async def test_the_side_menu_shows_every_agent_of_a_run_and_folds_them(
+async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(
     runtime: Runtime, served: tuple[RunManager, str], tmp_path: Path
 ) -> None:
     manager, address = served

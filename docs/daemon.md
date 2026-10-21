@@ -20,9 +20,9 @@ works. The creatures rest; only those at work move. Each chat stands once (item 
 while its latest run works, a chat leaves its day for the **Working** section above the list, and goes back once the run
 ends; a pinned chat stays under Pinned. At the right of a chat at work the time gives way to a dashed circle,
 **Working** and how long since the run was asked for ("12s", "4m", "1h 5m", read again every second).
-Under its name, in the line its last words would take, stand the faces of the runs it delegated and that work now
-(item 507): three at most, laid over one another as the marks of the connected apps stand in the foot, the rest counted,
-and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
+Under its name, in the line its last words would take, stand the faces of the runs it delegated (item 507), those at
+work and those that ended: three at most, laid over one another as the marks of the connected apps stand in the foot, the
+rest counted, and its name for a screen reader says how many there are. Nothing hangs under the row: a click on it opens the chat,
 whose conversation and Agents tab hold those runs. Working lists too what is no chat's: a schedule about to fire, the
 session of a campaign (which works in a thread of its own). A chat whose run waits for you keeps its waiting creature and
 its time among the days, and what it asks stands under **Waiting for you**. Working counts what it lists. Folded, Working keeps the open

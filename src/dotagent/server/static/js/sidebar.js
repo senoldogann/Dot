@@ -39,8 +39,7 @@ const ROW_WORDS = 7;
 const ROW_CHARS = 56;
 // Connect apps at the foot shows the marks of this many servers it is connected to (item 492).
 const CONNECTED_MARKS = 3;
-// Which sections the owner folded (`waiting`, `working`, `chats`), and the runs whose delegated runs they folded
-// (`runs`, item 198), kept between visits.
+// Which sections the owner folded (`waiting`, `working`, `chats`), kept between visits.
 const FOLDS_KEY = "dot.sideFolds";
 // What a status dot means, for screen readers; a chat whose latest run is done or cancelled shows no dot and needs no word.
 const STATUS_WORD = { queued: "queued", running: "running", blocked: "waiting for you", failed: "failed" };
@@ -163,8 +162,8 @@ function helperFaces(children) {
 }
 
 /** A chat's name over its last line (item 277): its latest words, "You:" before the owner's own — or, while runs it
- * delegated work, their faces with how many they are (item 507), the line its last words would take. */
-function chatText(chat, children = []) {
+ * delegated stand with it, their faces with how many they are (item 507), the line its last words would take. */
+function chatText(chat, children) {
   const words = chat.last_message ?? "";
   const last = words === "" || chat.last_role !== "user" ? words : `You: ${words}`;
   const faces = helperFaces(children);
@@ -286,7 +285,7 @@ function chatPick(chat, checked, onToggle, face) {
     { class: "side-run side-pick", title: clip(chat.title, 240) },
     box,
     face,
-    chatText(chat),
+    chatText(chat, []),
   );
 }
 
