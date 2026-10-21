@@ -2087,9 +2087,12 @@ class RunManager:
         """Whether a run starts tainted, as the run it goes on from is (item 243): a delegated run as its parent is now,
         a resumed run as the run it resumes was when it was cut off, and the run that tells its chat of a command in the
         background as the chat's last run ended, since that message is Dot's and only a message of the owner restores
-        trust; a schedule's firing as any earlier run whose words it reads ended (``opening.carried``, item 257), for
-        the same reason. Any other run starts untainted. Asked before the run's record is made: the chat's last run
-        is the one before it."""
+        trust. A run that goes on from the runs it names (``opening.carried``) starts tainted when any of them ended so,
+        for the same reason: a schedule's firing, from the earlier runs whose words it reads (item 257); the run a kept
+        step's answer starts, from the run that kept it, the run at the top of its delegations and the chat's last run
+        (items 482, 485); and the run the answer to a question of a run the owner watched starts, from the run that
+        asked and the chat's last run (item 508). Any other run starts untainted. Asked before the run's record is made:
+        the chat's last run is the one before it."""
         if parent is not None:
             return parent.gate.tainted
         if opening.resumed is not None:
