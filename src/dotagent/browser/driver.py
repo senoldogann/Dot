@@ -261,36 +261,15 @@ async def capture_lines(page: Page, timeout_ms: int, hide_secrets: bool) -> tupl
     """One AI snapshot with boxes, the options of collapsed dropdowns folded onto their lines. Taking it replaces the
     ref table of every frame, so refs always mean the latest. With ``hide_secrets`` (every mode but yolo, item 467)
     the value of a field the page marks secret shows as ``[hidden]``."""
-    # The page is asked whether it has a marked field before the snapshot and after it: a field taken out of the page
-    # in between was in the snapshot all the same.
-    marked: bool = hide_secrets and await _has_secret_fields(page)
     raw: str = await _once_more_after_navigation(
         page,
         "taking the page snapshot failed",
         lambda: page.aria_snapshot(mode="ai", boxes=True, timeout=timeout_ms),
     )
     lines: tuple[SnapshotLine, ...] = parse_snapshot(raw)
-    if not hide_secrets:
-        return fold_options(lines)
-    fields: tuple[SnapshotLine, ...] = filled_fields(lines)
-    if fields and (marked or await _has_secret_fields(page)):
-        lines = hide_values(lines, await secret_refs(page, fields))
+    if hide_secrets:
+        lines = hide_values(lines, await secret_refs(page, filled_fields(lines)))
     return fold_options(lines)
-
-
-async def _has_secret_fields(page: Page) -> bool:
-    """Whether a frame of the page has a field marked secret; a frame that went, or cannot be asked, counts as having
-    one, as the snapshot may hold its fields."""
-    for frame in page.frames:
-        if frame.is_detached():
-            return True
-        try:
-            if await frame.locator(secret_selector()).count() > 0:
-                return True
-        except PlaywrightError as error:
-            _log.warning("browser_frame_unreadable", url=frame.url, error=str(error))
-            return True
-    return False
 
 
 async def _is_secret(page: Page, ref: str) -> bool:
@@ -312,8 +291,9 @@ async def _is_secret(page: Page, ref: str) -> bool:
 
 
 async def secret_refs(page: Page, fields: tuple[SnapshotLine, ...]) -> frozenset[str]:
-    """The refs of ``fields`` that the page marks secret (item 467), each asked, all at once. :func:`capture_lines`
-    asks only on a page that has a marked field: a page without, nearly every page, is asked once per frame."""
+    """The refs of ``fields`` that the page marks secret (item 467), each field asked by its own ref, all at once. What
+    the page is like now does not decide for the snapshot taken before: a field added and taken away since, in a frame
+    that went or not, is gone, and so is hidden; only the field the snapshot showed answers for its value."""
     refs: list[str] = [field.ref for field in fields if field.ref is not None]
     answers: list[bool] = await asyncio.gather(*(_is_secret(page, ref) for ref in refs))
     return frozenset(ref for ref, secret in zip(refs, answers, strict=True) if secret)

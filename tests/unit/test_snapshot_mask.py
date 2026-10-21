@@ -95,62 +95,51 @@ def test_the_selector_names_every_kind_of_secret_field() -> None:
 
 @dataclass
 class _Locator:
-    """A field the page cannot be asked about: its frame went, or it is too slow."""
+    """A field as the page answers for it: still there or gone, with its marking, or unable to say."""
 
-    count_value: int
+    present: bool
+    marking: str | None
 
     async def count(self) -> int:
-        return self.count_value
+        return 1 if self.present else 0
 
     async def evaluate(self, expression: str, **options: float) -> object:
-        raise PlaywrightError("Frame was detached")
-
-
-@dataclass
-class _Frame:
-    secret_count: int
-    detached: bool
-
-    def is_detached(self) -> bool:
-        return self.detached
-
-    @property
-    def url(self) -> str:
-        return "https://example.com/login"
-
-    def locator(self, selector: str) -> _Locator:
-        return _Locator(self.secret_count)
+        if self.marking is None:
+            raise PlaywrightError("Frame was detached")
+        return self.marking
 
 
 @dataclass
 class _Page:
-    """The one stub of these tests: a page whose frames say whether they hold a marked field, and that cannot say
-    which of its fields is one."""
+    """The one stub of these tests: a page whose every field answers as ``field`` says, and that counts its asks."""
 
-    frames: list[_Frame] = field(default_factory=lambda: [_Frame(secret_count=1, detached=False)])
-    url: str = "https://example.com/login"
+    field: _Locator
     snapshot: str = '- textbox "Name" [ref=e5]: Ada\n'
+    url: str = "https://example.com/login"
+    asked: list[str] = field(default_factory=list)
 
     def locator(self, selector: str) -> _Locator:
-        return _Locator(1)
+        self.asked.append(selector)
+        return self.field
 
     async def aria_snapshot(self, mode: str, boxes: bool, **options: float) -> str:
         return self.snapshot
 
 
-async def test_a_field_that_cannot_be_asked_is_hidden_and_a_ref_of_another_shape_too() -> None:
-    lines: tuple[SnapshotLine, ...] = parse_snapshot(
-        '- textbox "Name" [ref=e5]: Ada\n- textbox "Odd" [ref=x9]: value\n'
-    )
-    assert await secret_refs(_Page(), filled_fields(lines)) == frozenset({"e5", "x9"})  # type: ignore[arg-type]
+async def test_a_field_that_cannot_be_asked_or_went_is_hidden_and_a_ref_of_another_shape_too() -> None:
+    lines: tuple[SnapshotLine, ...] = parse_snapshot('- textbox "Name" [ref=e5]: Ada\n- textbox "Odd" [ref=x9]: v\n')
+    unable: _Page = _Page(field=_Locator(present=True, marking=None))
+    assert await secret_refs(unable, filled_fields(lines)) == frozenset({"e5", "x9"})  # type: ignore[arg-type]
+    # A field taken away since the snapshot, in a frame that went or not, cannot answer for the value shown.
+    gone: _Page = _Page(field=_Locator(present=False, marking=""))
+    assert await secret_refs(gone, filled_fields(lines)) == frozenset({"e5", "x9"})  # type: ignore[arg-type]
 
 
-async def test_a_page_without_secret_fields_asks_no_field_and_a_frame_that_went_counts_as_one() -> None:
-    # Nothing marked: no field is asked (asking would fail and hide), and the value stays.
-    plain: _Page = _Page(frames=[_Frame(secret_count=0, detached=False)])
+async def test_an_ordinary_field_keeps_its_value_a_marked_one_does_not_and_yolo_asks_nothing() -> None:
+    plain: _Page = _Page(field=_Locator(present=True, marking="name"))
     assert render_lines(await capture_lines(plain, 1000, True)) == '- textbox "Name" [ref=e5]: Ada'  # type: ignore[arg-type]
-    # A frame that went may have had one in the snapshot: the fields are asked, and one that cannot say is hidden.
-    gone: _Page = _Page(frames=[_Frame(secret_count=0, detached=False), _Frame(secret_count=0, detached=True)])
-    assert HIDDEN_VALUE in render_lines(await capture_lines(gone, 1000, True))  # type: ignore[arg-type]
-    # Yolo asks nothing and hides nothing.
-    assert "Ada" in render_lines(await capture_lines(gone, 1000, False))  # type: ignore[arg-type]
+    marked: _Page = _Page(field=_Locator(present=True, marking="password current-password"))
+    assert HIDDEN_VALUE in render_lines(await capture_lines(marked, 1000, True))  # type: ignore[arg-type]
+    yolo: _Page = _Page(field=_Locator(present=True, marking=None))
+    assert "Ada" in render_lines(await capture_lines(yolo, 1000, False))  # type: ignore[arg-type]
+    assert yolo.asked == []
