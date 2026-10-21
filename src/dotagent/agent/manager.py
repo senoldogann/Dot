@@ -55,7 +55,7 @@ from dotagent.agent.resume import (
 )
 from dotagent.agent.review import reviewer_for, shorten_reason
 from dotagent.browser.attach import read_debug_endpoint
-from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputEvent, InputResult, InputTally, tally_after
+from dotagent.browser.remote_input import NO_INPUT, InputBatch, InputResult, InputTally, MouseButton, ScreenHold
 from dotagent.browser.session import BrowserSession
 from dotagent.config import ResumeMode
 from dotagent.core.errors import (
@@ -166,6 +166,15 @@ class RunHandle:
     cancel: asyncio.Event
     inbox: asyncio.Queue[UserInput]
     finished: asyncio.Event
+
+
+@dataclass(frozen=True)
+class _Hold:
+    """A run the owner holds (item 479): the hold their input from the screen goes through, and the browser session
+    its page is in, found when the hold began, so that ending the hold waits on nothing."""
+
+    hold: ScreenHold
+    browser: BrowserSession
 
 
 @dataclass(frozen=True)
@@ -282,8 +291,10 @@ class RunManager:
         self._handles: dict[str, RunHandle] = {}
         # What the owner did from the screen on the page of each run they hold (item 470), counts only, and the lock
         # that orders a batch of their input with the run's hand-back: a batch under way ends before it.
-        self._screen_input: dict[str, InputTally] = {}
-        self._input_locks: dict[str, asyncio.Lock] = {}
+        # The hold of each run the owner holds, whose page they may use from the screen (items 470 and 479), and the
+        # releases of what their input left pressed, under way.
+        self._holds: dict[str, _Hold] = {}
+        self._releases: set[asyncio.Task[None]] = set()
         # Threads that a run is being launched on and whose handle is not registered yet.
         self._claimed: set[str] = set()
         self._stopping: bool = False
@@ -1350,10 +1361,14 @@ class RunManager:
         handle: RunHandle = self._handle(run_id)
         browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
         handle.gate.hold()
+        # A run held on the Mac may be used from a screen as well (item 475): its hold is the screen's too, kept from
+        # the moment the run is held, so that an end that comes meanwhile ends it.
+        self._holds[run_id] = _Hold(hold=ScreenHold(False), browser=browser)
         try:
             url: str | None = await browser.focus(handle.thread_id)
         except BaseException:
             # No tab came to the front for the user: the run goes on.
+            self._end_hold(run_id, handle.thread_id)
             handle.gate.release()
             raise
         await self._runtime.bus.emit(run_id, TAKEOVER_EVENT, {"source": source, "url": url}, True)
@@ -1373,7 +1388,7 @@ class RunManager:
                 {"run_id": run_id},
             )
         handle.gate.hold()
-        self._screen_input[run_id] = NO_INPUT
+        self._holds[run_id] = _Hold(hold=ScreenHold(True), browser=browser)
         url: str | None = browser.current_url(handle.thread_id)
         await self._runtime.bus.emit(
             run_id,
@@ -1385,49 +1400,62 @@ class RunManager:
 
     async def send_input(self, run_id: str, batch: InputBatch) -> InputResult:
         """Do the owner's input on the page of a run they hold (item 470), as the run's browser does it
-        (:meth:`BrowserSession.send_input`), and count it for the hand-back's record. Refused when the run is not
-        held, its browser has no page, a step of it is still going after a moment, or ``[browser] remote_input`` is
-        off."""
+        (:meth:`BrowserSession.send_input`), counted in the hold for the hand-back's record. Refused when the run is
+        not held, its browser has no page, a step of it is still going after a moment, or ``[browser] remote_input``
+        is off."""
         handle: RunHandle = self._handle(run_id)
-        async with self._input_locks.setdefault(run_id, asyncio.Lock()):
-            if not handle.gate.held:
-                raise RunConflict("the run is not taken over", {"run_id": run_id})
-            browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
-            try:
-                result: InputResult = await browser.send_input(handle.thread_id, batch.events, lambda: handle.gate.held)
-            except BrowserError:
-                # The page failed part way: what was sent may have been done, a press among it too.
-                self._count_input(run_id, batch.events)
-                raise
-            self._count_input(run_id, batch.events)
-            return result
-
-    def _count_input(self, run_id: str, events: Sequence[InputEvent]) -> None:
-        self._screen_input[run_id] = tally_after(self._screen_input.get(run_id, NO_INPUT), events)
+        held: _Hold | None = self._holds.get(run_id)
+        if held is None or not handle.gate.held:
+            raise RunConflict("the run is not taken over", {"run_id": run_id})
+        return await held.browser.send_input(handle.thread_id, batch.events, held.hold)
 
     async def hand_back(self, run_id: str, source: str) -> float:
-        """Let the run go on after a takeover; returns how long it was held. Refused when it is not held. A hold the
-        owner used the page in from the screen lets go of a button their input left down first, and its event counts
-        what they did there (item 470), never what they typed."""
+        """Let the run go on after a takeover; returns how long it was held. Refused when it is not held. Nothing is
+        waited for (item 479): the hold ends, so that no batch of the owner's input begins after, and a button their
+        input left down is let go before the run's next step takes the page, by the last batch under way or here. The
+        event of a hold the owner used the page in from the screen counts what they did there (item 470), the batches
+        under way included, never what they typed."""
         handle: RunHandle = self._handle(run_id)
-        # A batch of the owner's input under way ends first, counted, and none starts after.
-        async with self._input_locks.setdefault(run_id, asyncio.Lock()):
-            if not handle.gate.held:
-                raise RunConflict("the run is not taken over", {"run_id": run_id})
-            used: InputTally | None = self._screen_input.pop(run_id, None)
-            if used is not None and used.buttons_down:
-                browser: BrowserSession = await browser_of(self._runtime, await self._runtime.store.get_run(run_id))
-                try:
-                    await browser.let_go_of_buttons(handle.thread_id, used.buttons_down)
-                except BrowserError as error:
-                    # The page went away with the button: the run is handed back all the same.
-                    log.warning("screen_input_release_failed", run_id=run_id, error=error.message)
-            held_s: float = handle.gate.release()
+        if not handle.gate.held:
+            raise RunConflict("the run is not taken over", {"run_id": run_id})
+        held: _Hold | None = self._end_hold(run_id, handle.thread_id)
+        used: InputTally = NO_INPUT if held is None else held.hold.tally
+        held_s: float = handle.gate.release()
         data: JsonObject = {"source": source, "held_s": round(held_s, 1)}
-        if used is not None:
+        if held is not None and (held.hold.on_screen or used != NO_INPUT):
             data["inputs"] = {"clicks": used.clicks, "scrolls": used.scrolls, "typed": used.typed}
         await self._runtime.bus.emit(run_id, HANDBACK_EVENT, data, True)
         return held_s
+
+    def _end_hold(self, run_id: str, thread_id: str) -> _Hold | None:
+        """End the owner's hold of the run, when there is one (item 479): no batch of their input begins after, and
+        what it left pressed is let go (:meth:`_let_go`); the hold, with what its input did, for the record."""
+        held: _Hold | None = self._holds.pop(run_id, None)
+        if held is not None:
+            held.hold.end()
+            self._let_go(run_id, thread_id, held)
+        return held
+
+    def _let_go(self, run_id: str, thread_id: str, held: _Hold) -> None:
+        """Let go of what the owner's input left pressed, now that their hold is over (item 479), unless a batch of it
+        is under way, which does it as it ends: in a task of its own, so that neither the hand-back nor the run's end
+        waits on a page. Its first step takes the page's lock, ahead of the run's next step, which the hand-back lets go
+        on after it."""
+        buttons: frozenset[MouseButton] = held.hold.take_release()
+        if not buttons:
+            return
+        task: asyncio.Task[None] = asyncio.create_task(self._letting_go(run_id, thread_id, held.browser, buttons))
+        self._releases.add(task)
+        task.add_done_callback(self._releases.discard)
+
+    async def _letting_go(
+        self, run_id: str, thread_id: str, browser: BrowserSession, buttons: frozenset[MouseButton]
+    ) -> None:
+        try:
+            await browser.let_go_of_buttons(thread_id, buttons)
+        except BrowserError as error:
+            # The page went away or does not answer: the hold is over all the same, and nobody waits on it.
+            log.warning("screen_input_release_failed", run_id=run_id, error=error.message)
 
     async def wait(self, run_id: str) -> RunRecord:
         """Block until the run is over (returns immediately for runs that already ended)."""
@@ -1482,6 +1510,9 @@ class RunManager:
             task.cancel()
         if learning:
             await asyncio.wait(learning)
+        # The releases of what the owner's input left pressed are bounded: they end on their own (item 479).
+        if self._releases:
+            await asyncio.wait(list(self._releases))
         if self._owner is not None:
             # Its runs have ended: this process lets go of them.
             await asyncio.to_thread(self._owner.release)
@@ -2187,8 +2218,9 @@ class RunManager:
             return False
         finally:
             self._handles.pop(run.id, None)
-            self._screen_input.pop(run.id, None)
-            self._input_locks.pop(run.id, None)
+            # A run that ends held ends its hold too: no batch of the owner's input begins after, and what it left
+            # pressed is let go, by the last batch under way or here, waiting on nothing (item 479).
+            self._end_hold(run.id, run.thread_id)
             self._emergency.discard(run.id)
             self._cutting.discard(run.id)
             finished.set()

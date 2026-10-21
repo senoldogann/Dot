@@ -402,8 +402,12 @@ Chrome's zoom and the scaling of the picture do not move them; they wait a momen
 only while the run is held, so input sent before **Return control** never comes after it. The picture and the input come
 from the browser the run works in, a campaign's Chrome too. The `takeover` event then says `by: "screen"` and whether
 the request came by a name of `[server] reach` rather than this Mac's own address (`via_reach_name`, a hint, never a
-decision), and the `handback` event counts the clicks and scrolls and says whether anything was typed, never what; a
-button left down is let go first. A tab a tap opens (a link to a new tab, a sign-in popup) is not the one the picture
+decision), and the `handback` event counts the clicks and scrolls and says whether anything was typed, never what, a
+batch still being done included. Neither **Return control** nor the run's end waits on the page (item 479): the hold
+ends, no batch begins after, and a button your input left down is let go before the run's next step has the page, by
+the last batch under way as it ends, or else at once; the page is given a moment to take a batch (3 s, its measure
+included) and to let go (1 s), and one that does not answer fails the batch and is logged, holding nothing up. A run
+held on the Mac can be used from the screen as well. A tab a tap opens (a link to a new tab, a sign-in popup) is not the one the picture
 shows: the run finds it at its next look at the page. `[browser] remote_input` switches it (Settings › Browser, on by
 default). On the run page, **Use it here** does it (item 475): it sits beside Take over in the pill, first on a touch
 screen, and on the card of a browser step handed to you; the view opens over the whole page, a tap clicks, two quick

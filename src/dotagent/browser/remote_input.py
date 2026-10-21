@@ -88,7 +88,7 @@ class InputResult(FrozenModel):
 
 class InputTally(FrozenModel):
     """What the owner did on the page during one hold, as counts only (item 470): presses of a button, wheel events,
-    whether anything was typed, and the buttons still down, which are let go when the run is handed back."""
+    whether anything was typed, and the buttons still down, which are let go once the hold is over (item 479)."""
 
     clicks: int
     scrolls: int
@@ -97,6 +97,43 @@ class InputTally(FrozenModel):
 
 
 NO_INPUT: InputTally = InputTally(clicks=0, scrolls=0, typed=False, buttons_down=frozenset())
+
+
+class ScreenHold:
+    """One hold of a run whose page the owner may use from the screen (items 470 and 479), shared by the run's manager,
+    which starts and ends it, and the browser session, which does its batches of input. It knows what the input did
+    (``tally``: a batch is counted once it may begin, before the page is touched, since what is sent may be done), how
+    many batches are being done now, and whether the hold is over: the run handed back, or ended. Nothing waits on it.
+    Ending a hold marks it over, and no batch begins after; what the input left pressed is let go once, by the last of
+    its batches to finish, or by the end itself when none is under way (:meth:`take_release`)."""
+
+    def __init__(self, on_screen: bool) -> None:
+        # Whether the hold began on the screen (Use it here) rather than on the Mac (Take over).
+        self.on_screen: bool = on_screen
+        self.tally: InputTally = NO_INPUT
+        self.under_way: int = 0
+        self.over: bool = False
+        self._released: bool = False
+
+    def begin(self, events: Sequence[InputEvent]) -> bool:
+        """Whether a batch of ``events`` may be done now, the hold going on; one that may is counted."""
+        if self.over:
+            return False
+        self.tally = tally_after(self.tally, events)
+        return True
+
+    def end(self) -> InputTally:
+        """Mark the hold over: no batch begins after. Returns what its input did, the batches under way's included."""
+        self.over = True
+        return self.tally
+
+    def take_release(self) -> frozenset[MouseButton]:
+        """The buttons to let go of now, once: those the input left down, when the hold is over and none of its batches
+        is under way. The first to ask then gets them, and nobody after it; none before."""
+        if not self.over or self.under_way > 0 or self._released:
+            return frozenset()
+        self._released = True
+        return self.tally.buttons_down
 
 
 def viewport_point(x: float, y: float, viewport: Viewport) -> tuple[float, float]:

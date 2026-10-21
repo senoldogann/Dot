@@ -10,7 +10,7 @@ import asyncio
 import json
 import threading
 import time
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Iterator, Sequence
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -23,9 +23,9 @@ from structlog.testing import capture_logs
 from dotagent.agent.gate import HANDBACK_EVENT, TAKEOVER_EVENT
 from dotagent.agent.manager import RunManager
 from dotagent.browser.attach import DebugEndpoint
-from dotagent.browser.remote_input import InputBatch, InputEvent, InputResult
+from dotagent.browser.remote_input import InputBatch, InputEvent, InputResult, InputTally, ScreenHold, dispatch
 from dotagent.browser.session import BrowserSession, no_runs_at_work
-from dotagent.browser.types import Frame, ScriptRun
+from dotagent.browser.types import Frame, ScriptRun, Viewport
 from dotagent.config import BrowserConfig, ServerConfig, load_config, load_default_config
 from dotagent.core.errors import BrowserError, RunConflict
 from dotagent.evals.runner import SCRIPTED_MODEL
@@ -166,8 +166,11 @@ def _tap(at: tuple[float, float]) -> list[InputEvent]:
     )
 
 
-def _held() -> bool:
-    return True
+def _ended() -> ScreenHold:
+    """A hold the owner gave back."""
+    over: ScreenHold = ScreenHold(True)
+    over.end()
+    return over
 
 
 async def _read(browser: BrowserSession, thread: str, script: str) -> object:
@@ -178,15 +181,16 @@ async def _read(browser: BrowserSession, thread: str, script: str) -> object:
 
 
 async def _taps_scrolls_and_keys_reach(browser: BrowserSession, thread: str) -> None:
-    taken: InputResult = await browser.send_input(thread, _tap(_BUTTON), _held)
+    hold: ScreenHold = ScreenHold(True)
+    taken: InputResult = await browser.send_input(thread, _tap(_BUTTON), hold)
     assert taken.accepted == 3 and taken.width > 0 and taken.height > 0, taken
     assert await _read(browser, thread, "document.getElementById('count').textContent") == "1"
-    await browser.send_input(thread, _batch({"kind": "wheel", "x": 0.5, "y": 0.5, "dx": 0, "dy": 600}), _held)
+    await browser.send_input(thread, _batch({"kind": "wheel", "x": 0.5, "y": 0.5, "dx": 0, "dy": 600}), hold)
     await asyncio.sleep(0.3)
     scrolled: object = await _read(browser, thread, "window.scrollY")
     assert isinstance(scrolled, int | float) and scrolled > 0, scrolled
-    await browser.send_input(thread, _tap(_FIELD), _held)
-    await browser.send_input(thread, _batch({"kind": "text", "text": SENTINEL}, {"kind": "key", "key": "Enter"}), _held)
+    await browser.send_input(thread, _tap(_FIELD), hold)
+    await browser.send_input(thread, _batch({"kind": "text", "text": SENTINEL}, {"kind": "key", "key": "Enter"}), hold)
     assert await _read(browser, thread, "document.getElementById('field').value") == SENTINEL
     assert await _read(browser, thread, "document.getElementById('submitted').textContent") == "1"
 
@@ -218,27 +222,29 @@ async def test_the_screens_taps_scrolls_and_keys_reach_the_page_whatever_its_zoo
 async def test_input_waits_out_a_step_under_way_and_lands_only_while_the_run_is_held(
     session: BrowserSession, site: _Site
 ) -> None:
+    hold: ScreenHold = ScreenHold(True)
     with pytest.raises(RunConflict, match="no page open"):
-        await session.send_input("nothing", _tap(_BUTTON), _held)
+        await session.send_input("nothing", _tap(_BUTTON), hold)
     await session.open_url("held", f"{site.base}/play", True)
-    # A step under way holds the thread's lock: the input waits a moment, then is refused.
+    # A step under way holds the thread's lock: the input waits a moment, then is refused, and is not counted.
     thread = session._threads["held"]
     async with thread.lock:
         started: float = time.monotonic()
         with pytest.raises(RunConflict, match="still going"):
-            await session.send_input("held", _tap(_BUTTON), _held)
+            await session.send_input("held", _tap(_BUTTON), hold)
         assert 1.5 <= time.monotonic() - started <= 5.0
+    assert (hold.tally.clicks, hold.under_way) == (0, 0)
     # Handed back while the input waited: it is not done.
     with pytest.raises(RunConflict, match="not taken over"):
-        await session.send_input("held", _tap(_BUTTON), lambda: False)
+        await session.send_input("held", _tap(_BUTTON), _ended())
     assert await _read(session, "held", "document.getElementById('count').textContent") == "0"
     session.set_remote_input(False)
     try:
         with pytest.raises(RunConflict, match="remote_input"):
-            await session.send_input("held", _tap(_BUTTON), _held)
+            await session.send_input("held", _tap(_BUTTON), hold)
     finally:
         session.set_remote_input(True)
-    await session.send_input("held", _tap(_BUTTON), _held)
+    await session.send_input("held", _tap(_BUTTON), hold)
     assert await _read(session, "held", "document.getElementById('count').textContent") == "1"
 
 
@@ -255,10 +261,91 @@ async def test_a_page_that_fails_keeps_what_was_typed_out_of_its_error(
     await session.open_url("broken", f"{site.base}/play", True)
     monkeypatch.setattr("dotagent.browser.session.dispatch", broken)
     with capture_logs() as logs, pytest.raises(BrowserError) as failed:
-        await session.send_input("broken", _batch({"kind": "text", "text": SENTINEL}), _held)
+        await session.send_input("broken", _batch({"kind": "text", "text": SENTINEL}), ScreenHold(True))
     assert failed.value.context["events"] == ["text"] and failed.value.context["error_type"] == "RuntimeError"
     assert SENTINEL not in str(failed.value) and failed.value.__cause__ is None
     assert SENTINEL not in json.dumps(logs, default=str)
+
+
+# A press in the page's empty corner, which neither the button nor the field takes, left down: no release follows it.
+_PRESS: dict[str, object] = {"kind": "down", "x": 0.9, "y": 0.9, "button": "left", "clicks": 1}
+_WHEEL: dict[str, object] = {"kind": "wheel", "x": 0.5, "y": 0.5, "dx": 0, "dy": 200}
+
+
+def _held_up(going: asyncio.Event) -> object:
+    """The page's own dispatch, done once ``going`` is set: a batch under way for as long as the test wants."""
+
+    async def held_up(page: Page, viewport: Viewport, events: Sequence[InputEvent]) -> None:
+        await going.wait()
+        await dispatch(page, viewport, events)
+
+    return held_up
+
+
+async def _until_counted(hold: ScreenHold, scrolls: int) -> None:
+    """Wait until ``hold`` counted ``scrolls`` scrolls: a batch may begin once it is counted."""
+    async with asyncio.timeout(10.0):
+        while True:
+            if hold.tally.scrolls >= scrolls:
+                return
+            await asyncio.sleep(0.02)
+
+
+@pytest.mark.browser
+async def test_the_last_batch_of_a_hold_that_ended_lets_go_of_its_press_before_anyone_else_has_the_page(
+    session: BrowserSession, site: _Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 479: a batch under way when its hold ends is done and counted, and, the last of the hold's batches, lets go
+    of the press the input left down before the page is anyone else's: a step of the run that waits for the page finds
+    no button down. The end itself waits on nothing, and leaves the release to the batch under way."""
+    await session.open_url("release", f"{site.base}/play", True)
+    hold: ScreenHold = ScreenHold(True)
+    await session.send_input("release", _batch(_PRESS), hold)
+    assert await _read(session, "release", "window.pressed") == 1
+    going: asyncio.Event = asyncio.Event()
+    monkeypatch.setattr("dotagent.browser.session.dispatch", _held_up(going))
+    scrolling: asyncio.Task[InputResult] = asyncio.create_task(session.send_input("release", _batch(_WHEEL), hold))
+    await _until_counted(hold, 1)
+    used: InputTally = hold.end()
+    assert (used.clicks, used.scrolls, hold.under_way) == (1, 1, 1)
+    assert hold.take_release() == frozenset()
+    # A step of the run waits for the page meanwhile, and reads it once the batch is over.
+    step: asyncio.Task[object] = asyncio.create_task(_read(session, "release", "window.pressed"))
+    await asyncio.sleep(0.2)
+    assert not step.done()
+    going.set()
+    assert (await scrolling).accepted == 1
+    assert await step == 0
+    assert hold.take_release() == frozenset()
+    with pytest.raises(RunConflict, match="not taken over"):
+        await session.send_input("release", _batch(_PRESS), hold)
+
+
+@pytest.mark.browser
+async def test_a_page_that_does_not_take_a_batch_holds_it_and_the_page_a_moment_only(
+    session: BrowserSession, site: _Site, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 479: the page is given a moment to measure itself and take a batch; one that does not answer fails the
+    batch as the page's failure, and the page is the run's again after."""
+    await session.open_url("stuck", f"{site.base}/play", True)
+
+    async def never(*parts: object) -> None:
+        await asyncio.Event().wait()
+
+    for target in ("dispatch", "measure"):
+        if target == "dispatch":
+            monkeypatch.setattr("dotagent.browser.session.dispatch", never)
+        else:
+            monkeypatch.setattr(session, "_viewport", never)
+        hold: ScreenHold = ScreenHold(True)
+        started: float = time.monotonic()
+        with pytest.raises(BrowserError) as failed:
+            await session.send_input("stuck", _tap(_BUTTON), hold)
+        assert failed.value.context["error_type"] == "TimeoutError", target
+        assert 2.5 <= time.monotonic() - started <= 6.0, target
+        assert hold.under_way == 0
+        monkeypatch.undo()
+        assert await _read(session, "stuck", "document.getElementById('count').textContent") == "0"
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
@@ -345,6 +432,15 @@ def _tapped(at: tuple[float, float]) -> dict[str, object]:
     )
 
 
+async def _waiting_at_the_gate(manager: RunManager, run_id: str) -> None:
+    """Wait until one of the run's tool calls waits for the owner to give the run back (item 479)."""
+    async with asyncio.timeout(_RUN_WAIT_S):
+        while True:
+            if manager._handles[run_id].gate.waiting > 0:
+                return
+            await asyncio.sleep(0.05)
+
+
 async def _results(runtime: Runtime, run_id: str, count: int) -> None:
     """Wait until ``count`` steps of the run have their results."""
     async with asyncio.timeout(_RUN_WAIT_S):
@@ -410,8 +506,9 @@ async def test_a_run_held_from_the_screen_takes_the_owners_input_and_records_cou
             f"/api/runs/{run.id}/input", json=_events({"kind": "key", "key": "Enter; rm -rf"})
         )
         assert refused.status_code == 422, refused.text
-        # The step under way when the run was taken over ends, and the next one waits for the owner.
-        await _results(runtime, run.id, 2)
+        # A step of the run comes to the gate and waits there for the owner: the one under way when the run was taken
+        # over, or the next one.
+        await _waiting_at_the_gate(manager, run.id)
         back: httpx.Response = await client.post(f"/api/runs/{run.id}/handback")
         assert back.status_code == 202, back.text
         late: httpx.Response = await client.post(f"/api/runs/{run.id}/input", json=_tapped(_BUTTON))
@@ -461,7 +558,7 @@ async def test_the_cast_and_the_input_of_a_campaign_come_from_its_own_browser(
         asked.append("cast")
         yield Frame(url="https://example.test/", data=b"\xff\xd8 a frame")
 
-    async def input_there(thread_id: str, events: list[InputEvent], still_held: object) -> InputResult:
+    async def input_there(thread_id: str, events: list[InputEvent], hold: ScreenHold) -> InputResult:
         asked.append("input")
         return InputResult(accepted=len(events), url="https://example.test/", width=1280, height=860)
 
@@ -497,54 +594,76 @@ async def test_the_cast_and_the_input_of_a_campaign_come_from_its_own_browser(
             await manager.wait(campaign.id)
 
 
-async def test_a_hand_back_waits_for_input_under_way_and_counts_it(
-    runtime: Runtime, manager: RunManager, monkeypatch: pytest.MonkeyPatch
+def _opened(site: _Site) -> ScriptedProvider:
+    """A run that opens the fixture page, then is held at its next step, which sleeps."""
+    return ScriptedProvider(
+        _PROVIDER,
+        [_call("browser_open", {"url": f"{site.base}/play"}), _call("shell", {"command": "sleep 5"}), _FINISH, _FINISH],
+    )
+
+
+@pytest.mark.browser
+async def test_a_hand_back_waits_for_nothing_and_the_batch_under_way_lets_go_of_its_press(
+    runtime: Runtime, manager: RunManager, site: _Site, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Return control while a batch of input is still being done: the batch ends first and is counted, a button it left
-    down is let go, and the next hold starts from nothing. The page is stood in for: no Chrome is started."""
-    going: asyncio.Event = asyncio.Event()
-    let_go: list[frozenset[str]] = []
-
-    async def slow_input(thread_id: str, events: list[InputEvent], still_held: object) -> InputResult:
-        await going.wait()
-        return InputResult(accepted=len(events), url="https://example.test/", width=1280, height=860)
-
-    async def letting_go(thread_id: str, buttons: frozenset[str]) -> None:
-        let_go.append(buttons)
-
-    monkeypatch.setattr(runtime.browser, "send_input", slow_input)
-    monkeypatch.setattr(runtime.browser, "let_go_of_buttons", letting_go)
-    MODEL.script = ScriptedProvider(_PROVIDER, [_call("shell", {"command": "sleep 5"}), _FINISH, _FINISH])
+    """Item 479: Return control while a batch of input is still being done waits for nothing: the run is given back at
+    once and no batch begins after; the batch under way is counted in the hand-back's record, and, done, lets go of the
+    press the owner's input left down."""
+    MODEL.script = _opened(site)
     run: RunRecord = await manager.start(
         "Wait", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
     )
     try:
+        await _results(runtime, run.id, 1)
         await manager.take_over_on_screen(run.id, "test", False)
-        pressed: InputBatch = InputBatch.model_validate(
-            {"events": [{"kind": "down", "x": 0.5, "y": 0.5, "button": "left", "clicks": 1}]}
+        await manager.send_input(run.id, InputBatch.model_validate(_events(_PRESS)))
+        assert await _on_the_page(runtime, run.thread_id, "window.pressed") == 1
+        going: asyncio.Event = asyncio.Event()
+        monkeypatch.setattr("dotagent.browser.session.dispatch", _held_up(going))
+        hold: ScreenHold = manager._holds[run.id].hold
+        scrolling: asyncio.Task[InputResult] = asyncio.create_task(
+            manager.send_input(run.id, InputBatch.model_validate(_events(_WHEEL)))
         )
-        sending: asyncio.Task[InputResult] = asyncio.create_task(manager.send_input(run.id, pressed))
-        await asyncio.sleep(0.2)
-        handing: asyncio.Task[float] = asyncio.create_task(manager.hand_back(run.id, "test"))
-        await asyncio.sleep(0.2)
-        assert not handing.done() and manager.held(run.id)
-        going.set()
-        assert (await sending).accepted == 1
-        await handing
-        assert let_go == [frozenset({"left"})]
-        with pytest.raises(RunConflict, match="not taken over"):
-            await manager.send_input(run.id, pressed)
-        await manager.take_over_on_screen(run.id, "test", False)
+        await _until_counted(hold, 1)
+        started: float = time.monotonic()
         await manager.hand_back(run.id, "test")
+        assert time.monotonic() - started < 1.0 and not manager.held(run.id)
         handbacks: list[EventRecord] = await runtime.store.events_of_kind(run.id, HANDBACK_EVENT, 5)
-        assert [event.data["inputs"] for event in handbacks] == [
-            {"clicks": 1, "scrolls": 0, "typed": False},
-            {"clicks": 0, "scrolls": 0, "typed": False},
-        ]
+        assert [event.data["inputs"] for event in handbacks] == [{"clicks": 1, "scrolls": 1, "typed": False}]
+        with pytest.raises(RunConflict, match="not taken over"):
+            await manager.send_input(run.id, InputBatch.model_validate(_events(_PRESS)))
+        going.set()
+        assert (await scrolling).accepted == 1
+        await _until(runtime, run.thread_id, "window.pressed", 0)
     finally:
         manager.cancel(run.id)
         async with asyncio.timeout(_RUN_WAIT_S):
             await manager.wait(run.id)
+
+
+@pytest.mark.browser
+async def test_a_run_that_ends_held_ends_at_once_and_lets_go_of_the_press_left_down(
+    runtime: Runtime, manager: RunManager, site: _Site
+) -> None:
+    """Item 479: a run stopped while held from the screen, the owner's press still down, ends without waiting on the
+    page; the press is let go of, so that the chat's next run does not click with it down, and nothing of the hold is
+    kept."""
+    MODEL.script = _opened(site)
+    run: RunRecord = await manager.start(
+        "Wait", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    await _results(runtime, run.id, 1)
+    await manager.take_over_on_screen(run.id, "test", False)
+    await manager.send_input(run.id, InputBatch.model_validate(_events(_PRESS)))
+    assert await _on_the_page(runtime, run.thread_id, "window.pressed") == 1
+    manager.cancel(run.id)
+    async with asyncio.timeout(10.0):
+        ended: RunRecord = await manager.wait(run.id)
+    assert ended.status == "cancelled", ended
+    await _until(runtime, run.thread_id, "window.pressed", 0)
+    assert run.id not in manager._holds
+    with pytest.raises(RunConflict):
+        await manager.send_input(run.id, InputBatch.model_validate(_events(_PRESS)))
 
 
 async def _on_the_page(runtime: Runtime, thread_id: str, script: str) -> object:
