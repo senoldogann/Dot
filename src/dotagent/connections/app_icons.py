@@ -13,6 +13,7 @@ from xml.parsers.expat import ExpatError
 from PIL import Image
 
 from dotagent.core.errors import DesktopError
+from dotagent.core.images import UNREADABLE_IMAGE
 from dotagent.core.logs import get_logger
 
 log = get_logger(__name__)
@@ -47,12 +48,17 @@ def icon_file(bundle: Path) -> Path | None:
     return found if found.is_file() else None
 
 
+# What an icon file that is no picture Pillow can read raises (item 515), and the SyntaxError of an icns it cannot
+# parse.
+_UNREADABLE_ICON: tuple[type[Exception], ...] = (*UNREADABLE_IMAGE, SyntaxError)
+
+
 @lru_cache(maxsize=_KEPT_ICONS)
 def _drawn(icns: Path, modified_ns: int) -> bytes:
     try:
         with Image.open(icns) as source:
             picture: Image.Image = source.convert("RGBA")
-    except (OSError, SyntaxError) as error:
+    except _UNREADABLE_ICON as error:
         raise DesktopError(
             "the application's icon could not be read", {"icns": str(icns), "error": str(error)}
         ) from error
