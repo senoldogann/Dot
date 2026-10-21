@@ -372,6 +372,18 @@ async def test_an_agent_is_made_runs_in_its_own_voice_and_bounds_and_leaves_its_
             assert (
                 await page_ui.locator("textarea[aria-label='Message']").get_attribute("placeholder") == "Message Scout"
             )
+            # The box starts on Auto, as the home's does (item 513): no mode pill until /task, /chat or /research names
+            # one, and /auto goes back.
+            message: Locator = page_ui.locator("textarea[aria-label='Message']")
+            mode_pill: Locator = page_ui.locator(".composer-pill[data-pill='mode']")
+            await expect(mode_pill).to_be_hidden()
+            await message.type("/chat")
+            await message.press("Tab")
+            await expect(mode_pill).to_contain_text("Chat")
+            await message.type("/auto")
+            await message.press("Tab")
+            await expect(mode_pill).to_be_hidden()
+            await expect(message).to_have_value("")
             # The tab names the agent and the bar's name is the page's one heading (item 437).
             await expect(page_ui).to_have_title("Scout · Agents · Dot")
             await expect(page_ui.get_by_role("heading", level=1)).to_have_text("Scout")
