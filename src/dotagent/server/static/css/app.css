@@ -7713,6 +7713,79 @@ button.attach-chip:hover {
   }
 }
 
+/* A team (item 504): a card as a template's, the faces and names of its agents under its name and what it does, and
+   Use team at its foot; on a phone, Use at its top right as a template's. */
+.team-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+
+.team-card > .btn {
+  margin-top: auto;
+  align-self: flex-start;
+}
+
+.team-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+}
+
+.team-members > li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+@media (max-width: 720px) {
+  .team-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "head use"
+      "members members";
+    align-items: start;
+    gap: var(--space-2);
+    padding: var(--space-3);
+  }
+
+  .team-card:has(> .template-also) {
+    grid-template-areas:
+      "head use"
+      "members members"
+      "also also";
+  }
+
+  .team-card > .template-head {
+    grid-area: head;
+  }
+
+  .team-card > .team-members {
+    grid-area: members;
+  }
+
+  .team-card > .template-also {
+    grid-area: also;
+    min-height: 40px;
+  }
+
+  .team-card > .btn.template-use {
+    grid-area: use;
+    height: 44px;
+    margin-top: 0;
+    padding: 0 var(--space-3);
+  }
+}
+
 .cluster.end {
   justify-content: flex-end;
 }

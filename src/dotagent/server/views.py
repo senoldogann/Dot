@@ -708,6 +708,14 @@ class TeamView(FrozenModel):
     messages: list[TeamMessage]
 
 
+class TeamUse(FrozenModel):
+    """``POST /api/agent-teams/{id}/use`` (item 504): the agents it made, in the team's order, and the owner's agents
+    it kept, each with the name of one of the team's members."""
+
+    made: list[AgentRecord]
+    kept: list[AgentRecord]
+
+
 class LearnedSkillView(FrozenModel):
     """A skill Dot or an agent learned from its own work (:mod:`dotagent.agent.playbooks`): its name and description,
     the kind of work, where it acted, the runs it comes from, how it fared (``uses`` done after reading it,
