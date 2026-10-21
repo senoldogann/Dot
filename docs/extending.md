@@ -125,6 +125,9 @@ The ways a service connects:
   instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again, and
   Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A server of
   Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
+  Dot's Playwright server starts with `--no-webmcp` (item 514): the tools a page registers through WebMCP, which the
+  server offers by default, are that page's words and code, and stay out of a run's tools; a server added before keeps
+  the arguments it was added with.
 
 **Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
 its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
