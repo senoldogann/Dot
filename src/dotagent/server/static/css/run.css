@@ -289,7 +289,7 @@
    of the chat is still seen and the line still read; the composition still fades in, as a page's fade stays. */
 @media (prefers-reduced-motion: reduce) {
   .chat-loading {
-    animation: fade-in var(--motion-base) var(--ease);
+    animation-name: fade-in;
   }
 
   .chat-loading-ring,
