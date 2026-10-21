@@ -1058,7 +1058,7 @@ class RunManager:
         ended."""
         handle: RunHandle = self._handle(run_id)
         try:
-            handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None, vouches=True))
+            handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None, vouches=True, said=text))
         except asyncio.QueueShutDown as exc:
             raise RunConflict("the run is not active", {"run_id": run_id}) from exc
 
@@ -1566,13 +1566,15 @@ class RunManager:
     async def _hand_back_kept(self, record: ApprovalRecord, source: str, note: str) -> None:
         """Tell the step's chat that the owner did a step kept for them (item 482): the run working there reads it as
         the next thing it is told, and otherwise a new run goes on from the goal of the run that kept it, starting
-        tainted when that run ended tainted. The words are Dot's, so they clear no taint and are no instruction."""
+        tainted when that run ended tainted. The words are Dot's: they clear no taint, and only the note the owner wrote
+        is their instruction, which is all the new run's goal adds to the goal it goes on from."""
         asked: RunRecord = await self._runtime.store.get_run(record.run_id)
         text: str = handed_back_text(record.id, note)
+        said: str = note.strip()
         active: RunHandle | None = self._active_on(asked.thread_id)
         if active is not None:
             try:
-                active.inbox.put_nowait(UserInput(text=text, files=(), question_id=record.id, vouches=False))
+                active.inbox.put_nowait(UserInput(text=text, files=(), question_id=record.id, vouches=False, said=said))
             except asyncio.QueueShutDown:
                 await active.finished.wait()
                 await self._hand_back_kept(record, source, note)
@@ -1585,7 +1587,9 @@ class RunManager:
                 "a run of another process is working on this thread; answer once it has ended",
                 {"approval_id": record.id, "thread_id": asked.thread_id, "run_id": newest.id},
             )
-        goal: str = f"{asked.goal}\n\n{text}"
+        # The goal, which the review model reads as the owner's, is theirs alone; the run reads Dot's words too.
+        goal: str = asked.goal if said == "" else f"{asked.goal}\n\n{said}"
+        opening: str = f"{asked.goal}\n\n{text}"
         run, _ = await self._launch(
             goal,
             asked.mode,
@@ -1597,9 +1601,18 @@ class RunManager:
             asked.speed,
             asked.approvals,
             asked.goal_mode,
-            RunOpening(text=goal, files=(), resumed=None, once=asked.once, carried=(asked.id,), picks=NO_PICKS),
+            # It starts tainted when the run that kept the step, or the chat's last run, ended so; as the agent the
+            # run that kept it ran as, within its bounds.
+            RunOpening(
+                text=opening,
+                files=(),
+                resumed=None,
+                once=asked.once,
+                carried=tuple(dict.fromkeys((asked.id, newest.id))),
+                picks=NO_PICKS,
+            ),
             None,
-            None,
+            asked.agent_id,
         )
         log.info("kept_step_handed_back", approval_id=record.id, run_id=run.id, delivered="run")
 
@@ -1618,7 +1631,9 @@ class RunManager:
         active: RunHandle | None = self._active_on(asked.thread_id)
         if active is not None:
             try:
-                active.inbox.put_nowait(UserInput(text=text, files=(), question_id=question.id, vouches=True))
+                active.inbox.put_nowait(
+                    UserInput(text=text, files=(), question_id=question.id, vouches=True, said=text)
+                )
             except asyncio.QueueShutDown:
                 await active.finished.wait()
                 await self._carry_on(question, source, answer)
@@ -1646,7 +1661,8 @@ class RunManager:
             asked.goal_mode,
             RunOpening(text=goal, files=(), resumed=None, once=asked.once, carried=(), picks=NO_PICKS),
             None,
-            None,
+            # As the agent the run that asked ran as, within its bounds, as a resumed run is.
+            asked.agent_id,
         )
         log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
 
@@ -1658,8 +1674,9 @@ class RunManager:
         session: RunHandle | None = self._handles.get(question.run_id)
         if approve and session is not None:
             try:
+                answer: str = _answer_text(question, note)
                 session.inbox.put_nowait(
-                    UserInput(text=_answer_text(question, note), files=(), question_id=question.id, vouches=True)
+                    UserInput(text=answer, files=(), question_id=question.id, vouches=True, said=answer)
                 )
             except asyncio.QueueShutDown:
                 # It is recording its end and reads nothing more.

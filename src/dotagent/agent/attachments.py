@@ -75,14 +75,16 @@ class StoredAttachment(FrozenModel):
 class UserInput(FrozenModel):
     """What the user sends to a running run: an instruction and the files that came with it. ``question_id`` names the
     question a run left when the text answers it, else it is ``None``. ``vouches`` says whether the text is the owner's
-    own words, which restore trust in what follows (the run's taint is cleared) and are an instruction the review
-    model reads; Dot's words that the owner did a step kept for them themselves are neither (item 482), as an "I did
-    it" during the run is neither."""
+    own words, which restore trust in what follows (the run's taint is cleared); ``said`` is what of it the owner said
+    themselves, the instruction the review model reads: all of it when it vouches. Dot's words that the owner did a
+    step kept for them themselves (item 482) vouch for nothing, as an "I did it" during the run does not, and only the
+    note the owner wrote with them, if any, is said."""
 
     text: str
     files: tuple[StoredAttachment, ...]
     question_id: str | None
     vouches: bool
+    said: str
 
 
 def attachments_root(workspace: Path) -> Path:

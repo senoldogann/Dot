@@ -161,16 +161,17 @@ class ApprovalBroker:
         summary: str,
         severity: str,
         args: JsonObject,
-        digest: str,
+        digest: str | None,
         keep_s: float,
         thread_id: str,
         schedule_id: str | None,
     ) -> Kept | None:
         """Keep a step that nobody answered in time for the owner (item 482): ``left`` until they answer it, skip it or
         ``keep_s`` passes, the run going on without it; ``question_left`` is its one event until then. The same step
-        (``digest``) kept already in the chat is that one again; past the caps (:data:`KEPT_HERE` in the chat or the
-        schedule's chats, :data:`KEPT_OVERALL` in all) it is not kept, and None says so."""
-        waiting: ApprovalRecord | None = await self._store.open_kept(digest, thread_id)
+        (``digest``) kept already in the chat is that one again, and a step of no digest is kept anew; past the caps
+        (:data:`KEPT_HERE` in the chat or the schedule's chats, :data:`KEPT_OVERALL` in all) it is not kept, and None
+        says so."""
+        waiting: ApprovalRecord | None = None if digest is None else await self._store.open_kept(digest, thread_id)
         if waiting is not None:
             return Kept(record=waiting, created=False)
         here, overall = await self._store.count_open_kept(thread_id, schedule_id)

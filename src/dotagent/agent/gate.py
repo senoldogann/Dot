@@ -200,8 +200,13 @@ class RunGate:
 
     def add_instruction(self, text: str) -> None:
         """Count a message of the user (a steer, the answer to a question) among the instructions the reviewer reads;
-        the user is there again, so a hand-off is put to them again before it is kept (item 482)."""
+        the user is there again (:meth:`heard_from_owner`)."""
         self._instructions = (*self._instructions, text)
+        self.heard_from_owner()
+
+    def heard_from_owner(self) -> None:
+        """The owner did something in the run (wrote to it, answered it, did a step it kept for them): a hand-off is put
+        to them again before it is kept (item 482)."""
         self._owner_away = False
 
     def keep_for(self, parking: Parking | None) -> None:
@@ -445,13 +450,18 @@ class RunGate:
         # left the run's last hand-off unanswered and written nothing since, else once its question expires.
         keeps: bool = self._parking is not None and decision.verdict == "handoff"
         if keeps and self._owner_away:
-            raise await self._keep(info, summary)
+            at_once: ApprovalRejected = await self._keep(info, summary)
+            if isinstance(at_once, ApprovalParked):
+                raise at_once
+            # Past the caps of the kept steps it is asked as before, and refused if nobody answers it.
+            self._owner_away = False
         outcome: ApprovalOutcome = await self._approvals.request(
             self._run_id, info.tool, summary, severity, _describe(info)
         )
         if keeps and outcome.status == "expired" and outcome.decided_by == TIMEOUT_DECIDER:
-            self._owner_away = True
-            raise await self._keep(info, summary)
+            unanswered: ApprovalRejected = await self._keep(info, summary)
+            self._owner_away = isinstance(unanswered, ApprovalParked)
+            raise unanswered
         if outcome.status != "approved":
             # The owner's no is kept; a question nobody answered in time, or one the eval harness refused, is no answer.
             key: str | None = declined_key(info)

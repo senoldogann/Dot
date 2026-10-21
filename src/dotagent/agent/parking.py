@@ -6,6 +6,7 @@ the owner by it: a hand-off is theirs to do. Pure: the gate and the manager do t
 
 import hashlib
 
+from dotagent.agent.declined import declined_key
 from dotagent.config import PolicyConfig
 from dotagent.core.types import FrozenModel
 from dotagent.policy.spend import render_amount
@@ -43,11 +44,26 @@ def parking_for(
     return Parking(thread_id=thread_id, schedule_id=schedule_id, keep_s=policy.parked_hours * 3600.0)
 
 
-def kept_digest(info: ActionInfo) -> str:
+def kept_digest(info: ActionInfo) -> str | None:
     """The fingerprint of an action, which keeps the same step once in a chat: its tool, kind, summary, target, amount
-    and flags, exactly as its card showed them."""
+    and flags, exactly as its card showed them, with the files it changes and the application it opens; None for a step
+    whose card shows less than all of it (:func:`dotagent.agent.declined.declined_key`), which is kept anew each time,
+    since two such steps may not be one."""
+    if declined_key(info) is None:
+        return None
     amount: str = "" if info.amount is None else render_amount(info.amount)
-    parts: str = "\n".join((info.tool, info.kind, info.summary, info.target, amount, ",".join(sorted(info.flags))))
+    parts: str = "\n".join(
+        (
+            info.tool,
+            info.kind,
+            info.summary,
+            info.target,
+            amount,
+            ",".join(sorted(info.flags)),
+            ",".join(info.changes),
+            info.bundle or "",
+        )
+    )
     return hashlib.blake2b(parts.encode(), digest_size=16).hexdigest()
 
 
@@ -68,6 +84,6 @@ def kept_text(approval_id: str, created: bool) -> str:
 
 def handed_back_text(approval_id: str, note: str) -> str:
     """What the run is told when the owner did a step kept for them themselves: Dot's words, not the owner's, so it
-    neither clears the run's taint nor becomes an instruction (as an "I did it" during the run does neither)."""
+    clears no taint (as an "I did it" during the run does not), and only the ``note`` they wrote is an instruction."""
     said: str = "" if note.strip() == "" else f" They wrote: {note.strip()}"
     return f"The user did the step that waited for them ({approval_id}) themselves; go on from there.{said}"

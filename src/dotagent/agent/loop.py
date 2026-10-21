@@ -1910,10 +1910,12 @@ async def run_agent(agent: AgentRun) -> RunEnd:
                 runtime, run.thread_id, run.id, text, sent.files, info.vision
             )
             history.append(note)
+            agent.gate.heard_from_owner()
             if sent.vouches:
                 agent.gate.clear_taint()
-                agent.gate.add_instruction(text)
-                ledger = with_instruction(ledger, text)
+            if sent.said != "":
+                agent.gate.add_instruction(sent.said)
+                ledger = with_instruction(ledger, sent.said)
             await runtime.store.append_messages(run.thread_id, [note])
             await runtime.bus.emit(run.id, "steer", steer_event(sent, agent.gate.tainted), True)
         changed: list[MemoryRecord] = await runtime.store.memories_changed_since(memory_seen_at, run.id)

@@ -364,6 +364,11 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
     assert (await runtime.store.get_approval(kept.id)).status == "approved"
     follow: RunRecord = (await runtime.store.list_runs(1, run.thread_id))[0]
     assert follow.id != run.id
-    assert follow.goal.endswith(f"The user did the step that waited for them ({kept.id}) themselves; go on from there.")
+    # The goal is the owner's (the run's, with no note); Dot's words are what the new run reads under it.
+    assert follow.goal == "File the invoices"
+    told: str = (
+        f"File the invoices\n\nThe user did the step that waited for them ({kept.id}) themselves; go on from there."
+    )
+    assert told in [message.content for message in await runtime.store.load_messages(run.thread_id, 0)]
     async with asyncio.timeout(_RUN_WAIT_S):
         assert (await manager.wait(follow.id)).status == "done"

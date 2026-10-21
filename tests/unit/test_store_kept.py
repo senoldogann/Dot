@@ -90,6 +90,14 @@ async def test_past_the_cap_of_a_chat_a_step_is_not_kept_and_the_same_one_is_the
         lapsed: ApprovalRecord = await broker.lapse(kept[1].record)
         assert (lapsed.status, lapsed.decided_by) == ("expired", "timeout")
         assert await broker.keep(run.id, "shell", "pay", "handoff", {}, "new", _HOUR_S, chat.id, None) is not None
+        # A step of no fingerprint is kept anew each time, while there is room.
+        unbound: list[Kept | None] = []
+        for room in (kept[2], kept[3]):
+            assert room is not None
+            await broker.lapse(room.record)
+            unbound.append(await broker.keep(run.id, "write_file", "w", "handoff", {}, None, _HOUR_S, chat.id, None))
+        assert [(step.created, step.record.digest) for step in unbound if step is not None] == [(True, None)] * 2
+        assert unbound[0] is not None and unbound[1] is not None and unbound[0].record.id != unbound[1].record.id
     finally:
         await store.close()
 

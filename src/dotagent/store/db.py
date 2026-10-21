@@ -2562,11 +2562,12 @@ class Store:
         summary: str,
         severity: str,
         args: JsonObject,
-        digest: str,
+        digest: str | None,
         kept_until: float,
     ) -> ApprovalRecord:
         """Store a step a run kept for the owner when nobody answered its question in time (item 482): ``left`` until
-        the owner answers it, skips it or it lapses at ``kept_until``; ``digest`` is the fingerprint of its action."""
+        the owner answers it, skips it or it lapses at ``kept_until``; ``digest`` is the fingerprint of its action, None
+        for one whose card shows less than all of it."""
         record: ApprovalRecord = ApprovalRecord(
             id=new_id("apr"),
             run_id=run_id,

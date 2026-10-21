@@ -26,7 +26,7 @@ from dotagent.policy.types import ApprovalMode
 from dotagent.runtime import Runtime, close_runtime, open_runtime
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.server import UI_SOURCE
-from dotagent.store.models import ApprovalRecord, EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import NO_PICKS, AgentRecord, ApprovalRecord, EventRecord, RunRecord, ThreadRecord
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL
 from dotagent.tools.shell import read_login_env
 
@@ -180,6 +180,40 @@ async def test_a_run_nobody_answers_leaves_its_question_and_the_answer_starts_a_
         with pytest.raises(RunConflict):
             await manager.decide(left[0].id, True, UI_SOURCE, ANSWER)
         assert len(await runtime.store.list_runs(5, asked.thread_id)) == 2
+
+
+async def test_the_run_an_answer_starts_is_of_the_agent_that_asked(login_env: dict[str, str]) -> None:
+    turns: list[ScriptedTurn] = [
+        ASK,
+        _finish("I need the port.", False, NEEDS),
+        _finish("port.txt holds 8431.", True, ""),
+    ]
+    async with _session(login_env, ScriptedProvider(_PROVIDER, turns)) as (runtime, manager):
+        scout: AgentRecord = await runtime.store.create_agent(
+            "Scout", "Finds ports", "", SCRIPTED_MODEL, None, None, (), None, None
+        )
+        asked: RunRecord = await manager.start_for_agent(
+            scout,
+            GOAL,
+            "task",
+            SCRIPTED_MODEL,
+            None,
+            SCHEDULE_SOURCE,
+            None,
+            "standard",
+            None,
+            "ask",
+            False,
+            (),
+            NO_PICKS,
+        )
+        await _ended(manager, asked)
+        left: list[ApprovalRecord] = await runtime.store.list_left_questions(asked.id)
+        await manager.decide(left[0].id, True, UI_SOURCE, ANSWER)
+        newest: RunRecord = (await runtime.store.list_runs(1, asked.thread_id))[0]
+        # It goes on within the bounds of the agent that asked, as a resumed run does.
+        assert (newest.id != asked.id, newest.agent_id) == (True, scout.id)
+        assert (await _ended(manager, newest)).status == "done"
 
 
 async def test_an_answer_while_the_run_works_reaches_that_run(login_env: dict[str, str]) -> None:

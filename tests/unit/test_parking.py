@@ -54,8 +54,18 @@ def test_the_fingerprint_is_the_step_as_its_card_showed_it() -> None:
         {"target": "./pay.sh --invoice 1043"},
         {"flags": ("financial",)},
         {"amount": Amount(value=120.0, currency="EUR")},
+        {"changes": ("/Users/me/invoices/1042.txt",)},
+        {"bundle": "/Applications/Bank.app"},
     ):
         assert kept_digest(_PAY.model_copy(update=changed)) != kept_digest(_PAY), changed
+
+
+@pytest.mark.parametrize(
+    "changed",
+    [{"kind": "write"}, {"summary": "pay the invoice of Octo…"}, {"target": "pay.sh --card ***"}],
+)
+def test_a_step_whose_card_shows_less_than_all_of_it_has_no_fingerprint(changed: dict[str, str]) -> None:
+    assert kept_digest(_PAY.model_copy(update=changed)) is None
 
 
 def test_what_the_run_is_told_of_a_kept_step_and_of_the_owner_doing_it() -> None:
