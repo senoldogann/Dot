@@ -263,7 +263,8 @@ async def test_a_quiet_session_is_pinged_and_connected_again_unless_its_server_a
 class _SessionEnder:
     """An ASGI wrapper that, once ``end_next`` is set, answers the next tool call as a server built on the MCP SDK
     answers a request of a session it ended or never knew: HTTP 404 with a JSON-RPC error of its own words in the body
-    (``streamable_http_manager.py``: "Session not found"). Every other request goes through."""
+    (``streamable_http_manager.py``: "Session not found"), its id null, as the server had not read the request. Every
+    other request goes through."""
 
     def __init__(self, app: ASGIApp) -> None:
         self._app = app
@@ -295,7 +296,7 @@ class _SessionEnder:
         self.end_next = False
         error: JsonObject = {
             "jsonrpc": "2.0",
-            "id": asked.get("id"),
+            "id": None,
             "error": {"code": INVALID_REQUEST, "message": "Session not found"},
         }
         await JSONResponse(error, status_code=404)(scope, receive, send)
@@ -313,8 +314,9 @@ async def test_a_session_its_server_ended_fails_a_call_once_and_the_next_call_co
         wipe: McpTool = next(tool for tool in hub.tools if tool.server == "docs" and tool.remote_name == "wipe")
         assert not (await hub.call(wipe, {"target": "the cache"})).is_error
         ender.end_next = True
-        with pytest.raises(McpError, match="closed the connection while running wipe"):
+        with pytest.raises(McpError, match="closed the connection while running wipe") as lost:
             await hub.call(wipe, {"target": "the cache"})
+        assert lost.value.context["error"] == "Session not found"
         with capture_logs() as logs:
             result: CallToolResult = await hub.call(wipe, {"target": "the cache"})
         assert not result.is_error, result

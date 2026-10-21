@@ -388,12 +388,13 @@ class McpConnection:
         return True
 
     async def _lost(self, live: _Live, step: str, error: MCPError) -> _ConnectionLost:
-        """Remember that the connection broke so the next call starts the server again."""
+        """Remember that the connection broke so the next call starts the server again. The error keeps the words of
+        the server or the client library ("Session not found", a redirect that was not followed), which say why."""
         live.broken = True
-        log.warning("mcp_server_connection_lost", server=self.name, step=step)
+        log.warning("mcp_server_connection_lost", server=self.name, step=step, error=error.message)
         return _ConnectionLost(
             f"the MCP server closed the connection while {step}; the next call {self._again()}",
-            {**self._context(), "code": error.code, **await self._tail_since(0)},
+            {**self._context(), "code": error.code, "error": error.message, **await self._tail_since(0)},
         )
 
     async def list_tools(self) -> tuple[McpTool, ...]:
