@@ -4,6 +4,7 @@ are reported as such. Nothing is mocked: a real HTTP server on a free port, the 
 
 import asyncio
 import importlib.util
+import json
 import os
 import socket
 import time
@@ -28,8 +29,8 @@ from mcp.types import (
     TextContent,
 )
 from starlette.datastructures import Headers
-from starlette.responses import Response
-from starlette.types import ASGIApp, Receive, Scope, Send
+from starlette.responses import JSONResponse, Response
+from starlette.types import ASGIApp, Message, Receive, Scope, Send
 from structlog.testing import capture_logs
 
 from dotagent.config import McpServerConfig
@@ -259,25 +260,59 @@ async def test_a_quiet_session_is_pinged_and_connected_again_unless_its_server_a
         await hub.close()
 
 
-async def test_a_session_its_server_ended_fails_a_call_once_and_the_next_call_connects_again(
-    http_port: int, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Item 513: a call on a session its server ended (the library says "Session terminated" for the server's 404) is
-    a connection lost, not a call refused: it fails, and the next call connects again rather than fail on the same
-    session. wipe declares no hints, so its failed call is not repeated."""
-    called: list[str] = []
-    call: Callable[..., Awaitable[CallToolResult]] = Client.call_tool
+class _SessionEnder:
+    """An ASGI wrapper that, once ``end_next`` is set, answers the next tool call as a server built on the MCP SDK
+    answers a request of a session it ended or never knew: HTTP 404 with a JSON-RPC error of its own words in the body
+    (``streamable_http_manager.py``: "Session not found"). Every other request goes through."""
 
-    async def ended_once(self: Client, name: str, arguments: JsonObject, **options: object) -> CallToolResult:
-        called.append(name)
-        if len(called) == 1:
-            raise MCPError(INVALID_REQUEST, "Session terminated")
-        return await call(self, name, arguments, **options)
+    def __init__(self, app: ASGIApp) -> None:
+        self._app = app
+        self.end_next: bool = False
 
-    monkeypatch.setattr(Client, "call_tool", ended_once)
-    hub: McpHub = await open_hub([_http("docs", http_port, f"Bearer ${{{TOKEN_VARIABLE}}}")], _login_env())
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if not (self.end_next and scope["type"] == "http" and scope["method"] == "POST"):
+            await self._app(scope, receive, send)
+            return
+        body: bytes = b""
+        more: bool = True
+        while more:
+            message = await receive()
+            body += message.get("body", b"")
+            more = message.get("more_body", False)
+        asked: JsonObject = json.loads(body)
+        if asked.get("method") != "tools/call":
+            replayed: bool = False
+
+            async def again() -> Message:
+                nonlocal replayed
+                if replayed:
+                    return await receive()
+                replayed = True
+                return {"type": "http.request", "body": body, "more_body": False}
+
+            await self._app(scope, again, send)
+            return
+        self.end_next = False
+        error: JsonObject = {
+            "jsonrpc": "2.0",
+            "id": asked.get("id"),
+            "error": {"code": INVALID_REQUEST, "message": "Session not found"},
+        }
+        await JSONResponse(error, status_code=404)(scope, receive, send)
+
+
+async def test_a_session_its_server_ended_fails_a_call_once_and_the_next_call_connects_again() -> None:
+    """Item 513: a call on a session its server ended is a connection lost, not a call refused. The server answers
+    with a 404 that holds a JSON-RPC error in its own words, as servers built on the MCP SDK do; the call fails, and
+    the next call connects again rather than fail on the same session. wipe declares no hints, so its failed call is
+    not repeated."""
+    ender: _SessionEnder = _SessionEnder(_BearerGuard(_fixture_server().streamable_http_app(), TOKEN))
+    served: _Served = await _serve(ender)
+    hub: McpHub = await open_hub([_http("docs", served.port, f"Bearer ${{{TOKEN_VARIABLE}}}")], _login_env())
     try:
         wipe: McpTool = next(tool for tool in hub.tools if tool.server == "docs" and tool.remote_name == "wipe")
+        assert not (await hub.call(wipe, {"target": "the cache"})).is_error
+        ender.end_next = True
         with pytest.raises(McpError, match="closed the connection while running wipe"):
             await hub.call(wipe, {"target": "the cache"})
         with capture_logs() as logs:
@@ -286,3 +321,4 @@ async def test_a_session_its_server_ended_fails_a_call_once_and_the_next_call_co
         assert "mcp_server_restart" in [entry["event"] for entry in logs]
     finally:
         await hub.close()
+        await _stop(served)

@@ -82,15 +82,13 @@ class _ConnectionLost(McpError):
     """The connection to the server broke while a request was out: the next request connects again."""
 
 
-# What the client library says when a server reached at a URL answers 404 to a request of a session: it ended the
-# session (a server that restarted, or one that drops the sessions that went quiet).
-_SESSION_ENDED: str = "Session terminated"
-
-
 def _session_gone(error: MCPError) -> bool:
-    """Whether ``error`` says the session cannot be used any more: its connection closed, or its server ended it
-    (item 513), so that the next request connects again rather than fail on the same session."""
-    return error.code == CONNECTION_CLOSED or (error.code == INVALID_REQUEST and error.message == _SESSION_ENDED)
+    """Whether ``error`` says the session cannot be used any more, so that the next request connects again rather than
+    fail on the same session (item 513): its connection closed, or its server refused the request as one of no session
+    it knows (``INVALID_REQUEST``). Servers word that last in their own ways ("Session not found", "Not Found: Session
+    has been terminated", the client's own "Session terminated" for a 404 with no body), so the code alone decides; a
+    request Dot sends whole is not invalid otherwise, and taking one for a gone session costs one connection more."""
+    return error.code in (CONNECTION_CLOSED, INVALID_REQUEST)
 
 
 def _prepare_log(path: Path) -> int:
