@@ -1242,6 +1242,8 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
       mark(campaignsLink, tab === "campaigns");
       mark(schedulesLink, tab === "schedules");
       mark(settingsLink, tab === "settings");
+      // Customize is reached from Connect apps, which stands for it while it is open.
+      connectButton.toggleAttribute("data-current", tab === "customize");
       routeRunId = runId;
       routeThreadId = null;
       keptUnread = null;

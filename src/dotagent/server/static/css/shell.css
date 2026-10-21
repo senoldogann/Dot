@@ -635,6 +635,11 @@
   border-color: var(--border-strong);
 }
 
+.side-connect[data-current] {
+  box-shadow: 0 1px 2px var(--shadow-ink);
+  font-weight: var(--weight-label);
+}
+
 .side-connect > .icon {
   flex: none;
   width: 16px;

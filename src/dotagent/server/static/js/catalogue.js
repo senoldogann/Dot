@@ -295,6 +295,19 @@ export function createCatalogue(onChange) {
     }
   }
 
+  /** Close the form of the key being asked for, and empty what was typed in it: the way back from a service's page
+   * leaves no key behind. */
+  function stopAsking() {
+    if (asking === null) {
+      return;
+    }
+    for (const input of secretFields.get(asking)?.values() ?? []) {
+      input.value = "";
+    }
+    asking = null;
+    changed();
+  }
+
   /** The form that takes a service's secrets (item 408): a password field for each, where to get one, Add and Cancel.
    * The values go to the daemon once, which keeps them in its .env; the fields are emptied after. */
   function secretsForm(service) {
@@ -460,6 +473,7 @@ export function createCatalogue(onChange) {
     standing,
     howChip,
     askSecrets,
+    stopAsking,
     secretsForm,
     takeStep,
     add,

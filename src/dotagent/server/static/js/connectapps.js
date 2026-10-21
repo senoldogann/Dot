@@ -77,6 +77,7 @@ export function openConnectApps({ onClose }) {
     const left = cameFrom;
     service = null;
     cameFrom = null;
+    catalogue.stopAsking();
     paint();
     body.scrollTop = listScroll;
     const tile = left === null ? null : body.querySelector(`.connect-tile[data-plugin="${left}"] .connect-tile-open`);
