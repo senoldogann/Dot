@@ -35,7 +35,9 @@ _GOAL: str = "Are both accounts connected?"
 _ANSWER: str = "Yes, both accounts are connected: Gmail and Outlook answered just now."
 _SCRIPT: tuple[ScriptedTurn, ...] = (
     ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo checked"}),)),
-    # The answer as a plain reply: a task run that used a tool is told to finish instead of ending here.
+    # The answer as a plain reply, twice: a task run that used a tool is told to finish instead of ending here, and a
+    # weak model may answer the note in words again before it calls finish.
+    ScriptedTurn(text=_ANSWER, calls=()),
     ScriptedTurn(text=_ANSWER, calls=()),
     ScriptedTurn(text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _ANSWER, "success": True}),)),
 )
@@ -97,8 +99,8 @@ async def _served(model: ScriptedProvider) -> AsyncIterator[tuple[Runtime, RunMa
 
 
 async def test_an_answer_repeated_by_finish_after_a_thought_shows_once() -> None:
-    """The plain reply, a thought and the finish with the same words: the chat holds those words once, in the answer,
-    and the thought stays."""
+    """The plain reply twice, a thought and the finish with the same words: the chat holds those words once, in the
+    answer, and the thought stays."""
     async with _served(_ThinksBeforeFinish()) as (runtime, manager, address):
         run: RunRecord = await manager.start(
             _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
@@ -107,7 +109,7 @@ async def test_an_answer_repeated_by_finish_after_a_thought_shows_once() -> None
             assert (await manager.wait(run.id)).status == "done"
         assert [event.data["text"] for event in await runtime.store.events_of_kind(run.id, "assistant", 10)].count(
             _ANSWER
-        ) == 1
+        ) == 2
         async with async_playwright() as playwright:
             browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
             try:

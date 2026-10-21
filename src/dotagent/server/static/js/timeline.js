@@ -391,7 +391,8 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       live: null,
       // The block of the latest step's thinking (item 246; see startThought).
       thought: null,
-      reply: null,
+      // The messages of the scope's turn, each with its words: an answer that repeats one of them leaves it out.
+      replies: [],
       touched: false,
       // The cards that wait for the reader's answer in this scope and the delegated runs inside it.
       asking: 0,
@@ -477,18 +478,17 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
   /**
    * A turn that ends with a plain reply has that text twice: as its last message and as the result of the run. The result
-   * is shown as the answer, so the message that repeats it goes, as an earlier turn leaves it out (history.js), also when
-   * a step came after it: a task run told to finish (the loop's note on a reply without a tool) thinks once more and
+   * is shown as the answer, so every message that repeats it goes, as an earlier turn leaves them out (history.js), also
+   * when a step came after it: a task run told to finish (the loop's note on a reply without a tool) thinks once more and
    * calls finish with the same words (item 460).
    */
   function dropRepeatedReply(scope, result) {
-    const reply = scope.reply;
-    scope.reply = null;
-    if (reply !== null && sameText(reply.text, result)) {
+    const repeated = scope.replies.filter((reply) => sameText(reply.text, result));
+    scope.replies = [];
+    for (const reply of repeated) {
       reply.node.remove();
-      return true;
     }
-    return false;
+    return repeated.length > 0;
   }
 
   /** The run is over: no group works any more, and a call that never reported back was cut off. */
@@ -936,7 +936,7 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
       const target = bubble ?? newBubble(scope, data.step, false);
       target.node.className = "bubble say";
       target.body.replaceWith(prose(data.text));
-      scope.reply = { node: target.node, text: data.text };
+      scope.replies.push({ node: target.node, text: data.text });
       if (!ORDINARY_ENDS.has(data.finish)) {
         target.node.append(el("div", { class: "small muted" }, `This message ended early: ${data.finish}`));
       }
