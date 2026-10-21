@@ -186,7 +186,8 @@ one of OpenCode's agent. The box of a run held it as **Save skill**, under a **M
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
 failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
-start, agent, model, approval mode, goal mode and campaign) are in the panel's Details, on its Run tab. Your goal is the
+agent, model, approval mode, goal mode and campaign) are in the panel's Details, on its Run tab, its start under More
+(item 452). Your goal is the
 first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
 answer does: its headings, lists, tables, code, quotes and emphasis (item 206). Under each of your messages, once its
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
@@ -231,7 +232,8 @@ a line of the same column with the brain. Approvals, questions and policy notes 
 opens or folds it while the run still works and after it ends, and the reader's choice stands for the life of the page;
 folded, it keeps the call under way in sight (on a phone, only the count). The lines of how a run was set up (the notes
 and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another model) are
-not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming them in short
+not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, in its More (item 452),
+which counts a line that warns beside its title, the head of Set up naming them in short
 and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a line that warns
 in amber (the embedding service failed, so the notes were found by their words alone); a delegated run's lines are on
 its own page. What the model thought in a step is a line of its own there, before the step's calls (item 246), or out of
@@ -264,10 +266,11 @@ bottom (item 201): resting the pointer on it shows the message nearest to it and
 to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are
 darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there, the
 conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Run details),
-under Details on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
+under More on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
 minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the
 share the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs
-it delegated and the web searches by engine. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run
+it delegated and the web searches by engine, and a figure of none has no line (item 452). It is
+`GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run
 ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
 of the same thread, and the box at the bottom queues a message for after a run that is going on, or follows up on a
 finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in the
@@ -306,10 +309,12 @@ smaller than the window (each step sends the model the whole run again, so a run
 costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen for the model in
 Settings › Models, which the timeline notes too; **Change context size** under them opens that setting at the run's
 model (item 396). It reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut
-off offers **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the
-model and its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool
-calls (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as
-compactions, reviews and the goal check), the duration, the start and the run id; its other tabs hold the plan, the
+off offers **Continue** on a line above the box. The panel's Details show what a glance needs (item 452): the status,
+the agent of a chat with one, the model and its reasoning level, the approval mode, goal mode when it is on, the
+campaign of a session, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and
+its side calls, such as compactions, reviews and the goal check), the compactions once there is one, and the duration.
+The run's mode, its start and its id (with a copy button) are under More, which folds away under them, closed the first
+time and as the browser last left it after; its other tabs hold the plan, the
 actions, the agents of the chat and the latest screenshots. Each tab wears its icon, and where the strip has no room for
 every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
 the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
@@ -334,7 +339,8 @@ written in again (item 447).
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
 at the head of the conversation. The panel is one card on the composer's corner, in five tabs
-(item 203): **Run** (Details, how the run was Set up, Cost and the conversation's Files), **Changes** (the files the
+(item 203): **Run** (Details, the conversation's Files, and under More the run's mode, start and id, how it was Set
+up and its Cost; item 452), **Changes** (the files the
 chat's runs wrote or created with `write_file` and `edit_file`, up to this run, which the tab counts: each with what
 became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;
 `GET /api/runs/{id}/changes`, item 368), **Plan** (its steps; the tab says how many are done), **Agents** (the agents

@@ -166,24 +166,33 @@ export function foldCard({ id, title, actions, body, openByDefault }) {
 /**
  * A section of the run's side panel (item 203): a head with its title, a short line that sums it up
  * (`setSummary(...nodes)`) and `actions` at its right, over `body`, which is always open: the panel's tabs choose what
- * is in sight. With `foldable` (item 426) the title is a button that folds the body away, the choice kept per browser
- * under `dot.fold.panel.${id}` and open the first time. Its body is `panel-${id}`. Returns the element and
- * `setSummary`, as `foldCard` does.
+ * is in sight. With `foldable` (item 426) it is `panelFold`'s, open the first time. Its body is `panel-${id}`.
+ * Returns the element and `setSummary`, as `foldCard` does.
  */
 export function panelSection({ id, title, actions, body, foldable = false }) {
+  if (foldable) {
+    return panelFold({ id, title, actions, body, openAtFirst: true });
+  }
   const summary = el("span", { class: "panel-summary" });
   const content = el("div", { class: "panel-section-body", id: `panel-${id}` }, body);
-  if (!foldable) {
-    const element = el(
-      "section",
-      { class: "panel-section" },
-      el("div", { class: "panel-section-head" }, el("h3", { class: "panel-section-title" }, title), summary, actions ?? null),
-      content,
-    );
-    return { element, setSummary: (...nodes) => summary.replaceChildren(...nodes.filter((node) => node !== null)) };
-  }
-  // A foldable section: its title is a button that folds the body away, the choice kept per browser.
-  const state = foldState(`panel.${id}`, true);
+  const element = el(
+    "section",
+    { class: "panel-section" },
+    el("div", { class: "panel-section-head" }, el("h3", { class: "panel-section-title" }, title), summary, actions ?? null),
+    content,
+  );
+  return { element, setSummary: (...nodes) => summary.replaceChildren(...nodes.filter((node) => node !== null)) };
+}
+
+/**
+ * A section of the run's side panel whose title is a button that folds its body away (item 426), the choice kept per
+ * browser under `dot.fold.panel.${id}`; open the first time when `openAtFirst`. Its body is `panel-${id}`. Returns the
+ * element and `setSummary`, as `panelSection` does.
+ */
+export function panelFold({ id, title, actions, body, openAtFirst }) {
+  const summary = el("span", { class: "panel-summary" });
+  const content = el("div", { class: "panel-section-body", id: `panel-${id}` }, body);
+  const state = foldState(`panel.${id}`, openAtFirst);
   const toggle = el(
     "button",
     { class: "fold-toggle panel-fold-toggle", type: "button", "aria-controls": content.id },

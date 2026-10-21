@@ -8,6 +8,10 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - Schedules: **Notifications** in a schedule's form says how the end of its runs is told on your phone and desktop:
   always (as before, else `[scheduler] notify`), only when it fails or needs you, or never; a run you start with
   **Run now** is always told (item 461).
+- The side panel's Run tab is plain: Details show the status, the model and its reasoning, the approvals, the tool calls,
+  the tokens and the duration (goal mode and the compactions only when there are some), then the conversation's files;
+  the run's mode, start and id, how it was set up and its cost fold under **More**, closed the first time, which counts
+  a set-up warning beside its title, and a figure of none has no line (item 452).
 - A message sent from a chat that is over no longer jumps the chat up and back down: it stays at its foot until the
   next run's page takes its place. A chat whose run is over opens with every message already there, instead of
   filling in as its stream is read (item 454).
