@@ -1,0 +1,123 @@
+"""A task run that answers in a plain reply is told to finish (the loop's note on a reply without a tool), thinks once
+more and calls finish with the same words: its chat shows the answer once (item 460), as an earlier turn does. A real
+server on a scripted model, the chat read once the run is over."""
+
+import asyncio
+import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+
+import pytest
+from playwright.async_api import Browser, Locator, Page, async_playwright, expect
+
+from dotagent.agent.manager import RunManager
+from dotagent.config import load_default_config
+from dotagent.evals.runner import SCRIPTED_MODEL, eval_config, eval_environment, scratch_home
+from dotagent.evals.scripted import ScriptedProvider
+from dotagent.evals.types import ScriptedCall, ScriptedTurn
+from dotagent.llm.router import parse_model_ref
+from dotagent.llm.types import ChatRequest, DeltaSink, ModelReply
+from dotagent.runtime import Runtime, close_runtime, open_runtime
+from dotagent.server import UI_SOURCE
+from dotagent.server.app import create_app
+from dotagent.server.context import ServerContext
+from dotagent.server.daemon import DotServer, bind_listener, serving_config
+from dotagent.server.links import ui_url
+from dotagent.store.models import RunRecord
+from dotagent.tools.shell import read_login_env
+
+pytestmark = [pytest.mark.browser, pytest.mark.asyncio(loop_scope="module")]
+
+TOKEN: str = "answer-once-token"
+_PROVIDER: str = parse_model_ref(SCRIPTED_MODEL).provider
+WAIT_S: float = 30.0
+_GOAL: str = "Are both accounts connected?"
+_ANSWER: str = "Yes, both accounts are connected: Gmail and Outlook answered just now."
+_SCRIPT: tuple[ScriptedTurn, ...] = (
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="shell", arguments={"command": "echo checked"}),)),
+    # The answer as a plain reply: a task run that used a tool is told to finish instead of ending here.
+    ScriptedTurn(text=_ANSWER, calls=()),
+    ScriptedTurn(text="", calls=(ScriptedCall(tool="finish", arguments={"answer": _ANSWER, "success": True}),)),
+)
+
+
+class _ThinksBeforeFinish(ScriptedProvider):
+    """The script, the step that finishes thinking first, as the model did that answered twice (2026-10-21)."""
+
+    def __init__(self) -> None:
+        super().__init__(_PROVIDER, _SCRIPT)
+        self.calls: int = 0
+
+    async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
+        self.calls += 1
+        reply: ModelReply = await super().complete(request, sink)
+        if self.calls == len(_SCRIPT):
+            return reply.model_copy(update={"thinking": "The note says I replied without a tool; I call finish."})
+        return reply
+
+
+@asynccontextmanager
+async def _served(model: ScriptedProvider) -> AsyncIterator[tuple[Runtime, RunManager, str]]:
+    """A runtime in a throw-away home whose model is ``model``, its runs, and the address a real server serves it at."""
+    with scratch_home() as home, eval_environment(home, {}):
+        runtime: Runtime = await open_runtime(
+            eval_config(load_default_config()),
+            await read_login_env(load_default_config().shell.login_env_timeout_s, ()),
+        )
+        try:
+            await runtime.router.register(_PROVIDER, model)
+            manager: RunManager = RunManager(runtime)
+            stopping: asyncio.Event = asyncio.Event()
+            listener = bind_listener("127.0.0.1", 0)
+            port: int = listener.getsockname()[1]
+            context: ServerContext = ServerContext(
+                runtime=runtime,
+                manager=manager,
+                scheduler=None,
+                token=TOKEN,
+                host="127.0.0.1",
+                port=port,
+                started_at=time.time(),
+                stopping=stopping,
+            )
+            server: DotServer = DotServer(serving_config(create_app(context)), stopping)
+            serving: asyncio.Task[None] = asyncio.create_task(server.serve(sockets=[listener]))
+            while not server.started:
+                assert not serving.done(), "the server stopped while starting"
+                await asyncio.sleep(0.05)
+            try:
+                yield runtime, manager, f"http://127.0.0.1:{port}"
+            finally:
+                server.should_exit = True
+                stopping.set()
+                await serving
+                await manager.shutdown()
+        finally:
+            await close_runtime(runtime)
+
+
+async def test_an_answer_repeated_by_finish_after_a_thought_shows_once() -> None:
+    """The plain reply, a thought and the finish with the same words: the chat holds those words once, in the answer,
+    and the thought stays."""
+    async with _served(_ThinksBeforeFinish()) as (runtime, manager, address):
+        run: RunRecord = await manager.start(
+            _GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, None, "standard", None, "yolo", False, ()
+        )
+        async with asyncio.timeout(WAIT_S):
+            assert (await manager.wait(run.id)).status == "done"
+        assert [event.data["text"] for event in await runtime.store.events_of_kind(run.id, "assistant", 10)].count(
+            _ANSWER
+        ) == 1
+        async with async_playwright() as playwright:
+            browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+            try:
+                page: Page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
+                await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+                await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await page.goto(f"{address}/#/runs/{run.id}")
+                answer: Locator = page.locator(".timeline .answer")
+                await expect(answer).to_contain_text(_ANSWER, timeout=15000)
+                await expect(page.locator(".timeline").get_by_text(_ANSWER)).to_have_count(1)
+                await expect(page.locator(".timeline").get_by_text("The note says I replied").first).to_be_attached()
+            finally:
+                await browser.close()

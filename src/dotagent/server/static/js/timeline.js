@@ -477,12 +477,14 @@ export function createTimeline({ rootRunId, actorId, startedAt, revealing, onGro
 
   /**
    * A turn that ends with a plain reply has that text twice: as its last message and as the result of the run. The result
-   * is shown as the answer, so the message that repeats it goes, provided nothing came after that message.
+   * is shown as the answer, so the message that repeats it goes, as an earlier turn leaves it out (history.js), also when
+   * a step came after it: a task run told to finish (the loop's note on a reply without a tool) thinks once more and
+   * calls finish with the same words (item 460).
    */
   function dropRepeatedReply(scope, result) {
     const reply = scope.reply;
     scope.reply = null;
-    if (reply !== null && sameText(reply.text, result) && scope.container.lastElementChild === reply.node) {
+    if (reply !== null && sameText(reply.text, result)) {
       reply.node.remove();
       return true;
     }
