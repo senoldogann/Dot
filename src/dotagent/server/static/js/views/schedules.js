@@ -82,8 +82,9 @@ function failedInRow(record) {
     return null;
   }
   const limit = record.options.stop_after_failures ?? defaultsNow().stopAfterFailures;
+  // A schedule switched off, by you or by its failures, switches nothing off again.
   const title =
-    record.cron !== null && limit !== null && limit > 0
+    record.enabled && record.cron !== null && limit !== null && limit > 0
       ? `It switches itself off at ${limit} failed runs in a row`
       : "Its last runs failed one after the other";
   return el("span", { class: "badge b-bad", title }, `${record.runs_failed_in_row} failed in a row`);
@@ -139,6 +140,9 @@ function optionChips(record) {
     options.speed === "fast" ? el("span", { class: "chip", title: "Its runs start in fast mode" }, "Fast") : null,
     options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
     options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
+    options.stop_after_failures === null
+      ? null
+      : el("span", { class: "chip", title: "When it switches itself off" }, `Switch off: ${stopLabel(options.stop_after_failures).toLowerCase()}`),
   ];
 }
 
