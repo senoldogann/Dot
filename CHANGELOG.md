@@ -5,6 +5,13 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- A message sent from a chat that is over no longer jumps the chat up and back down: it stays at its foot until the
+  next run's page takes its place. A chat whose run is over opens with every message already there, instead of
+  filling in as its stream is read (item 454).
+- `[browser] idle_close_s` closes Dot's own Chrome, with its Playwright driver, once nobody used it for that long, so it
+  does not keep its memory all day; while it runs macOS takes it for your Google Chrome, and a click on Chrome in the
+  Dock brings Dot's forward instead of opening yours. It is off (0) until Dot's Chrome keeps the cookies a site keeps
+  only for the session across its restarts, since a close would sign you out of such sites (item 454).
 - In `yolo`, Dot no longer asks you about what every other mode refuses (a read of where your secrets are kept, data
   sent out, a step in Dot's own window or on Chrome's remote debugging, a change of Dot's own files outside the undo
   journal): the step runs and is recorded. Money and credentials are still handed to you, and a message or a post in

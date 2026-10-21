@@ -431,13 +431,37 @@ function beginSession() {
   // Which page was asked for last: a page whose script came after another was asked for is not opened.
   let asked = 0;
 
-  async function show() {
+  /** The page asked for by the address, in place of the one before, which goes at once: it opens at its top. */
+  function show() {
+    leavePage();
+    shell.main.replaceChildren();
+    // A chat holds the phone's screen as one frame while it is open (`html.chat-shell`, item 352); it goes with its page.
+    document.documentElement.classList.remove("chat-shell");
+    window.scrollTo(0, 0);
+    return openPage();
+  }
+
+  /** The chat goes on at another of its runs (`goOnAt`): the page that was here stands as it was scrolled until the next
+   * one is drawn in its place (the run's page draws over what it finds, `views/run.js`), so a message sent does not
+   * empty the chat, lift it to its top and drop it back to its foot. */
+  function goOn() {
+    leavePage();
+    // What stands of it is only to be seen: a word typed into it or a click on it would reach a page that is gone.
+    for (const child of shell.main.children) {
+      child.inert = true;
+    }
+    return openPage();
+  }
+
+  function leavePage() {
     disposeView();
     disposeView = () => undefined;
-    shell.main.replaceChildren();
     clearStage();
     forgetImages();
     forgetSentPictures();
+  }
+
+  async function openPage() {
     const path = currentPath();
     const moved = MOVED.get(path);
     if (moved !== undefined) {
@@ -461,7 +485,6 @@ function beginSession() {
       back: backFrom(found, linked),
     });
     setPageTitle(`${found.route.title} · Dot`);
-    window.scrollTo(0, 0);
     const ctx = {
       params: found.params,
       navigate: (target) => {
@@ -475,7 +498,7 @@ function beginSession() {
         const linked = current?.linked;
         history.replaceState(linked ? { dotPath: target, dotLinked: true } : null, "", `${location.pathname}${location.search}#${target}`);
         // Once the caller's own work is done, as the event of a new address would come.
-        setTimeout(show, 0);
+        setTimeout(goOn, 0);
       },
       setTitle: (text) => {
         setPageTitle(`${text} · Dot`);

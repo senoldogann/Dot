@@ -551,6 +551,13 @@ navigation_backoff_ms = 80
 # Tabs one conversation thread may keep open; the oldest background tab is closed beyond that.
 max_tabs = 4
 tab_idle_s = 1800.0
+# Dot's own Chrome, and the Playwright driver with it, close once nothing used them for this long (item 454): no step of
+# a chat is under way in it, no run at work holds tabs in it, no page is being read in it for the web tools, no task is
+# being taught in it and its window is not the one in front. A Chrome left open keeps memory, and macOS takes it for your Google Chrome, whose Dock icon then brings
+# it forward instead of opening yours. The next call that needs it starts it again on the same profile; the chats' tabs
+# go with it, and so do the cookies a site keeps only for the session (no expiry), which sign you out of such sites
+# until Dot's Chrome keeps them across its restarts. 0, the default until then, keeps it open until the daemon stops.
+idle_close_s = 0.0
 screenshot_quality = 60
 max_batch_steps = 5
 read_text_chars = 8000

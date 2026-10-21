@@ -16070,6 +16070,30 @@ rather than running off the top.
 Tests: `tests/smoke/test_composer_picks.py` (`@` lists no Skills and no Commands, a hand-added server draws the plug, the
 menu's box stays inside the window on a phone, and `/` carries the skill and picks it); `tests/unit/test_palette.py`
 (a catalogued server's logo reaches the palette, a hand-added one has none).
+### 454. A chat that goes on without a jump, a finished chat drawn whole, and Dot's Chrome closed once unused
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent scrolls the chat up and down before it
+lands at its foot; a chat whose run is over streams its messages in again when opened; with Dot working in Chrome a lot,
+a click on their own Chrome opens nothing after a while; and what Dot opens should close once the work is done. **As
+built.** *The jump:* a message sent from a chat that is over starts a run, and the chat went on at that run's address
+through the router's full page change, which emptied the page, scrolled the window to its top and drew a loading panel
+before the next run's page scrolled to its foot. `goOnAt` now leaves the page standing, inert (`main.js`'s `goOn`), and
+the run's page draws over what it finds; the phone's one-screen frame (`html.chat-shell`) stays across, and the turn
+before the new run, read before the page is drawn (`history.js`'s `READ_FIRST`), stands whole instead of growing in.
+*The finished chat:* a run opened after it ended was drawn from its SSE stream frame by frame; `mount` now reads the
+stored events of a run that is over whole (the stream, which ends after them) before it draws the page. A run kept while
+it worked and ended meanwhile is item 446's, left as it built it. *Chrome:* Dot's own Chrome is the installed Google
+Chrome app on a profile of its own, and it ran until the daemon stopped. Measured with a Chrome started as Dot starts
+it: `open -b com.google.Chrome`, which a Dock click amounts to, starts no Chrome of the owner's but goes to Dot's. It
+can now close with its Playwright driver after `[browser] idle_close_s` unused: no chat's step under way, no run at work
+holding tabs in it, no page read in it for the web tools (`_in_use`), no task taught in it, its window not in front
+(`BrowserSession._close_unused`, run by the tab reaper). It is off (0) by default: a close loses the cookies a site
+keeps only for the session, which item 453 (keeping them across Chrome's restarts) is to fix; once that is in main the
+default can be 300 s. Also measured: a Chrome whose driver is killed exits with it, so a crashed daemon leaves no Chrome
+behind. Left as it was: background terminal commands still run until closed (`terminal_idle_s` closes idle sessions), by
+design for a server a run starts for the owner; while a run works in Dot's Chrome the Dock still brings it forward
+(`attach` mode avoids it). Measured in `tests/smoke/test_chat_scroll.py` (the window falls from 789 px to 0 on the code
+before; a finished chat's answer is there with its page) and `tests/smoke/test_browser.py`.
 
 ## Log
 

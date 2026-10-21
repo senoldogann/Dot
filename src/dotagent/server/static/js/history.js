@@ -13,6 +13,9 @@ import { countKinds, flowIcon, flowWords, toolRow } from "./tools.js";
 const THREAD_LIMIT = 200;
 // The last turns whose tool calls are read with the page; older ones read them as they come near it (item 374).
 const EAGER_TURNS = 6;
+// The last of them is read before the page is drawn: its work stands right above the run's own, where a chat opens and
+// where the chat goes on from when a message is sent, so it is there whole instead of growing in under the reader.
+const READ_FIRST = 1;
 const OPS_MARGIN = "800px";
 // The events of a run are read this many at a time (the most `GET /runs/{id}/events` gives).
 const EVENTS_PAGE = 2000;
@@ -34,17 +37,30 @@ function conversation(runs) {
 }
 
 /**
- * The runs before `run` in its thread, as `{ earlier }` (oldest first). A run the thread does not list, such as a delegated
- * one, stands alone: the list is empty.
+ * The runs before `run` in its thread, as `{ earlier, read }` (oldest first). A run the thread does not list, such as a
+ * delegated one, stands alone: the list is empty. `read` holds what the last turn did (`READ_FIRST`), a run's id to
+ * `{ events }`, or to `{ error }`, why they could not be read. Nothing more is read once `signal` aborted.
  */
-export async function loadHistory(run) {
+export async function loadHistory(run, signal) {
   const found = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${THREAD_LIMIT}`);
   const runs = conversation(found);
   const at = runs.findIndex((candidate) => candidate.id === run.id);
   if (at === -1) {
-    return { earlier: [] };
+    return { earlier: [], read: new Map() };
   }
-  return { earlier: runs.slice(0, at) };
+  const earlier = runs.slice(0, at);
+  const last = earlier.slice(-READ_FIRST).filter((past) => FINISHED.has(past.status));
+  const settled = await Promise.allSettled(last.map((past) => allEvents(past.id, signal)));
+  const read = new Map();
+  last.forEach((past, index) => {
+    const outcome = settled[index];
+    if (outcome.status === "rejected") {
+      read.set(past.id, { error: outcome.reason });
+    } else if (outcome.value !== null) {
+      read.set(past.id, { events: outcome.value });
+    }
+  });
+  return { earlier, read };
 }
 
 /**
@@ -92,27 +108,42 @@ async function allEvents(runId, signal) {
   }
 }
 
-/** What a run said and ran, read and drawn into the turn's `flow`; nothing is drawn once `signal` aborted. A failure
- * to read or to draw it says why, with the way to the run: the turn keeps its question and its answer. */
+/** What a run said and ran, read and drawn into the turn's `flow`; nothing is drawn once `signal` aborted. */
 async function fillFlow(past, flow, asked, signal) {
+  let events;
   try {
-    const events = await allEvents(past.id, signal);
-    if (events !== null && !signal.aborted) {
-      drawFlow(past, flow, asked, events);
-    }
+    events = await allEvents(past.id, signal);
   } catch (error) {
-    console.error("what an earlier run did could not be shown", { run: past.id, error });
-    flow.replaceChildren(
-      el(
-        "div",
-        { class: "note" },
-        icon("alert"),
-        el("span", null, `What this run did could not be shown: ${error.message}`),
-        el("a", { class: "small", href: `#/runs/${past.id}` }, "Open run"),
-      ),
-    );
-    flow.hidden = false;
+    flowNotShown(past, flow, error);
+    return;
   }
+  if (events !== null && !signal.aborted) {
+    drawRead(past, flow, asked, events);
+  }
+}
+
+/** Draws what was read of a run into the turn's `flow`. A failure to read or to draw it says why, with the way to the
+ * run: the turn keeps its question and its answer. */
+function drawRead(past, flow, asked, events) {
+  try {
+    drawFlow(past, flow, asked, events);
+  } catch (error) {
+    flowNotShown(past, flow, error);
+  }
+}
+
+function flowNotShown(past, flow, error) {
+  console.error("what an earlier run did could not be shown", { run: past.id, error });
+  flow.replaceChildren(
+    el(
+      "div",
+      { class: "note" },
+      icon("alert"),
+      el("span", null, `What this run did could not be shown: ${error.message}`),
+      el("a", { class: "small", href: `#/runs/${past.id}` }, "Open run"),
+    ),
+  );
+  flow.hidden = false;
 }
 
 /** What a run said and ran, in the order it happened (item 374): its words, the calls of the stretch that followed,
@@ -263,8 +294,10 @@ function whenNear(element, ops, asked, run, signal) {
   });
 }
 
-/** One earlier run as what was asked, what it did and how it ended; a run still going keeps the foot of its message back. */
-function turn(past, editFromHereOf, eager, signal) {
+/** One earlier run as what was asked, what it did and how it ended; a run still going keeps the foot of its message back.
+ * What the run did is drawn at once when `known` holds it (`loadHistory`'s `read`: `{ events }`, or `{ error }`), else
+ * read now for an `eager` turn and once the turn comes near what is seen for the others. */
+function turn(past, editFromHereOf, eager, known, signal) {
   const href = `#/runs/${past.id}`;
   const ended = FINISHED.has(past.status);
   const ops = el("div", { class: "turn-ops", hidden: true });
@@ -279,7 +312,13 @@ function turn(past, editFromHereOf, eager, signal) {
         : userMessage({ text: past.goal, sentAt: past.created_at, files: [], editFromHere: editFromHereOf(past) });
   const element = el("section", { class: ended ? "turn" : "turn turn-working" }, asked, ops, answer);
   if (ended) {
-    if (eager) {
+    if (known !== undefined) {
+      if ("error" in known) {
+        flowNotShown(past, ops, known.error);
+      } else {
+        drawRead(past, ops, asked, known.events);
+      }
+    } else if (eager) {
       void fillFlow(past, ops, asked, signal);
     } else {
       whenNear(element, ops, asked, past, signal);
@@ -289,11 +328,12 @@ function turn(past, editFromHereOf, eager, signal) {
 }
 
 /**
- * The earlier turns of the conversation as one block, or null when there are none. `editFromHereOf(run)` gives what
+ * The earlier turns of the conversation (`loadHistory`'s `{ earlier, read }`) as one block, or null when there are
+ * none. `editFromHereOf(run)` gives what
  * rewinds the chat to before the message of an earlier run (item 282), or null where it cannot be; `signal` ends with
  * the page, and what the turns read with it.
  */
-export function earlierTurns(earlier, editFromHereOf, signal) {
+export function earlierTurns({ earlier, read }, editFromHereOf, signal) {
   if (earlier.length === 0) {
     return null;
   }
@@ -311,7 +351,7 @@ export function earlierTurns(earlier, editFromHereOf, signal) {
           el("span", null, `${plural(left, "earlier run is", "earlier runs are")} not shown.`),
           el("a", { class: "small", href: `#/runs/${earlier[0].id}` }, "Open the first run"),
         ),
-    shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS, signal)),
+    shown.map((past, index) => turn(past, editFromHereOf, index >= shown.length - EAGER_TURNS, read.get(past.id), signal)),
   );
 }
 
