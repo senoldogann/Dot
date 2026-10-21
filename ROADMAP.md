@@ -16053,6 +16053,23 @@ few tokens to spare, get 26 000, still far under the 48 000 that Settings › Mo
 work with a draft of six lines that grows the dock, two drawn again from what was kept, one whose run ended while
 another chat was open; it fails on main), `tests/unit/test_run_modes.py`, `test_lean_prompt.py`. Docs: `docs/daemon.md`,
 `docs/autonomy.md`.
+### 447. The at menu is the servers and the plugins, with their logos, and it fits a phone's keyboard
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21, with a screenshot of the phone: `@` listed the MCP
+servers *and* every skill, so the servers the owner wanted were lost among them; the servers wore a plug where their
+Customize tile wears their own logo (item 408); and with the keyboard up the menu ran off the top of the screen.
+**As built.** `@` opens the MCP servers and the plugins alone (`pickGroups`, item 447): the skills and the servers' tools
+are the slash menu's, and a skill found by `@` is a skill found by `/` (`@` finds none of it now, and `/` keeps its
+Skills group). Each server carries the logo its Customize tile wears: the palette gained `PaletteServer.logo`, filled
+from `service_of` and `logo_of_service` as the MCP page fills it (a server added by hand has none, and the plug stands for
+it). `itemMark` draws that picture instead of the icon. And on a phone the menu's height is what the keyboard leaves —
+`min(320px, calc(100dvh - var(--seen-top) - var(--seen-bottom) - var(--dock-h) - 16px))`, the band `layout.js` keeps from
+`visualViewport` (a keyboard pans the page without resizing it, so `dvh` alone does not follow it) — scrolling inside it
+rather than running off the top.
+
+Tests: `tests/smoke/test_composer_picks.py` (`@` lists no Skills and no Commands, a hand-added server draws the plug, the
+menu's box stays inside the window on a phone, and `/` carries the skill and picks it); `tests/unit/test_palette.py`
+(a catalogued server's logo reaches the palette, a hand-added one has none).
 
 ### 449. The rules move with arrows, and a rule that never decides says so
 
@@ -17057,6 +17074,8 @@ bind; and never by running the kept call outside its run).
 - 2026-10-21 (Opus 5.5): item 446 on `item-446-chat-foot-always-a-way` from `main`: a chat reached from
   the side menu opens at its foot, a run that ended while another chat was open and a live one included;
   every run is told that there is always a way, within the rules of trust and safety.
+- 2026-10-21 (Opus 5.5): item 447: `@` offers the MCP servers and the plugins alone — the skills are `/`'s — each with
+  the logo of its Customize tile, and on a phone the menu takes the room the keyboard leaves and scrolls.
 - 2026-10-21 (Opus 5.5): item 449 on `item-449-rule-order` from `main`: a rule's arrows move it up or down the order, a
   rule that an earlier rule fits wherever it fits says it never decides, and the plan of the nine ideas taken from
   OpenBot is written down.

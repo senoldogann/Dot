@@ -24,6 +24,7 @@ from dotagent.config_edit import (
     set_role_model,
     set_shell_sandbox,
 )
+from dotagent.connections.directory import logo_of_service
 from dotagent.core.errors import (
     ConfigError,
     DotError,
@@ -82,6 +83,7 @@ from dotagent.secrets import secret_state
 from dotagent.server.context import ServerContext
 from dotagent.server.guard import daemon_proof
 from dotagent.server.palette import palette_view
+from dotagent.server.routes_mcp import service_of
 from dotagent.server.views import (
     ContextChoice,
     ContextEvidenceQuery,
@@ -505,7 +507,13 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         catalog: SkillCatalog = await asyncio.to_thread(
             load_skills, config.skills, ctx.runtime.plugins.plugins, playbook_root(config)
         )
-        return palette_view(catalog.skills, ctx.runtime.mcp.tools)
+        # Each server's logo, the one its Customize tile wears (item 408): the composer's @ menu draws it as the page
+        # does (item 447).
+        logos: dict[str, str | None] = {
+            name: logo_of_service(service) if (service := service_of(server)) is not None else None
+            for name, server in ctx.runtime.mcp.configs().items()
+        }
+        return palette_view(catalog.skills, ctx.runtime.mcp.tools, logos)
 
     @router.get("/doctor")
     async def doctor() -> list[CheckResult]:
