@@ -2,7 +2,9 @@
 rules:
   self-repository:
     ignore:
-      # The release's gate, named as a reusable workflow at a job's level: GitHub reads it from the commit the release
-      # runs for, never from a runner's files, so the state this audit guards against cannot reach it; and the release
-      # runs only for a tag, so GitHub's new $/ form there would first be tried by a release.
-      - release.yml:43
+      # The release's gate and its browser tests (item 486), named as reusable workflows at a job's level: GitHub reads
+      # them from the commit the release runs for, never from a runner's files, so the state this audit guards against
+      # cannot reach them; and the release runs only for a tag, so GitHub's new $/ form there would first be tried by a
+      # release.
+      - release.yml:44
+      - release.yml:48

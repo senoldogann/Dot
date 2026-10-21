@@ -44,8 +44,9 @@ their JSDoc (`tsconfig.json`; the service worker apart, in `tsconfig.sw.json`) a
 modules (`tests/js`, `node --test`). `npm run fix` applies the fixes Biome can make. [Development](docs/development.md)
 says how strict the type check is and what comes next.
 
-The gate leaves out the tests that need a browser or a service. Run those of them that touch your change on your Mac:
-`-m "not live and not internet and not hosted and not desktop"` adds the browser tests, which drive Google Chrome
+The gate's own job leaves out the tests that need a browser or a service; its `browser` job runs the core of the browser
+tests (item 486), and `.github/workflows/browser.yml` all of them every night. Run those that touch your change on your
+Mac: `-m "not live and not internet and not hosted and not desktop"` adds the browser tests, which drive Google Chrome
 headless against a local server. A few drive WebKit, the engine of Safari on the phone, which Playwright installs with
 `uv run playwright install webkit`. [Development](docs/development.md) says what each test marker needs.
 
