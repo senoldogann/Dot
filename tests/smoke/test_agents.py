@@ -508,7 +508,8 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
 ) -> None:
     """Item 511: the editor's tools have All tools, which ticks every box; all ticked saves the agent with every tool,
     such an agent opens with every box ticked, and a form with none ticked saves nothing. An agent that names every
-    tool listed keeps them named through a save that changed nothing: no save lifts its bounds by itself."""
+    tool listed keeps them named through a save that changed nothing, no save lifting its bounds by itself, until the
+    owner ticks All tools."""
     made = await client.post("/api/agents", json=_agent(["shell"]))
     assert made.status_code == 201, made.text
     agent_id: str = made.json()["id"]
@@ -549,6 +550,15 @@ async def test_all_tools_ticks_every_tool_of_an_agent_and_saves_it_with_every_to
             await page.get_by_role("button", name="Save changes").click()
             await expect(page.get_by_text("Agent saved.")).to_be_visible()
             assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == listed
+            # Ticked by the owner, All tools gives that agent every tool, any added later too.
+            await page.reload()
+            await page.locator(".stage-tools").get_by_role("button", name="Edit", exact=True).click()
+            await every.uncheck()
+            await every.check()
+            await expect(page.locator(".tool-picks-count")).to_have_text("every tool, and any added later")
+            await page.get_by_role("button", name="Save changes").click()
+            await expect(page.get_by_text("Agent saved.")).to_be_visible()
+            assert (await client.get(f"/api/agents/{agent_id}")).json()["record"]["tools"] == []
         finally:
             await browser.close()
     assert (await client.delete(f"/api/agents/{agent_id}")).status_code == 204

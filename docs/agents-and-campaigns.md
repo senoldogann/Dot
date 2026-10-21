@@ -4,35 +4,36 @@
 
 An agent is a profile you make for a kind of work: a name, a role in one line, instructions, and bounds for its runs (a
 model, a reasoning level, approvals, the tools it may use; each left out takes the configured one, and **All tools**,
-over the tools' boxes, means every tool, any added later too: an agent with every tool opens with every box ticked, and
-none ticked is refused, item 511) and a look: a shape, a rest expression and a colour of the character (see the design
-system), picked in the editor's Look field with a moving preview, worn as a still face wherever the agent shows, and
-until you choose one the shape and colour its id's hue gives it (`PUT /api/agents/{id}/look` sets the look alone; Dot's
-own is the "Dot's look" card of Settings › General, kept by the daemon for every browser). **Agents** in the sidebar
-lists Dot first and then your agents, each with its newest chat; **New agent** opens the editor; an agent's page greets
-with its face and role, takes a message for it ("Message Scout") and lists its chats, with Edit and Delete in the bar.
-The box of that page has the home's Mode, Model, Reasoning and Options pickers (item 426), starting from the agent's
-own: its model, its reasoning level and its approvals, not what this browser has chosen for the home's box; the mode,
-model, reasoning level and approvals chosen there go with that message, in place of the agent's own for that run, and
-leave the home's choices as they were. Fast mode and goal mode are the home's own, shared with it in this browser: the
-agent has no bounds for them, and turning one on there turns it on in the home's box too. The home composer offers an
-Agent menu once an agent exists, Dot by default. A run of an agent opens its system prompt with the agent's own section
-("You are Scout, an agent the owner made: ..." and your instructions), ahead of Dot's rules, which still hold; its tools
-are the ones the agent names plus finishing, asking you and turning tool groups on, and the tools of an MCP server you
-pick for its message, or picked for an earlier message of its chat (item 415): your pick widens the agent's bounds for
-that chat; a server the model only called does not. The run's page wears the agent's face and name in the bar with a
-chip to its page; its rows in the sidebar and on the home's Today strip wear the face too. A schedule can run as one of
-your agents (its **Agent** on Schedules, item 462; see [Memory and schedules](memory-and-schedules.md)). Deleting an
-agent leaves its chats, its lessons and its learned skills to Dot, and switches its schedules off ("switched off: its
-agent was deleted"), as Dot's with no agent named, so that none goes on firing with every tool; one you switch on again
-runs as Dot, or as the agent you then pick in its form. The dialog says how many of them it switches off: the ones on.
-The bar of an agent's page names the agent as the page's heading, as the tab does ("Scout · Agents · Dot"), and Edit
-opens the editor at the top of the page, not where the greeting stood. **Pause** in the bar (item 465; `POST
-/api/agents/<id>/pause`, and `/resume`) keeps the agent's schedules from starting anything by themselves until
-**Resume**: the list and the page say "Paused", and its schedules' rows "<name> is paused" (see [Memory and
-schedules](memory-and-schedules.md)). What you send the agent, **Run now** of one of its schedules and the messages of
-other agents still reach it, and runs already working go on, each with its Stop. Saving the agent in the editor, or a
-restart, keeps the pause; Dot is paused by switching its schedules off.
+over the tools' boxes, means every tool, any added later too: an agent with every tool opens with every box ticked,
+every box ticked saves as every tool, an agent that names each tool there is keeps them named through a save until you
+tick All tools yourself, and none ticked is refused, item 511) and a look: a shape, a rest expression and a colour of
+the character (see the design system), picked in the editor's Look field with a moving preview, worn as a still face
+wherever the agent shows, and until you choose one the shape and colour its id's hue gives it (`PUT
+/api/agents/{id}/look` sets the look alone; Dot's own is the "Dot's look" card of Settings › General, kept by the daemon
+for every browser). **Agents** in the sidebar lists Dot first and then your agents, each with its newest chat; **New
+agent** opens the editor; an agent's page greets with its face and role, takes a message for it ("Message Scout") and
+lists its chats, with Edit and Delete in the bar. The box of that page has the home's Mode, Model, Reasoning and Options
+pickers (item 426), starting from the agent's own: its model, its reasoning level and its approvals, not what this
+browser has chosen for the home's box; the mode, model, reasoning level and approvals chosen there go with that message,
+in place of the agent's own for that run, and leave the home's choices as they were. Fast mode and goal mode are the
+home's own, shared with it in this browser: the agent has no bounds for them, and turning one on there turns it on in
+the home's box too. The home composer offers an Agent menu once an agent exists, Dot by default. A run of an agent opens
+its system prompt with the agent's own section ("You are Scout, an agent the owner made: ..." and your instructions),
+ahead of Dot's rules, which still hold; its tools are the ones the agent names plus finishing, asking you and turning
+tool groups on, and the tools of an MCP server you pick for its message, or picked for an earlier message of its chat
+(item 415): your pick widens the agent's bounds for that chat; a server the model only called does not. The run's page
+wears the agent's face and name in the bar with a chip to its page; its rows in the sidebar and on the home's Today
+strip wear the face too. A schedule can run as one of your agents (its **Agent** on Schedules, item 462; see [Memory and
+schedules](memory-and-schedules.md)). Deleting an agent leaves its chats, its lessons and its learned skills to Dot, and
+switches its schedules off ("switched off: its agent was deleted"), as Dot's with no agent named, so that none goes on
+firing with every tool; one you switch on again runs as Dot, or as the agent you then pick in its form. The dialog says
+how many of them it switches off: the ones on. The bar of an agent's page names the agent as the page's heading, as the
+tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not where the greeting stood.
+**Pause** in the bar (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the agent's schedules from starting
+anything by themselves until **Resume**: the list and the page say "Paused", and its schedules' rows "<name> is paused"
+(see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run now** of one of its schedules and
+the messages of other agents still reach it, and runs already working go on, each with its Stop. Saving the agent in the
+editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
 The page is in two parts (item 509): **Your agents**, with their count, and under them **Add ready-made agents**, which
 shows the teams or the single agents, one of the two at a time (**Teams** first; the one chosen last while the app is

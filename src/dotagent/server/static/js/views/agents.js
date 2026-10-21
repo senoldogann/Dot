@@ -253,16 +253,19 @@ function select(label, entries, value) {
 
 /** The checkboxes of the tools under one that ticks them all (item 511): an agent with every tool (`chosen` empty)
     opens with every box ticked, and every box ticked saves as every tool (`widens`), unless the boxes are the tools the
-    agent names, unchanged: those stay named, so a save that changed nothing never lifts its bounds. */
+    agent names, unchanged, and All tools was not ticked: those stay named, so a save that changed nothing never lifts
+    its bounds, and ticking All tools always does. */
 function toolPicks(names, chosen) {
   const picked = new Set(chosen.length === 0 ? names : chosen);
   const boxes = names.map((name) => el("input", { type: "checkbox", value: name, checked: picked.has(name) }));
   const all = el("input", { type: "checkbox", "aria-label": "All tools" });
   const count = el("span", { class: "muted tool-picks-count" });
   const named = new Set(chosen);
+  // Whether the owner ticked All tools since a box was last unticked: every tool, whatever the agent named.
+  let allTicked = false;
   function widens() {
     const ticked = boxes.filter((box) => box.checked);
-    return ticked.length === boxes.length && (named.size === 0 || ticked.some((box) => !named.has(box.value)));
+    return ticked.length === boxes.length && (named.size === 0 || allTicked || ticked.some((box) => !named.has(box.value)));
   }
   function paint() {
     const ticked = boxes.filter((box) => box.checked).length;
@@ -271,13 +274,17 @@ function toolPicks(names, chosen) {
     count.textContent = widens() ? "every tool, and any added later" : `${ticked} of ${boxes.length}`;
   }
   all.addEventListener("change", () => {
+    allTicked = all.checked;
     for (const box of boxes) {
       box.checked = all.checked;
     }
     paint();
   });
   for (const box of boxes) {
-    box.addEventListener("change", paint);
+    box.addEventListener("change", () => {
+      allTicked = allTicked && box.checked;
+      paint();
+    });
   }
   paint();
   const element = el(
@@ -483,15 +490,14 @@ function mountList(root, ctx) {
           (names) => ({ names, problem: null }),
           (error) => ({ names: null, problem: error }),
         ),
-        // Only the marks of a team's card need them: a list that failed leaves the cards unmarked, and the list of the
-        // agents above says why.
-        api.get("/agents").catch((error) => {
-          console.warn("the agents could not be listed for the marks of the teams", error);
-          return [];
-        }),
+        // Only the marks of a team's card need them: a list that failed leaves the cards unmarked, and says so above them.
+        api.get("/agents").then(
+          (records) => ({ records, problem: null }),
+          (error) => ({ records: [], problem: error }),
+        ),
       ]);
       // The agents the owner has, by name as Use team reads them, for the marks of a team's card.
-      const owned = new Set(summaries.map(({ record }) => record.name.trim().toLowerCase()));
+      const owned = new Set(summaries.records.map(({ record }) => record.name.trim().toLowerCase()));
       const known = named.names === null ? null : new Set(named.names);
       const listingProblem = named.problem;
       const byId = new Map(listed.map((template) => [template.id, template]));
@@ -506,6 +512,15 @@ function mountList(root, ctx) {
               { class: "hint" },
               "A few agents that work together, made in one click: ask Dot or any of them, and they hand each other the parts their roles fit. An agent of that name you have already is kept, and joins the team.",
             ),
+            ...(summaries.problem === null
+              ? []
+              : [
+                  el(
+                    "p",
+                    { class: "hint", dataset: { teamsAgentsUnknown: "" } },
+                    `Your agents could not be listed: ${summaries.problem.message}. The cards mark none of them Yours, and Use team still keeps an agent you have.`,
+                  ),
+                ]),
             el("div", { class: "template-grid" }, teams.map((team) => teamCard(team, byId, useTeam, owned))),
           ),
           single: el(

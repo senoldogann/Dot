@@ -160,8 +160,15 @@ async def test_a_home_that_cannot_list_its_tools_says_so_on_the_cards_and_marks_
                 page = await browser.new_page(viewport={"width": 1280, "height": 900}, reduced_motion="reduce")
                 await page.route("**/api/tools", lambda route: route.fulfill(status=500, body="no"))
                 await page.goto(ui_url("127.0.0.1", int(address.rpartition(":")[2]), TOKEN))
+                await expect(page.locator("#sidebar .side-foot")).to_be_visible()
+                # The agents' list fails too, once the app is up (it reads the faces from it as it starts): the teams
+                # show, unmarked, and say why (item 511).
+                await page.route("**/api/agents", lambda route: route.fulfill(status=500, body="no"))
                 await page.goto(f"{address}/#/agents")
                 await expect(page.locator(".template-card")).to_have_count(len(TEMPLATES))
+                await expect(page.locator("[data-teams-agents-unknown]")).to_contain_text("could not be listed")
+                await expect(page.locator(".team-card")).to_have_count(len(TEAMS))
+                await expect(page.locator(".team-yours")).to_have_count(0)
                 await _singles(page)
                 notice = page.locator("[data-templates-tools-unknown]")
                 await expect(notice).to_contain_text("could not be listed")
