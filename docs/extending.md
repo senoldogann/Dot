@@ -224,7 +224,9 @@ Dot send the token it keeps for it, which **Sign in again** on [Customize › Pl
 there sign in by themselves. The tool list is read when Dot starts and when a server is added, removed or has its tools
 chosen on the Plugins page, for the runs that start after; a server that dies is started again by the next call. A
 server reached at a URL whose session was quiet for a minute is pinged before it is used, and connected again when the
-ping finds it gone, so that the calls that come go to a new session rather than fail on the old one (item 513). A call
+ping finds it gone (its connection closed, its server ended the session or failed; a server that answers that it
+does not know ping is there), so that the calls that come go to a new session rather than fail on the old one (item
+513). A call on a session its server ended is a connection that broke, and the next call connects again. A call
 whose connection broke is not repeated, as the tool may have done part of its work, unless the server declares the
 tool read-only (`readOnlyHint`): such a call is made once more on a new connection, with a warning in the log. A server that is enabled but cannot start (its command, a secret or its working directory is missing, it
 quits or does not answer in time, its `allow` list names a tool it does not offer, two of its tools would share a name,

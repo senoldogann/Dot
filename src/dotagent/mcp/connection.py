@@ -18,7 +18,16 @@ from mcp import Client, MCPError, StdioServerParameters, stdio_client
 from mcp.client.auth import OAuthFlowError
 from mcp.client.sse import sse_client
 from mcp.client.streamable_http import StreamableHTTPError, streamable_http_client
-from mcp.types import CONNECTION_CLOSED, REQUEST_TIMEOUT, CallToolResult, ListToolsResult, Tool, ToolAnnotations
+from mcp.types import (
+    CONNECTION_CLOSED,
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
+    REQUEST_TIMEOUT,
+    CallToolResult,
+    ListToolsResult,
+    Tool,
+    ToolAnnotations,
+)
 from pydantic import JsonValue
 
 from dotagent.config import McpServerConfig, McpTransport
@@ -71,6 +80,17 @@ class _Live:
 
 class _ConnectionLost(McpError):
     """The connection to the server broke while a request was out: the next request connects again."""
+
+
+# What the client library says when a server reached at a URL answers 404 to a request of a session: it ended the
+# session (a server that restarted, or one that drops the sessions that went quiet).
+_SESSION_ENDED: str = "Session terminated"
+
+
+def _session_gone(error: MCPError) -> bool:
+    """Whether ``error`` says the session cannot be used any more: its connection closed, or its server ended it
+    (item 513), so that the next request connects again rather than fail on the same session."""
+    return error.code == CONNECTION_CLOSED or (error.code == INVALID_REQUEST and error.message == _SESSION_ENDED)
 
 
 def _prepare_log(path: Path) -> int:
@@ -358,8 +378,9 @@ class McpConnection:
             live.broken = True
             return False
         except MCPError as exc:
-            # A server that answers the ping with an error of its own (one that does not know ping) is there.
-            if exc.code not in (CONNECTION_CLOSED, REQUEST_TIMEOUT):
+            # A server that does not know ping answered it, so the session is there; any other error (a session its
+            # server ended, a connection that closed, a gateway's failure) is connected again.
+            if exc.code == METHOD_NOT_FOUND:
                 live.answered_at = time.monotonic()
                 return True
             log.warning("mcp_server_quiet_session_gone", server=self.name, error=truncate_middle(repr(exc), 200))
@@ -392,7 +413,7 @@ class McpConnection:
                     {**self._context(), "timeout_s": self._config.startup_timeout_s},
                 ) from exc
             except MCPError as exc:
-                if exc.code == CONNECTION_CLOSED:
+                if _session_gone(exc):
                     raise await self._lost(live, "listing its tools", exc) from exc
                 raise McpError(
                     "the MCP server could not list its tools",
@@ -431,7 +452,7 @@ class McpConnection:
                     "the MCP tool call timed out",
                     {**self._context(), "tool": name, "timeout_s": self._config.call_timeout_s},
                 ) from exc
-            if exc.code == CONNECTION_CLOSED:
+            if _session_gone(exc):
                 raise await self._lost(live, f"running {name}", exc) from exc
             shown: str = truncate_middle(redact_secrets(dumps_compact(arguments)), _SHOWN_ARGUMENT_CHARS)
             raise McpError(

@@ -17,13 +17,24 @@ import pytest_asyncio
 import uvicorn
 from mcp import Client, MCPError
 from mcp.server.mcpserver import MCPServer
-from mcp.types import CONNECTION_CLOSED, CallToolResult, EmptyResult, RequestParamsMeta, TextContent
+from mcp.types import (
+    CONNECTION_CLOSED,
+    INTERNAL_ERROR,
+    INVALID_REQUEST,
+    METHOD_NOT_FOUND,
+    CallToolResult,
+    EmptyResult,
+    RequestParamsMeta,
+    TextContent,
+)
 from starlette.datastructures import Headers
 from starlette.responses import Response
 from starlette.types import ASGIApp, Receive, Scope, Send
 from structlog.testing import capture_logs
 
 from dotagent.config import McpServerConfig
+from dotagent.core.errors import McpError
+from dotagent.core.types import JsonObject
 from dotagent.mcp import connection as connection_module
 from dotagent.mcp.hub import McpHub, ServerReport, inspect_servers, open_hub
 from dotagent.mcp.types import McpTool
@@ -201,24 +212,34 @@ async def test_a_closed_port_is_reported_as_unreachable_quickly() -> None:
     assert "stderr_tail" not in report.detail
 
 
-async def test_a_quiet_session_that_does_not_answer_is_connected_again_before_the_call(
-    http_port: int, monkeypatch: pytest.MonkeyPatch
+@pytest.mark.parametrize(
+    ("code", "words", "again"),
+    [
+        (CONNECTION_CLOSED, "Connection closed", True),
+        (INVALID_REQUEST, "Session terminated", True),
+        (INTERNAL_ERROR, "Server returned an error response", True),
+        (METHOD_NOT_FOUND, "Method not found", False),
+    ],
+)
+async def test_a_quiet_session_is_pinged_and_connected_again_unless_its_server_answers(
+    http_port: int, monkeypatch: pytest.MonkeyPatch, code: int, words: str, again: bool
 ) -> None:
     """Item 513: Tavily's session went quiet for 17 minutes, its connection broke, and the four searches sent on it
-    failed at once. A session quiet for a while (here, any) is pinged before it is used; one whose ping finds the
-    connection gone (the library's own error, raised here once) is connected again, and the call goes on the new one.
-    The call is of wipe, which declares no hints and so is never called twice: the ping is what saves it."""
+    failed at once. A session quiet for a while (here, any) is pinged before it is used. One whose ping finds it gone
+    (the connection closed, its server ended the session or failed: the library's own errors, raised here once) is
+    connected again, and the call goes on the new one; a server that answers the ping with not knowing it is there,
+    and its session is used as it is. The call is of wipe, which declares no hints and is never called twice."""
     monkeypatch.setattr(connection_module, "_QUIET_CHECK_S", 0.0)
     pinged: list[Client] = []
     ping: Callable[..., Awaitable[EmptyResult]] = Client.send_ping
 
-    async def gone_once(self: Client, *, meta: RequestParamsMeta | None = None) -> EmptyResult:
+    async def answered_once(self: Client, *, meta: RequestParamsMeta | None = None) -> EmptyResult:
         pinged.append(self)
         if len(pinged) == 1:
-            raise MCPError(CONNECTION_CLOSED, "Connection closed")
+            raise MCPError(code, words)
         return await ping(self, meta=meta)
 
-    monkeypatch.setattr(Client, "send_ping", gone_once)
+    monkeypatch.setattr(Client, "send_ping", answered_once)
     hub: McpHub = await open_hub([_http("docs", http_port, f"Bearer ${{{TOKEN_VARIABLE}}}")], _login_env())
     try:
         wipe: McpTool = next(tool for tool in hub.tools if tool.server == "docs" and tool.remote_name == "wipe")
@@ -228,8 +249,40 @@ async def test_a_quiet_session_that_does_not_answer_is_connected_again_before_th
         (block,) = result.content
         assert isinstance(block, TextContent) and block.text == "wiped the cache"
         events: list[object] = [entry["event"] for entry in logs]
-        assert events[:2] == ["mcp_server_quiet_session_gone", "mcp_server_restart"], events
-        # The new session, just made, is used without a ping.
+        if again:
+            assert events[:2] == ["mcp_server_quiet_session_gone", "mcp_server_restart"], events
+        else:
+            assert "mcp_server_restart" not in events and "mcp_server_quiet_session_gone" not in events, events
+        # The session the call went on was not pinged again: a new one is fresh, and one that answered is too.
         assert len(pinged) == 1
+    finally:
+        await hub.close()
+
+
+async def test_a_session_its_server_ended_fails_a_call_once_and_the_next_call_connects_again(
+    http_port: int, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Item 513: a call on a session its server ended (the library says "Session terminated" for the server's 404) is
+    a connection lost, not a call refused: it fails, and the next call connects again rather than fail on the same
+    session. wipe declares no hints, so its failed call is not repeated."""
+    called: list[str] = []
+    call: Callable[..., Awaitable[CallToolResult]] = Client.call_tool
+
+    async def ended_once(self: Client, name: str, arguments: JsonObject, **options: object) -> CallToolResult:
+        called.append(name)
+        if len(called) == 1:
+            raise MCPError(INVALID_REQUEST, "Session terminated")
+        return await call(self, name, arguments, **options)
+
+    monkeypatch.setattr(Client, "call_tool", ended_once)
+    hub: McpHub = await open_hub([_http("docs", http_port, f"Bearer ${{{TOKEN_VARIABLE}}}")], _login_env())
+    try:
+        wipe: McpTool = next(tool for tool in hub.tools if tool.server == "docs" and tool.remote_name == "wipe")
+        with pytest.raises(McpError, match="closed the connection while running wipe"):
+            await hub.call(wipe, {"target": "the cache"})
+        with capture_logs() as logs:
+            result: CallToolResult = await hub.call(wipe, {"target": "the cache"})
+        assert not result.is_error, result
+        assert "mcp_server_restart" in [entry["event"] for entry in logs]
     finally:
         await hub.close()
