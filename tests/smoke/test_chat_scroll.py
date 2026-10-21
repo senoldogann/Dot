@@ -10,7 +10,7 @@ from typing import Literal
 
 import pytest
 import pytest_asyncio
-from playwright.async_api import Browser, BrowserContext, Page, async_playwright
+from playwright.async_api import Browser, BrowserContext, Page, async_playwright, expect
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -56,7 +56,7 @@ async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Run
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))
     built: Runtime = await build_runtime(load_config(home / "config.toml"))
-    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script() * 2))
+    await built.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script() * 8))
     try:
         yield built
     finally:
@@ -270,5 +270,92 @@ async def test_a_chat_that_is_over_opens_at_its_foot_and_return_breaks_the_line_
                 else:
                     assert value == "first line\n", (width, value)
                 await context.close()
+        finally:
+            await browser.close()
+
+
+# Where the conversation stands at every frame, from the moment it is sampled: the box it scrolls in on a phone, the
+# window on a wider one (run.js's `scroller`).
+_SAMPLE_SCROLL: str = """() => {
+  window.dotTops = [];
+  const sample = () => {
+    const phone = window.matchMedia('(max-width: 720px)').matches;
+    const box = phone ? document.querySelector('.run-thread') : document.scrollingElement;
+    window.dotTops.push(box === null ? -1 : box.scrollTop);
+    window.dotSampling = requestAnimationFrame(sample);
+  };
+  sample();
+}"""
+
+
+async def test_a_message_sent_from_a_chat_that_is_over_goes_in_at_its_foot_without_a_jump(
+    served: tuple[RunManager, str],
+) -> None:
+    """A message sent from a chat that is over starts its next run (item 454): the chat stays where it stood, at its
+    foot, until the next run's page is drawn in its place, and is never lifted to its top and dropped back on the way,
+    wide and on a phone."""
+    manager, address = served
+    run: RunRecord = await manager.start(
+        _GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(run.id)).status == "done"
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            for width, scheme in ((1280, "dark"), (390, "light")):
+                page, errors = await _page(browser, address, run.id, width, scheme)
+                await page.wait_for_timeout(600)
+                assert (await page.evaluate(_AT_THE_FOOT))["max"] > 0
+                await page.evaluate(_SAMPLE_SCROLL)
+                box = page.locator(".dock textarea")
+                await box.fill(f"One more look at the sea, {width}.")
+                await page.locator(".dock .send").click()
+                await page.wait_for_url(lambda url: run.id not in url, timeout=15000)
+                sent = page.locator(".para", has_text=f"One more look at the sea, {width}.")
+                await expect(sent).to_be_visible(timeout=15000)
+                await page.wait_for_timeout(600)
+                tops: list[int] = await page.evaluate("cancelAnimationFrame(window.dotSampling), window.dotTops")
+                assert min(tops) >= tops[0] - 2, (width, tops[0], min(tops))
+                assert errors == []
+                await page.context.close()
+        finally:
+            await browser.close()
+
+
+# Whether the run's answer was in the conversation when the run's page first stood in the window.
+_DRAWN_WHOLE: str = """(() => {
+  const watch = new MutationObserver(() => {
+    if (document.querySelector('.run-main') !== null) {
+      window.dotDrawnWhole = document.querySelector('.timeline .answer') !== null;
+      watch.disconnect();
+    }
+  });
+  watch.observe(document, { childList: true, subtree: true });
+})()"""
+
+
+async def test_a_chat_that_is_over_opens_drawn_whole(served: tuple[RunManager, str]) -> None:
+    """A chat whose run is over opens as it ended (item 454): its events are read before the page is drawn, so its
+    answer is there with the page, not filled in as its stream comes."""
+    manager, address = served
+    run: RunRecord = await manager.start(
+        _GOAL, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
+    )
+    async with asyncio.timeout(_RUN_WAIT_S):
+        assert (await manager.wait(run.id)).status == "done"
+    host, port = "127.0.0.1", int(address.rpartition(":")[2])
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch()
+        try:
+            page: Page = await (await browser.new_context(viewport={"width": 1280, "height": 900})).new_page()
+            await page.add_init_script("sessionStorage.setItem('dot.opened', '1')")
+            await page.goto(ui_url(host, port, TOKEN))
+            await page.add_init_script(_DRAWN_WHOLE)
+            await page.goto(f"{address}/#/runs/{run.id}")
+            await page.reload()
+            await page.wait_for_selector(".timeline .answer", timeout=15000)
+            assert await page.evaluate("window.dotDrawnWhole") is True
+            await page.context.close()
         finally:
             await browser.close()

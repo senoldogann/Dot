@@ -16070,6 +16070,74 @@ rather than running off the top.
 Tests: `tests/smoke/test_composer_picks.py` (`@` lists no Skills and no Commands, a hand-added server draws the plug, the
 menu's box stays inside the window on a phone, and `/` carries the skill and picks it); `tests/unit/test_palette.py`
 (a catalogued server's logo reaches the palette, a hand-added one has none).
+### 451. A message sent on one screen shows at once on the other
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent on the phone did not show on the desktop
+until the chat was left and opened again, and the same the other way round; fix that alone. **Cause.** A message sent to
+a chat at rest starts the chat's next run (`POST /runs` with its thread); the screen it was sent from goes on at that
+run, but a page of the same chat elsewhere follows only its own run's stream and was never told: the lifecycle stream's
+`run_queued` carries no thread, and nothing read the chat again. A message queued while a run works already showed
+everywhere (`queue_changed`), and a steer on the run's own stream. **As built** (`views/run.js`). A page that shows the
+chat's newest run goes on at the newer one, as the screen it was sent from does: when a run of the chat is queued (it
+reads the chat's newest runs once on a root `run_queued`), and once the lifecycle stream is back after a break, which
+replays nothing (a phone put away). What was typed there and not sent goes with it as the newer run's draft (`moveDraft`
+of `composer.js`). A page whose run was not the chat's newest when it first read the chat stays where it is: an earlier
+run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its address, or a
+delegated run; such a page reads the chat once. The tab keeps the run it showed as the chat's newest
+(`dot.chatShown.<thread>` in its session storage) until the page leaves it, so a phone's page that the browser loads
+again goes on from where it stood. Every way the page goes on (a message sent there, the queue's next one, an answer,
+Continue, a rewind) takes one guard, so two of them at once open the run once. The pre-push review's first pass stopped
+a page that took every page not reached by a link (main.js's history state) for the chat: the sidebar's Activity rows
+count as no link, and a question left on an earlier run could no longer be answered there. Its second and third passes
+found the same of questions: a page whose run left questions open stays for them, and once the last one closes, answered
+there or on another screen or skipped, it looks again whether the chat went on (`paintQuestions`). Tests:
+`tests/smoke/test_chat_follows.py` (Chrome wide and WebKit as a phone on one chat: the phone's message shows on the wide
+window and the wide window's on the phone, the wide window's unsent words go with it, a page of the earlier run opened
+by its address stays, and a phone's page loaded again after it showed the chat opens where the chat is; a run that left
+two questions, open on both screens: the first answer keeps both pages there, the last, sent on the phone, opens the
+chat's newest run on both; on main the wide window never moves). Docs: `docs/daemon.md`.
+
+### 452. The Run tab of the side panel, plain
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: the side panel's Run tab is crowded with what is not
+needed; make it plain and show what is really useful. It held Details with up to seventeen rows and Cost with ten, the
+steps, the tokens, the compactions and the time said twice, and Cost no money at all, its rows mostly "None". **As
+built.** Details keep what a glance needs: the status, the agent, the model, the reasoning level, the speed when it is
+fast, the approval mode, goal mode only when it is on, the campaign, the tool calls with the failed ones, the tokens,
+the compactions only once there is one (or a flagged check), the duration and the run that delegated it (`details.js`).
+The conversation's Files follow. The rest folds under **More**, closed the first time and kept as the browser last left
+it (`panelFold` of `panels.js`, which `panelSection`'s fold of item 426 now is): the run's mode, its start and its id
+with its copy button, how the run was Set up and its Cost, whose figures of none have no line (`cost.js`). A line of the
+set-up that warns is counted beside More's title ("1 warning", `setup.js`), so a warning is not hidden by the fold. The
+model turns are said once, as Cost's steps. Tests: `tests/smoke/test_side_panel.py` (the tab's sections are Details and
+More, closed the first time, the run id under it, the bill visible once it is opened), `test_activity.py`,
+`test_chat_calm.py` (the warning counted beside More), `test_context_meter.py`, `test_embedding_failure.py` (Set up
+under More). Docs: `docs/daemon.md`.
+
+### 454. A chat that goes on without a jump, a finished chat drawn whole, and Dot's Chrome closed once unused
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent scrolls the chat up and down before it
+lands at its foot; a chat whose run is over streams its messages in again when opened; with Dot working in Chrome a lot,
+a click on their own Chrome opens nothing after a while; and what Dot opens should close once the work is done. **As
+built.** *The jump:* a message sent from a chat that is over starts a run, and the chat went on at that run's address
+through the router's full page change, which emptied the page, scrolled the window to its top and drew a loading panel
+before the next run's page scrolled to its foot. `goOnAt` now leaves the page standing, inert (`main.js`'s `goOn`), and
+the run's page draws over what it finds; the phone's one-screen frame (`html.chat-shell`) stays across, and the turn
+before the new run, read before the page is drawn (`history.js`'s `READ_FIRST`), stands whole instead of growing in.
+*The finished chat:* a run opened after it ended was drawn from its SSE stream frame by frame; `mount` now reads the
+stored events of a run that is over whole (the stream, which ends after them) before it draws the page. A run kept while
+it worked and ended meanwhile is item 446's, left as it built it. *Chrome:* Dot's own Chrome is the installed Google
+Chrome app on a profile of its own, and it ran until the daemon stopped. Measured with a Chrome started as Dot starts
+it: `open -b com.google.Chrome`, which a Dock click amounts to, starts no Chrome of the owner's but goes to Dot's. It
+can now close with its Playwright driver after `[browser] idle_close_s` unused: no chat's step under way, no run at work
+holding tabs in it, no page read in it for the web tools or watched under "Dot's computer" (`_in_use`), no task taught
+in it, its window not in front (`BrowserSession._close_unused`, run by the tab reaper). It is off (0) by default, the
+owner's to set; since item 453 a close loses no session cookie, and 300 s is the value measured against. Also measured:
+a Chrome whose driver is killed exits with it, so a crashed daemon leaves no Chrome behind. Left as it was: background
+terminal commands still run until closed (`terminal_idle_s` closes idle sessions), by design for a server a run starts
+for the owner; while a run works in Dot's Chrome the Dock still brings it forward (`attach` mode avoids it). Measured in
+`tests/smoke/test_chat_scroll.py` (the window falls from 789 px to 0 on the code before; a finished chat's answer is
+there with its page) and `tests/smoke/test_browser.py`.
 
 ### 449. The rules move with arrows, and a rule that never decides says so
 
@@ -16143,22 +16211,60 @@ kept, Incognito and a fresh profile left alone, a state Dot does not know refuse
 sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
 `docs/browser-and-computer-use.md`.
 
-### 452. The Run tab of the side panel, plain
+### 455. A schedule runs now, by hand, and lists its firings
 
-**Status: done (2026-10-21).** The owner's word of 2026-10-21: the side panel's Run tab is crowded with what is not
-needed; make it plain and show what is really useful. It held Details with up to seventeen rows and Cost with ten, the
-steps, the tokens, the compactions and the time said twice, and Cost no money at all, its rows mostly "None". **As
-built.** Details keep what a glance needs: the status, the agent, the model, the reasoning level, the speed when it is
-fast, the approval mode, goal mode only when it is on, the campaign, the tool calls with the failed ones, the tokens,
-the compactions only once there is one (or a flagged check), the duration and the run that delegated it (`details.js`).
-The conversation's Files follow. The rest folds under **More**, closed the first time and kept as the browser last left
-it (`panelFold` of `panels.js`, which `panelSection`'s fold of item 426 now is): the run's mode, its start and its id
-with its copy button, how the run was Set up and its Cost, whose figures of none have no line (`cost.js`). A line of the
-set-up that warns is counted beside More's title ("1 warning", `setup.js`), so a warning is not hidden by the fold. The
-model turns are said once, as Cost's steps. Tests: `tests/smoke/test_side_panel.py` (the tab's sections are Details and
-More, closed the first time, the run id under it, the bill visible once it is opened), `test_activity.py`,
-`test_chat_calm.py` (the warning counted beside More), `test_context_meter.py`, `test_embedding_failure.py` (Set up
-under More). Docs: `docs/daemon.md`.
+**Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its first part:
+"a Run now button and the list of a schedule's past runs". **As built.** `Scheduler.fire_by_hand` starts a run of a
+schedule now, switched on or off, due or not, as a firing goes (unattended, the schedule's own choices, the digest of
+its earlier runs), in a chat titled `<name> · <time> · by hand` (or the schedule's chat), its first message saying it
+was started by hand (`by_hand_goal`); `Store.record_schedule_hand_run` writes its last run and its chat and nothing of
+when it fires next nor of its switch, so a one-time schedule is still due at its moment. It refuses (409) while the
+emergency stop is engaged and while a run of the schedule is at work or being started: a set of the schedules being
+started, entered by a tick's firing and by a hand run alike, closes the window between the check and the run in flight,
+so a click and a tick start one run between them, and a repeating schedule's firing whose time comes during a hand run
+is skipped as for a run still going, while a one-time schedule waits, still due, and fires once that run has ended (the
+pre-push review found that it was switched off for good by that skip, as its following time is none). A start the daemon
+refuses drops the chat made for it, is the caller's error and no missed firing (the owner is looking). `_fire` keeps its
+order (the firing written before the run starts); its parts both paths need (`_history`, `_carried`, `_start`, `_track`)
+are methods of their own, and `_firing_chat` takes its title. Routes: `POST /api/schedules/{id}/run` (201, a run), `GET
+/api/schedules/{id}/firings` (its last runs, newest first, one at work among them, each with its chat's title,
+`Store.schedule_firings`). On Schedules a row has a play button whose title says it does real work with the approvals
+its run takes (yolo: "asking nothing"), with no question first, as the owner's word of 2026-10-21 asks of yolo ("YOLO
+modundaki serbestliğe dokunma"): a click opens the run's page, where Stop is, and a toast says it started; **Firings**
+opens the list under the row, kept open and read again as the list is painted again. The critique's corrections: the
+design's "a gone model is a 422" does not hold (the run starts and fails as a failed run, which the list shows), so the
+refused start is tested with a manager that refuses; the watch is started before the hand run's status is written.
+Tests: `tests/smoke/test_run_now.py` (switched off and run by hand with its time kept, a one-time schedule still due, no
+second start by hand nor at its time and a click racing a tick, the emergency stop, a refused start leaving no chat, a
+yolo schedule's run in yolo, and the page at 1280 px and at 390 px as a touch screen: the button's title, the run's
+page, the list). The scheduler's own tests pass unchanged. Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`.
+
+### 458. A repeating schedule whose runs keep failing is switched off, and you are told
+
+**Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its second part:
+"a repeating schedule switched off after N failed runs in a row". Today a schedule whose goal cannot be reached any more
+(a site moved, a key expired) fails at every firing, unseen but for the end of each run. **As built.** A schedule keeps
+how many of its runs in a row ended failed (`runs_failed_in_row`, a column; not derived from the last runs, so that
+after the owner fixes the cause and switches it on again one more failure does not switch it straight off):
+`Store.record_schedule_outcome` writes a run's end and the row together (`done` sets it to 0, `failed` adds one,
+`cancelled` leaves it), in the watch of every run of the schedule, at its time and by hand alike (a run by hand that
+ends done starts the row again, which is how the owner tries a fix). A firing that started no run counts not at all.
+When a repeating schedule that is on reaches its limit (`ScheduleOptions.stop_after_failures`, its form's **Switch off
+after**: 3, 5, 10, 20 or never; else `[scheduler] stop_after_failures`, 0 = never, which is how Dot worked), it is
+switched off for good with the status "switched off: its last N runs failed" and the live event `schedule_stopped`, told
+once by the phone and the desktop (the schedule is off afterwards); a one-time schedule is never switched off by it.
+Switching a schedule on again, or changing it, starts its row afresh and clears that status. The row says "N failed in a
+row", with when it switches itself off in its title; the form's default names the configured value
+(`StatusView.schedule_stop_after_failures`). The critique's points taken: the counter moves for every schedule and only
+the switch-off is the repeating ones'; the event is sent only when the switch-off changed the row; the column is named
+apart from the failures to start of `scheduler/failures.py`. Not done: the critique's one tuple of option columns, left
+for the notification level, which adds the next option. Yolo is untouched: a yolo schedule's runs count as any other's,
+and nothing is asked. Tests: `tests/unit/test_schedule_stop.py` (the limit, the rule, the store's row),
+`tests/unit/test_push.py` (the phone's message), `tests/smoke/test_schedule_stop.py` (through the routes and a real
+scheduler: two failed and one done, a timed firing's failure counting, the third in a row switching off a yolo schedule
+with one event, switching it on again; a one-time schedule and one without a limit kept on; the page at 1280 px and at
+390 px as a touch screen: the row's note and the form's limit). Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`,
+`defaults.toml`.
 
 ## Log
 
@@ -17125,5 +17231,12 @@ under More). Docs: `docs/daemon.md`.
   OpenBot is written down.
 - 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.
+- 2026-10-21 (Opus 5.5): item 455 on `item-455-run-now` from `main`: a schedule runs now by hand, as its firing would,
+  its time and switch kept, and its Firings list its last runs.
+- 2026-10-21 (Opus 5.5): item 458 on `item-458-stop-after-failures` from `main`: a repeating schedule whose runs failed
+  so many times in a row is switched off and you are told once; its row counts them.
+- 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat's
+  newest run goes on at the run a message from another screen started, at once, after a break of its stream, and as a
+  phone loads it again; a page of an earlier run stays.
 - 2026-10-21 (Opus 5.5): item 452 on `item-452-run-panel-plain` from `main`: the Run tab says what a glance needs; the
   run's mode, start and id, its set-up and its cost fold under More, closed the first time.

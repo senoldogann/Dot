@@ -20,3 +20,27 @@ class ScheduleMissed(FrozenModel):
     schedule_id: str
     name: str
     status: str
+
+
+# The live event, of Dot itself, of a repeating schedule switched off because its runs failed so many times in a row
+# (item 458): sent once, as the schedule is off afterwards and its row starts afresh when it is switched on again.
+SCHEDULE_STOPPED_EVENT: str = "schedule_stopped"
+
+
+class ScheduleStopped(FrozenModel):
+    """What ``schedule_stopped`` carries: the schedule and how many of its runs in a row failed."""
+
+    schedule_id: str
+    name: str
+    failures: int
+
+
+def stop_limit(own: int | None, configured: int) -> int:
+    """How many failed runs in a row switch a schedule off: its own choice, else the configured one (0: never)."""
+    return configured if own is None else own
+
+
+def switches_off(repeating: bool, enabled: bool, failed_in_row: int, limit: int) -> bool:
+    """Whether a schedule whose run just failed, ``failed_in_row`` in a row, is switched off (item 458): a repeating
+    one that is on, when a limit applies and is reached. A one-time schedule has no next time to spare."""
+    return repeating and enabled and limit > 0 and failed_in_row >= limit

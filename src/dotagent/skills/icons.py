@@ -62,6 +62,7 @@ ICON_NAMES: frozenset[str] = frozenset(
         "pencil",
         "pin",
         "pinOff",
+        "play",
         "plug",
         "plus",
         "pointer",

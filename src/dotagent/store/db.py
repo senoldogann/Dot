@@ -67,6 +67,7 @@ from dotagent.store.models import (
     RunPicks,
     RunRecord,
     RunStatus,
+    ScheduleFiring,
     ScheduleOptions,
     ScheduleRecord,
     SentMessage,
@@ -715,18 +716,20 @@ def _schedule(row: aiosqlite.Row) -> ScheduleRecord:
             timezone=row["timezone"],
             history_runs=row["history_runs"],
             same_chat=None if row["same_chat"] is None else bool(row["same_chat"]),
+            stop_after_failures=row["stop_after_failures"],
         ),
+        runs_failed_in_row=row["runs_failed_in_row"],
     )
 
 
 type _OptionValues = tuple[
-    str | None, str | None, str | None, int | None, str | None, int | None, int | None, str | None
+    str | None, str | None, str | None, int | None, str | None, int | None, int | None, str | None, int | None
 ]
 
 
 def _option_values(options: ScheduleOptions) -> _OptionValues:
     """The schedule columns that hold ``options``, in the order model, effort, approvals, goal_mode, timezone,
-    history_runs, same_chat, speed."""
+    history_runs, same_chat, speed, stop_after_failures."""
     goal_mode: int | None = None if options.goal_mode is None else int(options.goal_mode)
     same_chat: int | None = None if options.same_chat is None else int(options.same_chat)
     return (
@@ -738,6 +741,7 @@ def _option_values(options: ScheduleOptions) -> _OptionValues:
         options.history_runs,
         same_chat,
         options.speed,
+        options.stop_after_failures,
     )
 
 
@@ -788,6 +792,8 @@ _ADDED_SCHEDULE_COLUMNS: tuple[tuple[str, str], ...] = (
     ("history_runs", "INTEGER"),
     ("same_chat", "INTEGER"),
     ("speed", "TEXT"),
+    ("stop_after_failures", "INTEGER"),
+    ("runs_failed_in_row", "INTEGER NOT NULL DEFAULT 0"),
 )
 
 
@@ -3375,11 +3381,12 @@ class Store:
             thread_id=thread_id,
             last_status="",
             options=options,
+            runs_failed_in_row=0,
         )
         await self._db.execute(
             "INSERT INTO schedules(id, name, cron, run_at, goal, mode, enabled, created_at, last_run_at, next_run_at,"
-            " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed)"
-            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            " thread_id, last_status, model, effort, approvals, goal_mode, timezone, history_runs, same_chat, speed,"
+            " stop_after_failures) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 name,
@@ -3412,12 +3419,17 @@ class Store:
         enabled: bool,
         next_run_at: float | None,
     ) -> ScheduleRecord:
-        """Replace what a schedule does and when; its history (last run, thread, status) stays."""
+        """Replace what a schedule does and when; its history (last run, thread, status) stays, its row of failed runs
+        starts afresh, and one switched on no longer says it was switched off for them (item 458), as the form's switch
+        is this way and not ``enable``'s."""
+        on: int = 1 if enabled else 0
         await self._db.execute(
             "UPDATE schedules SET name = ?, cron = ?, run_at = ?, goal = ?, mode = ?, model = ?, effort = ?,"
-            " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?, enabled = ?,"
-            " next_run_at = ? WHERE id = ?",
-            (name, cron, run_at, goal, mode, *_option_values(options), 1 if enabled else 0, next_run_at, schedule_id),
+            " approvals = ?, goal_mode = ?, timezone = ?, history_runs = ?, same_chat = ?, speed = ?,"
+            " stop_after_failures = ?, enabled = ?, next_run_at = ?, runs_failed_in_row = 0,"
+            " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
+            " WHERE id = ?",
+            (name, cron, run_at, goal, mode, *_option_values(options), on, next_run_at, on, schedule_id),
         )
         await self._db.commit()
         return await self.get_schedule(schedule_id)
@@ -3456,6 +3468,29 @@ class Store:
         """Mark the chat ``thread_id`` as one of the schedule ``schedule_id`` (item 257), whose next firings read the
         runs it started there."""
         await self._db.execute("UPDATE threads SET schedule_id = ? WHERE id = ?", (schedule_id, thread_id))
+        await self._db.commit()
+
+    async def schedule_firings(self, schedule_id: str, source: str, limit: int) -> list[ScheduleFiring]:
+        """The last ``limit`` runs of ``source`` (the scheduler's) in the chats of the schedule ``schedule_id``, newest
+        first, one at work among them, each with the title of its chat (item 455): its firings, at its time and by
+        hand, without the runs they delegated or the owner's follow-ups."""
+        rows = await self._all(
+            "SELECT r.*, t.title AS chat_title FROM runs r JOIN threads t ON t.id = r.thread_id"
+            " WHERE t.schedule_id = ? AND r.source = ? AND r.parent_run_id IS NULL"
+            " ORDER BY r.created_at DESC LIMIT ?",
+            (schedule_id, source, limit),
+        )
+        return [ScheduleFiring(run=_run(row), chat_title=str(row["chat_title"])) for row in rows]
+
+    @_writing
+    async def record_schedule_hand_run(self, schedule_id: str, started_at: float, thread_id: str) -> None:
+        """A run of the schedule ``schedule_id`` the owner started by hand at ``started_at`` in the chat ``thread_id``
+        (item 455): its last run and its chat, and nothing of when it fires next nor of whether it is switched on,
+        which :meth:`record_schedule_fire` would change."""
+        await self._db.execute(
+            "UPDATE schedules SET last_run_at = ?, thread_id = ?, last_status = 'running' WHERE id = ?",
+            (started_at, thread_id, schedule_id),
+        )
         await self._db.commit()
 
     async def schedule_runs(self, schedule_id: str, source: str, limit: int) -> list[RunRecord]:
@@ -3499,11 +3534,41 @@ class Store:
 
     @_writing
     async def set_schedule_enabled(self, schedule_id: str, enabled: bool, next_run_at: float | None) -> None:
+        """Switch a schedule on or off; one switched on starts its row of failed runs afresh, and no longer says it was
+        switched off for them (item 458)."""
+        on: int = 1 if enabled else 0
         await self._db.execute(
-            "UPDATE schedules SET enabled = ?, next_run_at = ? WHERE id = ?",
-            (1 if enabled else 0, next_run_at, schedule_id),
+            "UPDATE schedules SET enabled = ?, next_run_at = ?,"
+            " runs_failed_in_row = CASE WHEN ? = 1 THEN 0 ELSE runs_failed_in_row END,"
+            " last_status = CASE WHEN ? = 1 AND last_status LIKE 'switched off:%' THEN '' ELSE last_status END"
+            " WHERE id = ?",
+            (on, next_run_at, on, on, schedule_id),
         )
         await self._db.commit()
+
+    @_writing
+    async def record_schedule_outcome(self, schedule_id: str, status: str) -> int | None:
+        """How a run of the schedule ``schedule_id`` ended, as its last status, and its row of failed runs with it
+        (item 458): ``done`` sets it to 0, ``failed`` adds one, anything else (``cancelled``) leaves it. The row after
+        the write; ``None`` when the schedule was deleted meanwhile."""
+        row = await self._one(
+            "UPDATE schedules SET last_status = ?, runs_failed_in_row = CASE ? WHEN 'done' THEN 0"
+            " WHEN 'failed' THEN runs_failed_in_row + 1 ELSE runs_failed_in_row END WHERE id = ?"
+            " RETURNING runs_failed_in_row",
+            (status, status, schedule_id),
+        )
+        await self._db.commit()
+        return None if row is None else int(row["runs_failed_in_row"])
+
+    @_writing
+    async def switch_off_schedule(self, schedule_id: str, status: str) -> bool:
+        """Switch a schedule that is on off for good, with ``status`` saying why (item 458); whether it was on."""
+        cursor = await self._db.execute(
+            "UPDATE schedules SET enabled = 0, next_run_at = NULL, last_status = ? WHERE id = ? AND enabled = 1",
+            (status, schedule_id),
+        )
+        await self._db.commit()
+        return cursor.rowcount == 1
 
     @_writing
     async def delete_schedule(self, schedule_id: str) -> None:
