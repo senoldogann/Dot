@@ -1,10 +1,11 @@
 // Schedules: goals that Dot carries out by itself, once or on a cron schedule, while the daemon runs. A page of the
 // sidebar above Customize. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level,
-// time zone) and can be changed later.
+// time zone) and can be changed later. Run now starts one of its runs by hand, switched on or off, and its Firings
+// list its last runs, at its time and by hand (item 455).
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
-import { clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
+import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, paintOpener, segmented } from "../panels.js";
@@ -12,9 +13,12 @@ import { APPROVAL_OPTIONS, approvalLabel } from "../runmodes.js";
 import { getSnapshot, loadModels, onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
-const LIFECYCLE_KINDS = new Set(["run_started", "run_finished"]);
+// A run starting or ending, and a schedule switched off after its runs failed in a row (item 458), paint the list again.
+const LIFECYCLE_KINDS = new Set(["run_started", "run_finished", "schedule_stopped"]);
 const RELOAD_DELAY_MS = 400;
 const GOAL_PREVIEW_CHARS = 220;
+// A firing's answer is shown by its first line, cut to this.
+const FIRING_RESULT_CHARS = 120;
 const REPEATS = [
   { id: "cron", label: "Repeats", hint: "Fires again and again on a schedule" },
   { id: "once", label: "Once", hint: "Fires a single time" },
@@ -40,7 +44,7 @@ function lastStatusBadge(status) {
   let tone = "b-muted";
   if (status === "done") {
     tone = "b-ok";
-  } else if (status === "failed") {
+  } else if (status === "failed" || status.startsWith("switched off")) {
     tone = "b-bad";
   } else if (status === "starting" || status === "running") {
     tone = "b-info";
@@ -59,11 +63,44 @@ function defaultsNow() {
     goalMode: status === null ? null : status.goal_mode,
     historyRuns: status === null ? null : status.schedule_history_runs,
     sameChat: status === null ? null : status.schedule_same_chat,
+    stopAfterFailures: status === null ? null : status.schedule_stop_after_failures,
+    notify: status === null ? null : status.schedule_notify,
   };
 }
 
 // How many earlier runs a schedule's firing may know (item 257); a count saved over the API joins them in the menu.
 const HISTORY_COUNTS = [0, 1, 3, 5, 10];
+// How the end of a schedule's run is told on the phone and the desktop (item 461).
+const NOTIFY_LEVELS = [
+  { id: "always", label: "Always" },
+  { id: "problems", label: "Only when it fails or needs me" },
+  { id: "never", label: "Never" },
+];
+
+function notifyLabel(level) {
+  return NOTIFY_LEVELS.find((entry) => entry.id === level)?.label ?? level;
+}
+
+// How many failed runs in a row switch a repeating schedule off (item 458); 0 is never.
+const STOP_COUNTS = [0, 3, 5, 10, 20];
+
+function stopLabel(count) {
+  return count === 0 ? "Never" : `After ${count} failed runs in a row`;
+}
+
+/** The row's note of runs that failed in a row, with when the schedule switches itself off, or null. */
+function failedInRow(record) {
+  if (record.runs_failed_in_row === 0) {
+    return null;
+  }
+  const limit = record.options.stop_after_failures ?? defaultsNow().stopAfterFailures;
+  // A schedule switched off, by you or by its failures, switches nothing off again.
+  const title =
+    record.enabled && record.cron !== null && limit !== null && limit > 0
+      ? `It switches itself off at ${limit} failed runs in a row`
+      : "Its last runs failed one after the other";
+  return el("span", { class: "badge b-bad", title }, `${record.runs_failed_in_row} failed in a row`);
+}
 
 function historyLabel(count) {
   return count === 0 ? "None" : count === 1 ? "The last run" : `The last ${count} runs`;
@@ -91,22 +128,35 @@ function goalText(text) {
   return el("div", null, body, toggle);
 }
 
+/** The approvals a schedule's runs take where it or its agent chose them (item 462), or null for the configured ones. */
+function chosenApprovals(record, agent) {
+  return record.options.approvals ?? (agent === null ? null : agent.approvals);
+}
+
 /** The chips that say how the schedule's runs start; a choice left open shows what the daemon uses now. */
-function optionChips(record) {
+function optionChips(record, agent) {
   const options = record.options;
   const now = defaultsNow();
-  const approvals = options.approvals ?? now.approvals;
+  const approvals = chosenApprovals(record, agent);
   const goalMode = options.goal_mode ?? now.goalMode;
   const model = options.model ?? now.model;
-  // Only what this schedule chose for itself: the defaults it takes are the ones every run takes, and saying them on
-  // every row buries what is its own (item 373).
+  // Only what this schedule chose for itself, and what its agent chose where it left them open (item 462): the
+  // defaults it takes are the ones every run takes, and saying them on every row buries what is its own (item 373).
   return [
     el("span", { class: "chip", title: "Mode" }, record.mode),
-    options.approvals === null
+    agent === null ? null : el("span", { class: "chip", title: "Its runs run as this agent, within its bounds" }, `As ${agent.name}`),
+    // A paused agent's schedule fires nothing by itself until the agent is resumed (item 465).
+    agent === null || agent.paused_at === null
+      ? null
+      : el("span", { class: "badge b-warn", title: "It fires nothing by itself until you resume the agent" }, `${agent.name} is paused`),
+    approvals === null
       ? null
       : el(
           "span",
-          { class: approvals === "yolo" ? "badge b-warn" : "chip", title: "Who answers the safety policy's questions" },
+          {
+            class: approvals === "yolo" ? "badge b-warn" : "chip",
+            title: options.approvals === null ? "Who answers the safety policy's questions: its agent's choice" : "Who answers the safety policy's questions",
+          },
           `Approvals: ${approvalLabel(approvals)}`,
         ),
     options.goal_mode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}`),
@@ -115,11 +165,77 @@ function optionChips(record) {
     options.speed === "fast" ? el("span", { class: "chip", title: "Its runs start in fast mode" }, "Fast") : null,
     options.history_runs === null ? null : el("span", { class: "chip", title: "Earlier runs it knows" }, `Knows: ${historyLabel(options.history_runs)}`),
     options.same_chat === null ? null : el("span", { class: "chip" }, chatLabel(options.same_chat)),
+    // Only a repeating schedule is switched off by its failures (item 458).
+    options.stop_after_failures === null || record.cron === null
+      ? null
+      : el("span", { class: "chip", title: "When it switches itself off" }, `Switch off: ${stopLabel(options.stop_after_failures).toLowerCase()}`),
+    options.notify === null
+      ? null
+      : el("span", { class: "chip", title: "How the end of its runs is told" }, `Notifications: ${notifyLabel(options.notify).toLowerCase()}`),
   ];
 }
 
+/** What Run now says it starts: real work, as at the schedule's time, with the approvals its run takes. */
+function runNowTitle(record, agent) {
+  const approvals = chosenApprovals(record, agent) ?? defaultsNow().approvals;
+  if (approvals === null) {
+    return "Run now: it does real work, as it does at its time";
+  }
+  const asks = approvals === "yolo" ? ", asking nothing" : "";
+  return `Run now: it does real work, as it does at its time (approvals: ${approvalLabel(approvals)}${asks})`;
+}
+
+/** A schedule's last firings, newest first: how each went, when, its chat, and the first line of its answer. */
+function firingsList(firings) {
+  if (firings.length === 0) {
+    return el("div", { class: "hint" }, "No firings yet");
+  }
+  return el(
+    "ul",
+    { class: "firings-list" },
+    firings.map(({ run, chat_title }) =>
+      el(
+        "li",
+        { class: "firing" },
+        el(
+          "div",
+          { class: "row-meta" },
+          lastStatusBadge(run.status),
+          el("a", { class: "firing-title", href: `#/runs/${run.id}` }, chat_title),
+          el("span", { class: "faint" }, ago(run.created_at)),
+        ),
+        run.result === "" ? null : el("div", { class: "row-text muted" }, clip(run.result.split("\n")[0], FIRING_RESULT_CHARS)),
+      ),
+    ),
+  );
+}
+
 function scheduleRow(view, handlers) {
-  const { record } = view;
+  const { record, agent } = view;
+  const runNow = el(
+    "button",
+    {
+      class: "btn ghost sm icon-only",
+      type: "button",
+      title: runNowTitle(record, agent),
+      "aria-label": `Run ${record.name} now`,
+      onclick: () => handlers.onRunNow(record),
+    },
+    icon("play"),
+  );
+  const open = handlers.firingsOpen(record.id);
+  const firings = el("div", { class: "firings", hidden: !open, dataset: { firings: record.id } });
+  const firingsToggle = el(
+    "button",
+    {
+      class: "btn ghost sm",
+      type: "button",
+      "aria-expanded": String(open),
+      "aria-label": `Firings of ${record.name}`,
+      onclick: () => handlers.onFirings(record, firingsToggle, firings),
+    },
+    "Firings",
+  );
   const toggle = el("button", {
     class: "switch",
     type: "button",
@@ -161,12 +277,13 @@ function scheduleRow(view, handlers) {
     "div",
     { class: "list-row", dataset: { schedule: record.id } },
     toggle,
-    actorFace(record.id, "idle", null),
+    // A schedule of one of the owner's agents wears the agent's face (item 462); Dot's wears its own.
+    agent === null ? actorFace(record.id, "idle", null) : actorFace(agent.id, "idle", agent.look),
     el(
       "div",
       { class: "row-main" },
       el("div", { class: "row" }, el("span", { class: "row-title" }, record.name)),
-      el("div", { class: "row-meta" }, optionChips(record)),
+      el("div", { class: "row-meta" }, optionChips(record, agent)),
       goalText(record.goal),
       // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
       el(
@@ -177,13 +294,16 @@ function scheduleRow(view, handlers) {
           next,
           last,
           lastStatusBadge(record.last_status),
+          failedInRow(record),
           view.zone === localZone()
             ? null
             : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
         ]),
+        firingsToggle,
       ),
+      firings,
     ),
-    el("div", { class: "row-actions" }, edit, remove),
+    el("div", { class: "row-actions" }, runNow, edit, remove),
   );
 }
 
@@ -216,7 +336,19 @@ function scheduleForm({ view, onSaved, onCancel }) {
   const record = view === null ? null : view.record;
   const options =
     record === null
-      ? { model: null, effort: null, speed: null, approvals: null, goal_mode: null, timezone: null, history_runs: null, same_chat: null }
+      ? {
+          model: null,
+          effort: null,
+          speed: null,
+          approvals: null,
+          goal_mode: null,
+          timezone: null,
+          history_runs: null,
+          same_chat: null,
+          stop_after_failures: null,
+          notify: null,
+          agent_id: null,
+        }
       : record.options;
   const now = defaultsNow();
   const id = ++formCount;
@@ -231,9 +363,45 @@ function scheduleForm({ view, onSaved, onCancel }) {
   const mode = select("Mode", MODES, record === null ? "task" : record.mode);
   const approvals = select(
     "Approvals",
-    [{ id: "", label: now.approvals === null ? "Default" : `Default (${approvalLabel(now.approvals)})` }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label} — ${option.hint}` }))],
+    [{ id: "", label: "Default" }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label} — ${option.hint}` }))],
     options.approvals ?? "",
   );
+  // The owner's agent its runs run as (item 462): Dot, or one of theirs, whose model, reasoning and approvals its runs
+  // take where the schedule leaves them on Default. The list comes from the daemon; until then the schedule's own.
+  const agent = el("select", { class: "select", "aria-label": "Agent" }, el("option", { value: "" }, "Dot"));
+  let agents = view === null || view.agent === null ? [] : [view.agent];
+  // Once the owner picked one, the list read later keeps their pick.
+  let picked = false;
+  function paintAgents() {
+    const keep = picked ? agent.value : options.agent_id ?? "";
+    agent.replaceChildren(el("option", { value: "" }, "Dot"), ...agents.map((record) => el("option", { value: record.id }, record.name)));
+    agent.value = agents.some((record) => record.id === keep) ? keep : "";
+    paintApprovalsDefault();
+  }
+  // The Default of the approvals names what the run takes: the agent's choice, else the configured one.
+  function paintApprovalsDefault() {
+    const chosen = agents.find((record) => record.id === agent.value) ?? null;
+    const first = approvals.options[0];
+    if (chosen !== null && chosen.approvals !== null) {
+      first.textContent = `Default (the agent's: ${approvalLabel(chosen.approvals)})`;
+    } else {
+      first.textContent = now.approvals === null ? "Default" : `Default (${approvalLabel(now.approvals)})`;
+    }
+  }
+  agent.addEventListener("change", () => {
+    picked = true;
+    paintApprovalsDefault();
+  });
+  paintAgents();
+  api
+    .get("/agents")
+    .then((summaries) => {
+      agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
+      paintAgents();
+    })
+    .catch((error) => {
+      console.warn("the agents could not be listed", error);
+    });
   const goalMode = select(
     "Goal mode",
     [
@@ -251,6 +419,25 @@ function scheduleForm({ view, onSaved, onCancel }) {
       ...counts.map((count) => ({ id: String(count), label: historyLabel(count) })),
     ],
     options.history_runs === null ? "" : String(options.history_runs),
+  );
+  const stops = [...new Set([...STOP_COUNTS, ...(options.stop_after_failures === null ? [] : [options.stop_after_failures])])].sort(
+    (a, b) => a - b,
+  );
+  const stopAfter = select(
+    "Switch off after",
+    [
+      { id: "", label: now.stopAfterFailures === null ? "Default" : `Default (${stopLabel(now.stopAfterFailures)})` },
+      ...stops.map((count) => ({ id: String(count), label: stopLabel(count) })),
+    ],
+    options.stop_after_failures === null ? "" : String(options.stop_after_failures),
+  );
+  const notify = select(
+    "Notifications",
+    [
+      { id: "", label: now.notify === null ? "Default" : `Default (${notifyLabel(now.notify)})` },
+      ...NOTIFY_LEVELS.map(({ id, label }) => ({ id, label })),
+    ],
+    options.notify ?? "",
   );
   const chat = select(
     "Chat",
@@ -402,6 +589,9 @@ function scheduleForm({ view, onSaved, onCancel }) {
       timezone: zone.value.trim() === "" ? null : zone.value.trim(),
       history_runs: history.value === "" ? null : Number(history.value),
       same_chat: chat.value === "" ? null : chat.value === "same",
+      stop_after_failures: stopAfter.value === "" ? null : Number(stopAfter.value),
+      notify: notify.value === "" ? null : notify.value,
+      agent_id: agent.value === "" ? null : agent.value,
       // The form has no speed of its own: a schedule keeps the one its chat gave it (item 291).
       speed: options.speed,
     };
@@ -433,6 +623,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       { class: "form-grid" },
       field("Name", name, ""),
       field("Mode", mode, "Scheduled runs work unattended."),
+      field("Agent", agent, "Its runs run as this agent: with its instructions and its tools, and its model, reasoning and approvals where these are left on Default."),
       goalField,
       field("Approvals", approvals, "Unattended runs cannot wait for you: with Ask, a question stops the run until you answer."),
       field("Goal mode", goalMode, ""),
@@ -441,6 +632,8 @@ function scheduleForm({ view, onSaved, onCancel }) {
       field("Time zone", zone, "A name such as Europe/Istanbul; empty uses the configured zone."),
       field("Earlier runs it knows", history, "Each run starts with the dated answers of the last runs, to build on them instead of doing the same work again."),
       field("Chat", chat, "In the same chat each run reads the conversation of the runs before it instead."),
+      field("Switch off after", stopAfter, "A repeating schedule whose runs fail so many times in a row is switched off, and you are told; a run cancelled counts neither way."),
+      field("Notifications", notify, "How the end of its runs is told on your phone and desktop; a question, a draft and a switch-off are told always, and a run you start by hand too."),
       record === null ? null : switchRow(el("div", { class: "field" }, el("span", { class: "field-label" }, "Switched on"), enabled), enabled),
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Runs"), el("div", { class: "cluster" }, repeats.element)),
       cronField,
@@ -458,6 +651,8 @@ export function mount(root, ctx) {
   let views = null;
   // The id of the schedule whose form is open, or null.
   let editing = null;
+  // The schedules whose Firings are open: they stay open, and are read again, as the list is painted again.
+  const openFirings = new Set();
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
   // The form that adds a schedule stays away until New schedule asks for it; the list is what this page is for.
@@ -486,9 +681,46 @@ export function mount(root, ctx) {
       onToggle: (record) => attempt(() => toggle(record)),
       onDelete: (record) => attempt(() => remove(record)),
       onEdit: (view) => startEditing(view),
+      onRunNow: (record) => attempt(() => runNow(record)),
+      onFirings: (record, button, list) => attempt(() => toggleFirings(record, button, list)),
+      firingsOpen: (id) => openFirings.has(id),
     };
     holder.replaceChildren(el("div", { class: "schedule-list" }, views.map((view) => scheduleRow(view, handlers))));
     count.textContent = plural(views.length, "schedule", "schedules");
+    for (const list of holder.querySelectorAll("[data-firings]")) {
+      if (!list.hidden) {
+        attempt(() => loadFirings(list.dataset.firings, list));
+      }
+    }
+  }
+
+  async function loadFirings(id, list) {
+    const firings = await api.get(`/schedules/${id}/firings`);
+    if (!disposed && list.isConnected) {
+      list.replaceChildren(firingsList(firings));
+    }
+  }
+
+  async function toggleFirings(record, button, list) {
+    const open = !openFirings.has(record.id);
+    if (open) {
+      openFirings.add(record.id);
+    } else {
+      openFirings.delete(record.id);
+    }
+    button.setAttribute("aria-expanded", String(open));
+    list.hidden = !open;
+    if (open) {
+      list.replaceChildren(loadingPanel());
+      await loadFirings(record.id, list);
+    }
+  }
+
+  // No question first: the button says what it starts, and its run's page, where it can be stopped, opens at once.
+  async function runNow(record) {
+    const run = await api.post(`/schedules/${record.id}/run`, null);
+    toast("ok", run.approvals === "yolo" ? `Started ${record.name}: it asks nothing.` : `Started ${record.name}.`);
+    ctx.navigate(`/runs/${run.id}`);
   }
 
   async function reload() {

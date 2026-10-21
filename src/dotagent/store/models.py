@@ -28,6 +28,9 @@ DraftChannel = Literal["mail", "message"]
 # refused it, and the owner may send it again or discard it; ``sent`` and ``discarded`` are final.
 DraftStatus = Literal["waiting", "sending", "sent", "discarded", "failed"]
 Behavior = Literal["allow", "preapproved", "ask", "handoff"]
+# How the end of a schedule's run is told (item 461): every end, only a first failure or an end that needs the owner,
+# or nothing.
+NotifyLevel = Literal["always", "problems", "never"]
 # ``active``: its sessions go on; ``achieved``: the goal checker accepted its evidence, or the owner said so;
 # ``stopped``: the owner stopped it (also with the emergency stop of desktop control, which ends its session), or it ran
 # the sessions ``[agent] campaign_max_sessions`` allows.
@@ -188,8 +191,10 @@ class AgentRecord(FrozenModel):
     its runs, and the bounds of its runs: ``model`` (empty for the configured one), ``effort`` and ``approvals``
     (``None`` for the configured ones) and ``tools``, the names of the tools it may use (empty for every tool). Its
     face is its ``look`` (item 102), or with ``None`` the shape and colour its id's hue gives it (actors.js).
-    ``made_by`` is the run that made it with ``create_agent`` (item 99), ``None`` for one the owner made. Dot itself
-    is ``DOT_AGENT``, never stored; its look lives in the kv store under ``look:dot``."""
+    ``made_by`` is the run that made it with ``create_agent`` (item 99), ``None`` for one the owner made.
+    ``paused_at`` is when the owner paused it (item 465): its schedules start nothing by themselves until it is resumed;
+    ``None`` while it works. Dot itself is ``DOT_AGENT``, never stored; its look lives in the kv store under
+    ``look:dot``."""
 
     id: str
     name: str
@@ -203,6 +208,7 @@ class AgentRecord(FrozenModel):
     updated_at: float
     made_by: str | None
     look: AgentLook | None
+    paused_at: float | None
 
 
 DOT_AGENT_ID: str = "dot"
@@ -219,6 +225,7 @@ DOT_AGENT: AgentRecord = AgentRecord(
     updated_at=0.0,
     made_by=None,
     look=None,
+    paused_at=None,
 )
 
 
@@ -362,7 +369,10 @@ class ScheduleOptions(FrozenModel):
     """How the runs of a schedule are started. ``None`` takes what the configuration says when the schedule fires:
     the main model, its default reasoning level, the standard speed, the configured approvals, no goal mode, the
     configured time zone, ``[scheduler] history_runs`` earlier runs' answers in front of the goal and ``[scheduler]
-    same_chat`` (item 257). A schedule a run makes keeps that run's choices and its chat (item 291)."""
+    same_chat`` (item 257), and ``[scheduler] stop_after_failures`` for how many failed runs in a row switch a
+    repeating schedule off (item 458), and ``[scheduler] notify`` for how its runs' ends are told (item 461). A
+    schedule a run makes keeps that run's choices and its chat (item 291). ``agent_id`` names the owner's agent its runs
+    run as, within that agent's bounds (item 462), and ``None`` is Dot, as every schedule was before."""
 
     model: str | None
     effort: Effort | None
@@ -372,6 +382,9 @@ class ScheduleOptions(FrozenModel):
     timezone: str | None
     history_runs: int | None
     same_chat: bool | None
+    stop_after_failures: int | None
+    notify: NotifyLevel | None
+    agent_id: str | None
 
 
 class ScheduleRecord(FrozenModel):
@@ -388,6 +401,48 @@ class ScheduleRecord(FrozenModel):
     thread_id: str | None
     last_status: str
     options: ScheduleOptions
+    # How many of its runs in a row ended failed (item 458): a run that ends done sets it to 0, one cancelled leaves it,
+    # and switching the schedule on again or changing it starts it afresh.
+    runs_failed_in_row: int
+
+
+class ScheduleFiring(FrozenModel):
+    """A run a schedule started, at its time or by hand (item 455), with the title of the chat it went in, which says
+    which of the two it was."""
+
+    run: RunRecord
+    chat_title: str
+
+
+# Who decided an approval for the owner without asking them (item 443's records): the review model, or yolo.
+type AutoDecider = Literal["reviewer", "yolo"]
+
+
+class UnattendedRun(FrozenModel):
+    """A run that a schedule or a campaign started (item 466), with the name of the schedule whose chat it went in and
+    the title of the campaign it was a session of; a firing from before item 257 names no schedule."""
+
+    run: RunRecord
+    schedule_name: str | None
+    campaign_title: str | None
+
+
+class UnattendedCount(FrozenModel):
+    """How many of the runs that schedules and campaigns started ended with ``status``, or work (item 466)."""
+
+    status: RunStatus
+    campaign: bool
+    count: int
+
+
+class AutoDecisionCount(FrozenModel):
+    """How many approvals ``decided_by`` answered ``status`` for the owner (item 466) in the run ``run``, which a
+    schedule or a campaign started, and in its helpers; with what names the run, as :class:`UnattendedRun` has it."""
+
+    run: UnattendedRun
+    decided_by: AutoDecider
+    status: Literal["approved", "denied"]
+    count: int
 
 
 class CampaignRecord(FrozenModel):

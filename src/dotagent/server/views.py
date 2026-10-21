@@ -48,6 +48,7 @@ from dotagent.store.models import (
     HarnessVersion,
     MemoryRecord,
     MemoryScore,
+    NotifyLevel,
     QueuedMessage,
     RuleRecord,
     RunMode,
@@ -189,6 +190,13 @@ class RunsQuery(FrozenModel):
     thread_id: str | None = None
 
 
+class AwayQuery(FrozenModel):
+    """The moment "while you were away" reads from (item 466), in seconds since the epoch; the server keeps it within
+    the last :data:`~dotagent.server.away.AWAY_WINDOW_S`."""
+
+    since: float = Field(ge=0)
+
+
 class ThreadsQuery(FrozenModel):
     limit: int = Field(default=100, ge=1, le=500)
 
@@ -227,6 +235,12 @@ class ApprovalsQuery(FrozenModel):
 class MemoriesQuery(FrozenModel):
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+
+
+class FiringsQuery(FrozenModel):
+    """How many of a schedule's last firings to list (item 455)."""
+
+    limit: int = Field(default=20, ge=1, le=50)
 
 
 class SearchQuery(FrozenModel):
@@ -460,7 +474,8 @@ class MemoryRequest(FrozenModel):
 
 class ScheduleCreateRequest(FrozenModel):
     """A new schedule. ``model``, ``effort``, ``speed``, ``approvals``, ``goal_mode`` and ``timezone`` left out take the
-    configured ones when the schedule fires (the standard speed for ``speed``)."""
+    configured ones when the schedule fires (the standard speed for ``speed``). ``agent_id`` names the owner's agent its
+    runs run as (item 462); left out, Dot."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -476,12 +491,17 @@ class ScheduleCreateRequest(FrozenModel):
     # Item 257: how many earlier runs' answers a firing carries, and whether it goes on in the same chat.
     history_runs: int | None = Field(default=None, ge=0, le=20)
     same_chat: bool | None = None
+    stop_after_failures: int | None = Field(default=None, ge=0, le=50)
+    notify: NotifyLevel | None = None
+    agent_id: str | None = None
 
 
 class ScheduleUpdateRequest(FrozenModel):
     """The whole new state of a schedule: as for a new one, plus whether it is switched on. ``history_runs``,
     ``same_chat`` and ``speed`` left out take the configured ones, as a client from before item 257 sends none of them
-    (the standard speed for ``speed``, item 291)."""
+    (the standard speed for ``speed``, item 291). ``agent_id`` left out keeps the schedule's agent (item 462), so a
+    client that does not know of it never turns an agent's schedule into Dot's, whose runs have every tool; ``null``
+    makes it Dot's."""
 
     name: str = Field(min_length=1, max_length=_NAME_CHARS)
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
@@ -495,7 +515,10 @@ class ScheduleUpdateRequest(FrozenModel):
     timezone: str | None = Field(max_length=64)
     history_runs: int | None = Field(default=None, ge=0, le=20)
     same_chat: bool | None = None
+    stop_after_failures: int | None = Field(default=None, ge=0, le=50)
+    notify: NotifyLevel | None = None
     speed: Speed | None = None
+    agent_id: str | None = None
     enabled: bool
 
 
@@ -914,9 +937,22 @@ class MemoryPage(FrozenModel):
     agents: dict[str, str]
 
 
+class ScheduleAgent(FrozenModel):
+    """The agent a schedule's runs run as (item 462), as its row shows it: its name, its face, the approvals its runs
+    take when the schedule leaves them open (``None``: the configured ones), and when the owner paused it (item 465),
+    which keeps the schedule from firing by itself."""
+
+    id: str
+    name: str
+    look: AgentLook | None
+    approvals: ApprovalMode | None
+    paused_at: float | None
+
+
 class ScheduleView(FrozenModel):
     """A schedule as the UI shows it; the times are in the schedule's own ``zone``. ``run_at_input`` is the one-time
-    moment as a ``datetime-local`` field takes it (``2026-10-06T09:30``)."""
+    moment as a ``datetime-local`` field takes it (``2026-10-06T09:30``). ``agent`` is the agent its runs run as,
+    ``None`` for Dot."""
 
     record: ScheduleRecord
     when: str
@@ -924,6 +960,7 @@ class ScheduleView(FrozenModel):
     last_local: str | None
     run_at_input: str | None
     zone: str
+    agent: ScheduleAgent | None
 
 
 class ContextChoice(FrozenModel):
@@ -1274,6 +1311,8 @@ class StatusView(FrozenModel):
     # What a schedule that leaves them open does (item 257): the earlier runs it knows, and whether it keeps its chat.
     schedule_history_runs: int
     schedule_same_chat: bool
+    schedule_stop_after_failures: int
+    schedule_notify: NotifyLevel
     browser_mode: BrowserMode
     desktop_enabled: bool
     mcp_tools: int
@@ -1369,3 +1408,59 @@ class ActivityCount(FrozenModel):
     waiting: int
     working: int
     state: Literal["idle", "working", "waiting"]
+
+
+class AwayRun(FrozenModel):
+    """A run a schedule or a campaign started (item 466), as "while you were away" lists it: what names it (the
+    schedule, the campaign, else the first line of its goal), its agent, how it ended or that it works, its steps, and
+    the first line of its answer with its secrets masked."""
+
+    run_id: str
+    title: str
+    campaign: bool
+    agent_id: str | None
+    status: RunStatus
+    steps: int
+    created_at: float
+    finished_at: float | None
+    answer: str
+
+
+class AwayDecisions(FrozenModel):
+    """The approvals answered for the owner in those runs (item 466): by the review model and by yolo, approved and
+    denied."""
+
+    reviewer_approved: int
+    reviewer_denied: int
+    yolo_approved: int
+    yolo_denied: int
+
+
+class AwayDecisionRun(FrozenModel):
+    """One of the runs with the most approvals answered for the owner (item 466), with how many each answered and how
+    many of them were denied."""
+
+    run_id: str
+    title: str
+    reviewer: int
+    yolo: int
+    denied: int
+
+
+class AwayView(FrozenModel):
+    """What schedules and campaigns did between ``since`` and ``until`` (item 466): how many of their runs ended done,
+    failed or stopped, how many work and how many were sessions of campaigns; the newest of those runs; the approvals
+    answered for the owner in them and the runs with the most; and the drafts they wrote that wait for the owner. It
+    carries no summary nor the arguments of an approval."""
+
+    since: float
+    until: float
+    done: int
+    failed: int
+    cancelled: int
+    working: int
+    campaign_sessions: int
+    runs: list[AwayRun]
+    decisions: AwayDecisions
+    decision_runs: list[AwayDecisionRun]
+    drafts: int

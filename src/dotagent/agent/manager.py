@@ -70,7 +70,7 @@ from dotagent.core.errors import (
 from dotagent.core.logs import get_logger
 from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
 from dotagent.core.text import redact_json, redact_secrets, truncate_tail
-from dotagent.core.types import JsonObject
+from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import fail_unsettled_drafts
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
@@ -192,6 +192,27 @@ def _answer_text(question: ApprovalRecord, answer: str) -> str:
 def stricter_approvals(first: ApprovalMode, second: ApprovalMode) -> ApprovalMode:
     """The stricter of two approval modes."""
     return min(first, second, key=_APPROVALS_STRICTEST_FIRST.index)
+
+
+class AgentBounds(FrozenModel):
+    """What a run of one of the owner's agents starts with; ``None`` takes the configured one."""
+
+    model: str | None
+    effort: Effort | None
+    approvals: ApprovalMode | None
+
+
+def agent_bounds(
+    agent: AgentRecord, model: str | None, effort: Effort | None, approvals: ApprovalMode | None
+) -> AgentBounds:
+    """The model, reasoning level and approvals of a run of ``agent``: what its request or its schedule chose, else
+    the agent's own, else the configured ones (``None``). An approval mode chosen is kept as it is, yolo too: the
+    agent's is the one left open, never the stricter of the two (:func:`stricter_approvals` is the delegate's rule)."""
+    return AgentBounds(
+        model=model if model is not None else (agent.model if agent.model != "" else None),
+        effort=effort if effort is not None else agent.effort,
+        approvals=approvals if approvals is not None else agent.approvals,
+    )
 
 
 def _offers(info: ModelInfo, effort: Effort) -> bool:
@@ -641,6 +662,58 @@ class RunManager:
         schedule's earlier runs (``scheduler/history.py``). ``carried`` are the earlier runs whose words the run reads,
         in the digest or in its chat: it starts tainted when one of them ended so. Goal mode is asked by the goal
         alone; fast mode only of a model that has it (item 291). The rest is as for :meth:`start`."""
+        return await self._launch_firing(
+            goal, opening, mode, model, thread_id, effort, speed, approvals, goal_mode, carried, None
+        )
+
+    async def start_firing_for_agent(
+        self,
+        agent: AgentRecord,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        carried: tuple[str, ...],
+    ) -> RunRecord:
+        """Queue the run of the firing of a schedule of ``agent`` (item 462), as :meth:`start_firing` queues one of
+        Dot's, within the agent's bounds (:func:`agent_bounds`): the schedule's own model, reasoning level and
+        approvals, else the agent's, else the configured ones. The run carries the agent's id, so its loop adds the
+        agent's instructions to the prompt and keeps to its tools, as for :meth:`start_for_agent`."""
+        bounds: AgentBounds = agent_bounds(agent, model, effort, approvals)
+        return await self._launch_firing(
+            goal,
+            opening,
+            mode,
+            bounds.model,
+            thread_id,
+            bounds.effort,
+            speed,
+            bounds.approvals,
+            goal_mode,
+            carried,
+            agent.id,
+        )
+
+    async def _launch_firing(
+        self,
+        goal: str,
+        opening: str,
+        mode: RunMode,
+        model: str | None,
+        thread_id: str,
+        effort: Effort | None,
+        speed: Speed,
+        approvals: ApprovalMode | None,
+        goal_mode: bool | None,
+        carried: tuple[str, ...],
+        agent_id: str | None,
+    ) -> RunRecord:
+        """The run of a schedule's firing, of Dot (``agent_id`` None) or of one of the owner's agents."""
         ref: ModelRef = parse_model_ref(model if model is not None else self._main_model)
         _check_speed(ref, speed)
         if effort is not None:
@@ -658,7 +731,7 @@ class RunManager:
             goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=opening, files=(), resumed=None, once=None, carried=carried, picks=NO_PICKS),
             None,
-            None,
+            agent_id,
         )
         return run
 
@@ -679,27 +752,25 @@ class RunManager:
         picks: RunPicks,
     ) -> RunRecord:
         """Queue a run of ``agent`` (item 86): what the request leaves out, the agent's own bounds fill in (its model,
-        effort and approvals), and what the agent leaves out, the configured ones; the run carries the agent's id and
-        the loop adds its instructions to the prompt and keeps its tools. Goal mode, ``once`` and ``picks`` are as for
-        :meth:`start_picked`: a server the agent's bounds leave out is refused."""
-        model_ref: str | None = model if model is not None else (agent.model if agent.model != "" else None)
-        level: Effort | None = effort if effort is not None else agent.effort
-        approval_mode: ApprovalMode | None = approvals if approvals is not None else agent.approvals
-        agent_ref: ModelRef = parse_model_ref(model_ref if model_ref is not None else self._main_model)
+        effort and approvals, :func:`agent_bounds`), and what the agent leaves out, the configured ones; the run carries
+        the agent's id and the loop adds its instructions to the prompt and keeps its tools. Goal mode, ``once`` and
+        ``picks`` are as for :meth:`start_picked`: a server the agent's bounds leave out is refused."""
+        bounds: AgentBounds = agent_bounds(agent, model, effort, approvals)
+        agent_ref: ModelRef = parse_model_ref(bounds.model if bounds.model is not None else self._main_model)
         _check_speed(agent_ref, speed)
-        if level is not None:
-            await self._check_effort(agent_ref, level)
+        if bounds.effort is not None:
+            await self._check_effort(agent_ref, bounds.effort)
         await self._check_once(agent_ref, once)
         run, _ = await self._launch(
             goal,
             mode,
-            model_ref,
+            bounds.model,
             thread_id,
             source,
             None,
-            level,
+            bounds.effort,
             speed,
-            approval_mode,
+            bounds.approvals,
             goal_mode_asked(goal, mode, goal_mode),
             RunOpening(text=goal, files=files, resumed=None, once=once, carried=(), picks=picks),
             None,
@@ -1493,7 +1564,9 @@ class RunManager:
 
     async def _resume(self, old: RunRecord, calls: tuple[InterruptedCall, ...], automatic: bool) -> RunRecord:
         """Launch the run that resumes ``old`` on its thread, with its settings and its newest plan: its first message
-        is the note of :func:`dotagent.agent.resume.resume_note`. ``automatic`` is recorded in the ``resumed`` event."""
+        is the note of :func:`dotagent.agent.resume.resume_note`. ``automatic`` is recorded in the ``resumed`` event.
+        A run of one of the owner's agents goes on as that agent, within its bounds (item 462); deleting an agent
+        clears the runs' ``agent_id``, so the one kept here is an agent that is there."""
         cut_off: CutOff | None = cut_off_by(old)
         if cut_off is None:
             raise RunConflict("this run was not cut off", {"run_id": old.id, "status": old.status})
@@ -1525,7 +1598,7 @@ class RunManager:
                 picks=NO_PICKS,
             ),
             None,
-            None,
+            old.agent_id,
         )
         log.info("run_resumed", run_id=run.id, from_run_id=old.id, cut_off=cut_off, automatic=automatic)
         return run

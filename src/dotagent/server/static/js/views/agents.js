@@ -10,7 +10,7 @@ import { api } from "../api.js";
 import { messageText, readyToSend } from "../attachments.js";
 import { runChoices } from "../choices.js";
 import { composerFrame } from "../composer.js";
-import { ago, clip, el, modelName } from "../dom.js";
+import { ago, clip, el, modelName, plural } from "../dom.js";
 import { allModels, chosenLevel, KEPT_SPEED, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { touchFirst } from "../layout.js";
@@ -60,6 +60,8 @@ function agentRow({ record, latest }) {
     faceOf(record, latest),
     el("div", { class: "row-main" }, el("div", { class: "row-title" }, record.name), secondLine(record, latest)),
     record.made_by === null ? null : el("span", { class: "agent-made" }, "Made by Dot"),
+    // A paused agent (item 465) says so in the list, as on its page.
+    record.paused_at === null ? null : el("span", { class: "badge b-warn", title: "Its schedules start nothing by themselves until you resume it" }, "Paused"),
     latest === null ? null : el("span", { class: "agent-when" }, ago(latest.created_at)),
   );
 }
@@ -636,6 +638,14 @@ function who(record, face) {
     el("div", { class: "home-name" }, record.name),
     record.role === "" ? null : el("p", { class: "home-greeting" }, record.role),
     record.made_by === null ? null : el("p", { class: "home-greeting agent-made" }, "Made by Dot in one of its runs"),
+    record.paused_at === null
+      ? null
+      : el(
+          "p",
+          { class: "home-greeting agent-paused" },
+          el("span", { class: "badge b-warn" }, "Paused"),
+          " Its schedules start nothing by themselves; your messages here still go through.",
+        ),
   );
 }
 
@@ -712,8 +722,28 @@ function mountPage(root, ctx, agentId) {
     setStageTools(
       el("button", { class: "btn ghost sm", type: "button", title: "Edit the agent", onclick: () => edit(record) }, icon("pencil"), el("span", { class: "label" }, "Edit")),
       el("button", { class: "btn ghost sm", type: "button", title: "Save the agent as a file, to import in another home", onclick: () => attempt(() => exportAgent(record)) }, icon("download"), el("span", { class: "label" }, "Export")),
+      record.paused_at === null
+        ? el(
+            "button",
+            { class: "btn ghost sm", type: "button", title: "Pause the agent: its schedules start nothing by themselves until you resume it", onclick: () => attempt(() => setPaused(record, true)) },
+            icon("pause"),
+            el("span", { class: "label" }, "Pause"),
+          )
+        : el(
+            "button",
+            { class: "btn ghost sm", type: "button", title: "Resume the agent: its schedules fire again", onclick: () => attempt(() => setPaused(record, false)) },
+            icon("play"),
+            el("span", { class: "label" }, "Resume"),
+          ),
       el("button", { class: "btn ghost sm", type: "button", title: "Delete the agent", onclick: () => attempt(() => remove(record)) }, icon("trash"), el("span", { class: "label" }, "Delete")),
     );
+  }
+
+  /** Pause the agent or resume it (item 465), then show the page as the daemon has it. */
+  async function setPaused(record, paused) {
+    await api.post(`/agents/${record.id}/${paused ? "pause" : "resume"}`, null);
+    toast("ok", paused ? `${record.name} paused: its schedules start nothing by themselves.` : `${record.name} resumed.`);
+    await reload();
   }
 
   function closeForm() {
@@ -750,9 +780,13 @@ function mountPage(root, ctx, agentId) {
   }
 
   async function remove(record) {
+    // Its schedules are switched off with it (item 462), and the dialog says how many: the ones on now.
+    const schedules = (await api.get("/schedules")).filter((view) => view.record.options.agent_id === record.id && view.record.enabled);
+    const switchedOff =
+      schedules.length === 0 ? "" : ` Its ${plural(schedules.length, "schedule is", "schedules are")} switched off.`;
     const confirmed = await confirmDialog({
       title: `Delete ${record.name}?`,
-      message: "Its chats stay, as Dot's. The agent's face, role and instructions are gone.",
+      message: `Its chats stay, as Dot's. The agent's face, role and instructions are gone.${switchedOff}`,
       confirmLabel: "Delete",
       danger: true,
       focusCancel: true,

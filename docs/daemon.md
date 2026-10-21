@@ -60,6 +60,16 @@ opened again or the page comes back into view, and **Mark read** clears it. The 
 seen, so the phone and the desktop agree; the chats there when Dot learnt this are taken as seen, and a run that ends
 while nobody watches, a scheduled one too, leaves its chat unread.
 
+Over the home's **Today** strip, **While you were away** (item 466, `GET /api/away?since=`) says what your schedules and
+campaigns did since this browser last marked it read: how many of their runs ended done, failed or stopped, how many
+work and how many were campaign sessions; their newest runs, two then **Show N more**, each with its schedule's or
+campaign's name, how it ended, when, and the first line of its answer with its secrets masked; the approvals the review
+model and YOLO answered for you in those runs and their helpers, by who and how many were denied, with the runs that had
+the most, two then **Show N more** too; and the drafts they wrote that wait for you. It carries no summary and no
+arguments of an approval. **Mark as read** moves the moment on, kept in this browser (each device has its own); the
+first visit marks it and shows nothing, so the card never pours out the past, and the server reads a week back at most.
+A run started with **Run now** is one of them.
+
 Above the chats, two sections appear while they have rows: **Waiting for you** (the approvals and questions runs wait
 for, and a run whose browser you took over) and **Working** (the runs going on, a session of a campaign, a run delegated
 by another, and a schedule that fires within the hour), each row with its state dot, the first words of its title on one
@@ -186,7 +196,8 @@ one of OpenCode's agent. The box of a run held it as **Save skill**, under a **M
 A run opens as a conversation under Dot's face and name. The face is the state: still when the run rests, a slow breath
 while it works, an amber ring while it waits for you, a green tick for a moment when the run ends done, red when it
 failed (with reduced motion the tick simply shows). The panel button sits on the right; the run's facts (its state,
-start, agent, model, approval mode, goal mode and campaign) are in the panel's Details, on its Run tab. Your goal is the
+agent, model, approval mode, goal mode and campaign) are in the panel's Details, on its Run tab, its start under More
+(item 452). Your goal is the
 first message, in the bubble of your messages on the raised surface. What you write reads there as markdown, as an
 answer does: its headings, lists, tables, code, quotes and emphasis (item 206). Under each of your messages, once its
 turn has its answer, stand the time it was sent (the day too when it was not today, the full date where the pointer
@@ -231,7 +242,8 @@ a line of the same column with the brain. Approvals, questions and policy notes 
 opens or folds it while the run still works and after it ends, and the reader's choice stands for the life of the page;
 folded, it keeps the call under way in sight (on a phone, only the count). The lines of how a run was set up (the notes
 and skills it was handed and how they were found, its context budget, its tool groups, a step sent to another model) are
-not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, its head naming them in short
+not in the conversation (item 365): the side panel's Run tab lists them under **Set up**, in its More (item 452),
+which counts a line that warns beside its title, the head of Set up naming them in short
 and a kind a long run repeats (the goal repeated, a step sent to another model) once with its count, a line that warns
 in amber (the embedding service failed, so the notes were found by their words alone); a delegated run's lines are on
 its own page. What the model thought in a step is a line of its own there, before the step's calls (item 246), or out of
@@ -243,9 +255,15 @@ stay (item 274): formatted as it comes, drawn at most once a frame with the part
 caret at the end of its text, so that its end moves nothing. An answer that ends a run while its page is open is written
 in the same way (item 366), a few words a frame for two seconds at most, into the room it will take, so the page lands
 on it as it will stand and the words come in sight, its foot once it is all in; a run opened after it ended, a reply
-that streamed already and reduced motion show it at once. The answer of the run is the last message, with a copy button
+that streamed already and reduced motion show it at once. A chat whose run is over opens drawn whole (item 454): its
+events, those of the runs it delegated to, and the work of the turn before it are read before the page is drawn, so
+nothing fills in as the stream comes. A message sent from a chat that is over starts the next run in the same chat
+without a jump: the chat stands where it was, at its foot, inert, until the next run's page is drawn in its place,
+never lifted to its top and dropped back. The answer of the run is the last message, with a copy button
 (its icon turns to a check once the answer is on the clipboard), when it came and how the run ended under it; how long
-the run took shows where the pointer rests on it (on a touch screen it always shows). A copy out of the conversation
+the run took shows where the pointer rests on it (on a touch screen it always shows). A message that only says the
+answer again is not shown beside it, wherever it stands in the turn (item 460): a task run that answers in a plain
+reply is told to call finish, thinks once more and finishes with the same words. A copy out of the conversation
 keeps its markdown (item 206): a selection that starts in a message or an answer goes on the clipboard as the markdown
 it was written in, a list as a list, a table as a table and code in its fence, with the formatted copy alongside for the
 applications that read it; the line under a message or an answer stays out, and a copy within a block of code is its
@@ -260,10 +278,11 @@ bottom (item 201): resting the pointer on it shows the message nearest to it and
 to that message, and from the keyboard the arrows walk the marks and Enter goes; the marks of the messages in sight are
 darker. The column needs a pointer that rests, two messages or more, and a window wider than a phone's; there, the
 conversation leaves it its room at the left, beside the side panel too (item 228). In the side panel (Run details),
-under Details on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
+under More on the Run tab, **Cost** lists the bill of the run, each value beside its label as in Details: where the
 minutes went (the model, the summaries, the tools, the time spent waiting for you), the steps, the input tokens with the
 share the provider served from its cache, the output tokens, the compactions (with their rate per 100 steps), the runs
-it delegated and the web searches by engine. It is `GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run
+it delegated and the web searches by engine, and a figure of none has no line (item 452). It is
+`GET /api/runs/{id}/stats` (the same numbers as `dotx stats --run
 ID`), read again every ten seconds while the run works and once at its end. A strip under the head links the other runs
 of the same thread, and the box at the bottom queues a message for after a run that is going on, or follows up on a
 finished one. While the run works and the box is empty, the box's send is the run's **Stop** (a round button in the
@@ -282,7 +301,12 @@ stand and how many messages are queued; each part opens what it tells of, and th
 something to say and goes when none has. It does not say what the run does now, which the conversation shows, nor count
 the commands at work in the chat, which stand right under it. When the run ends done, the next message starts and the
 page follows it; every open page shows the queue as it changes, and only your messages wait in it: the end of a command
-in the background is never queued (see [Runs and tools](runs.md#tools)). In a campaign's chat the message steers the
+in the background is never queued (see [Runs and tools](runs.md#tools)). A message sent to the chat on another screen
+(the phone, another window) starts its run there, and every page that shows the chat's newest run goes on at it at
+once, as the screen it was sent from does: when the run is queued, once the page's stream is back after a break, and as
+a phone's page that the browser loads again opens; what was typed there and not sent goes with it. A page of an earlier
+run of the chat (opened from the sidebar's Activity, a link or its address) stays where it is, and so does a page while
+a question its run left is open on it, until none is (item 451). In a campaign's chat the message steers the
 session. The box wears the home's pills too: the mode, the model with its reasoning and the Options (approvals and goal
 mode) of the chat, and a follow-up or a queued message starts its run with them on the same thread, for the same
 agent. The chat keeps them (item 199): those its first run started with, then each one chosen in the box, at once and
@@ -297,10 +321,12 @@ smaller than the window (each step sends the model the whole run again, so a run
 costs less) and where it is set (items 239 and 250): `[agent] context_tokens`, or the size chosen for the model in
 Settings › Models, which the timeline notes too; **Change context size** under them opens that setting at the run's
 model (item 396). It reads the run's `scaffold` and `assistant` events and asks the model nothing. A run the daemon cut
-off offers **Continue** on a line above the box. The panel's Details show the status, the agent of a chat with one, the
-model and its reasoning level, the approval mode and goal mode, the campaign of a session, the model turns, the tool
-calls (with the failed ones), the tokens (of every model call of the run: its steps and its side calls, such as
-compactions, reviews and the goal check), the duration, the start and the run id; its other tabs hold the plan, the
+off offers **Continue** on a line above the box. The panel's Details show what a glance needs (item 452): the status,
+the agent of a chat with one, the model and its reasoning level, the approval mode, goal mode when it is on, the
+campaign of a session, the tool calls (with the failed ones), the tokens (of every model call of the run: its steps and
+its side calls, such as compactions, reviews and the goal check), the compactions once there is one, and the duration.
+The run's mode, its start and its id (with a copy button) are under More, which folds away under them, closed the first
+time and as the browser last left it after; its other tabs hold the plan, the
 actions, the agents of the chat and the latest screenshots. Each tab wears its icon, and where the strip has no room for
 every name, the tabs not chosen show their icon and count alone (item 227). The Agents tab lists, newest first, the runs
 the chat's runs handed work to: five at first and the rest on **Show N more**, each with its face and goal, its
@@ -325,7 +351,8 @@ written in again (item 447).
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
 at the head of the conversation. The panel is one card on the composer's corner, in five tabs
-(item 203): **Run** (Details, how the run was Set up, Cost and the conversation's Files), **Changes** (the files the
+(item 203): **Run** (Details, the conversation's Files, and under More the run's mode, start and id, how it was Set
+up and its Cost; item 452), **Changes** (the files the
 chat's runs wrote or created with `write_file` and `edit_file`, up to this run, which the tab counts: each with what
 became of it and the lines added and removed, opening on its unified diff from before the chat's first change to it;
 `GET /api/runs/{id}/changes`, item 368), **Plan** (its steps; the tab says how many are done), **Agents** (the agents
@@ -526,10 +553,12 @@ Notifications adds
 desktop notifications (off until you switch them on; the browser asks for its permission on that click): Dot says
 when it asks for an approval, a question or your help, and when it leaves you a question that a run could not wait for
 (a `yolo`, scheduled or campaign run goes on without the answer); when a run ends (done, failed or stopped, with the
-first line of its answer; the sub-runs of a run stay quiet); when a campaign ends by itself (achieved, or stopped by
-the emergency stop or by `campaign_max_sessions`); and when a schedule misses a firing that nobody saw (overdue, or
-its run could not start; told once while the reason stays the same). It says nothing while you are looking at that
-run: its page open, the tab visible and the window active. On another
+first line of its answer; the sub-runs of a run stay quiet, and a schedule's run is told as its notification level
+says, item 461, see [Memory and schedules](memory-and-schedules.md)); when a campaign ends by itself (achieved, or
+stopped by the emergency stop or by `campaign_max_sessions`); when a schedule misses a firing that nobody saw (overdue,
+or its run could not start; told once while the reason stays the same, and not at its level "never"); and when a
+repeating schedule is switched off because its runs failed so many times in a row (item 458, once). It says nothing
+while you are looking at that run: its page open, the tab visible and the window active. On another
 page, in a background tab or in an inactive window you are told; "Tell me even when I am looking" under the same
 setting turns the rule off. Clicking a notification opens what it tells of. The tab's
 icon is the same face in the state of the whole of Dot (amber ring while something waits for you, working while a run
@@ -671,6 +700,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /memories`, `GET /memories/search`, `POST /memories`, `GET\|PATCH\|DELETE /memories/{id}` | notes                                         |
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |
 | `GET\|POST /schedules`, `GET\|PATCH /schedules/{id}`, `POST /schedules/{id}/enable\|disable`, `DELETE /schedules/{id}` | schedules (`PATCH` takes the whole schedule) |
+| `POST /schedules/{id}/run`, `GET /schedules/{id}/firings?limit=` | a run of the schedule started by hand, 201 (409 while the emergency stop is engaged, while one of its runs is at work, or in a daemon that runs no scheduler); its last runs, at its time and by hand, newest first (item 455) |
 | `GET\|POST\|DELETE /failsafe`, `GET /images/{name}`                             | emergency stop; screenshots of runs                          |
 | `GET /browser`, `POST /browser/mode` (`{"mode": "own"\|"attach"}`)              | which Chrome Dot browses with and what Chrome allows; switch it (409 while runs are active, 422 when Chrome refuses) |
 | `POST /browser/debug-port` (`{"debug_port": 9222}`, 0 for none)                 | the DevTools port of Dot's own Chrome (409 while runs are active, 422 below 1024 or when another program holds the port) |

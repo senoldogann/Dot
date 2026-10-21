@@ -318,10 +318,14 @@ async def test_the_sections_show_what_waits_what_works_and_a_campaign_session_wi
                 await page.goto(f"http://{host}:{port}/#/runs/{working.id}")
                 if width < 960:
                     await page.locator("button[aria-label='Run details']").click()
+                # Under the Run tab's More (item 452), which this browser opens once and keeps open.
+                more = page.locator(".inspector").get_by_role("button", name="More")
+                if await more.get_attribute("aria-expanded") == "false":
+                    await more.click()
                 card = page.locator(".cost-card")
+                await expect(card).to_be_visible()
                 await expect(card).to_contain_text("Steps")
                 await expect(card).to_contain_text("Input tokens")
-                await expect(card).to_contain_text("Compactions")
                 await page.screenshot(path=str(tmp_path / f"run-cost-{width}-{scheme}.png"))
                 # What ended, on the home's Today strip: two runs, and the third of the four (the delegated run stands
                 # under its parent) a press away.

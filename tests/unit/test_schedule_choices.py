@@ -1,4 +1,4 @@
-"""A schedule made from a chat starts its runs as that chat does (item 291)."""
+"""A schedule made from a chat starts its runs as that chat does (item 291), as its agent too (item 463)."""
 
 from dotagent.store.models import ChatChoices, RunRecord, ScheduleOptions
 from dotagent.tools.schedule import chat_options, schedule_mode
@@ -42,6 +42,9 @@ def test_the_chat_choices_win_over_the_run_that_made_the_schedule() -> None:
         timezone=None,
         history_runs=None,
         same_chat=True,
+        stop_after_failures=None,
+        notify=None,
+        agent_id=None,
     )
 
 
@@ -55,6 +58,9 @@ def test_a_chat_without_kept_choices_schedules_as_its_run_started() -> None:
         timezone=None,
         history_runs=None,
         same_chat=True,
+        stop_after_failures=None,
+        notify=None,
+        agent_id=None,
     )
 
 
@@ -62,3 +68,14 @@ def test_the_mode_asked_wins_and_a_talking_chat_schedules_tasks() -> None:
     assert schedule_mode("task", "research") == "task"
     assert schedule_mode(None, "research") == "research"
     assert schedule_mode(None, "chat") == "task"
+
+
+def test_a_schedule_made_in_an_agents_chat_runs_as_that_agent_and_one_in_dots_chat_as_dot() -> None:
+    agents_run: RunRecord = _RUN.model_copy(update={"agent_id": "agt_scout"})
+    assert chat_options(agents_run, None).agent_id == "agt_scout"
+    kept: ChatChoices = ChatChoices(
+        mode="chat", model=None, effort=None, speed="standard", approvals="yolo", goal_mode=None
+    )
+    # The chat's yolo goes with it: the schedule's approvals are the chat's, ahead of the agent's own.
+    assert (chat_options(agents_run, kept).agent_id, chat_options(agents_run, kept).approvals) == ("agt_scout", "yolo")
+    assert chat_options(_RUN, None).agent_id is None
