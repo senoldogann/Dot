@@ -2,10 +2,11 @@
 step that a rule of the owner hands to them, and that nobody answers in time, is kept for them: the run is told it did
 not happen and goes on to its end, its next hand-off is kept at once and the same step is kept once. "I did it" carries
 the work on in the same chat as Dot's words: a new run, of the agent that kept the step, that starts tainted as the run
-that kept it ended, or a steer of the run working there that leaves its taint as it was; Skip starts nothing, and a
-step past its time lapses. Past the caps a hand-off is asked as before. A question that asks the owner's yes is refused
-as before, and so is every hand-off with ``"refuse"``, the default; a yolo run asks nothing. No network and no model
-service is used; the commands handed over never run, and a yolo run's writes a file of the throw-away workspace.
+that kept it ended, or a steer of the run working there that leaves its taint as it was; Skip starts nothing, and a step
+past its time lapses. Past the caps a hand-off is asked as before. A question whose card shows less than all of the step
+is refused as before, and so is every hand-off with ``"refuse"``, the default; a yolo run asks nothing. No network and
+no model service is used; the commands handed over never run, and a yolo run's writes a file of the throw-away
+workspace.
 
 A question whose card shows all of the step is kept for the owner's yes (item 483): "Allow once" that cannot reach the
 conversation is taken back; one that does lets the run do that exact step once, the next time asks again; a Skip

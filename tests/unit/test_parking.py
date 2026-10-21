@@ -1,6 +1,7 @@
 """Steps kept for the owner (items 482, 483), the pure part: which runs keep a hand-off nobody answers, which questions
 may wait for the owner's yes, the fingerprint that keeps the same step once in a chat, and what the run is told."""
 
+from pathlib import Path
 from typing import Literal
 
 import pytest
@@ -18,6 +19,7 @@ from dotagent.agent.parking import (
 )
 from dotagent.config import PolicyConfig, load_default_config
 from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Decision, DecisionSource, Verdict
+from dotagent.tools.shell import ShellArgs, _classify_shell
 
 _PAY: ActionInfo = ActionInfo(
     tool="shell",
@@ -137,3 +139,16 @@ def test_what_the_run_is_told_of_a_question_kept_allowed_or_skipped() -> None:
     )
     assert allowed_text("apr-2", " Go ahead. ").endswith(" They wrote: Go ahead.")
     assert "skipped this exact step when it was kept for them (apr-2)" in skipped_text("apr-2")
+
+
+def test_a_command_run_somewhere_else_is_another_step(tmp_path: Path) -> None:
+    """Where a command runs, when the call names it, is on its card and in its fingerprint (item 483): a yes to it in
+    one folder is no yes to the same line in another."""
+    here, there = tmp_path / "here", tmp_path / "there"
+    steps: list[ActionInfo] = [
+        _classify_shell(ShellArgs(command="./cleanup.sh", cwd=cwd), tmp_path, (), ())
+        for cwd in (None, str(here), str(there))
+    ]
+    assert steps[0].summary.startswith("Run: ./cleanup.sh (")
+    assert f"Run: ./cleanup.sh in {here} (" in steps[1].summary
+    assert len({kept_digest(step) for step in steps}) == 3

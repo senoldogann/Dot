@@ -1570,11 +1570,14 @@ class RunManager:
             return await self._runtime.approvals.resolve(record.id, True, source, note)
         hours: float = self._runtime.config.policy.permit_hours
         granted: ApprovalRecord = await self._runtime.approvals.grant(record, source, note, now + hours * 3600.0)
+        delivered: bool = False
         try:
             await self._carry_kept(record, source, allowed_text(record.id, note), note)
-        except DotError:
-            await self._runtime.approvals.reopen(granted)
-            raise
+            delivered = True
+        finally:
+            if not delivered:
+                # Whatever stopped it, a yes that did not reach the conversation is taken back.
+                await self._runtime.approvals.reopen(granted)
         await self._runtime.approvals.announce(granted)
         return granted
 
