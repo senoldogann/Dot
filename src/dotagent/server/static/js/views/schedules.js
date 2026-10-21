@@ -154,7 +154,7 @@ function optionChips(record, agent) {
       : el(
           "span",
           {
-            class: approvals === "yolo" ? "badge b-warn" : "chip",
+            class: "chip",
             title: options.approvals === null ? "Who answers the safety policy's questions: its agent's choice" : "Who answers the safety policy's questions",
           },
           `Approvals: ${approvalLabel(approvals)}`,

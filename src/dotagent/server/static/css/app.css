@@ -3298,19 +3298,6 @@ dialog.modal.connect-apps[open] {
   transform: rotate(90deg);
 }
 
-/* YOLO, quietly: the Options pill's icon and word in the warn ink, on no ground, so a run that asks nothing is never
-   started by accident and the bar does not shout. */
-.composer-pill[data-tone="warn"],
-.composer-pill[data-tone="warn"] > .icon {
-  color: var(--warn);
-}
-
-.composer-pill[data-tone="warn"]:hover,
-.composer-pill[data-tone="warn"][aria-expanded="true"] {
-  background: var(--warn-weak);
-  color: var(--warn);
-}
-
 /* On a chat's page while a run works (item 133), the choices wait for the next follow-up: the pills step back until
    the pointer or the focus comes to them, and their tooltips say so. */
 .composer-pill[data-waiting] {
@@ -3428,7 +3415,7 @@ dialog.modal.connect-apps[open] {
   animation: fade-in var(--motion-quick) var(--ease);
 }
 
-/* The Options menu: the four approval modes with what each does and YOLO's warning once it is chosen (item 398), then
+/* The Options menu: the four approval modes with what each does, YOLO chosen in the warning ink (item 398), then
    Execution's switches (Keep going, Goal mode, Plan first), whole where the window has the room. */
 .composer-popover:has(.approval-list) {
   max-height: min(640px, var(--room-above, 640px));
@@ -4728,10 +4715,6 @@ a.memory-line:hover .memory-change {
 .auto-decision > span {
   min-width: 0;
   overflow-wrap: anywhere;
-}
-
-.auto-decision.yolo {
-  color: var(--warn);
 }
 
 .auto-decision.denied {

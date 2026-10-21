@@ -122,8 +122,8 @@ menu says what each does and leads back to Auto); `POST /api/runs` takes `mode: 
 exists (its menu lists the agents with their roles), **Model** (the mark of its provider and its name: the daemon's
 default or one picked), **Reasoning** (a brain and the level, only for a model that offers a choice; kept in the browser
 per model) and **Options** (the approval mode, which the pill always shows by its icon and a short name: a lock for
-Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock for YOLO, in the warn ink, on no
-fill; its menu lists the four modes with what each does, item 398, see
+Supervised, a pencil and "Edits" for Auto-accept edits, a shield for Auto, an open lock for YOLO, on no fill; its menu
+lists the four modes with what each does, YOLO's in the warning ink while it is chosen, item 398, see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)) and the round send, quiet while the box is
 empty. The files under the box stand in one row that wraps only when the frame runs out of width: a photo shows itself
 at a thumbnail's size, its name its tooltip and its × at its corner, where another file keeps its icon, its name and its
@@ -441,8 +441,9 @@ left it, once the run has ended.
 
 **Settings** (`#/settings`) is one page with tabs: **General** (Dot's name and yours, Dot's own look, desktop
 notifications, the composer's keys, the Chat card's "Show what ran without asking", which is off until turned on: off, a
-chat leaves out the lines of the actions YOLO let through and of those the reviewer approved, while a refusal still
-shows (items 346 and 362, kept in this browser), and the token this browser is signed in with), **Appearance** (the look
+chat leaves out the lines of the decisions the review model made, while a refusal still shows; a step yolo let through
+draws no line either way (items 346, 362 and 500, kept in this browser), and the token this browser is signed in with),
+**Appearance** (the look
 of this browser, below), **Models** (the **Default model** first, a menu of the models that can call tools: the runs
 that name no model, a new chat's among them, start on the one chosen at once, and `config.toml` keeps it as `[models]
 main`, as when it is changed from the composer's model menu; then one fold per provider, with the reasoning levels of

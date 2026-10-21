@@ -45,8 +45,6 @@ export const APPROVAL_OPTIONS = [
     icon: "lockOpen",
   },
 ];
-const YOLO_NOTE =
-  "YOLO: this run asks nothing — money, passwords, messages and posts in your name are its to do, and each step's record keeps the reason it would have asked for.";
 const GOAL_MODE_HINT = "A checker compares the answer with the goal and sends the run back to work until the goal is really reached";
 const STANDING_HINT = "Keep going until done: Dot works on the goal in sessions until a check confirms the outcome or you stop it";
 const STANDING_NOTE = "Keep going is on: Dot works on this goal in sessions until a check confirms it; Campaigns shows it.";
@@ -154,8 +152,8 @@ function approvalList(selected, onSelect) {
  * The control that picks the approval mode of a new run, its choice in `kept` (`KEPT_APPROVALS` or a `heldChoice`).
  * `value()` is the mode chosen, or null while it follows the daemon (that is what a run is started with, so a later
  * change of the daemon's default still applies); `sync()` shows the choice or the daemon's default again after the status
- * changed; `warning` is the line to show with the control. `onPaint(mode)` runs whenever the mode shown changes, with
- * null while neither a choice nor the daemon's status is known.
+ * changed. `onPaint(mode)` runs whenever the mode shown changes, with null while neither a choice nor the daemon's
+ * status is known.
  */
 export function approvalsPicker(onPaint, kept) {
   function shown() {
@@ -166,14 +164,12 @@ export function approvalsPicker(onPaint, kept) {
     kept.write(id);
     paint();
   });
-  const warning = el("div", { class: "note warn", hidden: true }, icon("bolt"), el("span", null, YOLO_NOTE));
   // The mode `onPaint` was told last: `sync()` comes with every status update, and the composer's pill is drawn again
   // only when the mode it shows changed (item 310).
   let told;
 
   function paint() {
     control.element.dataset.mode = String(control.value());
-    warning.hidden = control.value() !== "yolo";
     if (control.value() !== told) {
       told = control.value();
       onPaint(told);
@@ -183,7 +179,6 @@ export function approvalsPicker(onPaint, kept) {
   paint();
   return {
     element: el("div", { class: "pop-group", role: "group", "aria-label": "Approvals" }, el("div", { class: "pop-heading", "aria-hidden": "true" }, "Approvals"), control.element),
-    warning,
     value: kept.read,
     sync: () => {
       control.set(shown());

@@ -16,7 +16,6 @@ test("what nobody was asked about names the rule, the preset or the reason", () 
 });
 
 test("who answered a question says so, with why it was asked", () => {
-  assert.equal(whyText(decided("guard", "yolo", "money leaves the Mac"), ["financial"]), "YOLO, not asked: money leaves the Mac. Flags: financial.");
   assert.equal(whyText(decided("taint", "reviewer", "the run read a page"), []), "The review model approved it; the policy asked because the run read a page.");
   assert.equal(whyText(decided("preset", "user", "deletes ask in balanced"), []), "You approved it; the policy asked because deletes ask in balanced.");
   assert.equal(whyText(decided("supervised", "user", "Supervised asks before every change"), []), "Supervised: you approved it.");
@@ -28,4 +27,10 @@ test("a step says why it ran when it acted or when more than the preset decided 
   assert.equal(showsWhy(decided("preset", "policy", "writes are allowed"), "write"), true);
   assert.equal(showsWhy(decided("rule", "policy", "Mail is fine"), "read"), true);
   assert.equal(showsWhy(decided("taint", "user", "the run read a page"), "network"), true);
+});
+
+test("a yolo step says nothing of why it ran, and a reviewed one does (item 500)", () => {
+  assert.equal(showsWhy(decided("guard", "yolo", "money leaves the Mac"), "write"), false);
+  assert.equal(showsWhy(decided("taint", "yolo", "the run read a page"), "network"), false);
+  assert.equal(showsWhy(decided("taint", "reviewer", "the run read a page"), "write"), true);
 });

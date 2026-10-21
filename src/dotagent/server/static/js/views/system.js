@@ -197,11 +197,11 @@ function buildComposerCard() {
   return section("Composer", null, el("div", { class: "card-pad stack" }, sendKey.element, busy.element));
 }
 
-/** What a chat shows of the actions that ran without asking you (items 346 and 362), kept in this browser. */
+/** What a chat shows of the actions the review model approved (items 346 and 362), kept in this browser. */
 function buildChatCard() {
   const lines = switchSetting({
     label: "Show what ran without asking",
-    hint: "A line under the step for each action YOLO let through without asking you, or the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows. Kept in this browser.",
+    hint: "A line under the step for each action the reviewer approved. Off, as it starts, the chat leaves them out; a refusal still shows, and a step YOLO let through draws no line. Kept in this browser.",
     read: () => settingValue(AUTO_LINES) === "shown",
     write: async (on) => setValue(AUTO_LINES, on ? "shown" : "hidden"),
     onToggled: () => lines.paint(),

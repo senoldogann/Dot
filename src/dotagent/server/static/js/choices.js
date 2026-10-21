@@ -112,7 +112,6 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
     const badge = shown === null ? null : approvalBadge(shown);
     optionsPill.setValue(badge === null ? "" : badge.short, "");
     optionsPill.setIcon(icon(badge === null ? "lock" : badge.icon));
-    optionsPill.setTone(shown === "yolo" ? "warn" : null);
     setTitle(optionsPill.element, shown === null ? optionsTitle : `${optionsTitle}: ${approvalLabel(shown)}`);
   }, told(kept.approvals));
   const goalMode = goalModePicker(told(kept.goalMode));
@@ -139,7 +138,6 @@ export function runChoices({ frame, modes, kept, optionsTitle, more, onMode, onC
       );
       return [
         approvals.element,
-        approvals.warning,
         ...(isChat ? [] : [executionGroup]),
         ...more(),
       ];

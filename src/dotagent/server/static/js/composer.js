@@ -470,7 +470,7 @@ export function composerFrame({ label, boxLabel, placeholder, maxPx, commands, s
  * A pill of the bar (item 108): an icon (`icon`, a node or null: the mark of a provider, a lock, a brain), the value it
  * holds ("Muse Spark 1.3") and a chevron; `caption` names it for a screen reader ("Model") without showing. `id` names
  * it (`data-pill`). `setValue(text, extra)` paints the value and a muted word after it (or ""); `setIcon(node)` swaps
- * the icon; `setTone(tone)` tints it ("warn", or null).
+ * the icon.
  */
 export function composerPill({ id, caption, value, icon: mark }) {
   const valueNode = el("span", { class: "composer-pill-value" }, value);
@@ -494,13 +494,6 @@ export function composerPill({ id, caption, value, icon: mark }) {
     },
     setIcon: (node) => {
       iconNode.replaceChildren(node);
-    },
-    setTone: (tone) => {
-      if (tone === null) {
-        delete element.dataset.tone;
-      } else {
-        element.dataset.tone = tone;
-      }
     },
   };
 }

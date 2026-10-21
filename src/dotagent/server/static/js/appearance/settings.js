@@ -137,9 +137,9 @@ export const BUSY_SEND = {
   paint: () => undefined,
 };
 
-/** Whether a chat shows the line of each action that ran without asking you (item 346): one YOLO let through, or one the
- * reviewer approved. It does not until asked to (item 362). A refusal shows either way, as what it held back did not
- * happen. Settings › General chooses it; it puts nothing on the page. */
+/** Whether a chat shows the line of each action the reviewer approved (item 346). It does not until asked to (item 362).
+ * A refusal shows either way, as what it held back did not happen, and a step yolo let through draws none (item 500).
+ * Settings › General chooses it; it puts nothing on the page. */
 export const AUTO_LINES = {
   key: "dot.autoLines",
   initial: "hidden",

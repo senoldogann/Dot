@@ -6,9 +6,10 @@
 const READ_ONLY_KINDS = new Set(["read", "network", "browser_read", "browser_navigate", "desktop_observe", "memory_read", "mcp_read", "delegate", "meta"]);
 
 /** Whether a tool row says why its step ran: an acting step always, one that only observed when more than the preset
- * decided it. A step recorded before item 468 has no decision, and says nothing. */
+ * decided it. A step a yolo run took without asking (item 500) says nothing, as the UI does not warn about the mode. A
+ * step recorded before item 468 has no decision, and says nothing. */
 export function showsWhy(decision, kind) {
-  if (decision === null || decision === undefined) {
+  if (decision === null || decision === undefined || decision.answered_by === "yolo") {
     return false;
   }
   return !READ_ONLY_KINDS.has(kind) || decision.source !== "preset" || decision.answered_by !== "policy";
@@ -22,8 +23,6 @@ function bare(reason) {
 function sentence(decision) {
   const reason = bare(decision.reason);
   switch (decision.answered_by) {
-    case "yolo":
-      return `YOLO, not asked: ${reason}.`;
     case "reviewer":
       return `The review model approved it; the policy asked because ${reason}.`;
     case "user":

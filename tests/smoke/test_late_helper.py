@@ -4,9 +4,8 @@ first four has ended: here the delegate tool's time limit, cut to a few seconds,
 shell command. The fifth joins their group, whose head says "5 helpers" and "1 working · 4 stopped", and the rings of
 the four stopped rows stand still; once the limit stops the fifth too, the head says "5 stopped", no ring spins, and
 the page loaded again shows the same. Before, the fifth opened a group of its own and the head kept saying "4
-helpers". The run is YOLO and a rule asks before each helper, so each call has its decision's line, which stays in
-the group of its call (it opened a group of its own after the card, which split the late helper off). Wide and light
-while it runs, on a phone and dark loaded again.
+helpers". The run is YOLO and a rule asks before each helper, so each call is a question the mode waives and draws no
+line of (item 500). Wide and light while it runs, on a phone and dark loaded again.
 
 No network and no model service is used: the scripted model plays the run and its helpers.
 """
@@ -157,8 +156,8 @@ async def test_a_helper_that_starts_late_joins_the_group_and_stopped_ones_stand_
                 await expect(rings).to_have_count(len(PARTS))
                 await expect(group.locator("details.child .status-ring.s-cancelled")).to_have_count(len(PARTS) - 1)
                 await expect(group.locator("details.child .status-ring.s-running")).to_have_count(1)
-                # Each call's decision is a line of the turn's group, the late one's too.
-                await expect(page.locator(".auto-decision.yolo")).to_have_count(len(PARTS))
+                # The run is yolo, so no call draws a line of its decision, the late one's included (item 500).
+                await expect(page.locator(".auto-decision")).to_have_count(0)
                 await page.screenshot(path=str(tmp_path / "late-helper-working.png"))
                 async with asyncio.timeout(WAIT_S):
                     await manager.wait(parent.id)

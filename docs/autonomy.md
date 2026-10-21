@@ -10,8 +10,7 @@ other, so every mix works. Each has a default in the configuration, and a single
 
 `GET /api/status` reports the configured defaults. A run keeps the values it was started with; the run page and its
 Details panel show them. The composer of the web UI sends nothing for a picker you did not touch, so the daemon applies
-its current default. The YOLO choice is remembered by the browser; it is shown with a warning tint and a note, and the
-run page carries a chip for it.
+its current default. The YOLO choice is remembered by the browser, and the run page carries a chip for it.
 
 **Approvals** decide who answers a question of the [policy](safety.md#safety), the `ask` outcome of its decision order,
 strictest first (item 398). The composer's Options menu lists them with their icons, under the names in brackets:
@@ -50,12 +49,15 @@ agent, which writes past the journal `dotx undo` reads (item 398). So is a login
 the review model never answers it, and a rule of yours can only hand it to you.
 
 Every automatic answer is an ordinary approval record (`decided_by` is `reviewer` or `yolo`, the summary is the action
-and the note holds the reason), an `approval_auto` event and one line in the timeline of the run ("YOLO, not asked:
-click 'Reply' — untrusted content is in context and this action reaches outside the Mac"), so you can see afterwards
-what went through and why. A chat leaves those lines out unless Settings › General › Chat › "Show what ran without
-asking" is on (items 346 and 362); the records and the events stay, and a refusal always shows. Every step the policy
+and the note holds the reason) and an `approval_auto` event, so you can see afterwards what went through and why. A chat
+draws a line in the timeline for the review model's decisions ("Reviewer approved: click 'Reply' — untrusted content is
+in context and this action reaches outside the Mac"), and none for a step yolo waived: the mode says nothing of what it
+let through, and the record and the event keep it (item 500). A chat leaves the review model's lines out unless Settings
+› General › Chat › "Show what ran without asking" is on (items 346 and 362); the records and the events stay, and a
+refusal always shows. Every step the policy
 let through keeps what decided it, a question answered or not (item 468, see [Safety](safety.md#safety)), and its row in
-the chat says why it ran when you open it; a step refused or handed to you has its `policy` event instead. The home's
+the chat says why it ran when you open it, unless a yolo run did it without asking (item 500); a step refused or handed
+to you has its `policy` event instead. The home's
 **While you were away** counts those automatic answers for the runs of your schedules and campaigns since you last
 looked (item 466; see [The daemon](daemon.md)).
 
