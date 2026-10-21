@@ -100,7 +100,8 @@ def schedule_mode(asked: Literal["task", "research"] | None, chat: RunMode) -> L
 def chat_options(run: RunRecord, choices: ChatChoices | None) -> ScheduleOptions:
     """How the runs of a schedule that the run ``run`` makes start (item 291): as the next follow-up of its chat starts,
     ``choices`` (those its first run started with, until the owner picked others), else as ``run`` started, its chat's
-    runs being older than kept choices; and in that chat. They are the owner's choices, never the model's."""
+    runs being older than kept choices; and in that chat, as its agent (item 463), within that agent's bounds, or as
+    Dot. They are the owner's choices, never the model's: the model names no agent."""
     if choices is None:
         return ScheduleOptions(
             model=run.model,
@@ -113,7 +114,7 @@ def chat_options(run: RunRecord, choices: ChatChoices | None) -> ScheduleOptions
             same_chat=True,
             stop_after_failures=None,
             notify=None,
-            agent_id=None,
+            agent_id=run.agent_id,
         )
     return ScheduleOptions(
         model=choices.model,
@@ -126,7 +127,7 @@ def chat_options(run: RunRecord, choices: ChatChoices | None) -> ScheduleOptions
         same_chat=True,
         stop_after_failures=None,
         notify=None,
-        agent_id=None,
+        agent_id=run.agent_id,
     )
 
 

@@ -206,12 +206,13 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   both, `/loop 30m check the build`) makes the message a loop of the chat: the message goes at once (in a new chat, as
   the message that starts it), and a schedule of the chat (item 291) asks it again every 5, 10, 15, 20 or 30 minutes or
   every 1, 2, 3, 4, 6, 8 or 12 hours, in the chat, as its follow-ups start (its model, reasoning level, speed, approvals
-  and goal mode). Each run of it is told how the loop ends: it deletes its schedule (`schedule_delete`) once the work is
-  done for good. Right above the composer, in the bar that also says how long the run has worked and how its helpers
-  stand (one pane of glass on a phone, item 401), a line shows each loop of the chat, how often it asks again, when
-  next, and a Stop that deletes it. A rhythm a cron expression cannot keep exactly, or one shorter than
-  `[scheduler] min_interval_s`, is refused (422); a new chat then starts nothing, nor when `[scheduler] max_schedules`
-  are switched on already. A loop does not go with Keep going, whose campaign goes on by itself.
+  and goal mode, and as its agent in a chat with one of yours, item 463). Each run of it is told how the loop ends: it
+  deletes its schedule (`schedule_delete`) once the work is done for good. Right above the composer, in the bar that
+  also says how long the run has worked and how its helpers stand (one pane of glass on a phone, item 401), a line shows
+  each loop of the chat, how often it asks again, when next, and a Stop that deletes it. A rhythm a cron expression
+  cannot keep exactly, or one shorter than `[scheduler] min_interval_s`, is refused (422); a new chat then starts
+  nothing, nor when `[scheduler] max_schedules` are switched on already. A loop does not go with Keep going, whose
+  campaign goes on by itself.
 - Files can go with a goal or a steering message (attach, drop or paste them in the web UI; at most 10 of 20 MB
   each). In the box they stand in one row that wraps only when it runs out of width, a photo as its own picture at a
   thumbnail's size with its name as its tooltip, another file with its icon, its name and its size. A text pasted into

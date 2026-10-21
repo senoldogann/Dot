@@ -171,6 +171,38 @@ async def test_a_new_chat_sent_with_a_loop_starts_with_it_or_not_at_all() -> Non
                 await manager.wait(str(record["id"]))
 
 
+async def test_the_loop_of_a_new_chat_with_an_agent_runs_as_that_agent() -> None:
+    """Item 463: the schedule of a loop sent in a new chat with one of the owner's agents names that agent."""
+    async with (
+        _daemon((_finish("Hello."),)) as (manager, address),
+        httpx.AsyncClient(
+            base_url=f"{address}/api", headers={"Authorization": f"Bearer {TOKEN}"}, timeout=30.0
+        ) as client,
+    ):
+        agent = await client.post(
+            "/agents",
+            json={
+                "name": "Scout",
+                "role": "Reads files",
+                "instructions": "",
+                "model": "",
+                "effort": None,
+                "approvals": None,
+                "tools": ["read_file"],
+            },
+        )
+        assert agent.status_code == 201, agent.text
+        message: dict[str, object] = {"goal": "check the build", "model": SCRIPTED_MODEL, "thread_id": None}
+        started = await client.post("/runs", json={**message, "agent_id": agent.json()["id"], "loop": "30m"})
+        assert started.status_code == 201, started.text
+        schedules = (await client.get("/schedules")).json()
+        assert [(view["record"]["options"]["agent_id"], view["agent"]["name"]) for view in schedules] == [
+            (agent.json()["id"], "Scout")
+        ]
+        async with asyncio.timeout(_RUN_WAIT_S):
+            await manager.wait(str(started.json()["id"]))
+
+
 async def _page(browser: Browser, address: str, width: int, scheme: Literal["light", "dark"]) -> Page:
     page: Page = await browser.new_page(
         viewport={"width": width, "height": 900}, color_scheme=scheme, reduced_motion="reduce"
