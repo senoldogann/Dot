@@ -228,8 +228,9 @@ a note that it was saved while reading outside content.
     gets a login until all of them are closed: the script could have left a listener that copies what is typed, in its
     page, in a tab it opened, or in a page Chrome brings back from its cache.
   - A login is filled only on a page of one of its own websites, or a host under one, on the port the website names
-    (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a document of those sites, so a frame of another site gets nothing. A password
-    goes only into a password field, where it shows in no text.
+    (its scheme's own when it names none), over https (plain http on this Mac alone). Each field must be in a
+    document of those sites, by the address the browser knows for its frame, which no script of the frame changes,
+    so a frame of another site gets nothing. A password goes only into a password field, where it shows in no text.
   - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
     stricter), and in `auto` you answer it, not the review model.
   - The token is kept in Dot's `.env`, which no tool of a run may read, under a name `op` does not read. The shell

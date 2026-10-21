@@ -158,12 +158,6 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
   const marking = field.getAttribute('autocomplete') || '';
   return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
 }"""
-# What a field to fill from the password manager is (item 493): its marking, as the check of secret fields reads it,
-# and the address of the document that holds it, a frame's for a field in a frame. ``location`` is the page's own and
-# no script of it can make it say another site.
-_FIELD_PLACE_SCRIPT: str = (
-    "(element) => ({ marking: (" + _FIELD_MARKING_SCRIPT + ")(element), href: element.ownerDocument.location.href })"
-)
 # The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
 # no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
 _PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
@@ -618,38 +612,53 @@ async def fill_login_field(
     timeout_ms: int,
 ) -> None:
     """Fill the field ``ref`` with ``value``, the part ``kind`` of a login of the password manager (item 493), once the
-    field is one that part may go into and the document that holds it is one of the login's sites (``fills_on`` of its
-    address): a password into a password field alone, nothing into a frame of another site. ``typing()`` runs once the
-    field passed, just before the value goes in. Neither the value nor Playwright's log of the call is in what it
-    raises."""
+    field is one that part may go into and the document that holds it is one of the login's sites (``fills_on`` of the
+    address of its frame): a password into a password field alone, nothing into a frame of another site. The frame and
+    its address are the browser's: a script of the frame can make the element itself name another document.
+    ``typing()`` runs once the field passed, just before the value goes into the element that passed. Neither the
+    value nor Playwright's log of the call is in what it raises."""
     locator: Locator = await live_locator(page, ref, "fill")
     try:
-        place: object = await locator.evaluate(_FIELD_PLACE_SCRIPT)
+        element: ElementHandle = await locator.element_handle(timeout=timeout_ms)
     except PlaywrightError as error:
         raise BrowserError(
             "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
         ) from error
-    if not isinstance(place, dict) or not isinstance(place.get("href"), str):
-        raise BrowserError("the field could not be read before the login was filled", {"ref": ref, "url": page.url})
-    if not fills_on(place["href"]):
-        raise BrowserError(
-            "the field is in a frame of another site: Dot fills a login only on its own site",
-            {"ref": ref, "url": page.url, "frame": truncate_middle(place["href"], _ERROR_CHARS)},
-        )
-    field: SecretKind | None = secret_kind(place.get("marking"))
-    if not _takes(kind, field):
-        raise BrowserError(
-            f"the field {ref} does not take the login's {kind}: a password goes only into a password field, so that it "
-            "shows in no text",
-            {"ref": ref, "url": page.url, "part": kind, "field": field},
-        )
-    typing()
     try:
-        await locator.evaluate(_MARK_FILLED_SCRIPT)
-        await locator.fill(value, timeout=timeout_ms)
-    except PlaywrightError:
-        # Playwright's log of the call is left out, here and in the chain of the error: it may name what was typed.
-        raise BrowserError("the field did not take the login", {"ref": ref, "url": page.url, "part": kind}) from None
+        try:
+            frame: Frame | None = await element.owner_frame()
+            marking: object = await element.evaluate(_FIELD_MARKING_SCRIPT)
+        except PlaywrightError as error:
+            raise BrowserError(
+                "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
+            ) from error
+        if frame is None or not fills_on(frame.url):
+            raise BrowserError(
+                "the field is in a frame of another site: Dot fills a login only on its own site",
+                {
+                    "ref": ref,
+                    "url": page.url,
+                    "frame": None if frame is None else truncate_middle(frame.url, _ERROR_CHARS),
+                },
+            )
+        field: SecretKind | None = secret_kind(marking)
+        if not _takes(kind, field):
+            raise BrowserError(
+                f"the field {ref} does not take the login's {kind}: a password goes only into a password field, so "
+                "that it shows in no text",
+                {"ref": ref, "url": page.url, "part": kind, "field": field},
+            )
+        typing()
+        try:
+            await element.evaluate(_MARK_FILLED_SCRIPT)
+            await element.fill(value, timeout=timeout_ms)
+        except PlaywrightError:
+            # Playwright's log of the call is left out, here and in the chain of the error: it may name what was typed.
+            raise BrowserError(
+                "the field did not take the login", {"ref": ref, "url": page.url, "part": kind}
+            ) from None
+    finally:
+        await element.dispose()
 
 
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:

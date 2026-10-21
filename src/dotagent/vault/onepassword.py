@@ -47,7 +47,7 @@ _CONNECT_TIMEOUT_S: float = 180.0
 _LOGINS_FOR_S: float = 60.0
 _ERROR_CHARS: int = 400
 # The token a service account is given: "ops_" and Base64 URL-safe characters (1Password's security page).
-_TOKEN: re.Pattern[str] = re.compile(r"ops_[A-Za-z0-9_\-]{20,}")
+TOKEN_PATTERN: re.Pattern[str] = re.compile(r"ops_[A-Za-z0-9_\-]{20,}")
 # What ``op`` may read of the daemon's environment: no key or token of Dot's goes along.
 _PASSED_ENV: tuple[str, ...] = ("HOME", "USER", "LOGNAME", "TMPDIR", "LANG", "LC_ALL", "PATH")
 
@@ -333,7 +333,7 @@ class OnePassword:
             None,
             _CONNECT_TIMEOUT_S,
         )
-        tokens: list[str] = _TOKEN.findall(made)
+        tokens: list[str] = TOKEN_PATTERN.findall(made)
         if len(tokens) != 1:
             raise VaultError(
                 "1Password's op made the service account but Dot could not read its token: make a service account that "

@@ -5,7 +5,6 @@ pasted instead; and Disconnect. Connect and a pasted token are taken on this Mac
 owner there. No token and no value of the vault is logged or answered."""
 
 import asyncio
-import re
 
 from fastapi import APIRouter, Request
 from pydantic import Field, SecretStr
@@ -17,12 +16,9 @@ from dotagent.core.types import FrozenModel
 from dotagent.secrets import remove_env_value, write_env_value
 from dotagent.server.context import ServerContext
 from dotagent.server.routes_accounts import on_this_mac
-from dotagent.vault.onepassword import TOKEN_NAME, VaultError, VaultView, kept_token
+from dotagent.vault.onepassword import TOKEN_NAME, TOKEN_PATTERN, VaultError, VaultView, kept_token
 
 log = get_logger(__name__)
-
-# A service account's token: "ops_" and Base64 URL-safe characters (1Password's security page).
-_TOKEN: re.Pattern[str] = re.compile(r"ops_[A-Za-z0-9_\-]{20,}")
 
 
 class VaultState(FrozenModel):
@@ -91,7 +87,7 @@ def vault_router(ctx: ServerContext) -> APIRouter:
         """Keep a service account token the owner made, once it reads a vault."""
         on_the_mac(request)
         token: str = body.token.get_secret_value().strip()
-        if _TOKEN.fullmatch(token) is None:
+        if TOKEN_PATTERN.fullmatch(token) is None:
             raise InvalidValueError("that is not a 1Password service account token, which starts with ops_", {})
         return await keep(token)
 

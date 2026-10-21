@@ -53,8 +53,9 @@ _POLL_S: float = 0.05
 
 
 class _Site(ThreadingHTTPServer):
-    """The login form, its frame of another host (``localhost``, where the page is ``127.0.0.1``), and the page the
-    form goes to, which keeps the address of each submission."""
+    """The login form, its frame of another host (``localhost``, where the page is ``127.0.0.1``), whose script makes
+    its field say it is in the login's page, and the page the form goes to, which keeps the address of each
+    submission."""
 
     def __init__(self) -> None:
         super().__init__(("127.0.0.1", 0), _Handler)
@@ -81,8 +82,12 @@ class _Handler(BaseHTTPRequestHandler):
 <button type="submit">Sign in</button>
 </form>
 <iframe title="An advert" src="http://localhost:{port}/frame"></iframe>""",
-            "/frame": """<!doctype html><title>Advert</title>
-<label>Frame password <input name="pass" type="password"></label>""",
+            "/frame": f"""<!doctype html><title>Advert</title>
+<label>Frame password <input name="pass" type="password"></label>
+<script>
+const login = {{ location: {{ href: "http://127.0.0.1:{port}/login" }} }};
+Object.defineProperty(document.querySelector("input"), "ownerDocument", {{ get: () => login }});
+</script>""",
             "/home": "<!doctype html><title>Home</title><h1>Welcome</h1>",
         }
         if path == "/home":

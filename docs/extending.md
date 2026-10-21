@@ -43,7 +43,7 @@ one at the foot of the list of chats. The services, where they stand and their s
 ### 1Password
 
 **1Password** (item 493), under Password managers, lets a run sign in with your logins without its model ever seeing
-them (see [Secrets](safety.md)). Dot reads 1Password through `op`, its command line (`brew install 1password-cli`),
+a password or a one-time code (see [Secrets](safety.md)). Dot reads 1Password through `op`, its command line (`brew install 1password-cli`),
 and through a service account, which reads only the vaults shared with it, as 1Password's own guidance has an agent
 work:
 

@@ -899,9 +899,12 @@ _VAULT_HOW: str = (
 )
 _VAULT_DATA: str = (
     "Between Dot and 1Password, through op on this Mac. A login's values go only into the page Dot fills, on the "
-    "login's own site; the run's model sees the logins' titles and websites, never a username, a password or a code."
+    "login's own site; the run's model sees the logins' titles and websites, never a password or a code. A username "
+    "is no secret: it shows where a site shows it."
 )
-_VAULT_DOES: str = "Fills your logins into pages on their own sites, with the run's model never seeing them."
+_VAULT_DOES: str = (
+    "Fills your logins into pages on their own sites, with the run's model never seeing a password or a code."
+)
 _FOLDER_HOW: str = "Dot reads and writes the files it keeps in sync in a folder of this Mac."
 
 
