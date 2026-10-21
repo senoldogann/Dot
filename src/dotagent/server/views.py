@@ -46,13 +46,13 @@ from dotagent.store.models import (
     CampaignEntry,
     CampaignRecord,
     ChatChoices,
+    ChatMode,
     HarnessVersion,
     MemoryRecord,
     MemoryScore,
     NotifyLevel,
     QueuedMessage,
     RuleRecord,
-    RunMode,
     RunPicks,
     RunRecord,
     RunStatus,
@@ -275,7 +275,8 @@ class StartRunRequest(FrozenModel):
     ``2h``), makes the goal a loop of the run's chat too, as ``/loop`` in a new chat's box does (item 400)."""
 
     goal: str = Field(min_length=1, max_length=_GOAL_CHARS)
-    mode: RunMode = "task"
+    # Auto (item 495) lets the goal's words settle the mode (agent/mode_words.py); the API's own default is a task.
+    mode: ChatMode = "task"
     model: str | None = None
     thread_id: str | None = None
     effort: Effort | None = None
@@ -345,7 +346,7 @@ class QueueMessageRequest(FrozenModel):
     configured ones then, as for ``StartRunRequest``."""
 
     text: str = Field(min_length=1, max_length=_GOAL_CHARS)
-    mode: RunMode = "task"
+    mode: ChatMode = "task"
     model: str | None = None
     effort: Effort | None = None
     speed: Speed = "standard"

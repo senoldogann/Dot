@@ -194,9 +194,9 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             page, errors = await _page(browser, address)
             await page.goto(f"{address}/#/runs/{first.id}")
 
-            # The dock starts from the open run: its mode, its model (no reasoning to choose) and its approvals, and
-            # nothing waits, since the run is over.
-            await expect(_pill(page, "mode")).to_contain_text("Task")
+            # The dock starts from the open run: its mode (a task, which the dock shows as Auto, item 495, with no
+            # pill), its model (no reasoning to choose) and its approvals, and nothing waits, since the run is over.
+            await expect(_pill(page, "mode")).to_be_hidden()
             await expect(_pill(page, "model")).to_contain_text("scripted")
             await expect(_pill(page, "reasoning")).to_be_hidden()
             await expect(_pill(page, "options")).to_contain_text("Edits")
@@ -223,10 +223,10 @@ async def test_a_follow_up_starts_its_run_with_the_choices_made_on_the_chats_pag
             await page.keyboard.press("Escape")
             await expect(options).to_be_hidden()
 
-            # A chat has no goal mode and no Plan first: chosen for one, Options holds no switch for them, and Task
-            # brings them back.
-            await _pill(page, "mode").click()
-            await _menu(page, "Mode").get_by_role("option").filter(has_text="Chat").click()
+            # A chat has no goal mode and no Plan first: named for one with its command (the dock shows no mode on
+            # Auto, item 495), Options holds no switch for them, and Task brings them back.
+            await page.locator(".dock textarea").type("/chat")
+            await page.locator(".dock textarea").press("Tab")
             await expect(_pill(page, "mode")).to_contain_text("Chat")
             await _pill(page, "options").click()
             await expect(options.get_by_role("switch", name="Goal mode")).to_be_hidden()

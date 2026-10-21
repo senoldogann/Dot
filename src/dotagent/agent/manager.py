@@ -35,6 +35,7 @@ from dotagent.agent.learning_health import (
 )
 from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
+from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
 from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
@@ -2452,7 +2453,7 @@ class RunManager:
                     thread_id,
                     ended_notices(ended),
                     (),
-                    choices.mode,
+                    resolved_mode(choices.mode, ended_notices(ended)),
                     choices.model,
                     effort,
                     choices.speed,

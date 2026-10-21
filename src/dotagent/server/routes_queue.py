@@ -8,6 +8,7 @@ import asyncio
 from fastapi import APIRouter
 
 from dotagent.agent.attachments import StoredAttachment, load_attachment, load_attachments
+from dotagent.agent.mode_words import resolved_mode
 from dotagent.core.errors import NotFoundError
 from dotagent.core.logs import get_logger
 from dotagent.llm.router import parse_model_ref
@@ -75,7 +76,8 @@ def queue_router(ctx: ServerContext) -> APIRouter:
                 thread_id,
                 request.text,
                 files,
-                request.mode,
+                # Auto (item 495): the message's own words settle its mode.
+                resolved_mode(request.mode, request.text),
                 request.model,
                 request.effort,
                 request.speed,

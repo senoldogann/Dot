@@ -15,6 +15,7 @@ from dotagent.agent.attachments import AttachedFile, StoredAttachment, load_atta
 from dotagent.agent.campaign import session_number
 from dotagent.agent.keep_going import keep_going_ask
 from dotagent.agent.lessons import run_lessons
+from dotagent.agent.mode_words import resolved_mode
 from dotagent.agent.playbooks import save_playbook
 from dotagent.agent.resume import cut_off_by
 from dotagent.agent.rewind import (
@@ -172,20 +173,23 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             parse_model_ref(request.model)
         files: tuple[StoredAttachment, ...] = await load_attachments(ctx.runtime.workspace, request.attachments)
         picks: RunPicks = picks_of(request.plugins, request.skills, request.accounts, request.plan_first)
+        # Auto (item 495): the message's words settle the run's mode, and the chat keeps Auto for its next ones. A
+        # campaign (standing) is a task whatever its words say.
+        mode: RunMode = (
+            "task" if request.standing and request.mode == "auto" else resolved_mode(request.mode, request.goal)
+        )
 
         async def start() -> str:
             if request.loop is not None:
                 # The loop's schedule is asked of the scheduler before the run starts: what it would refuse (a rhythm a
                 # loop cannot keep, a gap under min_interval_s, no room for one more) starts nothing.
-                loop: ScheduleRequest = _loop_schedule(
-                    request.goal, request.loop, request.mode, _opening_options(request)
-                )
+                loop: ScheduleRequest = _loop_schedule(request.goal, request.loop, mode, _opening_options(request))
                 await plan_schedule(store, ctx.runtime.config.scheduler, ctx.runtime.schedule_zone, loop, time.time())
             run: RunRecord
             if request.standing:
                 run = await ctx.manager.start_campaign(
                     request.goal,
-                    request.mode,
+                    mode,
                     request.model,
                     request.thread_id,
                     UI_SOURCE,
@@ -202,7 +206,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                 run = await ctx.manager.start_for_agent(
                     agent,
                     request.goal,
-                    request.mode,
+                    mode,
                     request.model,
                     request.thread_id,
                     UI_SOURCE,
@@ -217,7 +221,7 @@ def runs_router(ctx: ServerContext) -> APIRouter:
             else:
                 run = await ctx.manager.start_picked(
                     request.goal,
-                    request.mode,
+                    mode,
                     request.model,
                     request.thread_id,
                     UI_SOURCE,
@@ -230,12 +234,21 @@ def runs_router(ctx: ServerContext) -> APIRouter:
                     files,
                     picks,
                 )
+            if request.mode == "auto":
+                await keep_auto(run)
             return run.id
 
         run_id: str = await send_once(store, "run", request.key, start)
         if request.loop is not None:
             await make_loop(run_id, request.loop, request.goal)
         return await store.get_run(run_id)
+
+    async def keep_auto(run: RunRecord) -> None:
+        """Keep Auto as the mode of the chat of ``run``, which a message sent with Auto started (item 495): a chat's
+        first run keeps the mode it ran in, and the chat's next message is to be settled by its own words again."""
+        kept: ChatChoices | None = await store.chat_choices(run.thread_id)
+        if kept is not None and kept.mode != "auto":
+            await store.set_chat_choices(run.thread_id, kept.model_copy(update={"mode": "auto"}))
 
     @router.post("/runs/{run_id}/skill", status_code=201)
     async def save_skill(run_id: str) -> SavedSkill:
@@ -353,7 +366,10 @@ def runs_router(ctx: ServerContext) -> APIRouter:
         owner: RunRecord = run if run.parent_run_id is None else await store.get_run(run.parent_run_id)
         choices: ChatChoices | None = await store.chat_choices(owner.thread_id)
         plan: ScheduleRequest = _loop_schedule(
-            text, every, owner.mode if choices is None else choices.mode, chat_options(owner, choices)
+            text,
+            every,
+            owner.mode if choices is None else resolved_mode(choices.mode, text),
+            chat_options(owner, choices),
         )
         # The same loop asked for again (a page that sends it once more after a failure) is the one there is.
         for kept in await store.list_schedules():

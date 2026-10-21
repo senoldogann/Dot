@@ -171,8 +171,11 @@ def _menu(page: Page, label: str) -> Locator:
 
 
 async def _shows(page: Page, mode: str, model: str, level: str, approvals: str) -> None:
-    """The dock's pills show these choices."""
-    await expect(_pill(page, "mode")).to_contain_text(mode)
+    """The dock's pills show these choices; on Auto (item 495) the mode has no pill."""
+    if mode == "Auto":
+        await expect(_pill(page, "mode")).to_be_hidden()
+    else:
+        await expect(_pill(page, "mode")).to_contain_text(mode)
     await expect(_pill(page, "model")).to_contain_text(model)
     await expect(_pill(page, "reasoning")).to_contain_text(level)
     await expect(_pill(page, "options")).to_contain_text(approvals)
@@ -287,9 +290,10 @@ async def test_a_chat_keeps_what_its_composer_chose_after_a_reload_and_in_anothe
             await page.goto(f"{address}/#/runs/{first.id}")
             await expect(_pill(page, "model")).to_contain_text("scripted")
 
-            # Research, the model with levels at High, and Auto.
-            await _pill(page, "mode").click()
-            await _menu(page, "Mode").get_by_role("option").filter(has_text="Research").click()
+            # Research, named with its command (the dock shows no mode pill on Auto, item 495), the model with
+            # levels at High, and Auto approvals.
+            await page.locator(".dock textarea").type("/research")
+            await page.locator(".dock textarea").press("Tab")
             await _pill(page, "model").click()
             await _menu(page, "Model").get_by_role("option").filter(has_text="thinker").click()
             await _pill(page, "reasoning").click()
@@ -357,7 +361,7 @@ async def test_a_run_moved_to_a_standby_model_leaves_the_chats_model(
             for width, scheme in (_SHOTS[1], _SHOTS[2]):
                 page, errors = await _page(browser, address, width, scheme)
                 await page.goto(f"{address}/#/runs/{first.id}")
-                await _shows(page, "Task", "thinker", "Low", "Edits")
+                await _shows(page, "Auto", "thinker", "Low", "Edits")
                 await page.screenshot(path=str(tmp_path / f"standby-{width}-{scheme}.png"), animations="disabled")
                 assert errors == []
                 await page.context.close()
