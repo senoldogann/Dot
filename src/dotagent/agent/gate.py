@@ -148,6 +148,8 @@ class RunGate:
         self._free: asyncio.Event = asyncio.Event()
         self._free.set()
         self._held_since: float | None = None
+        # How many of the run's tool calls wait for the user to give the run back now (item 479).
+        self.waiting: int = 0
 
     @property
     def instructions(self) -> tuple[str, ...]:
@@ -179,7 +181,11 @@ class RunGate:
         if not self.held:
             return 0.0
         waited_from: float = time.monotonic()
-        await self._free.wait()
+        self.waiting += 1
+        try:
+            await self._free.wait()
+        finally:
+            self.waiting -= 1
         return time.monotonic() - waited_from
 
     def add_instruction(self, text: str) -> None:

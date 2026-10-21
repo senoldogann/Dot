@@ -72,7 +72,7 @@ from dotagent.browser.profiles import (
     profile_dir,
     write_default_zoom,
 )
-from dotagent.browser.remote_input import InputEvent, InputResult, MouseButton, dispatch, let_go
+from dotagent.browser.remote_input import InputEvent, InputResult, MouseButton, ScreenHold, dispatch, let_go
 from dotagent.browser.render import describe_step
 from dotagent.browser.safety import UrlVerdict, check_browser_url, request_verdict
 from dotagent.browser.snapshot import (
@@ -149,8 +149,12 @@ _TAB_MARK_BYTES: int = 6
 _UNZOOMED: int = 100
 # A scroll with no distance moves by this share of the page area the model sees.
 _SCROLL_SHARE: float = 0.8
-# How long input from the screen waits for a step of the run that is under way when the owner took it over (item 470).
+# How long input from the screen waits for a step of the run that is under way when the owner took it over (item 470),
+# how long the page is given to measure itself and take a batch of it, and to let go of a button it left down (item
+# 479): a page that does not answer holds nothing up longer.
 _INPUT_WAIT_S: float = 2.0
+_INPUT_DO_S: float = 3.0
+_LET_GO_S: float = 1.0
 
 _LAUNCH_ARGS: list[str] = [
     "--disable-blink-features=AutomationControlled",
@@ -1761,14 +1765,14 @@ class BrowserSession:
         tab: Tab = thread.tabs[thread.active]
         return None if tab.page.is_closed() else tab
 
-    async def send_input(
-        self, thread_id: str, events: Sequence[InputEvent], still_held: Callable[[], bool]
-    ) -> InputResult:
+    async def send_input(self, thread_id: str, events: Sequence[InputEvent], hold: ScreenHold) -> InputResult:
         """Do the owner's ``events`` on the thread's current tab (item 470), which starts no Chrome. A step of the run
-        that was under way when the owner took it over is waited for, up to a moment, under the thread's lock; then
-        ``still_held`` must still say the owner holds the run, so that input sent before the owner handed it back
-        never lands after. A failure of the page is said with its address and the kinds of the events only: what the
-        owner types is in no error and no log."""
+        that was under way when the owner took it over is waited for, up to a moment, under the thread's lock; then the
+        ``hold`` must still go on (:meth:`ScreenHold.begin`), so that input sent before the owner handed the run back
+        never lands after. The page is given a moment to take the batch. The last batch of a hold that ended while it
+        was done lets go of what the input left pressed before the page is anyone else's (item 479). A failure of the
+        page is said with its address and the kinds of the events only: what the owner types is in no error and no
+        log."""
         if not self._config.remote_input:
             raise RunConflict(
                 "using the page from the screen is switched off: [browser] remote_input, in Settings › Browser",
@@ -1777,57 +1781,114 @@ class BrowserSession:
         thread: ThreadTabs | None = self._threads.get(thread_id)
         if thread is None or self._tab_of(thread_id) is None:
             raise RunConflict("the run has no page open", {"thread_id": thread_id})
+        if hold.over:
+            raise RunConflict("the run is not taken over", {"thread_id": thread_id})
+        hold.under_way += 1
+        locked: bool = False
+        try:
+            try:
+                async with asyncio.timeout(_INPUT_WAIT_S):
+                    await thread.lock.acquire()
+            except TimeoutError:
+                raise RunConflict(
+                    "a step of the run is still going; try again in a moment", {"thread_id": thread_id}
+                ) from None
+            locked = True
+            return await self._do_input(thread, thread_id, events, hold)
+        finally:
+            hold.under_way -= 1
+            left: frozenset[MouseButton] = hold.take_release()
+            if locked:
+                try:
+                    await self._let_go_now(thread_id, left)
+                finally:
+                    thread.lock.release()
+            elif left:
+                # This batch never had the page, and the hold ended meanwhile: the release waits its turn for it.
+                await self._let_go_logged(thread_id, left)
+
+    async def _do_input(
+        self, thread: ThreadTabs, thread_id: str, events: Sequence[InputEvent], hold: ScreenHold
+    ) -> InputResult:
+        """Do ``events`` on the thread's tab, under its lock, while ``hold`` goes on; the page is given
+        :data:`_INPUT_DO_S` to measure itself and take them."""
+        tab: Tab | None = self._tab_of(thread_id)
+        if tab is None:
+            raise RunConflict("the run has no page open", {"thread_id": thread_id})
+        if not hold.begin(events):
+            raise RunConflict("the run is not taken over", {"thread_id": thread_id})
+        try:
+            async with asyncio.timeout(_INPUT_DO_S):
+                viewport: Viewport = await self._viewport(tab)
+                await dispatch(tab.page, viewport, events)
+        except Exception as error:  # noqa: BLE001 - raised again below without its words
+            # Whatever failed, its words may hold what the owner typed: only its kind is kept, and it is not chained,
+            # so that no traceback carries it either. A page that did not answer in time is a TimeoutError.
+            raise BrowserError(
+                "the page did not take the input",
+                {"url": tab.page.url, "events": [event.kind for event in events], "error_type": type(error).__name__},
+            ) from None
+        thread.last_used = time.monotonic()
+        return InputResult(accepted=len(events), url=tab.page.url, width=viewport.width, height=viewport.height)
+
+    async def _let_go_now(self, thread_id: str, buttons: frozenset[MouseButton]) -> None:
+        """Let go of ``buttons`` on the thread's tab, its lock held by the caller, giving the page :data:`_LET_GO_S`; a
+        page that does not take it is logged, since the hold it belonged to is over and nobody waits on it."""
+        tab: Tab | None = self._tab_of(thread_id)
+        if tab is None or not buttons:
+            return
+        try:
+            async with asyncio.timeout(_LET_GO_S):
+                await let_go(tab.page, buttons)
+        except (PlaywrightError, TimeoutError) as error:
+            _log.warning(
+                "screen_input_release_failed",
+                thread_id=thread_id,
+                url=tab.page.url,
+                buttons=", ".join(sorted(buttons)),
+                error_type=type(error).__name__,
+            )
+
+    async def _let_go_logged(self, thread_id: str, buttons: frozenset[MouseButton]) -> None:
+        try:
+            await self.let_go_of_buttons(thread_id, buttons)
+        except BrowserError as error:
+            _log.warning("screen_input_release_failed", thread_id=thread_id, error=error.message)
+
+    async def let_go_of_buttons(self, thread_id: str, buttons: frozenset[MouseButton]) -> None:
+        """Let go of the buttons the owner's input left down (items 470 and 479), once its hold is over and none of
+        its batches is under way: the thread's lock is waited for a moment, then the page is given
+        :data:`_LET_GO_S`. A thread with no page has nothing to let go of; a page that is busy past the moment, or does
+        not take the release, is a :class:`BrowserError`."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        if thread is None or self._tab_of(thread_id) is None or not buttons:
+            return
         try:
             async with asyncio.timeout(_INPUT_WAIT_S):
                 await thread.lock.acquire()
         except TimeoutError:
-            raise RunConflict(
-                "a step of the run is still going; try again in a moment", {"thread_id": thread_id}
+            raise BrowserError(
+                "the page was busy, so a button left down was not let go of",
+                {"thread_id": thread_id, "buttons": ", ".join(sorted(buttons))},
             ) from None
         try:
-            if not still_held():
-                raise RunConflict("the run is not taken over", {"thread_id": thread_id})
             tab: Tab | None = self._tab_of(thread_id)
             if tab is None:
-                raise RunConflict("the run has no page open", {"thread_id": thread_id})
-            viewport: Viewport = await self._viewport(tab)
+                return
             try:
-                await dispatch(tab.page, viewport, events)
-            except Exception as error:  # noqa: BLE001 - raised again below without its words
-                # Whatever failed, its words may hold what the owner typed: only its kind is kept, and it is not
-                # chained, so that no traceback carries it either.
-                raise BrowserError(
-                    "the page did not take the input",
-                    {
-                        "url": tab.page.url,
-                        "events": [event.kind for event in events],
-                        "error_type": type(error).__name__,
-                    },
-                ) from None
-            thread.last_used = time.monotonic()
-            return InputResult(accepted=len(events), url=tab.page.url, width=viewport.width, height=viewport.height)
-        finally:
-            thread.lock.release()
-
-    async def let_go_of_buttons(self, thread_id: str, buttons: frozenset[MouseButton]) -> None:
-        """Let go of the buttons the owner's input left down (item 470), once the run is handed back; a thread with no
-        page has nothing to let go of."""
-        tab: Tab | None = self._tab_of(thread_id)
-        if tab is None or not buttons:
-            return
-        thread: ThreadTabs = self._threads[thread_id]
-        async with thread.lock:
-            try:
-                await let_go(tab.page, buttons)
-            except PlaywrightError as error:
+                async with asyncio.timeout(_LET_GO_S):
+                    await let_go(tab.page, buttons)
+            except (PlaywrightError, TimeoutError) as error:
                 raise BrowserError(
                     "the page did not take the release of a button",
                     {
                         "url": tab.page.url,
                         "buttons": ", ".join(sorted(buttons)),
-                        "error": truncate_middle(str(error), 300),
+                        "error": truncate_middle(str(error), 300) or type(error).__name__,
                     },
                 ) from error
+        finally:
+            thread.lock.release()
 
     async def focus(self, thread_id: str) -> str | None:
         """Bring the thread's current tab to the front of its window, for the user to take over; returns its address,
