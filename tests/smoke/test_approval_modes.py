@@ -21,6 +21,7 @@ from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied
 from dotagent.events import EventBus
 from dotagent.policy.paths import CHANGES_DOT
 from dotagent.policy.types import ActionInfo, Amount, ApprovalMode, Preset
+from dotagent.server import UI_SOURCE
 from dotagent.store.db import Store
 from dotagent.store.models import ApprovalRecord, EventRecord, RunMode, RunRecord, ThreadRecord
 
@@ -271,6 +272,104 @@ async def test_in_yolo_money_is_the_runs_even_in_a_step_that_reads_a_secret(room
     waived: list[ApprovalRecord] = [record for record in await _decided(room) if record.decided_by == YOLO_DECIDER]
     assert [record.summary for record in waived] == [paying.summary]
     assert "handed to the user" in waived[0].note
+
+
+# ------------------------------------------------------------------------------------------------------------ a no
+
+
+async def test_a_no_is_not_asked_again_in_the_run_until_the_owner_writes(room: Room) -> None:
+    """Item 456: the owner's no to an action is kept; the same action is refused at once, with no card and no wait,
+    until the owner writes again; the policy's event is the refusal's record, as it is of the first (item 474); another
+    action asks as before."""
+    gate: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
+    first: Question = await _ask(room, gate, COMMAND)
+    await room.broker.resolve(first.record.id, False, UI_SOURCE, "not that")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(first.answer, WAIT_S)
+    asked: int = len(await room.store.list_approvals(None, 50))
+    requested: int = (await _kinds(room)).count("approval_requested")
+    weighed: int = (await _kinds(room)).count("policy")
+    with pytest.raises(ApprovalRejected) as again:
+        await asyncio.wait_for(gate.authorize(COMMAND), 1.0)
+    assert "“not that”" in again.value.message and "until the user writes again" in again.value.message
+    assert len(await room.store.list_approvals(None, 50)) == asked
+    assert (await _kinds(room)).count("approval_requested") == requested
+    assert (await _kinds(room)).count("policy") == weighed + 1
+    assert (await room.store.get_run(room.run.id)).status != "blocked"
+    other: Question = await _ask(room, gate, COMMAND.model_copy(update={"summary": "npm ci", "target": "npm ci"}))
+    await room.broker.resolve(other.record.id, True, UI_SOURCE, "")
+    assert await asyncio.wait_for(other.answer, WAIT_S) == ""
+    # The owner writes: the same action is theirs to answer again.
+    gate.add_instruction("use the lock file this time")
+    reopened: Question = await _ask(room, gate, COMMAND)
+    await room.broker.resolve(reopened.record.id, True, UI_SOURCE, "go")
+    assert await asyncio.wait_for(reopened.answer, WAIT_S) == "go"
+
+
+async def test_only_the_owners_no_is_kept(room: Room) -> None:
+    """A question nobody answered in time is no answer, and the no of the eval harness or of the review model is not
+    the owner's: each is put again."""
+    quick: RunGate = RunGate(
+        room.store,
+        room.bus,
+        ApprovalBroker(room.store, room.bus, 0.2),
+        room.run.id,
+        "task",
+        "cautious",
+        NO_PACE,
+        {},
+        "ask",
+        _nobody,
+        (INSTRUCTION,),
+        SiteLocks(),
+    )
+    for _ in range(2):
+        with pytest.raises(ApprovalRejected):
+            await asyncio.wait_for(quick.authorize(COMMAND), WAIT_S)
+    assert (await _kinds(room)).count("approval_requested") == 2
+    harness: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
+    for _ in range(2):
+        refused: Question = await _ask(room, harness, COMMAND)
+        await room.broker.resolve(refused.record.id, False, "eval", "nobody is there")
+        with pytest.raises(ApprovalRejected):
+            await asyncio.wait_for(refused.answer, WAIT_S)
+    reviewed: list[ReviewRequest] = []
+    refusing: RunGate = _gate(room, "task", "cautious", "auto", _answering("deny", reviewed))
+    for _ in range(2):
+        with pytest.raises(ApprovalRejected):
+            await asyncio.wait_for(refusing.authorize(COMMAND), WAIT_S)
+    assert len(reviewed) == 2
+
+
+async def test_in_auto_the_review_model_is_not_asked_about_what_the_owner_refused(room: Room) -> None:
+    asked: list[ReviewRequest] = []
+    answers: list[Literal["approve", "deny", "escalate"]] = ["escalate", "approve"]
+
+    async def passing_then_allowing(request: ReviewRequest) -> ReviewVerdict:
+        asked.append(request)
+        return ReviewVerdict(decision=answers[len(asked) - 1], reason="the review model's answer")
+
+    gate: RunGate = _gate(room, "task", "cautious", "auto", passing_then_allowing)
+    first: Question = await _ask(room, gate, COMMAND)
+    await room.broker.resolve(first.record.id, False, UI_SOURCE, "not that")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(first.answer, WAIT_S)
+    with pytest.raises(ApprovalRejected, match="declined this exact action"):
+        await asyncio.wait_for(gate.authorize(COMMAND), 1.0)
+    assert len(asked) == 1
+
+
+async def test_a_no_given_in_another_mode_does_not_carry_into_yolo(room: Room) -> None:
+    """Yolo asks nothing (item 443), and a no given to a run that asked stays with that run's gate."""
+    asking: RunGate = _gate(room, "task", "cautious", "ask", _nobody)
+    first: Question = await _ask(room, asking, COMMAND)
+    await room.broker.resolve(first.record.id, False, UI_SOURCE, "not that")
+    with pytest.raises(ApprovalRejected):
+        await asyncio.wait_for(first.answer, WAIT_S)
+    yolo: RunGate = _gate(room, "task", "cautious", "yolo", _nobody)
+    assert await asyncio.wait_for(yolo.authorize(COMMAND), WAIT_S) == ""
+    waived: list[ApprovalRecord] = [record for record in await _decided(room) if record.decided_by == YOLO_DECIDER]
+    assert [record.summary for record in waived] == [COMMAND.summary]
 
 
 async def test_no_rule_of_the_user_lets_a_message_go_without_their_yes(room: Room) -> None:
