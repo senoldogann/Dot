@@ -44,6 +44,7 @@ from dotagent.browser.devtools import devtools_switches, port_is_taken, port_tak
 from dotagent.browser.driver import (
     bring_to_front,
     capture_lines,
+    fill_login_field,
     go_back,
     install_consent_handler,
     keep_focused,
@@ -104,6 +105,7 @@ from dotagent.browser.types import (
     TabSummary,
     TextView,
     TextWait,
+    VaultFill,
     Viewport,
 )
 from dotagent.browser.upstream import ignore_repeated_frame_detach
@@ -2180,6 +2182,38 @@ class BrowserSession:
             await self._enforce_landing(tab)
             return TextWait(appeared=appeared, waited_s=waited_s, view=view)
 
+    async def fill_from_vault(
+        self, thread_id: str, fills: Sequence[VaultFill], fills_on: Callable[[str], bool]
+    ) -> PageView:
+        """Fill a login of the owner's password manager into the thread's current tab (item 493), each part into its
+        field, once the page is one of the login's sites (``fills_on`` of its address) and each field one its part may
+        go into, in a document of those sites (:func:`fill_login_field`). The values are the thread's to mask from the
+        first one on, so that a fill that fails half way leaves masked what went in, and the tab runs no script until
+        it loads another document. What changed on the page is shown with its secret fields hidden, in every mode."""
+        async with self._locked(thread_id) as thread:
+            tab: Tab = await self._current_tab(thread)
+            if not fills_on(tab.page.url):
+                raise BrowserError(
+                    "this page is not one of the login's sites: Dot fills a login only on its own site",
+                    {"url": tab.page.url},
+                )
+            for fill in fills:
+                value: str = fill.value.get_secret_value()
+                thread.vault_values.add(value)
+                tab.vault_held = True
+                await fill_login_field(
+                    tab.page, fill.ref, fill.kind, value, fills_on, _ms(self._config.action_timeout_s)
+                )
+            await self._settle(tab)
+            await self._enforce_landing(tab)
+            return await self._changes_view(thread, tab, True)
+
+    def vault_values(self, thread_id: str) -> frozenset[str]:
+        """The values filled into the thread's pages from the password manager (item 493), which no result of the
+        browser tools shows."""
+        thread: ThreadTabs | None = self._threads.get(thread_id)
+        return frozenset() if thread is None else frozenset(thread.vault_values)
+
     async def run_script(self, thread_id: str, script: str, timeout_s: float) -> ScriptRun:
         """Run ``script`` in the page of the thread's current tab and wait at most ``timeout_s`` for its value (item
         263). What the script led to is waited for as after a step (a tab it opened, a dialog), and the page is settled
@@ -2188,6 +2222,14 @@ class BrowserSession:
         they forbid is reset to a blank page and the call fails. After a script still running when the wait ended, only
         a navigation under way is let commit: the page cannot tell its DOM is quiet while the script holds it."""
         async with self._locked(thread_id) as thread:
+            # A script can read a field a login was filled into, and send it anywhere; a tab of the same thread can
+            # reach that page as its opener does (item 493).
+            if any(one.vault_held for one in thread.tabs):
+                raise BrowserError(
+                    "a login from the password manager was filled into a page of this chat: scripts stay off in its "
+                    "tabs until that page loads another one",
+                    {"tabs": [one.page.url for one in thread.tabs if one.vault_held]},
+                )
             tab: Tab = await self._current_tab(thread)
             before: _Watch = self._watch(thread, tab)
             started: float = time.monotonic()

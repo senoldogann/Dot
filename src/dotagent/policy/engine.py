@@ -42,6 +42,12 @@ _HARD_HANDOFF_FLAGS: frozenset[Flag] = frozenset({"financial", "credential"})
 # What waits for the user's yes in every mode that asks, whatever their rules say (item 429): a message sent for them,
 # a post in their name. A yolo run asks nothing and waives it (item 443).
 _GUARD_FLAGS: frozenset[Flag] = frozenset({"message_send", "public_post"})
+# A login filled from the owner's password manager (item 493) waits for the owner's own yes in every mode that asks,
+# whatever their rules say, as a message does; and, as money and credentials, it is never a review model's to answer.
+_VAULT_FLAGS: frozenset[Flag] = frozenset({"vault_fill"})
+_VAULT_REASON: str = "Dot asks before it fills a login from your password manager, whatever your rules say"
+# The sources of a question that only the owner answers, whatever the approval mode.
+_OWNERS_SOURCES: frozenset[str] = frozenset({"own_files", "vault"})
 _AGGRESSIVE_ASK_FLAGS: frozenset[Flag] = frozenset({"privilege", "system_settings", "public_post", "external_send"})
 _BALANCED_ASK_FLAGS: frozenset[Flag] = frozenset(
     {"destructive", "external_send", "public_post", "privilege", "system_settings", "install"}
@@ -135,6 +141,15 @@ def guard(info: ActionInfo) -> Decision | None:
         reason="Dot asks before a message or a post in your name, whatever your rules say",
         rule_id=None,
     )
+
+
+def vault_guard(info: ActionInfo) -> Decision | None:
+    """A login filled from the owner's password manager waits for their yes in every mode that asks, and no rule of
+    theirs lets it through (item 493): only a rule that hands it off is stricter. A yolo run asks nothing and waives
+    it (item 443); in ``auto`` the owner answers it, not the review model (:func:`route_for`)."""
+    if not _intersect(info, _VAULT_FLAGS):
+        return None
+    return Decision(verdict="ask", source="vault", reason=_VAULT_REASON, rule_id=None)
 
 
 def haystack_of(info: ActionInfo) -> str:
@@ -258,7 +273,7 @@ def decide_past_review(
     if stopped is not None:
         return stopped
     rule: RuleRecord | None = match_rule(info, rules)
-    guarded: Decision | None = guard(info)
+    guarded: Decision | None = guard(info) or vault_guard(info)
     if guarded is not None:
         return _handed_off(rule) if rule is not None and rule.behavior == "handoff" else guarded
     if allowance is not None:
@@ -310,13 +325,13 @@ def supervised(decision: Decision, info: ActionInfo) -> Decision:
 def route_for(decision: Decision, mode: ApprovalMode) -> Route:
     """Who answers a question the engine raised. A hand-off is the user's: money and credentials never go to a
     reviewer, and neither does a change of Dot's own files (item 398). A plain question follows the mode: its
-    reviewer in ``auto``, and the user otherwise. A yolo run asks nothing (item 443), so no question of its comes
-    here."""
+    reviewer in ``auto``, and the user otherwise; a login filled from the password manager is the user's in every mode
+    (item 493). A yolo run asks nothing (item 443), so no question of its comes here."""
     if mode == "yolo":
         # What the engine answers for a yolo question, and what its tests read; the gate never asks it one, because it
         # waives every question before this (:meth:`dotagent.agent.gate.RunGate._authorize_decision`, item 443).
         return "waived"
-    if decision.verdict == "handoff" or decision.source == "own_files":
+    if decision.verdict == "handoff" or decision.source in _OWNERS_SOURCES:
         return "user"
     return "reviewer" if mode == "auto" else "user"
 

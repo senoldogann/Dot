@@ -204,6 +204,26 @@ a note that it was saved while reading outside content.
   gives its page (its approvals, rules and settings decide what a run may do; a page of another site that takes such a
   title is refused as well). Desktop screenshots black out the password managers' windows; their secure fields are not
   masked.
+- A login of your 1Password is filled by Dot, never by the run's model (item 493). Once you connect 1Password
+  (Customize › Plugins › 1Password: a vault "Shared with Dot" and a service account that only reads it, or a service
+  account token of yours), a run sees the logins' titles and websites (`browser_logins`) and names one with the refs
+  of its fields (`browser_fill_login`); the daemon reads the values with `op`, 1Password's command line, and types them
+  itself:
+  - The values are in no argument, no result, no event and no message of the model.
+  - Every result of the browser tools of the chat masks them from then on, an error's words and a script's value
+    among them.
+  - No script runs in the chat's tabs while the page they were filled into is loaded: a script could read the field
+    and send it anywhere.
+  - A login is filled only on a page of one of its own websites, or a host under one, over https (plain http on this
+    Mac alone). Each field must be in a document of those sites, so a frame of another site gets nothing. A password
+    goes only into a password field, where it shows in no text.
+  - Each fill asks you first in every mode but `yolo`, whatever your rules say (only a rule that hands it off is
+    stricter), and in `auto` you answer it, not the review model.
+  - The token is kept in Dot's `.env`, which no tool of a run may read, under a name `op` does not read. The shell
+    refuses `op` as a reading of a secret store.
+
+  As every refusal of the review, that one is waived in `yolo`, which may read any file: the fill itself still shows
+  the model no value.
 - What a run reads of a web page never carries the value of a password, one-time-code or card field, outside `yolo`
   (item 467): the page's lines show `[hidden]` in its place, in the view of the page, in a search of it and in what
   changed after a step, and a screenshot covers the field in every frame, a payment provider's too. The fields are the

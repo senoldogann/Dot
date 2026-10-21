@@ -51,6 +51,9 @@ class Tab:
     target_id: str = ""
     born: set[str] = field(default_factory=set)
     born_changed: asyncio.Event = field(default_factory=asyncio.Event)
+    # A login of the password manager was filled into the page now loaded (item 493): no script runs in the tabs of its
+    # thread until the page loads another document, which reads the fields' values no more.
+    vault_held: bool = False
 
 
 @dataclass(slots=True)
@@ -61,6 +64,9 @@ class ThreadTabs:
     active: int = 0
     last_used: float = 0.0
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+    # The values filled into its pages from the password manager (item 493), which the browser tools' results of the
+    # thread never show, whatever page they read later.
+    vault_values: set[str] = field(default_factory=set)
 
     def remove(self, tab: Tab) -> None:
         """Forget ``tab``; the active index keeps pointing at the same tab, or at its neighbour when it was active."""
@@ -164,6 +170,11 @@ def _on_request_end(tab: Tab, request: Request) -> None:
             tab.nav_idle.set()
 
 
+def _on_document(tab: Tab) -> None:
+    """A document of its own is loaded in the tab: a login filled into the one before is not in it (item 493)."""
+    tab.vault_held = False
+
+
 def _on_response(tab: Tab, response: Response) -> None:
     if _is_main_navigation(tab, response.request):
         tab.status = response.status
@@ -235,3 +246,4 @@ def attach_handlers(tab: Tab, downloads: Path) -> None:
     page.on("requestfinished", partial(_on_request_end, tab))
     page.on("requestfailed", partial(_on_request_end, tab))
     page.on("response", partial(_on_response, tab))
+    page.on("domcontentloaded", lambda _page: _on_document(tab))

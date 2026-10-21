@@ -58,6 +58,7 @@ from dotagent.server.routes_system import health_router, proof_router, system_ro
 from dotagent.server.routes_teach import teach_router
 from dotagent.server.routes_themes import themes_router
 from dotagent.server.routes_threads import threads_router
+from dotagent.server.routes_vault import vault_router
 from dotagent.server.views import ErrorView
 
 log = get_logger(__name__)
@@ -133,6 +134,7 @@ def create_app(ctx: ServerContext) -> FastAPI:
     app.include_router(snapshots_router(ctx))
     app.include_router(assistant_router(ctx))
     app.include_router(accounts_router(ctx))
+    app.include_router(vault_router(ctx))
 
     @app.exception_handler(DotError)
     async def dot_error(request: Request, exc: DotError) -> JSONResponse:

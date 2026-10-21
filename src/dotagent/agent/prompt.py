@@ -16,6 +16,7 @@ from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
+from dotagent.tools.browser import FILL_LOGIN_TOOL
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import ACCOUNTS_GROUP, group_lines, tools_in
@@ -621,6 +622,19 @@ def _mcp_section(tool_names: Sequence[str]) -> str:
     return _MCP_SECTION if any(name.startswith(_MCP_TOOL_PREFIX) for name in tool_names) else ""
 
 
+# The owner's 1Password (item 493): the run names a login and its fields, and Dot types it, unseen.
+_VAULT_SECTION: str = """# Logins
+- The user's 1Password holds logins Dot may fill into pages: browser_logins lists them by id, title and website, and \
+browser_fill_login fills one into the current page, given the refs of its username, password and one-time code fields. \
+Dot types the values; you never see them, and no answer of yours needs them. Use it whenever a page asks you to sign \
+in to a site a login is for, instead of asking the user for a password; it fills a login only on its own site."""
+
+
+def _vault_section(tool_names: Sequence[str]) -> str:
+    """Only for a run that may fill a login: 1Password is connected, and the run has the tool."""
+    return _VAULT_SECTION if FILL_LOGIN_TOOL in tool_names else ""
+
+
 def _accounts_section(tool_names: Sequence[str]) -> str:
     """Only for a run with one of the tools of the accounts: an agent's tools may hold some of them only."""
     return _ACCOUNTS_SECTION if tools_in(tool_names, ACCOUNTS_GROUP) else ""
@@ -782,6 +796,7 @@ def build_system_prompt(inputs: PromptInputs) -> str:
         _tool_guidance_section(inputs.tool_guidance),
         _mcp_section(inputs.tool_names),
         _accounts_section(inputs.tool_names),
+        _vault_section(inputs.tool_names),
         _groups_section(inputs.tool_names),
         _skills_section(inputs.skills, inputs.skills_left, inputs.tool_names),
         _pages_section(inputs.tool_names),

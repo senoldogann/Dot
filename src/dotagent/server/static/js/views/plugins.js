@@ -18,6 +18,7 @@ import { attempt } from "../ui.js";
 /** The sections of the services, in the order the page and the Connect apps dialog show them (item 492). */
 export const SECTIONS = [
   { id: "popular", title: "Popular" },
+  { id: "passwords", title: "Password managers" },
   { id: "code", title: "Code" },
   { id: "design", title: "Design" },
   { id: "data", title: "Data" },
@@ -116,6 +117,38 @@ function serverActions(catalogue, server, service) {
   return actions.length === 0 ? null : el("div", { class: "plugin-actions" }, ...actions);
 }
 
+/** What to do or to know for 1Password (item 493), by where it stands: one line. */
+function vaultGuide(vault) {
+  if (!vault.connected) {
+    return vault.cli === null
+      ? "1Password's command line, op, is not installed: brew install 1password-cli, then check again."
+      : "Connect makes the vault Shared with Dot and a service account that only reads it, through the 1Password app, which asks you first: turn on its Settings › Developer › Integrate with 1Password CLI.";
+  }
+  if (vault.error !== null) {
+    return vault.error;
+  }
+  const names = vault.vaults.map((one) => one.name).join(", ");
+  const logins = vault.vaults.reduce((sum, one) => sum + one.logins, 0);
+  return `Reads ${plural(logins, "login", "logins")} in ${names}: the logins you move there are the ones runs may fill.`;
+}
+
+/** The buttons of 1Password's way (item 493): Connect 1Password and a token instead while it is not connected, with
+ * the token's form once asked for; Disconnect once it is. */
+function vaultActions(catalogue, vault) {
+  const acting = catalogue.busy("vault");
+  if (vault.connected) {
+    return el("div", { class: "plugin-actions" }, el("button", { class: "btn sm", type: "button", disabled: acting, onclick: () => attempt(() => catalogue.disconnectVault()) }, "Disconnect"));
+  }
+  const connect = el(
+    "button",
+    { class: "btn sm primary", type: "button", disabled: acting || vault.cli === null, onclick: () => attempt(() => catalogue.connectVault()) },
+    acting ? "Waiting for 1Password…" : "Connect 1Password",
+  );
+  // A token is read with op too: without it neither way connects.
+  const token = el("button", { class: "btn sm ghost", type: "button", disabled: acting || vault.cli === null, onclick: () => catalogue.askVault() }, "Use a service account token instead");
+  return el("div", { class: "plugin-actions" }, connect, token, catalogue.asking() === "vault" ? catalogue.vaultForm() : null);
+}
+
 /** One way of a service on its page: what it is, how it connects, where it stands, what to do and its step. */
 function wayRow(catalogue, way) {
   const now = catalogue.wayNow(way);
@@ -138,6 +171,12 @@ function wayRow(catalogue, way) {
       badge = el("span", { class: `badge ${MCP_STATE_TONES[now.server.state] ?? "b-muted"}` }, MCP_STATE_WORDS[now.server.state] ?? now.server.state);
       guideLine = serverGuide(now.server);
       actions = serverActions(catalogue, now.server, now.service);
+    }
+  } else if (way.kind === "vault") {
+    if (now.vault !== null) {
+      badge = catalogue.vaultBadge();
+      guideLine = vaultGuide(now.vault);
+      actions = vaultActions(catalogue, now.vault);
     }
   } else if (way.kind !== "untried" && now.app !== null) {
     const app = now.app;
@@ -214,7 +253,10 @@ export function mount(root, ctx) {
     const asked = catalogue.asking();
     const askedService = asked === null ? null : (catalogue.servers.services.find((one) => one.id === asked && plugin.ways.some((way) => way.kind === "mcp" && way.ref === one.id)) ?? null);
     let action = null;
-    if (step !== null && step.link !== undefined) {
+    if (step !== null && step.page) {
+      // A service whose step is its page (1Password, item 493): the "+" leads there.
+      action = el("a", { class: "btn sm icon-only plugin-add", href: `#/customize/plugins/${plugin.id}`, title: `${step.label}: ${plugin.name}`, "aria-label": `${step.label} ${plugin.name}` }, icon("plus"));
+    } else if (step !== null && step.link !== undefined) {
       action = el(
         "a",
         { class: "btn sm primary plugin-add", href: step.link, target: "_blank", rel: "noopener noreferrer", "aria-label": `Open the sign-in page of ${plugin.name}` },

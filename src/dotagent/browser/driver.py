@@ -22,7 +22,16 @@ from dotagent.browser.snapshot import (
     parse_snapshot,
     render_options,
 )
-from dotagent.browser.types import Dropdown, ScriptEnd, SecretField, SecretFieldCheck, SecretKind, Step, Viewport
+from dotagent.browser.types import (
+    Dropdown,
+    ScriptEnd,
+    SecretField,
+    SecretFieldCheck,
+    SecretKind,
+    Step,
+    VaultFieldKind,
+    Viewport,
+)
 from dotagent.core.errors import BrowserError
 from dotagent.core.logs import get_logger
 from dotagent.core.text import truncate_middle
@@ -149,6 +158,16 @@ _FIELD_MARKING_SCRIPT: str = """(element) => {
   const marking = field.getAttribute('autocomplete') || '';
   return field instanceof HTMLInputElement && field.type === 'password' ? `password ${marking}` : marking;
 }"""
+# What a field to fill from the password manager is (item 493): its marking, as the check of secret fields reads it,
+# and the address of the document that holds it, a frame's for a field in a frame. ``location`` is the page's own and
+# no script of it can make it say another site.
+_FIELD_PLACE_SCRIPT: str = (
+    "(element) => ({ marking: (" + _FIELD_MARKING_SCRIPT + ")(element), href: element.ownerDocument.location.href })"
+)
+# The secrets each part of a login may go into (item 493): a password into a password field alone, so that it shows in
+# no text; a one-time code into a field marked for one or a plain one; a username into anything but a password field.
+_PASSWORD_KINDS: frozenset[SecretKind] = frozenset({"password", "current-password", "new-password"})
+
 # Whether the element has the keyboard focus and takes typed text: a text input or a textarea, not disabled or
 # read-only.
 _TAKES_TEXT_SCRIPT: str = """(element) => element.getRootNode().activeElement === element
@@ -574,6 +593,50 @@ async def _into_editor(
             {"ref": ref, "url": page.url},
         )
     return True
+
+
+def _takes(kind: VaultFieldKind, field: SecretKind | None) -> bool:
+    """Whether a field marked ``field`` may take the part ``kind`` of a login."""
+    if kind == "password":
+        return field in _PASSWORD_KINDS
+    if kind == "otp":
+        return field is None or field == "one-time-code"
+    return field not in _PASSWORD_KINDS
+
+
+async def fill_login_field(
+    page: Page, ref: str, kind: VaultFieldKind, value: str, fills_on: Callable[[str], bool], timeout_ms: int
+) -> None:
+    """Fill the field ``ref`` with ``value``, the part ``kind`` of a login of the password manager (item 493), once the
+    field is one that part may go into and the document that holds it is one of the login's sites (``fills_on`` of its
+    address): a password into a password field alone, nothing into a frame of another site. Neither the value nor
+    Playwright's log of the call is in what it raises."""
+    locator: Locator = await live_locator(page, ref, "fill")
+    try:
+        place: object = await locator.evaluate(_FIELD_PLACE_SCRIPT)
+    except PlaywrightError as error:
+        raise BrowserError(
+            "the field could not be read before the login was filled", {"ref": ref, "url": page.url}
+        ) from error
+    if not isinstance(place, dict) or not isinstance(place.get("href"), str):
+        raise BrowserError("the field could not be read before the login was filled", {"ref": ref, "url": page.url})
+    if not fills_on(place["href"]):
+        raise BrowserError(
+            "the field is in a frame of another site: Dot fills a login only on its own site",
+            {"ref": ref, "url": page.url, "frame": truncate_middle(place["href"], _ERROR_CHARS)},
+        )
+    field: SecretKind | None = secret_kind(place.get("marking"))
+    if not _takes(kind, field):
+        raise BrowserError(
+            f"the field {ref} does not take the login's {kind}: a password goes only into a password field, so that it "
+            "shows in no text",
+            {"ref": ref, "url": page.url, "part": kind, "field": field},
+        )
+    try:
+        await locator.fill(value, timeout=timeout_ms)
+    except PlaywrightError:
+        # Playwright's log of the call is left out, here and in the chain of the error: it may name what was typed.
+        raise BrowserError("the field did not take the login", {"ref": ref, "url": page.url, "part": kind}) from None
 
 
 async def run_step(page: Page, step: Step, timeout_ms: int, secret_field: SecretFieldCheck) -> None:

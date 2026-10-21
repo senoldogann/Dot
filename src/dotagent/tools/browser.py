@@ -9,9 +9,10 @@ steps is classified once, from the elements it targets in the latest snapshot.
 import asyncio
 import base64
 import secrets
-from typing import Literal
+from dataclasses import replace
+from typing import Literal, Self
 
-from pydantic import Field
+from pydantic import Field, SecretStr, model_validator
 
 from dotagent.agent.judge import ClickFacts, ClickJudgment, PageCheck, PageFacts, render_page_check
 from dotagent.browser.render import (
@@ -47,18 +48,23 @@ from dotagent.browser.types import (
     Step,
     TextView,
     TextWait,
+    VaultFieldKind,
+    VaultFill,
 )
 from dotagent.config import AppConfig, BrowserConfig
-from dotagent.core.errors import ToolInputError
+from dotagent.core.errors import DotError, ToolInputError
+from dotagent.core.types import JsonObject
 from dotagent.llm.types import ImageData
 from dotagent.policy.elements import Element, StepAssessment, assessment_for, combine_assessments
 from dotagent.policy.pace import pace_class, paced_in_batch
 from dotagent.policy.paths import PathClass, classify_path, expand_path
 from dotagent.policy.spend import amount_in_label, render_amount, total_on_page
 from dotagent.policy.types import ActionInfo, ActionKind, Amount, Flag, PaceClass, Risk
+from dotagent.secrets import resolve_secret
 from dotagent.tools.base import (
     ACTING_MODES,
     ALL_MODES,
+    PreparedCall,
     RegisteredTool,
     ToolArgs,
     ToolResult,
@@ -73,6 +79,9 @@ from dotagent.tools.base import (
 )
 from dotagent.tools.batch import batch_cut_note, first_steps
 from dotagent.tools.context import ToolContext
+from dotagent.vault.hosts import fills_on, website_hosts
+from dotagent.vault.masking import masked
+from dotagent.vault.onepassword import TOKEN_NAME, Login, LoginSecret
 
 _NONCE_BYTES: int = 8
 _HEADROOM_CHARS: int = 3500  # room next to the page body for steps, tabs, notes and the fence lines
@@ -744,7 +753,186 @@ def _upload_tool() -> RegisteredTool:
     )
 
 
+# The tools of the owner's 1Password (item 493), offered to a run only while it is connected.
+FILL_LOGIN_TOOL: str = "browser_fill_login"
+VAULT_TOOLS: frozenset[str] = frozenset({"browser_logins", FILL_LOGIN_TOOL})
+# What a run is told when 1Password is not connected (item 493).
+_NOT_CONNECTED: str = (
+    "1Password is not connected: the owner connects it on Customize › Plugins › 1Password, and until then the logins "
+    "are theirs to type"
+)
+
+
+async def _vault_token(ctx: ToolContext) -> str:
+    """The service account's token, from Dot's .env, which no tool of a run reads; refused while 1Password is not
+    connected."""
+    token: str | None = await asyncio.to_thread(resolve_secret, TOKEN_NAME)
+    if token is None:
+        raise ToolInputError(_NOT_CONNECTED, {})
+    return token
+
+
+async def _login(ctx: ToolContext, token: str, wanted: str) -> Login:
+    """The login ``wanted`` names, by its id or its title (any case); refused for one the vault does not hold."""
+    logins: tuple[Login, ...] = await ctx.runtime.vault.logins(token)
+    found: Login | None = next(
+        (login for login in logins if login.id == wanted or login.title.lower() == wanted.lower()), None
+    )
+    if found is None:
+        raise ToolInputError(
+            f"1Password holds no login {wanted!r} that Dot may fill: browser_logins lists them",
+            {"login": wanted, "logins": len(logins)},
+        )
+    return found
+
+
+class LoginsArgs(ToolArgs):
+    site: str | None = Field(
+        default=None, description="Part of a site's address, to list its logins alone (for example github.com)."
+    )
+
+
+def _logins_tool() -> RegisteredTool:
+    def classify(args: LoginsArgs, ctx: ToolContext) -> ActionInfo:
+        return _observe_action("browser_logins", "List the logins Dot may fill from 1Password", ctx)
+
+    async def run(args: LoginsArgs, ctx: ToolContext) -> ToolResult:
+        token: str = await _vault_token(ctx)
+        wanted: str = (args.site or "").lower()
+        logins: list[Login] = [
+            login
+            for login in await ctx.runtime.vault.logins(token)
+            if not wanted or any(wanted in host for host in website_hosts(login.websites))
+        ]
+        if not logins:
+            return ok("No login of 1Password that Dot may fill" + (f" is for {args.site}." if args.site else "."))
+        lines: list[str] = [
+            f"- {login.id}: {login.title} ({', '.join(website_hosts(login.websites)) or 'no website'})"
+            for login in logins
+        ]
+        return ok("The logins Dot may fill from 1Password, by id:\n" + "\n".join(lines))
+
+    return make_tool(
+        name="browser_logins",
+        description=(
+            "List the logins of the owner's 1Password that Dot may fill into a page with browser_fill_login: each "
+            "one's id, title and websites, never a username or a password."
+        ),
+        args_model=LoginsArgs,
+        modes=ACTING_MODES,
+        parallel_safe=True,
+        timeout_s=_QUICK_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
+class FillLoginArgs(ToolArgs):
+    login: str = Field(min_length=1, description="The login's id, or its title, as browser_logins lists it.")
+    username: str | None = Field(default=None, description="The ref of the field the username goes into.")
+    password: str | None = Field(default=None, description="The ref of the password field.")
+    otp: str | None = Field(default=None, description="The ref of the field the one-time code goes into.")
+
+    @model_validator(mode="after")
+    def _something(self) -> Self:
+        if self.username is None and self.password is None and self.otp is None:
+            raise ValueError("name the field of the username, of the password or of the one-time code")
+        return self
+
+
+def _parts(args: FillLoginArgs) -> list[tuple[VaultFieldKind, str]]:
+    asked: list[tuple[VaultFieldKind, str | None]] = [
+        ("username", args.username),
+        ("password", args.password),
+        ("otp", args.otp),
+    ]
+    return [(kind, ref) for kind, ref in asked if ref is not None]
+
+
+def _value(secret: LoginSecret, kind: VaultFieldKind, login: Login) -> SecretStr:
+    value: SecretStr | None = {"username": secret.username, "password": secret.password, "otp": secret.otp}[kind]
+    if value is None:
+        raise ToolInputError(f"the login {login.title} has no {kind} to fill", {"login": login.id, "part": kind})
+    return value
+
+
+def _fill_login_tool() -> RegisteredTool:
+    async def classify(args: FillLoginArgs, ctx: ToolContext) -> ActionInfo:
+        token: str = await _vault_token(ctx)
+        login: Login = await _login(ctx, token, args.login)
+        url: str = ctx.browser.current_url(ctx.thread_id) or ""
+        if not fills_on(url, login.websites):
+            sites: str = ", ".join(website_hosts(login.websites)) or "no website"
+            raise ToolInputError(
+                f"the login {login.title} is for {sites}, and this page is {_clip(url, 120) or 'no page'}: Dot fills a "
+                "login only on its own site, over https",
+                {"login": login.id, "url": url},
+            )
+        parts: str = ", ".join(kind for kind, _ in _parts(args))
+        summary: str = f"Fill your login {login.title} from 1Password into this page: {parts}"
+        return _action("browser_fill_login", "browser_input", "high", summary, url, ("vault_fill",))
+
+    async def run(args: FillLoginArgs, ctx: ToolContext, authorized: ActionInfo) -> ToolResult:
+        token: str = await _vault_token(ctx)
+        login: Login = await _login(ctx, token, args.login)
+        parts: list[tuple[VaultFieldKind, str]] = _parts(args)
+        secret: LoginSecret = await ctx.runtime.vault.secret(token, login, any(kind == "otp" for kind, _ in parts))
+        fills: list[VaultFill] = [
+            VaultFill(ref=ref, kind=kind, value=_value(secret, kind, login)) for kind, ref in parts
+        ]
+        view: PageView = await ctx.browser.fill_from_vault(
+            ctx.thread_id, fills, lambda address: fills_on(address, login.websites)
+        )
+        said: str = (
+            f"Filled the {', '.join(kind for kind, _ in parts)} of the login {login.title} from 1Password. The values "
+            "were not shown to you and never are; scripts stay off in this chat's tabs until the page loads another."
+        )
+        return ok(f"{said}\n{render_page_view(view, _nonce(), _body_budget(ctx))}")
+
+    return make_reviewed_tool(
+        name="browser_fill_login",
+        description=(
+            "Fill a login of the owner's 1Password into the current page: give the login (browser_logins lists them) "
+            "and the refs of its fields: the username's, the password field's, the one-time code's. Dot reads the "
+            "values from 1Password and types them itself; you never see them. It fills a login only on its own "
+            "website, a password only into a password field. " + _REF_HELP
+        ),
+        args_model=FillLoginArgs,
+        modes=ACTING_MODES,
+        parallel_safe=False,
+        timeout_s=_SLOW_TIMEOUT_S,
+        classify=classify,
+        run=run,
+    )
+
+
+def _masked(tool: RegisteredTool) -> RegisteredTool:
+    """``tool`` with the values filled into its chat's pages from the password manager (item 493) taken out of what it
+    gives back, its text and an error it raises alike, whatever page it read."""
+
+    async def prepare(arguments: JsonObject, ctx: ToolContext) -> PreparedCall:
+        call: PreparedCall = await tool.prepare(arguments, ctx)
+
+        async def run(context: ToolContext) -> ToolResult:
+            try:
+                result: ToolResult = await call.run(context)
+            except DotError as error:
+                error.message = masked(error.message, context.browser.vault_values(context.thread_id))
+                raise
+            return result.model_copy(
+                update={"text": masked(result.text, context.browser.vault_values(context.thread_id))}
+            )
+
+        return PreparedCall(action=call.action, run=run)
+
+    return replace(tool, prepare=prepare)
+
+
 def build_browser_tools() -> tuple[RegisteredTool, ...]:
+    return tuple(_masked(tool) for tool in _browser_tools())
+
+
+def _browser_tools() -> tuple[RegisteredTool, ...]:
     return (
         _open_tool(),
         _new_tab_tool(),
@@ -761,4 +949,6 @@ def build_browser_tools() -> tuple[RegisteredTool, ...]:
         _switch_tab_tool(),
         _close_tab_tool(),
         _upload_tool(),
+        _logins_tool(),
+        _fill_login_tool(),
     )

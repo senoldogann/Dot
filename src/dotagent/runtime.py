@@ -96,6 +96,7 @@ from dotagent.tools.skill import build_skill_tool
 from dotagent.tools.team import build_team_tools
 from dotagent.tools.terminal import build_terminal_tools
 from dotagent.tools.web import build_web_tools
+from dotagent.vault.onepassword import OnePassword
 from dotagent.web.client import WebClient
 
 log = get_logger(__name__)
@@ -127,6 +128,8 @@ class Runtime:
     assistant: Assistant
     # The accounts of Google and Microsoft signed in through their official sign-ins (item 422).
     accounts: Accounts
+    # The owner's 1Password, through its command line (item 493): the logins a run fills without seeing them.
+    vault: OnePassword
     terminals: Terminals
     web: WebClient
     # Whether the key of Ollama's hosted search was found when the runtime was built: the first rung of web_search's
@@ -407,6 +410,7 @@ async def _open_services(config: AppConfig, login_env: dict[str, str], confineme
             awake=KeepAwake(),
             assistant=Assistant(config.assistant, await asyncio.to_thread(mac_first_name)),
             accounts=Accounts(store, Keychain(keychain_file()), None),
+            vault=OnePassword(None),
             router=ModelRouter(config, _call_recorder(store, bus), login_env),
             roles=ModelRoles(config.models),
             context_sizes=ContextSizes(config.models.context),

@@ -21,9 +21,20 @@ from dotagent.core.types import FrozenModel
 from dotagent.mcp.catalogue import MCP_SERVICES
 
 type PluginSection = Literal[
-    "popular", "code", "design", "data", "research", "communication", "productivity", "business", "support", "mac"
+    "popular",
+    "passwords",
+    "code",
+    "design",
+    "data",
+    "research",
+    "communication",
+    "productivity",
+    "business",
+    "support",
+    "mac",
 ]
-type WayKind = Literal["mcp", "mac", "folder", "web", "untried"]
+# ``vault``: the owner's password manager through its command line, whose logins a run fills (item 493).
+type WayKind = Literal["mcp", "mac", "folder", "web", "vault", "untried"]
 
 
 class PluginWay(FrozenModel):
@@ -98,6 +109,10 @@ def _mcp(ref: str) -> PluginWay:
 
 def _mac(ref: str) -> PluginWay:
     return PluginWay(kind="mac", ref=ref, how=None)
+
+
+def _vault(ref: str) -> PluginWay:
+    return PluginWay(kind="vault", ref=ref, how=None)
 
 
 def _web(ref: str) -> PluginWay:
@@ -214,6 +229,17 @@ PLUGINS: tuple[PluginListing, ...] = (
         glyph="calendar",
         monogram=None,
         ways=(_mac("calendar"),),
+    ),
+    PluginListing(
+        id="1password",
+        name="1Password",
+        section="passwords",
+        does=None,
+        logo=None,
+        colour="0572EC",
+        glyph="key",
+        monogram=None,
+        ways=(_vault("1password"),),
     ),
     PluginListing(
         id="sentry",
@@ -865,6 +891,17 @@ _MAC_DATA: str = (
 # Said of every way's data: a tool's result is part of what the model of the run is sent (docs/safety.md).
 _TO_MODEL: str = "what a run reads there goes to the run's model."
 _WEB_HOW: str = "Dot works in it in its own browser, once you have signed in there."
+# 1Password (item 493): how it connects, where a login's values go, and what Dot does with it.
+_VAULT_HOW: str = (
+    "A vault of yours, Shared with Dot, and a service account that only reads it: Connect makes both with your op, "
+    "1Password's command line, through the 1Password app, which asks you first; or paste a service account token you "
+    "made."
+)
+_VAULT_DATA: str = (
+    "Between Dot and 1Password, through op on this Mac. A login's values go only into the page Dot fills, on the "
+    "login's own site; the run's model sees the logins' titles and websites, never a username, a password or a code."
+)
+_VAULT_DOES: str = "Fills your logins into pages on their own sites, with the run's model never seeing them."
 _FOLDER_HOW: str = "Dot reads and writes the files it keeps in sync in a folder of this Mac."
 
 
@@ -899,6 +936,8 @@ def _way_view(way: PluginWay) -> PluginWayView:
         else:
             how = _MCP_OPEN
         return PluginWayView(kind="mcp", ref=service.id, how=how, data=data, does=service.does)
+    if way.kind == "vault":
+        return PluginWayView(kind="vault", ref=way.ref, how=_VAULT_HOW, data=_VAULT_DATA, does=_VAULT_DOES)
     if way.kind == "mac":
         app = next((one for one in MAC_APPS if one.id == way.ref), None)
         if app is None:

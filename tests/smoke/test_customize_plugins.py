@@ -258,6 +258,7 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 await expect(page.locator(".plugin-section-title")).to_have_text(
                     [
                         "Popular",
+                        "Password managers",
                         "Code",
                         "Design",
                         "Data",

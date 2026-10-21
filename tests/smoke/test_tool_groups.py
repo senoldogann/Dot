@@ -23,6 +23,7 @@ from dotagent.llm.router import parse_model_ref
 from dotagent.llm.types import ChatRequest, DeltaSink, ModelInfo, ModelReply, ToolSpec
 from dotagent.runtime import Runtime, _tool_groups, close_runtime, open_runtime
 from dotagent.store.models import EventRecord, RunRecord
+from dotagent.tools.browser import VAULT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
 from dotagent.tools.groups import ACCOUNTS_GROUP, group_of
@@ -251,13 +252,15 @@ async def test_a_run_that_offers_every_tool_has_no_groups_and_answers_use_tools_
     assert played.record.status == "done"
     assert played.groups == ()
     # Every tool of the mode at every step, as before there were groups (consult is left out, as no helper model is set
-    # up, and so are the campaign tools, which only a session of a campaign has, and the mail and calendar tools, as no
-    # account is signed in, item 424; skill stays, for the skills that come with Dot, item 196; message_agent stays
-    # although the owner made no agent, since the run may make one with create_agent, item 99).
+    # up, and so are the campaign tools, which only a session of a campaign has, the mail and calendar tools, as no
+    # account is signed in, item 424, and the logins of 1Password, which is not connected, item 493; skill stays, for
+    # the skills that come with Dot, item 196; message_agent stays although the owner made no agent, since the run may
+    # make one with create_agent, item 99).
     every: list[str] = [
         spec.name
         for spec in specs_for_mode(build_registry(_tool_groups(config, False)), "task")
-        if spec.name not in {USE_TOOLS_TOOL, CONSULT_TOOL, *CAMPAIGN_TOOLS} and group_of(spec.name) != ACCOUNTS_GROUP
+        if spec.name not in {USE_TOOLS_TOOL, CONSULT_TOOL, *CAMPAIGN_TOOLS, *VAULT_TOOLS}
+        and group_of(spec.name) != ACCOUNTS_GROUP
     ]
     assert all(_names(step) == every for step in played.steps)
     assert all("# Tool groups" not in step.messages[0].content for step in played.steps)
