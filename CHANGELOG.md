@@ -1,13 +1,14 @@
 # Changelog
 
-Each release of Dot lists here what it changes, the newest first. A change not released yet goes under **Unreleased**,
-at the top, until a release names it; how a release is made is in [Releasing](docs/development.md#releasing).
+Each release of Dot lists here what it changes, the newest first. A change not released yet is a file of its own in
+[changes/](changes/) (those from before item 459 stand under **Unreleased**), and a release gathers them into its
+section; how a release is made is in [Releasing](docs/development.md#releasing).
 
 ## Unreleased
 
-- Schedules: **Notifications** in a schedule's form says how the end of its runs is told on your phone and desktop:
-  always (as before, else `[scheduler] notify`), only when it fails or needs you, or never; a run you start with
-  **Run now** is always told (item 461).
+What is not released yet is also in [changes/](changes/), a file for each change (item 459); a release folds those
+files in here.
+
 - The side panel's Run tab is plain: Details show the status, the model and its reasoning, the approvals, the tool calls,
   the tokens and the duration (goal mode and the compactions only when there are some), then the conversation's files;
   the run's mode, start and id, how it was set up and its cost fold under **More**, closed the first time, which counts
