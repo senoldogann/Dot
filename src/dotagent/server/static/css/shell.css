@@ -589,6 +589,81 @@
   min-width: 0;
 }
 
+/* Connect apps (item 492): a row of its own over Settings, a pill with the plug, its words and the marks of the
+   servers Dot is connected to, each a small light tile as on Customize, a little over the one before it. */
+.side-connect {
+  display: flex;
+  flex: 1 1 100%;
+  order: -1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 0 var(--space-2) 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+
+.side-connect:hover {
+  border-color: var(--border-strong);
+}
+
+.side-connect > .icon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--text-2);
+}
+
+.side-connect-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.side-connect-marks {
+  display: flex;
+  flex: none;
+}
+
+.side-connect-marks:empty {
+  display: none;
+}
+
+.side-connect-mark {
+  --plugin-ink: var(--mark-ink);
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-xs);
+  background: var(--mark-ground);
+  box-shadow: 0 0 0 2px var(--surface), inset 0 0 0 1px var(--mark-ring);
+  color: var(--plugin-ink);
+}
+
+.side-connect-mark + .side-connect-mark {
+  margin-left: -4px;
+}
+
+.side-connect-mark .plugin-logo,
+.side-connect-mark .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.side-connect-mark .plugin-letters {
+  font-size: var(--text-xs);
+}
+
 /* With the sidebar next to the page, the way back to the list of chats is in sight, so a chat's page shows no link back
    of its own. A page under another (an agent's or a campaign's page, Team, a service's page, Diagnostics, Open source
    licences) keeps its link back: the sidebar names the list it is under, not the page itself (item 380). */
@@ -845,6 +920,7 @@
   }
 
   .side-foot > .side-link,
+  .side-foot > .side-connect,
   .side-compose {
     display: grid;
     place-items: center;
@@ -858,7 +934,17 @@
     color: var(--text);
   }
 
-  .side-foot > .side-link > span {
+  .side-foot > .side-connect {
+    order: 0;
+    min-height: 0;
+  }
+
+  .side-foot > .side-connect > .side-connect-marks {
+    display: none;
+  }
+
+  .side-foot > .side-link > span,
+  .side-foot > .side-connect > .side-connect-label {
     position: absolute;
     width: 1px;
     height: 1px;

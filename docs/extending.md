@@ -7,7 +7,7 @@ works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-an
 leads to Plugins.
 
 **Plugins** lists 65 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
-Communication, Development, Business, Productivity and This Mac. Each tile has the service's mark, what Dot does with
+Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
 service's own page: each way it connects, with where it stands and its step, the tools of its MCP server once it is
@@ -26,6 +26,19 @@ and Microsoft's artwork is not Dot's to ship; one that is not installed keeps it
 interface or letters (DeepWiki, Context7, Jina, Canva and Outlook have no logo to show). A server added by hand wears
 the mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item
 477).
+
+### Connect apps
+
+**Connect apps** (item 492), at the foot of the sidebar over Settings, opens the same services in a dialog over the
+page, wearing the marks of the first three MCP servers that are ready. It has a search, a chip for each section,
+**Suggested for you** (the popular services), then each section's first six tiles with **See all**, and **N connected**,
+which lists what Dot is connected to. A tile shows one thing: its first step as a button (**Add**, **Sign in**,
+**Allow**, **Open System Settings**), or where the service stands once it is connected, or **Not tried yet**. A tile
+opens the service's own page in the dialog, as on Customize, with a way back. A service that takes a key asks for it
+there, beside where to get one. **Customize** in the dialog leads to the page, which keeps what the dialog leaves out:
+the accounts, your own MCP servers and the skills. On a phone the dialog takes the screen, and the button is a round
+one at the foot of the list of chats. The services, where they stand and their steps are the same code on both
+(`static/js/catalogue.js`).
 
 A service none of whose ways was tried says **Not tried yet** and offers no step: Vercel and Canva (their MCP servers
 let in approved clients only; Canva refused Dot's on 2026-10-19), and Asana and Box (clients registered by hand). Figma

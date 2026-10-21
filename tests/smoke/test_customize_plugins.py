@@ -254,7 +254,18 @@ async def test_plugins_shows_where_each_service_stands_and_takes_its_step(
                 await expect(tiles.first).to_be_visible()
                 assert await tiles.count() >= 25
                 await expect(page.locator(".plugin-section-title")).to_have_text(
-                    ["Popular", "Communication", "Development", "Business", "Productivity", "This Mac"]
+                    [
+                        "Popular",
+                        "Code",
+                        "Design",
+                        "Data",
+                        "Research",
+                        "Communication",
+                        "Productivity",
+                        "Business",
+                        "Support",
+                        "This Mac",
+                    ]
                 )
                 for index in range(await tiles.count()):
                     tile: Locator = tiles.nth(index)
