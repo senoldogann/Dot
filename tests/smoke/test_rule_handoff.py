@@ -304,7 +304,8 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
 ) -> None:
     """Item 482: a hand-off that nobody answered in time and the run kept for the owner is listed on the run's page as
     "Kept for you", with what I did it does and until when it waits, and among what waits on the Activity list; I did
-    it there starts the run that goes on from it in the same chat, with Dot's words under the goal."""
+    it there starts the run that goes on from it in the same chat, with Dot's words under the goal. A question kept for
+    the owner's yes (item 483) offers Allow once and Skip, and Skip starts nothing."""
     MODEL.script = ScriptedProvider(
         _PROVIDER,
         [
@@ -327,12 +328,23 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
         "digest-1042",
         time.time() + 72 * 3600,
     )
+    report: ApprovalRecord = await runtime.store.create_kept_approval(
+        run.id,
+        "shell",
+        "Run: ./report.sh (writes a file) — a rule of yours asks",
+        "medium",
+        {"tool": "shell", "kind": "shell", "risk": "medium", "target": "./report.sh", "amount": None, "flags": []},
+        "digest-report",
+        time.time() + 72 * 3600,
+    )
     activity: httpx.Response = await client.get("/api/activity")
     assert activity.status_code == 200, activity.text
     rows: list[dict[str, object]] = [row for row in activity.json()["waiting"] if row["id"] == kept.id]
     assert [(row["kind"], row["detail"]) for row in rows] == [
         ("approval", "kept for you; once you did it, saying so carries the work on")
     ]
+    asked: list[dict[str, object]] = [row for row in activity.json()["waiting"] if row["id"] == report.id]
+    assert [row["detail"] for row in asked] == ["kept for you; allowing it once carries the work on"]
     host: str = client.base_url.host
     port: int | None = client.base_url.port
     assert port is not None
@@ -351,17 +363,32 @@ async def test_a_step_kept_for_the_owner_shows_as_kept_and_i_did_it_carries_the_
                 await expect(card).to_contain_text("Nobody answered in time, so the run went on without this step.")
                 await expect(card).to_contain_text("It waits until")
                 await expect(card.get_by_role("button", name="Skip this step")).to_be_visible()
+                if index == 0:
+                    # The sidebar lists each step that waits, two of one run included.
+                    waiting = page.locator("[data-section='waiting'] .side-activity-title")
+                    await expect(waiting).to_have_count(2)
+                    await expect(waiting.first).to_contain_text("Write ")
+                    await expect(waiting.last).to_contain_text("Run: ./report.sh")
+                question = page.locator(".approval:not(.handoff)", has_text="Kept for you")
+                await expect(question).to_contain_text("Allow once carries the work on in this conversation")
+                await expect(question.get_by_role("button", name="Allow once")).to_be_visible()
+                await expect(question.get_by_role("button", name="Skip", exact=True)).to_be_visible()
                 assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
                 await card.scroll_into_view_if_needed()
                 await page.mouse.move(0, 0)
                 await page.screenshot(path=str(tmp_path / f"kept-{width}-{scheme}.png"), animations="disabled")
                 if index == len(schemes) - 1:
+                    await question.get_by_role("button", name="Skip", exact=True).click()
+                    await expect(question).to_have_count(0)
                     await card.get_by_role("button", name="I did it").click()
                     await expect(card).to_have_count(0)
                 await page.close()
         finally:
             await browser.close()
     assert (await runtime.store.get_approval(kept.id)).status == "approved"
+    assert (await runtime.store.get_approval(report.id)).status == "denied"
+    # Skip started nothing; I did it started the one run after it.
+    assert len(await runtime.store.list_runs(5, run.thread_id)) == 2
     follow: RunRecord = (await runtime.store.list_runs(1, run.thread_id))[0]
     assert follow.id != run.id
     # The goal is the owner's (the run's, with no note); Dot's words are what the new run reads under it.

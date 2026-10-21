@@ -305,12 +305,13 @@ async def activity_view(store: Store, manager: RunManager, now: float) -> Activi
     for question in await store.list_approvals("left", _RECENT_RUNS):
         asked: RunRecord = live.get(question.run_id) or await store.get_run(question.run_id)
         if question.kept_until is not None:
-            # A step handed to the owner that nobody answered in time (item 482).
-            waiting.append(
-                _approval_row(
-                    question, asked, "approval", "kept for you; once you did it, saying so carries the work on"
-                )
+            # A step handed to the owner, or a question for their yes, that nobody answered in time (items 482, 483).
+            detail: str = (
+                "kept for you; once you did it, saying so carries the work on"
+                if question.severity == "handoff"
+                else "kept for you; allowing it once carries the work on"
             )
+            waiting.append(_approval_row(question, asked, "approval", detail))
         else:
             waiting.append(_approval_row(question, asked, "question", "left for you; answering carries the work on"))
     for run in live.values():

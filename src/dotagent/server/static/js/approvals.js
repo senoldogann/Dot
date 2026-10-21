@@ -14,6 +14,8 @@ export const LEFT_IN_RUN = "The run went on without your answer. Your answer goe
 export const LEFT_IN_CAMPAIGN = "The session went on without your answer. While it works, your answer reaches it; after that, the campaign's next session reads it, and starts right away while the campaign is active.";
 // What a step kept for the owner (item 482) says: nobody answered it in time, so the run went on without it.
 const KEPT_NOTE = "Nobody answered in time, so the run went on without this step. Once you have done it yourself, I did it carries the work on in this conversation.";
+// What a question kept for the owner's yes (item 483) says: Allow once lets the run do this exact step once.
+const KEPT_ASK_NOTE = "Nobody answered in time, so the run went on without this step. Allow once carries the work on in this conversation, where Dot may do this exact step once.";
 
 /** The common shape of an approval, from a stored record. */
 export function fromRecord(record) {
@@ -186,8 +188,8 @@ function technicalDetails(args) {
 }
 
 /** What a kept step's card says of it: what I did it does, and until when the step waits. */
-function keptNote(keptUntil) {
-  return `${KEPT_NOTE} It waits until ${dateTime(keptUntil)}.`;
+function keptNote(handoff, keptUntil) {
+  return `${handoff ? KEPT_NOTE : KEPT_ASK_NOTE} It waits until ${dateTime(keptUntil)}.`;
 }
 
 /**
@@ -287,8 +289,8 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
                   ),
                 ),
           );
-    const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : "Approve";
-    const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : "Deny";
+    const yes = isQuestion ? "Send answer" : isHandoff ? "I did it" : isKept ? "Allow once" : "Approve";
+    const no = isQuestion ? "Skip" : isHandoff ? "Skip this step" : isKept ? "Skip" : "Deny";
     node.replaceChildren(
       ...present(
         el(
@@ -302,7 +304,7 @@ export function approvalCard({ approval, heading, onSettled, leftNote, onUseHere
         ),
         el("div", { class: "approval-text" }, text),
         several ? el("div", { class: "small muted" }, "Choose one or more, then send them.") : null,
-        isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(approval.keptUntil) : leftNote) : null,
+        isLeft ? el("div", { class: "small muted" }, isKept ? keptNote(isHandoff, approval.keptUntil) : leftNote) : null,
         isQuestion ? options : technicalDetails(approval.args),
         isQuestion || isHandoff
           ? null

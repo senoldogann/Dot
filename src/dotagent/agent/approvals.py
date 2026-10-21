@@ -4,6 +4,7 @@ import asyncio
 import time
 from typing import Literal
 
+from dotagent.agent.declined import OWNER_DECIDERS
 from dotagent.agent.parking import KEPT_HERE, KEPT_OVERALL
 from dotagent.core.errors import RunConflict
 from dotagent.core.logs import get_logger
@@ -210,6 +211,39 @@ class ApprovalBroker:
                 True,
             )
         return lapsed
+
+    async def grant(self, record: ApprovalRecord, decided_by: str, note: str, permit_until: float) -> ApprovalRecord:
+        """Store the owner's yes to an ask kept for them (item 483), holding until ``permit_until`` and unused, and tell
+        no page yet: they are told once the yes reached the conversation (:meth:`announce`), or it is taken back
+        (:meth:`reopen`). Raises when the step was decided meanwhile."""
+        granted: ApprovalRecord = await self._store.grant_permit(record.id, decided_by, note, permit_until)
+        if (granted.status, granted.decided_by, granted.permit_until) != ("approved", decided_by, permit_until):
+            raise RunConflict("approval was decided meanwhile", {"approval_id": record.id, "status": granted.status})
+        return granted
+
+    async def reopen(self, granted: ApprovalRecord) -> ApprovalRecord:
+        """Take back a yes that could not reach the conversation (item 483): the step waits again, as its card, which
+        no page was told otherwise, still shows."""
+        return await self._store.reopen_kept(granted.id)
+
+    async def announce(self, granted: ApprovalRecord) -> None:
+        """Tell the pages that the owner allowed a step kept for them (item 483), once the yes reached the
+        conversation."""
+        await self._bus.emit(
+            granted.run_id,
+            "approval_decided",
+            {"approval_id": granted.id, "status": "approved", "note": granted.note},
+            True,
+        )
+
+    async def take_permit(self, digest: str, thread_id: str, now: float) -> ApprovalRecord | None:
+        """Spend the owner's yes to the step ``digest`` kept in the chat ``thread_id``, once (item 483)."""
+        return await self._store.take_permit(digest, thread_id, now)
+
+    async def skipped(self, digest: str, thread_id: str) -> ApprovalRecord | None:
+        """The step ``digest`` kept in the chat ``thread_id`` that the owner skipped and has not taken back by writing
+        there since (item 483), if any."""
+        return await self._store.skipped_kept(digest, thread_id, tuple(sorted(OWNER_DECIDERS)))
 
     async def resolve(self, approval_id: str, approve: bool, decided_by: str, note: str) -> ApprovalRecord:
         """Record a decision. Raises if the approval does not exist or was already decided. A question a run left has

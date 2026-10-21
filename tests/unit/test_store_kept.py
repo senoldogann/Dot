@@ -1,6 +1,6 @@
-"""Steps kept for the owner in the store (item 482): the same step once in a chat, the counts the caps read (a chat
-and the chats of its schedule, and all), the ones past their time, the cap of the broker, and a store from before the
-two columns."""
+"""Steps kept for the owner in the store (items 482, 483): the same step once in a chat, the counts the caps read (a
+chat and the chats of its schedule, and all), the ones past their time, the cap of the broker, the owner's yes (held,
+spent once, taken back) and Skip (until the owner writes in the chat), and a store from before the four columns."""
 
 import asyncio
 import sqlite3
@@ -102,13 +102,87 @@ async def test_past_the_cap_of_a_chat_a_step_is_not_kept_and_the_same_one_is_the
         await store.close()
 
 
+async def test_a_yes_is_spent_once_in_its_chat_in_time_and_one_not_delivered_is_taken_back(tmp_path: Path) -> None:
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        now: float = time.time()
+        chat, other = [await store.create_thread(title, "schedule") for title in ("A", "B")]
+        run: RunRecord = await _run(store, chat.id)
+        kept: ApprovalRecord = await _kept(store, run.id, "d1", now + _HOUR_S)
+        # Not delivered: the yes is taken back, and the step waits as it did.
+        granted: ApprovalRecord = await store.grant_permit(kept.id, "ui", "Go", now + _HOUR_S)
+        assert (granted.status, granted.decided_by, granted.permit_until, granted.used_at) == (
+            "approved",
+            "ui",
+            now + _HOUR_S,
+            None,
+        )
+        back: ApprovalRecord = await store.reopen_kept(kept.id)
+        assert (back.status, back.decided_by, back.permit_until, back.note) == ("left", None, None, "")
+        await store.grant_permit(kept.id, "ui", "Go", now + _HOUR_S)
+        # Another chat, another step, a later time: none of them spends it; the step in its chat, once.
+        assert await store.take_permit("d1", other.id, now) is None
+        assert await store.take_permit("d2", chat.id, now) is None
+        assert await store.take_permit("d1", chat.id, now + 2 * _HOUR_S) is None
+        spent: ApprovalRecord | None = await store.take_permit("d1", chat.id, now)
+        assert spent is not None and spent.id == kept.id and spent.used_at == now
+        assert await store.take_permit("d1", chat.id, now) is None
+        # A spent yes is not taken back, and a step decided already is not granted again.
+        assert (await store.reopen_kept(kept.id)).status == "approved"
+        assert (await store.grant_permit(kept.id, "cli", "", now + _HOUR_S)).decided_by == "ui"
+    finally:
+        await store.close()
+
+
+async def test_a_skip_holds_in_its_chat_until_the_owner_writes_there(tmp_path: Path) -> None:
+    store: Store = await Store.open(tmp_path / "dot.sqlite3", tmp_path / "screenshots")
+    try:
+        owners: tuple[str, ...] = ("cli", "ui")
+        chat, other = [await store.create_thread(title, "schedule") for title in ("A", "B")]
+        run: RunRecord = await _run(store, chat.id)
+        kept: ApprovalRecord = await _kept(store, run.id, "d1", time.time() + _HOUR_S)
+        assert await store.skipped_kept("d1", chat.id, owners) is None
+        await store.decide_approval(kept.id, "denied", "ui", "")
+        assert (await store.skipped_kept("d1", chat.id, owners)) == await store.get_approval(kept.id)
+        assert await store.skipped_kept("d1", other.id, owners) is None
+        # A run that is not the owner's, and Dot's words, take nothing back...
+        firing: RunRecord = await _run(store, chat.id)
+        await store.add_event(firing.id, "steer", {"text": "Done.", "vouches": False, "tainted": False})
+        assert await store.skipped_kept("d1", chat.id, owners) is not None
+        # ...a message of the owner's does, and so does a run they start there.
+        await store.add_event(firing.id, "steer", {"text": "Do it now."})
+        assert await store.skipped_kept("d1", chat.id, owners) is None
+        later: ApprovalRecord = await _kept(store, run.id, "d2", time.time() + _HOUR_S)
+        await store.decide_approval(later.id, "denied", "cli", "")
+        assert await store.skipped_kept("d2", chat.id, owners) is not None
+        await store.create_run(
+            chat.id,
+            "Again",
+            "task",
+            "ollama:qwen3",
+            None,
+            "ui",
+            "medium",
+            "standard",
+            None,
+            "ask",
+            False,
+            None,
+            None,
+            None,
+        )
+        assert await store.skipped_kept("d2", chat.id, owners) is None
+    finally:
+        await store.close()
+
+
 def _forget_kept_columns(path: Path) -> None:
     """Make the database at `path` what a version from before item 482 left: approvals with no kept columns."""
     connection: sqlite3.Connection = sqlite3.connect(path)
     try:
         connection.execute("DROP INDEX approvals_kept")
-        connection.execute("ALTER TABLE approvals DROP COLUMN digest")
-        connection.execute("ALTER TABLE approvals DROP COLUMN kept_until")
+        for column in ("digest", "kept_until", "permit_until", "used_at"):
+            connection.execute(f"ALTER TABLE approvals DROP COLUMN {column}")
         connection.commit()
     finally:
         connection.close()
@@ -126,6 +200,6 @@ async def test_the_approvals_of_a_store_from_before_kept_steps_read_back_as_they
     store = await Store.open(path, tmp_path / "screenshots")
     try:
         assert await store.get_approval(question.id) == question
-        assert (question.digest, question.kept_until) == (None, None)
+        assert (question.digest, question.kept_until, question.permit_until, question.used_at) == (None,) * 4
     finally:
         await store.close()

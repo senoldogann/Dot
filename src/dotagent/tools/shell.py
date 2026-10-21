@@ -183,11 +183,13 @@ def _classify_shell(
     if classify_path(cwd, workspace, protected, dot_paths) == "protected":
         flags = (*flags, "secret_access")
     preview: str = truncate_middle(" ".join(args.command.split()), 200)
+    # Where it runs, when the call names it (item 483): the same line elsewhere is another step, on its card too.
+    where: str = f" in {cwd}" if args.cwd else ""
     return ActionInfo(
         tool="shell",
         kind="shell",
         risk=assessment.risk,
-        summary=f"Run: {preview} ({'; '.join(assessment.reasons)})",
+        summary=f"Run: {preview}{where} ({'; '.join(assessment.reasons)})",
         target=args.command,
         flags=flags,
         changes=assessment.changes,

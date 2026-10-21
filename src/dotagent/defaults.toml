@@ -372,9 +372,14 @@ approval_timeout_s = 900.0
 # you instead, and the run goes on without it; its later hand-offs are kept at once, until you write to it. A kept step
 # waits on its card, in the list of what Dot asked you, for parked_hours; your "I did it" carries the work on in the
 # same conversation (the run is told, its taint unchanged), and Skip closes it. Nothing is ever done for you by it.
-# Never in yolo, which asks nothing; a delegated run, a campaign's session and an eval refuse as before.
+# A question that asks your yes is kept too when its card shows all of the step and nothing of it reaches other people
+# (a command, a file read or a folder listing, a page read or a web search; item 483): "Allow once" carries the work on,
+# and the run may do that exact step once in that conversation within permit_hours; never a question raised by what the
+# run read, nor one about Dot's own files. Never in yolo, which asks nothing; a delegated run, a campaign's session and
+# an eval refuse as before.
 unanswered = "refuse"
 parked_hours = 72.0
+permit_hours = 24.0
 protected_paths = [
   "~/.ssh",
   "~/.gnupg",

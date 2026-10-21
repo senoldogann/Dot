@@ -644,6 +644,8 @@ def _approval(row: aiosqlite.Row) -> ApprovalRecord:
         note=row["note"],
         digest=row["digest"],
         kept_until=row["kept_until"],
+        permit_until=row["permit_until"],
+        used_at=row["used_at"],
     )
 
 
@@ -894,8 +896,14 @@ _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("paused_at", "REAL"),
 )
 # Columns of ``approvals`` added later: a step kept for the owner (item 482) has the fingerprint of its action and when
-# it lapses; NULL for every other question, as for all of them before.
-_ADDED_APPROVAL_COLUMNS: tuple[tuple[str, str], ...] = (("digest", "TEXT"), ("kept_until", "REAL"))
+# it lapses, and the owner's yes to a kept ask (item 483) until when it holds and when it was spent; NULL for every
+# other question, as for all of them before.
+_ADDED_APPROVAL_COLUMNS: tuple[tuple[str, str], ...] = (
+    ("digest", "TEXT"),
+    ("kept_until", "REAL"),
+    ("permit_until", "REAL"),
+    ("used_at", "REAL"),
+)
 # The kv key of Dot's own look (item 102), an ``AgentLook`` as JSON.
 DOT_LOOK_KEY: str = "look:dot"
 
@@ -1804,6 +1812,14 @@ class Store:
                 " WHERE status = 'left' AND run_id IN (SELECT id FROM family)",
                 (*ids, now, "the chat was rewound to before the run that asked"),
             )
+            # The owner's yes to a step those runs kept goes with them, unused (item 483).
+            await self._db.execute(
+                f"WITH RECURSIVE family(id) AS (SELECT id FROM runs WHERE id IN ({marks})"
+                " UNION SELECT runs.id FROM runs JOIN family ON runs.parent_run_id = family.id)"
+                " UPDATE approvals SET permit_until = NULL WHERE status = 'approved' AND used_at IS NULL"
+                " AND permit_until IS NOT NULL AND run_id IN (SELECT id FROM family)",
+                ids,
+            )
             version: int = int(row["history_version"])
             place: int = int(row["history_seq"])
             thread: aiosqlite.Row | None = await self._one(
@@ -2492,7 +2508,8 @@ class Store:
     async def _insert_approval(self, record: ApprovalRecord) -> None:
         await self._db.execute(
             "INSERT INTO approvals(id, run_id, created_at, decided_at, status, tool, summary, severity, args, "
-            "decided_by, note, digest, kept_until) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "decided_by, note, digest, kept_until, permit_until, used_at)"
+            " VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.run_id,
@@ -2507,6 +2524,8 @@ class Store:
                 record.note,
                 record.digest,
                 record.kept_until,
+                record.permit_until,
+                record.used_at,
             ),
         )
         await self._db.commit()
@@ -2528,6 +2547,8 @@ class Store:
             note="",
             digest=None,
             kept_until=None,
+            permit_until=None,
+            used_at=None,
         )
         await self._insert_approval(record)
         return record
@@ -2551,6 +2572,8 @@ class Store:
             note="",
             digest=None,
             kept_until=None,
+            permit_until=None,
+            used_at=None,
         )
         await self._insert_approval(record)
         return record
@@ -2582,6 +2605,8 @@ class Store:
             note="",
             digest=digest,
             kept_until=kept_until,
+            permit_until=None,
+            used_at=None,
         )
         await self._insert_approval(record)
         return record
@@ -2608,6 +2633,69 @@ class Store:
         if row is None:
             return 0, 0
         return int(row["here"]), int(row["overall"])
+
+    @_writing
+    async def grant_permit(self, approval_id: str, decided_by: str, note: str, permit_until: float) -> ApprovalRecord:
+        """The owner's yes to an ask kept for them (item 483): decided ``approved``, holding until ``permit_until``,
+        unused; a kept ask no longer open keeps its decision."""
+        await self._db.execute(
+            "UPDATE approvals SET status = 'approved', decided_at = ?, decided_by = ?, note = ?, permit_until = ?"
+            " WHERE id = ? AND status = 'left' AND kept_until IS NOT NULL",
+            (time.time(), decided_by, note, permit_until, approval_id),
+        )
+        await self._db.commit()
+        return await self.get_approval(approval_id)
+
+    @_writing
+    async def reopen_kept(self, approval_id: str) -> ApprovalRecord:
+        """Open again an ask kept for the owner whose yes could not be delivered (item 483): ``left`` as it was, the yes
+        gone; one whose yes was spent meanwhile keeps it."""
+        await self._db.execute(
+            "UPDATE approvals SET status = 'left', decided_at = NULL, decided_by = NULL, note = '', permit_until = NULL"
+            " WHERE id = ? AND status = 'approved' AND permit_until IS NOT NULL AND used_at IS NULL",
+            (approval_id,),
+        )
+        await self._db.commit()
+        return await self.get_approval(approval_id)
+
+    @_writing
+    async def take_permit(self, digest: str, thread_id: str, now: float) -> ApprovalRecord | None:
+        """Spend the owner's yes to the step of fingerprint ``digest`` kept in the chat ``thread_id`` (item 483): the
+        oldest unused one still in time at ``now`` is spent, once; None when there is none."""
+        row = await self._one(
+            "SELECT a.id FROM approvals AS a JOIN runs AS r ON r.id = a.run_id WHERE a.digest = ?"
+            " AND a.status = 'approved' AND a.permit_until > ? AND a.used_at IS NULL AND r.thread_id = ?"
+            " ORDER BY a.decided_at LIMIT 1",
+            (digest, now, thread_id),
+        )
+        if row is None:
+            return None
+        spent = await self._db.execute(
+            "UPDATE approvals SET used_at = ? WHERE id = ? AND used_at IS NULL AND status = 'approved'"
+            " AND permit_until > ?",
+            (now, row["id"], now),
+        )
+        await self._db.commit()
+        return await self.get_approval(row["id"]) if spent.rowcount == 1 else None
+
+    async def skipped_kept(self, digest: str, thread_id: str, owners: Sequence[str]) -> ApprovalRecord | None:
+        """The newest step of fingerprint ``digest`` kept in the chat ``thread_id`` that the owner skipped (decided by
+        one of ``owners``, the sources of the owner's answers and runs) and that they have not taken back since by
+        writing in the chat: no run of theirs started there after it, and no message of theirs reached a run there (a
+        steer that vouches; item 483). None when there is none."""
+        marks: str = ", ".join("?" for _ in owners)
+        row = await self._one(
+            "SELECT a.* FROM approvals AS a JOIN runs AS r ON r.id = a.run_id WHERE a.digest = ? AND r.thread_id = ?"
+            f" AND a.status = 'denied' AND a.kept_until IS NOT NULL AND a.decided_by IN ({marks})"
+            " AND NOT EXISTS (SELECT 1 FROM runs AS o WHERE o.thread_id = r.thread_id AND o.created_at > a.decided_at"
+            f" AND o.source IN ({marks}))"
+            " AND NOT EXISTS (SELECT 1 FROM events AS e JOIN runs AS s ON s.id = e.run_id"
+            " WHERE s.thread_id = r.thread_id AND e.kind = 'steer' AND e.ts > a.decided_at"
+            " AND COALESCE(json_type(e.data, '$.vouches'), '') != 'false')"
+            " ORDER BY a.decided_at DESC LIMIT 1",
+            (digest, thread_id, *owners, *owners),
+        )
+        return None if row is None else _approval(row)
 
     async def kept_due(self, now: float) -> list[ApprovalRecord]:
         """The steps kept for the owner whose time is over at ``now``, still unanswered (item 482), oldest first."""
@@ -2645,6 +2733,8 @@ class Store:
             note=note,
             digest=None,
             kept_until=None,
+            permit_until=None,
+            used_at=None,
         )
         await self._insert_approval(record)
         return record
