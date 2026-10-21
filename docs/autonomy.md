@@ -56,7 +56,8 @@ let through, and the record and the event keep it (item 500). A chat leaves the 
 › General › Chat › "Show what ran without asking" is on (items 346 and 362); the records and the events stay, and a
 refusal always shows. Every step the policy
 let through keeps what decided it, a question answered or not (item 468, see [Safety](safety.md#safety)), and its row in
-the chat says why it ran when you open it; a step refused or handed to you has its `policy` event instead. The home's
+the chat says why it ran when you open it, unless a yolo run did it without asking (item 500); a step refused or handed
+to you has its `policy` event instead. The home's
 **While you were away** counts those automatic answers for the runs of your schedules and campaigns since you last
 looked (item 466; see [The daemon](daemon.md)).
 
