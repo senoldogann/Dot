@@ -437,6 +437,15 @@ class RuleRequest(FrozenModel):
     description: str = Field(max_length=300)
 
 
+class RulePreviewRequest(FrozenModel):
+    """A rule to try on the steps of the last ``days`` before it is added (item 469)."""
+
+    behavior: Behavior
+    tool_glob: str = Field(min_length=1, max_length=_NAME_CHARS)
+    match_regex: str = Field(max_length=500)
+    days: int = Field(ge=1, le=90)
+
+
 class RuleDraftRequest(FrozenModel):
     """A rule in the owner's own words, for the review model to draft (item 110)."""
 
@@ -1468,3 +1477,55 @@ class AwayView(FrozenModel):
     decisions: AwayDecisions
     decision_runs: list[AwayDecisionRun]
     drafts: int
+
+
+class RuleExample(FrozenModel):
+    """A past step a rule tried out fits (item 469): when, in which run, the tool, its summary and target clipped and
+    masked, whether it succeeded, and what the policy decided of it then. ``was`` is ``None`` for a step the gate did
+    not let through or that never reached it (``recorded``), and for one recorded before item 468 (not ``recorded``)."""
+
+    event_id: int
+    run_id: str
+    at: float
+    tool: str
+    summary: str
+    target: str
+    ok: bool
+    was: StepDecision | None
+    recorded: bool
+
+
+class RuleShadow(FrozenModel):
+    """An earlier rule that decides some of the steps a rule tried out fits, as it comes first (item 469)."""
+
+    rule_id: str
+    description: str
+    steps: int
+
+
+class RulePreview(FrozenModel):
+    """What a rule would have done on the past steps (item 469): how many were read (``scanned``, from ``since``; all
+    of the days asked unless ``partial``: the newest only, as a try-out reads at most so many steps for so long) and how
+    many it fits. Of those, ``shadowed_by`` an earlier rule decides first; of the rest, ``in_yolo`` ran in yolo, which
+    asks nothing whatever the rules say; ``before_rules`` were decided before any rule is read, by what no rule changes
+    (money and credentials, messages and posts, Dot's own files, the always-on review, a research run, a spend's caps),
+    and ``would_decide`` it would decide. Of those it would decide: ``stricter``, ``looser`` and ``same`` against what
+    was decided then; ``stopped``, not let through then (refused, declined, handed to the owner, or held by another
+    run), which kept no decision; ``unknown``, recorded before item 468. Then the newest steps it fits, and ``problem``,
+    when its pattern took too long on a step, which the daemon would refuse."""
+
+    scanned: int
+    since: float | None
+    partial: bool
+    fits: int
+    shadowed_by: list[RuleShadow]
+    in_yolo: int
+    before_rules: int
+    would_decide: int
+    stricter: int
+    looser: int
+    same: int
+    stopped: int
+    unknown: int
+    examples: list[RuleExample]
+    problem: str | None

@@ -42,6 +42,7 @@ from dotagent.scheduler.plans import (
 )
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
+from dotagent.server.rule_replay import candidate_rule, preview_rule
 from dotagent.server.rule_shadow import rule_views
 from dotagent.server.views import (
     FiringsQuery,
@@ -53,6 +54,8 @@ from dotagent.server.views import (
     RuleDraftRequest,
     RuleEnabledRequest,
     RuleMoveRequest,
+    RulePreview,
+    RulePreviewRequest,
     RuleRequest,
     RuleView,
     ScheduleAgent,
@@ -136,6 +139,16 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         )
         await tell_rules_changed()
         return rule
+
+    @router.post("/rules/preview")
+    async def preview(request: RulePreviewRequest) -> RulePreview:
+        """What a rule would have done on the steps of the last days (item 469), before it is added: nothing is written
+        and nothing decided."""
+        existing: list[RuleRecord] = await store.list_rules()
+        candidate: RuleRecord = candidate_rule(
+            request.behavior, request.tool_glob, _checked_pattern(request.match_regex), existing
+        )
+        return await preview_rule(store, candidate, existing, request.days, time.time())
 
     @router.post("/rules/draft")
     async def draft_rule(request: RuleDraftRequest) -> DraftedRule:

@@ -204,6 +204,8 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             await expect(page.get_by_role("textbox", name="Pattern", exact=True)).to_have_value(pattern)
             await expect(page.get_by_role("textbox", name="Why", exact=True)).to_have_value(_READ_BACK)
             await expect(page.locator(".segmented.answers button[aria-pressed='true']")).to_have_text("Do it")
+            # A drafted rule is tried on the steps of the last days at once (item 469).
+            await expect(page.locator(".rule-tryout")).to_contain_text("last 30 days")
             add = page.get_by_role("button", name="Add rule", exact=True)
             await expect(add).to_be_focused()
             await page.screenshot(path=str(tmp_path / "drafted-1280-light.png"), full_page=True)
@@ -215,6 +217,7 @@ async def test_a_rule_said_in_plain_words_is_drafted_read_back_and_added(
             await expect(page.locator(".list-row .row-text")).to_have_text(_READ_BACK)
             await expect(words).to_have_value("")
             await expect(page.locator(".rule-outcome")).to_be_hidden()
+            await expect(page.locator(".rule-tryout")).to_be_hidden()
             await page.screenshot(path=str(tmp_path / "added-1280-light.png"), full_page=True)
             await page.close()
 
