@@ -410,12 +410,13 @@ async def test_a_rule_moves_up_and_down_the_order_and_one_that_never_decides_nam
     client: httpx.AsyncClient,
 ) -> None:
     """Item 449: a rule moves one place at a time and the rules are numbered 1 to n again; a rule that an earlier rule
-    fits wherever it fits names that rule; a rule that is not there is 404, and a move past either end 422."""
+    fits wherever it fits names that rule; a rule that is not there is 404, and a move past either end 422. A rule
+    that hands off is never kept from deciding by one of another answer (item 481)."""
     before: list[str] = [rule["id"] for rule in (await client.get("/api/rules")).json()]
     made: list[str] = []
     for behavior, glob, pattern in (
         ("allow", "shell", ""),
-        ("handoff", "shell", r"\bgit push\b"),
+        ("ask", "shell", r"\bgit push\b"),
         ("ask", "write_file", ""),
     ):
         created: httpx.Response = await client.post(
@@ -433,7 +434,7 @@ async def test_a_rule_moves_up_and_down_the_order_and_one_that_never_decides_nam
     order: list[str] = [rule["id"] for rule in moved.json()]
     assert order == [*before, push, everything, write]
     assert [rule["position"] for rule in moved.json()] == list(range(1, len(order) + 1))
-    # Above the rule that fitted all it fits, the hand-off decides again.
+    # Above the rule that fitted all it fits, the rule decides again.
     assert {rule["id"]: rule["never_decided_by"] for rule in moved.json()}[push] is None
     back: httpx.Response = await client.post(f"/api/rules/{push}/move", json={"direction": "down"})
     now: list[str] = [rule["id"] for rule in back.json()]
