@@ -25,7 +25,6 @@ from dotagent.store.stats import ModelProfile
 
 # The newest finished runs a model's profile is read from.
 PROFILE_RUNS: int = 30
-# The share of the window a prompt may fill; the rest is room for the reply and for the error of the token estimate.
 # Tool output is never clipped below this, however small the window.
 _MIN_OUTPUT_CHARS: int = 2000
 # The context sizes Settings › Models offers for a model (item 250), up to three quarters of its window.
@@ -93,10 +92,14 @@ def context_choices(config: AgentConfig, window: int | None, chosen: int | None)
     """The context sizes Settings › Models offers for a model besides the default one (item 250), smallest first: the
     steps from :data:`CONTEXT_FLOOR` up to three quarters of its window, that ceiling itself, and the size chosen now.
     None when its provider does not say its window, or when the ceiling is below the floor."""
-    ceiling: int | None = context_ceiling(window)
+    return _offered(context_ceiling(window), context_budget(config, window, None), chosen)
+
+
+def _offered(ceiling: int | None, default: int, chosen: int | None) -> tuple[int, ...]:
+    """The sizes from :data:`CONTEXT_FLOOR` up to ``ceiling``, that ceiling itself and ``chosen``, smallest first,
+    without the ``default`` one; none when there is no ceiling or it is below the floor."""
     if ceiling is None or ceiling < CONTEXT_FLOOR:
         return ()
-    default: int = context_budget(config, window, None)
     steps: set[int] = {size for size in (*_SIZE_STEPS, ceiling) if CONTEXT_FLOOR <= size <= ceiling and size != default}
     return tuple(sorted(steps if chosen is None else steps | {chosen}))
 
@@ -104,14 +107,9 @@ def context_choices(config: AgentConfig, window: int | None, chosen: int | None)
 def window_choices(config: AgentConfig, info: ModelInfo, chosen: int | None) -> tuple[int, ...]:
     """The context sizes Settings › Models offers for the model ``info`` describes besides its default one (item 250),
     as :func:`context_choices` gives them, up to three quarters of the most window it may be given: its own for an
-    Ollama model, which is asked for the window its size needs (item 520)."""
-    room: int | None = most_window(info)
-    ceiling: int | None = context_ceiling(room)
-    if ceiling is None or ceiling < CONTEXT_FLOOR:
-        return ()
-    default: int = context_budget(config, info.context_length, None)
-    steps: set[int] = {size for size in (*_SIZE_STEPS, ceiling) if CONTEXT_FLOOR <= size <= ceiling and size != default}
-    return tuple(sorted(steps if chosen is None else steps | {chosen}))
+    Ollama model whose own window is larger than the one Dot asks for by default, which a larger size asks for (item
+    520)."""
+    return _offered(context_ceiling(most_window(info)), context_budget(config, info.context_length, None), chosen)
 
 
 def most_window(info: ModelInfo) -> int | None:

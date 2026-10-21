@@ -341,6 +341,7 @@ def _ask() -> ChatRequest:
         speed="standard",
         session_key="",
         cache_mark=None,
+        window=None,
     )
 
 

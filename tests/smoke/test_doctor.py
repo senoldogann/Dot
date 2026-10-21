@@ -16,7 +16,6 @@ from pathlib import Path
 
 import pytest
 
-from dotagent.agent.sizes import ContextSizes
 from dotagent.config import AppConfig, McpServerConfig, load_config
 from dotagent.core.errors import ProviderTransportError
 from dotagent.desktop.capture import rect_capture_supported
@@ -318,7 +317,7 @@ async def test_an_ollama_server_that_is_not_running_is_reported_at_once(
         encoding="utf-8",
     )
     config: AppConfig = load_config(tmp_path / "config.toml")
-    provider: OllamaProvider = OllamaProvider(config.providers.ollama, None, ContextSizes({}))
+    provider: OllamaProvider = OllamaProvider(config.providers.ollama, None)
     async with asyncio.timeout(AT_ONCE_S):
         try:
             with pytest.raises(ProviderTransportError):

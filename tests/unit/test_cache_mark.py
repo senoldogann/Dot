@@ -74,6 +74,7 @@ def _request(history: list[Message]) -> ChatRequest:
         speed="standard",
         session_key="thread",
         cache_mark=None if settled is None else settled + 1,
+        window=None,
     )
 
 

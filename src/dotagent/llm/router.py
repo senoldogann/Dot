@@ -32,6 +32,7 @@ from dotagent.llm.types import (
     ModelInfo,
     ModelReply,
     StreamDelta,
+    grown_window,
     split_model_ref,
 )
 from dotagent.opencode.bridge import ToolBridge
@@ -167,8 +168,9 @@ class ModelRouter:
 
     def __init__(self, config: AppConfig, recorder: CallRecorder, login_env: Mapping[str, str]) -> None:
         self._config: AppConfig = config
-        # The context sizes chosen for models (item 250), which runs read as they start and the Ollama connector with
-        # every request: a model of this Mac given one is asked for the window it needs (item 520).
+        # The context sizes chosen for models (item 250), which runs read as they start and a side call as it is made:
+        # a model whose own window is larger than its provider is asked for by default gets the window its size needs
+        # (item 520, :meth:`window_of`).
         self.context_sizes: ContextSizes = ContextSizes(config.models.context)
         self._recorder: CallRecorder = recorder
         self._login_env: dict[str, str] = dict(login_env)
@@ -184,7 +186,7 @@ class ModelRouter:
         match name:
             case "ollama":
                 key: str | None = await asyncio.to_thread(resolve_secret, self._config.providers.ollama.api_key_env)
-                return OllamaProvider(self._config.providers.ollama, key, self.context_sizes)
+                return OllamaProvider(self._config.providers.ollama, key)
             case "openai":
                 openai = self._config.providers.openai
                 api_key: str = await asyncio.to_thread(require_secret, openai.api_key_env, "the openai provider")
@@ -309,6 +311,16 @@ class ModelRouter:
     async def model_info(self, ref: ModelRef) -> ModelInfo:
         provider: ChatProvider = await self.provider(ref.provider)
         return await provider.model_info(ref.model)
+
+    async def window_of(self, ref: ModelRef) -> int | None:
+        """The window a call of ``ref`` made outside a run's steps asks for (``ChatRequest.window``), as a run that
+        started now would: its provider's, or the one the context size chosen for it now needs (item 520). A run's own
+        steps ask for the window it planned with as it started, which a later choice does not change. Ollama is the one
+        provider that takes a window, so a model of another is asked nothing of the kind, and its info is not read."""
+        if ref.provider != "ollama":
+            return None
+        info: ModelInfo = await self.model_info(ref)
+        return grown_window(info.context_length, info.own_context_length, self.context_sizes.of(ref.label))
 
     async def aclose(self) -> None:
         async with self._lock:

@@ -471,7 +471,7 @@ async def _current_plan(agent: AgentRun) -> PlanPayload:
 
 
 async def _model_summary(
-    agent: AgentRun, ref: ModelRef, transcript: str, context_tokens: int
+    agent: AgentRun, ref: ModelRef, transcript: str, context_tokens: int, window: int | None
 ) -> tuple[str | None, int, str | None]:
     """Ask the run's own model for a summary that fits a run with a budget of ``context_tokens``: ``(text or None,
     attempts made, last problem)``.
@@ -501,6 +501,7 @@ async def _model_summary(
             speed="standard",
             session_key=f"{agent.run.thread_id}:summary",
             cache_mark=None,
+            window=window,
         )
         try:
             async with asyncio.timeout(agent.runtime.config.agent.model_call_timeout_s):
@@ -547,7 +548,12 @@ async def _model_summary(
 
 
 async def _compact(
-    agent: AgentRun, head: Sequence[Message], ledger: RunLedger, context_tokens: int, part_chars: int
+    agent: AgentRun,
+    head: Sequence[Message],
+    ledger: RunLedger,
+    context_tokens: int,
+    part_chars: int,
+    window: int | None,
 ) -> Compaction:
     """Fold ``head`` into a continuity note written by the fast model (``[models] fast``), the side work of a run that
     its own, slower model need not do; the run's own model writes it when the fast one gives no usable summary (a
@@ -575,12 +581,19 @@ async def _compact(
     fast_problem: str | None = None if paused is None else f"{unavailable_text(paused, now)} cannot answer now"
     if paused is not None:
         log.info("summary_fast_paused", run_id=agent.run.id, fast=fast.label, own=own.label, until=paused.until)
-    text, attempts, problem = await _model_summary(agent, writer, transcript, context_tokens)
+    # The run's own model is asked with the window the run planned with (item 520), the fast one with its own.
+    text, attempts, problem = await _model_summary(
+        agent,
+        writer,
+        transcript,
+        context_tokens,
+        window if writer.label == own.label else await agent.runtime.router.window_of(writer),
+    )
     if text is None and writer.label != own.label:
         fast_problem = problem if problem is not None else "no reply"
         log.warning("summary_fast_failed", run_id=agent.run.id, fast=fast.label, own=own.label, problem=fast_problem)
         writer = own
-        text, own_attempts, problem = await _model_summary(agent, own, transcript, context_tokens)
+        text, own_attempts, problem = await _model_summary(agent, own, transcript, context_tokens, window)
         attempts += own_attempts
     # The summary stays in the run's context and its record: the secrets Dot holds, and any of a known form, are
     # masked in it (review Y3).
@@ -691,7 +704,7 @@ async def _fit_context(
         if head:
             ledger = with_compaction(ledger)
             part_chars: int = round(plain * _SUMMARY_SHARE * CHARS_PER_TOKEN)
-            compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars)
+            compaction: Compaction = await _compact(agent, head, ledger, context_tokens, part_chars, scaffold.window)
             before: int = estimated
             current = [compaction.note, *tail]
             estimated = round(estimate_tokens([system, *current], specs) * ratio)
@@ -2041,6 +2054,8 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             session_key=run.thread_id,
             # The end of what the next step sends unchanged, after the system message (item 237).
             cache_mark=_cache_mark(history, config),
+            # The window the run planned with as it started (item 520): a context size chosen since does not change it.
+            window=scaffold.window if routed is None else routed.scaffold.window,
         )
         steps += 1
         asked_at: float = time.monotonic()

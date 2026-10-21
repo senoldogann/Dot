@@ -83,8 +83,9 @@ reminder, a resumed run) and, in goal mode, to the goal check.
   context size up to three quarters of its own window in Settings › Models, and Dot then asks Ollama for the window
   that size needs (the size is three quarters of it, in steps of 1024 tokens, at most the model's own) and the run
   plans with that same window (item 520): a 9B model of a 262 144-token window given 96K is asked for 131 072, whatever
-  context length Ollama's own settings give it, since the window a request asks for wins. A larger window takes more
-  of the Mac's memory. OpenAI's and OpenCode
+  context length Ollama's own settings give it, since the window a request asks for wins. A cloud model whose own
+  window is larger than `num_ctx_cloud` is given a larger one the same way; on this Mac a larger window takes more
+  memory. OpenAI's and OpenCode
   Go's windows come from Dot's tables of their models, kept to their published pages; Anthropic's from its list of
   models. When three quarters of the window is less than the number `context_tokens` sets, or than 96 000 while it is
   `"most"`, the run's budget is that, and `tool_output_chars`, the most one tool result may carry, shrinks in the same

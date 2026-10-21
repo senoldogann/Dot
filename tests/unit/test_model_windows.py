@@ -7,9 +7,9 @@ import pytest
 from dotagent.agent.scaffold import Scaffold, context_ceiling, most_window, run_window, scaffold_for, window_choices
 from dotagent.config import OllamaConfig, load_default_config
 from dotagent.core.types import JsonObject
-from dotagent.llm.ollama import asked_window, is_cloud_model, num_ctx_for, parse_model_details
+from dotagent.llm.ollama import is_cloud_model, num_ctx_for, parse_model_details, request_window
 from dotagent.llm.openai import openai_traits
-from dotagent.llm.types import ModelInfo
+from dotagent.llm.types import ChatRequest, ModelInfo
 from dotagent.store.stats import ModelProfile
 
 _OPENAI_WINDOWS: list[tuple[str, int]] = [
@@ -61,28 +61,42 @@ def test_a_model_whose_own_window_is_larger_than_the_one_asked_keeps_it_in_view(
 def test_a_context_size_chosen_for_an_ollama_model_of_this_mac_asks_for_the_window_it_needs() -> None:
     """Item 520: the owner's Ollama gave its models 128K, Dot asked every one for num_ctx 65,536, and a 9B model of a
     262,144-token window had a budget of 49,152, under the 53,172 its prompt and tools take, so no run started. A
-    context size chosen for such a model asks for the window it needs, three quarters of it being the size, up to the
-    model's own, and the run plans with that same window."""
+    context size chosen for such a model plans the run with the window it needs, three quarters of it being the size,
+    up to the model's own, and the run's requests ask Ollama for that window."""
     ollama: OllamaConfig = load_default_config().providers.ollama
     shown: JsonObject = {"capabilities": ["tools"], "model_info": {"qwen35.context_length": 262_144}}
     info: ModelInfo = parse_model_details("bonsai-2:9b", shown, num_ctx_for("bonsai-2:9b", ollama)).info
     assert (info.context_length, info.own_context_length) == (65_536, 262_144)
     # No size chosen, or one the default window holds: the window of num_ctx.
-    assert asked_window("bonsai-2:9b", info, ollama, None) == 65_536
-    assert asked_window("bonsai-2:9b", info, ollama, 48_000) == 65_536
+    assert run_window(info, None) == run_window(info, 48_000) == 65_536
     # 96K needs 128K; 128K a whole number of steps over 170,666; more than the model holds stops at its own.
-    assert asked_window("bonsai-2:9b", info, ollama, 98_304) == 131_072
-    assert asked_window("bonsai-2:9b", info, ollama, 131_072) == 175_104
-    assert asked_window("bonsai-2:9b", info, ollama, 196_608) == 262_144
-    assert asked_window("bonsai-2:9b", info, ollama, 512_000) == 262_144
-    # The run plans with the window the request asks for.
-    for chosen in (None, 48_000, 98_304, 131_072, 196_608):
-        assert run_window(info, chosen) == asked_window("bonsai-2:9b", info, ollama, chosen)
-    # A model whose window Ollama does not say, or one smaller than num_ctx, is asked as before.
+    assert run_window(info, 98_304) == 131_072
+    assert run_window(info, 131_072) == 175_104
+    assert run_window(info, 196_608) == run_window(info, 512_000) == 262_144
+    # A request asks Ollama for the window it names, num_ctx when it names none.
+    assert request_window(_request("bonsai-2:9b", 131_072), ollama) == 131_072
+    assert request_window(_request("bonsai-2:9b", None), ollama) == 65_536
+    assert request_window(_request("kimi-k3:cloud", None), ollama) == ollama.num_ctx_cloud
+    # A model whose window Ollama does not say, or one smaller than num_ctx, plans with that window as before.
     unsaid: ModelInfo = parse_model_details("m", {"capabilities": ["tools"]}, 65_536).info
-    assert asked_window("m", unsaid, ollama, 98_304) == 65_536
+    assert run_window(unsaid, 98_304) == 65_536
     small: ModelInfo = parse_model_details("tiny", {"model_info": {"llama.context_length": 8_192}}, 65_536).info
-    assert asked_window("tiny", small, ollama, 98_304) == 8_192
+    assert run_window(small, 98_304) == 8_192
+
+
+def _request(model: str, window: int | None) -> ChatRequest:
+    return ChatRequest(
+        model=model,
+        messages=(),
+        tools=(),
+        temperature=None,
+        max_output_tokens=None,
+        effort="off",
+        speed="standard",
+        session_key="s",
+        cache_mark=None,
+        window=window,
+    )
 
 
 def test_settings_offer_an_ollama_model_of_this_mac_sizes_up_to_its_own_window() -> None:

@@ -12,7 +12,6 @@ import json
 import httpx
 from pydantic import JsonValue
 
-from dotagent.agent.sizes import ContextSizes
 from dotagent.config import OllamaConfig
 from dotagent.core.errors import ProviderProtocolError, ProviderTransportError
 from dotagent.core.ids import new_id
@@ -42,7 +41,6 @@ from dotagent.llm.types import (
     ToolCall,
     Usage,
     empty_usage,
-    grown_window,
 )
 from dotagent.llm.wire import function_tools, hoist_tool_images, parse_tool_arguments
 
@@ -173,13 +171,10 @@ def num_ctx_for(model: str, config: OllamaConfig) -> int:
     return config.num_ctx_cloud if is_cloud_model(model) else config.num_ctx
 
 
-def asked_window(model: str, info: ModelInfo, config: OllamaConfig, chosen: int | None) -> int:
-    """The window asked of ``model``, which ``info`` describes, with every request: ``num_ctx`` (``num_ctx_cloud`` for a
-    cloud model), or with a context size ``chosen`` for it that needs more, the window that size needs, up to the
-    model's own (item 520). The run plans with the same window (``agent.scaffold.run_window``), and one window for a
-    model means Ollama loads it once rather than again for each size."""
-    grown: int | None = grown_window(info.context_length, info.own_context_length, chosen)
-    return num_ctx_for(model, config) if grown is None else grown
+def request_window(request: ChatRequest, config: OllamaConfig) -> int:
+    """The window a request asks Ollama for, ``num_ctx``: the one the call names (``ChatRequest.window``: the one its
+    run planned with, or a side call's, item 520), else ``num_ctx`` (``num_ctx_cloud`` for a cloud model)."""
+    return num_ctx_for(request.model, config) if request.window is None else request.window
 
 
 def build_chat_payload(
@@ -366,10 +361,8 @@ def _on_this_mac(base_url: str) -> bool:
 class OllamaProvider:
     """Connector to an Ollama server (local, or ollama.com with an API key)."""
 
-    def __init__(self, config: OllamaConfig, api_key: str | None, sizes: ContextSizes) -> None:
+    def __init__(self, config: OllamaConfig, api_key: str | None) -> None:
         self._config: OllamaConfig = config
-        # The context sizes chosen for models (item 250): a model given one is asked for the window it needs (item 520).
-        self._sizes: ContextSizes = sizes
         self._client: httpx.AsyncClient = build_client(config.connect_timeout_s, config.read_timeout_s)
         self._headers: dict[str, str] = {"Content-Type": "application/json"}
         if api_key:
@@ -404,9 +397,6 @@ class OllamaProvider:
         self._details_cache[model] = details
         return details
 
-    def _window(self, model: str, info: ModelInfo) -> int:
-        return asked_window(model, info, self._config, self._sizes.of(f"{self.name}:{model}"))
-
     async def model_info(self, model: str) -> ModelInfo:
         return (await self._details(model)).info
 
@@ -432,9 +422,7 @@ class OllamaProvider:
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         details: OllamaModelDetails = await self._details(request.model)
-        payload: JsonObject = build_chat_payload(
-            request, details, self._config, self._window(request.model, details.info)
-        )
+        payload: JsonObject = build_chat_payload(request, details, self._config, request_window(request, self._config))
         url: str = self._url("/api/chat")
         context: JsonObject = request_context(url, payload)
 

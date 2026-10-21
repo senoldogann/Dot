@@ -173,6 +173,7 @@ async def extract(
         speed="standard",
         session_key=session_key,
         cache_mark=None,
+        window=await router.window_of(ref),
     )
     try:
         async with asyncio.timeout(timeout_s):
