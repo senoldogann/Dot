@@ -107,23 +107,23 @@ The ways a service connects:
   **Remove** takes the key out of `.env` with the service's own server, and nothing else does (`keep` in `routes_mcp.py`
   says so): a try that fails leaves the key for **Try again**, an add after a failed one writes it anew, and a daemon's
   restart forgets a failed try but not its key. The addresses, keys and commands are as the services' own docs read on
-  2026-10-19, and item 505's on 2026-10-21 (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools,
-  which go to the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you
-  are using: its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own
-  page, which sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's
-  through `[server] reach`), to a page that names the service and its mark and says Dot is finishing the sign-in,
-  because the service's code is traded for its tokens after that page; then the tile turns **Ready**. This is MCP's own
-  authorization: OAuth with PKCE, Dot registering itself with the service as a client without a secret. Dot keeps the
-  tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before they run out, after a restart too; a run
-  never signs in, so a server whose sign-in is gone is left out with words that bring you back here (**Sign in again**).
-  **Remove** takes a server added here out, with its tools and its sign-in, and takes one added from another agent of
-  this Mac back from Dot, stopped at once (item 497; the agent keeps it). A server of a plugin goes with its plugin:
-  **Remove plugin** stops the plugin's servers now, its skills leave the runs that start after, and its folder in Dot's
-  plugins goes to the Trash, from which it can be put back (`DELETE /api/installed-plugins/{name}`); a plugin read from
-  a folder of `[plugins] dirs` is taken out of the config instead. A plugin whose folder went without Dot still lists
-  the servers Dot runs for it until Dot starts again, and Remove plugin then stops them; a server of the same name added
-  since is the owner's, not the plugin's. A server of Dot's config is the owner's to take out of `config.toml` (its
-  `[[mcp]]` block).
+  2026-10-19, and item 505's on 2026-10-21 (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once
+  it answered with its tools, which go to the runs that start next, without a restart. A server that asks for a sign-in
+  gets one in the browser you are using: its tile says **Waiting for your sign-in**, and its page has **Open the sign-in
+  page**, the service's own page, which sends you back to Dot's `/oauth/callback` on the address you added it from (the
+  Mac's, or your phone's through `[server] reach`), to a page that names the service and its mark and says Dot is
+  finishing the sign-in, because the service's code is traded for its tokens after that page; then the tile turns
+  **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself with the service as a client
+  without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before they run
+  out, after a restart too; a run never signs in, so a server whose sign-in is gone is left out with words that bring
+  you back here (**Sign in again**). **Remove** takes a server added here out, with its tools and its sign-in, and takes
+  one added from another agent of this Mac back from Dot, stopped at once (item 497; the agent keeps it). A server of a
+  plugin goes with its plugin: **Remove plugin** stops the plugin's servers now, its skills leave the runs that start
+  after, and its folder in Dot's plugins goes to the Trash, from which it can be put back
+  (`DELETE /api/installed-plugins/{name}`); a plugin read from a folder of `[plugins] dirs` is taken out of the config
+  instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts again, and
+  Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A server of
+  Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
 
 **Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
 its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
