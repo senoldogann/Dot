@@ -191,8 +191,10 @@ class AgentRecord(FrozenModel):
     its runs, and the bounds of its runs: ``model`` (empty for the configured one), ``effort`` and ``approvals``
     (``None`` for the configured ones) and ``tools``, the names of the tools it may use (empty for every tool). Its
     face is its ``look`` (item 102), or with ``None`` the shape and colour its id's hue gives it (actors.js).
-    ``made_by`` is the run that made it with ``create_agent`` (item 99), ``None`` for one the owner made. Dot itself
-    is ``DOT_AGENT``, never stored; its look lives in the kv store under ``look:dot``."""
+    ``made_by`` is the run that made it with ``create_agent`` (item 99), ``None`` for one the owner made.
+    ``paused_at`` is when the owner paused it (item 465): its schedules start nothing by themselves until it is resumed;
+    ``None`` while it works. Dot itself is ``DOT_AGENT``, never stored; its look lives in the kv store under
+    ``look:dot``."""
 
     id: str
     name: str
@@ -206,6 +208,7 @@ class AgentRecord(FrozenModel):
     updated_at: float
     made_by: str | None
     look: AgentLook | None
+    paused_at: float | None
 
 
 DOT_AGENT_ID: str = "dot"
@@ -222,6 +225,7 @@ DOT_AGENT: AgentRecord = AgentRecord(
     updated_at=0.0,
     made_by=None,
     look=None,
+    paused_at=None,
 )
 
 

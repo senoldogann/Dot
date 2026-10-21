@@ -27,7 +27,11 @@ off: its agent was deleted"), as Dot's with no agent named, so that none goes on
 on again runs as Dot, or as the agent you then pick in its form. The dialog says how many of them it switches off: the
 ones on. The bar of an agent's page names the agent as the page's
 heading, as the tab does ("Scout · Agents · Dot"), and Edit opens the editor at the top of the page, not where the
-greeting stood.
+greeting stood. **Pause** in the bar (item 465; `POST /api/agents/<id>/pause`, and `/resume`) keeps the agent's
+schedules from starting anything by themselves until **Resume**: the list and the page say "Paused", and its schedules'
+rows "<name> is paused" (see [Memory and schedules](memory-and-schedules.md)). What you send the agent, **Run now** of
+one of its schedules and the messages of other agents still reach it, and runs already working go on, each with its
+Stop. Saving the agent in the editor, or a restart, keeps the pause; Dot is paused by switching its schedules off.
 
 An agent can start from a template (item 315). Under the list, **Start from a template** shows fourteen: Sales
 Outbound, Talent Scout, Paid Media, Expense Manager, Product Performance, Bug Reproduction, Account Health, Chief of

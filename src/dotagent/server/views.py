@@ -931,13 +931,15 @@ class MemoryPage(FrozenModel):
 
 
 class ScheduleAgent(FrozenModel):
-    """The agent a schedule's runs run as (item 462), as its row shows it: its name, its face, and the approvals its
-    runs take when the schedule leaves them open (``None``: the configured ones)."""
+    """The agent a schedule's runs run as (item 462), as its row shows it: its name, its face, the approvals its runs
+    take when the schedule leaves them open (``None``: the configured ones), and when the owner paused it (item 465),
+    which keeps the schedule from firing by itself."""
 
     id: str
     name: str
     look: AgentLook | None
     approvals: ApprovalMode | None
+    paused_at: float | None
 
 
 class ScheduleView(FrozenModel):

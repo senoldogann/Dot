@@ -533,6 +533,7 @@ def _agent(row: aiosqlite.Row) -> AgentRecord:
         updated_at=row["updated_at"],
         made_by=row["made_by"],
         look=_look_of(row),
+        paused_at=row["paused_at"],
     )
 
 
@@ -852,6 +853,8 @@ _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     ("shape", "TEXT"),
     ("expression", "TEXT"),
     ("colour", "TEXT"),
+    # When the owner paused the agent (item 465); NULL while it works, as every agent did before.
+    ("paused_at", "REAL"),
 )
 # The kv key of Dot's own look (item 102), an ``AgentLook`` as JSON.
 DOT_LOOK_KEY: str = "look:dot"
@@ -3751,6 +3754,7 @@ class Store:
             updated_at=now,
             made_by=made_by,
             look=look,
+            paused_at=None,
         )
         await self._db.execute(
             "INSERT INTO agents(id, name, role, instructions, model, effort, approvals, tools, created_at, updated_at,"
@@ -3788,7 +3792,7 @@ class Store:
         tools: Sequence[str],
         look: AgentLook | None,
     ) -> AgentRecord:
-        """Replace what the agent is; its id and its runs stay."""
+        """Replace what the agent is; its id, its runs and its pause (item 465) stay."""
         await self.get_agent(agent_id)
         await self._db.execute(
             "UPDATE agents SET name = ?, role = ?, instructions = ?, model = ?, effort = ?, approvals = ?, tools = ?,"
@@ -3808,6 +3812,14 @@ class Store:
                 agent_id,
             ),
         )
+        await self._db.commit()
+        return await self.get_agent(agent_id)
+
+    @_writing
+    async def set_agent_paused(self, agent_id: str, paused_at: float | None) -> AgentRecord:
+        """Pause the agent at ``paused_at`` (item 465), or resume it with ``None``; nothing else of it changes."""
+        await self.get_agent(agent_id)
+        await self._db.execute("UPDATE agents SET paused_at = ? WHERE id = ?", (paused_at, agent_id))
         await self._db.commit()
         return await self.get_agent(agent_id)
 

@@ -145,6 +145,10 @@ function optionChips(record, agent) {
   return [
     el("span", { class: "chip", title: "Mode" }, record.mode),
     agent === null ? null : el("span", { class: "chip", title: "Its runs run as this agent, within its bounds" }, `As ${agent.name}`),
+    // A paused agent's schedule fires nothing by itself until the agent is resumed (item 465).
+    agent === null || agent.paused_at === null
+      ? null
+      : el("span", { class: "badge b-warn", title: "It fires nothing by itself until you resume the agent" }, `${agent.name} is paused`),
     approvals === null
       ? null
       : el(

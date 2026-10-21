@@ -219,6 +219,23 @@ def agents_router(ctx: ServerContext) -> APIRouter:
             return await dot_record(store)
         return await store.set_agent_look(agent_id, look)
 
+    @router.post("/agents/{agent_id}/pause")
+    async def pause_agent(agent_id: str) -> AgentRecord:
+        """Pause the agent (item 465): its schedules start nothing by themselves until it is resumed. What the owner
+        sends it, Run now of its schedules and the messages of other agents still reach it."""
+        if agent_id == DOT_AGENT_ID:
+            raise InvalidValueError(
+                "Dot is not an agent to pause; switch its schedules off instead", {"agent_id": agent_id}
+            )
+        return await store.set_agent_paused(agent_id, time.time())
+
+    @router.post("/agents/{agent_id}/resume")
+    async def resume_agent(agent_id: str) -> AgentRecord:
+        """Let a paused agent's schedules fire again (item 465)."""
+        if agent_id == DOT_AGENT_ID:
+            raise InvalidValueError("Dot is not an agent to resume", {"agent_id": agent_id})
+        return await store.set_agent_paused(agent_id, None)
+
     @router.delete("/agents/{agent_id}", status_code=204)
     async def delete_agent(agent_id: str) -> None:
         if agent_id == DOT_AGENT_ID:

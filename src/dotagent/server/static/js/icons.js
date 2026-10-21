@@ -44,8 +44,12 @@ const SHAPES = {
   ],
   stop: [["rect", { width: 14, height: 14, x: 5, y: 5, rx: 2 }]],
   clock: [["circle", { cx: 12, cy: 12, r: 10 }], ["path", { d: "M12 6v6l4 2" }]],
-  // A schedule's Run now (item 455).
+  // A schedule's Run now (item 455), and an agent's Pause and Resume (item 465).
   play: [["path", { d: "M6 3l14 9-14 9z" }]],
+  pause: [
+    ["rect", { x: 14, y: 4, width: 4, height: 16, rx: 1 }],
+    ["rect", { x: 6, y: 4, width: 4, height: 16, rx: 1 }],
+  ],
   circleDashed: [
     ["path", { d: "M10.1 2.182a10 10 0 0 1 3.8 0" }],
     ["path", { d: "M13.9 21.818a10 10 0 0 1-3.8 0" }],
