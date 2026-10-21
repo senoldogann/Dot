@@ -16097,6 +16097,23 @@ by its address stays, and a phone's page loaded again after it showed the chat o
 two questions, open on both screens: the first answer keeps both pages there, the last, sent on the phone, opens the
 chat's newest run on both; on main the wide window never moves). Docs: `docs/daemon.md`.
 
+### 452. The Run tab of the side panel, plain
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: the side panel's Run tab is crowded with what is not
+needed; make it plain and show what is really useful. It held Details with up to seventeen rows and Cost with ten, the
+steps, the tokens, the compactions and the time said twice, and Cost no money at all, its rows mostly "None". **As
+built.** Details keep what a glance needs: the status, the agent, the model, the reasoning level, the speed when it is
+fast, the approval mode, goal mode only when it is on, the campaign, the tool calls with the failed ones, the tokens,
+the compactions only once there is one (or a flagged check), the duration and the run that delegated it (`details.js`).
+The conversation's Files follow. The rest folds under **More**, closed the first time and kept as the browser last left
+it (`panelFold` of `panels.js`, which `panelSection`'s fold of item 426 now is): the run's mode, its start and its id
+with its copy button, how the run was Set up and its Cost, whose figures of none have no line (`cost.js`). A line of the
+set-up that warns is counted beside More's title ("1 warning", `setup.js`), so a warning is not hidden by the fold. The
+model turns are said once, as Cost's steps. Tests: `tests/smoke/test_side_panel.py` (the tab's sections are Details and
+More, closed the first time, the run id under it, the bill visible once it is opened), `test_activity.py`,
+`test_chat_calm.py` (the warning counted beside More), `test_context_meter.py`, `test_embedding_failure.py` (Set up
+under More). Docs: `docs/daemon.md`.
+
 ### 454. A chat that goes on without a jump, a finished chat drawn whole, and Dot's Chrome closed once unused
 
 **Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent scrolls the chat up and down before it
@@ -17221,3 +17238,5 @@ with one event, switching it on again; a one-time schedule and one without a lim
 - 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat's
   newest run goes on at the run a message from another screen started, at once, after a break of its stream, and as a
   phone loads it again; a page of an earlier run stays.
+- 2026-10-21 (Opus 5.5): item 452 on `item-452-run-panel-plain` from `main`: the Run tab says what a glance needs; the
+  run's mode, start and id, its set-up and its cost fold under More, closed the first time.

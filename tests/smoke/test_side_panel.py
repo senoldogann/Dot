@@ -188,16 +188,26 @@ async def test_the_side_panel_shows_one_tab_at_a_time_and_keeps_the_one_chosen_w
                 await expect(run_tab).to_have_attribute("aria-selected", "true")
                 shown: Locator = panel.get_by_role("tabpanel")
                 await expect(shown).to_have_count(1)
-                # The Files card (item 364) stays hidden while the conversation has no file.
-                await expect(shown.locator(".panel-section:not([hidden]) .panel-section-title")).to_have_text(
-                    ["Details", "Cost"]
+                # The Files card (item 364) stays hidden while the conversation has no file; what a glance does not need
+                # folds away under More, closed the first time (item 452).
+                top: Locator = shown.locator(":scope > .panel-section:not([hidden])")
+                await expect(top.locator(":scope > .panel-section-head .panel-section-title")).to_have_text(
+                    ["Details", "More"]
                 )
                 await expect(shown.get_by_label("Details")).to_contain_text("running")
-                # The bill under the details, label beside value as the details are, no line over it saying it again.
+                await expect(shown.get_by_label("Details")).not_to_contain_text("Run id")
+                more: Locator = shown.get_by_role("button", name="More")
+                if index == 0:
+                    await expect(more).to_have_attribute("aria-expanded", "false")
+                if await more.get_attribute("aria-expanded") == "false":
+                    await more.click()
+                # The bill under More, label beside value as the details are, no line over it saying it again; the run's
+                # id beside it.
+                await expect(shown.get_by_label("More about this run")).to_contain_text("Run id")
                 bill: Locator = shown.get_by_label("Cost of this run")
-                await expect(bill.locator("dt").first).to_have_text("Model")
+                await expect(bill).to_be_visible()
                 await expect(bill).to_contain_text("Input tokens")
-                await expect(shown.locator(".panel-section:not([hidden]) .panel-summary")).to_have_text(["", ""])
+                await expect(top.locator(":scope > .panel-section-head .panel-summary")).to_have_text(["", ""])
                 # The drawer has its own way out; beside the conversation, the header's button closes the panel.
                 close: Locator = panel.get_by_role("button", name="Close the details")
                 if width < 960:
@@ -328,7 +338,7 @@ async def test_the_screenshots_section_folds_away_from_its_title_and_stays_folde
                 await panel.get_by_role("tab", name="Screen").click()
                 await expect(fold).to_have_attribute("aria-expanded", "false")
                 await expect(body).to_be_hidden()
-                await expect(panel.locator(".panel-fold")).to_have_count(1)
+                await expect(panel.get_by_role("tabpanel").locator(".panel-fold")).to_have_count(1)
                 await fold.click()
                 await expect(fold).to_have_attribute("aria-expanded", "true")
                 await expect(body).to_be_visible()
