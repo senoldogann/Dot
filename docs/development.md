@@ -54,10 +54,11 @@ Markdown at the root, `docs/` or the issue and pull request templates alone skip
 the checks of the interface (`npm run check`), the unit tests, `dotx eval check` and every smoke test that needs no
 service, chosen by its marks (`-m "not live and not browser and not internet and not desktop and not hosted"`). The
 tests run spread over the cores with `-n auto` (pytest-xdist). Beside it, its `browser` job runs the core of the browser
-tests (item 486) on two workers (the runner has three cores, and each worker drives a Chrome and a daemon): the files
-whose names start `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards
-and the face, in Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides
-nothing of the gate's. `.github/workflows/browser.yml` runs every browser test every night, when asked (`gh workflow run
+tests (item 486) in two parts, the pages and the phone, each on a runner of its own and one worker (a runner has three
+cores and a worker drives a Chrome and a daemon; at two or three workers pages ran out of their time): the files whose
+names start `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the
+face, in Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of
+the gate's. `.github/workflows/browser.yml` runs every browser test every night, when asked (`gh workflow run
 browser.yml --ref <branch>`) and before a release; a red night is GitHub's to show. A browser test that leans on another
 test's state fails there, as the browser tests run without the others: each makes what it needs; and one that saves a
 note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama server runs there. When something under

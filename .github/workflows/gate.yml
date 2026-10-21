@@ -83,12 +83,23 @@ jobs:
 
   # The core of the browser tests (item 486), beside the gate, so that a red one hides nothing of the gate's: the files
   # whose names start test_browser_ and test_phone_ (new ones join by their names), the secret fields, the page guards
-  # and the face. Two workers: the runner has three cores and each worker drives a Chrome and a daemon of its own; at
-  # three, pages ran out of their time.
+  # and the face. In two parts, on runners of their own, each on one worker: a runner has three cores and a worker
+  # drives a Chrome and a daemon of its own, and at two or three workers pages ran out of their time.
   browser:
     # The release runs every browser test itself (browser.yml) beside this gate, so the core is not run twice there: a
     # workflow a release calls takes the release's context, whose workflow is "release".
     if: github.workflow != 'release'
+    name: browser (${{ matrix.part.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        part:
+          - name: pages
+            tests: >-
+              tests/smoke/test_browser_*.py tests/smoke/test_secret_fields.py tests/smoke/test_page_guards.py
+              tests/smoke/test_face.py
+          - name: phone
+            tests: tests/smoke/test_phone_*.py
     runs-on: macos-latest
     timeout-minutes: 45
     env:
@@ -96,6 +107,8 @@ jobs:
       DOT_LOG_DIR: ${{ github.workspace }}/.ci/logs
       DOT_CHROME_DIR: ${{ github.workspace }}/.ci/chrome
       TZ: UTC
+      # The part's files, globs the shell expands.
+      PART_TESTS: ${{ matrix.part.tests }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -115,8 +128,8 @@ jobs:
       - name: Throw-away home
         run: mkdir -p "$DOT_HOME" "$DOT_LOG_DIR" "$DOT_CHROME_DIR"
       - name: Core browser tests
+        # PART_TESTS is split into its globs on purpose.
         run: >
-          uv run pytest -q -n 2 -p no:cacheprovider --durations=10
+          uv run pytest -q -p no:cacheprovider --durations=10
           -m "browser and not live and not internet and not hosted and not desktop"
-          tests/smoke/test_browser_*.py tests/smoke/test_phone_*.py tests/smoke/test_secret_fields.py
-          tests/smoke/test_page_guards.py tests/smoke/test_face.py
+          $PART_TESTS
