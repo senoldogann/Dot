@@ -1230,9 +1230,12 @@ class RunManager:
             asked: RunRecord = await self._runtime.store.get_run(record.run_id)
             if record.kept_until is not None:
                 decided: ApprovalRecord = await self._decide_kept(record, approve, source, note)
-                # A step a session kept, answered once the session ended (item 484): the campaign's next session comes
-                # forward, once the session planned it, and its brief says what the owner answered.
-                ended: bool = record.scope_campaign_id is not None and asked.status not in WORKING_STATUSES
+                # A step a session kept, answered while no session of the campaign works (item 484): the campaign's
+                # next session comes forward, once the session that kept it planned it, and its brief says what the
+                # owner answered; a session at work was told, and plans its next one itself.
+                ended: bool = record.scope_campaign_id is not None and not await self._campaign_works(
+                    record.scope_campaign_id
+                )
                 if not ended or record.scope_campaign_id is None:
                     return decided
                 campaign_id: str = record.scope_campaign_id
@@ -1607,7 +1610,10 @@ class RunManager:
         # A session of a campaign hears it itself, never another run of the campaign's conversation; any other kept
         # step goes to the run at work in its chat.
         active: RunHandle | None = (
-            self._handles.get(asked.id) if record.scope_campaign_id is not None else self._active_on(asked.thread_id)
+            self._active_on(asked.thread_id)
+            if record.scope_campaign_id is None
+            # The session that kept it, or the campaign's session at work now, which found it waiting (item 484).
+            else self._handles.get(asked.id) or await self._session_at_work(record.scope_campaign_id)
         )
         if active is not None:
             try:
@@ -1655,6 +1661,20 @@ class RunManager:
             asked.agent_id,
         )
         log.info("kept_step_handed_back", approval_id=record.id, run_id=run.id, delivered="run")
+
+    async def _session_at_work(self, campaign_id: str) -> RunHandle | None:
+        """The campaign's session that works in this process, if any (item 484)."""
+        for session in reversed(await self._runtime.store.campaign_sessions(campaign_id)):
+            handle: RunHandle | None = self._handles.get(session.id)
+            if handle is not None:
+                return handle
+        return None
+
+    async def _campaign_works(self, campaign_id: str) -> bool:
+        """Whether a session of the campaign works now, in this process or another (item 484)."""
+        return any(
+            session.status in WORKING_STATUSES for session in await self._runtime.store.campaign_sessions(campaign_id)
+        )
 
     async def lapse_kept(self, now: float) -> int:
         """Close the steps kept for the owner whose time is over at ``now`` (item 482); how many. It waits for an

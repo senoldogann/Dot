@@ -43,14 +43,21 @@ async def login_env() -> dict[str, str]:
 
 
 class _Recording(ScriptedProvider):
-    """The scripted model, which keeps what each step was sent."""
+    """The scripted model, which keeps what each step was sent; its ``held``-th call (0: none) waits until the test lets
+    it go, so the test acts while a session is in that step."""
 
-    def __init__(self, turns: Sequence[ScriptedTurn]) -> None:
+    def __init__(self, turns: Sequence[ScriptedTurn], held: int = 0) -> None:
         super().__init__(_PROVIDER, turns)
         self.requests: list[ChatRequest] = []
+        self._held: int = held
+        self.entered: asyncio.Event = asyncio.Event()
+        self.release: asyncio.Event = asyncio.Event()
 
     async def complete(self, request: ChatRequest, sink: DeltaSink) -> ModelReply:
         self.requests.append(request)
+        if len(self.requests) == self._held:
+            self.entered.set()
+            await self.release.wait()
         return await super().complete(request, sink)
 
 
@@ -167,3 +174,58 @@ async def test_a_session_keeps_a_question_and_allow_once_brings_the_next_session
         assert [(record.status, record.scope_campaign_id) for record in again] == [("left", campaign_id)]
         after: CampaignRecord = await runtime.store.get_campaign(campaign_id)
         assert after.next_session_at is not None and after.next_session_at > time.time() + 23 * 3600
+
+
+async def test_allow_once_of_a_step_an_earlier_session_kept_reaches_the_session_at_work(
+    login_env: dict[str, str],
+) -> None:
+    """The same step met by a later session waits already, the earlier session's; Allow once while the later one works
+    reaches it, which does the step once on that yes, and brings no session forward."""
+    targets: ScriptedCall = ScriptedCall(
+        tool=CAMPAIGN_TARGETS_TOOL, arguments={"targets": "The board has the report", "verification": "Ask them"}
+    )
+    model: _Recording = _Recording(
+        [
+            _turn(targets),
+            _report(),
+            _finish("The report waits for the owner's yes."),
+            # Session 2 meets the same step, waiting already; then the owner allows it while it works.
+            _report(),
+            _finish("Still waiting for the yes."),
+            _report(),
+            _finish("Exported."),
+        ],
+        held=5,
+    )
+    async with _session(login_env, model) as (runtime, manager):
+        scheduler: Scheduler = Scheduler(runtime, manager)
+        await scheduler.start()
+        try:
+            opening: RunRecord = await manager.start_campaign(
+                GOAL, "task", SCRIPTED_MODEL, None, UI_SOURCE, None, "standard", None, "ask", None, (), None
+            )
+            assert opening.campaign_id is not None
+            campaign_id: str = opening.campaign_id
+            await _ended_sessions(runtime, campaign_id, 1)
+            kept: list[ApprovalRecord] = await _kept(runtime, opening.id)
+            # A day on: the next session starts while the step still waits.
+            await runtime.store.set_next_session(campaign_id, time.time())
+            async with asyncio.timeout(_TIME_LIMIT_S):
+                await model.entered.wait()
+            second: RunRecord = (await runtime.store.campaign_sessions(campaign_id))[-1]
+            assert await _kept(runtime, second.id) == []
+            await manager.decide(kept[0].id, True, UI_SOURCE, "")
+            model.release.set()
+            sessions: list[RunRecord] = await _ended_sessions(runtime, campaign_id, 2)
+        finally:
+            await scheduler.stop()
+        assert [session.id for session in sessions] == [opening.id, second.id]
+        events: list[EventRecord] = await runtime.store.list_events(second.id, 0, _MAX_EVENTS)
+        steers: list[EventRecord] = [event for event in events if event.kind == "steer"]
+        assert [event.data.get("vouches") for event in steers] == [False]
+        auto: list[EventRecord] = [event for event in events if event.kind == "approval_auto"]
+        assert [(event.data["decided_by"], event.data["status"]) for event in auto] == [("permit", "approved")]
+        assert (runtime.workspace / "report.txt").read_text() == "exported\n"
+        # Nothing waits any more, so the session after comes after the gap, not now and not in a day.
+        after: CampaignRecord = await runtime.store.get_campaign(campaign_id)
+        assert after.next_session_at is not None and time.time() + 30 * 60 < after.next_session_at < time.time() + 7200
