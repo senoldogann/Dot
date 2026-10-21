@@ -94,6 +94,16 @@ def named_page(url: str) -> str:
     return f"{parts.scheme}://{parts.netloc}" + "/".join(segments)
 
 
+# The pages a recording names: a blank tab (about:blank, whose script reports its origin as "null") or a page of
+# Chrome's own is where the owner starts, not a step of the task.
+_WEB_SCHEMES: frozenset[str] = frozenset({"http", "https"})
+
+
+def web_page(url: str) -> bool:
+    """Whether ``url`` is a page of the web, which a recording names, rather than a blank tab or Chrome's own."""
+    return urlsplit(url).scheme in _WEB_SCHEMES
+
+
 _KIND_OF: dict[str, StepKind] = {"page": "page", "click": "click", "fill": "fill", "choice": "choice", "enter": "enter"}
 
 
@@ -123,7 +133,7 @@ class TaughtStep(FrozenModel):
 def taught_step(payload: str, now: float | None = None) -> TaughtStep | None:
     """The step the recorder reported as ``payload`` (a JSON object it wrote), or ``None`` when it reported something
     this code does not know, or a step that says nothing: a page whose report cannot be read is a page that changed
-    under the recording, not a step."""
+    under the recording, not a step, and a blank tab or a page of Chrome's own is not one either."""
     try:
         reported = json.loads(payload)
     except ValueError:
@@ -136,6 +146,8 @@ def taught_step(payload: str, now: float | None = None) -> TaughtStep | None:
         return None
     label: str = str(reported.get("label", ""))[:200].strip()
     if kind == "page":
+        if not web_page(label):
+            return None
         label = named_page(label)
     secret: bool = bool(reported.get("secret")) and kind in ("fill", "enter")
     if kind != "page" and not label and not secret:
@@ -170,7 +182,10 @@ class Recording:
 
     def opened(self, url: str) -> None:
         """Take the page the recording starts on, when the tab is already there and its script has nothing new to
-        report: the skill needs the page it begins from, and the last step tells whether it was already taken."""
+        report: the skill needs the page it begins from, and the last step tells whether it was already taken. A blank
+        tab is no page to begin from."""
+        if not web_page(url):
+            return
         address: str = named_page(url)
         if not any(step.kind == "page" and step.label == address for step in self.steps):
             self.steps.append(TaughtStep(kind="page", label=address))
