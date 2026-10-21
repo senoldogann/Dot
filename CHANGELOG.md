@@ -56,6 +56,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - Every run, a chat's too, is told that there is always a way: it does not give up on a step while a way is left
   untried and says that something cannot be done only after trying it, naming each way it tried; a chat does not end
   its turn announcing a step it could take now. No way goes around a refusal, a denial or your decision (item 446).
+- A message sent to a chat on the phone shows at once on the desktop, and one sent on the desktop on the phone: every
+  page that shows the chat goes on at the run it started, also once a phone put away is back or loads the page again,
+  and what was typed there and not sent goes with it (item 451).
 
 ## 0.1.0 (2026-10-20)
 

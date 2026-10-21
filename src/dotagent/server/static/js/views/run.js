@@ -13,7 +13,7 @@ import { runChoices } from "../choices.js";
 import { createComputer } from "../computer.js";
 import { createCostCard } from "../cost.js";
 import { createDetails } from "../details.js";
-import { CHAT_BOX_PX, composerFrame, keepDraft, NEW_CHAT_DRAFT } from "../composer.js";
+import { CHAT_BOX_PX, composerFrame, keepDraft, NEW_CHAT_DRAFT, readDraft } from "../composer.js";
 import { createContextMeter } from "../contextmeter.js";
 import { clip, debounce, duration, el, FILE_BUTTONS, fileSource, modelName, OPEN_FILE_EVENT, plural, requestFile, setText, showAfter } from "../dom.js";
 import { levelLabel } from "../efforts.js";
@@ -86,6 +86,8 @@ const HELPER_MOMENTS = new Set(["run_queued", "run_started", "run_finished"]);
 const HELPERS_SETTLE_MS = 1500;
 // How often the cost card is read again while the run works (its numbers come from a query over the run's events).
 const COST_REFRESH_MS = 10_000;
+// The newest runs of a chat read for its newest turn, its delegated runs listed among them (item 451).
+const NEWEST_READ = 20;
 
 /** What a rewind did (item 282), said in a toast, and the files it left as they are, with why, in one of its own. */
 function tellRewound(cut) {
@@ -201,7 +203,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
         attempt(async () => {
           const next = await api.post(`/runs/${runId}/resume`, null);
           toast("ok", "Resuming the run…");
-          ctx.goOnAt(`/runs/${next.id}`);
+          goOn(`/runs/${next.id}`);
         }),
     },
     icon("arrowRight"),
@@ -474,7 +476,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     if (lastAnswered && !active) {
       const [newest] = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=1`);
       if (newest !== undefined && newest.id !== runId) {
-        ctx.goOnAt(`/runs/${newest.id}`);
+        goOn(`/runs/${newest.id}`);
         return;
       }
     }
@@ -538,7 +540,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     onSteered: (text) => holdMessage(text),
     onStarted: (startedRunId, afterRunId) => {
       if (afterRunId === runId) {
-        ctx.goOnAt(`/runs/${startedRunId}`);
+        goOn(`/runs/${startedRunId}`);
       }
     },
     onEdit: () => syncControls(),
@@ -750,7 +752,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
         const next = await deliver(text, files, other);
         frame.clear();
         if (next !== null) {
-          ctx.goOnAt(`/runs/${next}`);
+          goOn(`/runs/${next}`);
         }
       });
     } finally {
@@ -782,7 +784,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
         const next = await deliver(message, files, other);
         frame.clear();
         if (next !== null) {
-          ctx.goOnAt(`/runs/${next}`);
+          goOn(`/runs/${next}`);
         }
       });
     } finally {
@@ -888,7 +890,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       if (cut.back_to === null) {
         ctx.navigate("/runs");
       } else {
-        ctx.goOnAt(`/runs/${cut.back_to}`);
+        goOn(`/runs/${cut.back_to}`);
       }
     });
   }
@@ -1110,6 +1112,55 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
     } catch (error) {
       readFailed("The run", error);
     }
+  }
+
+  // ----------------------------------------------------------------------------------------------- goes on
+  // The chat goes on at another of its runs once, whichever way learns of it first (item 451): a message sent here, the
+  // queue's next one, an answer, Continue, a rewind, or a run started in the chat from another screen.
+  function goOn(target) {
+    if (signal.aborted || location.hash === `#${target}`) {
+      return;
+    }
+    ctx.goOnAt(target);
+  }
+
+  // A message sent to this chat from another screen (a phone, another window) starts its next run there, which this
+  // page did not know of until it was opened again (item 451). A page that shows the chat goes on at the newer run, as
+  // the screen it was sent from does: when a run of the chat is queued, once the lifecycle stream is back after a break
+  // (it replays nothing), and as it opens, a phone's page that the browser loaded again included. What was typed here and
+  // not sent goes with it, as the newer run's draft. A page shows the chat unless a link led to its run (main.js keeps
+  // that in the history's state, item 338) and the run was not the chat's newest when the page first read it: an earlier
+  // run opened from a link, or a delegated one, stays where it is. `newestKnown` is the chat's newest run as the page
+  // last read it; a page that shows the chat starts at its own run.
+  // `history` here is the conversation's earlier runs: the browser's history is the window's.
+  const entry = window.history.state;
+  const reachedByLink = entry !== null && typeof entry === "object" && entry.dotLinked === true && entry.dotPath === `/runs/${runId}`;
+  let newestKnown = reachedByLink ? null : runId;
+
+  async function catchUp() {
+    if (run.parent_run_id !== null || sending) {
+      return;
+    }
+    let runs;
+    try {
+      runs = await api.get(`/runs?thread_id=${encodeURIComponent(run.thread_id)}&limit=${NEWEST_READ}`);
+    } catch (error) {
+      readFailed("The chat", error);
+      return;
+    }
+    const newest = runs.find((each) => each.parent_run_id === null);
+    if (signal.aborted || sending || newest === undefined) {
+      return;
+    }
+    if (newestKnown === runId && newest.id !== runId) {
+      const draft = readDraft(runId);
+      if (draft !== null) {
+        keepDraft(newest.id, draft);
+      }
+      goOn(`/runs/${newest.id}`);
+      return;
+    }
+    newestKnown = newest.id;
   }
 
   function onRunStatus(update) {
@@ -1459,10 +1510,17 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       reconcile();
     } else if (HELPER_MOMENTS.has(event.kind) && event.run_id !== runId && (event.data.parent_run_id === runId || timeline.knows(event.run_id))) {
       helpersChanged();
+    } else if (event.kind === "run_queued" && event.data.parent_run_id === null && event.run_id !== runId) {
+      catchUp();
     }
   });
-  // The run as it stands, its lessons and its questions among it, once the lifecycle stream is back after a break.
-  const stopBack = onStreamBack(reconcile);
+  // The run as it stands, its lessons and its questions among it, once the lifecycle stream is back after a break, and
+  // whether the chat went on meanwhile (item 451).
+  const stopBack = onStreamBack(() => {
+    reconcile();
+    catchUp();
+  });
+  catchUp();
 
   const take = (message) => {
     if (message.data.kind === "steer" && message.data.run_id === runId) {

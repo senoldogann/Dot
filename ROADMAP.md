@@ -16143,6 +16143,26 @@ kept, Incognito and a fresh profile left alone, a state Dot does not know refuse
 sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
 `docs/browser-and-computer-use.md`.
 
+### 451. A message sent on one screen shows at once on the other
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21: a message sent on the phone did not show on the
+desktop until the chat was left and opened again, and the same the other way round; fix that alone. **Cause.** A
+message sent to a chat at rest starts the chat's next run (`POST /runs` with its thread); the screen it was sent from
+goes on at that run, but a page of the same chat elsewhere follows only its own run's stream and was never told: the
+lifecycle stream's `run_queued` carries no thread, and nothing read the chat again. A message queued while a run works
+already showed everywhere (`queue_changed`), and a steer on the run's own stream. **As built** (`views/run.js`). A page
+that shows the chat goes on at its newer run, as the screen it was sent from does: when a run of the chat is queued
+(it reads the chat's newest runs once on `run_queued`), once the lifecycle stream is back after a break (which replays
+nothing: a phone put away), and as it opens (a phone's page that the browser loaded again). What was typed there and
+not sent goes with it as the newer run's draft (`readDraft` of `composer.js`, exported). A page shows the chat unless
+a link led to its run (main.js keeps that in the history's state, item 338) and that run was not the chat's newest:
+an earlier run opened from a link, or a delegated one, stays where it is. Every way the page goes on (a message sent
+there, the queue's next one, an answer, Continue, a rewind) takes one guard, so two of them at once open the run once.
+Tests: `tests/smoke/test_chat_follows.py` (Chrome wide and WebKit as a phone on one chat: the phone's message shows on
+the wide window and the wide window's on the phone, the wide window's unsent words go with it, a page a link led to
+the earlier run stays, and a phone's page loaded again at that run opens where the chat is; on main the wide window
+never moves). Docs: `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -17108,3 +17128,5 @@ sent after Dot's Chrome starts again, and without the word it is not, while a da
   OpenBot is written down.
 - 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.
+- 2026-10-21 (Opus 5.5): item 451 on `item-451-chat-follows-other-screens` from `main`: a page that shows a chat goes
+  on at the run a message from another screen started, at once, after a break of its stream, and as it opens again.

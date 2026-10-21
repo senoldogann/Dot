@@ -30,7 +30,7 @@ export const CHAT_BOX_PX = 160;
 
 /** The draft kept under `key` (`{ text, files, picks }`, `picks` missing from a draft of before item 318), or null when
  * there is none or it is not one. */
-function readDraft(key) {
+export function readDraft(key) {
   const stored = readPref(`${DRAFT_PREFIX}${key}`);
   if (stored === null) {
     return null;
