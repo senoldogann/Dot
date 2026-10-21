@@ -95,8 +95,12 @@ jobs:
             tests: >-
               tests/smoke/test_browser_*.py tests/smoke/test_secret_fields.py tests/smoke/test_page_guards.py
               tests/smoke/test_face.py
+          # A phone back on a network that wakes measures seconds of grace against the runner's own clock, which a
+          # slow runner does not keep: it runs at night (browser.yml) and on the developer's Mac.
           - name: phone
-            tests: tests/smoke/test_phone_*.py
+            tests: >-
+              tests/smoke/test_phone_*.py --deselect
+              tests/smoke/test_phone_return.py::test_a_phone_back_from_the_background_keeps_its_chat_still_while_the_network_wakes
     runs-on: macos-latest
     timeout-minutes: 45
     env:

@@ -59,21 +59,23 @@ cores and a worker drives a Chrome and a daemon; at two or three workers pages r
 names start `test_browser_` and `test_phone_` (a new one joins by its name), the secret fields, the page guards and the
 face, in Google Chrome, Playwright's headless shell and WebKit (the phone's engine); a red one there hides nothing of
 the gate's. `.github/workflows/browser.yml` runs every browser test every night and when asked (`gh workflow run
-browser.yml --ref <branch>`), on one worker, for hours; a red night is GitHub's to show, and blocks nothing. A browser
-test that leans on another test's state fails there, as the browser tests run without the others: each makes what it
-needs; and one that saves a note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama server runs
-there. When something under `desktop/` changes, `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and
-`cargo test` for the desktop shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved
-later cannot change what runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and
-when asked, `.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for
-`uv.lock`, cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). When
-something under `.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and
-Dependabot's file with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout
-that keeps its token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read
-by a release, Dependabot taking a release the day it is out (it waits a week, `cooldown` in `dependabot.yml`). Any
-finding fails the job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned by its version in the
-workflow, as pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version>
---min-severity low .` first, on your Mac).
+browser.yml --ref <branch>`), on one worker, for hours; a red night is GitHub's to show, and blocks nothing. The phone's
+test of a network that wakes after the page comes back measures seconds of grace against the runner's clock, which a
+slow runner does not keep, so the core leaves it to the night and to your Mac. A browser test that leans on another
+test's state fails there, as the browser tests run without the others: each makes what it needs; and one that saves a
+note turns embeddings off (`[memory] embed_enabled = false`), as no Ollama server runs there. When something under
+`desktop/` changes, `.github/workflows/desktop.yml` runs `cargo fmt --check`, clippy and `cargo test` for the desktop
+shell. Each action the workflows use is pinned by the commit its tag named, so a tag moved later cannot change what
+runs. The tests marked live, internet, desktop or hosted stay on your Mac. Once a week, and when asked,
+`.github/workflows/audit.yml` checks the dependencies as locked against the public advisories (pip-audit for `uv.lock`,
+cargo audit for the desktop shell's `Cargo.lock`) and fails on a known vulnerability (item 217). When something under
+`.github/` changes, every week and when asked, `.github/workflows/zizmor.yml` audits the workflows and Dependabot's file
+with [zizmor](https://docs.zizmor.sh/audits/) (item 487): an event's text run as a script, a checkout that keeps its
+token, an action pinned by a commit its repository does not have, a known vulnerable action, a cache read by a release,
+Dependabot taking a release the day it is out (it waits a week, `cooldown` in `dependabot.yml`). Any finding fails the
+job; one accepted is in `.github/zizmor.yml` with its reason. zizmor is pinned by its version in the workflow, as
+pip-audit is; raise it by hand when a release brings an audit worth having (`uvx zizmor@<version> --min-severity low .`
+first, on your Mac).
 
 The work on the agent's autonomy (measuring it, noticing a stuck run, adapting to the model, resuming, learning) is
 planned and tracked in [ROADMAP.md](../ROADMAP.md) and, from item 459 on, in [roadmap/](../roadmap/); read them before
