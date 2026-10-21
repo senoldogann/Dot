@@ -367,7 +367,8 @@ class ScheduleOptions(FrozenModel):
     configured time zone, ``[scheduler] history_runs`` earlier runs' answers in front of the goal and ``[scheduler]
     same_chat`` (item 257), and ``[scheduler] stop_after_failures`` for how many failed runs in a row switch a
     repeating schedule off (item 458), and ``[scheduler] notify`` for how its runs' ends are told (item 461). A
-    schedule a run makes keeps that run's choices and its chat (item 291)."""
+    schedule a run makes keeps that run's choices and its chat (item 291). ``agent_id`` names the owner's agent its runs
+    run as, within that agent's bounds (item 462), and ``None`` is Dot, as every schedule was before."""
 
     model: str | None
     effort: Effort | None
@@ -379,6 +380,7 @@ class ScheduleOptions(FrozenModel):
     same_chat: bool | None
     stop_after_failures: int | None
     notify: NotifyLevel | None
+    agent_id: str | None
 
 
 class ScheduleRecord(FrozenModel):

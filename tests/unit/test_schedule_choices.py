@@ -44,6 +44,7 @@ def test_the_chat_choices_win_over_the_run_that_made_the_schedule() -> None:
         same_chat=True,
         stop_after_failures=None,
         notify=None,
+        agent_id=None,
     )
 
 
@@ -59,6 +60,7 @@ def test_a_chat_without_kept_choices_schedules_as_its_run_started() -> None:
         same_chat=True,
         stop_after_failures=None,
         notify=None,
+        agent_id=None,
     )
 
 

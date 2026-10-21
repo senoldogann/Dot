@@ -128,22 +128,31 @@ function goalText(text) {
   return el("div", null, body, toggle);
 }
 
+/** The approvals a schedule's runs take where it or its agent chose them (item 462), or null for the configured ones. */
+function chosenApprovals(record, agent) {
+  return record.options.approvals ?? (agent === null ? null : agent.approvals);
+}
+
 /** The chips that say how the schedule's runs start; a choice left open shows what the daemon uses now. */
-function optionChips(record) {
+function optionChips(record, agent) {
   const options = record.options;
   const now = defaultsNow();
-  const approvals = options.approvals ?? now.approvals;
+  const approvals = chosenApprovals(record, agent);
   const goalMode = options.goal_mode ?? now.goalMode;
   const model = options.model ?? now.model;
-  // Only what this schedule chose for itself: the defaults it takes are the ones every run takes, and saying them on
-  // every row buries what is its own (item 373).
+  // Only what this schedule chose for itself, and what its agent chose where it left them open (item 462): the
+  // defaults it takes are the ones every run takes, and saying them on every row buries what is its own (item 373).
   return [
     el("span", { class: "chip", title: "Mode" }, record.mode),
-    options.approvals === null
+    agent === null ? null : el("span", { class: "chip", title: "Its runs run as this agent, within its bounds" }, `As ${agent.name}`),
+    approvals === null
       ? null
       : el(
           "span",
-          { class: approvals === "yolo" ? "badge b-warn" : "chip", title: "Who answers the safety policy's questions" },
+          {
+            class: approvals === "yolo" ? "badge b-warn" : "chip",
+            title: options.approvals === null ? "Who answers the safety policy's questions: its agent's choice" : "Who answers the safety policy's questions",
+          },
           `Approvals: ${approvalLabel(approvals)}`,
         ),
     options.goal_mode === null ? null : el("span", { class: "chip" }, `Goal mode ${goalMode ? "on" : "off"}`),
@@ -163,8 +172,8 @@ function optionChips(record) {
 }
 
 /** What Run now says it starts: real work, as at the schedule's time, with the approvals its run takes. */
-function runNowTitle(record) {
-  const approvals = record.options.approvals ?? defaultsNow().approvals;
+function runNowTitle(record, agent) {
+  const approvals = chosenApprovals(record, agent) ?? defaultsNow().approvals;
   if (approvals === null) {
     return "Run now: it does real work, as it does at its time";
   }
@@ -198,13 +207,13 @@ function firingsList(firings) {
 }
 
 function scheduleRow(view, handlers) {
-  const { record } = view;
+  const { record, agent } = view;
   const runNow = el(
     "button",
     {
       class: "btn ghost sm icon-only",
       type: "button",
-      title: runNowTitle(record),
+      title: runNowTitle(record, agent),
       "aria-label": `Run ${record.name} now`,
       onclick: () => handlers.onRunNow(record),
     },
@@ -264,12 +273,13 @@ function scheduleRow(view, handlers) {
     "div",
     { class: "list-row", dataset: { schedule: record.id } },
     toggle,
-    actorFace(record.id, "idle", null),
+    // A schedule of one of the owner's agents wears the agent's face (item 462); Dot's wears its own.
+    agent === null ? actorFace(record.id, "idle", null) : actorFace(agent.id, "idle", agent.look),
     el(
       "div",
       { class: "row-main" },
       el("div", { class: "row" }, el("span", { class: "row-title" }, record.name)),
-      el("div", { class: "row-meta" }, optionChips(record)),
+      el("div", { class: "row-meta" }, optionChips(record, agent)),
       goalText(record.goal),
       // One line of when and how it went, its parts kept by a dot: a phone wraps it in two lines, not one a part.
       el(
@@ -333,6 +343,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
           same_chat: null,
           stop_after_failures: null,
           notify: null,
+          agent_id: null,
         }
       : record.options;
   const now = defaultsNow();
@@ -348,9 +359,45 @@ function scheduleForm({ view, onSaved, onCancel }) {
   const mode = select("Mode", MODES, record === null ? "task" : record.mode);
   const approvals = select(
     "Approvals",
-    [{ id: "", label: now.approvals === null ? "Default" : `Default (${approvalLabel(now.approvals)})` }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label} — ${option.hint}` }))],
+    [{ id: "", label: "Default" }, ...APPROVAL_OPTIONS.map((option) => ({ id: option.id, label: `${option.label} — ${option.hint}` }))],
     options.approvals ?? "",
   );
+  // The owner's agent its runs run as (item 462): Dot, or one of theirs, whose model, reasoning and approvals its runs
+  // take where the schedule leaves them on Default. The list comes from the daemon; until then the schedule's own.
+  const agent = el("select", { class: "select", "aria-label": "Agent" }, el("option", { value: "" }, "Dot"));
+  let agents = view === null || view.agent === null ? [] : [view.agent];
+  // Once the owner picked one, the list read later keeps their pick.
+  let picked = false;
+  function paintAgents() {
+    const keep = picked ? agent.value : options.agent_id ?? "";
+    agent.replaceChildren(el("option", { value: "" }, "Dot"), ...agents.map((record) => el("option", { value: record.id }, record.name)));
+    agent.value = agents.some((record) => record.id === keep) ? keep : "";
+    paintApprovalsDefault();
+  }
+  // The Default of the approvals names what the run takes: the agent's choice, else the configured one.
+  function paintApprovalsDefault() {
+    const chosen = agents.find((record) => record.id === agent.value) ?? null;
+    const first = approvals.options[0];
+    if (chosen !== null && chosen.approvals !== null) {
+      first.textContent = `Default (the agent's: ${approvalLabel(chosen.approvals)})`;
+    } else {
+      first.textContent = now.approvals === null ? "Default" : `Default (${approvalLabel(now.approvals)})`;
+    }
+  }
+  agent.addEventListener("change", () => {
+    picked = true;
+    paintApprovalsDefault();
+  });
+  paintAgents();
+  api
+    .get("/agents")
+    .then((summaries) => {
+      agents = summaries.map((summary) => summary.record).filter((record) => record.id !== "dot");
+      paintAgents();
+    })
+    .catch((error) => {
+      console.warn("the agents could not be listed", error);
+    });
   const goalMode = select(
     "Goal mode",
     [
@@ -540,6 +587,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       same_chat: chat.value === "" ? null : chat.value === "same",
       stop_after_failures: stopAfter.value === "" ? null : Number(stopAfter.value),
       notify: notify.value === "" ? null : notify.value,
+      agent_id: agent.value === "" ? null : agent.value,
       // The form has no speed of its own: a schedule keeps the one its chat gave it (item 291).
       speed: options.speed,
     };
@@ -571,6 +619,7 @@ function scheduleForm({ view, onSaved, onCancel }) {
       { class: "form-grid" },
       field("Name", name, ""),
       field("Mode", mode, "Scheduled runs work unattended."),
+      field("Agent", agent, "Its runs run as this agent: with its instructions and its tools, and its model, reasoning and approvals where these are left on Default."),
       goalField,
       field("Approvals", approvals, "Unattended runs cannot wait for you: with Ask, a question stops the run until you answer."),
       field("Goal mode", goalMode, ""),

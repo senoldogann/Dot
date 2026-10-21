@@ -92,7 +92,10 @@ class _Recorder:
 def home(tmp_path_factory: pytest.TempPathFactory) -> Path:
     path: Path = tmp_path_factory.mktemp("home")
     (path / "config.toml").write_text(
-        f'[models]\nmain = "ollama:{MODEL}"\n\n[scheduler]\ntick_s = 0.2\n', encoding="utf-8"
+        f'[models]\nmain = "ollama:{MODEL}"\n\n[scheduler]\ntick_s = 0.2\n\n'
+        # A tick past the nightly reflection's time would start it, and drain() would wait on a model the test lacks.
+        '[agent]\nreflection_time = "off"\n',
+        encoding="utf-8",
     )
     return path
 
@@ -254,6 +257,7 @@ async def test_the_model_can_create_list_and_delete_schedules(runtime: Runtime) 
         same_chat=True,
         stop_after_failures=None,
         notify=None,
+        agent_id=None,
     )
 
     listed, action = await _call(runtime, run, "schedule_list", {})
@@ -852,6 +856,7 @@ async def test_a_schedule_is_edited_whole_and_keeps_its_history(runtime: Runtime
         same_chat=None,
         stop_after_failures=None,
         notify=None,
+        agent_id=None,
     )
     edited: ScheduleRecord = await edit_schedule(
         runtime.store,
@@ -953,6 +958,7 @@ async def test_a_schedule_starts_its_runs_with_the_mode_model_and_approvals_it_w
         same_chat=None,
         stop_after_failures=None,
         notify=None,
+        agent_id=None,
     )
     request: ScheduleRequest = _once(runtime, "Chosen", 3).model_copy(update={"mode": "task", "options": options})
     # The moment was written in the configured zone; read it in the schedule's own zone instead it would move, so give

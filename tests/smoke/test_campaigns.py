@@ -971,6 +971,7 @@ async def test_an_emergency_stop_engaged_while_a_schedule_starts_its_run_ends_th
                 same_chat=None,
                 stop_after_failures=None,
                 notify=None,
+                agent_id=None,
             )
             request: ScheduleRequest = ScheduleRequest(
                 name="Leads", goal=GOAL, cron="0 9 * * *", at=None, mode="task", options=options

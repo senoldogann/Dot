@@ -24,6 +24,7 @@ from dotagent.core.paths import failsafe_path
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.harness.probe import probe_apart
 from dotagent.harness.step import run_step
+from dotagent.llm.types import Speed
 from dotagent.runtime import Runtime
 from dotagent.scheduler import (
     SCHEDULE_MISSED_EVENT,
@@ -48,7 +49,16 @@ from dotagent.scheduler.notices import BY_HAND_LEVEL, notify_level, tells
 from dotagent.scheduler.plans import schedule_zone
 from dotagent.scheduler.timing import format_local, next_firing
 from dotagent.store.db import Store
-from dotagent.store.models import EventRecord, HarnessStep, NotifyLevel, RunRecord, ScheduleRecord, ThreadRecord
+from dotagent.store.models import (
+    AgentRecord,
+    EventRecord,
+    HarnessStep,
+    NotifyLevel,
+    RunRecord,
+    ScheduleOptions,
+    ScheduleRecord,
+    ThreadRecord,
+)
 
 log = get_logger(__name__)
 
@@ -554,17 +564,35 @@ class Scheduler:
         return tuple(run.id for run in await self._runtime.store.list_runs(1, thread_id))
 
     async def _start(self, record: ScheduleRecord, opening: str, thread_id: str, carried: tuple[str, ...]) -> RunRecord:
-        """Start the run of a firing of ``record`` in the chat ``thread_id`` with the schedule's own choices."""
-        return await self._manager.start_firing(
+        """Start the run of a firing of ``record`` in the chat ``thread_id`` with the schedule's own choices, as the
+        owner's agent the schedule names, within that agent's bounds (item 462), or as Dot."""
+        options: ScheduleOptions = record.options
+        speed: Speed = "standard" if options.speed is None else options.speed
+        if options.agent_id is None:
+            return await self._manager.start_firing(
+                record.goal,
+                opening,
+                record.mode,
+                options.model,
+                thread_id,
+                options.effort,
+                speed,
+                options.approvals,
+                options.goal_mode,
+                carried,
+            )
+        agent: AgentRecord = await self._runtime.store.get_agent(options.agent_id)
+        return await self._manager.start_firing_for_agent(
+            agent,
             record.goal,
             opening,
             record.mode,
-            record.options.model,
+            options.model,
             thread_id,
-            record.options.effort,
-            "standard" if record.options.speed is None else record.options.speed,
-            record.options.approvals,
-            record.options.goal_mode,
+            options.effort,
+            speed,
+            options.approvals,
+            options.goal_mode,
             carried,
         )
 

@@ -76,7 +76,12 @@ MODEL: Outcomes = Outcomes()
 @pytest_asyncio.fixture(scope="module", loop_scope="module")
 async def runtime(tmp_path_factory: pytest.TempPathFactory) -> AsyncIterator[Runtime]:
     home: Path = tmp_path_factory.mktemp("home")
-    (home / "config.toml").write_text(f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\n', encoding="utf-8")
+    (home / "config.toml").write_text(
+        f'[browser]\nheadless = true\n\n[models]\nmain = "{OPUS}"\n\n'
+        # A tick past the nightly reflection's time would start it, and drain() would wait on a model the test lacks.
+        '[agent]\nreflection_time = "off"\n',
+        encoding="utf-8",
+    )
     patch: pytest.MonkeyPatch = pytest.MonkeyPatch()
     patch.setenv("DOT_HOME", str(home))
     patch.setenv("DOT_CHROME_DIR", str(tmp_path_factory.mktemp("chrome")))

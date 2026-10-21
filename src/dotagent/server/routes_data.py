@@ -55,6 +55,7 @@ from dotagent.server.views import (
     RuleMoveRequest,
     RuleRequest,
     RuleView,
+    ScheduleAgent,
     ScheduleCreateRequest,
     ScheduleUpdateRequest,
     ScheduleView,
@@ -62,6 +63,7 @@ from dotagent.server.views import (
 )
 from dotagent.store.db import Store
 from dotagent.store.models import (
+    AgentRecord,
     MemoryRecord,
     MemoryScore,
     RuleRecord,
@@ -96,7 +98,9 @@ _INPUT_MOMENT: str = "%Y-%m-%dT%H:%M"
 RULES_CHANGED_EVENT: str = "rules_changed"
 
 
-def _schedule_view(record: ScheduleRecord, zone: ZoneInfo) -> ScheduleView:
+def _schedule_view(record: ScheduleRecord, zone: ZoneInfo, agents: dict[str, AgentRecord]) -> ScheduleView:
+    """``record`` as the UI shows it, with the agent of ``agents`` its runs run as (item 462)."""
+    agent: AgentRecord | None = None if record.options.agent_id is None else agents.get(record.options.agent_id)
     return ScheduleView(
         record=record,
         when=schedule_timing(record, zone),
@@ -106,6 +110,9 @@ def _schedule_view(record: ScheduleRecord, zone: ZoneInfo) -> ScheduleView:
         if record.run_at is None
         else datetime.fromtimestamp(record.run_at, tz=zone).strftime(_INPUT_MOMENT),
         zone=zone.key,
+        agent=None
+        if agent is None
+        else ScheduleAgent(id=agent.id, name=agent.name, look=agent.look, approvals=agent.approvals),
     )
 
 
@@ -250,12 +257,19 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
     config: SchedulerConfig = ctx.runtime.config.scheduler
     zone: ZoneInfo = ctx.runtime.schedule_zone
 
+    async def agents_by_id() -> dict[str, AgentRecord]:
+        return {agent.id: agent for agent in await store.list_agents()}
+
     async def view_of(record: ScheduleRecord) -> ScheduleView:
-        return _schedule_view(record, await schedule_zone(record.options, zone))
+        return _schedule_view(record, await schedule_zone(record.options, zone), await agents_by_id())
 
     @router.get("/schedules")
     async def list_schedules() -> list[ScheduleView]:
-        return [await view_of(record) for record in sorted(await store.list_schedules(), key=schedule_order)]
+        agents: dict[str, AgentRecord] = await agents_by_id()
+        return [
+            _schedule_view(record, await schedule_zone(record.options, zone), agents)
+            for record in sorted(await store.list_schedules(), key=schedule_order)
+        ]
 
     @router.get("/schedules/{schedule_id}")
     async def get_schedule(schedule_id: str) -> ScheduleView:
@@ -280,12 +294,19 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 same_chat=request.same_chat,
                 stop_after_failures=request.stop_after_failures,
                 notify=request.notify,
+                agent_id=request.agent_id,
             ),
         )
         return await view_of(await create_schedule(store, config, zone, plan, time.time(), None))
 
     @router.patch("/schedules/{schedule_id}")
     async def change_schedule(schedule_id: str, request: ScheduleUpdateRequest) -> ScheduleView:
+        # A change that does not name the agent keeps the schedule's (item 462): only an explicit null makes it Dot's.
+        agent_id: str | None = (
+            request.agent_id
+            if "agent_id" in request.model_fields_set
+            else (await store.get_schedule(schedule_id)).options.agent_id
+        )
         plan: ScheduleRequest = ScheduleRequest(
             name=request.name,
             goal=request.goal,
@@ -303,6 +324,7 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
                 same_chat=request.same_chat,
                 stop_after_failures=request.stop_after_failures,
                 notify=request.notify,
+                agent_id=agent_id,
             ),
         )
         edited: ScheduleRecord = await edit_schedule(
