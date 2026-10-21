@@ -1,10 +1,11 @@
 // Schedules: goals that Dot carries out by itself, once or on a cron schedule, while the daemon runs. A page of the
 // sidebar above Customize. Each schedule keeps how its runs start (mode, approvals, goal mode, model, reasoning level,
-// time zone) and can be changed later.
+// time zone) and can be changed later. Run now starts one of its runs by hand, switched on or off, and its Firings
+// list its last runs, at its time and by hand (item 455).
 
 import { actorFace } from "../actors.js";
 import { api } from "../api.js";
-import { clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
+import { ago, clip, debounce, el, joined, modelName, plural, switchRow } from "../dom.js";
 import { allModels, chosenLevel, levelLabel } from "../efforts.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, pageHead, paintOpener, segmented } from "../panels.js";
@@ -15,6 +16,8 @@ import { attempt, confirmDialog, toast } from "../ui.js";
 const LIFECYCLE_KINDS = new Set(["run_started", "run_finished"]);
 const RELOAD_DELAY_MS = 400;
 const GOAL_PREVIEW_CHARS = 220;
+// A firing's answer is shown by its first line, cut to this.
+const FIRING_RESULT_CHARS = 120;
 const REPEATS = [
   { id: "cron", label: "Repeats", hint: "Fires again and again on a schedule" },
   { id: "once", label: "Once", hint: "Fires a single time" },
@@ -118,8 +121,67 @@ function optionChips(record) {
   ];
 }
 
+/** What Run now says it starts: real work, as at the schedule's time, with the approvals its run takes. */
+function runNowTitle(record) {
+  const approvals = record.options.approvals ?? defaultsNow().approvals;
+  if (approvals === null) {
+    return "Run now: it does real work, as it does at its time";
+  }
+  const asks = approvals === "yolo" ? ", asking nothing" : "";
+  return `Run now: it does real work, as it does at its time (approvals: ${approvalLabel(approvals)}${asks})`;
+}
+
+/** A schedule's last firings, newest first: how each went, when, its chat, and the first line of its answer. */
+function firingsList(firings) {
+  if (firings.length === 0) {
+    return el("div", { class: "hint" }, "No firings yet");
+  }
+  return el(
+    "ul",
+    { class: "firings-list" },
+    firings.map(({ run, chat_title }) =>
+      el(
+        "li",
+        { class: "firing" },
+        el(
+          "div",
+          { class: "row-meta" },
+          lastStatusBadge(run.status),
+          el("a", { class: "firing-title", href: `#/runs/${run.id}` }, chat_title),
+          el("span", { class: "faint" }, ago(run.created_at)),
+        ),
+        run.result === "" ? null : el("div", { class: "row-text muted" }, clip(run.result.split("\n")[0], FIRING_RESULT_CHARS)),
+      ),
+    ),
+  );
+}
+
 function scheduleRow(view, handlers) {
   const { record } = view;
+  const runNow = el(
+    "button",
+    {
+      class: "btn ghost sm icon-only",
+      type: "button",
+      title: runNowTitle(record),
+      "aria-label": `Run ${record.name} now`,
+      onclick: () => handlers.onRunNow(record),
+    },
+    icon("play"),
+  );
+  const open = handlers.firingsOpen(record.id);
+  const firings = el("div", { class: "firings", hidden: !open, dataset: { firings: record.id } });
+  const firingsToggle = el(
+    "button",
+    {
+      class: "btn ghost sm",
+      type: "button",
+      "aria-expanded": String(open),
+      "aria-label": `Firings of ${record.name}`,
+      onclick: () => handlers.onFirings(record, firingsToggle, firings),
+    },
+    "Firings",
+  );
   const toggle = el("button", {
     class: "switch",
     type: "button",
@@ -181,9 +243,11 @@ function scheduleRow(view, handlers) {
             ? null
             : el("span", { class: "faint", title: "The time zone this schedule is read in" }, view.zone),
         ]),
+        firingsToggle,
       ),
+      firings,
     ),
-    el("div", { class: "row-actions" }, edit, remove),
+    el("div", { class: "row-actions" }, runNow, edit, remove),
   );
 }
 
@@ -458,6 +522,8 @@ export function mount(root, ctx) {
   let views = null;
   // The id of the schedule whose form is open, or null.
   let editing = null;
+  // The schedules whose Firings are open: they stay open, and are read again, as the list is painted again.
+  const openFirings = new Set();
   const holder = el("div", null, loadingPanel());
   const count = el("span", { class: "hint" });
   // The form that adds a schedule stays away until New schedule asks for it; the list is what this page is for.
@@ -486,9 +552,46 @@ export function mount(root, ctx) {
       onToggle: (record) => attempt(() => toggle(record)),
       onDelete: (record) => attempt(() => remove(record)),
       onEdit: (view) => startEditing(view),
+      onRunNow: (record) => attempt(() => runNow(record)),
+      onFirings: (record, button, list) => attempt(() => toggleFirings(record, button, list)),
+      firingsOpen: (id) => openFirings.has(id),
     };
     holder.replaceChildren(el("div", { class: "schedule-list" }, views.map((view) => scheduleRow(view, handlers))));
     count.textContent = plural(views.length, "schedule", "schedules");
+    for (const list of holder.querySelectorAll("[data-firings]")) {
+      if (!list.hidden) {
+        attempt(() => loadFirings(list.dataset.firings, list));
+      }
+    }
+  }
+
+  async function loadFirings(id, list) {
+    const firings = await api.get(`/schedules/${id}/firings`);
+    if (!disposed && list.isConnected) {
+      list.replaceChildren(firingsList(firings));
+    }
+  }
+
+  async function toggleFirings(record, button, list) {
+    const open = !openFirings.has(record.id);
+    if (open) {
+      openFirings.add(record.id);
+    } else {
+      openFirings.delete(record.id);
+    }
+    button.setAttribute("aria-expanded", String(open));
+    list.hidden = !open;
+    if (open) {
+      list.replaceChildren(loadingPanel());
+      await loadFirings(record.id, list);
+    }
+  }
+
+  // No question first: the button says what it starts, and its run's page, where it can be stopped, opens at once.
+  async function runNow(record) {
+    const run = await api.post(`/schedules/${record.id}/run`, null);
+    toast("ok", run.approvals === "yolo" ? `Started ${record.name}: it asks nothing.` : `Started ${record.name}.`);
+    ctx.navigate(`/runs/${run.id}`);
   }
 
   async function reload() {

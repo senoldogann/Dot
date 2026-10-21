@@ -1,7 +1,7 @@
 """The profiles of Dot's own Chrome (item 355): Default and Incognito are always there, the ones added are listed by
 name and can be deleted, a name is a folder's and nothing else, and clearing a profile deletes its cookies and caches
 while its settings stay. The zoom Dot's own Chrome draws pages at (item 358) is written into a profile's preferences,
-the others kept."""
+the others kept, and so is the word that has Chrome keep the session cookies of its last run (item 453)."""
 
 import json
 from pathlib import Path
@@ -17,12 +17,14 @@ from dotagent.browser.profiles import (
     clear_site_data,
     delete_profile,
     empty_incognito,
+    keep_session_cookies,
     listed_profiles,
     profile_dir,
     write_default_zoom,
 )
 from dotagent.config import BrowserProfileName
 from dotagent.core.errors import BrowserError, InvalidValueError, NotFoundError
+from dotagent.core.paths import browser_incognito_dir
 
 _NAMES: TypeAdapter[str] = TypeAdapter(BrowserProfileName)
 
@@ -130,3 +132,43 @@ def test_preferences_dot_does_not_know_are_refused_and_left_as_they_were(tmp_pat
     with pytest.raises(BrowserError):
         write_default_zoom(tmp_path, 125)
     assert (tmp_path / "Default" / "Preferences").read_text(encoding="utf-8") == held
+
+
+def test_a_profile_keeps_the_session_cookies_of_its_last_run_and_its_other_preferences_stay(home: Path) -> None:
+    """Item 453: the profile says its last run crashed, after which Chrome gives the cookies without an expiry back."""
+    folder: Path = home / "browser-profile"
+    preferences: Path = folder / "Default" / "Preferences"
+    preferences.parent.mkdir(parents=True)
+    preferences.write_text(
+        json.dumps({"profile": {"name": "Dot", "exit_type": "Normal", "exited_cleanly": True}, "zoom": 1}),
+        encoding="utf-8",
+    )
+    keep_session_cookies(folder)
+    kept = json.loads(preferences.read_text(encoding="utf-8"))
+    assert kept == {"profile": {"name": "Dot", "exit_type": "Crashed", "exited_cleanly": False}, "zoom": 1}
+    assert preferences.stat().st_mode & 0o777 == 0o600
+    # Said already, the file is left as it is.
+    written: int = preferences.stat().st_mtime_ns
+    keep_session_cookies(folder)
+    assert preferences.stat().st_mtime_ns == written
+
+
+def test_incognito_and_a_profile_chrome_never_started_on_are_not_written(home: Path) -> None:
+    fresh: Path = home / "browser-profiles" / "Work"
+    keep_session_cookies(fresh)
+    assert not (fresh / "Default" / "Preferences").exists()
+    incognito: Path = browser_incognito_dir()
+    (incognito / "Default").mkdir(parents=True)
+    (incognito / "Default" / "Preferences").write_text('{"profile": {"exit_type": "Normal"}}', encoding="utf-8")
+    keep_session_cookies(incognito)
+    assert json.loads((incognito / "Default" / "Preferences").read_text(encoding="utf-8")) == {
+        "profile": {"exit_type": "Normal"}
+    }
+
+
+def test_a_profile_state_dot_does_not_know_is_refused_and_left_as_it_was(tmp_path: Path) -> None:
+    (tmp_path / "Default").mkdir()
+    (tmp_path / "Default" / "Preferences").write_text('{"profile": "Dot"}', encoding="utf-8")
+    with pytest.raises(BrowserError):
+        keep_session_cookies(tmp_path)
+    assert (tmp_path / "Default" / "Preferences").read_text(encoding="utf-8") == '{"profile": "Dot"}'

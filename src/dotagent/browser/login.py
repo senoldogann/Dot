@@ -10,6 +10,7 @@ from pathlib import Path
 
 from dotagent.browser.keychain import KeychainMode, keychain_switches, read_keychain_mode
 from dotagent.browser.profile_lock import profile_holder_pid
+from dotagent.browser.profiles import HIDE_CRASH_BUBBLE, keep_session_cookies
 from dotagent.browser.safety import normalize_url
 from dotagent.core.errors import BrowserError
 
@@ -20,7 +21,7 @@ _CHROME_BINARY: Path = CHROME_APP / "Contents" / "MacOS" / "Google Chrome"
 def chrome_arguments(profile: Path, url: str | None, keychain: KeychainMode) -> list[str]:
     """The command line that opens ``profile`` in Chrome, on ``url`` when one is given."""
     arguments: list[str] = [str(_CHROME_BINARY), f"--user-data-dir={profile}", "--no-first-run"]
-    arguments.append("--no-default-browser-check")
+    arguments.extend(("--no-default-browser-check", HIDE_CRASH_BUBBLE))
     arguments.extend(keychain_switches(keychain))
     if url is not None:
         arguments.append(normalize_url(url))
@@ -52,7 +53,8 @@ async def open_sign_in_window(profile: Path) -> asyncio.subprocess.Process:
 
 
 async def _ready_profile(profile: Path) -> KeychainMode:
-    """The keychain mode of ``profile``, made when missing, once Chrome is known to be there and nothing holds it."""
+    """The keychain mode of ``profile``, made when missing, once Chrome is known to be there and nothing holds it; the
+    profile then keeps the session cookies of its last run (item 453), as the automated sessions' does."""
     if not await asyncio.to_thread(_CHROME_BINARY.exists):
         raise BrowserError("Google Chrome is not installed", {"expected": str(_CHROME_BINARY)})
     holder: int | None = await asyncio.to_thread(profile_holder_pid, profile)
@@ -63,4 +65,5 @@ async def _ready_profile(profile: Path) -> KeychainMode:
             {"profile": str(profile), "pid": holder},
         )
     await asyncio.to_thread(lambda: profile.mkdir(mode=0o700, parents=True, exist_ok=True))
+    await asyncio.to_thread(keep_session_cookies, profile)
     return await asyncio.to_thread(read_keychain_mode, profile)

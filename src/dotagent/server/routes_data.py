@@ -11,7 +11,7 @@ from fastapi import APIRouter, Query
 from dotagent.agent.learning_health import LearningHealth, quiet_limit, read_learning_health, stall_reason
 from dotagent.agent.review import RuleDrafter, RuleWordsRequest, ToolBrief, rule_drafter_for
 from dotagent.config import SchedulerConfig
-from dotagent.core.errors import InvalidValueError, NotFoundError
+from dotagent.core.errors import InvalidValueError, NotFoundError, RunConflict
 from dotagent.events import SYSTEM_RUN_ID
 from dotagent.memory.service import (
     MemoryHit,
@@ -28,6 +28,7 @@ from dotagent.memory.service import (
     update_memory_note,
 )
 from dotagent.policy.drafting import DraftedRule
+from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.scheduler.plans import (
     ScheduleRequest,
     create_schedule,
@@ -41,7 +42,9 @@ from dotagent.scheduler.plans import (
 )
 from dotagent.scheduler.timing import format_local
 from dotagent.server.context import ServerContext
+from dotagent.server.rule_shadow import rule_views
 from dotagent.server.views import (
+    FiringsQuery,
     LearningHealthView,
     MemoriesQuery,
     MemoryPage,
@@ -49,14 +52,24 @@ from dotagent.server.views import (
     OwnerLinesRequest,
     RuleDraftRequest,
     RuleEnabledRequest,
+    RuleMoveRequest,
     RuleRequest,
+    RuleView,
     ScheduleCreateRequest,
     ScheduleUpdateRequest,
     ScheduleView,
     SearchQuery,
 )
 from dotagent.store.db import Store
-from dotagent.store.models import MemoryRecord, MemoryScore, RuleRecord, ScheduleOptions, ScheduleRecord
+from dotagent.store.models import (
+    MemoryRecord,
+    MemoryScore,
+    RuleRecord,
+    RunRecord,
+    ScheduleFiring,
+    ScheduleOptions,
+    ScheduleRecord,
+)
 
 
 def _checked_pattern(pattern: str) -> str:
@@ -104,8 +117,8 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         await ctx.runtime.bus.emit(SYSTEM_RUN_ID, RULES_CHANGED_EVENT, {}, False)
 
     @router.get("/rules")
-    async def list_rules() -> list[RuleRecord]:
-        return await store.list_rules()
+    async def list_rules() -> list[RuleView]:
+        return rule_views(await store.list_rules())
 
     @router.post("/rules", status_code=201)
     async def add_rule(request: RuleRequest) -> RuleRecord:
@@ -140,6 +153,13 @@ def rules_router(ctx: ServerContext) -> APIRouter:
         await store.set_rule_enabled(rule_id, request.enabled)
         await tell_rules_changed()
         return await _rule(store, rule_id)
+
+    @router.post("/rules/{rule_id}/move")
+    async def move_rule(rule_id: str, request: RuleMoveRequest) -> list[RuleView]:
+        """Move a rule one place up or down the order the policy reads the rules in (item 449); 422 past either end."""
+        await store.move_rule(rule_id, -1 if request.direction == "up" else 1)
+        await tell_rules_changed()
+        return rule_views(await store.list_rules())
 
     @router.delete("/rules/{rule_id}")
     async def delete_rule(rule_id: str) -> RuleRecord:
@@ -297,5 +317,19 @@ def schedules_router(ctx: ServerContext) -> APIRouter:
     @router.delete("/schedules/{schedule_id}")
     async def delete_schedule(schedule_id: str) -> ScheduleView:
         return await view_of(await remove_schedule(store, schedule_id))
+
+    @router.post("/schedules/{schedule_id}/run", status_code=201)
+    async def run_schedule_now(schedule_id: str) -> RunRecord:
+        """Start a run of the schedule now, by hand (item 455): 409 while the emergency stop is engaged, while one of
+        its runs is at work, and in a daemon that runs no scheduler; its next time and its switch stay as they are."""
+        if ctx.scheduler is None:
+            raise RunConflict("this daemon runs no scheduler", {"schedule_id": schedule_id})
+        return await ctx.scheduler.fire_by_hand(schedule_id, time.time())
+
+    @router.get("/schedules/{schedule_id}/firings")
+    async def list_firings(schedule_id: str, query: Annotated[FiringsQuery, Query()]) -> list[ScheduleFiring]:
+        """The schedule's last firings, at its time and by hand, newest first, one at work among them (item 455)."""
+        await store.get_schedule(schedule_id)
+        return await store.schedule_firings(schedule_id, SCHEDULE_SOURCE, query.limit)
 
     return router

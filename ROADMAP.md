@@ -16096,6 +16096,106 @@ Chrome the Dock still brings it forward (`attach` mode avoids it). Measured in `
 window falls from 789 px to 0 on the code before; a finished chat's answer is there with its page) and
 `tests/smoke/test_browser.py`.
 
+### 449. The rules move with arrows, and a rule that never decides says so
+
+**Status: done (2026-10-21).** The first of the nine ideas the owner took from the comparison with OpenBot
+(`reports/openbot-vs-dot-2026-10-20.md`, local; the plan below), and the first step of its second, "the strictest rule
+wins". The design, checked against the code and critiqued, does not make the strictest answer win: the order of the
+rules is today the only way to write an exception (the Rules page's own examples, "let Dot run git status without
+asking" above "ask me before rm", are an allow above a broader ask), and a stored rule carries no sign that an exception
+was meant. It goes in three steps: the owner can move the rules and sees which of them never decide (this item); later,
+once the owner has seen the notes for a release, a rule that hands the step over decides wherever it stands (on the
+human path of `policy/`). **As built.** `Store.move_rule` moves a rule a number of places along the order, which it
+reads under the write lock, and numbers the rules 1 to n, which closes the gaps deleted rules left; `POST
+/api/rules/{id}/move` moves it one place up or down (422 past either end, 404 for no rule) and tells the pages
+(`rules_changed`). `server/rule_shadow.py` names for each rule the earlier enabled rule that fits every action it fits
+(no expression or the same one, on a tool pattern that takes in its own: `*`, the same pattern, or one that matches its
+plain tool name), and `GET /api/rules` gives it as `never_decided_by`, computed once on the server and not again in the
+page (the critique). Whether two different expressions overlap is not told. The policy is untouched: `match_rule` still
+takes the first fit, and the rule the note names is the one that decides (the unit test reads it off `match_rule`). The
+Rules page draws two arrows on a rule's row, off at the ends, that keep the focus as the rule moves (the other arrow
+once it reaches an end), and a "Never decides" badge whose title names the rule that decides in its place. The note
+above the rules said a yolo run keeps all of the protections that are always on but the first; since item 443 it keeps
+only the second, a research run's limit, and the note says so. What a yolo run does is untouched. Tests:
+`tests/unit/test_rule_shadow.py` (the certain cases, the cases not told, the note against the engine),
+`tests/smoke/test_server.py` (a move, the numbering, the ends, 404, a direction that is none),
+`tests/smoke/test_rules.py` (the page at 1280 and at 390 px, the phone a touch screen where a row's buttons always show,
+in light and dark: the badge, the arrows, the focus). Docs: `docs/safety.md` (step 6), `docs/daemon.md`.
+
+**The plan it starts.** The owner's go-ahead of 2026-10-20 and 21: the nine ideas, each in its own pull request, planned
+so that today's Dot keeps working as it does, and yolo's freedom untouched ("YOLO modundaki serbestliğe dokunma"): in
+yolo none of them adds a question, a refusal, a hand-off, a wait or a mask, a no given in another mode does not carry
+into it, and each that touches the gate, the policy, the loop or what a run sees has a test that a yolo run does what it
+did. The designs were written against the code by seven agents and critiqued; an item takes its number when it starts.
+First, small and off the human paths: the money and credential floor of MCP tools (their names say a payment or a
+credential), a no not asked again in the same run, the session cookies of Dot's own Chrome kept across its restarts
+(cookies, sessions and history stay as in a real browser, for the Default profile and those the owner added, not
+Incognito), a repeating schedule switched off after failed runs in a row, Run now with a schedule's past firings, and
+this item. Then the medium ones: the values of password, one-time-code and card fields kept out of what the model reads
+(not in yolo), every decision of the gate recorded on its step and a rule tried on past steps before it is added, a
+notification level per schedule, an agent paused without losing it, a "while you were away" digest, scheduled work held
+without the emergency stop, a schedule run as one of the owner's agents, and the owner driving Dot's browser from the
+phone while the run is held. Last, the ones on the human paths, each waiting for the owner's yes: the release gated on
+the whole gate with browser tests in CI and the workflows checked by zizmor, the rule that hands a step over deciding
+wherever it stands, and approvals a run nobody watches keeps for the owner to answer later (off by default; never in
+yolo, where nothing is asked; not for a message, a post, an MCP call or an upload, whose words a later yes would not
+bind; and never by running the kept call outside its run).
+
+### 453. Dot's own Chrome keeps its session cookies when it starts again
+
+**Status: done (2026-10-21).** Part of the ninth of the nine ideas taken from OpenBot (item 449 has the plan), and the
+owner's word of 2026-10-21, corrected after a first reading the wrong way round: "Hayır sen yanlış anladın silmesin" —
+Dot's Chrome must keep cookies, sessions and history like a real browser, for Default and the profiles the owner added,
+not for Incognito. Cookies with an expiry and the history already stayed; the cookies a site gives no expiry, where many
+sites keep a sign-in, were gone after every restart of Dot's Chrome (the daemon's, the Mac's, an idle close). **Measured
+first.** The design would have kept them in a file of its own (a 0600 copy of the jar, saved every 30 s and put back
+before the first page), and the critique asked to try Chrome's own way before that: Chrome writes session cookies into
+the profile while it runs and deletes them as it starts, unless its last run crashed, when it gives them back. On a
+scratch profile (Chrome 155, Playwright 1.63, Dot's switches): a normal restart dropped the session cookie; with
+`profile.exit_type` set to `Crashed` in the profile's preferences and `--hide-crash-restore-bubble` the cookie came
+back, headless and with a window, after each of five restarts in a row, and no page of the last run was opened. **As
+built.** `browser.profiles.keep_session_cookies` writes that word into the preferences of the profile (`exit_type`
+`Crashed`, `exited_cleanly` false; the other preferences kept, written only when they say otherwise, and not for
+Incognito nor a profile whose preferences hold nothing yet; a new profile whose zoom was just written gets it too, with
+nothing to give back) before Dot's own Chrome starts (after the zoom, item 358) and before Sign in… and `dotx browser
+login` open their window (`browser.login`), so a session cookie set in either survives the other; both start Chrome with
+the switch. No copy of a cookie leaves Chrome's own store, which keeps them under the key it always used, so an imported
+profile keeps them too. **Clear** still deletes them. Item 447 of another session (Dot's Chrome closed once unused)
+ships with that close off; with this item in, the close loses no sign-in and its default can be 300 s, the owner's call.
+Yolo and every approval mode are untouched. Tests: `tests/unit/test_browser_profiles.py` (the word written, the rest
+kept, Incognito and a fresh profile left alone, a state Dot does not know refused),
+`tests/smoke/test_browser_session_cookies.py` (a real Chrome on a throwaway profile: a cookie without an expiry is still
+sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
+`docs/browser-and-computer-use.md`.
+
+### 455. A schedule runs now, by hand, and lists its firings
+
+**Status: done (2026-10-21).** The fifth of the nine ideas taken from OpenBot (item 449 has the plan), its first part:
+"a Run now button and the list of a schedule's past runs". **As built.** `Scheduler.fire_by_hand` starts a run of a
+schedule now, switched on or off, due or not, as a firing goes (unattended, the schedule's own choices, the digest of
+its earlier runs), in a chat titled `<name> · <time> · by hand` (or the schedule's chat), its first message saying it
+was started by hand (`by_hand_goal`); `Store.record_schedule_hand_run` writes its last run and its chat and nothing of
+when it fires next nor of its switch, so a one-time schedule is still due at its moment. It refuses (409) while the
+emergency stop is engaged and while a run of the schedule is at work or being started: a set of the schedules being
+started, entered by a tick's firing and by a hand run alike, closes the window between the check and the run in flight,
+so a click and a tick start one run between them, and a repeating schedule's firing whose time comes during a hand run
+is skipped as for a run still going, while a one-time schedule waits, still due, and fires once that run has ended (the
+pre-push review found that it was switched off for good by that skip, as its following time is none). A start the daemon
+refuses drops the chat made for it, is the caller's error and no missed firing (the owner is looking). `_fire` keeps its
+order (the firing written before the run starts); its parts both paths need (`_history`, `_carried`, `_start`, `_track`)
+are methods of their own, and `_firing_chat` takes its title. Routes: `POST /api/schedules/{id}/run` (201, a run), `GET
+/api/schedules/{id}/firings` (its last runs, newest first, one at work among them, each with its chat's title,
+`Store.schedule_firings`). On Schedules a row has a play button whose title says it does real work with the approvals
+its run takes (yolo: "asking nothing"), with no question first, as the owner's word of 2026-10-21 asks of yolo ("YOLO
+modundaki serbestliğe dokunma"): a click opens the run's page, where Stop is, and a toast says it started; **Firings**
+opens the list under the row, kept open and read again as the list is painted again. The critique's corrections: the
+design's "a gone model is a 422" does not hold (the run starts and fails as a failed run, which the list shows), so the
+refused start is tested with a manager that refuses; the watch is started before the hand run's status is written.
+Tests: `tests/smoke/test_run_now.py` (switched off and run by hand with its time kept, a one-time schedule still due, no
+second start by hand nor at its time and a click racing a tick, the emergency stop, a refused start leaving no chat, a
+yolo schedule's run in yolo, and the page at 1280 px and at 390 px as a touch screen: the button's title, the run's
+page, the list). The scheduler's own tests pass unchanged. Docs: `docs/memory-and-schedules.md`, `docs/daemon.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -17056,3 +17156,10 @@ window falls from 789 px to 0 on the code before; a finished chat's answer is th
   every run is told that there is always a way, within the rules of trust and safety.
 - 2026-10-21 (Opus 5.5): item 447: `@` offers the MCP servers and the plugins alone — the skills are `/`'s — each with
   the logo of its Customize tile, and on a phone the menu takes the room the keyboard leaves and scrolls.
+- 2026-10-21 (Opus 5.5): item 449 on `item-449-rule-order` from `main`: a rule's arrows move it up or down the order, a
+  rule that an earlier rule fits wherever it fits says it never decides, and the plan of the nine ideas taken from
+  OpenBot is written down.
+- 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
+  of its last run when it starts again, as Chrome does after a crash, without a page of that run.
+- 2026-10-21 (Opus 5.5): item 455 on `item-455-run-now` from `main`: a schedule runs now by hand, as its firing would,
+  its time and switch kept, and its Firings list its last runs.

@@ -122,6 +122,13 @@ Chrome is let go of when it works on it); **Delete** removes an added profile th
 `dotx browser login`, `dotx browser import-chrome` and `dotx doctor` work on the profile in use. Every profile is
 guarded as Default is: a run neither reads nor changes it. In My Chrome mode the profiles are your Chrome's own.
 
+A profile keeps what a real browser keeps (item 453): its history, its cookies with an expiry, and its session
+cookies too, the ones a site gives no expiry and many keep a sign-in in. Chrome writes those into the profile while it
+runs and deletes them as it starts again, unless its last run crashed; so before Dot's own Chrome, Sign in… or `dotx
+browser login` start on a profile, Dot writes into its preferences that the last run crashed (`profile.exit_type`),
+and Chrome starts with `--hide-crash-restore-bubble`: it gives the session cookies back and opens none of the pages of
+that run. Incognito keeps nothing, as before. **Clear** still deletes them all.
+
 Both modes share what follows.
 
 - The page is observed as an accessibility snapshot in which every element has a ref (`e12`). It covers the viewport

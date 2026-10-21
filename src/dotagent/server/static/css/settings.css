@@ -585,6 +585,15 @@
   line-height: var(--leading-md);
 }
 
+/* A rule's arrows (item 449): the chevron of the icon set, turned to point up or down the order. */
+.rule-move.up .icon {
+  transform: rotate(-90deg);
+}
+
+.rule-move.down .icon {
+  transform: rotate(90deg);
+}
+
 .rule-sentence-preview {
   color: var(--text-2);
 }
@@ -1600,6 +1609,21 @@
 
 .schedule-panel .row-main {
   gap: var(--space-1);
+}
+
+/* A schedule's last firings (item 455), under its line of when it runs: a run each, its title the way to its chat. */
+.firings-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.firing-title {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* ---------- Rules (item 373): the rules that are checked, in order, and the ways to write one when Add rule asks. ---------- */

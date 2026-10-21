@@ -49,6 +49,7 @@ from dotagent.store.models import (
     MemoryRecord,
     MemoryScore,
     QueuedMessage,
+    RuleRecord,
     RunMode,
     RunPicks,
     RunRecord,
@@ -226,6 +227,12 @@ class ApprovalsQuery(FrozenModel):
 class MemoriesQuery(FrozenModel):
     limit: int = Field(default=50, ge=1, le=200)
     offset: int = Field(default=0, ge=0)
+
+
+class FiringsQuery(FrozenModel):
+    """How many of a schedule's last firings to list (item 455)."""
+
+    limit: int = Field(default=20, ge=1, le=50)
 
 
 class SearchQuery(FrozenModel):
@@ -429,6 +436,19 @@ class RuleDraftRequest(FrozenModel):
 
 class RuleEnabledRequest(FrozenModel):
     enabled: bool
+
+
+class RuleMoveRequest(FrozenModel):
+    """Which way a rule moves in the order the policy reads the rules in: one place up, toward the first, or down."""
+
+    direction: Literal["up", "down"]
+
+
+class RuleView(RuleRecord):
+    """A rule as the Rules page lists it (item 449): the rule, and the id of the earlier rule that fits every action it
+    fits, so that it never decides (:func:`dotagent.server.rule_shadow.shadowing_rule`); None when it can decide."""
+
+    never_decided_by: str | None
 
 
 class OwnerLinesRequest(FrozenModel):
