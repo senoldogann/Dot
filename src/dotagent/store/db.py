@@ -73,6 +73,7 @@ from dotagent.store.models import (
     ScheduleRecord,
     SentMessage,
     ShownPage,
+    StepRow,
     ThreadRecord,
     ThreadSummary,
     UnattendedCount,
@@ -2282,6 +2283,56 @@ class Store:
         return [_run(row) for row in rows]
 
     # ----- events ----------------------------------------------------------------------------
+
+    async def first_event_id_since(self, since: float) -> int:
+        """The id of the first event at or after ``since``, one past the last event when none is; found by halving the
+        ids, which grow with the time, so no read walks the whole table (it has no index on the time, item 469)."""
+        bounds = await self._one("SELECT MIN(id) AS low, MAX(id) AS high FROM events", ())
+        if bounds is None or bounds["low"] is None:
+            return 0
+        low: int = int(bounds["low"])
+        high: int = int(bounds["high"]) + 1
+        while low < high:
+            middle: int = (low + high) // 2
+            row = await self._one("SELECT id, ts FROM events WHERE id >= ? ORDER BY id LIMIT 1", (middle,))
+            if row is None or float(row["ts"]) >= since:
+                high = middle if row is None else min(middle, int(row["id"]))
+            else:
+                low = int(row["id"]) + 1
+        return low
+
+    async def tool_steps(self, floor_id: int, before_id: int, limit: int) -> list[StepRow]:
+        """The newest ``limit`` steps whose action reached the policy (a ``tool_result`` with a kind) among the events
+        from ``floor_id`` up to, not with, ``before_id``, newest first, with whether their run was in yolo (item 469);
+        SQLite reads the fields out of each event's JSON, so a page carries no event's whole text."""
+        rows = await self._all(
+            "SELECT e.id, e.run_id, e.ts, json_extract(e.data, '$.tool') AS tool,"
+            " json_extract(e.data, '$.kind') AS action_kind, json_extract(e.data, '$.risk') AS risk,"
+            " json_extract(e.data, '$.summary') AS summary, json_extract(e.data, '$.target') AS target,"
+            " json_extract(e.data, '$.ok') AS ok, json_extract(e.data, '$.decision') AS decision,"
+            " json_type(e.data, '$.decision') IS NOT NULL AS recorded, COALESCE(r.approvals = 'yolo', 0) AS yolo"
+            " FROM events AS e LEFT JOIN runs AS r ON r.id = e.run_id"
+            " WHERE e.id >= ? AND e.id < ? AND e.kind = 'tool_result'"
+            " AND COALESCE(json_extract(e.data, '$.kind'), '') != '' ORDER BY e.id DESC LIMIT ?",
+            (floor_id, before_id, limit),
+        )
+        return [
+            StepRow(
+                event_id=row["id"],
+                run_id=row["run_id"],
+                at=row["ts"],
+                tool=row["tool"] or "",
+                kind=row["action_kind"] or "",
+                risk=row["risk"] or "",
+                summary=row["summary"] or "",
+                target=row["target"] or "",
+                ok=bool(row["ok"]),
+                decision=None if row["decision"] is None else parse_json_object(row["decision"], "a step's decision"),
+                recorded=bool(row["recorded"]),
+                yolo=bool(row["yolo"]),
+            )
+            for row in rows
+        ]
 
     @_writing
     async def add_event(self, run_id: str, kind: str, data: JsonObject) -> EventRecord:

@@ -1,0 +1,249 @@
+"""Trying a rule on past steps before it is added (item 469): which of the steps of the last days it fits, which of
+those an earlier rule decides first, which no rule decides (a yolo run's, or what the policy settles before it reads
+any rule), and how what it would decide compares with what was decided then (recorded since item 468). The steps are
+the ``tool_result`` events, read newest first by pages, at most so many and for so long, and the rule is matched as the
+policy matches rules (:func:`dotagent.policy.engine.match_rule`), the policy itself untouched: nothing is written and
+nothing decided."""
+
+import asyncio
+import time
+from collections import Counter
+from collections.abc import Sequence
+from typing import get_args
+
+from dotagent.agent.authorization import StepDecision
+from dotagent.core.errors import ConfigError
+from dotagent.core.text import plain_line, redact_secrets
+from dotagent.policy.engine import match_rule
+from dotagent.policy.types import ActionInfo, ActionKind, DecisionSource, Risk, Verdict
+from dotagent.server.views import RuleExample, RulePreview, RuleShadow
+from dotagent.store.db import Store
+from dotagent.store.models import Behavior, RuleRecord, StepRow
+
+DAY_S: float = 86_400.0
+# The id of the rule being tried, which no stored rule has.
+CANDIDATE_ID: str = "candidate"
+# How a try-out reads: pages of steps, at most so many steps and so long, so the store and the event loop stay free
+# for the runs at work (the store has one connection, and a pattern runs on the loop, item 387).
+_PAGE: int = 1000
+_MAX_STEPS: int = 20_000
+_BUDGET_S: float = 2.0
+# The longest a try-out counts without letting the runs at work go on: a pattern can be slow on every step and still
+# under the daemon's limit for one.
+_SLICE_S: float = 0.05
+_EXAMPLES: int = 20
+_EXAMPLE_CHARS: int = 200
+_KINDS: frozenset[str] = frozenset(get_args(ActionKind))
+_RISKS: frozenset[str] = frozenset(get_args(Risk))
+# What a rule's behaviour comes to at the gate, as the policy reads it (policy/engine.py, _BEHAVIOR_VERDICT).
+_VERDICT: dict[Behavior, Verdict] = {"allow": "allow", "preapproved": "allow", "ask": "ask", "handoff": "handoff"}
+_STRICTNESS: dict[Verdict, int] = {"allow": 0, "ask": 1, "handoff": 2, "deny": 3}
+# What settles a step before the policy reads any rule (policy/engine.py, decide_past_review; the gate's pace): a rule
+# changes nothing there, but for one that hands the step off, which the guard of messages and posts and a spend within
+# its caps give way to.
+_BEFORE_RULES: frozenset[DecisionSource] = frozenset(
+    {"auto_review", "mode", "own_files", "hard_stop", "guard", "spend", "pace"}
+)
+_HANDOFF_FIRST: frozenset[DecisionSource] = frozenset({"guard", "spend"})
+
+
+def candidate_rule(behavior: Behavior, tool_glob: str, match_regex: str, existing: Sequence[RuleRecord]) -> RuleRecord:
+    """The rule tried, where a new rule goes: after every stored one."""
+    return RuleRecord(
+        id=CANDIDATE_ID,
+        position=max((rule.position for rule in existing), default=0) + 1,
+        enabled=True,
+        behavior=behavior,
+        tool_glob=tool_glob,
+        match_regex=match_regex,
+        description="",
+        created_at=time.time(),
+    )
+
+
+def _action(step: StepRow) -> ActionInfo | None:
+    """The step as the policy matched rules on it: its tool, summary and target; a step of a kind or risk this Dot does
+    not know is passed over."""
+    if step.kind not in _KINDS or step.risk not in _RISKS:
+        return None
+    return ActionInfo.model_validate(
+        {
+            "tool": step.tool,
+            "kind": step.kind,
+            "risk": step.risk,
+            "summary": step.summary,
+            "target": step.target,
+            "flags": [],
+        }
+    )
+
+
+def _was(step: StepRow) -> StepDecision | None:
+    return None if step.decision is None else StepDecision.model_validate(step.decision)
+
+
+def _example(step: StepRow) -> RuleExample:
+    return RuleExample(
+        event_id=step.event_id,
+        run_id=step.run_id,
+        at=step.at,
+        tool=step.tool,
+        summary=plain_line(redact_secrets(step.summary), _EXAMPLE_CHARS),
+        target=plain_line(redact_secrets(step.target), _EXAMPLE_CHARS),
+        ok=step.ok,
+        was=_was(step),
+        recorded=step.recorded,
+    )
+
+
+def _settled_before_rules(was: StepDecision, behavior: Behavior) -> bool:
+    """Whether what decided the step then comes before every rule, so that the rule tried would change nothing."""
+    return was.source in _BEFORE_RULES and not (was.source in _HANDOFF_FIRST and behavior == "handoff")
+
+
+def _verdict_now(was: StepDecision, behavior: Behavior) -> Verdict:
+    """What the policy would decide of the step with the rule tried deciding it: the rule's answer, but for an ``allow``
+    on a step the taint made a question then, which the taint makes a question again (``preapproved`` it does not)."""
+    if was.source == "taint" and behavior == "allow":
+        return "ask"
+    return _VERDICT[behavior]
+
+
+class Tally:
+    """What a try-out counted so far; one is filled page by page and read once at the end."""
+
+    def __init__(self) -> None:
+        self.scanned: int = 0
+        self.oldest: float | None = None
+        self.fits: int = 0
+        self.shadowed_by: Counter[str] = Counter()
+        self.in_yolo: int = 0
+        self.before_rules: int = 0
+        self.would_decide: int = 0
+        self.stricter: int = 0
+        self.looser: int = 0
+        self.same: int = 0
+        self.stopped: int = 0
+        self.unknown: int = 0
+        self.examples: list[RuleExample] = []
+        self.problem: str | None = None
+
+
+def _count_first(tally: Tally, step: StepRow, behavior: Behavior) -> None:
+    """Count a step whose first rule to fit is the one tried: a yolo run's, which asks nothing whatever the rules say;
+    one settled before any rule; or one it would decide, against what was decided then."""
+    if step.yolo:
+        tally.in_yolo += 1
+        return
+    was: StepDecision | None = _was(step)
+    if was is not None and _settled_before_rules(was, behavior):
+        tally.before_rules += 1
+        return
+    tally.would_decide += 1
+    if was is None:
+        if step.recorded:
+            tally.stopped += 1
+        else:
+            tally.unknown += 1
+        return
+    now: int = _STRICTNESS[_verdict_now(was, behavior)]
+    then: int = _STRICTNESS[was.verdict]
+    if now > then:
+        tally.stricter += 1
+    elif now < then:
+        tally.looser += 1
+    else:
+        tally.same += 1
+
+
+def tally_steps(
+    tally: Tally, existing: Sequence[RuleRecord], candidate: RuleRecord, steps: Sequence[StepRow], deadline: float
+) -> int:
+    """Count ``steps`` (newest first) into ``tally`` until the monotonic ``deadline`` passes, and say how many were
+    counted (one at least): a pattern that takes too long on one stops the count there, with the problem said, as the
+    daemon would refuse the step."""
+    ruled: list[RuleRecord] = [*existing, candidate]
+    counted: int = 0
+    for step in steps:
+        if counted > 0 and time.monotonic() > deadline:
+            return counted
+        counted += 1
+        action: ActionInfo | None = _action(step)
+        tally.scanned += 1
+        tally.oldest = step.at
+        if action is None:
+            continue
+        try:
+            if match_rule(action, [candidate]) is None:
+                continue
+            ruling: RuleRecord | None = match_rule(action, ruled)
+        except ConfigError as error:
+            tally.problem = (
+                f"This pattern takes longer than the daemon allows on a past step ({step.tool}: "
+                f"{plain_line(redact_secrets(step.summary), _EXAMPLE_CHARS)}), or a stored rule cannot be read: "
+                f"{error.message}. The daemon would refuse such a step."
+            )
+            return counted
+        tally.fits += 1
+        if len(tally.examples) < _EXAMPLES:
+            tally.examples.append(_example(step))
+        if ruling is not None and ruling.id != CANDIDATE_ID:
+            tally.shadowed_by[ruling.id] += 1
+        else:
+            _count_first(tally, step, candidate.behavior)
+    return counted
+
+
+def preview_of(tally: Tally, existing: Sequence[RuleRecord], partial: bool) -> RulePreview:
+    names: dict[str, str] = {rule.id: rule.description or f"rule {rule.position}" for rule in existing}
+    return RulePreview(
+        scanned=tally.scanned,
+        since=tally.oldest,
+        partial=partial,
+        fits=tally.fits,
+        shadowed_by=[
+            RuleShadow(rule_id=rule_id, description=names.get(rule_id, rule_id), steps=steps)
+            for rule_id, steps in tally.shadowed_by.most_common()
+        ],
+        in_yolo=tally.in_yolo,
+        before_rules=tally.before_rules,
+        would_decide=tally.would_decide,
+        stricter=tally.stricter,
+        looser=tally.looser,
+        same=tally.same,
+        stopped=tally.stopped,
+        unknown=tally.unknown,
+        examples=tally.examples,
+        problem=tally.problem,
+    )
+
+
+async def preview_rule(
+    store: Store, candidate: RuleRecord, existing: Sequence[RuleRecord], days: int, now: float
+) -> RulePreview:
+    """Try ``candidate`` on the steps of the last ``days`` before ``now``, newest first, by pages, letting the runs at
+    work go on between slices of counting; a try-out that reaches its cap of steps or of time with steps left says it
+    read the newest only."""
+    floor: int = await store.first_event_id_since(now - days * DAY_S)
+    before: int = 2**62
+    tally: Tally = Tally()
+    ends: float = time.monotonic() + _BUDGET_S
+    while True:
+        wanted: int = min(_PAGE, _MAX_STEPS - tally.scanned)
+        page: list[StepRow] = await store.tool_steps(floor, before, wanted)
+        done: int = 0
+        while done < len(page):
+            done += tally_steps(tally, existing, candidate, page[done:], min(ends, time.monotonic() + _SLICE_S))
+            if tally.problem is not None:
+                return preview_of(tally, existing, False)
+            if time.monotonic() > ends:
+                break
+            await asyncio.sleep(0)
+        if done < len(page):
+            return preview_of(tally, existing, True)
+        if len(page) < wanted:
+            return preview_of(tally, existing, False)
+        before = page[-1].event_id
+        if tally.scanned >= _MAX_STEPS or time.monotonic() > ends:
+            left: list[StepRow] = await store.tool_steps(floor, before, 1)
+            return preview_of(tally, existing, left != [])

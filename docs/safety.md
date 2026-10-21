@@ -107,7 +107,19 @@ currency, so list sites that bill in one currency. Empty by default.
    move it one place up or down that order, and **New rule** opens the two ways to write one. A rule that an earlier
    enabled rule fits wherever it fits (no expression, or the same one, on a tool pattern that takes in its own: `*`,
    the same pattern, or one that matches its plain tool name) never decides, and the page says so with the number of
-   the rule that decides in its place (item 449); whether two different expressions overlap it does not tell. It can
+   the rule that decides in its place (item 449); whether two different expressions overlap it does not tell. Before
+   a rule is added, **Test on the last 30 days** under its fields (`POST /api/rules/preview`, item 469) tries it on the
+   steps of past runs, as the policy matches rules, and writes nothing. It says how many steps it fits and which
+   earlier rules decide some of them first. Of the rest, it counts apart the steps of yolo runs, which ask nothing
+   whatever the rules say, and those settled before any rule is read, by the checks above that no rule changes
+   (money, credentials, messages and posts, Dot's own files, the always-on review, a research run, a spend within its
+   caps; a rule that hands the step to you does take the place of the question about a message, a post or a spend).
+   The steps it would decide it compares with what was decided then: asked more, asked less, the same; a step the
+   gate did not let through (refused, declined or handed to you) kept no decision, and neither did one from before
+   item 468. Then come the newest steps it fits, each leading to its run. A drafted rule is tried at once. A try-out
+   reads at most 20,000 steps and two seconds, the newest first, and says so when it read only those; a pattern that
+   takes too long on a past step stops it, with that said, as the daemon would refuse the step. Only steps still in
+   the database count, and a batch of browser or desktop steps is one step, as its record keeps it. It can
    also be said in your own words ("let Dot run git status and git
    diff without asking me"): the review model drafts its parts, the tool, the answer and the commands or words the
    action must mention, and Dot writes the expression from them, so that a rule that lets Dot run a command fits it

@@ -7,12 +7,15 @@
 // Above the rules, the switch of the macOS sandbox of a run's commands (item 262).
 
 import { api } from "../api.js";
-import { clip, el, plural } from "../dom.js";
+import { ago, clip, el, plural } from "../dom.js";
 import { icon } from "../icons.js";
 import { emptyPanel, errorPanel, field, loadingPanel, paintOpener, paneHead, segmented, switchSetting } from "../panels.js";
+import { outcomeLabel, previewLines } from "../rulepreview.js";
 import { onLifecycle, onStreamBack, readFailed } from "../state.js";
 import { attempt, confirmDialog, toast } from "../ui.js";
 
+// How far back a rule is tried before it is added (item 469).
+const TRY_OUT_DAYS = 30;
 const QUOTE_CHARS = 100;
 // The live event of a rule added, switched or deleted on any page (`rules_changed`, `dotagent.server.routes_data`).
 const RULES_CHANGED = "rules_changed";
@@ -178,7 +181,10 @@ function buildForm(onCreated) {
   const answers = segmented(
     ANSWERS.map(({ id, label, text }) => ({ id, label, hint: text })),
     ANSWERS[0].id,
-    () => paintPreview(),
+    () => {
+      paintPreview();
+      putAwayTryOut();
+    },
   );
   answers.element.classList.add("answers");
   answers.element.setAttribute("aria-label", "Then");
@@ -189,9 +195,79 @@ function buildForm(onCreated) {
     preview.replaceChildren(...sentence(glob.value.trim(), regex.value.trim()), " ", el("em", null, answer.label.toLowerCase()), ".");
   }
 
-  glob.addEventListener("input", paintPreview);
-  regex.addEventListener("input", paintPreview);
+  // What the rule would have done on the steps of the last days (item 469); a change of the rule puts it away.
+  const tryOutButton = el("button", { class: "btn", type: "button" }, `Test on the last ${TRY_OUT_DAYS} days`);
+  const tried = el("div", { class: "rule-tryout stack tight", role: "status", hidden: true });
+  // Which try-out may still show: one that answers after the rule changed is left unshown.
+  let tryOutTicket = 0;
+
+  function putAwayTryOut() {
+    tryOutTicket += 1;
+    tried.hidden = true;
+    tried.replaceChildren();
+  }
+
+  glob.addEventListener("input", () => {
+    paintPreview();
+    putAwayTryOut();
+  });
+  regex.addEventListener("input", () => {
+    paintPreview();
+    putAwayTryOut();
+  });
   const create = el("button", { class: "btn primary", type: "button" }, icon("plus"), "Add rule");
+
+  async function tryOut() {
+    const globText = glob.value.trim();
+    if (globText === "") {
+      glob.focus();
+      return;
+    }
+    tryOutTicket += 1;
+    const ticket = tryOutTicket;
+    tryOutButton.disabled = true;
+    try {
+      const view = await api.post("/rules/preview", {
+        behavior: answers.value(),
+        tool_glob: globText,
+        match_regex: regex.value.trim(),
+        days: TRY_OUT_DAYS,
+      });
+      if (ticket !== tryOutTicket) {
+        return;
+      }
+      // replaceChildren writes a null as the word: what is not there is left out first.
+      const parts = [
+        ...previewLines(view, TRY_OUT_DAYS).map((line) => el("p", { class: "small" }, line)),
+        view.problem === null ? null : el("p", { class: "small rule-tryout-problem" }, view.problem),
+        view.examples.length === 0
+          ? null
+          : el(
+              "ul",
+              { class: "firings-list" },
+              view.examples.map((example) =>
+                el(
+                  "li",
+                  { class: "firing" },
+                  el(
+                    "div",
+                    { class: "row-meta" },
+                    el("span", { class: "faint" }, ago(example.at)),
+                    el("a", { class: "firing-title", href: `#/runs/${example.run_id}` }, `${example.tool}: ${example.summary}`),
+                    el("span", { class: "faint" }, outcomeLabel(example.was, example.ok, example.recorded)),
+                  ),
+                ),
+              ),
+            ),
+      ];
+      tried.replaceChildren(...parts.filter((part) => part !== null));
+      tried.hidden = false;
+    } finally {
+      tryOutButton.disabled = false;
+    }
+  }
+
+  tryOutButton.addEventListener("click", () => attempt(tryOut));
 
   async function submit() {
     const globText = glob.value.trim();
@@ -211,6 +287,7 @@ function buildForm(onCreated) {
       regex.value = "";
       description.value = "";
       paintPreview();
+      putAwayTryOut();
       toast("ok", "Rule added at the end of the list.");
       await onCreated();
     } finally {
@@ -227,6 +304,8 @@ function buildForm(onCreated) {
     paintPreview();
     element.scrollIntoView({ block: "nearest" });
     create.focus({ preventScroll: true });
+    // A drafted rule was written without looking at what it would catch: it is tried at once.
+    attempt(tryOut);
   }
 
   create.addEventListener("click", () => attempt(submit));
@@ -247,7 +326,8 @@ function buildForm(onCreated) {
       el("div", { class: "field wide" }, el("span", { class: "field-label" }, "Then"), answers.element, answerHint),
       field("Why", description, "Optional. Shown when the rule decides."),
     ),
-    el("div", { class: "row" }, el("span", { class: "spacer" }), create),
+    tried,
+    el("div", { class: "row" }, el("span", { class: "spacer" }), tryOutButton, create),
   );
   return { element, fill };
 }

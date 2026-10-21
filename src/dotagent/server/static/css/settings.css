@@ -607,6 +607,15 @@
   color: var(--text);
 }
 
+/* A rule tried on the steps of the last days before it is added (item 469): a few lines, the steps it fits. */
+.rule-tryout p {
+  margin: 0;
+}
+
+.rule-tryout-problem {
+  color: var(--warn);
+}
+
 .segmented.answers {
   flex-wrap: wrap;
 }
