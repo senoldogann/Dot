@@ -475,6 +475,8 @@ export function mount(root, _ctx) {
   async function move(record, direction) {
     await api.post(`/rules/${record.id}/move`, { direction });
     await reload();
+    // A click does not focus a button in WebKit (Safari, the desktop shell), so the arrow is focused here too.
+    focusArrow(record.id, direction);
   }
 
   async function remove(record) {

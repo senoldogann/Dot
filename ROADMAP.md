@@ -16063,19 +16063,20 @@ rules is today the only way to write an exception (the Rules page's own examples
 asking" above "ask me before rm", are an allow above a broader ask), and a stored rule carries no sign that an exception
 was meant. It goes in three steps: the owner can move the rules and sees which of them never decide (this item); later,
 once the owner has seen the notes for a release, a rule that hands the step over decides wherever it stands (on the
-human path of `policy/`). **As built.** `Store.move_rule` puts a rule at a place of the order and numbers the rules 1 to
-n, which closes the gaps deleted rules left; `POST /api/rules/{id}/move` moves it one place up or down (422 past either
-end, 404 for no rule) and tells the pages (`rules_changed`). `server/rule_shadow.py` names for each rule the earlier
-enabled rule that fits every action it fits (no expression or the same one, on a tool pattern that takes in its own:
-`*`, the same pattern, or one that matches its plain tool name), and `GET /api/rules` gives it as `never_decided_by`,
-computed once on the server and not again in the page (the critique). Whether two different expressions overlap is not
-told. The policy is untouched: `match_rule` still takes the first fit, and the rule the note names is the one that
-decides (the unit test reads it off `match_rule`). The Rules page draws two arrows on a rule's row, off at the ends,
-that keep the focus as the rule moves (the other arrow once it reaches an end), and a "Never decides" badge whose title
-names the rule that decides in its place. The note above the rules said a yolo run keeps all of the protections that are
-always on but the first; since item 443 it keeps only the second, a research run's limit, and the note says so. What a
-yolo run does is untouched. Tests: `tests/unit/test_rule_shadow.py` (the certain cases, the cases not told, the note
-against the engine), `tests/smoke/test_server.py` (a move, the numbering, the ends, 404, a direction that is none),
+human path of `policy/`). **As built.** `Store.move_rule` moves a rule a number of places along the order, which it
+reads under the write lock, and numbers the rules 1 to n, which closes the gaps deleted rules left; `POST
+/api/rules/{id}/move` moves it one place up or down (422 past either end, 404 for no rule) and tells the pages
+(`rules_changed`). `server/rule_shadow.py` names for each rule the earlier enabled rule that fits every action it fits
+(no expression or the same one, on a tool pattern that takes in its own: `*`, the same pattern, or one that matches its
+plain tool name), and `GET /api/rules` gives it as `never_decided_by`, computed once on the server and not again in the
+page (the critique). Whether two different expressions overlap is not told. The policy is untouched: `match_rule` still
+takes the first fit, and the rule the note names is the one that decides (the unit test reads it off `match_rule`). The
+Rules page draws two arrows on a rule's row, off at the ends, that keep the focus as the rule moves (the other arrow
+once it reaches an end), and a "Never decides" badge whose title names the rule that decides in its place. The note
+above the rules said a yolo run keeps all of the protections that are always on but the first; since item 443 it keeps
+only the second, a research run's limit, and the note says so. What a yolo run does is untouched. Tests:
+`tests/unit/test_rule_shadow.py` (the certain cases, the cases not told, the note against the engine),
+`tests/smoke/test_server.py` (a move, the numbering, the ends, 404, a direction that is none),
 `tests/smoke/test_rules.py` (the page at 1280 and at 390 px, the phone a touch screen where a row's buttons always show,
 in light and dark: the badge, the arrows, the focus). Docs: `docs/safety.md` (step 6), `docs/daemon.md`.
 
