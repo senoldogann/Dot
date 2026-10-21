@@ -119,9 +119,10 @@ around a refusal, a denial or a decision that is yours.
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
 schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question of the
-policy waits `approval_timeout_s` and then counts as a refusal. A no you gave a run holds for the rest of it: the same
-action is refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks
-nothing, so none is kept there.
+policy waits `approval_timeout_s` and then counts as a refusal, or, for a step handed to you with `[policy] unanswered =
+"park"`, is kept for you (Steps kept for you, below). A no you gave a run holds for the rest of it: the same action is
+refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks nothing, so none
+is kept there.
 
 **Questions nobody answers during the run.** In a `yolo`, scheduled or eval run nobody answers the agent's own questions
 (`ask_user`) while it works, and `[agent] questions` decides what they do. With `leave` (the default) the question is
@@ -131,11 +132,34 @@ asked you", during the run and after it, and `dotx run` prints each one when it 
 the answer. Your answer (`POST /api/approvals/{id}/decision`) goes to the conversation as your message, "Answer to your
 question “…”: …": into the run working there, or else as a new run on it, whose goal is the goal of the run that asked
 with your answer under it (so its goal check and its title keep the task), with the mode, model, reasoning level,
-approval mode and goal mode of the run that asked; the page then opens that run once no other question of the run is
-open there. A run reads an answer that comes during its last step before it ends; one that reaches a run that is then
-stopped or fails stays in the conversation as your message, for the next run there. An empty answer is refused. Skip
-only closes the question, and a left question never expires. With `wait` such a question waits as in a run you watch,
-for `approval_timeout_s` at most. A run you started in any mode but `yolo` always waits for your answer.
+approval mode and goal mode of the run that asked, and as the agent it ran as, within that agent's bounds (item 482), as
+a resumed run is; the page then opens that run once no other question of the run is open there. A run reads an answer
+that comes during its last step before it ends; one that reaches a run that is then stopped or fails stays in the
+conversation as your message, for the next run there. An empty answer is refused. Skip only closes the question, and a
+left question never expires. With `wait` such a question waits as in a run you watch, for `approval_timeout_s` at most.
+A run you started in any mode but `yolo` always waits for your answer.
+
+**Steps kept for you.** A step the policy hands to you (money, a credential, a rule of yours that hands it off) waits
+`approval_timeout_s` for **I did it**, as every question of the policy does. With `[policy] unanswered = "park"` (item
+482; the default, `"refuse"`, counts it as a refusal) one nobody answers in that time is kept for you instead: the run
+is told that the step did not happen and waits for you, and goes on with what does not depend on it, or ends and says
+what waits for you; its later hand-offs are kept at once, with no new wait, until you write to it or do a step it kept.
+A kept step is a `left` record with the fingerprint of its action (tool, kind, summary, target, amount, flags, the files
+it changes and the application it opens; none when its card shows less than all of it, a write's text or a cut summary)
+and the time it lapses, `[policy] parked_hours` (72) on: the run's page lists it as "Kept for you" with the questions it
+left, the timeline says so where it was asked, the Activity list shows it among what waits, `dotx run` prints it, and
+your phone is told when it is kept. The same step, by its fingerprint, is kept once in a chat (the run is told it waits
+already), and at most 20 wait in a chat or the chats of one schedule and 50 in all; past them a hand-off is asked as
+before and refused if nobody answers it. **I did it** tells the conversation that you did the step yourself, "The user
+did the step that waited for them (…) themselves; go on from there.", with your note: into the run working there, or
+else as a new run on it, which reads those words under the goal of the run that kept it, with that run's mode, model,
+reasoning level, approval mode and goal mode, as the agent it ran as, and which starts tainted when that run, or the
+chat's last run, ended tainted. These words are Dot's, not yours: they restore no trust, and only the note you wrote
+counts among your instructions (the new run's goal is the goal it goes on from, with your note under it). Skip this step
+only closes it, and one past its time closes as expired (the daemon looks every half minute) and can no longer be
+answered. A kept step gives the run no authority: a hand-off is yours to do. A question that asks your yes, not a
+hand-off, still counts as a refusal when nobody answers, and nothing is kept in `yolo`, which asks nothing, in a
+delegated run, whose parent decides, in a session of a campaign or in an eval.
 
 **The end of a run.** There is no step limit. A run ends by `finish`; by the progress watchdog; by a model call that
 still fails after its retries and the wait for a model out of reach (see [Models and providers](models.md#models-and-providers));

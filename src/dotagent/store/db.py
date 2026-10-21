@@ -642,6 +642,8 @@ def _approval(row: aiosqlite.Row) -> ApprovalRecord:
         args=parse_json_object(row["args"], "approval args"),
         decided_by=row["decided_by"],
         note=row["note"],
+        digest=row["digest"],
+        kept_until=row["kept_until"],
     )
 
 
@@ -891,6 +893,9 @@ _ADDED_AGENT_COLUMNS: tuple[tuple[str, str], ...] = (
     # When the owner paused the agent (item 465); NULL while it works, as every agent did before.
     ("paused_at", "REAL"),
 )
+# Columns of ``approvals`` added later: a step kept for the owner (item 482) has the fingerprint of its action and when
+# it lapses; NULL for every other question, as for all of them before.
+_ADDED_APPROVAL_COLUMNS: tuple[tuple[str, str], ...] = (("digest", "TEXT"), ("kept_until", "REAL"))
 # The kv key of Dot's own look (item 102), an ``AgentLook`` as JSON.
 DOT_LOOK_KEY: str = "look:dot"
 
@@ -919,6 +924,7 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     await _add_columns(connection, "queued_messages", _ADDED_QUEUE_COLUMNS)
     await _add_columns(connection, "harness_experiences", _ADDED_HARNESS_EXPERIENCE_COLUMNS)
     await _add_columns(connection, "agents", _ADDED_AGENT_COLUMNS)
+    await _add_columns(connection, "approvals", _ADDED_APPROVAL_COLUMNS)
     if "seen_at" in await _add_columns(connection, "threads", _ADDED_THREAD_COLUMNS):
         # The chats of a store from before item 131 are taken as seen, so that none of them shows up unread at once.
         await connection.execute("UPDATE threads SET seen_at = ?", (time.time(),))
@@ -937,6 +943,8 @@ async def _add_missing_columns(connection: aiosqlite.Connection) -> None:
     # The chats of a schedule, whose runs its next firing reads (item 257).
     await connection.execute("CREATE INDEX IF NOT EXISTS threads_schedule ON threads(schedule_id)")
     await connection.execute("CREATE INDEX IF NOT EXISTS approvals_status ON approvals(status, created_at)")
+    # The steps kept for the owner: the same one once in a chat, and the ones whose time is over (item 482).
+    await connection.execute("CREATE INDEX IF NOT EXISTS approvals_kept ON approvals(digest, status)")
     await connection.commit()
 
 
@@ -2330,7 +2338,8 @@ class Store:
             " json_extract(e.data, '$.ok') AS ok, json_extract(e.data, '$.decision') AS decision,"
             " json_type(e.data, '$.decision') IS NOT NULL AS recorded, json_extract(e.data, '$.flags') AS flags,"
             " COALESCE(r.approvals = 'yolo', 0) AS yolo,"
-            " COALESCE((SELECT t.kind != 'steer' AND json_type(t.data, '$.tainted') = 'true' FROM events AS t"
+            " COALESCE((SELECT (t.kind != 'steer' OR json_type(t.data, '$.vouches') = 'false')"
+            " AND json_type(t.data, '$.tainted') = 'true' FROM events AS t"
             f" WHERE t.run_id = e.run_id AND t.id < e.id AND t.kind IN ({kinds}) ORDER BY t.id DESC LIMIT 1), 0)"
             " AS tainted_before,"
             " CASE WHEN json_type(e.data, '$.decision') = 'null' THEN (SELECT json_object('source',"
@@ -2483,7 +2492,7 @@ class Store:
     async def _insert_approval(self, record: ApprovalRecord) -> None:
         await self._db.execute(
             "INSERT INTO approvals(id, run_id, created_at, decided_at, status, tool, summary, severity, args, "
-            "decided_by, note) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "decided_by, note, digest, kept_until) VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (
                 record.id,
                 record.run_id,
@@ -2496,6 +2505,8 @@ class Store:
                 dumps_compact(record.args),
                 record.decided_by,
                 record.note,
+                record.digest,
+                record.kept_until,
             ),
         )
         await self._db.commit()
@@ -2515,6 +2526,8 @@ class Store:
             args=args,
             decided_by=None,
             note="",
+            digest=None,
+            kept_until=None,
         )
         await self._insert_approval(record)
         return record
@@ -2536,9 +2549,74 @@ class Store:
             args=args,
             decided_by=None,
             note="",
+            digest=None,
+            kept_until=None,
         )
         await self._insert_approval(record)
         return record
+
+    async def create_kept_approval(
+        self,
+        run_id: str,
+        tool: str,
+        summary: str,
+        severity: str,
+        args: JsonObject,
+        digest: str | None,
+        kept_until: float,
+    ) -> ApprovalRecord:
+        """Store a step a run kept for the owner when nobody answered its question in time (item 482): ``left`` until
+        the owner answers it, skips it or it lapses at ``kept_until``; ``digest`` is the fingerprint of its action, None
+        for one whose card shows less than all of it."""
+        record: ApprovalRecord = ApprovalRecord(
+            id=new_id("apr"),
+            run_id=run_id,
+            created_at=time.time(),
+            decided_at=None,
+            status="left",
+            tool=tool,
+            summary=summary,
+            severity=severity,
+            args=args,
+            decided_by=None,
+            note="",
+            digest=digest,
+            kept_until=kept_until,
+        )
+        await self._insert_approval(record)
+        return record
+
+    async def open_kept(self, digest: str, thread_id: str) -> ApprovalRecord | None:
+        """The step of fingerprint ``digest`` that a run of the chat ``thread_id`` kept and nobody answered yet, the
+        oldest; None when there is none (item 482)."""
+        row = await self._one(
+            "SELECT a.* FROM approvals AS a JOIN runs AS r ON r.id = a.run_id"
+            " WHERE a.digest = ? AND a.status = 'left' AND r.thread_id = ? ORDER BY a.created_at LIMIT 1",
+            (digest, thread_id),
+        )
+        return None if row is None else _approval(row)
+
+    async def count_open_kept(self, thread_id: str, schedule_id: str | None) -> tuple[int, int]:
+        """How many steps kept for the owner wait now: of the chat ``thread_id`` and the chats of the schedule
+        ``schedule_id`` (each firing of a schedule may have a chat of its own), and of all (item 482)."""
+        row = await self._one(
+            "SELECT COUNT(*) AS overall, COALESCE(SUM(r.thread_id = ? OR (t.schedule_id IS NOT NULL AND t.schedule_id"
+            " = ?)), 0) AS here FROM approvals AS a JOIN runs AS r ON r.id = a.run_id"
+            " LEFT JOIN threads AS t ON t.id = r.thread_id WHERE a.status = 'left' AND a.kept_until IS NOT NULL",
+            (thread_id, schedule_id),
+        )
+        if row is None:
+            return 0, 0
+        return int(row["here"]), int(row["overall"])
+
+    async def kept_due(self, now: float) -> list[ApprovalRecord]:
+        """The steps kept for the owner whose time is over at ``now``, still unanswered (item 482), oldest first."""
+        rows = await self._all(
+            "SELECT * FROM approvals WHERE status = 'left' AND kept_until IS NOT NULL AND kept_until <= ?"
+            " ORDER BY kept_until",
+            (now,),
+        )
+        return [_approval(row) for row in rows]
 
     async def create_decided_approval(
         self,
@@ -2565,6 +2643,8 @@ class Store:
             args=args,
             decided_by=decided_by,
             note=note,
+            digest=None,
+            kept_until=None,
         )
         await self._insert_approval(record)
         return record
@@ -3656,6 +3736,11 @@ class Store:
             (fired_at, next_run_at, thread_id, status, next_run_at, schedule_id),
         )
         await self._db.commit()
+
+    async def schedule_of_thread(self, thread_id: str) -> str | None:
+        """The schedule whose chat ``thread_id`` is (item 257), None for a chat of no schedule or one not there."""
+        row = await self._one("SELECT schedule_id FROM threads WHERE id = ?", (thread_id,))
+        return None if row is None else row["schedule_id"]
 
     @_writing
     async def link_schedule_thread(self, thread_id: str, schedule_id: str) -> None:

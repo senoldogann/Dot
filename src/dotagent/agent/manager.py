@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pydantic import JsonValue
 
-from dotagent.agent.attachments import StoredAttachment, UserInput, attachment_summary, load_attachments
+from dotagent.agent.attachments import StoredAttachment, UserInput, load_attachments, steer_event
 from dotagent.agent.campaign import (
     BRIEF_ENTRIES,
     BRIEF_QUESTIONS,
@@ -36,6 +36,7 @@ from dotagent.agent.learning_health import (
 from dotagent.agent.lessons import LESSONS_FAILED, LessonCase, dismiss_lesson, learn, save_lesson, undo_lesson
 from dotagent.agent.loop import AGENT_CORE_TOOLS, AgentRun, RunEnd, RunOpening, browser_of, run_agent
 from dotagent.agent.owners import RunOwner, clear_gone_owners, owner_alive
+from dotagent.agent.parking import handed_back_text, parking_for
 from dotagent.agent.picks import picked_groups, picks_problems
 from dotagent.agent.plan import EMPTY_PLAN, PLAN_EVENT, plan_from_event
 from dotagent.agent.playbooks import PLAYBOOK_FAILED, learn_playbook, offered_to_run, playbook_case
@@ -74,6 +75,7 @@ from dotagent.core.paths import chrome_data_dir, failsafe_path, run_owners_dir
 from dotagent.core.text import redact_json, redact_secrets, truncate_tail
 from dotagent.core.types import FrozenModel, JsonObject
 from dotagent.drafts.service import fail_unsettled_drafts
+from dotagent.evals import EVAL_SOURCE
 from dotagent.llm.opencode import OPENCODE_PROVIDER
 from dotagent.llm.router import ModelRef, offers_fast_mode, parse_model_ref
 from dotagent.llm.types import ONE_MESSAGE_LEVELS, Effort, ModelInfo, OneMessage, Speed, user_message
@@ -458,10 +460,10 @@ class RunManager:
         return events[-1].id if len(events) == _RELAY_PAGE else upto
 
     async def watch_commands(self) -> None:
-        """Every ``COMMAND_CHECK_S`` until cancelled, store the ends the store refused (:meth:`store_left_ends`) and
-        close the runs of dead ``dotx`` commands (:meth:`close_runs_of_dead_commands`); a check that fails, on the store
-        or on the files of the owners (a read of the store fails with sqlite3's own error), is logged and the next one
-        goes on."""
+        """Every ``COMMAND_CHECK_S`` until cancelled, store the ends the store refused (:meth:`store_left_ends`),
+        close the runs of dead ``dotx`` commands (:meth:`close_runs_of_dead_commands`) and the steps kept for the owner
+        past their time (:meth:`lapse_kept`); a check that fails, on the store or on the files of the owners (a read of
+        the store fails with sqlite3's own error), is logged and the next one goes on."""
         while True:
             await asyncio.sleep(COMMAND_CHECK_S)
             try:
@@ -479,12 +481,20 @@ class RunManager:
                 closed: int = await self.close_runs_of_dead_commands()
             except DotError as exc:
                 log.warning("dead_commands_not_checked", error=exc.message, context=exc.context)
-                continue
             except (sqlite3.Error, OSError) as exc:
                 log.warning("dead_commands_not_checked", error=str(exc), error_type=type(exc).__name__)
-                continue
-            if closed:
-                log.info("runs_of_dead_commands_closed", runs=closed)
+            else:
+                if closed:
+                    log.info("runs_of_dead_commands_closed", runs=closed)
+            try:
+                lapsed: int = await self.lapse_kept(time.time())
+            except DotError as exc:
+                log.warning("kept_steps_not_lapsed", error=exc.message, context=exc.context)
+            except (sqlite3.Error, OSError) as exc:
+                log.warning("kept_steps_not_lapsed", error=str(exc), error_type=type(exc).__name__)
+            else:
+                if lapsed:
+                    log.info("kept_steps_lapsed", steps=lapsed)
 
     async def _hold_claims_of_gone(self, directory: Path) -> None:
         """End the claims on queued messages (:meth:`Store.claim_queued`) of the processes that are gone, and hold the
@@ -1048,7 +1058,7 @@ class RunManager:
         ended."""
         handle: RunHandle = self._handle(run_id)
         try:
-            handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None))
+            handle.inbox.put_nowait(UserInput(text=text, files=files, question_id=None, vouches=True, said=text))
         except asyncio.QueueShutDown as exc:
             raise RunConflict("the run is not active", {"run_id": run_id}) from exc
 
@@ -1215,6 +1225,8 @@ class RunManager:
             record: ApprovalRecord = await self._runtime.store.get_approval(approval_id)
             if record.status != "left":
                 return await self._runtime.approvals.resolve(approval_id, approve, source, note)
+            if record.kept_until is not None:
+                return await self._decide_kept(record, approve, source, note)
             if approve and note.strip() == "":
                 raise InvalidValueError("the answer to the question is empty", {"approval_id": approval_id})
             asked: RunRecord = await self._runtime.store.get_run(record.run_id)
@@ -1540,6 +1552,79 @@ class RunManager:
                 "the thread went on after the run to resume", {"run_id": run_id, "newest_run_id": newest_run_id}
             )
 
+    async def _decide_kept(self, record: ApprovalRecord, approve: bool, source: str, note: str) -> ApprovalRecord:
+        """The owner's answer to a step a run kept for them (item 482): "I did it" carries the work on in the step's
+        chat (:meth:`_hand_back_kept`), delivered before the step is decided, so one that cannot be delivered leaves it
+        open; Skip only closes it. A step past its time has lapsed, and is closed so."""
+        if record.kept_until is not None and record.kept_until <= time.time():
+            await self._runtime.approvals.lapse(record)
+            raise RunConflict("this step was kept for you too long and has lapsed", {"approval_id": record.id})
+        if approve:
+            await self._hand_back_kept(record, source, note)
+        return await self._runtime.approvals.resolve(record.id, approve, source, note)
+
+    async def _hand_back_kept(self, record: ApprovalRecord, source: str, note: str) -> None:
+        """Tell the step's chat that the owner did a step kept for them (item 482): the run working there reads it as
+        the next thing it is told, and otherwise a new run goes on from the goal of the run that kept it, starting
+        tainted when that run ended tainted. The words are Dot's: they clear no taint, and only the note the owner wrote
+        is their instruction, which is all the new run's goal adds to the goal it goes on from."""
+        asked: RunRecord = await self._runtime.store.get_run(record.run_id)
+        text: str = handed_back_text(record.id, note)
+        said: str = note.strip()
+        active: RunHandle | None = self._active_on(asked.thread_id)
+        if active is not None:
+            try:
+                active.inbox.put_nowait(UserInput(text=text, files=(), question_id=record.id, vouches=False, said=said))
+            except asyncio.QueueShutDown:
+                await active.finished.wait()
+                await self._hand_back_kept(record, source, note)
+                return
+            log.info("kept_step_handed_back", approval_id=record.id, run_id=active.run_id, delivered="steer")
+            return
+        newest: RunRecord = (await self._runtime.store.list_runs(1, asked.thread_id))[0]
+        if newest.status in WORKING_STATUSES:
+            raise RunConflict(
+                "a run of another process is working on this thread; answer once it has ended",
+                {"approval_id": record.id, "thread_id": asked.thread_id, "run_id": newest.id},
+            )
+        # The goal, which the review model reads as the owner's, is theirs alone; the run reads Dot's words too.
+        goal: str = asked.goal if said == "" else f"{asked.goal}\n\n{said}"
+        opening: str = f"{asked.goal}\n\n{text}"
+        run, _ = await self._launch(
+            goal,
+            asked.mode,
+            asked.model,
+            asked.thread_id,
+            source,
+            None,
+            asked.effort,
+            asked.speed,
+            asked.approvals,
+            asked.goal_mode,
+            # It starts tainted when the run that kept the step, or the chat's last run, ended so; as the agent the
+            # run that kept it ran as, within its bounds.
+            RunOpening(
+                text=opening,
+                files=(),
+                resumed=None,
+                once=asked.once,
+                carried=tuple(dict.fromkeys((asked.id, newest.id))),
+                picks=NO_PICKS,
+            ),
+            None,
+            asked.agent_id,
+        )
+        log.info("kept_step_handed_back", approval_id=record.id, run_id=run.id, delivered="run")
+
+    async def lapse_kept(self, now: float) -> int:
+        """Close the steps kept for the owner whose time is over at ``now`` (item 482); how many. It waits for an
+        answer being given (:meth:`decide`), so that an "I did it" that started a run is not lapsed under it."""
+        async with self._answering:
+            due: list[ApprovalRecord] = await self._runtime.store.kept_due(now)
+            for record in due:
+                await self._runtime.approvals.lapse(record)
+        return len(due)
+
     async def _carry_on(self, question: ApprovalRecord, source: str, answer: str) -> None:
         """Deliver the answer to a question a run left (see :meth:`decide`). A run whose end is being recorded reads
         nothing more: the answer waits until it has ended and then goes on as one that came after."""
@@ -1548,7 +1633,9 @@ class RunManager:
         active: RunHandle | None = self._active_on(asked.thread_id)
         if active is not None:
             try:
-                active.inbox.put_nowait(UserInput(text=text, files=(), question_id=question.id))
+                active.inbox.put_nowait(
+                    UserInput(text=text, files=(), question_id=question.id, vouches=True, said=text)
+                )
             except asyncio.QueueShutDown:
                 await active.finished.wait()
                 await self._carry_on(question, source, answer)
@@ -1576,7 +1663,8 @@ class RunManager:
             asked.goal_mode,
             RunOpening(text=goal, files=(), resumed=None, once=asked.once, carried=(), picks=NO_PICKS),
             None,
-            None,
+            # As the agent the run that asked ran as, within its bounds, as a resumed run is.
+            asked.agent_id,
         )
         log.info("question_answered", approval_id=question.id, run_id=run.id, delivered="run")
 
@@ -1588,8 +1676,9 @@ class RunManager:
         session: RunHandle | None = self._handles.get(question.run_id)
         if approve and session is not None:
             try:
+                answer: str = _answer_text(question, note)
                 session.inbox.put_nowait(
-                    UserInput(text=_answer_text(question, note), files=(), question_id=question.id)
+                    UserInput(text=answer, files=(), question_id=question.id, vouches=True, said=answer)
                 )
             except asyncio.QueueShutDown:
                 # It is recording its end and reads nothing more.
@@ -2017,6 +2106,19 @@ class RunManager:
             )
             if starts_tainted:
                 gate.taint()
+            # A step it hands to the owner that nobody answers in time is kept for them where [policy] unanswered
+            # says so (item 482); never in yolo, a delegated run, a campaign's session or an eval.
+            gate.keep_for(
+                parking_for(
+                    runtime.config.policy,
+                    approval_mode,
+                    parent_run_id is not None,
+                    campaign_id is not None,
+                    source == EVAL_SOURCE,
+                    thread_id,
+                    await runtime.store.schedule_of_thread(thread_id),
+                )
+            )
             cancel: asyncio.Event = asyncio.Event()
             inbox: asyncio.Queue[UserInput] = asyncio.Queue()
             finished: asyncio.Event = asyncio.Event()
@@ -2537,14 +2639,15 @@ class RunManager:
         """Keep in the thread, as the user's messages, the answers to questions that reached a run too late for it to
         read them (it was stopped, failed or was cut off before its next step). Those questions are decided, so the next
         run on the thread finds the answers there. Other messages it did not read are dropped; the run page marks them
-        as not read."""
+        as not read. An answer of the owner clears the run's taint as it ended, and Dot's words vouch for nothing (item
+        482)."""
+        tainted: bool = await self._ended_tainted(run.id)
         for sent in unread:
             if sent.question_id is None:
                 continue
             await self._runtime.store.append_messages(run.thread_id, [user_message(sent.text, ())])
-            await self._runtime.bus.emit(
-                run.id, "steer", {"text": sent.text, "files": attachment_summary(sent.files)}, True
-            )
+            await self._runtime.bus.emit(run.id, "steer", steer_event(sent, tainted), True)
+            tainted = tainted and not sent.vouches
             log.warning("answer_kept_in_thread", run_id=run.id, approval_id=sent.question_id)
 
     async def distilled(self, run_id: str) -> None:

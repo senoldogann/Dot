@@ -9,6 +9,7 @@ from urllib.parse import urlsplit
 from dotagent.agent.authorization import Authorization, StepDecision
 from dotagent.agent.gate import RunGate, hold_note
 from dotagent.core.errors import (
+    ApprovalParked,
     ApprovalRejected,
     DotError,
     FailSafeTriggered,
@@ -78,6 +79,9 @@ def _describe_failure(exc: Exception, tool: RegisteredTool) -> str:
     """The text the model sees for a call that failed: what an expected error says, or the kind and the words of one
     that no tool expects (a fault in Dot, not in what the call asked)."""
     if isinstance(exc, ToolInputError):
+        return exc.message
+    if isinstance(exc, ApprovalParked):
+        # Kept for the owner (item 482): its words say it did not happen, that it waits, and how to go on.
         return exc.message
     if isinstance(exc, PolicyDenied | ApprovalRejected):
         return f"Not allowed: {exc.message}. Do not retry this action or look for a way around it."

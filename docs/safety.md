@@ -361,8 +361,11 @@ automated likes and bulk or aggressive following, and warn that scripting its we
 
 **Approvals.** An action that needs a yes becomes an approval: `allow? [y/N]` in the terminal, a card in the web UI. The
 run waits (its status is `blocked`) for up to `[policy] approval_timeout_s`; an approval nobody answers expires and
-counts as a refusal. The note you write with your answer reaches the model. Your no stands for the rest of the run (item
-456): the same action, as its card showed it, is refused at once, with no new card, nor a question to the review model
+counts as a refusal. With `[policy] unanswered = "park"` a hand-off nobody answers is kept for you instead and the run
+goes on without it (item 482, [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)); your **I did
+it** on it gives the run no authority, and the words it sends restore no trust. The note you write with your answer
+reaches the model. Your no stands for the rest of the run (item 456): the same action, as its card showed it, is refused
+at once, with no new card, nor a question to the review model
 in `auto`, until you write to the run again (a steer, the answer to its question); the policy's event records the
 refusal, as it does the first. Only your no is kept, given in the web UI or the terminal: a refusal of the review model,
 of the eval harness and an approval nobody answered are not; and an action whose card shows less than all of it is
