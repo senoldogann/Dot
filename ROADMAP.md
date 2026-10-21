@@ -16143,6 +16143,28 @@ kept, Incognito and a fresh profile left alone, a state Dot does not know refuse
 sent after Dot's Chrome starts again, and without the word it is not, while a dated one is in both). Docs:
 `docs/browser-and-computer-use.md`.
 
+### 456. A no is not asked again in the same run
+
+**Status: done (2026-10-21).** Part of the ninth of the nine ideas taken from OpenBot (item 449 has the plan): "a
+declined action is not asked again in the same run". Today a run whose action the owner refused may put the same card to
+them again a step later, and in `auto` the review model, which reads the owner's instructions but not their no, may
+approve it. **As built.** `agent/declined.py` keeps the owner's no by the action as its card showed it (tool, summary,
+target and amount, exactly: a browser element keeps its ref while its role and name stay the same, so another Reply
+button is another action; the design's normalising of refs, which would have merged them, is left out on the critique's
+word), and never for a kind whose card says not what it writes or types (a file's text, a field's). `RunGate` keeps it
+when the owner denies a question (`denied`; an approval nobody answered is no answer, and the review model's no is not
+the owner's) and looks it up in `_authorize_decision` after the yolo waiver and after a refusal of the policy, before
+the route, so the same action is refused at once, with no card, no wait and no record, before the owner and before the
+review model of `auto` alike; the run is told it stays declined until the owner writes, and that it can carry on, ask
+with `ask_user`, or finish. A message of the owner (a steer, the answer to a question, `add_instruction`) releases it.
+Nothing is allowed by it: an action the policy allows runs as before, and yolo, where nothing is asked, keeps nothing,
+so a no given in another mode does not carry into it (the owner's word of 2026-10-21: "YOLO modundaki serbestliğe
+dokunma"). The kept refusals live with the run's gate: a resumed or delegated run asks once more. Tests:
+`tests/unit/test_declined.py` (the key exact, the kinds never kept, the release, the words),
+`tests/smoke/test_approval_modes.py` (the real gate: the repeat refused within a second with no card nor record, another
+action asking, a message reopening it; an expired question and the review model's no not kept; in `auto` the review
+model not asked again after the owner's no; yolo untouched). Docs: `docs/safety.md`, `docs/autonomy.md`.
+
 ## Log
 
 - 2026-10-08: roadmap written from the owner's go-ahead for all eight items, in this order. Nothing implemented yet.
@@ -17108,3 +17130,5 @@ sent after Dot's Chrome starts again, and without the word it is not, while a da
   OpenBot is written down.
 - 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.
+- 2026-10-21 (Opus 5.5): item 456 on `item-456-declined` from `main`: the owner's no to an action stands for the rest
+  of the run, before the owner and the review model alike, until they write again; yolo keeps nothing.
