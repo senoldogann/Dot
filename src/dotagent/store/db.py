@@ -2317,11 +2317,11 @@ class Store:
     async def tool_steps(self, floor_id: int, before_id: int, limit: int, taint_kinds: Sequence[str]) -> list[StepRow]:
         """The newest ``limit`` steps whose action reached the policy (a ``tool_result`` with a kind) among the events
         from ``floor_id`` up to, not with, ``before_id``, newest first (item 469): with whether their run was in yolo,
-        whether the run was tainted when the step was decided (after the newest of its events of ``taint_kinds`` before
-        the step, as :func:`dotagent.agent.gate.tainted_after` reads them), and, for a step whose record says the gate
-        did not let it through, what the ``policy`` event of its call said, looked for among the run's own events since
-        the call's ``tool_call``, at most :data:`_STEP_CALL_EVENTS` back. SQLite reads the fields out of each event's
-        JSON, so a page carries no event's whole text."""
+        whether the run was tainted before the step's result (after the newest of its events of ``taint_kinds`` before
+        it, as :func:`dotagent.agent.gate.tainted_after` reads them), and, for a step whose record says the gate did not
+        let it through, what the ``policy`` event of its call said, with the taint it kept (item 474), looked for among
+        the run's own events since the call's ``tool_call``, at most :data:`_STEP_CALL_EVENTS` back. SQLite reads the
+        fields out of each event's JSON, so a page carries no event's whole text."""
         kinds: str = ", ".join("?" for _ in taint_kinds)
         rows = await self._all(
             "SELECT e.id, e.run_id, e.ts, json_extract(e.data, '$.tool') AS tool,"
@@ -2334,7 +2334,8 @@ class Store:
             f" WHERE t.run_id = e.run_id AND t.id < e.id AND t.kind IN ({kinds}) ORDER BY t.id DESC LIMIT 1), 0)"
             " AS tainted_before,"
             " CASE WHEN json_type(e.data, '$.decision') = 'null' THEN (SELECT json_object('source',"
-            " json_extract(p.data, '$.source'), 'verdict', json_extract(p.data, '$.verdict')) FROM events AS p"
+            " json_extract(p.data, '$.source'), 'verdict', json_extract(p.data, '$.verdict'),"
+            " 'tainted', json(p.data -> '$.tainted')) FROM events AS p"
             " WHERE p.run_id = e.run_id AND p.kind = 'policy' AND p.id < e.id AND p.id > (SELECT c.id FROM events AS c"
             " WHERE c.run_id = e.run_id AND c.id < e.id AND c.id >= COALESCE((SELECT a.id FROM events AS a"
             " WHERE a.run_id = e.run_id AND a.id < e.id ORDER BY a.id DESC LIMIT 1 OFFSET ?), 0)"

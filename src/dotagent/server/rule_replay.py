@@ -99,10 +99,12 @@ def _example(step: StepRow) -> RuleExample:
 
 
 class _Said(FrozenModel):
-    """What the policy said of a step then: where the answer came from and what it was."""
+    """What the policy said of a step then: where the answer came from, what it was, and whether the run was tainted
+    when the gate decided (kept since item 474; ``None`` before)."""
 
     source: DecisionSource
     verdict: Verdict
+    tainted: bool | None
 
 
 def _said(step: StepRow) -> _Said | None:
@@ -110,7 +112,7 @@ def _said(step: StepRow) -> _Said | None:
     (refused, declined, handed to the owner), the policy event of its call; ``None`` when neither says."""
     was: StepDecision | None = _was(step)
     if was is not None:
-        return _Said(source=was.source, verdict=was.verdict)
+        return _Said(source=was.source, verdict=was.verdict, tainted=was.tainted)
     if step.stopped_by is not None:
         return _Said.model_validate(step.stopped_by)
     return None
@@ -121,11 +123,14 @@ def _settled_before_rules(said: _Said, behavior: Behavior) -> bool:
     return said.source in _BEFORE_RULES and not (said.source in _HANDOFF_FIRST and behavior == "handoff")
 
 
-def _verdict_now(step: StepRow, behavior: Behavior) -> Verdict:
+def _verdict_now(step: StepRow, said: _Said, behavior: Behavior) -> Verdict:
     """What the policy would decide of the step with the rule tried deciding it: the rule's answer, but for an ``allow``
     on a step that reaches outside while the run was tainted, which the taint makes a question (``preapproved`` it does
-    not; policy/engine.py, decide_past_review)."""
-    if behavior == "allow" and step.tainted_before and TAINT_ESCALATION_FLAGS.intersection(step.flags):
+    not; policy/engine.py, decide_past_review). The taint is the one the gate weighed, kept with the step's decision or
+    policy event since item 474; for a step from before, the run's taint before the step's result, which for a call
+    that ran beside read-only ones may hold one their results brought after the gate decided."""
+    tainted: bool = step.tainted_before if said.tainted is None else said.tainted
+    if behavior == "allow" and tainted and TAINT_ESCALATION_FLAGS.intersection(step.flags):
         return "ask"
     return _VERDICT[behavior]
 
@@ -169,7 +174,7 @@ def _count_first(tally: Tally, step: StepRow, behavior: Behavior) -> None:
         else:
             tally.unknown += 1
         return
-    now: int = _STRICTNESS[_verdict_now(step, behavior)]
+    now: int = _STRICTNESS[_verdict_now(step, said, behavior)]
     then: int = _STRICTNESS[said.verdict]
     if now > then:
         tally.stricter += 1

@@ -248,11 +248,13 @@ class RunGate:
         rules: list[RuleRecord] = await self._store.list_rules()
         state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
-        decided: Decision = decide(info, self._mode, self.tainted, self._preset, rules, allowance)
+        # The taint the policy weighs, kept with the step's record (item 474).
+        tainted: bool = self.tainted
+        decided: Decision = decide(info, self._mode, tainted, self._preset, rules, allowance)
         if self._approval_mode == "yolo" and decided.source == "auto_review":
             # What the always-on review refuses in every other mode, a yolo run does without asking: the layers
             # after the review still judge the step, and a refusal among them stands (item 443).
-            rest: Decision = decide_past_review(info, self._mode, self.tainted, self._preset, rules, allowance)
+            rest: Decision = decide_past_review(info, self._mode, tainted, self._preset, rules, allowance)
             review: Decision = waived_in_yolo(info)
             if rest.verdict == "allow":
                 decided = review
@@ -278,7 +280,7 @@ class RunGate:
                 state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
             )
             log.info("spend_recorded", run_id=self._run_id, host=state.host, amount=state.amount.value)
-        return Authorization(note=note, decision=step_decision(decision, answered_by, self._preset))
+        return Authorization(note=note, decision=step_decision(decision, answered_by, self._preset, tainted))
 
     def _capped_site(self, info: ActionInfo) -> str | None:
         """The site of a payment step with an amount on a site with pre-approved caps; ``None`` for any other action."""
@@ -315,6 +317,8 @@ class RunGate:
         return await self._ask_user(info, decision, ""), "user"
 
     async def _emit_policy(self, info: ActionInfo, decision: Decision) -> None:
+        """The event of a step the policy asks about, hands off or refuses, with whether the run was tainted then
+        (item 474): a step that does not go through keeps no decision in its result, so this is its record."""
         await self._bus.emit(
             self._run_id,
             "policy",
@@ -324,6 +328,7 @@ class RunGate:
                 "source": decision.source,
                 "reason": decision.reason,
                 "rule_id": decision.rule_id,
+                "tainted": self.tainted,
             },
             True,
         )

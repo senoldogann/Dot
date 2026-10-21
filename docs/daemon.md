@@ -397,7 +397,8 @@ What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the
 every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are
 left out)
 with the channel it went through, its target, the result the model got as its evidence, the flags its action raised
-and what the policy decided of it and who answered (`decision`, item 468; none for a step recorded before); every
+and what the policy decided of it, who answered and whether the run was tainted then (`decision`, items 468 and
+474; none for a step recorded before item 468, no taint for one before item 474); every
 approval and question
 of the run with its decision, who decided and the note; and every file the run, or a run it delegated to, changed with
 `write_file`, `edit_file` or `write_notes`, with its undo state as `dotx undo` reads it (can be taken back, changed

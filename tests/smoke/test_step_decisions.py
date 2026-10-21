@@ -146,3 +146,19 @@ async def test_who_answered_a_question_is_kept_with_the_step(room: Room) -> None
     assert (supervised.decision.source, supervised.decision.answered_by) == ("supervised", "user")
     # authorize gives the owner's note as it did.
     assert await _gate(room, "balanced", "ask", _nobody).authorize(READ) == ""
+
+
+async def test_the_taint_the_gate_weighed_is_kept_with_the_decision_and_the_question(room: Room) -> None:
+    """Item 474: a step's decision, and the policy event of a question, say whether the run was tainted when the gate
+    decided, so that what a rule would have done there can be told later (item 469)."""
+    clean: StepDecision = (await _gate(room, "balanced", "ask", _nobody).authorize_recorded(READ)).decision
+    assert clean.tainted is False
+    tainted: RunGate = _gate(room, "cautious", "ask", _nobody)
+    tainted.taint()
+    read: StepDecision = (await tainted.authorize_recorded(READ)).decision
+    assert read.tainted is True
+    asked: Authorization = await _answered_by_the_owner(room, tainted, WRITE)
+    assert asked.decision.tainted is True
+    events: list[EventRecord] = await room.store.list_events(room.run.id, 0, 500)
+    policy: EventRecord = [event for event in events if event.kind == "policy"][-1]
+    assert (policy.data["summary"], policy.data["tainted"]) == ("Write notes.md", True)

@@ -15,6 +15,7 @@ import pytest_asyncio
 from playwright.async_api import Browser, Locator, Page, async_playwright, expect
 
 from dotagent.agent.authorization import StepDecision
+from dotagent.agent.gate import TAINT_EVENTS
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
 from dotagent.core.types import JsonObject
@@ -24,7 +25,7 @@ from dotagent.server.app import create_app
 from dotagent.server.context import ServerContext
 from dotagent.server.daemon import DotServer, bind_listener, serving_config
 from dotagent.server.links import ui_url
-from dotagent.store.models import EventRecord, RunRecord, ThreadRecord
+from dotagent.store.models import EventRecord, RunRecord, StepRow, ThreadRecord
 
 pytestmark = [pytest.mark.asyncio(loop_scope="module")]
 
@@ -269,3 +270,18 @@ async def test_the_rules_page_tests_a_rule_before_it_is_added(
                 await page.close()
         finally:
             await browser.close()
+
+
+async def test_the_store_gives_a_stopped_step_the_taint_its_policy_event_kept(runtime: Runtime) -> None:
+    """Item 474: the policy event of a question keeps the run's taint, and the store reads it with the step the gate
+    stopped. Last in the file: its push would count in the others' try-outs."""
+    run: RunRecord = await _run(runtime, "ask")
+    await runtime.store.add_event(run.id, "tool_call", {"call_id": "t1", "tool": "shell", "args": {}})
+    await runtime.store.add_event(
+        run.id, "policy", {**_policy("Run: git push --all", "preset", "ask"), "tainted": True}
+    )
+    result: EventRecord = await runtime.store.add_event(
+        run.id, "tool_result", _not_run("Run: git push --all", "t1", True)
+    )
+    steps: list[StepRow] = await runtime.store.tool_steps(result.id, result.id + 1, 10, TAINT_EVENTS)
+    assert [step.stopped_by for step in steps] == [{"source": "preset", "verdict": "ask", "tainted": True}]
