@@ -510,6 +510,9 @@ class ScheduleCreateRequest(FrozenModel):
     stop_after_failures: int | None = Field(default=None, ge=0, le=50)
     notify: NotifyLevel | None = None
     agent_id: str | None = None
+    # Item 464: false saves it switched off, as a template's schedule is until the owner has read its goal; the room for
+    # one more switched on is checked when it is switched on.
+    enabled: bool = True
 
 
 class ScheduleUpdateRequest(FrozenModel):

@@ -30,7 +30,9 @@ async def _agent(store: Store, name: str) -> AgentRecord:
 
 
 async def _schedule(store: Store, name: str, agent_id: str | None) -> ScheduleRecord:
-    return await store.add_schedule(name, "0 9 * * *", None, "Look.", "task", 2_000_000_000.0, _options(agent_id), None)
+    return await store.add_schedule(
+        name, "0 9 * * *", None, "Look.", "task", 2_000_000_000.0, _options(agent_id), None, True
+    )
 
 
 async def test_deleting_an_agent_switches_its_schedules_off_and_leaves_the_others(tmp_path: Path) -> None:

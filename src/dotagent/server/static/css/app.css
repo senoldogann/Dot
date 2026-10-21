@@ -7297,6 +7297,31 @@ button.attach-chip:hover {
   align-self: flex-start;
 }
 
+/* A template that suggests a schedule offers it with the agent (item 464): ticked, the schedule is added switched off,
+   for its goal to be read first. */
+.template-also {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  cursor: pointer;
+}
+
+.template-also input {
+  flex: none;
+  margin: 4px 0 0;
+}
+
+/* A schedule on its agent's page (item 464): the goal in full, to be read before it is switched on. */
+.agent-schedule-goal {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  line-height: var(--leading-sm);
+  overflow-wrap: anywhere;
+}
+
 /* A template's tools (item 425): the count under the facts, and the names themselves, wrapped, a click below it, so
    that a card keeps its height while the list stays in reach. */
 .template-tools {
@@ -7348,6 +7373,7 @@ button.attach-chip:hover {
     grid-template-areas:
       "head use"
       "facts facts"
+      "also also"
       "tools tools";
     align-items: start;
     gap: var(--space-2);
@@ -7364,6 +7390,13 @@ button.attach-chip:hover {
 
   .template-card > .template-tools {
     grid-area: tools;
+  }
+
+  /* The tick is tapped: a 40 px row, as the other rows a finger uses. */
+  .template-card > .template-also {
+    grid-area: also;
+    align-items: center;
+    min-height: 40px;
   }
 
   /* The count that opens the tools is tapped: a 40 px row, like the other rows a finger opens, its marker kept. */

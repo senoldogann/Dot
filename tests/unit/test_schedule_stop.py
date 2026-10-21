@@ -40,7 +40,7 @@ async def test_the_store_keeps_the_row_of_failed_runs(tmp_path: Path) -> None:
     store: Store = await Store.open(tmp_path / "dot.db", tmp_path / "images")
     try:
         record: ScheduleRecord = await store.add_schedule(
-            "report", "*/5 * * * *", None, "Write it.", "task", 1.0, UNSET_OPTIONS, None
+            "report", "*/5 * * * *", None, "Write it.", "task", 1.0, UNSET_OPTIONS, None, True
         )
         assert record.runs_failed_in_row == 0
         assert [await store.record_schedule_outcome(record.id, status) for status in ("failed", "failed")] == [1, 2]
