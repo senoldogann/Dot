@@ -104,7 +104,8 @@ The ways a service connects:
 **Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
 its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
 tick 1 to 30. **Save** connects the server with those and keeps the choice with it, so a restart offers the same ones; a
-server that does not answer leaves the choice unwritten and the button stays.
+server that does not answer leaves the choice unwritten and the button stays. A server you signed in to (Linear,
+Postman) lists and connects its tools with that sign-in, so the choice asks for none again (item 499).
 
 **Your own MCP server**, at the foot of All: any [MCP server](#mcp-servers) by its name and address, a URL or the
 command that starts it on this Mac, added as the services are. Connected lists, besides the services, every server Dot
