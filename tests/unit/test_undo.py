@@ -53,7 +53,7 @@ def test_a_changed_file_is_put_back_as_it_was_with_its_permission_bits(tmp_path:
     notes.write_text("one\n", encoding="utf-8")
     notes.chmod(0o640)
     target: JournalTarget = _target(root, RUN_ID, MIB, MIB)
-    _edit_blocking(notes, "one", "two", False, target)
+    _edit_blocking(notes, "one", "two", False, target, tmp_path)
     atomic_write(notes, "three\n", target)
     first, second = read_journal(run_journal(root, RUN_ID))
     assert (first.seq, first.existed, first.mode, first.backup, first.copied) == (0, True, 0o640, True, 4)

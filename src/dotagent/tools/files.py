@@ -313,10 +313,12 @@ def _with_crlf(snippet: str) -> str:
     return snippet.replace("\r\n", "\n").replace("\n", "\r\n")
 
 
-def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: JournalTarget) -> str:
+def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: JournalTarget, workspace: Path) -> str:
     """Replace ``old`` with ``new`` in the file and leave every other byte as it was: a file that breaks its lines with
     CRLF keeps them, and the old and the new text are taken with CRLF too (``read_file`` shows lines without it). Only
-    UTF-8 text is edited; a file in another encoding is refused, saying so, rather than guessed at."""
+    UTF-8 text is edited; a file in another encoding is refused, saying so, rather than guessed at. When ``old`` is not
+    found, the error names the file's closest lines, but for a file third parties wrote (item 494): an error does not
+    mark the run untrusted."""
     if not path.is_file():
         raise ToolExecutionError("file does not exist", {"path": str(path)})
     try:
@@ -330,9 +332,11 @@ def _edit_blocking(path: Path, old: str, new: str, replace_all: bool, journal: J
         old, new = _with_crlf(old), _with_crlf(new)
     occurrences: int = text.count(old)
     if occurrences == 0:
+        closest: dict[str, str] = (
+            {} if holds_third_party(path, workspace) else {"closest_lines": _closest_lines(text, old)}
+        )
         raise ToolExecutionError(
-            "the text to replace was not found; re-read the file and copy it exactly",
-            {"path": str(path), "closest_lines": _closest_lines(text, old)},
+            "the text to replace was not found; re-read the file and copy it exactly", {"path": str(path), **closest}
         )
     if occurrences > 1 and not replace_all:
         raise ToolExecutionError(
@@ -355,6 +359,7 @@ def _edit_file_tool() -> RegisteredTool:
             args.new,
             args.replace_all,
             journal_for(ctx, "edit_file"),
+            ctx.workspace,
         )
         return ok(message)
 

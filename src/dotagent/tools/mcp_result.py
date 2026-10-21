@@ -30,8 +30,6 @@ from dotagent.tools.base import ToolResult
 MAX_IMAGES: int = 4
 FENCE_OVERHEAD_CHARS: int = 300
 _NO_CONTENT: str = "(the tool returned no content)"
-# Room in the budget for Dot's note after the fence of an answer kept in a file: its path, its size, where to read on.
-_NOTE_CHARS: int = 500
 _NAME_CHARS: int = 60
 _UNSAFE_NAME: re.Pattern[str] = re.compile(r"[^A-Za-z0-9_.-]+")
 
@@ -157,6 +155,8 @@ async def render_call_result(
         text = fence_mcp(server, tool, body, nonce)
     else:
         path: Path = await asyncio.to_thread(_write_answer, folder, _file_name(server, tool, nonce), body)
-        shown, shown_lines = _leading_lines(body, text_chars - _NOTE_CHARS)
+        # The note is longest when it names the last line; what it leaves of the budget is shown.
+        room: int = text_chars - len(_kept_note(path, body, len(body.splitlines())))
+        shown, shown_lines = _leading_lines(body, max(room, 0))
         text = f"{fence_mcp(server, tool, shown, nonce)}\n{_kept_note(path, body, shown_lines)}"
     return ToolResult(text=text, images=tuple(images), is_error=result.is_error, untrusted=True)
