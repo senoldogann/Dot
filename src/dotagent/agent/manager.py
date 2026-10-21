@@ -1617,10 +1617,12 @@ class RunManager:
         log.info("kept_step_handed_back", approval_id=record.id, run_id=run.id, delivered="run")
 
     async def lapse_kept(self, now: float) -> int:
-        """Close the steps kept for the owner whose time is over at ``now`` (item 482); how many."""
-        due: list[ApprovalRecord] = await self._runtime.store.kept_due(now)
-        for record in due:
-            await self._runtime.approvals.lapse(record)
+        """Close the steps kept for the owner whose time is over at ``now`` (item 482); how many. It waits for an
+        answer being given (:meth:`decide`), so that an "I did it" that started a run is not lapsed under it."""
+        async with self._answering:
+            due: list[ApprovalRecord] = await self._runtime.store.kept_due(now)
+            for record in due:
+                await self._runtime.approvals.lapse(record)
         return len(due)
 
     async def _carry_on(self, question: ApprovalRecord, source: str, answer: str) -> None:
