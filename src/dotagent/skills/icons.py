@@ -72,6 +72,7 @@ ICON_NAMES: frozenset[str] = frozenset(
         "refresh",
         "search",
         "send",
+        "settings",
         "shield",
         "sliders",
         "smartphone",
