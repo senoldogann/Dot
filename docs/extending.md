@@ -6,7 +6,7 @@
 works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
 leads to Plugins.
 
-**Plugins** lists 66 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
+**Plugins** lists 78 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
 Password managers (item 493), Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
@@ -16,14 +16,16 @@ ready, and where its data goes. **Check again** reads them all anew. `GET /api/p
 
 Each tile's mark is the service's own logo, in its own colours, on a tile that is white in both colour schemes (a dark
 logo such as GitHub's or X's reads in the dark scheme too). The logos are files of `static/icons/plugins`: from
-[gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the five brands it draws as a wordmark alone
-(Stripe, Box, Wix, Zapier and Webflow), Simple Icons' symbol in the brand's colour (version 16.35.0, CC0); the
+[gilbarbara/logos](https://github.com/gilbarbara/logos) (CC0), and, for the brands it draws as a wordmark alone
+(Stripe, Box, Wix, Zapier, Webflow and Mixpanel) or not at all (Calendly and Semrush), Simple Icons' symbol in the
+brand's colour (version 16.35.0, CC0); the
 folder's LICENSE names the files, the source and the commit they came from, and the brands' guidelines. A mark
 identifies its service and nothing more. The applications of this Mac (Mail, Calendar, Notes, Reminders, Messages,
 Contacts, Excel, Word, PowerPoint, Outlook and OneDrive) show the icon of the application you have installed, read from
 its bundle when the page is drawn (`GET /api/connections/{id}/icon`, a PNG; `connections/app_icons.py`), since Apple's
 and Microsoft's artwork is not Dot's to ship; one that is not installed keeps its own mark, a logo, an icon of the
-interface or letters (DeepWiki, Context7, Jina, Canva and Outlook have no logo to show). A server added by hand wears
+interface or letters (DeepWiki, Context7, Jina, Canva, Outlook, Mobbin, Parallel, Plain, MailerLite and Klaviyo have
+no logo to show). A server added by hand wears
 the mark of the service it is one of, and the composer's menus draw a server and its tools with the same mark (item
 477).
 
@@ -91,34 +93,37 @@ The ways a service connects:
 - **MCP server** (item 279): Notion, Linear, Sentry, Cloudflare, Stripe and Todoist, which sign in with your account,
   Supabase and monday.com too (item 408), and GitLab, PostHog, Zapier, Webflow, ClickUp, Postman, Netlify, Apify, Miro,
   Heroku and Atlassian (item 413: Dot's own client registered with each and each opened its sign-in page to it on
-  2026-10-19), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs and Jina, open to all, and the services that
-  take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix, Firecrawl and Tavily;
-  a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to over standard input
-  and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation, and with a key
-  (**MCP · On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana and Atlassian
-  (API token); a value the owner knows, such as a site's address, is asked for with the keys, without a link. A service
-  that takes a key asks for it under its tile and on its page, with where to get one; Dot keeps each in its `.env` (mode
-  0600) under `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the server's headers or environment refer to
-  it as `${...}`, so the value is in no record and leaves the daemon only to the service; **Remove** takes the key out
-  of `.env` with the service's own server, and nothing else does (`keep` in `routes_mcp.py` says so): a try that fails
-  leaves the key for **Try again**, an add after a failed one writes it anew, and a daemon's restart forgets a failed
-  try but not its key. The addresses, keys and commands are as the services' own docs read on 2026-10-19
-  (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools, which go to
-  the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you are using:
-  its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own page, which
-  sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's through
-  `[server] reach`), to a page that names the service and its mark and says Dot is finishing the sign-in, because the
-  service's code is traded for its tokens after that page; then the tile turns **Ready**. This is MCP's own authorization: OAuth with PKCE, Dot registering itself
-  with the service as a client without a secret. Dot keeps the tokens in `mcp-sign-ins/<server>.json` (mode 0600) and
-  renews them before they run out, after a restart too; a run never signs in, so a server whose sign-in is gone is left
-  out with words that bring you back here (**Sign in again**). **Remove** takes a server added here out, with its tools
-  and its sign-in, and takes one added from another agent of this Mac back from Dot, stopped at once (item 497; the
-  agent keeps it). A server of a plugin goes with its plugin: **Remove plugin** stops the plugin's servers now, its
-  skills leave the runs that start after, and its folder in Dot's plugins goes to the Trash, from which it can be put
-  back (`DELETE /api/installed-plugins/{name}`); a plugin read from a folder of `[plugins] dirs` is taken out of the
-  config instead. A plugin whose folder went without Dot still lists the servers Dot runs for it until Dot starts
-  again, and Remove plugin then stops them; a server of the same name added since is the owner's, not the plugin's. A
-  server of Dot's config is the owner's to take out of `config.toml` (its `[[mcp]]` block).
+  2026-10-19), Mobbin, Semrush, Parallel Task, Plain, MailerLite, Airtable, Klaviyo, Calendly, Amplitude, Mixpanel, New
+  Relic and PayPal (item 505: each one's metadata, read on 2026-10-21, offers a client that registers itself without a
+  secret), DeepWiki, Microsoft Learn, Context7, Exa, Cloudflare Docs, Jina and Parallel Search, open to all, and the
+  services that take a key (**MCP · Key**): GitHub (a personal access token), Intercom, Neon, Hugging Face, Wix,
+  Firecrawl and Tavily; a few run on this Mac (**MCP · On this Mac**), started by Dot with `npx` or `uvx` and talked to
+  over standard input and output: Memory, Sequential Thinking, Fetch, Playwright, Chrome DevTools and AWS Documentation,
+  and with a key (**MCP · On this Mac · Key**) Brave Search, Figma (Framelink), Perplexity, ElevenLabs, Mapbox, Grafana
+  and Atlassian (API token); a value the owner knows, such as a site's address, is asked for with the keys, without a
+  link. A service that takes a key asks for it under its tile and on its page, with where to get one; Dot keeps each in
+  its `.env` (mode 0600) under `MCP_<SERVICE>_<NAME>`, written once the add is accepted, and the server's headers or
+  environment refer to it as `${...}`, so the value is in no record and leaves the daemon only to the service;
+  **Remove** takes the key out of `.env` with the service's own server, and nothing else does (`keep` in `routes_mcp.py`
+  says so): a try that fails leaves the key for **Try again**, an add after a failed one writes it anew, and a daemon's
+  restart forgets a failed try but not its key. The addresses, keys and commands are as the services' own docs read on
+  2026-10-19 (`mcp/catalogue.py`). **Add** tries the server first and keeps it only once it answered with its tools,
+  which go to the runs that start next, without a restart. A server that asks for a sign-in gets one in the browser you
+  are using: its tile says **Waiting for your sign-in**, and its page has **Open the sign-in page**, the service's own
+  page, which sends you back to Dot's `/oauth/callback` on the address you added it from (the Mac's, or your phone's
+  through `[server] reach`), to a page that names the service and its mark and says Dot is finishing the sign-in,
+  because the service's code is traded for its tokens after that page; then the tile turns **Ready**. This is MCP's own
+  authorization: OAuth with PKCE, Dot registering itself with the service as a client without a secret. Dot keeps the
+  tokens in `mcp-sign-ins/<server>.json` (mode 0600) and renews them before they run out, after a restart too; a run
+  never signs in, so a server whose sign-in is gone is left out with words that bring you back here (**Sign in again**).
+  **Remove** takes a server added here out, with its tools and its sign-in, and takes one added from another agent of
+  this Mac back from Dot, stopped at once (item 497; the agent keeps it). A server of a plugin goes with its plugin:
+  **Remove plugin** stops the plugin's servers now, its skills leave the runs that start after, and its folder in Dot's
+  plugins goes to the Trash, from which it can be put back (`DELETE /api/installed-plugins/{name}`); a plugin read from
+  a folder of `[plugins] dirs` is taken out of the config instead. A plugin whose folder went without Dot still lists
+  the servers Dot runs for it until Dot starts again, and Remove plugin then stops them; a server of the same name added
+  since is the owner's, not the plugin's. A server of Dot's config is the owner's to take out of `config.toml` (its
+  `[[mcp]]` block).
 
 **Choose tools** (item 426): a server added here that offers more tools than a model gets at once (30) is left out, and
 its row says so; its **Choose tools** opens the list of every tool it offers with what each says it does, of which you
