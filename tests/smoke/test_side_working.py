@@ -1,8 +1,8 @@
 """The side menu shows each chat once (item 202): a chat at work stands in Working, as a chat with its menu, its time
 and the faces of the runs it delegated (item 507), and not again among the days; a pinned chat at work stays among the
 pinned ones, wearing the same faces there; what waits for an answer stays above, and its chat keeps its place. Folded,
-Working keeps the open chat in sight; the search finds the chats at work too; once the runs end, the chats are back
-among the days. Scripted runs, served by a real server, wide and on a phone, light and dark."""
+Working hides its rows, the open chat's too (item 513); the search finds the chats at work, folded or not; once the runs
+end, the chats are back among the days. Scripted runs, served by a real server, wide and on a phone, light and dark."""
 
 import asyncio
 import re

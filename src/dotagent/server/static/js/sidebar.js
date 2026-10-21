@@ -386,8 +386,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     el("div", { class: "row" }, allButton, deleteButton),
   );
   let activity = null;
-  // Where the runs at work stand (`placeWork`), worked out at each paint, and Working's entries as painted, each with
-  // the id of its chat (null for a row that is no chat's).
+  // Where the runs at work stand (`placeWork`), worked out at each paint, and Working's entries as painted.
   let work = { working: [], pinned: new Map() };
   let workingNodes = [];
   const activityNav = el("nav", { class: "side-activity-nav", "aria-label": "Activity", hidden: true });
@@ -673,7 +672,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
   function workingEntry(entry) {
     const node =
       entry.chat === null ? activityRow(entry.row, onNavigate, entry.children) : chatEntry(entry.chat, entry);
-    workingNodes.push({ chatId: entry.chat === null ? null : entry.chat.id, node });
+    workingNodes.push({ node });
     return node;
   }
 

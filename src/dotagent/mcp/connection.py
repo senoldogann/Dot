@@ -353,7 +353,15 @@ class McpConnection:
         try:
             async with asyncio.timeout(_PING_TIMEOUT_S):
                 await live.client.send_ping()
-        except (MCPError, TimeoutError) as exc:
+        except TimeoutError:
+            log.warning("mcp_server_quiet_session_gone", server=self.name, error="the ping was not answered in time")
+            live.broken = True
+            return False
+        except MCPError as exc:
+            # A server that answers the ping with an error of its own (one that does not know ping) is there.
+            if exc.code not in (CONNECTION_CLOSED, REQUEST_TIMEOUT):
+                live.answered_at = time.monotonic()
+                return True
             log.warning("mcp_server_quiet_session_gone", server=self.name, error=truncate_middle(repr(exc), 200))
             live.broken = True
             return False
