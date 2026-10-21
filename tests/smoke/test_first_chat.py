@@ -214,7 +214,7 @@ async def test_a_first_open_has_dot_greet_the_owner_name_itself_and_say_what_it_
             # Dot's browser here has no window: the card says so instead of offering a sign-in.
             await expect(first.locator(".first-connect")).to_contain_text("runs without a window")
             await expect(page.get_by_role("textbox", name="Goal")).to_have_attribute(
-                "placeholder", "Message Miro (@ for skills, / for commands)"
+                "placeholder", "Message Miro (@ for servers, / for skills and commands)"
             )
             assert 'name = "Miro"' in _written()
             await first.get_by_role("button", name="Skip the introduction").click()

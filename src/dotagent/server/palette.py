@@ -2,15 +2,16 @@
 as the web UI lists them when the owner types ``/``. The commands of the menu are the web UI's own: they act on the
 composer, not on the daemon."""
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from dotagent.mcp.types import McpTool
 from dotagent.server.views import PaletteServer, PaletteSkill, PaletteTool, PaletteView
 from dotagent.skills.types import Skill
 
 
-def palette_view(skills: Sequence[Skill], tools: Sequence[McpTool]) -> PaletteView:
-    """The skills by name and the servers by name, each with its tools by the name the model calls them by."""
+def palette_view(skills: Sequence[Skill], tools: Sequence[McpTool], logos: Mapping[str, str | None]) -> PaletteView:
+    """The skills by name and the servers by name, each with its tools by the name the model calls them by and the logo
+    its Customize tile wears (item 408), when ``logos`` knows one."""
     servers: dict[str, list[PaletteTool]] = {}
     for tool in sorted(tools, key=lambda tool: (tool.server, tool.exposed_name)):
         servers.setdefault(tool.server, []).append(
@@ -21,5 +22,7 @@ def palette_view(skills: Sequence[Skill], tools: Sequence[McpTool]) -> PaletteVi
             PaletteSkill(name=skill.name, description=skill.description, source=skill.source, icon=skill.icon)
             for skill in sorted(skills, key=lambda skill: skill.name)
         ),
-        servers=tuple(PaletteServer(name=name, tools=tuple(listed)) for name, listed in servers.items()),
+        servers=tuple(
+            PaletteServer(name=name, tools=tuple(listed), logo=logos.get(name)) for name, listed in servers.items()
+        ),
     )

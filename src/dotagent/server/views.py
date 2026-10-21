@@ -49,6 +49,7 @@ from dotagent.store.models import (
     MemoryRecord,
     MemoryScore,
     QueuedMessage,
+    RuleRecord,
     RunMode,
     RunPicks,
     RunRecord,
@@ -429,6 +430,19 @@ class RuleDraftRequest(FrozenModel):
 
 class RuleEnabledRequest(FrozenModel):
     enabled: bool
+
+
+class RuleMoveRequest(FrozenModel):
+    """Which way a rule moves in the order the policy reads the rules in: one place up, toward the first, or down."""
+
+    direction: Literal["up", "down"]
+
+
+class RuleView(RuleRecord):
+    """A rule as the Rules page lists it (item 449): the rule, and the id of the earlier rule that fits every action it
+    fits, so that it never decides (:func:`dotagent.server.rule_shadow.shadowing_rule`); None when it can decide."""
+
+    never_decided_by: str | None
 
 
 class OwnerLinesRequest(FrozenModel):
@@ -996,8 +1010,12 @@ class PaletteTool(FrozenModel):
 
 
 class PaletteServer(FrozenModel):
+    """An MCP server of the palette: its name, the tools it lists, and its own logo among the plugins' as the Customize
+    page draws it (item 408), or ``None`` for a server added by hand with no service behind it."""
+
     name: str
     tools: tuple[PaletteTool, ...]
+    logo: str | None = None
 
 
 class PaletteView(FrozenModel):

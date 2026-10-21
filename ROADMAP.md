@@ -16053,6 +16053,68 @@ few tokens to spare, get 26 000, still far under the 48 000 that Settings › Mo
 work with a draft of six lines that grows the dock, two drawn again from what was kept, one whose run ended while
 another chat was open; it fails on main), `tests/unit/test_run_modes.py`, `test_lean_prompt.py`. Docs: `docs/daemon.md`,
 `docs/autonomy.md`.
+### 447. The at menu is the servers and the plugins, with their logos, and it fits a phone's keyboard
+
+**Status: done (2026-10-21).** The owner's word of 2026-10-21, with a screenshot of the phone: `@` listed the MCP
+servers *and* every skill, so the servers the owner wanted were lost among them; the servers wore a plug where their
+Customize tile wears their own logo (item 408); and with the keyboard up the menu ran off the top of the screen.
+**As built.** `@` opens the MCP servers and the plugins alone (`pickGroups`, item 447): the skills and the servers' tools
+are the slash menu's, and a skill found by `@` is a skill found by `/` (`@` finds none of it now, and `/` keeps its
+Skills group). Each server carries the logo its Customize tile wears: the palette gained `PaletteServer.logo`, filled
+from `service_of` and `logo_of_service` as the MCP page fills it (a server added by hand has none, and the plug stands for
+it). `itemMark` draws that picture instead of the icon. And on a phone the menu's height is what the keyboard leaves —
+`min(320px, calc(100dvh - var(--seen-top) - var(--seen-bottom) - var(--dock-h) - 16px))`, the band `layout.js` keeps from
+`visualViewport` (a keyboard pans the page without resizing it, so `dvh` alone does not follow it) — scrolling inside it
+rather than running off the top.
+
+Tests: `tests/smoke/test_composer_picks.py` (`@` lists no Skills and no Commands, a hand-added server draws the plug, the
+menu's box stays inside the window on a phone, and `/` carries the skill and picks it); `tests/unit/test_palette.py`
+(a catalogued server's logo reaches the palette, a hand-added one has none).
+
+### 449. The rules move with arrows, and a rule that never decides says so
+
+**Status: done (2026-10-21).** The first of the nine ideas the owner took from the comparison with OpenBot
+(`reports/openbot-vs-dot-2026-10-20.md`, local; the plan below), and the first step of its second, "the strictest rule
+wins". The design, checked against the code and critiqued, does not make the strictest answer win: the order of the
+rules is today the only way to write an exception (the Rules page's own examples, "let Dot run git status without
+asking" above "ask me before rm", are an allow above a broader ask), and a stored rule carries no sign that an exception
+was meant. It goes in three steps: the owner can move the rules and sees which of them never decide (this item); later,
+once the owner has seen the notes for a release, a rule that hands the step over decides wherever it stands (on the
+human path of `policy/`). **As built.** `Store.move_rule` moves a rule a number of places along the order, which it
+reads under the write lock, and numbers the rules 1 to n, which closes the gaps deleted rules left; `POST
+/api/rules/{id}/move` moves it one place up or down (422 past either end, 404 for no rule) and tells the pages
+(`rules_changed`). `server/rule_shadow.py` names for each rule the earlier enabled rule that fits every action it fits
+(no expression or the same one, on a tool pattern that takes in its own: `*`, the same pattern, or one that matches its
+plain tool name), and `GET /api/rules` gives it as `never_decided_by`, computed once on the server and not again in the
+page (the critique). Whether two different expressions overlap is not told. The policy is untouched: `match_rule` still
+takes the first fit, and the rule the note names is the one that decides (the unit test reads it off `match_rule`). The
+Rules page draws two arrows on a rule's row, off at the ends, that keep the focus as the rule moves (the other arrow
+once it reaches an end), and a "Never decides" badge whose title names the rule that decides in its place. The note
+above the rules said a yolo run keeps all of the protections that are always on but the first; since item 443 it keeps
+only the second, a research run's limit, and the note says so. What a yolo run does is untouched. Tests:
+`tests/unit/test_rule_shadow.py` (the certain cases, the cases not told, the note against the engine),
+`tests/smoke/test_server.py` (a move, the numbering, the ends, 404, a direction that is none),
+`tests/smoke/test_rules.py` (the page at 1280 and at 390 px, the phone a touch screen where a row's buttons always show,
+in light and dark: the badge, the arrows, the focus). Docs: `docs/safety.md` (step 6), `docs/daemon.md`.
+
+**The plan it starts.** The owner's go-ahead of 2026-10-20 and 21: the nine ideas, each in its own pull request, planned
+so that today's Dot keeps working as it does, and yolo's freedom untouched ("YOLO modundaki serbestliğe dokunma"): in
+yolo none of them adds a question, a refusal, a hand-off, a wait or a mask, a no given in another mode does not carry
+into it, and each that touches the gate, the policy, the loop or what a run sees has a test that a yolo run does what it
+did. The designs were written against the code by seven agents and critiqued; an item takes its number when it starts.
+First, small and off the human paths: the money and credential floor of MCP tools (their names say a payment or a
+credential), a no not asked again in the same run, the session cookies of Dot's own Chrome kept across its restarts
+(cookies, sessions and history stay as in a real browser, for the Default profile and those the owner added, not
+Incognito), a repeating schedule switched off after failed runs in a row, Run now with a schedule's past firings, and
+this item. Then the medium ones: the values of password, one-time-code and card fields kept out of what the model reads
+(not in yolo), every decision of the gate recorded on its step and a rule tried on past steps before it is added, a
+notification level per schedule, an agent paused without losing it, a "while you were away" digest, scheduled work held
+without the emergency stop, a schedule run as one of the owner's agents, and the owner driving Dot's browser from the
+phone while the run is held. Last, the ones on the human paths, each waiting for the owner's yes: the release gated on
+the whole gate with browser tests in CI and the workflows checked by zizmor, the rule that hands a step over deciding
+wherever it stands, and approvals a run nobody watches keeps for the owner to answer later (off by default; never in
+yolo, where nothing is asked; not for a message, a post, an MCP call or an upload, whose words a later yes would not
+bind; and never by running the kept call outside its run).
 
 ### 453. Dot's own Chrome keeps its session cookies when it starts again
 
@@ -17038,5 +17100,10 @@ sent after Dot's Chrome starts again, and without the word it is not, while a da
 - 2026-10-21 (Opus 5.5): item 446 on `item-446-chat-foot-always-a-way` from `main`: a chat reached from
   the side menu opens at its foot, a run that ended while another chat was open and a live one included;
   every run is told that there is always a way, within the rules of trust and safety.
+- 2026-10-21 (Opus 5.5): item 447: `@` offers the MCP servers and the plugins alone — the skills are `/`'s — each with
+  the logo of its Customize tile, and on a phone the menu takes the room the keyboard leaves and scrolls.
+- 2026-10-21 (Opus 5.5): item 449 on `item-449-rule-order` from `main`: a rule's arrows move it up or down the order, a
+  rule that an earlier rule fits wherever it fits says it never decides, and the plan of the nine ideas taken from
+  OpenBot is written down.
 - 2026-10-21 (Opus 5.5): item 453 on `item-453-session-cookies` from `main`: Dot's own Chrome keeps the session cookies
   of its last run when it starts again, as Chrome does after a crash, without a page of that run.

@@ -5,6 +5,10 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+- Settings › Rules: a rule's arrows move it up or down the order the rules are checked in, and a rule that an earlier
+  rule fits wherever it fits says it never decides, with the number of the rule that decides in its place. The note
+  above the rules now says what a yolo run keeps of the protections that are always on: only a research run's limit
+  (item 449).
 - Dot's own Chrome no longer signs you out of sites that keep their sign-in in a session cookie whenever it starts
   again: Default and the profiles you added keep those cookies across restarts, as a real browser keeps a sign-in;
   Incognito still keeps nothing (item 453).

@@ -406,6 +406,46 @@ async def test_rules_are_listed_changed_and_deleted_through_the_api(client: http
     assert (await client.delete(f"/api/rules/{rule_id}")).status_code == 404
 
 
+async def test_a_rule_moves_up_and_down_the_order_and_one_that_never_decides_names_the_rule_that_does(
+    client: httpx.AsyncClient,
+) -> None:
+    """Item 449: a rule moves one place at a time and the rules are numbered 1 to n again; a rule that an earlier rule
+    fits wherever it fits names that rule; a rule that is not there is 404, and a move past either end 422."""
+    before: list[str] = [rule["id"] for rule in (await client.get("/api/rules")).json()]
+    made: list[str] = []
+    for behavior, glob, pattern in (
+        ("allow", "shell", ""),
+        ("handoff", "shell", r"\bgit push\b"),
+        ("ask", "write_file", ""),
+    ):
+        created: httpx.Response = await client.post(
+            "/api/rules", json={"behavior": behavior, "tool_glob": glob, "match_regex": pattern, "description": ""}
+        )
+        assert created.status_code == 201, created.text
+        made.append(created.json()["id"])
+    everything, push, write = made
+    shadows: dict[str, str | None] = {
+        rule["id"]: rule["never_decided_by"] for rule in (await client.get("/api/rules")).json()
+    }
+    assert shadows[push] == everything and shadows[everything] is None and shadows[write] is None
+    moved: httpx.Response = await client.post(f"/api/rules/{push}/move", json={"direction": "up"})
+    assert moved.status_code == 200, moved.text
+    order: list[str] = [rule["id"] for rule in moved.json()]
+    assert order == [*before, push, everything, write]
+    assert [rule["position"] for rule in moved.json()] == list(range(1, len(order) + 1))
+    # Above the rule that fitted all it fits, the hand-off decides again.
+    assert {rule["id"]: rule["never_decided_by"] for rule in moved.json()}[push] is None
+    back: httpx.Response = await client.post(f"/api/rules/{push}/move", json={"direction": "down"})
+    now: list[str] = [rule["id"] for rule in back.json()]
+    assert now == [*before, everything, push, write]
+    assert (await client.post(f"/api/rules/{now[0]}/move", json={"direction": "up"})).status_code == 422
+    assert (await client.post(f"/api/rules/{now[-1]}/move", json={"direction": "down"})).status_code == 422
+    assert (await client.post("/api/rules/rul_missing/move", json={"direction": "up"})).status_code == 404
+    assert (await client.post(f"/api/rules/{push}/move", json={"direction": "sideways"})).status_code == 422
+    for rule_id in made:
+        assert (await client.delete(f"/api/rules/{rule_id}")).status_code == 200
+
+
 async def test_schedules_are_created_switched_and_deleted_through_the_api(client: httpx.AsyncClient) -> None:
     created: httpx.Response = await client.post(
         "/api/schedules", json={"name": "morning look", "goal": "Say hello.", "cron": "0 9 * * 1-5"}

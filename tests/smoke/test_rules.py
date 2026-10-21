@@ -349,3 +349,73 @@ async def test_a_card_the_guard_raised_offers_no_rule_and_says_why(
         async with asyncio.timeout(_RUN_WAIT_S):
             ended: RunRecord = await manager.wait(run.id)
     assert ended.status == "done", ended
+
+
+async def _fresh_rules(client: httpx.AsyncClient) -> list[str]:
+    """The rules this test reads, alone in the list: everything the shell does, then a hand-off of ``git push`` that
+    the first one keeps from ever deciding, then a question about writing files."""
+    for rule in (await client.get("/api/rules")).json():
+        assert (await client.delete(f"/api/rules/{rule['id']}")).status_code == 200
+    made: list[str] = []
+    for behavior, glob, pattern in (
+        ("allow", "shell", ""),
+        ("handoff", "shell", r"\bgit push\b"),
+        ("ask", "write_file", ""),
+    ):
+        created: httpx.Response = await client.post(
+            "/api/rules", json={"behavior": behavior, "tool_glob": glob, "match_regex": pattern, "description": ""}
+        )
+        assert created.status_code == 201, created.text
+        made.append(created.json()["id"])
+    return made
+
+
+async def test_a_rule_moves_with_its_arrows_and_one_that_never_decides_says_so(
+    runtime: Runtime, client: httpx.AsyncClient, tmp_path: Path
+) -> None:
+    """Item 449, on a wide window and a phone, in light and dark: the hand-off under a rule that fits all it fits says
+    it never decides, and which rule decides in its place; its up arrow moves it above that rule, the note goes, the
+    arrow keeps the focus (the other arrow once the rule is first), and the ends' arrows are off."""
+    host, port = _address(client)
+    async with async_playwright() as playwright:
+        browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
+        try:
+            for width, height, scheme in (
+                (1280, 900, "light"),
+                (1280, 900, "dark"),
+                (390, 844, "light"),
+                (390, 844, "dark"),
+            ):
+                await _fresh_rules(client)
+                # The phone is a touch screen, where a row's buttons always show; on the wide window they show on hover.
+                phone: bool = width < 720
+                page: Page = await browser.new_page(
+                    viewport={"width": width, "height": height},
+                    color_scheme=scheme,
+                    is_mobile=phone,
+                    has_touch=phone,
+                    reduced_motion="reduce",
+                )
+                await page.goto(ui_url(host, port, TOKEN))
+                await page.goto(f"http://{host}:{port}/#/settings/rules")
+                rows: Locator = page.locator(".rule-list > .list-row")
+                await expect(rows).to_have_count(3)
+                never: Locator = rows.nth(1).locator(".badge", has_text="Never decides")
+                await expect(never).to_be_visible()
+                await expect(never).to_have_attribute("title", re.compile(r"^Rule #1 fits every action this rule fits"))
+                await expect(page.locator(".rule-list .badge", has_text="Never decides")).to_have_count(1)
+                await expect(page.get_by_role("button", name="Move rule 1 up")).to_be_disabled()
+                await expect(page.get_by_role("button", name="Move rule 3 down")).to_be_disabled()
+                assert await page.evaluate("document.documentElement.scrollWidth <= window.innerWidth")
+                if not phone:
+                    await rows.nth(1).hover()
+                await expect(page.get_by_role("button", name="Move rule 2 up")).to_be_visible()
+                await page.screenshot(path=str(tmp_path / f"rules-{width}-{scheme}.png"), full_page=True)
+                await page.get_by_role("button", name="Move rule 2 up").click()
+                await expect(rows.nth(0).locator(".badge", has_text="Hand it to me")).to_be_visible()
+                await expect(page.locator(".rule-list .badge", has_text="Never decides")).to_have_count(0)
+                # The moved rule is first now, so its up arrow is off and its down arrow holds the focus.
+                await expect(page.get_by_role("button", name="Move rule 1 down")).to_be_focused()
+                await page.close()
+        finally:
+            await browser.close()

@@ -10,12 +10,12 @@ from dotagent.mcp.hub import MAX_UNFILTERED_TOOLS
 from dotagent.mcp.launch import referenced_secrets
 from dotagent.mcp.signin import checked_link
 from dotagent.server.routes_mcp import (
-    _service_of,
     chosen_tools,
     kept_secret_names,
     requested_server,
     secret_entries,
     service_config,
+    service_of,
 )
 from dotagent.server.views import McpServerAdd
 
@@ -87,11 +87,11 @@ def test_a_service_s_secrets_are_asked_for_by_name_and_kept_under_dot_s_own_name
         {"BRAVE_API_KEY": "${MCP_BRAVE_SEARCH_BRAVE_API_KEY}"},
     )
     # A server added by hand with the service's address or command wears the service's name.
-    assert _service_of(McpServerConfig(name="mine", url="https://mcp.notion.com/mcp")) == "notion"
+    assert service_of(McpServerConfig(name="mine", url="https://mcp.notion.com/mcp")) == "notion"
     assert (
-        _service_of(McpServerConfig(name="mine", command="npx", args=["-y", "@playwright/mcp@latest"])) == "playwright"
+        service_of(McpServerConfig(name="mine", command="npx", args=["-y", "@playwright/mcp@latest"])) == "playwright"
     )
-    assert _service_of(McpServerConfig(name="mine", command="npx", args=["-y", "something-else"])) is None
+    assert service_of(McpServerConfig(name="mine", command="npx", args=["-y", "something-else"])) is None
 
 
 def test_a_sign_in_page_is_opened_only_at_an_https_address_or_one_of_this_mac() -> None:

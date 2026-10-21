@@ -145,16 +145,20 @@ a word opens the slash menu over the box: the commands of the composer (`/task`,
 `/btw` and `/loop` in the box of a run), the skills by name with their description, and each MCP server with its tools,
 read from the daemon as a run reads them (`GET /api/palette`); letters filter, the arrows move, Enter or Tab picks and
 Escape closes. A skill picked is a chip under the box, a tool the chip of its server, as from the **+** (below), and the
-slash word goes; a command does its work. `@` at the start of a word opens the same menu for the picks alone (item 367):
-the MCP servers by name with the number of their tools, then the skills and each server's tools, filtered by the letters
-after it; a pick is a chip and the at word goes. An `@` inside a word, as in an address, opens nothing. A run that waits
+slash word goes; a command does its work. `@` at the start of a word opens the menu of the servers and plugins alone
+(item 367, and the owner's word of 2026-10-21, item 447) — the group the menu titles **MCP servers**, the plugins: each
+one by its name, the number of its tools and the
+logo its Customize tile wears (the plug where it has none), filtered by the letters after it — the skills and the
+servers' tools, which the slash menu carries, are not there; a pick is a chip and the at word goes. An `@` inside a
+word, as in an address, opens nothing. On a phone either menu takes the room the keyboard leaves above the composer and
+scrolls inside it. A run that waits
 for your approval is listed under Waits for you, below the composer, and leads to its chat: the card stands there alone
 (item 434). Once you allow it, the card leaves the chat with the line that asked for it, as the page opens again too;
 refused, it stays and says so, and a question keeps its answer.
 
 The **+** at the left of the bar (item 318, after Codex's composer) opens the file picker at once (documents, photos and
-screenshots alike; a phone opens its own sheet). The slash and at menus pick **Plugins** (the MCP servers with tools)
-and **Skills**, both as `GET /api/palette` lists them. A plugin or a skill picked is a chip under the box in a colour of
+screenshots alike; a phone opens its own sheet). The slash menu picks **Plugins** (the MCP servers with tools) and
+**Skills**, as `GET /api/palette` lists them; the at menu picks the plugins alone (item 447). A plugin or a skill picked is a chip under the box in a colour of
 its name, which its × takes away; Plan first is a chip too, and a chat has neither it nor goal mode nor Keep going; all
 three switches stand in the **Options** menu's Execution group, under the approvals (item 353). The picks go with the
 message (`plugins`, `skills` and `plan_first` of `POST /api/runs`, and of a message the queue holds), and once it is
@@ -316,7 +320,7 @@ cost show is read again (item 426). A run that ended while its page was open is 
 its face at rest, not the tick again. One that was still at work when its page was left has its state read again before
 it is drawn, from the side menu or any other way back: if it ended meanwhile, its chat opens at its foot with its answer
 drawn at once and its face at rest, as a run that was over when its page opened does, not on the top of its answer
-written in again (item 446).
+written in again (item 447).
 
 In the conversation each turn of the actor (Dot, or the agent the run belongs to, in its look), and the answer at the
 end, opens with its still face; the run's state is the top bar's face and the first fact of Details, with no card for it
@@ -661,7 +665,8 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /threads/{id}/terminals`                                                  | the chat's terminal sessions: command, background or not, start, end and exit status (404 for no chat) |
 | `DELETE /threads/{id}/terminals/{session}`                                     | ends a session's program and what it started; the chat is told nothing (404 for no such session) |
 | `GET /approvals`, `POST /approvals/{id}/decision`                               | pending approvals; answer one                                |
-| `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules                                          |
+| `GET\|POST /rules`, `PATCH\|DELETE /rules/{id}`                                 | custom policy rules; each of `GET`'s names in `never_decided_by` the earlier rule that fits every action it fits, or null (item 449) |
+| `POST /rules/{id}/move` (`{"direction": "up"\|"down"}`)                        | moves a rule one place in the order and numbers the rules 1 to n; answers the list (422 past either end, 404 for no rule) |
 | `POST /rules/draft` (`{"sentence": …}`)                                         | a rule drafted from your words, not kept (422 with the model's reason when the words make no rule) |
 | `GET /memories`, `GET /memories/search`, `POST /memories`, `GET\|PATCH\|DELETE /memories/{id}` | notes                                         |
 | `GET /drafts/{id}`, `POST /drafts/{id}/send\|discard`                          | a draft a run wrote; send it with its words, or discard it (item 314) |

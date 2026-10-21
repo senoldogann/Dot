@@ -339,7 +339,7 @@ async def test_on_an_iphone_a_field_has_the_size_it_has_on_the_mac(own_home: Pat
 
 
 async def test_the_words_in_an_empty_composer_box_fit_its_line_on_every_phone(own_home: Path) -> None:
-    """A textarea's placeholder cannot end in an ellipsis, so a phone's one line cut "Message Dot (@ for skills, / for"
+    """A textarea's placeholder cannot end in an ellipsis, so a phone's one line cut "Message Dot (@ for servers, / for"
     in the middle of a word (item 437): on the home, in a finished chat and on an agent's page, the words fit."""
     async with _served(own_home) as (manager, address), async_playwright() as playwright:
         async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:

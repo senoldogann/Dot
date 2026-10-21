@@ -585,6 +585,15 @@
   line-height: var(--leading-md);
 }
 
+/* A rule's arrows (item 449): the chevron of the icon set, turned to point up or down the order. */
+.rule-move.up .icon {
+  transform: rotate(-90deg);
+}
+
+.rule-move.down .icon {
+  transform: rotate(90deg);
+}
+
 .rule-sentence-preview {
   color: var(--text-2);
 }
