@@ -558,6 +558,17 @@ class RoleModelRequest(FrozenModel):
     model: ModelReference
 
 
+# How many standby models Settings › Models keeps at most (item 478): a run takes each once at most.
+MAX_STANDBY_MODELS: int = 8
+
+
+class StandbyModelsRequest(FrozenModel):
+    """The models a run moves to, in their order, when its own model cannot answer (item 478): ``[models] standby``;
+    none moves no run."""
+
+    models: tuple[ModelReference, ...] = Field(max_length=MAX_STANDBY_MODELS)
+
+
 class ResumeRequest(FrozenModel):
     """Whether the daemon's next start resumes on its own the runs it cut off (item 231): ``[agent] resume``."""
 

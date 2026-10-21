@@ -411,7 +411,8 @@ taps double-click, a finger dragged scrolls the page, a finger held still a mome
 slider, a selection), two fingers zoom the picture itself, a mouse and a trackpad go as they are, and **Keyboard**
 brings up the screen's keyboard for the page, a key with Control or Meta, or a named key with Alt, going as a chord and
 a character the layout types with Option or AltGr as text. A step the run was taking when you held it keeps the page a
-moment, which the view says, and **Return control** ends it all.
+moment, which the view says, and **Return control** ends it all and closes the view, back to the run's page, as the
+run's end does (item 491).
 
 What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the run's page no longer shows (item 364):
 every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are
@@ -700,6 +701,7 @@ The REST API (all under `/api`; bodies and replies are JSON, event streams are s
 | `GET /health` (public), `GET /status`, `GET /models`, `GET /doctor`             | liveness, state of the daemon, models per provider (with their reasoning levels), checks |
 | `POST /models/main` (`{"model": "provider:model"}`)                            | make the default model, kept in `config.toml` (422 for one that cannot call tools or of no known provider; the provider's error, 502, for one it does not know) |
 | `POST /models/roles` (`{"role": "review", "model": "provider:model"}`)         | make the fast, review or vision model, kept in `config.toml` (422 for one that cannot do that work) |
+| `PUT /models/standby` (`{"models": ["provider:model", …]}`)                    | the standby models in their order (item 478), kept in `config.toml` as `[models] standby`; `[]` for none (422 for one named twice, one that cannot call tools or one of Zen's free models) |
 | `PUT /agent/resume` (`{"resume": "safe"}`)                                     | whether the daemon's next start resumes the runs it cut off (`"safe"` or `"off"`), kept in `config.toml` |
 | `GET\|PUT /shell/sandbox` (`{"sandbox": false}`)                                | whether a run's commands outside yolo start in the macOS sandbox, from the next one on, kept in `config.toml` (422 when the sandbox does not start) |
 | `PUT /models/context` (`{"model": "provider:model", "tokens": 192000}`)        | the context size of the model's runs from its next one, kept in `config.toml`; `null` for Dot's default, `[agent] context_tokens` (422 below 48 000 or past three quarters of its window) |

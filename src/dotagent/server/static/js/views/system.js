@@ -919,6 +919,122 @@ function modelSetting({ label, hint, className, fits, choose }) {
   return { element, paint, hide };
 }
 
+// The provider of Zen's free models, which answer only as OpenCode's own agent: none can be a standby model.
+const OPENCODE_PROVIDER = "opencode";
+const STANDBY_HINT =
+  "When a run's model cannot answer (its quota, its rate limit, its key or its access, or its content filter stopped the reply), the run goes on with the first of these that can, each once at most. With none, the run ends with the error.";
+
+/**
+ * The standby models (item 478): the models a run moves to, in their order, when its own model cannot answer, each a
+ * row with its arrows and its ×, under a menu that adds one of the models that call tools. `choose(refs)` sends the
+ * whole list, which the daemon keeps as `[models] standby`, and gives back the models it answered with.
+ * `paint(providers, chosen)` draws it again; `hide()` hides it while the models are read.
+ */
+function standbySetting({ choose }) {
+  let shown = [];
+  const add = el("select", { class: "select sm", "aria-label": "Add a standby model" });
+  const list = el("ol", { class: "standby-list", "aria-label": "Standby models, in their order" });
+  const none = el("div", { class: "small muted standby-none" }, "None: a run whose model cannot answer ends with the error.");
+  const element = el(
+    "div",
+    { class: "setting models-standby", hidden: true },
+    el("div", { class: "row" }, el("span", { class: "grow" }, "Standby models"), add),
+    el("div", { class: "hint" }, STANDBY_HINT),
+    list,
+    none,
+  );
+  // Each change is sent once the one before it was answered, and made to the list that answer holds, so changes made
+  // in a row all hold; the list is drawn again from the status after each.
+  let making = Promise.resolve();
+  function send(change) {
+    making = making.then(() =>
+      attempt(async () => {
+        const answered = await choose(change(shown));
+        shown = [...answered.standby];
+        await refresh();
+      }),
+    );
+  }
+  add.addEventListener("change", () => {
+    const ref = add.value;
+    add.value = "";
+    if (ref !== "") {
+      send((list) => (list.includes(ref) ? list : [...list, ref]));
+    }
+  });
+
+  /** `list` with `ref` moved `by` places (-1 up, 1 down), as far as the list goes. */
+  function moved(list, ref, by) {
+    const at = list.indexOf(ref);
+    const to = at + by;
+    if (at < 0 || to < 0 || to >= list.length) {
+      return list;
+    }
+    const next = [...list];
+    next.splice(at, 1);
+    next.splice(to, 0, ref);
+    return next;
+  }
+
+  function arrow(ref, at, by) {
+    const up = by < 0;
+    return el(
+      "button",
+      {
+        class: `btn ghost sm icon-only standby-move ${up ? "up" : "down"}`,
+        type: "button",
+        title: up ? "Move up: a run tries it earlier" : "Move down: a run tries it later",
+        "aria-label": `Move ${modelName(ref)} ${up ? "up" : "down"}`,
+        disabled: up ? at === 0 : at === shown.length - 1,
+        onclick: () => send((list) => moved(list, ref, by)),
+      },
+      icon("chevron"),
+    );
+  }
+
+  function row(ref, at, providers) {
+    const provider = providers.find((one) => one.provider === providerOf(ref)) ?? null;
+    const listed = provider !== null && provider.models.some((model) => model.ref === ref);
+    const keyless = provider !== null && provider.problem === "no_key";
+    return el(
+      "li",
+      { class: "standby-row", dataset: { model: ref } },
+      el("span", { class: "standby-order small muted" }, `${at + 1}.`),
+      el("span", { class: "grow standby-name" }, modelName(ref), el("span", { class: "small muted" }, ` · ${providerLabel(providerOf(ref))}`)),
+      keyless ? el("span", { class: "badge b-muted", title: "A run passes it over until its provider has a key" }, "no key") : null,
+      !listed && !keyless ? el("span", { class: "badge b-muted", title: "Its provider does not list it now" }, "not listed now") : null,
+      arrow(ref, at, -1),
+      arrow(ref, at, 1),
+      el("button", { class: "btn ghost sm icon-only", type: "button", title: "Take it off the list", "aria-label": `Remove ${modelName(ref)}`, onclick: () => send((list) => list.filter((model) => model !== ref)) }, icon("x")),
+    );
+  }
+
+  function paint(providers, chosen) {
+    shown = [...chosen];
+    const groups = providers
+      .filter((provider) => provider.provider !== OPENCODE_PROVIDER)
+      .map((provider) => ({ provider: provider.provider, models: provider.models.filter((model) => model.tools && !shown.includes(model.ref)) }))
+      .filter((group) => group.models.length > 0);
+    add.replaceChildren(
+      el("option", { value: "" }, "Add a model…"),
+      ...groups.map((group) =>
+        el("optgroup", { label: providerLabel(group.provider) }, group.models.map((model) => el("option", { value: model.ref }, modelName(model.ref)))),
+      ),
+    );
+    add.value = "";
+    list.replaceChildren(...shown.map((ref, at) => row(ref, at, providers)));
+    list.hidden = shown.length === 0;
+    none.hidden = shown.length > 0;
+    element.hidden = false;
+  }
+
+  function hide() {
+    element.hidden = true;
+  }
+
+  return { element, paint, hide };
+}
+
 /** The Models card. `asked` is the model an address asked for (`#/settings/models?model=<ref>`, the context meter's link,
  * item 396), "" for none: once listed, its provider's fold and the card open, and its row comes into sight, marked, with
  * the focus on its context size. */
@@ -948,7 +1064,14 @@ function buildModels(isDisposed, asked) {
       },
     }),
   }));
-  const body = el("div", null, main.element, ...roles.map(({ control }) => control.element), list);
+  const standby = standbySetting({
+    choose: async (refs) => {
+      const answered = await api.put("/models/standby", { models: refs });
+      toast("ok", refs.length === 0 ? "A run whose model cannot answer ends with the error now." : `A run whose model cannot answer moves to ${refs.map(modelName).join(", then ")}.`);
+      return answered;
+    },
+  });
+  const body = el("div", null, main.element, ...roles.map(({ control }) => control.element), standby.element, list);
   let providers = null;
   const reload = el(
     "button",
@@ -968,17 +1091,27 @@ function buildModels(isDisposed, asked) {
     const status = getSnapshot().status;
     const mainModel = status === null ? "" : status.models.main;
     const chosen = roles.map(({ role }) => (status === null ? "" : status.models[role])).join(" ");
+    const standbyModels = status === null ? [] : status.models.standby;
+    const standbyKey = standbyModels.join(" ");
     const inUse = providersInUse(status);
     const usage = inUse.join(" ");
-    if (painted !== null && painted.providers === providers && painted.mainModel === mainModel && painted.chosen === chosen && painted.usage === usage) {
+    if (
+      painted !== null &&
+      painted.providers === providers &&
+      painted.mainModel === mainModel &&
+      painted.chosen === chosen &&
+      painted.standbyKey === standbyKey &&
+      painted.usage === usage
+    ) {
       return;
     }
-    painted = { providers, mainModel, chosen, usage };
+    painted = { providers, mainModel, chosen, standbyKey, usage };
     card.setSummary(...modelsSummary(providers, inUse));
     main.paint(providers, mainModel);
     for (const { role, control } of roles) {
       control.paint(providers, status === null ? "" : status.models[role]);
     }
+    standby.paint(providers, standbyModels);
     list.replaceChildren(...providers.map((provider) => providerBlock(provider, mainModel, inUse.includes(provider.provider), remember)));
     cueTables();
     showAsked();
@@ -1019,6 +1152,7 @@ function buildModels(isDisposed, asked) {
     for (const { control } of roles) {
       control.hide();
     }
+    standby.hide();
     list.replaceChildren(inlineLoading());
     card.setSummary();
     try {

@@ -119,7 +119,9 @@ around a refusal, a denial or a decision that is yours.
 A delegated run takes the approval mode of the run that started it and has no goal mode of its own. A scheduled run uses
 the model, reasoning level, approval mode and goal mode of its schedule, and the configured defaults for those the
 schedule leaves open, so what a schedule does while nobody is there depends on them: with `ask`, a question of the
-policy waits `approval_timeout_s` and then counts as a refusal.
+policy waits `approval_timeout_s` and then counts as a refusal. A no you gave a run holds for the rest of it: the same
+action is refused at once until you write to it again (item 456, [Safety](safety.md#safety)); a `yolo` run asks
+nothing, so none is kept there.
 
 **Questions nobody answers during the run.** In a `yolo`, scheduled or eval run nobody answers the agent's own questions
 (`ask_user`) while it works, and `[agent] questions` decides what they do. With `leave` (the default) the question is

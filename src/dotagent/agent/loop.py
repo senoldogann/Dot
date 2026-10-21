@@ -1482,7 +1482,7 @@ async def _to_standby(
     reason: str | None = _cannot_answer(error)
     if reason is None:
         return None
-    standby: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.config.models.standby)
+    standby: Roster = await current_roster(runtime.router, runtime.config.providers, runtime.roles.standby())
     candidates: list[str] = [model for model in standby.available if model not in left]
     if not candidates:
         log.warning("no_standby_model", run_id=agent.run.id, model=ref.label, reason=reason)

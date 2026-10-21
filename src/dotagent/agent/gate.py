@@ -7,6 +7,7 @@ from collections.abc import Mapping, Sequence
 
 from dotagent.agent.approvals import ApprovalBroker, ApprovalOutcome
 from dotagent.agent.authorization import Answerer, Authorization, step_decision
+from dotagent.agent.declined import OWNER_DECIDERS, Declined, declined_key, refusal_text, still_declined
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied, RunConflict
@@ -138,6 +139,8 @@ class RunGate:
         self._reviewer: Reviewer = reviewer
         self._instructions: tuple[str, ...] = instructions
         self._locks: SiteLocks = locks
+        # The actions the owner refused in this run, by how their card showed them (item 456).
+        self._declined: Mapping[str, Declined] = {}
         self.tainted: bool = False
         # Whether the run read such content at any point: a fresh instruction clears ``tainted``, never this.
         self.ever_tainted: bool = False
@@ -311,6 +314,13 @@ class RunGate:
         if decision.verdict == "deny":
             await self._emit_policy(info, decision, tainted)
             raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})
+        # An action the owner refused is not put to them, nor to the review model, again until they write (item 456);
+        # the policy's event is its record, as a step the owner refuses has (item 474).
+        earlier: Declined | None = still_declined(self._declined, declined_key(info), len(self._instructions))
+        if earlier is not None:
+            await self._emit_policy(info, decision, tainted)
+            log.warning("declined_again_refused", run_id=self._run_id, tool=info.tool)
+            raise ApprovalRejected(refusal_text(earlier), {"action": _describe(info), "note": earlier.note})
         route: Route = route_for(decision, self._approval_mode)
         if route == "waived":
             return await self._waive(info, decision), "yolo"
@@ -385,6 +395,11 @@ class RunGate:
             self._run_id, info.tool, summary, severity, _describe(info)
         )
         if outcome.status != "approved":
+            # The owner's no is kept; a question nobody answered in time, or one the eval harness refused, is no answer.
+            key: str | None = declined_key(info)
+            if outcome.status == "denied" and outcome.decided_by in OWNER_DECIDERS and key is not None:
+                kept: Declined = Declined(note=outcome.note.strip(), spoken=len(self._instructions))
+                self._declined = {**self._declined, key: kept}
             raise ApprovalRejected(_rejection(outcome), {"action": _describe(info), "note": outcome.note})
         if decision.verdict == "handoff":
             raise HandedOff(outcome.note or "the user completed this step themselves", {"action": _describe(info)})

@@ -49,7 +49,7 @@ type BrowserSetting = Literal[
     "zoom",
 ]
 type JudgeSetting = Literal["provider"]
-type ModelsSetting = Literal["main", "fast", "review", "vision"]
+type ModelsSetting = Literal["main", "fast", "review", "vision", "standby"]
 type ServerSetting = Literal["reach", "keep_awake"]
 type ShellSetting = Literal["sandbox"]
 type SnapshotsSetting = Literal["enabled", "app_text", "sound", "animations", "flash", "open_dot"]
@@ -63,7 +63,7 @@ type SettingKey = (
     | ShellSetting
     | SnapshotsSetting
 )
-# A list of names is ``[server] reach`` (item 271).
+# A list of names is ``[server] reach`` (item 271) or ``[models] standby`` (item 478).
 type SettingValue = str | bool | int | list[str]
 
 
@@ -244,6 +244,12 @@ def set_role_model(path: Path, role: ModelRole, model: str) -> None:
     """Write ``[models] fast``, ``review`` or ``vision``, the model of that part of Dot's own work, into the config file
     at ``path`` (see :func:`set_setting`)."""
     set_setting(path, "models", role, model)
+
+
+def set_standby_models(path: Path, models: list[str]) -> None:
+    """Write ``[models] standby``, the models a run moves to in their order when its own model cannot answer (item
+    478), into the config file at ``path`` (see :func:`set_setting`)."""
+    set_setting(path, "models", "standby", models)
 
 
 def set_resume(path: Path, mode: ResumeMode) -> None:

@@ -1892,6 +1892,17 @@ dialog.computer-full::backdrop {
   color: var(--text);
 }
 
+/* In the desktop shell the traffic lights stand at the top left of the dialog too, centred 26 px under the top edge and
+   ending 80 px from the left (shell.css): the close goes after them, on their line, and the title after the close. */
+:root[data-shell="desktop"] .computer-full-close {
+  top: 8px;
+  left: 96px;
+}
+
+:root[data-shell="desktop"] .computer-full .panel-section-head {
+  padding-left: 140px;
+}
+
 .computer-full > .computer {
   display: flex;
   flex: 1;
