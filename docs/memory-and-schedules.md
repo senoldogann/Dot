@@ -204,6 +204,6 @@ earlier runs.
   `[scheduler] notify` (`always`, every end, by default). **Only when it fails or needs me** (`problems`) tells a run
   that ends with something it needs from you, failed or not, and of the other failed runs the first of a row, not the
   ones after it; **Never** (`never`) tells no end of its runs and no missed firing, which its row, its **Firings** and
-  the run's page still show. A run started with **Run now** is told at every level, as are a question, an approval, a draft and
-  the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
+  the run's page still show. A run started with **Run now** is told at every level, as are a question, an approval, a
+  draft and the schedule's switch-off; a schedule deleted while its run works tells that run's end at the level it had.
 - A cron expression may not fire more often than every `min_interval_s`; at most `max_schedules` schedules can be on.
