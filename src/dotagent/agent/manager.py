@@ -562,7 +562,7 @@ class RunManager:
 
     @property
     def answers_reach_runs(self) -> bool:
-        """Whether the answer to a question a run of this process left reaches it while it works (item 506): in the
+        """Whether the answer to a question a run of this process left reaches it while it works (item 508): in the
         daemon, which steers it into the run; not in a ``dotx`` command, which leaves its chats' queues to the daemon
         (:meth:`leave_queues`) and whose runs the daemon cannot steer."""
         return not self._leaves_queues
@@ -1715,7 +1715,7 @@ class RunManager:
         nothing more: the answer waits until it has ended and then goes on as one that came after."""
         asked: RunRecord = await self._runtime.store.get_run(question.run_id)
         text: str = _answer_text(question, answer)
-        # The answer to a question a run the owner watches left without waiting (item 506) does what the answer to one
+        # The answer to a question a run the owner watches left without waiting (item 508) does what the answer to one
         # it waits for does: it is their instruction, and it clears no mark of untrusted content, in the run at work or
         # in the run it starts, so the run's choice to wait never decides what the answer does to its trust. The answer
         # to one a run nobody answers left is the owner's message to the run, which restores it.

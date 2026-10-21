@@ -385,7 +385,7 @@ sessions open (3; 0 removes the tools), each closed after `terminal_idle_s` with
 when the daemon stops; the end of a run closes none, so a server it started stays up for the next message.
 
 A command that runs long and ends by itself, as an eval or a long build, past the 30 minutes that `shell` may wait
-(`[shell] max_timeout_s`), or for minutes while the run has other work to do (item 506), goes to a terminal session in
+(`[shell] max_timeout_s`), or for minutes while the run has other work to do (item 508), goes to a terminal session in
 the background (`terminal_open` with `background`, item 229): it is not closed while it runs for being left unread, and
 the run that started it can end. When it ends by itself, its chat is told once (item 437), and never in a message of its
 queue: the Queued list of the composer does not show it, and a stopped chat is not left paused with it. A run at work on

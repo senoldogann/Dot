@@ -317,13 +317,13 @@ def _asking(source: str, questions: AskMode, tool_names: list[str]) -> str:
 def test_a_question_left_for_the_user_is_no_act_of_the_run(
     arguments: JsonObject, questions: AskMode, acts: bool
 ) -> None:
-    """Item 506: a step whose only call is a question that does not wait changes nothing until someone answers."""
+    """Item 508: a step whose only call is a question that does not wait changes nothing until someone answers."""
     assert _acts([ToolCall(id="call_1", name=ASK_USER_TOOL, arguments=arguments)], questions) is acts
     assert _acts([ToolCall(id="call_2", name="read_file", arguments={"path": "a"})], questions) is True
 
 
 def test_the_prompt_says_that_a_run_that_chooses_asks_without_wait_when_it_can_go_on() -> None:
-    """Item 506: where the user can answer while the run works, the prompt says when to wait for the answer."""
+    """Item 508: where the user can answer while the run works, the prompt says when to wait for the answer."""
     going_on: str = "Ask without wait when there is work that does not depend on the answer"
     assert going_on in _asking(UI_SOURCE, "choose", [ASK_USER_TOOL])
     assert going_on not in _asking("cli", "wait", [ASK_USER_TOOL])

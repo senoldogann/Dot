@@ -140,7 +140,7 @@ conversation as your message, for the next run there. An empty answer is refused
 left question never expires. With `wait` such a question waits as in a run you watch, for `approval_timeout_s` at most.
 
 **Questions in a run you watch.** A run you started in any mode but `yolo`, in the daemon (from the web page, the phone
-or the menu bar), chooses for each question whether it waits for your answer (item 506). One asked with `wait`, which it
+or the menu bar), chooses for each question whether it waits for your answer (item 508). One asked with `wait`, which it
 uses only when nothing useful can be done until you answer, waits as before, for `approval_timeout_s` at most. Any other
 is left on the chat as above and the run goes on with what does not depend on the answer: its status stays `running`,
 the card waits under "Dot asked you", and your answer comes to the run as your instruction at its next step, clearing no

@@ -1,7 +1,7 @@
 """Questions in the real loop with a scripted model: a yolo or scheduled run leaves its question and goes on, and the
 answer carries the work on in the thread, into the run that works there or into a new one; a run the user watches waits
 for a question asked with wait, and goes on past one asked without it, whose answer reaches it while it works (item
-506). And the end of a task run: only text replies in a row end it, so a status line between tool steps does not.
+508). And the end of a task run: only text replies in a row end it, so a status line between tool steps does not.
 
 No network and no model service is used: the scripted model plays the runs.
 """
@@ -295,7 +295,7 @@ async def test_a_question_asked_with_wait_in_a_run_the_user_watches_waits_for_it
 async def test_a_question_asked_without_wait_in_a_run_the_user_watches_goes_on_and_its_answer_reaches_the_run(
     login_env: dict[str, str],
 ) -> None:
-    """Item 506: the run is never blocked; it is told that the question is on the chat and goes on; the owner answers
+    """Item 508: the run is never blocked; it is told that the question is on the chat and goes on; the owner answers
     while it works, and the answer comes to it as their message at its next step, in the same run."""
     turns: list[ScriptedTurn] = [
         ASK,
@@ -329,7 +329,7 @@ async def test_a_question_asked_without_wait_in_a_run_the_user_watches_goes_on_a
 async def test_the_run_an_answer_starts_once_the_run_that_asked_ended_tainted_is_untrusted_if_it_was_watched(
     login_env: dict[str, str], approvals: ApprovalMode, tainted: bool
 ) -> None:
-    """Item 506: the answer to a question a run the owner watches left vouches for nothing, so the run it starts once
+    """Item 508: the answer to a question a run the owner watches left vouches for nothing, so the run it starts once
     that run has ended starts as untrusted as that run ended; the answer to one a yolo run left restores trust."""
     turns: list[ScriptedTurn] = [
         ASK,
@@ -352,7 +352,7 @@ async def test_the_run_an_answer_starts_once_the_run_that_asked_ended_tainted_is
 async def test_a_question_of_a_run_sent_with_plan_first_waits_though_it_is_asked_without_wait(
     login_env: dict[str, str],
 ) -> None:
-    """Item 506: a message sent with Plan first acts only once the owner agrees, so its run's questions wait."""
+    """Item 508: a message sent with Plan first acts only once the owner agrees, so its run's questions wait."""
     model: ScriptedProvider = ScriptedProvider(_PROVIDER, [ASK, _finish("port.txt holds 8431.", True, "")])
     picks: RunPicks = RunPicks(plugins=(), skills=(), plan_first=True)
     async with _session(login_env, model) as (runtime, manager):
@@ -382,7 +382,7 @@ async def test_a_run_that_only_leaves_questions_between_text_replies_still_ends(
     login_env: dict[str, str], approvals: ApprovalMode
 ) -> None:
     # A left question changes nothing until someone answers it, so it does not start the count of text replies again:
-    # in a run nobody answers (yolo), nor where the run chooses and asks without wait (item 506).
+    # in a run nobody answers (yolo), nor where the run chooses and asks without wait (item 508).
     nudges: int = load_default_config().agent.finish_nudges
     waiting: ScriptedTurn = ScriptedTurn(text="I need the port to go on.", calls=())
     turns: list[ScriptedTurn] = [

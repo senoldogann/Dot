@@ -42,7 +42,7 @@ _LEFT_RESULT: str = (
     "later. Go on with what does not depend on it. If nothing can be done without it, end the run and say exactly what "
     "you need."
 )
-# A question asked without wait where the user can answer while the run works (item 506).
+# A question asked without wait where the user can answer while the run works (item 508).
 _GOES_ON_RESULT: str = (
     "The question is on the chat for the user, and you go on: do what does not depend on the answer, and do not guess "
     "it. Their answer comes to you as their message at your next step once they give it; if the run has ended by then, "
@@ -134,7 +134,7 @@ def _ask_user_tool() -> RegisteredTool:
             "options": [option.model_dump() for option in options],
             "multiple": args.multiple,
         }
-        # Where the run chooses (item 506), a question asked without wait is left as one nobody answers during the run
+        # Where the run chooses (item 508), a question asked without wait is left as one nobody answers during the run
         # is: the answer reaches the run as the user's message while it works (``RunManager.decide``).
         if ctx.questions == "leave" or (ctx.questions == "choose" and not args.wait):
             await ctx.runtime.approvals.leave(ctx.run_id, ASK_USER_TOOL, args.question, "question", details)

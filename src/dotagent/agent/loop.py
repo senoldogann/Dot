@@ -420,7 +420,7 @@ async def _discard(delta: StreamDelta) -> None:
 
 def _acts(calls: Sequence[ToolCall], questions: AskMode) -> bool:
     """Whether a step does something: a question left for the user does not (every question where the run leaves them,
-    one asked without ``wait`` where the run chooses, item 506), since it changes nothing until someone answers it, so a
+    one asked without ``wait`` where the run chooses, item 508), since it changes nothing until someone answers it, so a
     run that only leaves questions between text replies still ends."""
     return any(call.name != ASK_USER_TOOL or _waits(call, questions) for call in calls)
 
@@ -1723,7 +1723,7 @@ async def run_agent(agent: AgentRun) -> RunEnd:
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
     asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
     # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
-    # wait for the answer whatever it says (item 506).
+    # wait for the answer whatever it says (item 508).
     questions: AskMode = "wait" if asks == "choose" and agent.opening.picks.plan_first else asks
     # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
     # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that

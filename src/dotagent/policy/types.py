@@ -82,7 +82,7 @@ DecisionSource = Literal[
 ApprovalMode = Literal["supervised", "ask", "auto", "yolo"]
 # What the agent's own question (``ask_user``) does in a run nobody can answer during it (``[agent] questions``,
 # ``agent.progress.can_ask_user``): ``wait`` for the answer, or ``leave`` it for the user and go on. A run the user can
-# answer chooses for each question (``tools.context.AskMode``, item 506).
+# answer chooses for each question (``tools.context.AskMode``, item 508).
 QuestionMode = Literal["leave", "wait"]
 # The answerer a question is routed to; ``waived`` means that nobody is asked.
 Route = Literal["user", "reviewer", "waived"]

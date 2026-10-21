@@ -180,7 +180,7 @@ def can_ask_user(source: str, parent_run_id: str | None, approvals: ApprovalMode
 
 def question_mode(setting: QuestionMode, can_ask: bool, answers_reach: bool) -> AskMode:
     """What ``ask_user`` does in a run. Where a person can answer and the answer reaches the run while it works
-    (``answers_reach``: a run of the daemon), the run chooses for each question whether to wait or go on (item 506);
+    (``answers_reach``: a run of the daemon), the run chooses for each question whether to wait or go on (item 508);
     where a person can answer only while the run waits (a ``dotx`` command's run), it waits; elsewhere ``[agent]
     questions`` decides."""
     if not can_ask:

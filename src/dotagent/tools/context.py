@@ -41,7 +41,7 @@ class DelegateOutcome:
 
 
 # What ``ask_user`` does in a run (``agent.progress.question_mode``): ``leave`` every question for the user, ``wait``
-# for every answer, or ``choose`` (item 506): wait for an answer the run cannot go on without, and leave the others,
+# for every answer, or ``choose`` (item 508): wait for an answer the run cannot go on without, and leave the others,
 # whose answers reach the run as the user's messages while it works.
 AskMode = Literal["leave", "wait", "choose"]
 
@@ -51,7 +51,7 @@ class Spawner(Protocol):
 
     @property
     def answers_reach_runs(self) -> bool:
-        """Whether the user's answer to a question a run left reaches the run while it works (item 506): true in the
+        """Whether the user's answer to a question a run left reaches the run while it works (item 508): true in the
         daemon, false in a ``dotx`` command, whose runs no other process steers."""
         ...
 

@@ -587,7 +587,7 @@ def _environment(inputs: PromptInputs) -> str:
     # A delegated run has no ask_user, so it has no questions to leave.
     if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_LEFT_QUESTIONS}")
-    # Where the user can answer while the run works, the run chooses for each question whether to wait (item 506).
+    # Where the user can answer while the run works, the run chooses for each question whether to wait (item 508).
     if inputs.questions == "choose" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_QUESTIONS_GO_ON}")
     if inputs.devtools is not None and not _SCRIPT_TOOLS.isdisjoint(inputs.tool_names):
