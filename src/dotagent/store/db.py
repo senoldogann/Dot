@@ -2587,17 +2587,19 @@ class Store:
         return record
 
     @_writing
-    async def move_rule(self, rule_id: str, index: int) -> None:
-        """Put the rule ``rule_id`` at ``index`` (0 is the first) of the order the policy reads the rules in, and number
-        every rule 1 to n in that order, which also closes the gaps that deleted rules left."""
+    async def move_rule(self, rule_id: str, places: int) -> None:
+        """Move the rule ``rule_id`` ``places`` places along the order the policy reads the rules in (a negative number
+        toward the first), read here under the write lock, and number every rule 1 to n in that order, which also
+        closes the gaps that deleted rules left."""
         rows = await self._all("SELECT id FROM rules ORDER BY position, created_at", ())
         order: list[str] = [str(row["id"]) for row in rows]
         if rule_id not in order:
             raise NotFoundError("rule not found", {"rule_id": rule_id})
+        index: int = order.index(rule_id) + places
         if not 0 <= index < len(order):
             raise InvalidValueError(
                 "a rule cannot move past either end of the order",
-                {"rule_id": rule_id, "index": index, "rules": len(order)},
+                {"rule_id": rule_id, "places": places, "rules": len(order)},
             )
         order.remove(rule_id)
         order.insert(index, rule_id)

@@ -147,11 +147,7 @@ def rules_router(ctx: ServerContext) -> APIRouter:
     @router.post("/rules/{rule_id}/move")
     async def move_rule(rule_id: str, request: RuleMoveRequest) -> list[RuleView]:
         """Move a rule one place up or down the order the policy reads the rules in (item 449); 422 past either end."""
-        rules: list[RuleRecord] = await store.list_rules()
-        index: int | None = next((at for at, rule in enumerate(rules) if rule.id == rule_id), None)
-        if index is None:
-            raise NotFoundError("rule not found", {"rule_id": rule_id})
-        await store.move_rule(rule_id, index - 1 if request.direction == "up" else index + 1)
+        await store.move_rule(rule_id, -1 if request.direction == "up" else 1)
         await tell_rules_changed()
         return rule_views(await store.list_rules())
 

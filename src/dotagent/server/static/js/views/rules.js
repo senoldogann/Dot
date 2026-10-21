@@ -423,9 +423,15 @@ export function mount(root, _ctx) {
       onMove: (record, direction) => attempt(() => move(record, direction)),
     };
     const numberOf = (id) => rules.findIndex((record) => record.id === id) + 1;
+    // A rule's arrow keeps the focus through every drawing of the list, whichever of the reads after a move comes last.
+    const active = document.activeElement;
+    const focused = active instanceof HTMLElement && holder.contains(active) ? active.dataset : null;
     holder.replaceChildren(
       el("div", { class: "rule-list" }, rules.map((record, index) => ruleRow(record, index, rules.length, numberOf, handlers))),
     );
+    if (focused?.rule !== undefined) {
+      focusArrow(focused.rule, focused.move);
+    }
     count.textContent = plural(rules.length, "rule", "rules");
   }
 
@@ -459,13 +465,16 @@ export function mount(root, _ctx) {
     await reload();
   }
 
+  /** The arrow pressed keeps the focus as its rule moves; once the rule has reached an end, the other arrow takes it. */
+  function focusArrow(id, direction) {
+    const arrows = [...holder.querySelectorAll(`[data-rule="${CSS.escape(id)}"]`)];
+    const pressed = arrows.find((arrow) => arrow.dataset.move === direction);
+    (pressed !== undefined && !pressed.disabled ? pressed : arrows.find((arrow) => !arrow.disabled))?.focus();
+  }
+
   async function move(record, direction) {
     await api.post(`/rules/${record.id}/move`, { direction });
     await reload();
-    // The arrow pressed keeps the focus as its rule moves; once the rule has reached an end, the other arrow takes it.
-    const arrows = [...holder.querySelectorAll(`[data-rule="${CSS.escape(record.id)}"]`)];
-    const pressed = arrows.find((arrow) => arrow.dataset.move === direction);
-    (pressed !== undefined && !pressed.disabled ? pressed : arrows.find((arrow) => !arrow.disabled))?.focus();
   }
 
   async function remove(record) {
