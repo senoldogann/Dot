@@ -6,7 +6,7 @@
 works with, and **Skills**, the skills it reads ([Skills and plugins](#skills-and-plugins)). The old address `#/connect`
 leads to Plugins.
 
-**Plugins** lists 65 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
+**Plugins** lists 77 services with a search, **Connected** and **All** (each with its count), in sections: Popular,
 Code, Design, Data, Research, Communication, Productivity, Business, Support and This Mac (item 492). Each tile has the service's mark, what Dot does with
 it, how it connects (MCP · Sign in, MCP · Key, MCP · Open to all, MCP · On this Mac, MCP · On this Mac · Key,
 AppleScript, Dot's browser or Synced folder), where it stands, and a **+** that takes its first step; a tile opens the
