@@ -56,6 +56,10 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 - Every run, a chat's too, is told that there is always a way: it does not give up on a step while a way is left
   untried and says that something cannot be done only after trying it, naming each way it tried; a chat does not end
   its turn announcing a step it could take now. No way goes around a refusal, a denial or your decision (item 446).
+- The side panel's Run tab is plain: Details show the status, the model and its reasoning, the approvals, the tool calls,
+  the tokens and the duration (goal mode and the compactions only when there are some), then the conversation's files;
+  the run's mode, start and id, how it was set up and its cost fold under **More**, closed the first time, which counts
+  a set-up warning beside its title, and a figure of none has no line (item 452).
 
 ## 0.1.0 (2026-10-20)
 

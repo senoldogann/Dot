@@ -25,7 +25,7 @@ import { chatLoops, LOOP_COMMAND, LOOP_HOW, LOOP_WORD, loopOf } from "../loops.j
 import { createQueue } from "../queue.js";
 import { showMessageFiles, showMessagePicks, userMessage } from "../messages.js";
 import { messageOutline } from "../outline.js";
-import { emptyPanel, errorPanel, loadingPanel, panelSection } from "../panels.js";
+import { emptyPanel, errorPanel, loadingPanel, panelFold, panelSection } from "../panels.js";
 import { heldChoice } from "../runmodes.js";
 import { messageKeys } from "../sending.js";
 import { changesSection } from "../changes.js";
@@ -324,6 +324,23 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // ------------------------------------------------------------------------------------------------ cost
   // What the run cost and where (see cost.js): read on arrival, every COST_REFRESH_MS while it works, once at its end.
   const cost = createCostCard();
+
+  // ------------------------------------------------------------------------------------------------ more
+  // The Run tab holds what a glance needs (item 452): the details and the conversation's files. The run's mode, its
+  // start and its id, how it was set up and where its time went fold away under More, closed the first time; a line of
+  // the set-up that warns is counted beside its title.
+  const more = panelFold({
+    id: "run-more",
+    title: "More",
+    actions: null,
+    body: el("div", { class: "run-more" }, details.more, setup.element, cost.element),
+    openAtFirst: false,
+  });
+
+  function paintMore() {
+    const warnings = setup.warnings();
+    more.setSummary(warnings === 0 ? null : el("span", { class: "run-more-warning" }, icon("alert"), plural(warnings, "warning", "warnings")));
+  }
 
   async function paintCost() {
     try {
@@ -1248,7 +1265,7 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   const inspector = createInspector({
     layout,
     tabs: [
-      { id: "run", label: "Run", icon: "info", sections: [details.element, setup.element, cost.element, filesCard.element] },
+      { id: "run", label: "Run", icon: "info", sections: [details.element, filesCard.element, more.element] },
       { id: "changes", label: "Changes", icon: "fileDiff", sections: [changes.element] },
       { id: "plan", label: "Plan", icon: "squareCheck", sections: [plan.element] },
       { id: "agents", label: "Agents", icon: "users", sections: [agents.element] },
@@ -1306,7 +1323,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       }
     },
     onScaffold: (scaffold) => meter.setBudget(scaffold),
-    onSetup: (line) => setup.add(line),
+    onSetup: (line) => {
+      setup.add(line);
+      paintMore();
+    },
     onCalls: ({ calls, failed }) => {
       seen.calls = calls;
       seen.failed = failed;
