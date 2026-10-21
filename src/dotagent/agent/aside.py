@@ -86,6 +86,7 @@ async def _ask(runtime: Runtime, ref: ModelRef, run: RunRecord, record: str, que
             speed="standard",
             session_key=f"{run.thread_id}:aside",
             cache_mark=None,
+            window=await runtime.router.window_of(ref),
         )
         try:
             async with asyncio.timeout(runtime.config.agent.model_call_timeout_s):

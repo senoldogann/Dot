@@ -273,9 +273,9 @@ async def test_the_api_sets_a_models_context_size_in_the_file_and_for_its_next_r
         assert written.endswith(f'{_MODELS_TABLE}\n[models.context]\n"{SCRIPTED_MODEL}" = 192000\n'), written
         assert load_config(path).models.context == {SCRIPTED_MODEL: 192_000}
         assert (await _listed(http, SCRIPTED_MODEL))["context"]["chosen"] == 192_000
-        # A window Dot asks Ollama for: three quarters of it is Dot's default already, so the floor is the one other
-        # size.
-        assert (await _listed(http, _ASKED))["context"]["sizes"] == [48_000]
+        # A window Dot asks Ollama for: sizes go up to three quarters of the model's own window, which a larger size
+        # asks for (item 520), past three quarters of the window it is asked for by default, Dot's default.
+        assert (await _listed(http, _ASKED))["context"]["sizes"] == [48_000, 64_000, 96_000, 128_000, 192_000, 196_608]
 
         back: httpx.Response = await http.put("/api/models/context", json={"model": SCRIPTED_MODEL, "tokens": None})
         assert back.status_code == 200, back.text
@@ -340,7 +340,9 @@ async def test_settings_choose_a_models_context_size_and_say_why_with_its_runs_n
                 cell: Locator = page.locator("td.context-cell", has=size)
                 await expect(cell).to_contain_text("of 1.0M")
                 asked: Locator = page.get_by_role("combobox", name=f"Context size of {_ASKED}")
-                await expect(asked.locator("option")).to_have_text(["49k (default)", "48k"])
+                await expect(asked.locator("option")).to_have_text(
+                    ["49k (default)", "48k", "64k", "96k", "128k", "192k", "197k (most)"]
+                )
                 # The window Dot asks Ollama for, the model's own beside it (item 221).
                 await expect(page.locator("td.context-cell", has=asked)).to_contain_text("of 66k (own 262k)")
                 tiny: Locator = page.locator(

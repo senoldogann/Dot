@@ -514,7 +514,8 @@ const WINDOW_SOURCES = {
   provider: (provider) => `${providerLabel(provider)} gives it for the model.`,
   published: (provider) => `${providerLabel(provider)} publishes it; Dot keeps it in its table of models.`,
   assumed: (provider) => `${providerLabel(provider)} does not say it, so Dot assumes it.`,
-  asked: () => "It is the window Dot asks Ollama to give the model: [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model.",
+  asked: () =>
+    "It is the window Dot asks Ollama to give the model: [providers.ollama] num_ctx, or num_ctx_cloud for a cloud model, or the window the context size chosen here needs, up to the model's own (item 520).",
 };
 
 function tokens(count) {
@@ -546,7 +547,10 @@ function defaultFacts(context) {
 function contextFacts(model) {
   const context = model.context;
   const provider = providerOf(model.ref);
-  const own = model.own_context_length === null ? "" : ` The model's own window is ${tokens(model.own_context_length)} tokens; a larger num_ctx gives it more of it.`;
+  const own =
+    model.own_context_length === null
+      ? ""
+      : ` The model's own window is ${tokens(model.own_context_length)} tokens: a larger context size here asks Ollama for the window it needs, up to that (item 520), and a larger window takes more of this Mac's memory.`;
   return [
     el(
       "p",
@@ -586,7 +590,7 @@ function contextFacts(model) {
     ),
     // The native replaceChildren writes a null as text: the note of a window too small for any size is left out instead.
     ...(context.sizes.length === 0 && context.ceiling !== null
-      ? [el("p", { class: "hint" }, "Three quarters of this window are below the smallest size, so its runs keep Dot's default; for an Ollama model a larger num_ctx gives it more.")]
+      ? [el("p", { class: "hint" }, "Three quarters of this window are below the smallest size, so its runs keep Dot's default.")]
       : []),
   ];
 }
@@ -658,7 +662,8 @@ function contextControl(initial, remember) {
     // The window, and the model's own beside it when Dot asks Ollama for less of it (item 221).
     const own = model.context_length === null || model.own_context_length === null ? null : model.own_context_length;
     windowText.textContent = model.context_length === null ? "" : own === null ? `of ${compact(model.context_length)}` : `of ${compact(model.context_length)} (own ${compact(own)})`;
-    windowText.title = own === null ? "" : `Dot asks for ${tokens(model.context_length)} tokens ([providers.ollama] num_ctx or num_ctx_cloud); the model takes ${tokens(own)}.`;
+    windowText.title =
+      own === null ? "" : `Dot asks for ${tokens(model.context_length)} tokens by default ([providers.ollama] num_ctx or num_ctx_cloud), more for a larger context size, up to the model's own ${tokens(own)}.`;
     facts.replaceChildren(...contextFacts(model));
   }
 

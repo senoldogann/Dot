@@ -19,14 +19,12 @@ from typing import Literal
 from dotagent.config import CONTEXT_FLOOR, AgentConfig, Tier
 from dotagent.core.errors import ConfigError
 from dotagent.core.types import FrozenModel, JsonObject
-from dotagent.llm.types import ModelInfo
+from dotagent.llm.types import WINDOW_SHARE, ModelInfo, grown_window
 from dotagent.store.models import RunMode
 from dotagent.store.stats import ModelProfile
 
 # The newest finished runs a model's profile is read from.
 PROFILE_RUNS: int = 30
-# The share of the window a prompt may fill; the rest is room for the reply and for the error of the token estimate.
-_WINDOW_SHARE: float = 0.75
 # Tool output is never clipped below this, however small the window.
 _MIN_OUTPUT_CHARS: int = 2000
 # The context sizes Settings › Models offers for a model (item 250), up to three quarters of its window.
@@ -80,7 +78,7 @@ def configured_size(config: AgentConfig, window: int | None, chosen: int | None)
 def context_ceiling(window: int | None) -> int | None:
     """The most a run of a model whose request holds ``window`` tokens plans to fill: three quarters of the window,
     ``None`` when its provider does not say."""
-    return None if window is None else round(window * _WINDOW_SHARE)
+    return None if window is None else round(window * WINDOW_SHARE)
 
 
 def context_budget(config: AgentConfig, window: int | None, chosen: int | None) -> int:
@@ -94,12 +92,30 @@ def context_choices(config: AgentConfig, window: int | None, chosen: int | None)
     """The context sizes Settings › Models offers for a model besides the default one (item 250), smallest first: the
     steps from :data:`CONTEXT_FLOOR` up to three quarters of its window, that ceiling itself, and the size chosen now.
     None when its provider does not say its window, or when the ceiling is below the floor."""
-    ceiling: int | None = context_ceiling(window)
+    return _offered(context_ceiling(window), context_budget(config, window, None), chosen)
+
+
+def _offered(ceiling: int | None, default: int, chosen: int | None) -> tuple[int, ...]:
+    """The sizes from :data:`CONTEXT_FLOOR` up to ``ceiling``, that ceiling itself and ``chosen``, smallest first,
+    without the ``default`` one; none when there is no ceiling or it is below the floor."""
     if ceiling is None or ceiling < CONTEXT_FLOOR:
         return ()
-    default: int = context_budget(config, window, None)
     steps: set[int] = {size for size in (*_SIZE_STEPS, ceiling) if CONTEXT_FLOOR <= size <= ceiling and size != default}
     return tuple(sorted(steps if chosen is None else steps | {chosen}))
+
+
+def window_choices(config: AgentConfig, info: ModelInfo, chosen: int | None) -> tuple[int, ...]:
+    """The context sizes Settings › Models offers for the model ``info`` describes besides its default one (item 250),
+    as :func:`context_choices` gives them, up to three quarters of the most window it may be given: its own for an
+    Ollama model whose own window is larger than the one Dot asks for by default, which a larger size asks for (item
+    520)."""
+    return _offered(context_ceiling(most_window(info)), context_budget(config, info.context_length, None), chosen)
+
+
+def most_window(info: ModelInfo) -> int | None:
+    """The most window the model ``info`` describes may be given: its own where it holds more than its provider is asked
+    for by default (an Ollama model, item 520), else the one its provider says."""
+    return info.context_length if info.own_context_length is None else info.own_context_length
 
 
 def summarise_point(config: AgentConfig, window: int | None, chosen: int | None, context_tokens: int) -> float:
@@ -134,14 +150,22 @@ def choose_tier(config: AgentConfig, profile: ModelProfile) -> tuple[Tier, str]:
     )
 
 
+def run_window(info: ModelInfo, chosen: int | None) -> int | None:
+    """The window a run of the model ``info`` describes asks for, with ``chosen`` its context size: its provider's, or
+    for a model that holds more than its provider is asked for by default (an Ollama model of this Mac, item 520) as
+    much of its own window as the size needs (:func:`~dotagent.llm.types.grown_window`)."""
+    return grown_window(info.context_length, info.own_context_length, chosen)
+
+
 def scaffold_for(config: AgentConfig, info: ModelInfo, profile: ModelProfile, chosen: int | None) -> Scaffold:
     """The scaffold of a run of the profile's model, whose provider describes it with ``info`` and whose context size
     is ``chosen`` (``None``: the one ``[agent] context_tokens`` gives)."""
-    context_tokens: int = context_budget(config, info.context_length, chosen)
+    window: int | None = run_window(info, chosen)
+    context_tokens: int = context_budget(config, window, chosen)
     tier, reason = choose_tier(config, profile)
     return Scaffold(
         model=profile.model,
-        window=info.context_length,
+        window=window,
         chosen=chosen,
         context_tokens=context_tokens,
         tool_output_chars=output_budget(config, context_tokens),
@@ -211,9 +235,8 @@ def require_room(scaffold: Scaffold, fixed_tokens: int) -> None:
                 "context_tokens": scaffold.context_tokens,
                 "fixed_tokens": fixed_tokens,
                 "hint": (
-                    "pick a model with a larger window, raise [providers.ollama] num_ctx for an Ollama model, or give "
-                    "the model a larger context size in Settings › Models when its budget is below three quarters of "
-                    "the window"
+                    "give the model a larger context size in Settings › Models (an Ollama model whose own window is "
+                    "larger is then asked for the window it needs, up to its own), or pick a model with a larger window"
                 ),
             },
         )

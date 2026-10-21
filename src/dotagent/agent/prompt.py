@@ -525,9 +525,18 @@ starts with taught- is what the owner showed Dot once, doing the task themselves
 follow as it stands unless what you see says otherwise. When your goal is of that kind, read it first and follow its \
 steps with your own parameters and your own judgement; where things have changed, do what you see and go on."""
 
+# The pages of a conversation (item 521): what has a shape is drawn, live, with a library where one fits.
 _PAGES_SECTION: str = """# Pages in the conversation
-When a chart, a table, a diagram or a 3D view would say more than words (figures over time, a comparison, a \
-structure, a layout), show it with show_page, and say in your answer what it shows."""
+- Draw what has a shape. When an answer holds figures to compare, a trend, a ranking, a share of a whole, \
+a timeline, the steps of a process, how parts connect, a place or a layout, show it with show_page as a chart, a \
+table, a diagram or a 3D view, and say in your answer what it shows. Prefer it to a long list or to figures set out \
+in text. One page per question, not one per step, and none for a single number or a sentence.
+- Make it live: animate it in (bars that grow, a line that draws itself, rows that slide into place, a 3D view that \
+turns), show the values on hover, let a table sort by its columns and a chart switch its series on and off, and keep \
+still under prefers-reduced-motion.
+- Use a library where one fits, a pinned version from cdn.jsdelivr.net: Apache ECharts or Chart.js for charts, \
+Mermaid for flowcharts, sequences and timelines, D3 for a drawing of your own, three.js for 3D (lit, labelled, turned \
+with the pointer)."""
 
 _HELP_SECTION: str = """# Help on this Mac
 Before you take a hard way (writing a script or a program for the work, clicking through an application or a \
