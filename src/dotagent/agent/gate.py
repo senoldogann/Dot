@@ -368,8 +368,9 @@ class RunGate:
         return await self._ask_user(info, decision, "", tainted), "user"
 
     async def _kept_answer(self, info: ActionInfo, decision: Decision, tainted: bool) -> ApprovalRecord | None:
-        """What the owner answered to this step when it was kept for them in this chat (items 482, 483): a Skip they
-        have not taken back by writing here since refuses it at once, with no card; their yes to a kept question,
+        """What the owner answered to this step when it was kept for them where this run keeps its steps (items 482 to
+        484: its chat, or its campaign's conversation): a Skip they have not taken back by writing there since refuses
+        it at once, with no card; their yes to a kept question,
         unused and in time, lets this question through once, and is returned (None: neither). Only a run that keeps
         steps reads them, and only for a step it would keep: a refusal, a question the run's reading raised and yolo,
         which asks nothing, never come here."""

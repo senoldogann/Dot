@@ -1249,9 +1249,10 @@ class RunManager:
                 campaign_id = asked.campaign_id
                 decided, ended = await self._decide_for_session(record, approve, source, note)
         if ended:
-            ending: RunHandle | None = self._handles.get(asked.id)
-            if ending is not None:
-                # It plans the next session before it is finished: that plan is what comes forward.
+            # A session plans the next one before it is finished, the one that asked or another recording its end
+            # now (its end stored, its handle not let go yet): that plan is what comes forward. A session at work is
+            # not waited for.
+            for ending in self._ending_sessions(await self._runtime.store.campaign_sessions(campaign_id)):
                 await ending.finished.wait()
             await self._bring_session_forward(campaign_id)
         return decided
@@ -1661,6 +1662,14 @@ class RunManager:
             asked.agent_id,
         )
         log.info("kept_step_handed_back", approval_id=record.id, run_id=run.id, delivered="run")
+
+    def _ending_sessions(self, sessions: Sequence[RunRecord]) -> list[RunHandle]:
+        """The handles this process holds of the ``sessions`` whose end is stored: those recording their end now."""
+        return [
+            handle
+            for session in sessions
+            if session.status not in WORKING_STATUSES and (handle := self._handles.get(session.id)) is not None
+        ]
 
     async def _session_at_work(self, campaign_id: str) -> RunHandle | None:
         """The campaign's session that works in this process, if any (item 484)."""
