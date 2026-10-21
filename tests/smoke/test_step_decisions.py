@@ -162,3 +162,21 @@ async def test_the_taint_the_gate_weighed_is_kept_with_the_decision_and_the_ques
     events: list[EventRecord] = await room.store.list_events(room.run.id, 0, 500)
     policy: EventRecord = [event for event in events if event.kind == "policy"][-1]
     assert (policy.data["summary"], policy.data["tainted"]) == ("Write notes.md", True)
+
+
+async def test_a_question_the_review_model_passed_on_keeps_the_taint_the_gate_weighed(room: Room) -> None:
+    """Item 474: the review model takes its time, and a read beside the step may taint the run meanwhile; the review
+    model, the policy event of the question it passed on and the step's decision all keep the taint the gate weighed."""
+    gates: list[RunGate] = []
+    seen: list[bool] = []
+
+    async def passing_on(request: ReviewRequest) -> ReviewVerdict:
+        seen.append(request.tainted)
+        gates[0].taint()
+        return ReviewVerdict(decision="escalate", reason="the owner should say")
+
+    gates.append(_gate(room, "cautious", "auto", passing_on))
+    asked: Authorization = await _answered_by_the_owner(room, gates[0], WRITE)
+    events: list[EventRecord] = await room.store.list_events(room.run.id, 0, 500)
+    policy: EventRecord = [event for event in events if event.kind == "policy"][-1]
+    assert (seen, policy.data["tainted"], asked.decision.tainted, gates[0].tainted) == ([False], False, False, True)

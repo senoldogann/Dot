@@ -158,8 +158,9 @@ class Tally:
 def _count_first(tally: Tally, step: StepRow, behavior: Behavior) -> None:
     """Count a step whose first rule to fit is the one tried: a yolo run's, which asks nothing whatever the rules say;
     one settled before any rule; or one it would decide, against what was decided then. Of those, a step that did not
-    run and whose record does not say why (another run held what it needed, the review model refused it) is
-    ``stopped``, and one with no decision on record at all (from before item 468, an OpenCode agent's) ``unknown``."""
+    run and whose record does not say why is ``stopped``: another run held what it needed, the review model refused it,
+    or the gate stopped an OpenCode agent's call, whose policy event comes before its ``tool_call``. One with no
+    decision on record at all, from before item 468 or an OpenCode agent's from before item 474, is ``unknown``."""
     if step.yolo:
         tally.in_yolo += 1
         return
