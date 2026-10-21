@@ -151,7 +151,7 @@ async def test_the_side_menu_shows_every_agent_of_a_run_on_the_chats_row(
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)
         try:
-            for index, (width, scheme) in enumerate(_SHOTS):
+            for width, scheme in _SHOTS:
                 page: Page = await _open_sidebar(browser, address, width, scheme)
                 section: Locator = page.locator("#sidebar [data-section=working]")
                 # Working holds the run's chat (item 202), wearing the faces of every run it delegated (item 507):
