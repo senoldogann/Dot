@@ -56,7 +56,7 @@ def _script() -> list[ScriptedTurn]:
     """The model's turns in the order the runs ask for them: the chat that works, the run it delegated, the chat that
     asks a question. A cancelled run asks for no more."""
     wait: ScriptedTurn = _turn("shell", {"command": _WAIT_COMMAND})
-    return [wait, wait, _turn(ASK_USER_TOOL, {"question": "Which shelf?"})]
+    return [wait, wait, _turn(ASK_USER_TOOL, {"question": "Which shelf?", "wait": True})]
 
 
 @pytest_asyncio.fixture(scope="module", loop_scope="module")

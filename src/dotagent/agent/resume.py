@@ -266,8 +266,9 @@ async def interrupted_calls(runtime: Runtime, run: RunRecord) -> tuple[Interrupt
         thread_id=run.thread_id,
         mode=run.mode,
         approvals=run.approvals,
+        # Nobody answers here (``_NoAnswers``), so no answer reaches the run either.
         questions=question_mode(
-            runtime.config.agent.questions, can_ask_user(run.source, run.parent_run_id, run.approvals)
+            runtime.config.agent.questions, can_ask_user(run.source, run.parent_run_id, run.approvals), False
         ),
         workspace=runtime.workspace,
         gate=_NoAnswers(),

@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Literal
 
-from pydantic import JsonValue
+from pydantic import JsonValue, ValidationError
 
 from dotagent.agent.attachments import (
     ATTACHMENTS_EVENT,
@@ -224,7 +224,6 @@ from dotagent.memory.service import (
     words_only,
 )
 from dotagent.oauth.tokens import Account
-from dotagent.policy.types import QuestionMode
 from dotagent.runtime import Runtime
 from dotagent.secrets import known_secrets
 from dotagent.skills.catalog import load_skills, playbook_root
@@ -246,7 +245,7 @@ from dotagent.terminal.session import TerminalSession, ended_notices
 from dotagent.tools.browser import VAULT_TOOLS
 from dotagent.tools.campaign import CAMPAIGN_TOOLS
 from dotagent.tools.consult import CONSULT_TOOL
-from dotagent.tools.context import Spawner, ToolContext
+from dotagent.tools.context import AskMode, Spawner, ToolContext
 from dotagent.tools.delegate import DELEGATE_TOOL, closing_step, delegated_evidence
 from dotagent.tools.groups import (
     ACCOUNTS_GROUP,
@@ -261,7 +260,7 @@ from dotagent.tools.groups import (
     used_groups,
 )
 from dotagent.tools.mail_calendar import account_lines
-from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, FinishArgs, UseToolsArgs
+from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, USE_TOOLS_TOOL, AskUserArgs, FinishArgs, UseToolsArgs
 from dotagent.tools.posts import POST_TOOLS
 from dotagent.tools.registry import ToolRegistry, specs_for_mode
 from dotagent.tools.skill import skill_instructions
@@ -419,10 +418,23 @@ async def _discard(delta: StreamDelta) -> None:
     return None
 
 
-def _acts(calls: Sequence[ToolCall], questions: QuestionMode) -> bool:
-    """Whether a step does something: a question left for the user does not, since it changes nothing until someone
-    answers it, so a run that only leaves questions between text replies still ends."""
-    return questions == "wait" or any(call.name != ASK_USER_TOOL for call in calls)
+def _acts(calls: Sequence[ToolCall], questions: AskMode) -> bool:
+    """Whether a step does something: a question left for the user does not (every question where the run leaves them,
+    one asked without ``wait`` where the run chooses, item 508), since it changes nothing until someone answers it, so a
+    run that only leaves questions between text replies still ends."""
+    return any(call.name != ASK_USER_TOOL or _waits(call, questions) for call in calls)
+
+
+def _waits(call: ToolCall, questions: AskMode) -> bool:
+    """Whether the question ``call`` asks waits for its answer: every one where the run waits, and one asked with
+    ``wait``, as the tool reads its arguments, where it chooses. A call whose arguments the tool refuses asks nothing,
+    so it waits for nothing."""
+    if questions != "choose":
+        return questions == "wait"
+    try:
+        return AskUserArgs.model_validate(call.arguments).wait
+    except ValidationError:
+        return False
 
 
 def _drain(inbox: asyncio.Queue[UserInput]) -> list[UserInput]:
@@ -1709,7 +1721,10 @@ async def run_agent(agent: AgentRun) -> RunEnd:
             True,
         )
     can_ask: bool = can_ask_user(run.source, run.parent_run_id, run.approvals)
-    questions: QuestionMode = question_mode(config.questions, can_ask)
+    asks: AskMode = question_mode(config.questions, can_ask, agent.spawner.answers_reach_runs)
+    # A message sent with Plan first acts only once the owner agrees (item 318): where the run chooses, its questions
+    # wait for the answer whatever it says (item 508).
+    questions: AskMode = "wait" if asks == "choose" and agent.opening.picks.plan_first else asks
     # The instructions list the skills that fit the chat's first words, its title, the same at every message of the
     # chat, and the notes the run recalled stay out of them: what fits this message goes under it (turn_note), so that
     # the provider's cache of the instructions and the history holds from message to message (item 404). More skills

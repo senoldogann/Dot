@@ -23,6 +23,7 @@ from dotagent.evals import EVAL_SOURCE
 from dotagent.policy.types import ApprovalMode, QuestionMode
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.store.endings import PREFIX_STALLED
+from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE
 from dotagent.tools.meta import ASK_USER_TOOL, FINISH_TOOL, MARK_PLAN_STEP_TOOL, UPDATE_PLAN_TOOL
 
@@ -177,9 +178,14 @@ def can_ask_user(source: str, parent_run_id: str | None, approvals: ApprovalMode
     return parent_run_id is None and source not in _UNATTENDED_SOURCES and approvals != "yolo"
 
 
-def question_mode(setting: QuestionMode, can_ask: bool) -> QuestionMode:
-    """What ``ask_user`` does in a run: where a person can answer, it waits; elsewhere ``[agent] questions`` decides."""
-    return "wait" if can_ask else setting
+def question_mode(setting: QuestionMode, can_ask: bool, answers_reach: bool) -> AskMode:
+    """What ``ask_user`` does in a run. Where a person can answer and the answer reaches the run while it works
+    (``answers_reach``: a run of the daemon), the run chooses for each question whether to wait or go on (item 508);
+    where a person can answer only while the run waits (a ``dotx`` command's run), it waits; elsewhere ``[agent]
+    questions`` decides."""
+    if not can_ask:
+        return setting
+    return "choose" if answers_reach else "wait"
 
 
 def ladder_for(escalation: bool, can_ask: bool) -> tuple[Rung, ...]:
@@ -361,8 +367,8 @@ def replan_note(alert: Alert, can_ask: bool) -> str:
 def ask_note(alert: Alert) -> str:
     return (
         f"[system note] Progress check: {alert.detail} You have been warned several times. For this one step you can "
-        "only ask the user or finish. Ask ONE concrete question whose answer would let you go on (what you need and "
-        "what you tried), or call finish with what you have and what is missing."
+        "only ask the user or finish. Ask ONE concrete question, with wait, whose answer would let you go on (what you "
+        "need and what you tried), or call finish with what you have and what is missing."
     )
 
 

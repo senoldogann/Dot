@@ -4,11 +4,11 @@ import asyncio
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import TYPE_CHECKING, Protocol
+from typing import TYPE_CHECKING, Literal, Protocol
 
 from dotagent.browser.session import BrowserSession
 from dotagent.policy.sandbox import UNSANDBOXED, Sandbox
-from dotagent.policy.types import ActionInfo, ApprovalMode, QuestionMode
+from dotagent.policy.types import ActionInfo, ApprovalMode
 from dotagent.store.models import RunMode, RunRecord
 from dotagent.web.refused import RefusedHosts
 
@@ -40,8 +40,20 @@ class DelegateOutcome:
     tainted: bool
 
 
+# What ``ask_user`` does in a run (``agent.progress.question_mode``): ``leave`` every question for the user, ``wait``
+# for every answer, or ``choose`` (item 508): wait for an answer the run cannot go on without, and leave the others,
+# whose answers reach the run as the user's messages while it works.
+AskMode = Literal["leave", "wait", "choose"]
+
+
 class Spawner(Protocol):
     """Starts runs on behalf of a running one."""
+
+    @property
+    def answers_reach_runs(self) -> bool:
+        """Whether the user's answer to a question a run left reaches the run while it works (item 508): true in the
+        daemon, false in a ``dotx`` command, whose runs no other process steers."""
+        ...
 
     async def delegate(
         self, parent_run_id: str, goal: str, mode: RunMode, model: str | None, agent_id: str | None
@@ -71,7 +83,7 @@ class ToolContext:
     thread_id: str
     mode: RunMode
     approvals: ApprovalMode
-    questions: QuestionMode
+    questions: AskMode
     workspace: Path
     gate: Gate
     cancel: asyncio.Event

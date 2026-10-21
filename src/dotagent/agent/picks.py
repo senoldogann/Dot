@@ -102,7 +102,7 @@ def with_picks(text: str, picks: RunPicks, skills: Sequence[str]) -> str:
     if picks.plan_first:
         lines.append(
             f"{_HEAD} Plan first: before you change anything, write your plan with update_plan, then ask the owner "
-            "with ask_user whether to go ahead, and act only once they agree."
+            "with ask_user, with wait, whether to go ahead, and act only once they agree."
         )
     if skills:
         lines.append(f"{_HEAD} The owner picked the skills below for this message.")

@@ -11,13 +11,14 @@ from typing import Literal
 from dotagent.config import PromptStyle
 from dotagent.core.types import FrozenModel
 from dotagent.harness.components import HarnessText
-from dotagent.policy.types import ApprovalMode, Preset, QuestionMode
+from dotagent.policy.types import ApprovalMode, Preset
 from dotagent.scheduler import SCHEDULE_SOURCE
 from dotagent.skills.catalog import PLAYBOOK_SOURCE
 from dotagent.skills.types import SKILL_TOOL, Skill
 from dotagent.store.models import RunMode
 from dotagent.tools.browser import FILL_LOGIN_TOOL
 from dotagent.tools.consult import CONSULT_TOOL
+from dotagent.tools.context import AskMode
 from dotagent.tools.delegate import DELEGATE_SOURCE, DELEGATE_TOOL
 from dotagent.tools.groups import ACCOUNTS_GROUP, group_lines, tools_in
 from dotagent.tools.help import FIND_HELP_TOOL
@@ -41,7 +42,7 @@ class PromptInputs(FrozenModel):
     source: str
     preset: Preset
     approvals: ApprovalMode
-    questions: QuestionMode
+    questions: AskMode
     goal_mode: bool
     # The owner asked for the goal's independent parts to run at the same time on delegated runs (Ultracode, item 251).
     split: bool
@@ -176,8 +177,8 @@ steps are independent: run them at the same time, each as its own delegate with 
 them.
 - A long run may have its earlier conversation compacted into a continuity note. That note is the same run going on: \
 continue from its next steps, do not restart the task and do not repeat the actions it lists as completed.
-- Use ask_user only when you cannot proceed without a decision that only the user can make; otherwise decide, state \
-your assumption and continue. When you ask, offer the likely answers as options and mark the one you recommend. Never \
+- Use ask_user only for a decision that only the user can make; otherwise decide, state your assumption and \
+continue. When you ask, offer the likely answers as options and mark the one you recommend. Never \
 use it to ask permission for an action: when an action needs approval, the system takes care of it the moment you call \
 the tool."""
 
@@ -394,7 +395,8 @@ when the task is about what the user copied."""
 # it, and the policy hands it to them. A yolo run asks nothing (item 443): a code it can read, or a password it was
 # given, is its own to type.
 _SECRETS_REFUSED: str = (
-    "Passwords, payment details and one-time codes are never typed by you: use ask_user or let the user do that step."
+    "Passwords, payment details and one-time codes are never typed by you: use ask_user with wait, or let the user "
+    "do that step."
 )
 _SECRETS_TYPED: str = (
     "A password, a one-time code or a card's details you were given, or that a mail or a page you read carries, you "
@@ -452,6 +454,12 @@ _LEFT_QUESTIONS: str = (
     "Questions: nobody answers during this run. ask_user leaves your question for the user and returns at once; go on "
     "with what does not depend on the answer. If nothing can be done without it, end the run and say exactly what you "
     "need: the user's answer carries the work on later."
+)
+
+_QUESTIONS_GO_ON: str = (
+    "Questions: the user can answer while you work. Ask without wait when there is work that does not depend on the "
+    "answer: the question stays on the chat for them, you go on, and their answer comes to you as their message. Ask "
+    "with wait only when nothing useful can be done until they answer."
 )
 
 _DELEGATED: str = (
@@ -579,6 +587,9 @@ def _environment(inputs: PromptInputs) -> str:
     # A delegated run has no ask_user, so it has no questions to leave.
     if inputs.questions == "leave" and ASK_USER_TOOL in inputs.tool_names:
         lines.append(f"- {_LEFT_QUESTIONS}")
+    # Where the user can answer while the run works, the run chooses for each question whether to wait (item 508).
+    if inputs.questions == "choose" and ASK_USER_TOOL in inputs.tool_names:
+        lines.append(f"- {_QUESTIONS_GO_ON}")
     if inputs.devtools is not None and not _SCRIPT_TOOLS.isdisjoint(inputs.tool_names):
         lines.append(f"- {_DEVTOOLS.format(address=inputs.devtools)}")
     return "\n".join(lines)
@@ -862,7 +873,7 @@ def collect_prompt_inputs(
     source: str,
     preset: Preset,
     approvals: ApprovalMode,
-    questions: QuestionMode,
+    questions: AskMode,
     goal_mode: bool,
     split: bool,
     workspace: Path,

@@ -42,6 +42,13 @@ _LEFT_RESULT: str = (
     "later. Go on with what does not depend on it. If nothing can be done without it, end the run and say exactly what "
     "you need."
 )
+# A question asked without wait where the user can answer while the run works (item 508).
+_GOES_ON_RESULT: str = (
+    "The question is on the chat for the user, and you go on: do what does not depend on the answer, and do not guess "
+    "it. Their answer comes to you as their message at your next step once they give it; if the run has ended by then, "
+    "it carries the work on in this conversation. If nothing can be done without it, end the run and say exactly what "
+    "you need."
+)
 
 
 def _meta_action(tool: str, summary: str) -> ActionInfo:
@@ -96,6 +103,14 @@ class AskUserArgs(ToolArgs):
         default=None, description="Answers to pick from; the user may also write their own."
     )
     multiple: bool = Field(default=False, description="True if several may be chosen.")
+    wait: bool = Field(
+        default=False,
+        description=(
+            "True only when nothing useful can be done until the user answers: you wait for the answer. False: the "
+            "question stays on the chat for them, you go on with what does not depend on it, and their answer comes to "
+            "you later as their message. In a run nobody watches, every question is left for the user."
+        ),
+    )
 
     @model_validator(mode="after")
     def _check_options(self) -> Self:
@@ -119,9 +134,11 @@ def _ask_user_tool() -> RegisteredTool:
             "options": [option.model_dump() for option in options],
             "multiple": args.multiple,
         }
-        if ctx.questions == "leave":
+        # Where the run chooses (item 508), a question asked without wait is left as one nobody answers during the run
+        # is: the answer reaches the run as the user's message while it works (``RunManager.decide``).
+        if ctx.questions == "leave" or (ctx.questions == "choose" and not args.wait):
             await ctx.runtime.approvals.leave(ctx.run_id, ASK_USER_TOOL, args.question, "question", details)
-            return ok(_LEFT_RESULT)
+            return ok(_LEFT_RESULT if ctx.questions == "leave" else _GOES_ON_RESULT)
         outcome: ApprovalOutcome = await ctx.runtime.approvals.request(
             ctx.run_id, ASK_USER_TOOL, args.question, "question", details
         )
@@ -136,8 +153,10 @@ def _ask_user_tool() -> RegisteredTool:
     return make_tool(
         name=ASK_USER_TOOL,
         description=(
-            "Ask the user a question. The result is the answer, or says that the question was left for the user "
-            "because nobody answers during this run. Use sparingly: prefer deciding yourself."
+            "Ask the user a question. With wait, the result is their answer. Without it the question stays on the "
+            "chat for them and you go on: the result says so, and their answer comes to you later as their message. "
+            "In a run nobody watches the question is always left for the user. Use sparingly: prefer deciding "
+            "yourself."
         ),
         args_model=AskUserArgs,
         modes=ALL_MODES,

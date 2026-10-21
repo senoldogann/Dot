@@ -50,7 +50,8 @@ def _script() -> list[ScriptedTurn]:
     )
     asks: list[ScriptedTurn] = [
         ScriptedTurn(
-            text="", calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": question, "options": []}),)
+            text="",
+            calls=(ScriptedCall(tool=ASK_USER_TOOL, arguments={"question": question, "options": [], "wait": True}),),
         )
         for question in _QUESTIONS
     ]

@@ -234,7 +234,10 @@ async def test_a_subscription_gets_the_question_and_the_end_and_goes_when_its_se
 
     MODEL.script = ScriptedProvider(
         _PROVIDER,
-        [_turn(ASK_USER_TOOL, {"question": "Which colour?"}), _turn(FINISH_TOOL, {"answer": "Blue.", "success": True})],
+        [
+            _turn(ASK_USER_TOOL, {"question": "Which colour?", "wait": True}),
+            _turn(FINISH_TOOL, {"answer": "Blue.", "success": True}),
+        ],
     )
     run: RunRecord = await manager.start(
         "Pick a colour", "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "ask", False, ()
@@ -283,7 +286,7 @@ async def test_a_question_a_yolo_run_leaves_reaches_the_phone_and_the_run_goes_o
     MODEL.script = ScriptedProvider(
         _PROVIDER,
         [
-            _turn(ASK_USER_TOOL, {"question": "Which colour?"}),
+            _turn(ASK_USER_TOOL, {"question": "Which colour?", "wait": True}),
             _turn(FINISH_TOOL, {"answer": "Blue, as nobody said otherwise.", "success": True}),
         ],
     )

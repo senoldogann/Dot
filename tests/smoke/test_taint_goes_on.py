@@ -176,7 +176,9 @@ async def test_the_note_that_tells_a_run_of_the_end_of_its_command_clears_no_tai
 
 async def test_a_run_cut_off_after_it_read_a_terminal_is_resumed_tainted(login_env: dict[str, str]) -> None:
     opening: ScriptedTurn = _turn("terminal_open", {"command": "echo shelf-42"})
-    question: ScriptedTurn = _turn(ASK_USER_TOOL, {"question": "Which shelf goes first?", "options": ["A", "B"]})
+    question: ScriptedTurn = _turn(
+        ASK_USER_TOOL, {"question": "Which shelf goes first?", "options": ["A", "B"], "wait": True}
+    )
     with scratch_home() as home, eval_environment(home, {}):
         async with _session(login_env, [opening, question]) as (runtime, manager):
             cut: RunRecord = await _start(manager, None)

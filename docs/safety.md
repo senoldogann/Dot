@@ -183,18 +183,20 @@ other agents of the Mac set up count the same way, unfenced, and so does reading
 when it is too long for one result, under `<workspace>/crawl/` and `<workspace>/mcp-results/` (item 494): `read_file` of
 one, a `search_files` match in one or a search of one, a shell line that names one or runs in one (the words of the
 line are read, so a line that reaches them otherwise, by a variable or a search of the workspace, is not seen); a
-failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and
-from then on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a
-schedule or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a
-change on a code host, inline code that reaches the network or runs a command of it) ask even when the preset or an
-`allow` rule would let them through; only a `preapproved` rule skips the question. A message you send to the run clears
-the mark. A delegated run starts as untrusted as its parent, a resumed run as the run it resumes was when it was cut off,
-and the run that tells a chat that its command in the background ended as the chat's last run ended: that message is
-Dot's, not yours, and so is the note that tells a run at work of such an end, which clears nothing. A message you send
-starts a run unmarked. A note a run saved while it was marked keeps that origin (`tainted`): it is never among the
-notes a run starts with, is handed while it works or as a site's lessons (item 384), a `memory_search` that returns
-one marks the run that read it, so its next save asks again, and Settings › Memory and `dotx memory list` say of such
-a note that it was saved while reading outside content.
+failed `edit_file` of one names none of its lines. A run that has seen such content is marked untrusted, and from then
+on outward-facing or lasting actions (messages, posts, follows and likes, privilege, system settings, saving a schedule
+or a note, and a shell line that sends data out: an upload or a form, a push, a copy to another machine, a change on a
+code host, inline code that reaches the network or runs a command of it) ask even when the preset or an `allow` rule
+would let them through; only a `preapproved` rule skips the question. A message you send to the run clears the mark;
+your answer to a question of a run you watch does not, whether the run waited for it or went on (item 508), as it
+answers what the run asked rather than sending it on its way: the run it reaches stays marked, and the run it starts
+once that run has ended starts as untrusted as that run ended. A delegated run starts as untrusted as its parent, a
+resumed run as the run it resumes was when it was cut off, and the run that tells a chat that its command in the
+background ended as the chat's last run ended: that message is Dot's, not yours, and so is the note that tells a run at
+work of such an end, which clears nothing. A message you send starts a run unmarked. A note a run saved while it was
+marked keeps that origin (`tainted`): it is never among the notes a run starts with, is handed while it works or as a
+site's lessons (item 384), a `memory_search` that returns one marks the run that read it, so its next save asks again,
+and Settings › Memory and `dotx memory list` say of such a note that it was saved while reading outside content.
 
 **Secrets.**
 
@@ -426,7 +428,8 @@ among them), told a text by its length (`(42 chars)`) or masked a secret (`***`)
 tell apart are not one. This is the default approval mode, `ask`, and `supervised` asks before every change as well; in
 `auto` the questions of the policy are answered for you, and a `yolo` run asks nothing at all (item 443). What is yours
 in every mode that asks (item 429) — money, credentials, messages and posts in your name — is a card in the chat there.
-A question of the agent itself (`ask_user`) waits the same way, except in a run nobody can answer during it (see
+A question of the agent itself (`ask_user`) waits the same way when the run cannot go on without the answer; one it can
+go on without waits on the chat while the run works, and one in a run nobody can answer during it is left for you (see
 [Autonomy](autonomy.md#autonomy-approvals-goal-mode-and-the-end-of-a-run)). Its options are rows on the card, each with
 what it leads to, and the one Dot recommends is marked: a row sends its option, or, when several may be chosen, the rows
 ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by

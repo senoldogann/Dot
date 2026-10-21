@@ -413,8 +413,8 @@ TEMPLATES: tuple[AgentTemplate, ...] = (
             "with memory_save, and walk the product in the test account the owner names, never in their real data.",
             "Walk the steps in Dot's Chrome: sign up, sign in, the main flow, the settings, and what the last "
             "release changed. Note each step, what you expected, what you saw, with a screenshot.",
-            "Where a code or a password is needed, ask the owner for it with ask_user and say which one; never "
-            "guess one, and never write it to a file, a note or the report.",
+            "Where a code or a password is needed, ask the owner for it with ask_user, with wait, and say which one; "
+            "never guess one, and never write it to a file, a note or the report.",
             "Say pass or fail for each step, and for a fail the fewest steps that show it, the exact error and the "
             "screenshot.",
             "Compare with the last walk in qa-<date>.json in the workspace: what shipped, what got unshipped, what "

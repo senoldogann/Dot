@@ -260,7 +260,10 @@ async def test_a_question_left_a_campaign_ended_and_a_missed_firing_are_told(
     base: str = f"http://{host}:{port}"
     MODEL.script = ScriptedProvider(
         _PROVIDER,
-        [_turn(ASK_USER_TOOL, {"question": "Which colour?"}), _turn(FINISH_TOOL, {"answer": "Blue.", "success": True})],
+        [
+            _turn(ASK_USER_TOOL, {"question": "Which colour?", "wait": True}),
+            _turn(FINISH_TOOL, {"answer": "Blue.", "success": True}),
+        ],
     )
     async with async_playwright() as playwright:
         browser: Browser = await playwright.chromium.launch(channel=runtime.config.browser.channel, headless=True)

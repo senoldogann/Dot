@@ -560,6 +560,13 @@ class RunManager:
         process relays them (:meth:`relay_elsewhere`)."""
         return sorted(self._elsewhere)
 
+    @property
+    def answers_reach_runs(self) -> bool:
+        """Whether the answer to a question a run of this process left reaches it while it works (item 508): in the
+        daemon, which steers it into the run; not in a ``dotx`` command, which leaves its chats' queues to the daemon
+        (:meth:`leave_queues`) and whose runs the daemon cannot steer."""
+        return not self._leaves_queues
+
     def leave_queues(self) -> None:
         """Leave the queues of the chats whose runs this process ends to the daemon, which moves each as it sees the
         end (:meth:`relay_elsewhere`): a ``dotx`` command ends with its run, and a queued message started there would
@@ -1708,11 +1715,16 @@ class RunManager:
         nothing more: the answer waits until it has ended and then goes on as one that came after."""
         asked: RunRecord = await self._runtime.store.get_run(question.run_id)
         text: str = _answer_text(question, answer)
+        # The answer to a question a run the owner watches left without waiting (item 508) does what the answer to one
+        # it waits for does: it is their instruction, and it clears no mark of untrusted content, in the run at work or
+        # in the run it starts, so the run's choice to wait never decides what the answer does to its trust. The answer
+        # to one a run nobody answers left is the owner's message to the run, which restores it.
+        vouches: bool = not can_ask_user(asked.source, asked.parent_run_id, asked.approvals)
         active: RunHandle | None = self._active_on(asked.thread_id)
         if active is not None:
             try:
                 active.inbox.put_nowait(
-                    UserInput(text=text, files=(), question_id=question.id, vouches=True, said=text)
+                    UserInput(text=text, files=(), question_id=question.id, vouches=vouches, said=text)
                 )
             except asyncio.QueueShutDown:
                 await active.finished.wait()
@@ -1739,7 +1751,16 @@ class RunManager:
             asked.speed,
             asked.approvals,
             asked.goal_mode,
-            RunOpening(text=goal, files=(), resumed=None, once=asked.once, carried=(), picks=NO_PICKS),
+            # One that vouches for nothing starts tainted when the run that asked, or the chat's last run, ended so,
+            # as the run a kept step's answer starts does (item 482).
+            RunOpening(
+                text=goal,
+                files=(),
+                resumed=None,
+                once=asked.once,
+                carried=() if vouches else tuple(dict.fromkeys((asked.id, newest.id))),
+                picks=NO_PICKS,
+            ),
             None,
             # As the agent the run that asked ran as, within its bounds, as a resumed run is.
             asked.agent_id,
