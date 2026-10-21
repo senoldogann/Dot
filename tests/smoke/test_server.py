@@ -410,8 +410,7 @@ async def test_a_rule_moves_up_and_down_the_order_and_one_that_never_decides_nam
     client: httpx.AsyncClient,
 ) -> None:
     """Item 449: a rule moves one place at a time and the rules are numbered 1 to n again; a rule that an earlier rule
-    fits wherever it fits names that rule; a rule that is not there is 404, and a move past either end 422. A rule
-    that hands off is never kept from deciding by one of another answer (item 481)."""
+    fits wherever it fits names that rule; a rule that is not there is 404, and a move past either end 422."""
     before: list[str] = [rule["id"] for rule in (await client.get("/api/rules")).json()]
     made: list[str] = []
     for behavior, glob, pattern in (

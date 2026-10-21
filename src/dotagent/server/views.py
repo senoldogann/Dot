@@ -469,8 +469,9 @@ class RuleMoveRequest(FrozenModel):
 
 
 class RuleView(RuleRecord):
-    """A rule as the Rules page lists it (item 449): the rule, and the id of the earlier rule that fits every action it
-    fits, so that it never decides (:func:`dotagent.server.rule_shadow.shadowing_rule`); None when it can decide."""
+    """A rule as the Rules page lists it (item 449): the rule, and the id of the rule that decides every action it fits
+    in its place, so that it never decides (:func:`dotagent.server.rule_shadow.shadowing_rule`): an earlier rule, or a
+    rule that hands the step off wherever it stands (item 481); None when it can decide."""
 
     never_decided_by: str | None
 
