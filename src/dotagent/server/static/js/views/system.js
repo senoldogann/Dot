@@ -927,8 +927,8 @@ const STANDBY_HINT =
 /**
  * The standby models (item 478): the models a run moves to, in their order, when its own model cannot answer, each a
  * row with its arrows and its ×, under a menu that adds one of the models that call tools. `choose(refs)` sends the
- * whole list, which the daemon keeps as `[models] standby`. `paint(providers, chosen)` draws it again; `hide()` hides it
- * while the models are read.
+ * whole list, which the daemon keeps as `[models] standby`, and gives back the models it answered with.
+ * `paint(providers, chosen)` draws it again; `hide()` hides it while the models are read.
  */
 function standbySetting({ choose }) {
   let shown = [];
@@ -943,13 +943,14 @@ function standbySetting({ choose }) {
     list,
     none,
   );
-  // Each change is sent once the one before it was answered, so the last one made holds; the list is drawn again from
-  // the status after each.
+  // Each change is sent once the one before it was answered, and made to the list that answer holds, so changes made
+  // in a row all hold; the list is drawn again from the status after each.
   let making = Promise.resolve();
-  function send(refs) {
+  function send(change) {
     making = making.then(() =>
       attempt(async () => {
-        await choose(refs);
+        const answered = await choose(change(shown));
+        shown = [...answered.standby];
         await refresh();
       }),
     );
@@ -958,15 +959,20 @@ function standbySetting({ choose }) {
     const ref = add.value;
     add.value = "";
     if (ref !== "") {
-      send([...shown, ref]);
+      send((list) => (list.includes(ref) ? list : [...list, ref]));
     }
   });
 
-  /** The list with the model at `at` moved `by` places (-1 up, 1 down). */
-  function moved(at, by) {
-    const next = [...shown];
-    const [model] = next.splice(at, 1);
-    next.splice(at + by, 0, model);
+  /** `list` with `ref` moved `by` places (-1 up, 1 down), as far as the list goes. */
+  function moved(list, ref, by) {
+    const at = list.indexOf(ref);
+    const to = at + by;
+    if (at < 0 || to < 0 || to >= list.length) {
+      return list;
+    }
+    const next = [...list];
+    next.splice(at, 1);
+    next.splice(to, 0, ref);
     return next;
   }
 
@@ -980,7 +986,7 @@ function standbySetting({ choose }) {
         title: up ? "Move up: a run tries it earlier" : "Move down: a run tries it later",
         "aria-label": `Move ${modelName(ref)} ${up ? "up" : "down"}`,
         disabled: up ? at === 0 : at === shown.length - 1,
-        onclick: () => send(moved(at, by)),
+        onclick: () => send((list) => moved(list, ref, by)),
       },
       icon("chevron"),
     );
@@ -999,7 +1005,7 @@ function standbySetting({ choose }) {
       !listed && !keyless ? el("span", { class: "badge b-muted", title: "Its provider does not list it now" }, "not listed now") : null,
       arrow(ref, at, -1),
       arrow(ref, at, 1),
-      el("button", { class: "btn ghost sm icon-only", type: "button", title: "Take it off the list", "aria-label": `Remove ${modelName(ref)}`, onclick: () => send(shown.filter((model) => model !== ref)) }, icon("x")),
+      el("button", { class: "btn ghost sm icon-only", type: "button", title: "Take it off the list", "aria-label": `Remove ${modelName(ref)}`, onclick: () => send((list) => list.filter((model) => model !== ref)) }, icon("x")),
     );
   }
 
@@ -1060,8 +1066,9 @@ function buildModels(isDisposed, asked) {
   }));
   const standby = standbySetting({
     choose: async (refs) => {
-      await api.put("/models/standby", { models: refs });
+      const answered = await api.put("/models/standby", { models: refs });
       toast("ok", refs.length === 0 ? "A run whose model cannot answer ends with the error now." : `A run whose model cannot answer moves to ${refs.map(modelName).join(", then ")}.`);
+      return answered;
     },
   });
   const body = el("div", null, main.element, ...roles.map(({ control }) => control.element), standby.element, list);

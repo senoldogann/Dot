@@ -233,8 +233,8 @@ def system_router(ctx: ServerContext, pages: str) -> APIRouter:
         return await asyncio.to_thread(failsafe_path().exists)
 
     def models_now() -> ModelsConfig:
-        """The configured models, the default one, those of Dot's own work and the context sizes as the owner last
-        chose them (items 199, 232 and 250)."""
+        """The configured models, the default one, those of Dot's own work, the standby models and the context sizes as
+        the owner last chose them (items 199, 232, 250 and 478)."""
         return ctx.runtime.roles.applied(
             config.models.model_copy(
                 update={"main": ctx.manager.main_model(), "context": ctx.runtime.context_sizes.all()}

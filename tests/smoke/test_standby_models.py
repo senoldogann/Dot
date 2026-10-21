@@ -191,8 +191,8 @@ async def test_settings_choose_the_standby_models_in_their_order(runtime: Runtim
                         "(options) => options.map((option) => option.value).filter((value) => value !== '')"
                     )
                     assert sorted(offered) == sorted([SCRIPTED_MODEL, _HAIKU, _OPUS]), offered
+                    # Two adds in a row, the second before the first is answered: both hold, in their order.
                     await add.select_option(_HAIKU)
-                    await expect(card.locator(".standby-row")).to_have_count(1)
                     await add.select_option(_OPUS)
                     await expect(card.locator(".standby-row")).to_have_count(2)
                     assert await _listed(page) == [_HAIKU, _OPUS]
