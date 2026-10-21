@@ -5,7 +5,7 @@
 # link to Applications), signed, notarized and stapled; and latest.json, which the shell's updater reads from the latest
 # release. They land in desktop/dist/<version>/, which git ignores. What a release needs once, and how it is published,
 # is in docs/development.md (Releasing). The script publishes nothing: it prints the command that does, since a v* tag
-# also publishes the Python package to PyPI (.github/workflows/release.yml).
+# also publishes the Python package to PyPI (.github/workflows/release.yml), once the whole gate passes again on it.
 set -euo pipefail
 
 desktop=$(cd "$(dirname "$0")" && pwd)
@@ -173,5 +173,6 @@ Publish it, from this commit ($(git -C "$root" rev-parse --short HEAD)), with:
     --notes-file desktop/dist/$version/notes.md \\
     desktop/dist/$version/$name.dmg desktop/dist/$version/$name.app.tar.gz desktop/dist/$version/latest.json
 
-The tag $tag also publishes the Python package dotagent-macos $version to PyPI (.github/workflows/release.yml).
+The tag $tag also publishes the Python package dotagent-macos $version to PyPI (.github/workflows/release.yml), once
+the whole gate passes again on it, some eight minutes later: watch that run before you announce the release.
 EOF
