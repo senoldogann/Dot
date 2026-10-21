@@ -92,6 +92,8 @@ async def served(login_env: dict[str, str]) -> AsyncIterator[tuple[Runtime, RunR
                 seed_workspace, workspace, [FileSeed(path="notes.txt", content="Helo, world\n", encoding="text")]
             )
             await runtime.router.register(_PROVIDER, ScriptedProvider(_PROVIDER, _script(workspace)))
+            # A rule of the owner's that lets new files be written: the step it decides names it (item 468).
+            await runtime.store.add_rule("allow", "write_file", "", "New files are fine")
             manager: RunManager = RunManager(runtime)
             try:
                 run: RunRecord = await manager.start(
@@ -134,3 +136,26 @@ async def test_the_api_lists_the_acting_steps_and_the_file_changes_with_their_un
         (str(workspace / "made/new.txt"), "ready", "delete", "write_file", 1),
         (str(workspace / "notes.txt"), "ready", "restore", "edit_file", 1),
     ]
+
+
+async def test_each_acting_step_keeps_what_decided_it_in_its_result_and_the_api(
+    served: tuple[Runtime, RunRecord, str],
+) -> None:
+    """Item 468: the rule that let the new file be written is named, the edit that the preset let through names the
+    preset, nobody was asked, and the step's ``tool_result`` keeps the same."""
+    runtime, run, address = served
+    async with httpx.AsyncClient(base_url=address, headers={"Authorization": f"Bearer {TOKEN}"}) as client:
+        view = (await client.get(f"/api/runs/{run.id}/actions")).json()
+    rule = next(rule for rule in await runtime.store.list_rules() if rule.description == "New files are fine")
+    decided = {step["tool"]: step["decision"] for step in view["steps"]}
+    assert (decided["write_file"]["source"], decided["write_file"]["rule_id"], decided["write_file"]["reason"]) == (
+        "rule",
+        rule.id,
+        "New files are fine",
+    )
+    assert (decided["edit_file"]["source"], decided["edit_file"]["rule_id"]) == ("preset", None)
+    assert {decision["answered_by"] for decision in decided.values()} == {"policy"}
+    assert all(step["flags"] == [] for step in view["steps"])
+    results = [event for event in await runtime.store.list_events(run.id, 0, 500) if event.kind == "tool_result"]
+    written = next(event for event in results if event.data["tool"] == "write_file")
+    assert written.data["decision"] == decided["write_file"]

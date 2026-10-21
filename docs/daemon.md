@@ -236,7 +236,9 @@ after "Working…", in place of how much it did so far, which the open group kee
 line in line with the group's head (item 402): its mark (a spinner while it runs, then the mark of its kind, in the
 failure's colour when it failed; item 403), what it did (a command is the command itself, the policy's words its
 tooltip; another call, whose mark several tools share, keeps its tool's name and the policy's words, "Read notes.txt")
-and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened; a group that is
+and a chevron, a failure's first line its tooltip and its result on a hairline under it once opened, with **Why it
+ran** for a step that acted, or that more than the preset decided: the rule of yours, the preset, or who answered and
+why the policy asked (item 468); a group that is
 over wears the mark of the kind its words start with (the terminal's for "Ran 2 commands"), and the model's thinking is
 a line of the same column with the brain. Approvals, questions and policy notes stay in the open. A click on that line
 opens or folds it while the run still works and after it ends, and the reader's choice stands for the life of the page;
@@ -394,7 +396,9 @@ once the run has ended.
 What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the run's page no longer shows (item 364):
 every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are
 left out)
-with the channel it went through, its target and the result the model got as its evidence; every approval and question
+with the channel it went through, its target, the result the model got as its evidence, the flags its action raised
+and what the policy decided of it and who answered (`decision`, item 468; none for a step recorded before); every
+approval and question
 of the run with its decision, who decided and the note; and every file the run, or a run it delegated to, changed with
 `write_file`, `edit_file` or `write_notes`, with its undo state as `dotx undo` reads it (can be taken back, changed
 since, cannot be taken back, as before the run). `POST /api/runs/{id}/undo` takes one change back, a file as the run

@@ -6,6 +6,7 @@ import time
 from collections.abc import Mapping, Sequence
 
 from dotagent.agent.approvals import ApprovalBroker, ApprovalOutcome
+from dotagent.agent.authorization import Answerer, Authorization, step_decision
 from dotagent.agent.review import Reviewer, ReviewRequest, ReviewVerdict, shorten_reason
 from dotagent.config import PaceConfig, SpendCap
 from dotagent.core.errors import ApprovalRejected, HandedOff, PolicyDenied, RunConflict
@@ -197,18 +198,22 @@ class RunGate:
         self.tainted = False
 
     async def authorize(self, info: ActionInfo) -> str:
-        """Let the action through or raise. Returns the note the user wrote when approving it, or an empty string. A
-        public or social browser action keeps the pace of its site first, whatever the approval mode, and counts once
-        it is let through (:mod:`dotagent.policy.pace`), all under the site's pace lock."""
+        """Let the action through or raise. Returns the note the user wrote when approving it, or an empty string."""
+        return (await self.authorize_recorded(info)).note
+
+    async def authorize_recorded(self, info: ActionInfo) -> Authorization:
+        """Let the action through or raise, as :meth:`authorize`, with what decided it for the step's record (item
+        468). A public or social browser action keeps the pace of its site first, whatever the approval mode, and
+        counts once it is let through (:mod:`dotagent.policy.pace`), all under the site's pace lock."""
         paced: PacedAction | None = paced_action(info)
         if paced is None:
             return await self._decide(info)
         async with self._locks.pace(paced.host):
             await self._keep_pace(info, paced)
-            note: str = await self._decide(info)
+            authorized: Authorization = await self._decide(info)
             await self._space(paced)
             await self._store.record_paced_action(paced.host, paced.pace, time.time(), self._run_id)
-        return note
+        return authorized
 
     async def _keep_pace(self, info: ActionInfo, paced: PacedAction) -> None:
         """Refuse the action when its site had as many of its class as the pace allows in the last hour or day."""
@@ -230,7 +235,7 @@ class RunGate:
             log.info("pace_wait", run_id=self._run_id, host=paced.host, seconds=round(wait, 1))
             await asyncio.sleep(wait)
 
-    async def _decide(self, info: ActionInfo) -> str:
+    async def _decide(self, info: ActionInfo) -> Authorization:
         """What the policy says and who answers its question: the action goes through, or the call raises. A payment
         on a site with caps is decided under the site's spend lock, from what was spent there until then."""
         site: str | None = self._capped_site(info)
@@ -239,7 +244,7 @@ class RunGate:
         async with self._locks.spend(site):
             return await self._decide_spent(info, site)
 
-    async def _decide_spent(self, info: ActionInfo, site: str | None) -> str:
+    async def _decide_spent(self, info: ActionInfo, site: str | None) -> Authorization:
         rules: list[RuleRecord] = await self._store.list_rules()
         state: SpendState | None = None if site is None else await self._spend_state(info, site)
         allowance: Decision | None = None if state is None else spend_allowance(state)
@@ -258,7 +263,7 @@ class RunGate:
                 # would have asked (item 443).
                 decided = rest.model_copy(update={"reason": f"{rest.reason}; also {review.reason}"})
         decision: Decision = supervised(decided, info) if self._approval_mode == "supervised" else decided
-        note: str = "" if decision.verdict == "allow" else await self._authorize_decision(info, decision, rules)
+        note, answered_by = await self._authorize_decision(info, decision, rules)
         if allowance is not None and state is not None:
             # The payment goes ahead under its caps, whichever question let it through (the guard asks first when the
             # step also sends or posts, item 429): it counts against the site's day. A refusal or a hand-off raised.
@@ -273,7 +278,7 @@ class RunGate:
                 state.host, state.amount.value, state.amount.currency, time.time(), self._run_id
             )
             log.info("spend_recorded", run_id=self._run_id, host=state.host, amount=state.amount.value)
-        return note
+        return Authorization(note=note, decision=step_decision(decision, answered_by, self._preset))
 
     def _capped_site(self, info: ActionInfo) -> str | None:
         """The site of a payment step with an amount on a site with pre-approved caps; ``None`` for any other action."""
@@ -287,30 +292,39 @@ class RunGate:
         spent: float = await self._store.spent_since(site, time.time() - DAY_S)
         return spend_state(self._spend, info.target, info.amount, spent)
 
-    async def _authorize_decision(self, info: ActionInfo, decision: Decision, rules: list[RuleRecord]) -> str:
-        """What the decision means in this approval mode: a waiver, a refusal, the review model or the user."""
+    async def _authorize_decision(
+        self, info: ActionInfo, decision: Decision, rules: list[RuleRecord]
+    ) -> tuple[str, Answerer]:
+        """What the decision means in this approval mode: a waiver, a refusal, the review model or the user; with the
+        owner's note and who answered (item 468)."""
         if decision.verdict == "allow":
-            return ""
+            return "", "policy"
         if self._approval_mode == "yolo" and decision.verdict != "deny":
             # A yolo run asks nothing (the owner's word of 2026-10-20, item 443): money, a credential, a message or a
             # post in their name, a spend, Dot's own files, the review's refusal — the step does it, and the record says
             # what it would have asked. A refusal is not a question and stands below.
-            return await self._waive(info, decision)
+            return await self._waive(info, decision), "yolo"
         if decision.verdict == "deny":
             await self._emit_policy(info, decision)
             raise PolicyDenied(decision.reason, {"action": _describe(info), "source": decision.source})
         route: Route = route_for(decision, self._approval_mode)
         if route == "waived":
-            return await self._waive(info, decision)
+            return await self._waive(info, decision), "yolo"
         if route == "reviewer":
             return await self._review(info, decision)
-        return await self._ask_user(info, decision, "")
+        return await self._ask_user(info, decision, ""), "user"
 
     async def _emit_policy(self, info: ActionInfo, decision: Decision) -> None:
         await self._bus.emit(
             self._run_id,
             "policy",
-            {**_describe(info), "verdict": decision.verdict, "source": decision.source, "reason": decision.reason},
+            {
+                **_describe(info),
+                "verdict": decision.verdict,
+                "source": decision.source,
+                "reason": decision.reason,
+                "rule_id": decision.rule_id,
+            },
             True,
         )
 
@@ -329,14 +343,15 @@ class RunGate:
         )
         return ""
 
-    async def _review(self, info: ActionInfo, decision: Decision) -> str:
-        """Auto: the review model answers from the user's instructions; what it cannot tell goes to the user."""
+    async def _review(self, info: ActionInfo, decision: Decision) -> tuple[str, Answerer]:
+        """Auto: the review model answers from the user's instructions; what it cannot tell goes to the user, who then
+        answered."""
         verdict: ReviewVerdict = await self._reviewer(
             ReviewRequest(instructions=self._instructions, action=info, reason=decision.reason, tainted=self.tainted)
         )
         reason: str = shorten_reason(verdict.reason)
         if verdict.decision == "escalate":
-            return await self._ask_user(info, decision, f"The review model passed this on to you: {reason}")
+            return await self._ask_user(info, decision, f"The review model passed this on to you: {reason}"), "user"
         await self._approvals.record_automatic(
             self._run_id,
             info.tool,
@@ -351,7 +366,7 @@ class RunGate:
             raise ApprovalRejected(
                 f"the review model refused this action: {reason}", {"action": _describe(info), "note": reason}
             )
-        return ""
+        return "", "reviewer"
 
     async def _ask_user(self, info: ActionInfo, decision: Decision, passed_on: str) -> str:
         await self._emit_policy(info, decision)

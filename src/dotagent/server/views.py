@@ -6,6 +6,7 @@ from typing import Annotated, Literal, Self
 from pydantic import Field, JsonValue, StrictBool, StringConstraints, model_validator
 
 from dotagent.agent.attachments import MAX_ATTACHMENT_BYTES, MAX_ATTACHMENTS, AttachedFile, AttachmentKind
+from dotagent.agent.authorization import StepDecision
 from dotagent.agent.learning_health import LearningHealth
 from dotagent.agent.lessons import RunLessons
 from dotagent.agent.resume import CutOff
@@ -835,7 +836,8 @@ class RunDetail(FrozenModel):
 class ActionStep(FrozenModel):
     """One acting tool call of a run, as the Actions panel lists it: when it ran, the tool, the channel it went through
     (``tools.channels``), the kind the policy gave it, its target (a path, an address, an application, a command) and
-    summary, whether it succeeded, and its evidence, the result the model got, clipped."""
+    summary, whether it succeeded, and its evidence, the result the model got, clipped; the flags its action raised and
+    what the policy decided of it (item 468), ``None`` for a step recorded before."""
 
     event_id: int
     at: float
@@ -846,6 +848,8 @@ class ActionStep(FrozenModel):
     summary: str
     ok: bool
     evidence: str
+    flags: list[str]
+    decision: StepDecision | None
 
 
 class FileEdit(FrozenModel):

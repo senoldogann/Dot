@@ -342,6 +342,13 @@ what it leads to, and the one Dot recommends is marked: a row sends its option, 
 ticked are sent with what you write, as one answer. In the terminal you type an option's number (several, separated by
 commas) or your own words. The run reads which option you chose, and whether it was the one it recommended.
 
+**The record of each step.** Every step that the policy let through keeps, with its result, what decided it (item 468):
+the verdict, where it came from (one of your rules, named, the preset, the guard, the taint, supervised...), the reason,
+the preset of the run, and who answered when there was a question: nobody (the policy let it through), you, the review
+model, or yolo, which asks nothing; and the flags its action raised (money, a credential, a message in your name...).
+A step refused or handed to you has its `policy` event instead, which names the rule too. The steps a browser batch
+takes inside one call are the batch's one record; one of them that asked has its own `policy` event and approval.
+
 **Emergency stop.** Any of these stops Dot from controlling the desktop:
 
 - the **Emergency stop** button of the web UI (Settings › System; or `POST /api/failsafe`; a chat's own run stops with
