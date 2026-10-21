@@ -208,27 +208,36 @@ async def test_a_message_sent_on_one_screen_shows_at_once_on_the_other(
             reloaded: Page = await _reloaded_screen(webkit, address, south)
             await _shows(reloaded, west, _FROM_WIDE)
 
-            # A run that left two questions, the newest of its chat: the answer to the first starts the chat's next run,
-            # and the page stays for the second; the answer to the last opens the chat's newest run.
+            # A run that left two questions, the newest of its chat, open on both screens: the answer to the first
+            # starts the chat's next run, and both pages stay for the second; the answer to the last, sent on the phone,
+            # opens the chat's newest run there and on the wide window.
             asked: RunRecord = await manager.start(
                 _ASKS, "task", SCRIPTED_MODEL, None, "test", None, None, "standard", None, "yolo", False, ()
             )
             await _newest(runtime, asked.thread_id, set())
             questions: Page = await _screen(chromium, address, f"/runs/{asked.id}", False)
+            other: Page = await _screen(webkit, address, f"/runs/{asked.id}", True)
             cards: Locator = questions.get_by_label("Dot asked you").locator(".approval")
+            other_cards: Locator = other.get_by_label("Dot asked you").locator(".approval")
             await expect(cards).to_have_count(2)
+            await expect(other_cards).to_have_count(2)
             await cards.first.get_by_label("Your answer").fill("The north coast.")
             await cards.first.get_by_role("button", name="Send answer").click()
             first_answer: RunRecord = await _newest(runtime, asked.thread_id, {asked.id})
             await expect(cards).to_have_count(1)
+            await expect(other_cards).to_have_count(1)
             await questions.wait_for_timeout(1500)
-            assert await questions.evaluate("() => location.hash") == f"#/runs/{asked.id}"
-            await cards.first.get_by_label("Your answer").fill("Ten names.")
-            await cards.first.get_by_role("button", name="Send answer").click()
-            await questions.wait_for_function(
-                "asked => location.hash !== asked", arg=f"#/runs/{asked.id}", timeout=_FOLLOW_MS
+            for page in (questions, other):
+                assert await page.evaluate("() => location.hash") == f"#/runs/{asked.id}"
+            await other_cards.first.get_by_label("Your answer").fill("Ten names.")
+            await other_cards.first.get_by_role("button", name="Send answer").click()
+            last_answer: RunRecord = await _newest(runtime, asked.thread_id, {asked.id, first_answer.id})
+            await other.wait_for_function(
+                "hash => location.hash === hash", arg=f"#/runs/{last_answer.id}", timeout=_FOLLOW_MS
             )
-            assert first_answer.thread_id == asked.thread_id
+            await questions.wait_for_function(
+                "hash => location.hash === hash", arg=f"#/runs/{last_answer.id}", timeout=_FOLLOW_MS
+            )
         finally:
             await chromium.close()
             await webkit.close()

@@ -481,12 +481,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       }
     }
     await reconcile();
-    // With no question left open here, the page goes on at the chat's newer run if one started meanwhile (item 451).
-    catchUp();
   }
 
   /** `questions` are the stored questions the run left that are still open; a card that is there already stays as it is. */
   function paintQuestions(questions) {
+    const wereOpen = questionCards.size;
     const open = new Set(questions.map((question) => question.id));
     for (const [id, node] of questionCards) {
       if (!open.has(id)) {
@@ -507,6 +506,11 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
       }
     }
     questionsList.hidden = questionCards.size === 0;
+    // The last question open here closed, answered here or on another screen or skipped: the page goes on at the
+    // chat's newer run if one started meanwhile (item 451), which it did not while a question stood.
+    if (wereOpen > 0 && questionCards.size === 0) {
+      catchUp();
+    }
   }
 
   // ------------------------------------------------------------------------------------------------ dock
@@ -1132,9 +1136,10 @@ function showRun({ root, ctx, signal, detail, history, historyProblem, reload, k
   // back after a break (it replays nothing: a phone put away). What was typed here and not sent goes with it, as the
   // newer run's draft. A page whose run was not the chat's newest when it first read the chat stays where it is: an
   // earlier run opened from the sidebar's Activity (a question it left, a lesson it drew), from a link or by its
-  // address, or a delegated run; and a page with a question its run left open stays until none is. `newestKnown` is the chat's newest run as the page last read it, null until then;
-  // `shownKey` keeps, in this tab, the run the page showed as the chat's newest until it leaves it, so that a page the
-  // browser loads again (a phone's, put away) goes on from where it stood.
+  // address, or a delegated run; and a page with a question its run left open stays until none is (the last one closed,
+  // by an answer here or on another screen or a skip, it looks again). `newestKnown` is the chat's newest run as the
+  // page last read it, null until then; `shownKey` keeps, in this tab, the run the page showed as the chat's newest
+  // until it leaves it, so that a page the browser loads again (a phone's, put away) goes on from where it stood.
   const shownKey = `dot.chatShown.${run.thread_id}`;
   let newestKnown = sessionStorage.getItem(shownKey) === runId ? runId : null;
 

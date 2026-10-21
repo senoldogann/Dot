@@ -16161,11 +16161,14 @@ delegated run; such a page reads the chat once. The tab keeps the run it showed 
 again goes on from where it stood. Every way the page goes on (a message sent there, the queue's next one, an answer,
 Continue, a rewind) takes one guard, so two of them at once open the run once. The pre-push review's first pass stopped
 a page that took every page not reached by a link (main.js's history state) for the chat: the sidebar's Activity rows
-count as no link, and a question left on an earlier run could no longer be answered there. Tests:
+count as no link, and a question left on an earlier run could no longer be answered there. Its second and third passes
+found the same of questions: a page whose run left questions open stays for them, and once the last one closes, answered
+there or on another screen or skipped, it looks again whether the chat went on (`paintQuestions`). Tests:
 `tests/smoke/test_chat_follows.py` (Chrome wide and WebKit as a phone on one chat: the phone's message shows on the wide
 window and the wide window's on the phone, the wide window's unsent words go with it, a page of the earlier run opened
-by its address stays, and a phone's page loaded again after it showed the chat opens where the chat is; on main the wide
-window never moves). Docs: `docs/daemon.md`.
+by its address stays, and a phone's page loaded again after it showed the chat opens where the chat is; a run that left
+two questions, open on both screens: the first answer keeps both pages there, the last, sent on the phone, opens the
+chat's newest run on both; on main the wide window never moves). Docs: `docs/daemon.md`.
 
 ## Log
 
