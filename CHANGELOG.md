@@ -5,6 +5,9 @@ at the top, until a release names it; how a release is made is in [Releasing](do
 
 ## Unreleased
 
+What is not released yet is also in [changes/](changes/), a file for each change (item 459); a release folds those
+files in here.
+
 - A message sent from a chat that is over no longer jumps the chat up and back down: it stays at its foot until the
   next run's page takes its place. A chat whose run is over opens with every message already there, instead of
   filling in as its stream is read (item 454).

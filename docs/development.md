@@ -89,7 +89,9 @@ src/dotagent/
 
 A release is one version, the same in `pyproject.toml`, `src/dotagent/__init__.py`, `desktop/package.json`,
 `desktop/src-tauri/Cargo.toml` and `desktop/src-tauri/tauri.conf.json` (`tests/unit/test_version.py` keeps them alike),
-with its section `## <version> (<date>)` in `CHANGELOG.md`. It is made from one commit of `main`, in two parts: the
+with its section `## <version> (<date>)` in `CHANGELOG.md`, which `uv run python scripts/fold_changes.py <version>
+<date>` writes from the entries under Unreleased and the files of `changes/` (and removes those), in the commit that
+raises the version. It is made from one commit of `main`, in two parts: the
 desktop app, built on a Mac, and the Python package, which the release's tag publishes on PyPI. A version is released
 once: the next release raises it in the five files first.
 

@@ -6,6 +6,9 @@ work, read it first, and keep the status table, the item sections and the log at
 of where the work stands. Part 1 (items 1 to 8, autonomy) is done; part 2 (items 9 to 20: standing goals, yolo without
 questions, faster steps, helper models) was planned on 2026-10-09 and has its own status table below. Part 3 (items 22 to 41: fewer steps, evidence, learned playbooks, the owner's own channels, an own crawler) was planned on 2026-10-10 from the competitive research in `reports/Dot ajanı rekabet yol haritası.md`; its status table and handoff prompt are under "Part 3".
 
+Items from 459 on are files of their own in [roadmap/](roadmap/), one per item, with their lines of the log
+([roadmap/README.md](roadmap/README.md)); this file keeps the items up to 458 and the log up to then.
+
 ## Principle
 
 Do not count on the model being clever. The harness measures, notices, steers and recovers, so a weak model gets more
