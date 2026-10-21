@@ -228,7 +228,7 @@ async def test_a_chat_at_work_stands_once_in_working_and_a_pinned_one_stays_pinn
                 await expect(working.locator(".side-children")).to_have_count(0)
                 assert "3 helpers" in (await row.locator("a.side-run").get_attribute("aria-label") or "")
                 await expect(chats.locator(f"a[href='#/runs/{shelves.id}']")).to_have_count(0)
-                # The pinned chat at work stays among the pinned ones, with the run it delegated under it.
+                # The pinned chat at work stays among the pinned ones, wearing the face of the run it delegated.
                 await expect(chats.locator(".side-group > .side-label")).to_have_text(["Pinned", "Today"])
                 pinned: Locator = chats.locator(".side-group").first
                 await expect(_titles(pinned)).to_have_text(["Count the boxes"])

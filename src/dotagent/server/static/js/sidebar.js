@@ -133,6 +133,11 @@ function chatFaceOf(chat) {
 // over one another in the foot.
 const SIDE_HELPERS = 3;
 
+/** What a row delegated, in words: "1 helper", "4 helpers", nothing for a row that delegated none (item 507). */
+function helperWords(children) {
+  return children.length === 1 ? "1 helper" : children.length > 1 ? `${children.length} helpers` : "";
+}
+
 /** The runs a row delegated, as small faces laid over one another (item 507): three at most, the rest counted, a run
  * without an actor a dot of its state. The row that wears them opens the chat they work in. */
 function helperFaces(children) {
@@ -182,8 +187,7 @@ function chatText(chat, children) {
  * Working and for how long (item 122), over the accent dot of a chat that is unread (item 131). A daemon from before
  * item 131 sends no `unread`, and its chats are read. */
 function chatLink(chat, onNavigate, face, children) {
-  const helpers = children.length === 1 ? "1 helper" : children.length > 1 ? `${children.length} helpers` : "";
-  const word = [STATUS_WORD[chat.latest_status], helpers, chat.unread === true ? "unread" : undefined]
+  const word = [STATUS_WORD[chat.latest_status], helperWords(children), chat.unread === true ? "unread" : undefined]
     .filter((part) => part !== undefined && part !== "")
     .join(", ");
   const title = clip(chat.title, 120);
@@ -216,7 +220,7 @@ function activityRow(row, onNavigate, children) {
   const ended = ENDED.has(row.status);
   const detail = [row.channel, row.detail].filter((part) => part !== "");
   const facts = ended ? [row.status, ...detail] : detail;
-  const words = facts.join(", ");
+  const words = [...facts, helperWords(children)].filter((part) => part !== "").join(", ");
   const state = row.section === "waiting" ? "waiting" : ended ? faceState(row.status) : "working";
   return el(
     "a",
@@ -653,7 +657,7 @@ export function buildSidebar({ homeHref, onCollapse, onNavigate }) {
     );
   }
 
-  // An entry of Working: a chat at work, or a row that is no chat's, each with the runs it delegated under it.
+  // An entry of Working: a chat at work, or a row that is no chat's, each wearing the faces of the runs it delegated.
   function workingEntry(entry) {
     const node =
       entry.chat === null ? activityRow(entry.row, onNavigate, entry.children) : chatEntry(entry.chat, entry);

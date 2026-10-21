@@ -96,8 +96,8 @@ left out (item 309): files changed on disk while it runs (a merge, a batch of wo
 so that a page never asks the daemon's API for a field or a route only a newer daemon has. A run delegated by another
 run stands in the sidebar as a small face in the row of the run that delegated it, three at most with the rest counted
 (item 507), and the row's name says how many there are. In the chat, the delegated run's card carries a chip with its
-progress ("step 3 · web_fetch", then "done · 12 steps"), its steps so far, its channel and an **open** link to the run's
-own page.
+progress ("step 3 · web_fetch", then "done · 12 steps"), its steps so far, the time it has worked and an **open** link to
+the run's own page.
 
 **New chat** is Dot's presence and one composer, standing in the middle of the space under the top bar, across and down,
 however long the day under them is. The face is Dot's character, moving (idle with a wink now and then; a still frame
