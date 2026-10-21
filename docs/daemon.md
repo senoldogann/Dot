@@ -402,7 +402,13 @@ the request came by a name of `[server] reach` rather than this Mac's own addres
 decision), and the `handback` event counts the clicks and scrolls and says whether anything was typed, never what; a
 button left down is let go first. A tab a tap opens (a link to a new tab, a sign-in popup) is not the one the picture
 shows: the run finds it at its next look at the page. `[browser] remote_input` switches it (Settings › Browser, on by
-default).
+default). On the run page, **Use it here** does it (item 475): it sits beside Take over in the pill, first on a touch
+screen, and on the card of a browser step handed to you; the view opens over the whole page, a tap clicks, two quick
+taps double-click, a finger dragged scrolls the page, a finger held still a moment and then dragged drags on it (a
+slider, a selection), two fingers zoom the picture itself, a mouse and a trackpad go as they are, and **Keyboard**
+brings up the screen's keyboard for the page, a key with Control or Meta, or a named key with Alt, going as a chord and
+a character the layout types with Option or AltGr as text. A step the run was taking when you held it keeps the page a
+moment, which the view says, and **Return control** ends it all.
 
 What a run did and what can be undone is `GET /api/runs/{id}/actions`, which the run's page no longer shows (item 364):
 every acting step (a tool call that changed something: a file written, a command run, a click, a message sent; reads are
