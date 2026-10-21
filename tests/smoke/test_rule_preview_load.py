@@ -1,7 +1,7 @@
 """A rule tried on many past steps (item 469): over 20,000 steps the try-out reads them all in pages, or says it read
 the newest only once its budget of time ran out, and the daemon, whose event loop it shares, answers other requests all
-the while; with a pattern slow on every step, it stops at its budget and the daemon's answers wait no longer than a
-slice of its counting."""
+the while; with a pattern slow on every step, which keeps the interpreter while it matches as the regex module does,
+it stops at its budget, and the daemon answers between two matches."""
 
 import asyncio
 import json
@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 import pytest_asyncio
+import regex
 
 from dotagent.agent.manager import RunManager
 from dotagent.config import load_config
@@ -33,10 +34,13 @@ STEPS: int = 20_000
 # The try-out's budget of time (server/rule_replay.py, _BUDGET_S) and what a slow machine may add to it.
 BUDGET_S: float = 2.0
 SLACK_S: float = 1.0
-# The longest the daemon may take to answer a request while a try-out counts: ten of its 50 ms slices.
+# The longest the daemon may take to answer a request while a try-out counts in its worker thread, which lets the event
+# loop take its turn between two matches.
 ANSWER_S: float = 0.5
-# What a pattern slow on every step costs a match.
-SLOW_MATCH_S: float = 0.002
+# A match that takes a few milliseconds and keeps the interpreter while it runs, as a rule's pattern does in the regex
+# module: a pattern slow on every step, well within the daemon's limit for one.
+_BACKTRACKS: str = r"(a|aa)+$"
+_SLOW_TEXT: str = "a" * 19 + "b"
 _TRY: JsonObject = {"behavior": "ask", "tool_glob": "shell", "match_regex": r"\bgit push\b", "days": 30}
 
 
@@ -192,11 +196,11 @@ async def test_a_try_out_over_twenty_thousand_steps_reads_them_all_and_the_daemo
     assert len(answers) > 1, answers
 
 
-async def test_a_pattern_slow_on_every_step_stops_at_the_budget_and_the_daemon_answers_between_slices(
+async def test_a_pattern_slow_on_every_step_stops_at_the_budget_and_the_daemon_answers_meanwhile(
     client: httpx.AsyncClient, many: RunRecord, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     def slow(info: ActionInfo, rules: list[RuleRecord]) -> RuleRecord | None:
-        time.sleep(SLOW_MATCH_S)
+        regex.search(_BACKTRACKS, _SLOW_TEXT, timeout=1.0)
         return match_rule(info, rules)
 
     monkeypatch.setattr(rule_replay, "match_rule", slow)

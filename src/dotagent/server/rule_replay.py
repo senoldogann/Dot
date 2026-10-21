@@ -26,14 +26,13 @@ from dotagent.store.models import Behavior, RuleRecord, StepRow
 DAY_S: float = 86_400.0
 # The id of the rule being tried, which no stored rule has.
 CANDIDATE_ID: str = "candidate"
-# How a try-out reads: pages of steps, at most so many steps and so long, so the store and the event loop stay free
-# for the runs at work (the store has one connection, and a pattern runs on the loop, item 387).
+# How a try-out reads: pages of steps, at most so many steps and so long, so the store stays free for the runs at work
+# (it has one connection). The steps of a page are counted in a worker thread, so that the event loop, which serves the
+# pages and the runs, takes its turn between two matches; one match it still waits out, as the regex module keeps the
+# interpreter while it matches (for at most the daemon's limit for one, item 387).
 _PAGE: int = 1000
 _MAX_STEPS: int = 20_000
 _BUDGET_S: float = 2.0
-# The longest a try-out counts without letting the runs at work go on: a pattern can be slow on every step and still
-# under the daemon's limit for one.
-_SLICE_S: float = 0.05
 _EXAMPLES: int = 20
 _EXAMPLE_CHARS: int = 200
 _KINDS: frozenset[str] = frozenset(get_args(ActionKind))
@@ -245,9 +244,8 @@ def preview_of(tally: Tally, existing: Sequence[RuleRecord], partial: bool) -> R
 async def preview_rule(
     store: Store, candidate: RuleRecord, existing: Sequence[RuleRecord], days: int, now: float
 ) -> RulePreview:
-    """Try ``candidate`` on the steps of the last ``days`` before ``now``, newest first, by pages, letting the runs at
-    work go on between slices of counting; a try-out that reaches its cap of steps or of time with steps left says it
-    read the newest only."""
+    """Try ``candidate`` on the steps of the last ``days`` before ``now``, newest first, by pages counted in a worker
+    thread; a try-out that reaches its cap of steps or of time with steps left says it read the newest only."""
     floor: int = await store.first_event_id_since(now - days * DAY_S)
     before: int = 2**62
     tally: Tally = Tally()
@@ -255,14 +253,9 @@ async def preview_rule(
     while True:
         wanted: int = min(_PAGE, _MAX_STEPS - tally.scanned)
         page: list[StepRow] = await store.tool_steps(floor, before, wanted, TAINT_EVENTS)
-        done: int = 0
-        while done < len(page):
-            done += tally_steps(tally, existing, candidate, page[done:], min(ends, time.monotonic() + _SLICE_S))
-            if tally.problem is not None:
-                return preview_of(tally, existing, False)
-            if time.monotonic() > ends:
-                break
-            await asyncio.sleep(0)
+        done: int = await asyncio.to_thread(tally_steps, tally, existing, candidate, page, ends)
+        if tally.problem is not None:
+            return preview_of(tally, existing, False)
         if done < len(page):
             return preview_of(tally, existing, True)
         if len(page) < wanted:

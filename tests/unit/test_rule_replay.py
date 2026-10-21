@@ -189,14 +189,14 @@ def test_the_rule_that_decides_and_its_answer_are_what_the_policy_gives() -> Non
                         assert (tally.stricter, tally.looser, tally.same) == expected, case
 
 
-def test_the_examples_are_the_newest_twenty_and_a_slice_ends_at_its_deadline() -> None:
+def test_the_examples_are_the_newest_twenty_and_a_count_ends_at_its_deadline() -> None:
     steps: list[StepRow] = [_step(event_id, _PUSH, None, False, False) for event_id in range(30, 0, -1)]
     preview: RulePreview = _tried("ask", [], steps)
     assert preview.fits == 30
     assert [example.event_id for example in preview.examples] == list(range(30, 10, -1))
     tally: Tally = Tally()
     candidate: RuleRecord = candidate_rule("ask", "shell", "", [])
-    # A slice whose time is up counts one step, so that a try-out always goes on.
+    # A count whose time is up counts one step, so that a try-out always goes on.
     assert tally_steps(tally, [], candidate, steps, time.monotonic() - 1.0) == 1
     assert tally.scanned == 1
 
